@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  postgres:
+    container_name: lextech_db_core
+    image: ankane/pgvector:latest # Imagen oficial de Postgres con Vector Search (IA) preinstalado
+    ports:
+      - "5432:5432" # Puerto Host:Puerto Contenedor
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: Elena2026 # Contraseña de desarrollo
+      POSTGRES_DB: lextech_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data # Persistencia: Los datos sobreviven al reinicio
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d lextech_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data: # Definición del volumen persistente
