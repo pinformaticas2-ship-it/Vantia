@@ -1,7 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
-import App from './App.tsx'
+import App from './App'
 import './index.css'
 import { ClerkProvider } from '@clerk/clerk-react'
 
@@ -11,7 +11,7 @@ const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
 console.log("LexTech Debugger: Verificando clave de Clerk...");
 
 if (!PUBLISHABLE_KEY) {
-  console.error("❌ Error: No se encontró VITE_CLERK_PUBLISHABLE_KEY");
+  throw new Error("❌ Error: No se encontró VITE_CLERK_PUBLISHABLE_KEY. Asegúrate de configurar el archivo .env.");
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
