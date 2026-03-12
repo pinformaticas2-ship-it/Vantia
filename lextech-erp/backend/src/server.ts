@@ -5,6 +5,11 @@ import dotenv from 'dotenv';
 import path from 'path';
 import entityRoutes from './routes/entities';
 import ocrRoutes from './routes/ocr';
+import activityRoutes from './routes/activity';
+import vantiaRoutes from './routes/vantia';
+import filesRoutes from './routes/files';
+import { runMigrations } from './config/migrations';
+import pool from './config/database';
 
 dotenv.config();
 
@@ -23,10 +28,29 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 // --- RUTAS ---
 app.use('/api/entities', entityRoutes);
 app.use('/api/ocr', ocrRoutes);
+app.use('/api/activity', activityRoutes);
+app.use('/api/vantia', vantiaRoutes);
+app.use('/api/files',  filesRoutes);
 
-// Health check — útil para verificar que el servidor está vivo
+// Health check básico
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Health check de base de datos — visita http://localhost:4000/api/health/db para diagnosticar
+app.get('/api/health/db', async (_req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        current_database() AS db,
+        current_user       AS user,
+        NOW()              AS server_time,
+        (SELECT COUNT(*) FROM entities) AS entity_count
+    `);
+    res.json({ status: 'ok', ...result.rows[0] });
+  } catch (err: any) {
+    res.status(500).json({ status: 'error', error: err?.message || String(err) });
+  }
 });
 
 // --- MANEJADOR DE ERRORES GLOBAL ---
@@ -41,6 +65,9 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
   res.status(500).json({ success: false, error: 'Error interno del servidor' });
 });
 
-app.listen(PORT, () => {
-  console.log(`🛡️  VANTIA Backend corriendo en http://localhost:${PORT}`);
+// Arrancar servidor después de ejecutar migraciones
+runMigrations().then(() => {
+  app.listen(PORT, () => {
+    console.log(`🛡️  VANTIA Backend corriendo en http://localhost:${PORT}`);
+  });
 });

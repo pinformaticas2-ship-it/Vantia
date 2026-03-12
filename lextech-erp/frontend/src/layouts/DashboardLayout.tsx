@@ -1,87 +1,375 @@
-import React, { useState } from "react";
-import { 
-  Outlet, 
-  Link, 
-  useLocation
-} from "react-router-dom";
-import { 
-  LayoutDashboard, 
-  Briefcase, 
-  Users, 
-  FileText, 
-  Settings, 
-  Menu,
-  Search,
-  X,
-  Bell,
-  User as UserIcon,
-  ShieldCheck,
-  Calendar
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
+import {
+  LayoutDashboard, Briefcase, Users, FileText, Settings,
+  Menu, Search, X, Bell, ShieldCheck, Calendar,
+  MessageCircle, Bot, Send, ChevronRight, Loader2,
 } from "lucide-react";
-import { UserButton, useUser } from "@clerk/clerk-react";
+import { UserButton, useUser, useAuth } from "@clerk/clerk-react";
+import { safeJson } from "../lib/api";
 
-/**
- * COMPONENTES DE UI INLINE (Regla de Oro #4)
- */
-const Button = ({ children, variant = "primary", size = "default", className = "", ...props }: any) => {
-  const variants: any = {
-    primary: "bg-blue-600 text-white hover:bg-blue-700 shadow-sm shadow-blue-900/10",
-    ghost: "hover:bg-slate-100 text-slate-600",
-    outline: "border border-slate-200 bg-white hover:bg-slate-50 text-slate-700",
-    icon: "p-2 rounded-xl"
+// ── Módulos buscables ────────────────────────────────────────────────────────
+const MODULES = [
+  { name: "Dashboard",      path: "/dashboard",              icon: LayoutDashboard, desc: "Panel de control" },
+  { name: "Expedientes",    path: "/dashboard/expedientes",  icon: Briefcase,       desc: "Gestión de expedientes" },
+  { name: "Clientes",       path: "/dashboard/clientes",     icon: Users,           desc: "Base de datos de clientes" },
+  { name: "Nuevo Cliente",  path: "/dashboard/clientes/new", icon: Users,           desc: "Alta de nuevo cliente" },
+  { name: "Agenda",         path: "/dashboard/agenda",       icon: Calendar,        desc: "Calendario y citas" },
+  { name: "Documentos",     path: "/dashboard/documentos",   icon: FileText,        desc: "Gestión documental" },
+  { name: "Configuración",  path: "/dashboard/config",       icon: Settings,        desc: "Ajustes del sistema" },
+];
+
+const NAV_ITEMS = [
+  { name: "Dashboard",    href: "/dashboard",             icon: LayoutDashboard },
+  { name: "Expedientes",  href: "/dashboard/expedientes", icon: Briefcase },
+  { name: "Clientes",     href: "/dashboard/clientes",    icon: Users },
+  { name: "Agenda",       href: "/dashboard/agenda",      icon: Calendar },
+  { name: "Documentos",   href: "/dashboard/documentos",  icon: FileText },
+];
+
+// ── Contexto VantIA por módulo ───────────────────────────────────────────────
+function getVantIAContext(pathname: string): string {
+  if (pathname.startsWith("/dashboard/clientes"))
+    return "Eres VantIA, especializado en gestión de clientes para despachos de abogados. Ayudas con altas de clientes, consultas de datos, LOPD, NIF/CIF, tipos de documentos y todo lo relacionado con la base de clientes del despacho. Responde siempre en español.";
+  if (pathname.startsWith("/dashboard/expedientes"))
+    return "Eres VantIA, especializado en gestión de expedientes judiciales. Conoces el flujo de un expediente legal, plazos procesales, tipos de procedimientos y cómo gestionar casos en un despacho. Responde siempre en español.";
+  if (pathname.startsWith("/dashboard/agenda"))
+    return "Eres VantIA, especializado en gestión de agenda y citas para un despacho legal. Ayudas con vistas, reuniones, plazos judiciales, y organización del tiempo. Responde siempre en español.";
+  if (pathname.startsWith("/dashboard/documentos"))
+    return "Eres VantIA, especializado en gestión documental jurídica. Conoces tipos de documentos legales, contratos, escrituras, demandas y buenas prácticas de archivo. Responde siempre en español.";
+  if (pathname.startsWith("/dashboard/config"))
+    return "Eres VantIA, asistente de configuración de VANTIA Legis ERP. Ayudas con ajustes del sistema, usuarios, permisos y personalización. Responde siempre en español.";
+  return "Eres VantIA, el asistente inteligente de VANTIA Legis ERP, un ERP para despachos de abogados. Tienes conocimientos generales de derecho español, gestión de despachos, expedientes, clientes y documentación. Eres útil, conciso y profesional. Responde siempre en español.";
+}
+
+function getVantIALabel(pathname: string): string {
+  if (pathname.startsWith("/dashboard/clientes"))    return "Especialista en Clientes";
+  if (pathname.startsWith("/dashboard/expedientes")) return "Especialista en Expedientes";
+  if (pathname.startsWith("/dashboard/agenda"))      return "Especialista en Agenda";
+  if (pathname.startsWith("/dashboard/documentos"))  return "Especialista en Documentos";
+  return "Asistente General";
+}
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "ahora mismo";
+  if (m < 60) return `hace ${m} min`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `hace ${h}h`;
+  return `hace ${Math.floor(h / 24)}d`;
+}
+function actionIcon(t: string) {
+  if (t.toLowerCase().includes("cliente")) return "👤";
+  if (t.toLowerCase().includes("expediente")) return "📁";
+  if (t.toLowerCase().includes("documento")) return "📄";
+  return "⚡";
+}
+
+// ── VantIA flotante (siempre visible, contextual) ───────────────────────────
+interface ChatMsg { role: "user" | "model"; text: string }
+
+function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opts?: { skipCache?: boolean }) => Promise<string | null> }) {
+  const [open, setOpen] = useState(false);
+  const [messages, setMessages] = useState<ChatMsg[]>([]);
+  const [input, setInput]       = useState("");
+  const [loading, setLoading]   = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const prevPath  = useRef(pathname);
+
+  // Resetear chat y mostrar saludo al cambiar de módulo
+  useEffect(() => {
+    if (prevPath.current !== pathname) {
+      prevPath.current = pathname;
+      setMessages([]);
+    }
+  }, [pathname]);
+
+  // Saludo inicial cuando se abre el chat
+  useEffect(() => {
+    if (open && messages.length === 0) {
+      setMessages([{
+        role: "model",
+        text: `¡Hola! Soy VantIA — ${getVantIALabel(pathname)}. ¿En qué puedo ayudarte?`,
+      }]);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, loading]);
+
+  const send = async () => {
+    const text = input.trim();
+    if (!text || loading) return;
+    setInput("");
+    const newHistory = [...messages, { role: "user" as const, text }];
+    setMessages(newHistory);
+    setLoading(true);
+    try {
+      const token   = await getToken({ skipCache: true });
+      const history = messages.map((m) => ({ role: m.role, text: m.text }));
+      const res     = await fetch("/api/vantia/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          message: text,
+          history,
+          systemPrompt: getVantIAContext(pathname),
+        }),
+      });
+      const data = await safeJson(res);
+      if (!res.ok) throw new Error(data.error || "Error");
+      setMessages([...newHistory, { role: "model", text: data.reply }]);
+    } catch (err: any) {
+      setMessages([...newHistory, { role: "model", text: `❌ ${err.message}` }]);
+    } finally {
+      setLoading(false);
+    }
   };
-  const sizes: any = {
-    default: "px-4 py-2",
-    icon: "h-10 w-10",
-    sm: "px-3 py-1.5 text-xs"
-  };
-  
+
   return (
-    <button 
-      className={`inline-flex items-center justify-center rounded-xl text-sm font-semibold transition-all active:scale-95 disabled:opacity-50 ${variants[variant] || variants.primary} ${sizes[size] || sizes.default} ${className}`}
-      {...props}
-    >
-      {children}
-    </button>
+    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2">
+
+      {/* Panel de chat */}
+      {open && (
+        <div className="w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden"
+             style={{ height: "460px" }}>
+
+          {/* Header */}
+          <div className="bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-3 flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-2">
+              <div className="h-7 w-7 bg-white/20 rounded-lg flex items-center justify-center">
+                <Bot size={14} className="text-white" />
+              </div>
+              <div>
+                <p className="text-white text-sm font-bold leading-none">VantIA</p>
+                <p className="text-violet-200 text-[10px]">{getVantIALabel(pathname)}</p>
+              </div>
+            </div>
+            <button onClick={() => setOpen(false)} className="text-white/70 hover:text-white">
+              <X size={16} />
+            </button>
+          </div>
+
+          {/* Mensajes */}
+          <div className="flex-1 overflow-y-auto p-3 space-y-2">
+            {messages.map((msg, i) => (
+              <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                <div className={`max-w-[88%] px-3 py-2 rounded-2xl text-xs leading-relaxed whitespace-pre-wrap ${
+                  msg.role === "user"
+                    ? "bg-indigo-600 text-white rounded-br-sm"
+                    : "bg-slate-100 text-slate-700 rounded-bl-sm"
+                }`}>
+                  {msg.text}
+                </div>
+              </div>
+            ))}
+            {loading && (
+              <div className="flex justify-start">
+                <div className="bg-slate-100 px-3 py-2 rounded-2xl rounded-bl-sm flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                  <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                  <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                </div>
+              </div>
+            )}
+            <div ref={bottomRef} />
+          </div>
+
+          {/* Input */}
+          <div className="border-t border-slate-100 p-2 flex gap-2 shrink-0">
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()}
+              placeholder="Escribe tu consulta..."
+              className="flex-1 text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300"
+            />
+            <button
+              onClick={send}
+              disabled={!input.trim() || loading}
+              className="h-8 w-8 bg-indigo-600 disabled:opacity-40 text-white rounded-xl flex items-center justify-center hover:bg-indigo-700 transition-colors"
+            >
+              <Send size={12} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Botón flotante VantIA */}
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className={`h-12 w-12 rounded-2xl shadow-xl flex items-center justify-center transition-all active:scale-95 ${
+          open
+            ? "bg-slate-700 shadow-slate-900/30"
+            : "bg-gradient-to-br from-violet-600 to-indigo-600 shadow-indigo-500/40 hover:shadow-indigo-500/60 hover:scale-105"
+        }`}
+        title="VantIA — Asistente IA"
+      >
+        {open ? <X size={18} className="text-white" /> : <Bot size={20} className="text-white" />}
+      </button>
+    </div>
   );
-};
+}
 
-const SidebarContent = ({ pathname, onClose }: { pathname: string, onClose?: () => void }) => {
-  const navigation = [
-    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Expedientes", href: "/dashboard/expedientes", icon: Briefcase },
-    { name: "Clientes", href: "/dashboard/clientes", icon: Users },
-    { name: "Agenda", href: "/dashboard/agenda", icon: Calendar },
-    { name: "Documentos", href: "/dashboard/documentos", icon: FileText },
-    { name: "Configuración", href: "/dashboard/config", icon: Settings },
-  ];
+// ── WhatsApp mini popup ──────────────────────────────────────────────────────
+function WhatsAppWidget() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    const h = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+
+  const openChat = () => {
+    // Número configurable — cambia por el número real del despacho
+    const NUMERO = "34600000000";
+    const MENSAJE = encodeURIComponent("Hola, me pongo en contacto desde VANTIA Legis ERP.");
+    window.open(
+      `https://wa.me/${NUMERO}?text=${MENSAJE}`,
+      "whatsapp_chat",
+      "width=480,height=700,left=100,top=100,resizable=yes,scrollbars=yes"
+    );
+    setOpen(false);
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        title="WhatsApp"
+        className="flex flex-col items-center gap-1 p-2.5 rounded-xl bg-slate-800/60 hover:bg-[#25D366]/20 border border-slate-700 hover:border-[#25D366]/50 transition-all group w-full"
+      >
+        <div className="h-7 w-7 bg-[#25D366]/10 group-hover:bg-[#25D366]/20 rounded-lg flex items-center justify-center">
+          <MessageCircle size={15} className="text-[#25D366]" />
+        </div>
+        <span className="text-[10px] font-bold text-slate-400 group-hover:text-[#25D366]">WhatsApp</span>
+      </button>
+
+      {open && (
+        <div className="absolute bottom-full left-0 mb-2 w-64 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-50">
+          {/* Header WhatsApp */}
+          <div className="bg-[#25D366] px-4 py-3 flex items-center gap-3">
+            <div className="h-9 w-9 bg-white/20 rounded-xl flex items-center justify-center">
+              <MessageCircle size={18} className="text-white" />
+            </div>
+            <div>
+              <p className="text-white font-bold text-sm leading-none">Despacho Vantia</p>
+              <p className="text-white/80 text-[11px] mt-0.5">Normalmente responde en minutos</p>
+            </div>
+          </div>
+
+          {/* Body */}
+          <div className="p-4 space-y-3">
+            <div className="bg-[#f0f2f5] rounded-xl rounded-tl-sm px-3 py-2">
+              <p className="text-xs text-slate-700">👋 ¡Hola! ¿En qué podemos ayudarte?</p>
+              <p className="text-[10px] text-slate-400 mt-1 text-right">09:00 ✓✓</p>
+            </div>
+            <p className="text-[11px] text-slate-500 text-center">
+              Continúa la conversación en WhatsApp
+            </p>
+            <button
+              onClick={openChat}
+              className="w-full flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#1ebe5d] text-white text-sm font-bold py-2.5 rounded-xl transition-colors"
+            >
+              <MessageCircle size={15} />
+              Abrir WhatsApp
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Notifications Panel ──────────────────────────────────────────────────────
+function NotificationsPanel({ notifs, loading, onClose }: { notifs: any[]; loading: boolean; onClose: () => void }) {
+  return (
+    <div className="absolute right-0 top-14 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden">
+      <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+        <h3 className="font-bold text-slate-800 text-sm">Notificaciones</h3>
+        <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={14} /></button>
+      </div>
+      <div className="max-h-72 overflow-y-auto divide-y divide-slate-50">
+        {loading ? (
+          <div className="flex justify-center py-8"><Loader2 size={18} className="animate-spin text-slate-300" /></div>
+        ) : notifs.length === 0 ? (
+          <div className="py-8 text-center text-slate-400 text-xs">Sin actividad reciente</div>
+        ) : notifs.map((n: any) => (
+          <div key={n.id} className="flex items-start gap-3 px-4 py-3 hover:bg-slate-50">
+            <span className="text-base mt-0.5">{actionIcon(n.action_type)}</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-slate-700 truncate">{n.action_type}</p>
+              {n.entity_name && <p className="text-[11px] text-slate-500 truncate">{n.entity_name}</p>}
+              <p className="text-[10px] text-slate-400 mt-0.5">{timeAgo(n.created_at)}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Search Dropdown ──────────────────────────────────────────────────────────
+function SearchDropdown({ query, onSelect }: { query: string; onSelect: () => void }) {
+  const navigate  = useNavigate();
+  const filtered  = MODULES.filter(
+    (m) => m.name.toLowerCase().includes(query.toLowerCase()) ||
+           m.desc.toLowerCase().includes(query.toLowerCase())
+  );
+  if (!query || !filtered.length) return null;
+  return (
+    <div className="absolute top-full left-0 mt-2 w-full bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden">
+      {filtered.map((m) => {
+        const Icon = m.icon;
+        return (
+          <button key={m.path} onClick={() => { navigate(m.path); onSelect(); }}
+            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left group">
+            <div className="h-8 w-8 bg-slate-100 group-hover:bg-indigo-50 rounded-lg flex items-center justify-center transition-colors">
+              <Icon size={14} className="text-slate-500 group-hover:text-indigo-600" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-slate-700 group-hover:text-indigo-600">{m.name}</p>
+              <p className="text-[11px] text-slate-400">{m.desc}</p>
+            </div>
+            <ChevronRight size={14} className="text-slate-300 group-hover:text-indigo-400" />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Sidebar ──────────────────────────────────────────────────────────────────
+function SidebarContent({ pathname, onClose }: { pathname: string; onClose?: () => void }) {
   return (
     <div className="flex flex-col h-full bg-slate-900 border-r border-slate-800">
-      <div className="p-8">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="h-10 w-10 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-600/20 text-white font-black text-2xl">L</div>
-          <h1 className="text-xl font-bold tracking-tighter text-white uppercase italic">LexTech <span className="text-blue-500">AI</span></h1>
+      {/* Logo */}
+      <div className="p-7">
+        <div className="flex items-center gap-3 mb-1.5">
+          <div className="h-10 w-10 bg-red-600 rounded-2xl flex items-center justify-center shadow-lg shadow-red-600/20 text-white font-black text-2xl">V</div>
+          <h1 className="text-xl font-bold tracking-tighter text-white uppercase italic">Vantia <span className="text-red-500">Legis</span></h1>
         </div>
-        <p className="text-[10px] uppercase font-bold text-slate-500 tracking-[0.4em] ml-1">Legal Brain ERP</p>
+        <p className="text-[10px] uppercase font-bold text-slate-500 tracking-[0.4em] ml-1">ERP para despachos</p>
       </div>
-      
-      <nav className="flex-1 px-4 mt-4 space-y-1.5">
-        {navigation.map((item) => {
-          const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
-          const Icon = item.icon; // Regla de Oro #3: Icono como componente
 
+      {/* Nav principal */}
+      <nav className="flex-1 px-4 space-y-1">
+        {NAV_ITEMS.map((item) => {
+          const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
+          const Icon = item.icon;
           return (
-            <Link
-              key={item.name}
-              to={item.href}
-              onClick={onClose}
+            <Link key={item.name} to={item.href} onClick={onClose}
               className={`flex items-center gap-3 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all duration-200 ${
-                isActive 
-                  ? "bg-blue-600 text-white shadow-xl shadow-blue-900/40 translate-x-1" 
-                  : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-100"
-              }`}
-            >
+                isActive ? "bg-red-600 text-white shadow-xl shadow-red-900/40 translate-x-1"
+                         : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-100"
+              }`}>
               <Icon className={`h-5 w-5 ${isActive ? "text-white" : "text-slate-500"}`} />
               {item.name}
             </Link>
@@ -89,97 +377,164 @@ const SidebarContent = ({ pathname, onClose }: { pathname: string, onClose?: () 
         })}
       </nav>
 
-      <div className="p-6">
-        <div className="p-4 bg-slate-800/30 rounded-2xl border border-slate-800/50 flex items-center gap-3">
-          <ShieldCheck className="h-4 w-4 text-blue-500" />
+      {/* ── Herramientas (encima de Configuración) ── */}
+      <div className="px-4 pb-2">
+        <p className="text-[9px] uppercase font-bold text-slate-600 tracking-[0.3em] px-1 mb-2">Herramientas</p>
+        <div className="flex">
+          {/* WhatsApp mini popup */}
+          <WhatsAppWidget />
+        </div>
+      </div>
+
+      {/* Configuración */}
+      <div className="px-4 pb-3">
+        <Link to="/dashboard/config" onClick={onClose}
+          className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold transition-all ${
+            pathname === "/dashboard/config" ? "bg-red-600 text-white" : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-100"
+          }`}>
+          <Settings className="h-5 w-5" /> Configuración
+        </Link>
+      </div>
+
+      {/* Badge */}
+      <div className="p-4">
+        <div className="p-3 bg-slate-800/30 rounded-2xl border border-slate-800/50 flex items-center gap-3">
+          <ShieldCheck className="h-4 w-4 text-red-500 shrink-0" />
           <div className="min-w-0">
             <p className="text-[10px] font-bold text-white uppercase tracking-tighter truncate">Conexión Segura</p>
-            <p className="text-[9px] text-slate-500 truncate">Sincronizado</p>
+            <p className="text-[9px] text-slate-500 truncate">VANTIA Legis ERP</p>
           </div>
         </div>
       </div>
     </div>
   );
-};
+}
 
-/**
- * DASHBOARD LAYOUT PRINCIPAL
- * Sin BrowserRouter interno para evitar el error de Pantalla Blanca.
- */
+// ── LAYOUT PRINCIPAL ─────────────────────────────────────────────────────────
 export default function DashboardLayout() {
-  const location = useLocation();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const location   = useLocation();
+  const { user }   = useUser();
+  const { getToken } = useAuth();
+
+  const [isMobileOpen,  setIsMobileOpen]  = useState(false);
+  const [isNotifOpen,   setIsNotifOpen]   = useState(false);
+  const [searchQuery,   setSearchQuery]   = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [notifLoading,  setNotifLoading]  = useState(false);
+
+  const searchRef = useRef<HTMLDivElement>(null);
+  const notifRef  = useRef<HTMLDivElement>(null);
+
+  // Cerrar paneles al clicar fuera
+  useEffect(() => {
+    const h = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setSearchFocused(false); setSearchQuery("");
+      }
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setIsNotifOpen(false);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+
+  const openNotifications = useCallback(async () => {
+    setIsNotifOpen(true);
+    setNotifLoading(true);
+    try {
+      const token = await getToken({ skipCache: true });
+      const res   = await fetch("/api/activity", { headers: { Authorization: `Bearer ${token}` } });
+      const data  = await safeJson(res);
+      if (res.ok) setNotifications(data.data || []);
+    } catch (_e) {
+    } finally { setNotifLoading(false); }
+  }, [getToken]);
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex font-sans antialiased text-slate-900">
-      
+
+      {/* VantIA flotante — siempre visible, contextual según la ruta */}
+      <VantIAWidget pathname={location.pathname} getToken={getToken} />
+
       {/* Sidebar Desktop */}
-      <aside className="hidden md:flex w-72 flex-col fixed inset-y-0 z-30">
+      <aside className="hidden md:flex w-64 flex-col fixed inset-y-0 z-30">
         <SidebarContent pathname={location.pathname} />
       </aside>
 
-      {/* Menú Móvil Overlay */}
-      {isMobileMenuOpen && (
+      {/* Menú Móvil */}
+      {isMobileOpen && (
         <div className="fixed inset-0 z-50 flex md:hidden">
-          <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)} />
-          <div className="relative w-72 h-full shadow-2xl">
-            <button 
-              onClick={() => setIsMobileMenuOpen(false)} 
-              className="absolute right-4 top-6 text-slate-400 hover:text-white z-10"
-            >
-              <X className="h-7 w-7" />
+          <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm" onClick={() => setIsMobileOpen(false)} />
+          <div className="relative w-64 h-full shadow-2xl">
+            <button onClick={() => setIsMobileOpen(false)} className="absolute right-4 top-6 text-slate-400 hover:text-white z-10">
+              <X className="h-6 w-6" />
             </button>
-            <SidebarContent pathname={location.pathname} onClose={() => setIsMobileMenuOpen(false)} />
+            <SidebarContent pathname={location.pathname} onClose={() => setIsMobileOpen(false)} />
           </div>
         </div>
       )}
 
-      {/* Contenedor Principal */}
-      <main className="flex-1 md:pl-72 flex flex-col min-w-0">
-        
+      {/* Contenedor principal */}
+      <main className="flex-1 md:pl-64 flex flex-col min-w-0">
+
         {/* Topbar */}
-        <header className="h-20 border-b bg-white/80 backdrop-blur-md flex items-center justify-between px-6 md:px-10 sticky top-0 z-20">
+        <header className="h-18 border-b bg-white/80 backdrop-blur-md flex items-center justify-between px-5 md:px-8 sticky top-0 z-20 py-4">
           <div className="flex items-center gap-4">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="md:hidden" 
-              onClick={() => setIsMobileMenuOpen(true)}
-            >
-              <Menu className="h-6 w-6 text-slate-600" />
-            </Button>
-            
-            <div className="relative group hidden lg:block">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
-              <input 
-                type="search" 
-                placeholder="Buscar expedientes, clientes..." 
-                className="pl-11 h-12 w-[350px] lg:w-[450px] rounded-2xl border-slate-100 bg-slate-50 text-sm focus:bg-white focus:ring-4 focus:ring-blue-500/5 transition-all outline-none border hover:border-slate-200"
+            <button className="md:hidden p-2 rounded-xl hover:bg-slate-100 text-slate-600" onClick={() => setIsMobileOpen(true)}>
+              <Menu className="h-5 w-5" />
+            </button>
+
+            {/* Búsqueda funcional */}
+            <div ref={searchRef} className="relative hidden lg:block">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => setSearchFocused(true)}
+                placeholder="Buscar módulos..."
+                className="pl-11 h-11 w-80 rounded-2xl border border-slate-100 bg-slate-50 text-sm focus:bg-white focus:ring-4 focus:ring-red-500/5 focus:border-slate-200 outline-none transition-all"
               />
+              {searchFocused && searchQuery && (
+                <SearchDropdown query={searchQuery} onSelect={() => { setSearchQuery(""); setSearchFocused(false); }} />
+              )}
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" className="relative text-slate-500 bg-slate-50">
-              <Bell className="h-5 w-5" />
-              <span className="absolute top-2.5 right-2.5 h-2 w-2 bg-red-500 rounded-full border-2 border-white"></span>
-            </Button>
-            
-            <div className="h-8 w-[1px] bg-slate-200 mx-2 hidden sm:block"></div>
-            
-            <div className="flex items-center gap-3 pl-2 cursor-pointer group">
+          <div className="flex items-center gap-3">
+            {/* Notificaciones */}
+            <div ref={notifRef} className="relative">
+              <button
+                onClick={isNotifOpen ? () => setIsNotifOpen(false) : openNotifications}
+                className="relative p-2.5 rounded-xl hover:bg-slate-50 text-slate-500 border border-slate-100 transition-colors"
+              >
+                <Bell className="h-5 w-5" />
+                {notifications.length > 0 && (
+                  <span className="absolute top-2 right-2 h-2 w-2 bg-red-500 rounded-full border-2 border-white" />
+                )}
+              </button>
+              {isNotifOpen && (
+                <NotificationsPanel
+                  notifs={notifications.slice(0, 10)}
+                  loading={notifLoading}
+                  onClose={() => setIsNotifOpen(false)}
+                />
+              )}
+            </div>
+
+            <div className="h-7 w-[1px] bg-slate-200 hidden sm:block" />
+
+            {/* Usuario */}
+            <div className="flex items-center gap-3">
               <div className="text-right hidden sm:block">
-                <p className="text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">Abogado Senior</p>
-                <p className="text-[10px] text-blue-600 font-bold tracking-tighter uppercase">Plan Maestro</p>
+                <p className="text-sm font-bold text-slate-700 leading-none">{user?.fullName || "Usuario"}</p>
               </div>
-              <div className="h-10 w-10 rounded-xl bg-slate-900 flex items-center justify-center text-white shadow-lg border border-slate-800">
-                <UserIcon className="h-5 w-5" />
-              </div>
+              <UserButton afterSignOutUrl="/" />
             </div>
           </div>
         </header>
-        
-        {/* EL OUTLET: Aquí se renderizan ClientForm, ClientDetail, etc. */}
+
+        {/* Contenido */}
         <div className="flex-1 overflow-y-auto">
           <div className="max-w-[1600px] mx-auto p-4 md:p-8">
             <Outlet />

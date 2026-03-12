@@ -14,7 +14,7 @@ export default function ClientList() {
     try {
       setLoading(true);
       setError(null);
-      const token = await getToken();
+      const token = await getToken({ skipCache: true });
       const response = await fetch("/api/entities", {
         headers: { "Authorization": `Bearer ${token}` }
       });
@@ -112,27 +112,35 @@ export default function ClientList() {
             ) : (
               clients.map((client: any) => (
                 <tr key={client.id} className="hover:bg-slate-50/70 transition-colors group">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 bg-red-100 rounded-lg flex items-center justify-center text-red-700 font-bold text-sm shrink-0">
-                        {(client.first_name || "?").charAt(0).toUpperCase()}
-                      </div>
+                  <td className="px-6 py-5">
+                    <div className="flex items-center gap-3.5">
+                      {client.photo_url ? (
+                        <img
+                          src={client.photo_url}
+                          alt={client.first_name}
+                          className="h-11 w-11 rounded-xl object-cover shrink-0 shadow-sm"
+                        />
+                      ) : (
+                        <div className="h-11 w-11 bg-red-100 rounded-xl flex items-center justify-center text-red-700 font-bold text-base shrink-0">
+                          {(client.first_name || "?").charAt(0).toUpperCase()}
+                        </div>
+                      )}
                       <div>
-                        <p className="font-bold text-slate-800">{client.first_name} {client.last_name}</p>
-                        {client.commercial_name && <p className="text-xs text-slate-400">{client.commercial_name}</p>}
+                        <p className="font-bold text-slate-800 text-[15px]">{client.first_name} {client.last_name}</p>
+                        {client.commercial_name && <p className="text-xs text-slate-400 mt-0.5">{client.commercial_name}</p>}
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm text-slate-500 hidden md:table-cell">
+                  <td className="px-6 py-5 text-sm text-slate-500 hidden md:table-cell">
                     {client.email || <span className="text-slate-300">—</span>}
                   </td>
-                  <td className="px-6 py-4 font-mono text-xs text-slate-500">{client.nif_cif}</td>
-                  <td className="px-6 py-4 hidden md:table-cell">
-                    <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 uppercase">
+                  <td className="px-6 py-5 font-mono text-xs text-slate-500">{client.nif_cif}</td>
+                  <td className="px-6 py-5 hidden md:table-cell">
+                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 uppercase">
                       {client.type || "Cliente"}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-right">
+                  <td className="px-6 py-5 text-right">
                     <Link to={`/dashboard/clientes/${client.id}`}>
                       <button className="p-2 hover:bg-red-50 text-slate-300 hover:text-red-600 rounded-lg transition-colors">
                         <ExternalLink size={18} />

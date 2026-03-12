@@ -25,6 +25,7 @@ export default function App() {
             <Route index element={<DashboardHome />} />
             <Route path="clientes" element={<ClientList />} />
             <Route path="clientes/new" element={<ClientForm />} />
+            <Route path="clientes/:id/edit" element={<ClientForm />} />
             <Route path="clientes/:id" element={<ClientDetail />} />
             {/* Módulos en construcción */}
             <Route path="expedientes" element={<ModuloEnCarga nombre="Expedientes" />} />

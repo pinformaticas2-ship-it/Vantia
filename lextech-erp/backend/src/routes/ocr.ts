@@ -1,13 +1,14 @@
 import { Router } from 'express';
 import multer from 'multer';
+import os from 'os';
 import { requireAuth } from '../middleware/auth';
 import { scanDNI } from '../controllers/ocrController';
 
 const router = Router();
 
-// Guardamos el archivo temporalmente en /tmp para procesarlo con Claude
+// os.tmpdir() devuelve la carpeta temporal correcta en Windows, Linux y Mac
 const upload = multer({
-  dest: '/tmp/',
+  dest: os.tmpdir(),
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB máximo
   fileFilter: (_req, file, cb) => {
     if (file.mimetype.startsWith('image/')) {
