@@ -9,6 +9,7 @@ import activityRoutes from './routes/activity';
 import vantiaRoutes from './routes/vantia';
 import filesRoutes from './routes/files';
 import { runMigrations } from './config/migrations';
+import { startLocalFilesWatcher } from './watchers/localFilesWatcher';
 import pool from './config/database';
 
 dotenv.config();
@@ -69,5 +70,6 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 runMigrations().then(() => {
   app.listen(PORT, () => {
     console.log(`🛡️  VANTIA Backend corriendo en http://localhost:${PORT}`);
+    startLocalFilesWatcher();
   });
 });

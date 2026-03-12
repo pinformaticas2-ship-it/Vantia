@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Backend (Express + ts-node)",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "npm run dev --prefix backend"],
+      "port": 4000
+    },
+    {
+      "name": "Frontend (Vite + React)",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "npm run dev --prefix frontend"],
+      "port": 5173
+    }
+  ]
+}

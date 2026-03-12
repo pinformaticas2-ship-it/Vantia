@@ -150,17 +150,24 @@ export async function runMigrations(): Promise<void> {
     // ── Tabla client_files (adjuntos por cliente) ─────────────────
     await client.query(`
       CREATE TABLE IF NOT EXISTS client_files (
-        id            UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
-        client_id     UUID         NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
-        original_name VARCHAR(300) NOT NULL,
-        stored_name   VARCHAR(300) NOT NULL,
-        mimetype      VARCHAR(120) NOT NULL DEFAULT 'application/octet-stream',
-        size_bytes    BIGINT       NOT NULL DEFAULT 0,
-        category      VARCHAR(60)  NOT NULL DEFAULT 'adjunto',
-        created_by    VARCHAR(150) NOT NULL DEFAULT 'SYSTEM',
-        created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+        id               UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        client_id        UUID         NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+        original_name    VARCHAR(300) NOT NULL,
+        stored_name      VARCHAR(300) NOT NULL,
+        mimetype         VARCHAR(120) NOT NULL DEFAULT 'application/octet-stream',
+        size_bytes       BIGINT       NOT NULL DEFAULT 0,
+        category         VARCHAR(60)  NOT NULL DEFAULT 'adjunto',
+        document_name    VARCHAR(300) DEFAULT NULL,
+        attachment_type  VARCHAR(100) DEFAULT 'Sin clasificar',
+        created_by       VARCHAR(150) NOT NULL DEFAULT 'SYSTEM',
+        created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW()
       );
     `);
+    // Agregar columnas nuevas si ya existe la tabla
+    try {
+      await client.query(`ALTER TABLE client_files ADD COLUMN IF NOT EXISTS document_name VARCHAR(300) DEFAULT NULL;`);
+      await client.query(`ALTER TABLE client_files ADD COLUMN IF NOT EXISTS attachment_type VARCHAR(100) DEFAULT 'Sin clasificar';`);
+    } catch (_e: any) {}
     try {
       await client.query(`CREATE INDEX IF NOT EXISTS idx_client_files_client_id ON client_files (client_id);`);
     } catch (_e: any) {}

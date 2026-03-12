@@ -644,6 +644,15 @@ function isPreviewable(mime: string) {
   return mime === "application/pdf" || mime.startsWith("image/") || mime.startsWith("text/");
 }
 
+function isWordFile(mime: string, name: string) {
+  return (
+    mime.includes("word") ||
+    mime.includes("officedocument.wordprocessingml") ||
+    name.toLowerCase().endsWith(".doc") ||
+    name.toLowerCase().endsWith(".docx")
+  );
+}
+
 // ── Tab: Adjuntos ─────────────────────────────────────────────
 function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
   const { getToken } = useAuth();
@@ -665,8 +674,18 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
   // Thumbnails de imágenes (blobURL por fileId)
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
   const loadingThumbIds = useRef<Set<string>>(new Set());
+  const previewBlobUrl  = useRef<string | null>(null);
   const fileInputRef   = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
+  // Modal para editar nombre y tipo de adjunto
+  const [editingFile, setEditingFile] = useState<{ id: string; document_name: string; attachment_type: string } | null>(null);
+  const [editDocName, setEditDocName] = useState('');
+  const [editAttachmentType, setEditAttachmentType] = useState('Sin clasificar');
+  const [savingMetadata, setSavingMetadata] = useState(false);
+  // Plantilla pendiente de guardar
+  const [pendingTemplate, setPendingTemplate] = useState<{ filePath: string; fileName: string } | null>(null);
+  // Vista previa de Word
+  const [wordPreview, setWordPreview] = useState<{ id: string; name: string; mime: string } | null>(null);
 
   // ── Cargar thumbnails de imágenes ─────────────────────────────
   const loadThumb = useCallback(async (fileId: string) => {
@@ -720,7 +739,25 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
         headers: { Authorization: `Bearer ${token}` },
         body: fd,
       });
-      if (res.ok) await loadFiles();
+      if (res.ok) {
+        const data = await res.json();
+        await loadFiles();
+        // Descargar automáticamente .docx (sin diálogo) — Word lo abrirá automáticamente
+        if (data.data) {
+          for (const f of data.data) {
+            if (f.mimetype?.includes('wordprocessingml') || f.original_name?.endsWith('.docx')) {
+              const downloadUrl = `${window.location.origin}/api/files/${clientId}/${f.id}/download`;
+              const a = document.createElement('a');
+              a.href = downloadUrl;
+              a.download = f.original_name;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              break; // Descargar solo el primer .docx
+            }
+          }
+        }
+      }
     } catch (_e) {}
     finally { setUploading(false); }
   };
@@ -747,24 +784,110 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
     if (preview) setPreview(null);
   };
 
-  // ── Vista previa ─────────────────────────────────────────────
-  const openPreview = async (f: any) => {
+  // ── Abrir en Word (via backend: abre desde carpeta local) ──
+  const openInWord = async (f: any) => {
     const token = await getToken({ skipCache: true });
-    const url = `/api/files/${clientId}/${f.id}/download?t=${token}`;
-    setPreview({ url, name: f.original_name, mime: f.mimetype });
+    try {
+      const response = await fetch(`/api/files/${clientId}/${f.id}/open-local`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) {
+        alert('Error al abrir archivo');
+      }
+    } catch (err) {
+      alert('Error al abrir archivo');
+    }
   };
 
-  // ── Documento en blanco ──────────────────────────────────────
-  const createBlankDoc = async () => {
+  // ── Vista previa ─────────────────────────────────────────────
+  const openPreview = async (f: any) => {
+    if (previewBlobUrl.current) {
+      URL.revokeObjectURL(previewBlobUrl.current);
+      previewBlobUrl.current = null;
+    }
     const token = await getToken({ skipCache: true });
-    const res = await fetch('/api/files/templates/blank.docx', { headers: { Authorization: `Bearer ${token}` } });
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Nuevo documento ${new Date().toLocaleDateString('es-ES').replace(/\//g, '-')}.docx`;
-    a.click();
-    URL.revokeObjectURL(url);
+
+    // Si es un archivo Word, usar endpoint especial para HTML
+    const isWord = f.mimetype?.includes('wordprocessingml') || f.original_name?.endsWith('.docx');
+    const endpoint = isWord
+      ? `/api/files/${clientId}/${f.id}/preview-html`
+      : `/api/files/${clientId}/${f.id}/download`;
+
+    const res = await fetch(endpoint, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      const errorMsg = errorData.error || `Error ${res.status}`;
+      const errorHtml = `<html><body style="font-family: Arial; margin: 20px; color: #d32f2f;"><h2>Error al cargar vista previa</h2><p>${errorMsg}</p></body></html>`;
+      const blob = new Blob([errorHtml], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      previewBlobUrl.current = url;
+      setPreview({ url, name: f.original_name, mime: 'text/html' });
+      return;
+    }
+
+    if (isWord) {
+      // Para Word, el contenido es HTML directo
+      const html = await res.text();
+      const blob = new Blob([html], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      previewBlobUrl.current = url;
+      setPreview({ url, name: f.original_name, mime: 'text/html' });
+    } else {
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      previewBlobUrl.current = url;
+      setPreview({ url, name: f.original_name, mime: f.mimetype });
+    }
+  };
+
+  // ── Mostrar modal para crear documento en blanco ──────────────
+  const showCreateBlankModal = () => {
+    setEditingFile({ id: 'NEW_BLANK', document_name: '', attachment_type: 'Sin clasificar' });
+    setEditDocName('');
+    setEditAttachmentType('Sin clasificar');
+  };
+
+  // ── Documento en blanco (después de ingresar nombre y tipo) ────
+  const createBlankDoc = async () => {
+    if (!editingFile || editingFile.id !== 'NEW_BLANK') return;
+    setSavingMetadata(true);
+    const token = await getToken({ skipCache: true });
+    try {
+      // POST a nueva ruta que guarda directamente en BD con metadatos
+      const res = await fetch(`/api/files/${clientId}/create-blank`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          document_name: editDocName,
+          attachment_type: editAttachmentType,
+        }),
+      });
+      if (!res.ok) throw new Error(`Error: ${res.status}`);
+      const data = await res.json();
+      if (data.success && data.data) {
+        setEditingFile(null); // Cerrar modal
+        await loadFiles(); // Recargar lista de archivos
+        // Descargar automáticamente (sin diálogo) — Word lo abrirá automáticamente
+        const downloadUrl = `${window.location.origin}${data.data.downloadUrl}`;
+        const a = document.createElement('a');
+        a.href = downloadUrl;
+        a.download = data.data.original_name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+    } catch (_e) {
+      // Error al crear documento
+    } finally {
+      setSavingMetadata(false);
+    }
   };
 
   // ── Abrir modal plantillas y cargar DocPlant ──────────────────
@@ -797,17 +920,103 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
     }
   };
 
-  // ── Descargar plantilla de DocPlant ──────────────────────────
-  const downloadDocPlantTemplate = async (filePath: string, fileName: string) => {
+  // ── Mostrar modal para adjuntar plantilla ──────────────────────
+  const showTemplateModal = (filePath: string, fileName: string) => {
+    setPendingTemplate({ filePath, fileName });
+    // Extraer nombre sin extensión para usar como nombre de documento
+    const baseName = fileName.replace(/\.[^/.]+$/, '');
+    setEditingFile({ id: 'PENDING_TEMPLATE', document_name: '', attachment_type: 'Sin clasificar' });
+    setEditDocName(baseName);
+    setEditAttachmentType('Sin clasificar');
+  };
+
+  // ── Adjuntar plantilla de DocPlant (después de ingresar nombre y tipo) ────
+  const downloadDocPlantTemplate = async () => {
+    if (!pendingTemplate) return;
+    setSavingMetadata(true);
     const token = await getToken({ skipCache: true });
-    const res = await fetch(`/api/files/templates/download?path=${encodeURIComponent(filePath)}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = fileName; a.click();
-    URL.revokeObjectURL(url);
+    try {
+      const res = await fetch(`/api/files/templates/download?path=${encodeURIComponent(pendingTemplate.filePath)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const blob = await res.blob();
+      // Usar documento_name si se proporcionó, si no usar fileName
+      const finalFileName = editDocName.trim() ? `${editDocName}.${pendingTemplate.fileName.split('.').pop()}` : pendingTemplate.fileName;
+      const file = new File([blob], finalFileName, { type: blob.type });
+      const fd = new FormData();
+      fd.append('files', file);
+      const uploadRes = await fetch(`/api/files/${clientId}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+      if (uploadRes.ok) {
+        const data = await uploadRes.json();
+        const fileId = data.data?.[0]?.id;
+        if (fileId) {
+          // Actualizar metadatos si se proporcionó nombre diferente
+          if (editDocName.trim() || editAttachmentType !== 'Sin clasificar') {
+            await fetch(`/api/files/${clientId}/${fileId}`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                document_name: editDocName.trim() || null,
+                attachment_type: editAttachmentType,
+              }),
+            });
+          }
+          await loadFiles();
+          const isWord = blob.type.includes('word') || pendingTemplate.fileName.endsWith('.doc') || pendingTemplate.fileName.endsWith('.docx');
+          const fileUrl = `${window.location.origin}/api/files/${clientId}/${fileId}/download`;
+          if (isWord) {
+            // Descargar automáticamente (sin diálogo) — Word lo abrirá automáticamente
+            const a = document.createElement('a');
+            a.href = fileUrl;
+            a.download = finalFileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+          } else {
+            window.open(fileUrl, '_blank');
+          }
+        }
+        setShowTemplates(false); // Cerrar modal de plantillas
+        setEditingFile(null); // Cerrar modal de edición
+        setPendingTemplate(null);
+      }
+    } catch (_e) {
+      // Error al descargar plantilla
+    } finally {
+      setSavingMetadata(false);
+    }
+  };
+
+  // ── Guardar metadatos del archivo (nombre y tipo) ──────────────
+  const saveFileMetadata = async () => {
+    if (!editingFile) return;
+    setSavingMetadata(true);
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/files/${clientId}/${editingFile.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          document_name: editDocName,
+          attachment_type: editAttachmentType,
+        }),
+      });
+      if (res.ok) {
+        await loadFiles(); // Recargar lista
+        setEditingFile(null);
+      }
+    } catch (_e) {}
+    finally { setSavingMetadata(false); }
   };
 
   // ── Generar documento desde plantilla ────────────────────────
@@ -850,7 +1059,7 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
           </button>
           {/* Nuevo documento en blanco */}
           <button
-            onClick={createBlankDoc}
+            onClick={showCreateBlankModal}
             className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl transition-all"
           >
             <FilePlus2 size={13} /> Nuevo
@@ -913,6 +1122,8 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
                 <thead className="bg-slate-50 border-b border-slate-100">
                   <tr>
                     <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Archivo</th>
+                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden lg:table-cell">Documento</th>
+                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Tipo</th>
                     <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Tamaño</th>
                     <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Fecha</th>
                     <th className="px-4 py-3"></th>
@@ -922,6 +1133,12 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
                   {files.map((f: any) => {
                     const fi = fileIcon(f.mimetype, f.original_name);
                     const canPreview = isPreviewable(f.mimetype);
+                    const canWord    = isWordFile(f.mimetype, f.original_name);
+                    const handleNameClick = canPreview
+                      ? () => openPreview(f)
+                      : canWord
+                        ? () => openInWord(f)
+                        : undefined;
                     return (
                       <tr key={f.id} className="hover:bg-slate-50/60 transition-colors group">
                         <td className="px-4 py-3">
@@ -945,13 +1162,21 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
                               )
                             }
                             <button
-                              onClick={() => canPreview ? openPreview(f) : undefined}
-                              className={`text-sm font-medium text-slate-700 text-left truncate max-w-[180px] ${canPreview ? "hover:text-red-600 hover:underline cursor-pointer" : ""}`}
-                              title={f.original_name}
+                              onClick={handleNameClick}
+                              className={`text-sm font-medium text-slate-700 text-left truncate max-w-[180px] ${(canPreview || canWord) ? "hover:text-red-600 hover:underline cursor-pointer" : ""}`}
+                              title={canWord ? "Abrir en Word" : f.original_name}
                             >
                               {f.original_name}
                             </button>
                           </div>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-600 hidden lg:table-cell max-w-[150px] truncate" title={f.document_name || "Sin nombre"}>
+                          {f.document_name || <span className="text-slate-400 italic">Sin nombre</span>}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-600 hidden md:table-cell">
+                          <span className="px-2 py-1 bg-slate-100 text-slate-700 rounded text-[10px] font-medium">
+                            {f.attachment_type || 'Sin clasificar'}
+                          </span>
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-400 hidden md:table-cell">{fmtSize(f.size_bytes)}</td>
                         <td className="px-4 py-3 text-xs text-slate-400 hidden md:table-cell">
@@ -965,23 +1190,30 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
                                 <Eye size={14} />
                               </button>
                             )}
-                            <a
-                              href={`/api/files/${clientId}/${f.id}/download`}
-                              download={f.original_name}
-                              title="Descargar"
-                              className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                              onClick={async (e) => {
-                                e.preventDefault();
-                                const token = await getToken({ skipCache: true });
-                                const res = await fetch(`/api/files/${clientId}/${f.id}/download`, { headers: { Authorization: `Bearer ${token}` } });
-                                const blob = await res.blob();
-                                const url = URL.createObjectURL(blob);
-                                const a = document.createElement("a"); a.href = url; a.download = f.original_name; a.click();
-                                URL.revokeObjectURL(url);
+                            {canWord && !canPreview && (
+                              <button onClick={() => openPreview(f)} title="Vista previa de Word"
+                                className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                                <Eye size={14} />
+                              </button>
+                            )}
+                            <button
+                              title="Editar"
+                              className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                              onClick={() => {
+                                setEditingFile({ id: f.id, document_name: f.document_name || '', attachment_type: f.attachment_type || 'Sin clasificar' });
+                                setEditDocName(f.document_name || '');
+                                setEditAttachmentType(f.attachment_type || 'Sin clasificar');
                               }}
                             >
+                              <Edit3 size={14} />
+                            </button>
+                            <button
+                              title="Abrir en Word"
+                              className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                              onClick={() => openInWord(f)}
+                            >
                               <Download size={14} />
-                            </a>
+                            </button>
                             <button onClick={() => handleDelete(f.id)} title="Eliminar"
                               className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
                               <Trash2 size={14} />
@@ -1002,9 +1234,24 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
           <div className="w-1/2 bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col">
             <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 border-b border-slate-100">
               <p className="text-xs font-bold text-slate-600 truncate max-w-[220px]" title={preview.name}>{preview.name}</p>
-              <button onClick={() => setPreview(null)} className="p-1 text-slate-400 hover:text-slate-700 rounded transition-colors">
-                <X size={14} />
-              </button>
+              <div className="flex items-center gap-2">
+                {preview.mime === "text/html" && (
+                  <button
+                    onClick={() => {
+                      setPreview(null);
+                      const file = files.find(f => f.original_name === preview.name);
+                      if (file) openInWord(file);
+                    }}
+                    className="p-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors text-[11px] font-medium px-2 py-1"
+                    title="Abrir en Word"
+                  >
+                    Abrir en Word
+                  </button>
+                )}
+                <button onClick={() => { if (previewBlobUrl.current) { URL.revokeObjectURL(previewBlobUrl.current); previewBlobUrl.current = null; } setPreview(null); }} className="p-1 text-slate-400 hover:text-slate-700 rounded transition-colors">
+                  <X size={14} />
+                </button>
+              </div>
             </div>
             <div className="flex-1 min-h-[400px]">
               {preview.mime === "application/pdf" && (
@@ -1017,6 +1264,11 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
               )}
               {preview.mime.startsWith("text/") && (
                 <iframe src={preview.url} className="w-full h-full min-h-[400px] bg-white" title={preview.name} />
+              )}
+              {preview.mime === "error" && (
+                <div className="flex items-center justify-center h-full p-4 bg-slate-50">
+                  <p className="text-sm text-slate-600">Error al cargar vista previa</p>
+                </div>
               )}
             </div>
           </div>
@@ -1146,10 +1398,10 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
                                     <span className="shrink-0 text-[10px] text-slate-300 font-mono uppercase">{f.ext}</span>
                                   </div>
                                   <button
-                                    onClick={() => downloadDocPlantTemplate(f.path, f.name)}
+                                    onClick={() => showTemplateModal(f.path, f.name)}
                                     className="shrink-0 ml-3 flex items-center gap-1 px-3 py-1 text-[11px] font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-100 rounded-lg opacity-0 group-hover:opacity-100 transition-all active:scale-95"
                                   >
-                                    <Download size={11} /> Descargar
+                                    <Download size={11} /> Usar
                                   </button>
                                 </div>
                               ))}
@@ -1193,6 +1445,123 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
               </div>
             )}
 
+          </div>
+        </div>
+      )}
+
+      {/* Modal vista previa de Word */}
+      {wordPreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setWordPreview(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
+              <div className="flex items-center gap-3">
+                <FileText size={20} className="text-blue-600" />
+                <div>
+                  <p className="text-sm font-bold text-slate-900">Vista previa</p>
+                  <p className="text-xs text-slate-500 mt-0.5 truncate max-w-xs">{wordPreview.name}</p>
+                </div>
+              </div>
+              <button onClick={() => setWordPreview(null)} className="p-2 text-slate-400 hover:text-slate-700 rounded-lg transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-slate-600">
+                Este es un documento Word. Para editarlo, abrelo en Microsoft Word.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setWordPreview(null);
+                    // Encontrar el archivo y abrirlo
+                    const file = files.find(f => f.id === wordPreview.id);
+                    if (file) openInWord(file);
+                  }}
+                  className="flex-1 px-4 py-2.5 bg-blue-600 text-white font-medium text-sm rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Download size={14} />
+                  Abrir en Word
+                </button>
+                <button
+                  onClick={() => setWordPreview(null)}
+                  className="flex-1 px-4 py-2.5 bg-slate-100 text-slate-700 font-medium text-sm rounded-lg hover:bg-slate-200 transition-colors"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal editar metadatos del archivo */}
+      {editingFile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setEditingFile(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <h2 className="text-base font-bold text-slate-900">
+                {editingFile.id === 'NEW_BLANK' ? 'Nuevo documento' : editingFile.id === 'PENDING_TEMPLATE' ? 'Usar plantilla' : 'Editar documento'}
+              </h2>
+              <button onClick={() => setEditingFile(null)} className="p-2 text-slate-400 hover:text-slate-700 rounded-lg transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Contenido */}
+            <div className="p-6 space-y-4">
+              {/* Nombre del documento */}
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5">Nombre del documento</label>
+                <input
+                  type="text"
+                  value={editDocName}
+                  onChange={(e) => setEditDocName(e.target.value)}
+                  placeholder="Ej: 1. - Consentimiento"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                  autoFocus
+                />
+              </div>
+
+              {/* Tipo de adjunto */}
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5">Tipo de adjunto</label>
+                <select
+                  value={editAttachmentType}
+                  onChange={(e) => setEditAttachmentType(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                >
+                  <option value="Sin clasificar">Sin clasificar</option>
+                  <option value="AUTO">AUTO</option>
+                  <option value="ESCRITO PROCESAL">ESCRITO PROCESAL</option>
+                  <option value="FACTURAS">FACTURAS</option>
+                  <option value="PODER">PODER</option>
+                  <option value="EVIDENCIA">EVIDENCIA</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex gap-2 px-6 py-4 border-t border-slate-100 bg-slate-50">
+              <button
+                onClick={() => setEditingFile(null)}
+                className="flex-1 px-4 py-2 text-sm font-medium text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  if (editingFile.id === 'NEW_BLANK') createBlankDoc();
+                  else if (editingFile.id === 'PENDING_TEMPLATE') downloadDocPlantTemplate();
+                  else saveFileMetadata();
+                }}
+                disabled={savingMetadata || !editDocName.trim()}
+                className="flex-1 px-4 py-2 text-sm font-bold text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+              >
+                {savingMetadata ? "Procesando..." : editingFile.id === 'NEW_BLANK' ? "Crear" : editingFile.id === 'PENDING_TEMPLATE' ? "Usar" : "Guardar"}
+              </button>
+            </div>
           </div>
         </div>
       )}

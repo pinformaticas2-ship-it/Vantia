@@ -1,6 +1,14 @@
 import { Request, Response } from 'express';
+import path from 'path';
+import fs from 'fs';
 import pool from '../config/database';
 import { logActivity } from './activityController';
+
+const UPLOADS_ROOT = path.join(__dirname, '../../uploads/clients');
+
+const CLIENT_FILES_ROOT = process.env.CLIENT_FILES_PATH
+  ? path.resolve(process.env.CLIENT_FILES_PATH)
+  : path.join(process.env.USERPROFILE || process.env.HOME || '', 'lextech-client-files');
 
 /** Convierte string vacío a null (evita cast ::date fallido en PostgreSQL) */
 const nullIfEmpty = (v: any) => (v === '' || v === undefined ? null : v);
@@ -179,6 +187,17 @@ export const createEntity = async (req: any, res: Response) => {
         userId,                                              // $31
       ]
     );
+    // Crear carpetas para archivos del cliente (uploads del servidor + carpeta local)
+    try {
+      const clientId = result.rows[0].id;
+      const serverFolder = path.join(UPLOADS_ROOT, clientId);
+      const localFolder  = path.join(CLIENT_FILES_ROOT, clientId);
+      if (!fs.existsSync(serverFolder)) fs.mkdirSync(serverFolder, { recursive: true });
+      if (!fs.existsSync(localFolder))  fs.mkdirSync(localFolder,  { recursive: true });
+    } catch (err) {
+      console.warn('⚠️ No se pudo crear carpeta para cliente:', err);
+    }
+
     // Registrar actividad (fire-and-forget, no bloquea la respuesta)
     const entityName = `${first_name} ${last_name || ''}`.trim() + ` (${nif_cif})`;
     logActivity(userId, userId, 'Nuevo cliente creado', 'CLIENT', result.rows[0].id, entityName);
