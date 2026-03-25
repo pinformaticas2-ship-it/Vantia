@@ -24,10 +24,30 @@ try {
 const pool = new Pool({
   connectionString: rawUrl,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+
+  // ── Optimización del pool de conexiones ──────────────────
+  max: 20,                        // Máximo de conexiones simultáneas (default era 10)
+  idleTimeoutMillis: 30_000,      // Cerrar conexiones inactivas tras 30s
+  connectionTimeoutMillis: 5_000, // Timeout al obtener conexión del pool
+  allowExitOnIdle: false,         // Mantener pool activo mientras el servidor corra
+
+  // Statement timeout global: evita queries infinitas (30 segundos)
+  statement_timeout: 30_000,
 });
 
 pool.on('error', (err: any) => {
   console.error('🔥 Error en el Pool de PG:', err);
 });
+
+// Precalentar el pool: abrir conexiones al arrancar para evitar latencia en las primeras peticiones
+(async () => {
+  try {
+    const warmup = await pool.connect();
+    warmup.release();
+    console.log('🔥 Pool de conexiones precalentado correctamente.');
+  } catch (_e) {
+    // No bloquea el arranque
+  }
+})();
 
 export default pool;

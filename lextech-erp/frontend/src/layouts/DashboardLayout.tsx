@@ -73,28 +73,47 @@ interface ChatMsg { role: "user" | "model"; text: string }
 function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opts?: { skipCache?: boolean }) => Promise<string | null> }) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
-  const [input, setInput]       = useState("");
-  const [loading, setLoading]   = useState(false);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const prevPath  = useRef(pathname);
 
-  // Resetear chat y mostrar saludo al cambiar de módulo
+  // Cargar historial al abrir el chat o cambiar de módulo
   useEffect(() => {
-    if (prevPath.current !== pathname) {
-      prevPath.current = pathname;
-      setMessages([]);
-    }
-  }, [pathname]);
+    if (!open) return;
 
-  // Saludo inicial cuando se abre el chat
-  useEffect(() => {
-    if (open && messages.length === 0) {
-      setMessages([{
-        role: "model",
-        text: `¡Hola! Soy VantIA — ${getVantIALabel(pathname)}. ¿En qué puedo ayudarte?`,
-      }]);
-    }
-  }, [open]);
+    const fetchHistory = async () => {
+      setLoading(true);
+      try {
+        const token = await getToken({ skipCache: true });
+        const res = await fetch(`/api/vantia/chat/history?moduleId=${pathname}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await safeJson(res);
+        if (res.ok && data.history && data.history.length > 0) {
+          setMessages(data.history);
+        } else {
+          // Si no hay historial, mostrar el saludo inicial
+          setMessages([
+            {
+              role: 'model',
+              text: `¡Hola! Soy VantIA — ${getVantIALabel(pathname)}. ¿En qué puedo ayudarte?`,
+            },
+          ]);
+        }
+      } catch (err) {
+        setMessages([
+          {
+            role: 'model',
+            text: `❌ No pude cargar el historial. ${err instanceof Error ? err.message : ''}`,
+          },
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchHistory();
+  }, [open, pathname, getToken]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -104,23 +123,28 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
     const text = input.trim();
     if (!text || loading) return;
     setInput("");
-    const newHistory = [...messages, { role: "user" as const, text }];
+    const newHistory: ChatMsg[] = [...messages, { role: "user", text }];
     setMessages(newHistory);
     setLoading(true);
     try {
-      const token   = await getToken({ skipCache: true });
-      const history = messages.map((m) => ({ role: m.role, text: m.text }));
-      const res     = await fetch("/api/vantia/chat", {
+      const token = await getToken({ skipCache: true });
+      // El historial que se envía a Gemini no debe contener el saludo inicial si es el único mensaje.
+      const historyForApi = messages.length === 1 && messages[0].role === 'model'
+        ? []
+        : messages;
+
+      const res = await fetch("/api/vantia/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           message: text,
-          history,
+          history: historyForApi,
           systemPrompt: getVantIAContext(pathname),
+          moduleId: pathname, // Enviar el `pathname` para que el backend sepa dónde guardar
         }),
       });
       const data = await safeJson(res);
-      if (!res.ok) throw new Error(data.error || "Error");
+      if (!res.ok) throw new Error(data.error || "Error en la API de VantIA");
       setMessages([...newHistory, { role: "model", text: data.reply }]);
     } catch (err: any) {
       setMessages([...newHistory, { role: "model", text: `❌ ${err.message}` }]);
@@ -138,14 +162,14 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
              style={{ height: "460px" }}>
 
           {/* Header */}
-          <div className="bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-3 flex items-center justify-between shrink-0">
+          <div className="bg-red-700 px-4 py-3 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2">
               <div className="h-7 w-7 bg-white/20 rounded-lg flex items-center justify-center">
                 <Bot size={14} className="text-white" />
               </div>
               <div>
                 <p className="text-white text-sm font-bold leading-none">VantIA</p>
-                <p className="text-violet-200 text-[10px]">{getVantIALabel(pathname)}</p>
+                <p className="text-red-200 text-[10px]">{getVantIALabel(pathname)}</p>
               </div>
             </div>
             <button onClick={() => setOpen(false)} className="text-white/70 hover:text-white">
@@ -159,8 +183,8 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
               <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                 <div className={`max-w-[88%] px-3 py-2 rounded-2xl text-xs leading-relaxed whitespace-pre-wrap ${
                   msg.role === "user"
-                    ? "bg-indigo-600 text-white rounded-br-sm"
-                    : "bg-slate-100 text-slate-700 rounded-bl-sm"
+                    ? "bg-red-700 text-white rounded-br-sm"
+                    : "bg-neutral-100 text-neutral-700 rounded-bl-sm"
                 }`}>
                   {msg.text}
                 </div>
@@ -168,10 +192,10 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
             ))}
             {loading && (
               <div className="flex justify-start">
-                <div className="bg-slate-100 px-3 py-2 rounded-2xl rounded-bl-sm flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                  <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                  <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                <div className="bg-neutral-100 px-3 py-2 rounded-2xl rounded-bl-sm flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 bg-neutral-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                  <span className="w-1.5 h-1.5 bg-neutral-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                  <span className="w-1.5 h-1.5 bg-neutral-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
                 </div>
               </div>
             )}
@@ -185,12 +209,12 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()}
               placeholder="Escribe tu consulta..."
-              className="flex-1 text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300"
+              className="flex-1 text-xs bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-red-600/20 focus:border-red-300"
             />
             <button
               onClick={send}
               disabled={!input.trim() || loading}
-              className="h-8 w-8 bg-indigo-600 disabled:opacity-40 text-white rounded-xl flex items-center justify-center hover:bg-indigo-700 transition-colors"
+              className="h-8 w-8 bg-red-700 disabled:opacity-40 text-white rounded-xl flex items-center justify-center hover:bg-red-800 transition-colors"
             >
               <Send size={12} />
             </button>
@@ -203,8 +227,8 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
         onClick={() => setOpen((v) => !v)}
         className={`h-12 w-12 rounded-2xl shadow-xl flex items-center justify-center transition-all active:scale-95 ${
           open
-            ? "bg-slate-700 shadow-slate-900/30"
-            : "bg-gradient-to-br from-violet-600 to-indigo-600 shadow-indigo-500/40 hover:shadow-indigo-500/60 hover:scale-105"
+            ? "bg-neutral-800 shadow-neutral-900/30"
+            : "bg-red-700 shadow-red-700/30 hover:shadow-red-700/50 hover:scale-105"
         }`}
         title="VantIA — Asistente IA"
       >
@@ -330,15 +354,15 @@ function SearchDropdown({ query, onSelect }: { query: string; onSelect: () => vo
         const Icon = m.icon;
         return (
           <button key={m.path} onClick={() => { navigate(m.path); onSelect(); }}
-            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left group">
-            <div className="h-8 w-8 bg-slate-100 group-hover:bg-indigo-50 rounded-lg flex items-center justify-center transition-colors">
-              <Icon size={14} className="text-slate-500 group-hover:text-indigo-600" />
+            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-neutral-50 transition-colors text-left group">
+            <div className="h-8 w-8 bg-neutral-100 group-hover:bg-red-50 rounded-lg flex items-center justify-center transition-colors">
+              <Icon size={14} className="text-neutral-500 group-hover:text-red-700" />
             </div>
             <div className="flex-1">
-              <p className="text-sm font-semibold text-slate-700 group-hover:text-indigo-600">{m.name}</p>
-              <p className="text-[11px] text-slate-400">{m.desc}</p>
+              <p className="text-sm font-semibold text-neutral-700 group-hover:text-red-700">{m.name}</p>
+              <p className="text-[11px] text-neutral-400">{m.desc}</p>
             </div>
-            <ChevronRight size={14} className="text-slate-300 group-hover:text-indigo-400" />
+            <ChevronRight size={14} className="text-neutral-300 group-hover:text-red-400" />
           </button>
         );
       })}
@@ -451,7 +475,7 @@ export default function DashboardLayout() {
   }, [getToken]);
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex font-sans antialiased text-slate-900">
+    <div className="min-h-screen bg-[#F2F2F2] flex font-sans antialiased text-neutral-900">
 
       {/* VantIA flotante — siempre visible, contextual según la ruta */}
       <VantIAWidget pathname={location.pathname} getToken={getToken} />

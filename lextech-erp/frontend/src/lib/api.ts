@@ -26,7 +26,15 @@ export async function safeJson(response: Response) {
 }
 
 /**
+ * Deduplicación de peticiones GET simultáneas.
+ * Si ya hay una petición en vuelo para la misma URL, reutiliza la misma Promise
+ * en lugar de hacer otra llamada al servidor.
+ */
+const inflightGET = new Map<string, Promise<any>>();
+
+/**
  * Realiza un fetch autenticado con reintento automático en caso de 401.
+ * Las peticiones GET se deduplican automáticamente (evita refrescos dobles).
  *
  * Uso:
  *   const data = await apiFetch("/api/entities", { getToken });
@@ -39,22 +47,40 @@ export async function apiFetch(
     ...init
   }: RequestInit & { getToken: (opts?: { skipCache?: boolean }) => Promise<string | null> }
 ): Promise<any> {
-  // Primer intento con token cacheado fresco (skipCache evita tokens a punto de expirar)
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const token = await getToken({ skipCache: attempt > 0 });
+  const method = (init.method || 'GET').toUpperCase();
 
-    const res = await fetch(url, {
-      ...init,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-        ...(init.headers || {}),
-      },
-    });
-
-    // En el primer intento, si hay 401 hacemos un segundo intento con token forzado
-    if (res.status === 401 && attempt === 0) continue;
-
-    return safeJson(res);
+  // Deduplicar GETs en vuelo
+  if (method === 'GET' && inflightGET.has(url)) {
+    return inflightGET.get(url)!;
   }
+
+  const doFetch = async () => {
+    // Primer intento con token cacheado fresco (skipCache evita tokens a punto de expirar)
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const token = await getToken({ skipCache: attempt > 0 });
+
+      const res = await fetch(url, {
+        ...init,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+          ...(init.headers || {}),
+        },
+      });
+
+      // En el primer intento, si hay 401 hacemos un segundo intento con token forzado
+      if (res.status === 401 && attempt === 0) continue;
+
+      return safeJson(res);
+    }
+  };
+
+  const promise = doFetch();
+
+  if (method === 'GET') {
+    inflightGET.set(url, promise);
+    promise.finally(() => inflightGET.delete(url));
+  }
+
+  return promise;
 }

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useUser, useAuth } from "@clerk/clerk-react";
 import {
   Clock, Plus, CheckCircle2, Loader2, RefreshCw,
@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { safeJson } from "../lib/api";
+import { useAutoRefresh } from "../lib/useAutoRefresh";
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 function timeAgo(dateStr: string): string {
@@ -61,18 +62,21 @@ export default function DashboardHome() {
   const [activity, setActivity]     = useState<any[]>([]);
   const [actLoading, setActLoading] = useState(true);
 
-  useEffect(() => { fetchData(); }, []);
-
-  const fetchData = async () => {
-    setActLoading(true);
+  const fetchData = useCallback(async (silent = false) => {
+    if (!silent) setActLoading(true);
     try {
       const token = await getToken({ skipCache: true });
       const res   = await fetch("/api/activity", { headers: { Authorization: `Bearer ${token}` } });
       const data  = await safeJson(res);
       if (res.ok) setActivity(data.data || []);
     } catch (_e) {
-    } finally { setActLoading(false); }
-  };
+    } finally { if (!silent) setActLoading(false); }
+  }, [getToken]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Auto-refrescar actividad: cada 20s, al volver a pestaña, al reconectar
+  useAutoRefresh(() => fetchData(true), { intervalMs: 20_000 });
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -196,7 +200,7 @@ export default function DashboardHome() {
               <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
                 <Clock size={15} className="text-slate-400" /> Actividad
               </h3>
-              <button onClick={fetchData} className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600">
+              <button onClick={() => fetchData()} className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600">
                 <RefreshCw size={12} />
               </button>
             </div>

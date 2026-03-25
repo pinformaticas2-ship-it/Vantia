@@ -11,6 +11,8 @@ import DashboardHome from './pages/DashboardHome';
 import ClientList from './pages/ClientList';
 import ClientForm from './pages/ClientForm';
 import ClientDetail from './pages/ClientDetail';
+import ExpedienteList from './pages/ExpedienteList';
+import ExpedienteDetail from './pages/ExpedienteDetail';
 
 export default function App() {
   return (
@@ -27,8 +29,9 @@ export default function App() {
             <Route path="clientes/new" element={<ClientForm />} />
             <Route path="clientes/:id/edit" element={<ClientForm />} />
             <Route path="clientes/:id" element={<ClientDetail />} />
+            <Route path="expedientes" element={<ExpedienteList />} />
+            <Route path="expedientes/:id" element={<ExpedienteDetail />} />
             {/* Módulos en construcción */}
-            <Route path="expedientes" element={<ModuloEnCarga nombre="Expedientes" />} />
             <Route path="agenda" element={<ModuloEnCarga nombre="Agenda" />} />
             <Route path="documentos" element={<ModuloEnCarga nombre="Documentos" />} />
             <Route path="config" element={<ModuloEnCarga nombre="Configuración" />} />

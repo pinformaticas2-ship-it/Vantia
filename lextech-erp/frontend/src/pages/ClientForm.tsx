@@ -4,14 +4,14 @@ import { useNavigate, useParams, Link } from "react-router-dom";
 import {
   Save, X, ArrowLeft, ScanLine, Upload, Image as ImageIcon,
   Loader2, Sparkles, RotateCcw, AlertTriangle, CheckCircle2,
-  Camera, Edit3,
+  Camera, Edit3, Users, MapPin, Phone, Briefcase, BarChart2,
 } from "lucide-react";
 import { safeJson } from "../lib/api";
 
 // ── UI helpers ────────────────────────────────────────────────
 const F = ({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) => (
-  <div className="flex flex-col gap-1">
-    <label className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+  <div className="flex flex-col">
+    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
       {label}{required && <span className="text-red-500 ml-0.5">*</span>}
     </label>
     {children}
@@ -20,7 +20,7 @@ const F = ({ label, required, children }: { label: string; required?: boolean; c
 
 const I = ({ highlight = false, className = "", ...props }: any) => (
   <input
-    className={`h-9 w-full rounded-md border px-3 text-sm outline-none transition-all
+    className={`w-full rounded-lg border px-2.5 py-1.5 text-sm text-slate-700 outline-none transition-all
       ${highlight
         ? "border-emerald-400 ring-2 ring-emerald-100 bg-emerald-50/40"
         : "border-slate-200 bg-white focus:border-red-400 focus:ring-2 focus:ring-red-100"
@@ -31,7 +31,7 @@ const I = ({ highlight = false, className = "", ...props }: any) => (
 
 const S = ({ highlight = false, className = "", children, ...props }: any) => (
   <select
-    className={`h-9 w-full rounded-md border px-3 text-sm outline-none transition-all
+    className={`w-full rounded-lg border px-2.5 py-1.5 text-sm text-slate-700 outline-none transition-all
       ${highlight
         ? "border-emerald-400 ring-2 ring-emerald-100 bg-emerald-50/40"
         : "border-slate-200 bg-white focus:border-red-400 focus:ring-2 focus:ring-red-100"
@@ -42,12 +42,13 @@ const S = ({ highlight = false, className = "", children, ...props }: any) => (
   </select>
 );
 
-const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
+const Section = ({ title, icon: Icon, children, cols = 4 }: { title: string; icon?: any; children: React.ReactNode; cols?: number }) => (
   <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-    <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100">
-      <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{title}</h3>
+    <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+      {Icon && <Icon size={13} className="text-slate-400" />}
+      <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{title}</h3>
     </div>
-    <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-3">
+    <div className={`p-4 grid gap-3 ${cols === 2 ? "grid-cols-1 md:grid-cols-2" : cols === 3 ? "grid-cols-2 md:grid-cols-3" : "grid-cols-2 md:grid-cols-4"}`}>
       {children}
     </div>
   </div>
@@ -332,42 +333,47 @@ export default function ClientForm() {
   );
 
   return (
-    <div className="flex gap-6 animate-in fade-in duration-500">
+    <div className="flex gap-6 animate-in fade-in duration-500 bg-slate-50 -m-6 p-6 min-h-screen">
 
       {/* ── COLUMNA PRINCIPAL ─────────────────────────────── */}
       <form onSubmit={handleSubmit} className="flex-1 min-w-0 space-y-4">
 
         {/* Cabecera */}
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center bg-white border border-slate-200 rounded-xl px-4 py-3">
           <div className="flex items-center gap-3">
             <Link
               to={isEdit ? `/dashboard/clientes/${id}` : "/dashboard/clientes"}
-              className="p-2 hover:bg-slate-100 rounded-lg text-slate-500"
+              className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
             >
-              <ArrowLeft size={18} />
+              <ArrowLeft size={16} />
             </Link>
-            <div>
-              <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                {isEdit ? <><Edit3 size={18} className="text-red-600" /> Editar cliente</> : "Nuevo cliente"}
-              </h1>
-              <p className="text-slate-400 text-xs">
-                {isEdit ? "Modifica los datos y pulsa Guardar cambios" : "Ficha de alta · todos los campos son editables"}
-              </p>
+            <div className="flex items-center gap-2.5">
+              <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-red-50 border border-red-100">
+                <Users size={15} className="text-red-600" />
+              </div>
+              <div>
+                <h1 className="text-sm font-bold text-slate-800 leading-tight">
+                  {isEdit ? "Editar cliente" : "Nuevo cliente"}
+                </h1>
+                <p className="text-[11px] text-slate-400">
+                  {isEdit ? "Modifica los datos y pulsa Guardar cambios" : "Ficha de alta · todos los campos son editables"}
+                </p>
+              </div>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             <Link to={isEdit ? `/dashboard/clientes/${id}` : "/dashboard/clientes"}>
-              <button type="button" className="flex items-center gap-1.5 px-3 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">
-                <X size={15} /> Cancelar
+              <button type="button" className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-500 hover:bg-slate-100 rounded-lg transition-colors">
+                <X size={14} /> Cancelar
               </button>
             </Link>
             <button
               type="submit" disabled={loading || showSuccess}
-              className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white text-sm font-bold rounded-xl shadow-md shadow-red-200 active:scale-95 transition-all"
+              className="flex items-center gap-2 px-4 py-1.5 bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white text-sm font-bold rounded-lg shadow-sm shadow-red-200 active:scale-95 transition-all"
             >
               {loading
-                ? <><Loader2 size={14} className="animate-spin" /> Guardando...</>
-                : <><Save size={14} /> {isEdit ? "Guardar cambios" : "Guardar"}</>
+                ? <><Loader2 size={13} className="animate-spin" /> Guardando...</>
+                : <><Save size={13} /> {isEdit ? "Guardar cambios" : "Guardar"}</>
               }
             </button>
           </div>
@@ -472,8 +478,9 @@ export default function ClientForm() {
 
         {/* ── FOTO DE PERFIL + IDENTIFICACIÓN ──────────────── */}
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-          <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100">
-            <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Identificación</h3>
+          <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+            <Users size={13} className="text-slate-400" />
+            <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Identificación</h3>
           </div>
           <div className="p-4 flex gap-5">
             {/* Avatar */}
@@ -535,7 +542,7 @@ export default function ClientForm() {
                 <I type="date" name="birth_date" value={form.birth_date} onChange={handleChange} highlight={h("birth_date")} />
               </F>
               <F label="Edad">
-                <I value={age !== null ? `${age} años` : ""} readOnly className="bg-slate-50 text-slate-400" />
+                <I value={age !== null ? `${age} años` : ""} readOnly className="bg-slate-50 text-slate-400 cursor-default border-slate-100" />
               </F>
               <F label="Nacionalidad">
                 <I name="nationality" value={form.nationality} onChange={handleChange} />
@@ -550,7 +557,7 @@ export default function ClientForm() {
         </div>
 
         {/* ── DIRECCIÓN ─────────────────────────────────────── */}
-        <Section title="Dirección">
+        <Section title="Dirección" icon={MapPin}>
           <div className="col-span-2 md:col-span-2">
             <F label="Dirección"><I name="address_street" value={form.address_street} onChange={handleChange} placeholder="Calle, número, piso..." /></F>
           </div>
@@ -574,7 +581,7 @@ export default function ClientForm() {
         </Section>
 
         {/* ── CONTACTO ──────────────────────────────────────── */}
-        <Section title="Contacto">
+        <Section title="Contacto" icon={Phone}>
           <div className="col-span-2">
             <F label="Correo electrónico"><I type="email" name="email" value={form.email} onChange={handleChange} placeholder="cliente@email.com" /></F>
           </div>
@@ -589,7 +596,7 @@ export default function ClientForm() {
         </Section>
 
         {/* ── ADMINISTRACIÓN ────────────────────────────────── */}
-        <Section title="Administración">
+        <Section title="Administración" icon={Briefcase}>
           <F label="Estado">
             <S name="client_status" value={form.client_status} onChange={handleChange}>
               <option>Alta</option><option>Baja</option><option>Suspendido</option><option>Potencial</option>
@@ -627,8 +634,9 @@ export default function ClientForm() {
       {/* ── PANEL INDICADORES ─────────────────────────────── */}
       <aside className="w-52 shrink-0 space-y-4">
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden sticky top-6">
-          <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100">
-            <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Indicadores</h3>
+          <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+            <BarChart2 size={13} className="text-slate-400" />
+            <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Indicadores</h3>
           </div>
           <div className="px-4 py-3">
             <Indicador label="Expedientes" value="—" />

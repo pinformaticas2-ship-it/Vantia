@@ -1,0 +1,459 @@
+import React, { useState } from "react";
+import {
+  FolderOpen, Loader2, X, Paperclip, Activity, FileSpreadsheet,
+  Users, ClipboardList, MoreHorizontal,
+} from "lucide-react";
+import { safeJson } from "../lib/api";
+import AdjuntosModal from "./AdjuntosModal";
+
+// ── Constantes compartidas ────────────────────────────────────
+export const TIPOS: Record<string, { label: string; short: string; color: string }> = {
+  judicial:         { label: "Expediente Judicial",        short: "JUDICIAL",      color: "bg-blue-100 text-blue-700" },
+  extrajudicial:    { label: "Expediente Extrajudicial",    short: "EXTRAJUDICIAL", color: "bg-indigo-100 text-indigo-700" },
+  monitorio:        { label: "Monitorio",                  short: "MONITORIO",     color: "bg-amber-100 text-amber-700" },
+  obligacion_hacer: { label: "Obligación de Hacer",        short: "OBLIG. HACER",  color: "bg-orange-100 text-orange-700" },
+  prejudicial:      { label: "Prejudicial",                short: "PREJUDICIAL",   color: "bg-purple-100 text-purple-700" },
+  diligencias:      { label: "Diligencias Previas",        short: "DILIGENCIAS",   color: "bg-rose-100 text-rose-700" },
+  penal:            { label: "Penal",                      short: "PENAL",         color: "bg-red-100 text-red-700" },
+  laboral:          { label: "Laboral",                    short: "LABORAL",       color: "bg-teal-100 text-teal-700" },
+  contencioso:      { label: "Contencioso-Administrativo", short: "CONTENCIOSO",   color: "bg-cyan-100 text-cyan-700" },
+  otro:             { label: "Otro",                       short: "OTRO",          color: "bg-slate-100 text-slate-500" },
+};
+
+export const ESTADOS: Record<string, { label: string; color: string }> = {
+  abierto:    { label: "Abierto",    color: "bg-emerald-100 text-emerald-700" },
+  cerrado:    { label: "Cerrado",    color: "bg-slate-100 text-slate-500" },
+  suspendido: { label: "Suspendido", color: "bg-amber-100 text-amber-700" },
+  archivado:  { label: "Archivado",  color: "bg-red-100 text-red-600" },
+};
+
+export const ETAPAS = ["", "Inicio", "Instrucción", "Juicio Oral", "Ejecución", "Apelación", "Casación", "Archivo"];
+
+export const COLORES = [
+  { value: "ninguno",  label: "□ Ninguno" },
+  { value: "rojo",     label: "Rojo" },
+  { value: "azul",     label: "Azul" },
+  { value: "verde",    label: "Verde" },
+  { value: "amarillo", label: "Amarillo" },
+  { value: "naranja",  label: "Naranja" },
+  { value: "morado",   label: "Morado" },
+];
+
+export const EXP_EMPTY = {
+  anio: new Date().getFullYear(),
+  ref_propia: "", ref_expediente: "", descripcion: "",
+  tipo: "judicial", cliente_id: "", cliente_nombre: "",
+  contrario: "", procurador: "", juzgado: "", tipo_proc: "",
+  num_autos: "", nig: "", estado: "abierto", observaciones: "",
+  fecha_inicio: new Date().toISOString().slice(0, 10), fecha_cierre: "",
+  importe: "",
+  tipos_asunto: "", cuantia_principal: "", intereses: "", costas: "",
+  cuantia_total: "", indeterminado: false as boolean | string, etapa: "",
+  persona_contacto: "", contacto: "", centro: "", color: "ninguno",
+};
+
+// ── Estilos de formulario ─────────────────────────────────────
+export const lbl   = "text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5 block";
+export const inp   = "w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm text-slate-700 focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100 bg-white";
+export const inpRO = "w-full border border-slate-100 rounded-lg px-2.5 py-1.5 text-sm text-slate-400 bg-slate-50 cursor-default";
+
+// ── SecCard ───────────────────────────────────────────────────
+export function SecCard({ title, icon: Icon, children, cols = 3 }: {
+  title: string; icon: any; children: React.ReactNode; cols?: number;
+}) {
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+      <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+        <Icon size={13} className="text-slate-400" />
+        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{title}</span>
+      </div>
+      <div className={`p-4 grid gap-3 ${cols === 4 ? "grid-cols-2 md:grid-cols-4" : cols === 2 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-2 md:grid-cols-3"}`}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ── Tab keys ──────────────────────────────────────────────────
+export type TabKey = "notas" | "adjuntos" | "clientes" | "contrarios" | "juzgados" | "historial" | "tareas";
+
+export const BOTTOM_TABS: { key: TabKey; label: string }[] = [
+  { key: "notas",      label: "Notas" },
+  { key: "adjuntos",   label: "Adjuntos" },
+  { key: "clientes",   label: "Clientes" },
+  { key: "contrarios", label: "Contrarios" },
+  { key: "juzgados",   label: "Juzgados" },
+  { key: "historial",  label: "Historial Expediente" },
+  { key: "tareas",     label: "Tareas-Plazos" },
+];
+
+// ── Modal de alta / edición ───────────────────────────────────
+export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, saving }: {
+  initial: typeof EXP_EMPTY;
+  editId?: string;
+  clientes: any[];
+  onSave: (d: typeof EXP_EMPTY) => void;
+  onClose: () => void;
+  saving: boolean;
+}) {
+  const [form, setForm]     = useState(initial);
+  const [tab, setTab]       = useState<TabKey>("notas");
+  const [showAdj, setShowAdj] = useState(false);
+  const set = (k: string, v: any) => setForm(p => ({ ...p, [k]: v }));
+
+  const handleClienteChange = (id: string) => {
+    const c = clientes.find((x: any) => x.id === id);
+    set("cliente_id", id);
+    set("cliente_nombre", c ? `${c.first_name || ""} ${c.last_name || ""}`.trim() : "");
+  };
+
+  return (
+    <>
+    <div className="fixed inset-0 z-50 flex flex-col bg-slate-50">
+
+      {/* ── Cabecera ── */}
+      <div className="shrink-0 bg-white border-b border-slate-200 px-5 py-3 flex items-center gap-3 shadow-sm">
+        <div className="flex items-center gap-2.5 mr-2">
+          <div className="p-2 bg-red-50 rounded-xl">
+            <FolderOpen size={16} className="text-red-600" />
+          </div>
+          <div>
+            <h1 className="text-sm font-bold text-slate-900 leading-tight">
+              {editId
+                ? `Expediente ${form.anio}/${(form as any).num_exp || "—"}`
+                : "Nuevo expediente"}
+            </h1>
+            <p className="text-[10px] text-slate-400">
+              {form.descripcion || "Rellena los datos del expediente"}
+            </p>
+          </div>
+        </div>
+
+        <div className="w-px h-6 bg-slate-200 mx-1" />
+
+        <button
+          onClick={() => onSave(form)}
+          disabled={saving || !form.descripcion.trim()}
+          className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-40 rounded-xl shadow-sm active:scale-95 transition-all">
+          {saving && <Loader2 size={13} className="animate-spin" />}
+          {editId ? "Guardar cambios" : "Crear expediente"}
+        </button>
+        <button onClick={onClose}
+          className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors">
+          Cancelar
+        </button>
+
+        <div className="w-px h-6 bg-slate-200 mx-1" />
+
+        <button
+          onClick={() => editId && setShowAdj(true)}
+          disabled={!editId}
+          title={!editId ? "Guarda el expediente primero" : "Adjuntos"}
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+            editId ? "text-slate-600 hover:bg-slate-100 cursor-pointer" : "text-slate-300 cursor-not-allowed"
+          }`}
+        >
+          <Paperclip size={12} /> Adjuntos
+        </button>
+        <button className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
+          <Activity size={12} /> Historial
+        </button>
+        <button className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
+          <FileSpreadsheet size={12} /> Económico
+        </button>
+
+        <button onClick={onClose}
+          className="ml-auto p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+          <X size={16} />
+        </button>
+      </div>
+
+      {/* ── Cuerpo ── */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+
+        {/* Columna izquierda */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-4 min-w-0">
+
+          <SecCard title="Identificación" icon={FolderOpen} cols={4}>
+            <div>
+              <label className={lbl}>Núm. Exp</label>
+              <input value={(form as any).num_exp || (editId ? "—" : "Auto")} readOnly className={inpRO} />
+            </div>
+            <div>
+              <label className={lbl}>Año</label>
+              <input type="number" value={form.anio}
+                onChange={e => set("anio", parseInt(e.target.value) || new Date().getFullYear())}
+                className={inp} min={2000} max={2100} />
+            </div>
+            <div>
+              <label className={lbl}>Fecha Alta</label>
+              <input type="date" value={form.fecha_inicio}
+                onChange={e => set("fecha_inicio", e.target.value)} className={inp} />
+            </div>
+            <div>
+              <label className={lbl}>Estado</label>
+              <select value={form.estado} onChange={e => set("estado", e.target.value)} className={inp}>
+                {Object.entries(ESTADOS).map(([k, v]) => (
+                  <option key={k} value={k}>{v.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="col-span-2">
+              <label className={lbl}>Descripción Expediente *</label>
+              <input value={form.descripcion} onChange={e => set("descripcion", e.target.value)}
+                placeholder="Ej: Reclamación de cantidad contra BBVA" className={inp} />
+            </div>
+            <div className="col-span-2">
+              <label className={lbl}>Tipo de Expediente</label>
+              <select value={form.tipo} onChange={e => set("tipo", e.target.value)} className={inp}>
+                {Object.entries(TIPOS).map(([k, v]) => (
+                  <option key={k} value={k}>{v.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="col-span-2">
+              <label className={lbl}>Tipos de Asunto</label>
+              <input value={form.tipos_asunto} onChange={e => set("tipos_asunto", e.target.value)}
+                placeholder="Civil, Penal…" className={inp} />
+            </div>
+            <div>
+              <label className={lbl}>Etapa</label>
+              <select value={form.etapa} onChange={e => set("etapa", e.target.value)} className={inp}>
+                {ETAPAS.map(et => <option key={et} value={et}>{et || "— Seleccionar —"}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={lbl}>Fecha Cierre</label>
+              <input type="date" value={form.fecha_cierre}
+                onChange={e => set("fecha_cierre", e.target.value)} className={inp} />
+            </div>
+          </SecCard>
+
+          <SecCard title="Procedimiento judicial" icon={Users} cols={3}>
+            <div>
+              <label className={lbl}>Tipo de Procedimiento</label>
+              <input value={form.tipo_proc} onChange={e => set("tipo_proc", e.target.value)}
+                placeholder="Monitorio, Ordinario…" className={inp} />
+            </div>
+            <div>
+              <label className={lbl}>Juzgado / Tribunal</label>
+              <input value={form.juzgado} onChange={e => set("juzgado", e.target.value)}
+                placeholder="Juzgado de 1ª Inst. nº 3 de Madrid" className={inp} />
+            </div>
+            <div>
+              <label className={lbl}>Procurador Propio</label>
+              <input value={form.procurador} onChange={e => set("procurador", e.target.value)}
+                placeholder="Nombre del procurador" className={inp} />
+            </div>
+            <div>
+              <label className={lbl}>N.I.G.</label>
+              <input value={form.nig} onChange={e => set("nig", e.target.value)}
+                placeholder="2809042120240001302" className={inp} />
+            </div>
+            <div>
+              <label className={lbl}>Núm. Autos</label>
+              <input value={form.num_autos} onChange={e => set("num_autos", e.target.value)}
+                placeholder="1302/2024" className={inp} />
+            </div>
+          </SecCard>
+
+          <SecCard title="Cuantías económicas" icon={ClipboardList} cols={4}>
+            <div>
+              <label className={lbl}>Cuantía Principal (€)</label>
+              <input type="number" value={form.cuantia_principal}
+                onChange={e => set("cuantia_principal", e.target.value)}
+                placeholder="0.00" step="0.01" className={inp} />
+            </div>
+            <div>
+              <label className={lbl}>Intereses (€)</label>
+              <input type="number" value={form.intereses}
+                onChange={e => set("intereses", e.target.value)}
+                placeholder="0.00" step="0.01" className={inp} />
+            </div>
+            <div>
+              <label className={lbl}>Costas (€)</label>
+              <input type="number" value={form.costas}
+                onChange={e => set("costas", e.target.value)}
+                placeholder="0.00" step="0.01" className={inp} />
+            </div>
+            <div>
+              <label className={lbl}>Cuantía Total (€)</label>
+              <input type="number" value={form.cuantia_total}
+                onChange={e => set("cuantia_total", e.target.value)}
+                placeholder="0.00" step="0.01" className={inp} />
+            </div>
+            <div>
+              <label className={lbl}>Importe (€)</label>
+              <input type="number" value={form.importe}
+                onChange={e => set("importe", e.target.value)}
+                placeholder="0.00" step="0.01" className={inp} />
+            </div>
+            <div className="flex items-end pb-0.5">
+              <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer select-none font-medium">
+                <input type="checkbox"
+                  checked={form.indeterminado === true || form.indeterminado === "true"}
+                  onChange={e => set("indeterminado", e.target.checked)}
+                  className="rounded border-slate-300 text-red-600 focus:ring-red-400" />
+                Cuantía indeterminada
+              </label>
+            </div>
+          </SecCard>
+
+          <SecCard title="Referencias y datos internos" icon={MoreHorizontal} cols={4}>
+            <div>
+              <label className={lbl}>Ref. Propia</label>
+              <input value={form.ref_propia} onChange={e => set("ref_propia", e.target.value)}
+                placeholder="2024-CIVIL-001" className={inp} />
+            </div>
+            <div>
+              <label className={lbl}>Ref. Expediente</label>
+              <input value={form.ref_expediente} onChange={e => set("ref_expediente", e.target.value)}
+                placeholder="REF-EXP-001" className={inp} />
+            </div>
+            <div>
+              <label className={lbl}>Centro</label>
+              <input value={form.centro} onChange={e => set("centro", e.target.value)}
+                placeholder="Oficina / Centro" className={inp} />
+            </div>
+            <div>
+              <label className={lbl}>Color</label>
+              <select value={form.color} onChange={e => set("color", e.target.value)} className={inp}>
+                {COLORES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+              </select>
+            </div>
+          </SecCard>
+
+        </div>
+
+        {/* Columna derecha */}
+        <div className="w-80 shrink-0 flex flex-col border-l border-slate-200 bg-white overflow-hidden">
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+
+            <div className="flex items-center gap-2 mb-1">
+              <Users size={13} className="text-slate-400" />
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Partes</span>
+            </div>
+
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 overflow-hidden">
+              <div className="px-3 py-2 bg-emerald-50 border-b border-emerald-100 flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">Cliente</span>
+              </div>
+              <div className="p-3 space-y-2.5">
+                <div>
+                  <label className={lbl}>Nombre</label>
+                  <select value={form.cliente_id}
+                    onChange={e => handleClienteChange(e.target.value)}
+                    className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm text-slate-700 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 bg-white">
+                    <option value="">— Sin asignar —</option>
+                    {clientes.map((c: any) => (
+                      <option key={c.id} value={c.id}>
+                        {`${c.first_name || ""} ${c.last_name || ""}`.trim() || c.commercial_name || c.nif_cif}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className={lbl}>Persona de Contacto</label>
+                  <input value={form.persona_contacto}
+                    onChange={e => set("persona_contacto", e.target.value)}
+                    placeholder="Nombre del contacto"
+                    className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm text-slate-700 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 bg-white" />
+                </div>
+                <div>
+                  <label className={lbl}>Teléfono / Email</label>
+                  <input value={form.contacto} onChange={e => set("contacto", e.target.value)}
+                    placeholder="612 345 678"
+                    className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm text-slate-700 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 bg-white" />
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-red-200 bg-red-50/30 overflow-hidden">
+              <div className="px-3 py-2 bg-red-50 border-b border-red-100 flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-red-400" />
+                <span className="text-[10px] font-bold text-red-700 uppercase tracking-wider">Parte Contraria</span>
+              </div>
+              <div className="p-3">
+                <label className={lbl}>Nombre / Razón social</label>
+                <input value={form.contrario} onChange={e => set("contrario", e.target.value)}
+                  placeholder="Nombre de la parte contraria"
+                  className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm text-slate-700 focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100 bg-white" />
+              </div>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden mt-1">
+              <div className="px-3 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+                <Activity size={13} className="text-slate-400" />
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Indicadores</span>
+              </div>
+              <div className="px-3 py-2">
+                {([
+                  ["Días sin actuaciones", "0 días", "text-slate-700"],
+                  ["Total cobrado",        "0 €",    "text-emerald-600"],
+                  ["Imp. Cobros Pdtes.",   "0 €",    "text-amber-600"],
+                  ["Total Prov. Recibidas","0 €",    "text-slate-600"],
+                  ["Nº Exptes Relac.",     "0",      "text-blue-600"],
+                  ["Saldo Total Exp",      "0 €",    "text-slate-700"],
+                  ["Pdte. Facturar",       "0 €",    "text-red-600"],
+                ] as [string, string, string][]).map(([label, value, color]) => (
+                  <div key={label} className="flex justify-between items-center py-1.5 border-b border-slate-100 last:border-0">
+                    <span className="text-xs text-slate-500">{label}</span>
+                    <span className={`text-xs font-bold ${color}`}>{value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Panel inferior (solo en edición) ── */}
+      {editId && (
+        <div className="border-t border-slate-200 shrink-0 bg-white flex flex-col" style={{ height: 240 }}>
+          <div className="flex items-end overflow-x-auto shrink-0 border-b border-slate-100 bg-slate-50 px-2 pt-2 gap-0.5">
+            {BOTTOM_TABS.map(t => (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className={`px-4 py-2 text-xs font-semibold whitespace-nowrap rounded-t-lg border border-b-0 transition-colors shrink-0
+                  ${tab === t.key
+                    ? "bg-white border-slate-200 text-red-700 shadow-sm"
+                    : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-white/70"}`}>
+                {t.label}
+              </button>
+            ))}
+            <div className="ml-auto flex items-center pr-1 pb-1">
+              <span className="text-[10px] text-slate-300 italic">Más pestañas próximamente</span>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 bg-white">
+            {tab === "notas" ? (
+              <textarea
+                value={form.observaciones}
+                onChange={e => set("observaciones", e.target.value)}
+                placeholder="Escribe aquí las notas internas del expediente…"
+                className="w-full h-full text-sm text-slate-700 border border-slate-200 rounded-lg px-3 py-2.5 focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100 resize-none placeholder:text-slate-300"
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-slate-300 gap-2">
+                <FolderOpen size={28} className="opacity-20" />
+                <span className="text-xs font-medium">Sin datos por ahora</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+
+    {/* ── Modal Adjuntos ── */}
+    {showAdj && editId && (
+      <AdjuntosModal
+        entityId={editId}
+        entityName={form.descripcion || `Expediente ${form.anio}`}
+        onClose={() => setShowAdj(false)}
+      />
+    )}
+    </>
+  );
+}

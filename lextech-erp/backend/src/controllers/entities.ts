@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import path from 'path';
 import fs from 'fs';
 import pool from '../config/database';
-import { logActivity } from './activityController';
+import { logActivity, logActivityForReq } from './activityController';
 
 const UPLOADS_ROOT = path.join(__dirname, '../../uploads/clients');
 
@@ -13,63 +13,88 @@ const CLIENT_FILES_ROOT = process.env.CLIENT_FILES_PATH
 /** Convierte string vacío a null (evita cast ::date fallido en PostgreSQL) */
 const nullIfEmpty = (v: any) => (v === '' || v === undefined ? null : v);
 
+/** Extrae el nombre legible del usuario desde las sessionClaims de Clerk */
+function reqUserName(req: any): string {
+  const c = req.auth?.sessionClaims;
+  if (!c) return req.auth?.userId || 'Sistema';
+  return c.name
+    || c.full_name
+    || [c.first_name, c.last_name].filter(Boolean).join(' ')
+    || c.email
+    || c.username
+    || req.auth?.userId
+    || 'Sistema';
+}
+
 /** Formatea un error de PG de forma legible */
 const pgErr = (e: any) =>
   `${e?.message || String(e)}${e?.detail ? ' | detail: ' + e.detail : ''}${e?.code ? ' | code: ' + e.code : ''}`;
 
 // ─────────────────────────────────────────────────────────────
-// GET /api/entities
+// GET /api/entities  — con búsqueda, filtro y paginación
 // ─────────────────────────────────────────────────────────────
 export const getEntities = async (req: any, res: Response) => {
-  // Intentar primero query completo (con todas las columnas nuevas)
   try {
-    const result = await pool.query(`
-      SELECT
-        id,
-        internal_number,
-        type,
-        client_status,
-        first_name,
-        last_name,
-        commercial_name,
-        nif_cif,
-        email,
-        phone_1,
-        phone_mobile,
-        address_town,
-        address_province,
-        photo_url,
-        created_at
-      FROM entities
-      ORDER BY created_at DESC
-      LIMIT 100
-    `);
-    return res.json({ success: true, data: result.rows });
-  } catch (_fullErr: any) {
-    // Si falla (columnas nuevas aún no existen), usar query mínimo con columnas originales
-    console.warn('⚠️  getEntities full query failed, using fallback query:', _fullErr?.message);
-  }
+    const search = (req.query.search as string || '').trim();
+    const typeFilter = req.query.type as string || '';
+    const statusFilter = req.query.status as string || '';
+    const limit  = Math.min(parseInt(req.query.limit  as string) || 200, 500);
+    const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
 
-  try {
+    const conditions: string[] = [];
+    const values: any[] = [];
+    let p = 1;
+
+    // Búsqueda por texto (nombre, NIF, email)
+    if (search) {
+      conditions.push(`(
+        first_name ILIKE $${p} OR last_name ILIKE $${p}
+        OR nif_cif ILIKE $${p} OR email ILIKE $${p}
+        OR commercial_name ILIKE $${p}
+      )`);
+      values.push(`%${search}%`);
+      p++;
+    }
+
+    // Filtro por tipo
+    if (typeFilter) {
+      conditions.push(`type = $${p}`);
+      values.push(typeFilter);
+      p++;
+    }
+
+    // Filtro por estado
+    if (statusFilter) {
+      conditions.push(`client_status = $${p}`);
+      values.push(statusFilter);
+      p++;
+    }
+
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
     const result = await pool.query(`
       SELECT
-        id,
-        type,
-        first_name,
-        last_name,
-        commercial_name,
-        nif_cif,
-        email,
-        phone_1,
-        address_town,
-        created_at
-      FROM entities
-      ORDER BY created_at DESC
-      LIMIT 100
-    `);
-    return res.json({ success: true, data: result.rows });
+        e.id, e.internal_number, e.type, e.client_status,
+        e.first_name, e.last_name, e.commercial_name, e.nif_cif,
+        e.email, e.phone_1, e.phone_mobile,
+        e.address_town, e.address_province,
+        e.photo_url, e.created_at, e.date_alta, e.lopd,
+        (SELECT COUNT(*) FROM activity_log al
+         WHERE al.entity_id = e.id AND al.entity_type = 'CLIENT'
+           AND al.action_type NOT LIKE 'Nota%'
+        )::int AS total_actuaciones,
+        (SELECT COUNT(*) FROM expedientes exp
+         WHERE exp.cliente_id = e.id
+        )::int AS total_expedientes
+      FROM entities e
+      ${where}
+      ORDER BY e.created_at DESC
+      LIMIT $${p} OFFSET $${p + 1}
+    `, [...values, limit, offset]);
+
+    return res.json({ success: true, data: result.rows, count: result.rowCount });
   } catch (error: any) {
-    console.error('❌ getEntities fallback:', pgErr(error));
+    console.error('❌ getEntities:', pgErr(error));
     res.status(500).json({ success: false, error: pgErr(error) });
   }
 };
@@ -200,7 +225,7 @@ export const createEntity = async (req: any, res: Response) => {
 
     // Registrar actividad (fire-and-forget, no bloquea la respuesta)
     const entityName = `${first_name} ${last_name || ''}`.trim() + ` (${nif_cif})`;
-    logActivity(userId, userId, 'Nuevo cliente creado', 'CLIENT', result.rows[0].id, entityName);
+    logActivityForReq(req, 'Nuevo cliente creado', 'CLIENT', result.rows[0].id, entityName);
 
     res.status(201).json({ success: true, data: result.rows[0] });
   } catch (error: any) {
@@ -307,12 +332,47 @@ export const updateEntity = async (req: any, res: Response) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Cliente no encontrado' });
     }
-    res.json({ success: true, data: result.rows[0] });
+    const updatedRow = result.rows[0];
+    const updatedName = updatedRow.commercial_name
+      || [updatedRow.first_name, updatedRow.last_name].filter(Boolean).join(' ')
+      || id;
+    logActivityForReq(req, 'Datos del cliente actualizados', 'CLIENT', id, updatedName);
+    res.json({ success: true, data: updatedRow });
   } catch (error: any) {
     console.error('❌ updateEntity:', pgErr(error));
     if (error.code === '23505') {
       return res.status(409).json({ success: false, error: 'Este NIF/CIF ya está registrado.' });
     }
+    res.status(500).json({ success: false, error: pgErr(error) });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+// PATCH /api/entities/:id  — actualización parcial de campos
+// ─────────────────────────────────────────────────────────────
+export const patchEntity = async (req: any, res: Response) => {
+  const { id } = req.params;
+  const ALLOWED = [
+    'client_status', 'date_baja', 'date_alta',
+    'lopd', 'center', 'commercial_communications',
+    'type', 'commercial_name', 'website',
+  ];
+  const entries = Object.entries(req.body).filter(([k]) => ALLOWED.includes(k));
+  if (entries.length === 0) {
+    return res.status(400).json({ success: false, error: 'Sin campos válidos para actualizar' });
+  }
+  const sets   = entries.map(([k], i) => `${k} = $${i + 1}`).join(', ');
+  const values = entries.map(([, v]) => (v === '' ? null : v));
+  try {
+    const result = await pool.query(
+      `UPDATE entities SET ${sets}, updated_at = NOW() WHERE id = $${entries.length + 1} RETURNING *`,
+      [...values, id]
+    );
+    if (result.rows.length === 0)
+      return res.status(404).json({ success: false, error: 'Cliente no encontrado' });
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error: any) {
+    console.error('❌ patchEntity:', pgErr(error));
     res.status(500).json({ success: false, error: pgErr(error) });
   }
 };

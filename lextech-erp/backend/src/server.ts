@@ -1,6 +1,7 @@
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
+import compression from 'compression';
 import dotenv from 'dotenv';
 import path from 'path';
 import entityRoutes from './routes/entities';
@@ -8,6 +9,8 @@ import ocrRoutes from './routes/ocr';
 import activityRoutes from './routes/activity';
 import vantiaRoutes from './routes/vantia';
 import filesRoutes from './routes/files';
+import tasksRoutes from './routes/tasks';
+import expedientesRoutes from './routes/expedientes';
 import { runMigrations } from './config/migrations';
 import { startLocalFilesWatcher } from './watchers/localFilesWatcher';
 import pool from './config/database';
@@ -20,8 +23,21 @@ const PORT = process.env.PORT || 4000;
 // --- MIDDLEWARES GLOBALES ---
 app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use(cors({ origin: true, credentials: true }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// ── Cache control: evitar datos stale en el navegador ────────
+app.use('/api', (_req, res, next) => {
+  res.set({
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0',
+  });
+  next();
+});
+
+// ── Compresión gzip de respuestas para velocidad ─────────────
+app.use(compression());
 
 // Servir archivos estáticos (fotos DNI subidas, etc.)
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
@@ -32,6 +48,8 @@ app.use('/api/ocr', ocrRoutes);
 app.use('/api/activity', activityRoutes);
 app.use('/api/vantia', vantiaRoutes);
 app.use('/api/files',  filesRoutes);
+app.use('/api/tasks',       tasksRoutes);
+app.use('/api/expedientes', expedientesRoutes);
 
 // Health check básico
 app.get('/health', (_req, res) => {

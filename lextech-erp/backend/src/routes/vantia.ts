@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth';
-import { chatVantia } from '../controllers/vantiaController';
+import { chatVantia, getChatHistory } from '../controllers/vantiaController';
 
 const router = Router();
 
+router.get('/chat/history', requireAuth, getChatHistory);
 router.post('/chat', requireAuth, chatVantia);
 
 export default router;

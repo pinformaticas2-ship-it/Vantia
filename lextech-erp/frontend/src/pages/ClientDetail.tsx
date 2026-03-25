@@ -7,12 +7,13 @@ import {
   Calendar, Hash, FileText, Shield, StickyNote,
   Paperclip, Clock, AlertTriangle, CheckCircle2,
   Upload, Plus, Trash2, ChevronRight, Gavel,
-  FolderOpen, Eye, Download, X, Sparkles,
+  FolderOpen, Eye, Download, X, Sparkles, ExternalLink,
   ScrollText, Receipt, Scale, UserCheck,
   MessageSquare, FileSignature, ShieldAlert, FilePlus,
   FilePlus2, Search, ChevronDown, ChevronRight as ChevronR,
 } from "lucide-react";
 import { safeJson } from "../lib/api";
+import { useAutoRefresh } from "../lib/useAutoRefresh";
 
 // ── helpers ───────────────────────────────────────────────────
 const statusColor: Record<string, string> = {
@@ -174,60 +175,159 @@ function TabExpedientes() {
 }
 
 // ── Tab: Historial ────────────────────────────────────────────
-function TabHistorial({ clientId }: { clientId: string }) {
-  // Historial de actuaciones — placeholder hasta que se implemente el módulo
-  const actuaciones = [
-    { id: 1, fecha: "11/03/2026", tipo: "Alta cliente", descripcion: "Registro del cliente en el sistema", usuario: "Admin", estado: "ok" },
-  ];
+interface ActividadEntry {
+  id: string;
+  user_id: string;
+  user_name: string;
+  action_type: string;
+  created_at: string;
+}
 
-  const tipoColor: Record<string, string> = {
-    "Alta cliente":    "bg-emerald-100 text-emerald-700",
-    "Actuación":       "bg-blue-100 text-blue-700",
-    "Documento":       "bg-amber-100 text-amber-700",
-    "Comunicación":    "bg-purple-100 text-purple-700",
-    "Vencimiento":     "bg-red-100 text-red-700",
+// Ícono y color según tipo de movimiento
+function actividadMeta(action: string): { dot: string; badge: string; label: string; detail: string } {
+  const lower = action.toLowerCase();
+  const colonIdx = action.indexOf(":");
+  const label  = colonIdx >= 0 ? action.slice(0, colonIdx).trim() : action;
+  const detail = colonIdx >= 0 ? action.slice(colonIdx + 1).trim() : "";
+
+  if (lower.startsWith("nuevo cliente"))     return { dot: "bg-emerald-500", badge: "bg-emerald-100 text-emerald-700", label, detail };
+  if (lower.startsWith("datos del cliente")) return { dot: "bg-sky-500",     badge: "bg-sky-100 text-sky-700",         label, detail };
+  if (lower.startsWith("archivo subido"))    return { dot: "bg-blue-500",    badge: "bg-blue-100 text-blue-700",        label, detail };
+  if (lower.startsWith("archivo eliminado")) return { dot: "bg-red-400",     badge: "bg-red-100 text-red-600",          label, detail };
+  if (lower.startsWith("documento creado"))  return { dot: "bg-indigo-500",  badge: "bg-indigo-100 text-indigo-700",    label, detail };
+  if (lower.startsWith("nota añadida"))      return { dot: "bg-amber-500",   badge: "bg-amber-100 text-amber-700",      label, detail };
+  if (lower.startsWith("nota eliminada"))    return { dot: "bg-orange-400",  badge: "bg-orange-100 text-orange-700",    label, detail };
+  return                                            { dot: "bg-slate-400",   badge: "bg-slate-100 text-slate-600",      label, detail };
+}
+
+function TabHistorial({ clientId }: { clientId: string }) {
+  const { getToken } = useAuth();
+  const [actividades, setActividades] = useState<ActividadEntry[]>([]);
+  const [loading, setLoading]         = useState(true);
+  const [refreshing, setRefreshing]   = useState(false);
+  const [error, setError]             = useState<string | null>(null);
+  const lastFetchRef                  = useRef<number>(0);
+
+  const fmtDate = (iso: string) => {
+    const d = new Date(iso);
+    return d.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" })
+      + " · " + d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
   };
+
+  // Carga silenciosa (sin mostrar spinner) para polling
+  const fetchActividades = useCallback(async (showSpinner = false) => {
+    if (showSpinner) setLoading(true);
+    else setRefreshing(true);
+    setError(null);
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/activity/client/${clientId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setActividades(data.data);
+        lastFetchRef.current = Date.now();
+      } else {
+        setError(data.error || "Error al cargar el historial");
+      }
+    } catch (e: any) {
+      setError(e.message || "Error de red");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [clientId, getToken]);
+
+  // Carga inicial
+  useEffect(() => { fetchActividades(true); }, [fetchActividades]);
+
+  // Polling cada 10 segundos como fallback
+  useEffect(() => {
+    const id = setInterval(() => fetchActividades(false), 10000);
+    return () => clearInterval(id);
+  }, [fetchActividades]);
+
+  // Actualización instantánea cuando se hace una acción en la página
+  useEffect(() => {
+    const handler = () => fetchActividades(false);
+    window.addEventListener('historial-changed', handler);
+    return () => window.removeEventListener('historial-changed', handler);
+  }, [fetchActividades]);
+
+  // Refresh al recuperar foco de ventana
+  useEffect(() => {
+    const onFocus = () => {
+      if (Date.now() - lastFetchRef.current > 10000) fetchActividades(false);
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [fetchActividades]);
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-between items-center">
-        <p className="text-sm text-slate-500">{actuaciones.length} actuaciones registradas</p>
-        <button className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm active:scale-95 transition-all">
-          <Plus size={15} /> Nueva actuación
+      {/* Cabecera */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-slate-500">
+          {loading ? "Cargando…" : `${actividades.length} movimiento${actividades.length !== 1 ? "s" : ""} registrado${actividades.length !== 1 ? "s" : ""}`}
+        </p>
+        <button
+          onClick={() => fetchActividades(false)}
+          disabled={loading || refreshing}
+          className="text-xs text-slate-400 hover:text-slate-600 flex items-center gap-1 transition-colors disabled:opacity-50"
+        >
+          <Loader2 size={12} className={(loading || refreshing) ? "animate-spin" : ""} /> Actualizar
         </button>
       </div>
 
+      {/* Línea de tiempo */}
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-        {actuaciones.length === 0 ? (
-          <div className="p-16 flex flex-col items-center gap-3 text-slate-400">
-            <Clock size={40} className="opacity-20" />
-            <p className="font-medium text-sm">Sin actuaciones registradas</p>
+        {loading ? (
+          <div className="p-14 flex flex-col items-center gap-3 text-slate-400">
+            <Loader2 size={28} className="animate-spin opacity-40" />
+            <p className="text-sm">Cargando historial…</p>
+          </div>
+        ) : error ? (
+          <div className="p-10 flex flex-col items-center gap-2 text-red-400">
+            <AlertCircle size={26} className="opacity-60" />
+            <p className="text-sm font-medium">{error}</p>
+            <button onClick={() => fetchActividades(true)} className="text-xs text-red-500 underline mt-1">Reintentar</button>
+          </div>
+        ) : actividades.length === 0 ? (
+          <div className="p-14 flex flex-col items-center gap-3 text-slate-300">
+            <Clock size={36} className="opacity-60" />
+            <p className="text-sm font-medium text-slate-400">Sin movimientos registrados</p>
+            <p className="text-xs text-slate-400">Los movimientos aparecerán aquí automáticamente</p>
           </div>
         ) : (
-          <table className="w-full text-left">
-            <thead className="bg-slate-50 border-b border-slate-100">
-              <tr>
-                <th className="px-5 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Fecha</th>
-                <th className="px-5 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tipo</th>
-                <th className="px-5 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Descripción</th>
-                <th className="px-5 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Usuario</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {actuaciones.map((a) => (
-                <tr key={a.id} className="hover:bg-slate-50/70 transition-colors">
-                  <td className="px-5 py-3 text-xs font-mono text-slate-500 whitespace-nowrap">{a.fecha}</td>
-                  <td className="px-5 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${tipoColor[a.tipo] || "bg-slate-100 text-slate-600"}`}>
-                      {a.tipo}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3 text-sm text-slate-700">{a.descripcion}</td>
-                  <td className="px-5 py-3 text-xs text-slate-500 hidden md:table-cell">{a.usuario}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="divide-y divide-slate-50">
+            {actividades.map((a, idx) => {
+              const { dot, badge, label, detail } = actividadMeta(a.action_type);
+              return (
+                <div key={a.id} className="flex items-start gap-4 px-5 py-3.5 hover:bg-slate-50/60 transition-colors">
+                  {/* Línea vertical + punto */}
+                  <div className="flex flex-col items-center pt-1 shrink-0">
+                    <span className={`w-2.5 h-2.5 rounded-full ${dot} shrink-0`} />
+                    {idx < actividades.length - 1 && (
+                      <span className="w-px flex-1 bg-slate-100 mt-1" style={{ minHeight: 16 }} />
+                    )}
+                  </div>
+                  {/* Contenido */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${badge}`}>{label}</span>
+                      {detail && <span className="text-sm text-slate-700 truncate">{detail}</span>}
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-0.5">{fmtDate(a.created_at)}</p>
+                  </div>
+                  {/* Usuario */}
+                  <span className="text-[11px] text-slate-400 shrink-0 hidden md:block pt-0.5">
+                    {a.user_name && !/^user_[A-Za-z0-9]+$/.test(a.user_name) ? a.user_name : 'Usuario'}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
     </div>
@@ -235,23 +335,184 @@ function TabHistorial({ clientId }: { clientId: string }) {
 }
 
 // ── Tab: Notas ────────────────────────────────────────────────
-function TabNotas() {
-  const [notas, setNotas] = useState<{ id: number; texto: string; fecha: string; autor: string }[]>([]);
+// ── Tab: Notas ─────────────────────────────────────────────────
+interface Nota {
+  id: string;
+  content: string;
+  category: string;
+  priority: string;
+  color: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+function TabNotas({ clientId }: { clientId: string }) {
+  const { getToken } = useAuth();
+  const [notas, setNotas] = useState<Nota[]>([]);
   const [nueva, setNueva] = useState("");
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [categoria, setCategoria] = useState("general");
+  const [prioridad, setPrioridad] = useState("normal");
+  const [color, setColor] = useState("#FCD34D");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  const addNota = () => {
-    if (!nueva.trim()) return;
-    setSaving(true);
-    setTimeout(() => {
-      const now = new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" });
-      setNotas(prev => [{ id: Date.now(), texto: nueva.trim(), fecha: now, autor: "Yo" }, ...prev]);
-      setNueva("");
-      setSaving(false);
-    }, 400);
+  // Helper: cabeceras con token JWT de Clerk
+  const authHeaders = async (): Promise<Record<string, string>> => {
+    const token = await getToken({ skipCache: true });
+    return {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    };
   };
 
-  const deleteNota = (id: number) => setNotas(prev => prev.filter(n => n.id !== id));
+  // Colores disponibles para las notas
+  const colores = [
+    { nombre: "Amarillo", valor: "#FCD34D" },
+    { nombre: "Rojo", valor: "#FECACA" },
+    { nombre: "Verde", valor: "#BBFBCC" },
+    { nombre: "Azul", valor: "#BFDBFE" },
+    { nombre: "Rosa", valor: "#FBCFE8" },
+    { nombre: "Púrpura", valor: "#E9D5FF" },
+  ];
+
+  const categorias = [
+    { nombre: "General", valor: "general" },
+    { nombre: "Urgente", valor: "urgente" },
+    { nombre: "Seguimiento", valor: "seguimiento" },
+    { nombre: "Recordatorio", valor: "recordatorio" },
+    { nombre: "Comercial", valor: "comercial" },
+    { nombre: "Legal", valor: "legal" },
+    { nombre: "Otro", valor: "otro" },
+  ];
+
+  const prioridades = [
+    { nombre: "Baja", valor: "baja" },
+    { nombre: "Normal", valor: "normal" },
+    { nombre: "Alta", valor: "alta" },
+    { nombre: "Urgente", valor: "urgente" },
+  ];
+
+  // Cargar notas
+  const cargarNotas = useCallback(async (silent = false) => {
+    try {
+      if (!silent) setLoading(true);
+      const headers = await authHeaders();
+      const response = await fetch(`/api/entities/${clientId}/notes`, { headers });
+      if (response.ok) {
+        const data = await response.json();
+        setNotas(data.data || []);
+      } else if (!silent) {
+        console.error("Error cargando notas:", response.statusText);
+      }
+    } catch (error) {
+      if (!silent) console.error("Error cargando notas:", error);
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }, [clientId]);
+
+  useEffect(() => {
+    if (clientId) cargarNotas();
+  }, [clientId, cargarNotas]);
+
+  // Auto-refrescar notas cada 30s
+  useAutoRefresh(() => cargarNotas(true), { intervalMs: 30_000, enabled: !!clientId });
+
+  // Agregar nueva nota
+  const addNota = async () => {
+    if (!nueva.trim()) return;
+    setSaving(true);
+    try {
+      const headers = await authHeaders();
+      const response = await fetch(`/api/entities/${clientId}/notes`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          content: nueva.trim(),
+          category: categoria,
+          priority: prioridad,
+          color: color,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setNotas(prev => [data.data, ...prev]);
+        window.dispatchEvent(new CustomEvent('historial-changed'));
+        setNueva("");
+        setCategoria("general");
+        setPrioridad("normal");
+        setColor("#FCD34D");
+      } else {
+        console.error("Error guardando nota:", response.statusText);
+      }
+    } catch (error) {
+      console.error("Error guardando nota:", error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Editar nota
+  const startEdit = (nota: Nota) => {
+    setEditingId(nota.id);
+    setEditContent(nota.content);
+  };
+
+  const saveEdit = async (notaId: string) => {
+    if (!editContent.trim()) return;
+    try {
+      const headers = await authHeaders();
+      const response = await fetch(`/api/entities/${clientId}/notes/${notaId}`, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({ content: editContent.trim() }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setNotas(prev => prev.map(n => n.id === notaId ? data.data : n));
+        setEditingId(null);
+        setEditContent("");
+      }
+    } catch (error) {
+      console.error("Error editando nota:", error);
+    }
+  };
+
+  // Eliminar nota — muestra modal de confirmación
+  const deleteNota = (notaId: string) => setConfirmDeleteId(notaId);
+
+  const confirmDeleteNota = async () => {
+    if (!confirmDeleteId) return;
+    const notaId = confirmDeleteId;
+    setConfirmDeleteId(null);
+    try {
+      const headers = await authHeaders();
+      const response = await fetch(`/api/entities/${clientId}/notes/${notaId}`, {
+        method: "DELETE",
+        headers,
+      });
+      if (response.ok) {
+        setNotas(prev => prev.filter(n => n.id !== notaId));
+        window.dispatchEvent(new CustomEvent('historial-changed'));
+      }
+    } catch (error) {
+      console.error("Error eliminando nota:", error);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 size={32} className="animate-spin text-slate-400" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -265,6 +526,50 @@ function TabNotas() {
           rows={3}
           className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100"
         />
+
+        {/* Opciones de personalización */}
+        <div className="grid grid-cols-3 gap-3">
+          {/* Categoría */}
+          <div>
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Categoría</label>
+            <select
+              value={categoria}
+              onChange={e => setCategoria(e.target.value)}
+              className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:border-red-400"
+            >
+              {categorias.map(c => <option key={c.valor} value={c.valor}>{c.nombre}</option>)}
+            </select>
+          </div>
+
+          {/* Prioridad */}
+          <div>
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Prioridad</label>
+            <select
+              value={prioridad}
+              onChange={e => setPrioridad(e.target.value)}
+              className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:border-red-400"
+            >
+              {prioridades.map(p => <option key={p.valor} value={p.valor}>{p.nombre}</option>)}
+            </select>
+          </div>
+
+          {/* Color */}
+          <div>
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Color</label>
+            <div className="flex gap-1">
+              {colores.map(c => (
+                <button
+                  key={c.valor}
+                  onClick={() => setColor(c.valor)}
+                  className={`h-8 w-8 rounded-lg border-2 transition-all ${color === c.valor ? "border-slate-900" : "border-transparent"}`}
+                  style={{ backgroundColor: c.valor }}
+                  title={c.nombre}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+
         <div className="flex justify-end">
           <button
             onClick={addNota}
@@ -286,19 +591,116 @@ function TabNotas() {
       ) : (
         <div className="space-y-3">
           {notas.map(n => (
-            <div key={n.id} className="bg-white border border-slate-200 rounded-xl p-4 flex gap-3">
-              <div className="h-8 w-8 bg-amber-100 rounded-lg flex items-center justify-center shrink-0">
-                <StickyNote size={15} className="text-amber-600" />
+            <div key={n.id} className="bg-white border border-slate-200 rounded-xl overflow-hidden" style={{ borderLeft: `4px solid ${n.color}` }}>
+              <div className="p-4 space-y-2">
+                {/* Badges */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                    {categorias.find(c => c.valor === n.category)?.nombre || n.category}
+                  </span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    n.priority === "urgente" ? "bg-red-100 text-red-600" :
+                    n.priority === "alta" ? "bg-orange-100 text-orange-600" :
+                    n.priority === "normal" ? "bg-blue-100 text-blue-600" :
+                    "bg-slate-100 text-slate-600"
+                  }`}>
+                    {prioridades.find(p => p.valor === n.priority)?.nombre || n.priority}
+                  </span>
+                </div>
+
+                {/* Contenido */}
+                {editingId === n.id ? (
+                  <textarea
+                    value={editContent}
+                    onChange={e => setEditContent(e.target.value)}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:border-red-400"
+                    rows={3}
+                  />
+                ) : (
+                  <p className="text-sm text-slate-800 leading-relaxed">{n.content}</p>
+                )}
+
+                {/* Meta */}
+                <p className="text-[10px] text-slate-400">
+                  {n.created_by && !/^user_[A-Za-z0-9]+$/.test(n.created_by) ? n.created_by : 'Usuario'} · {new Date(n.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                </p>
+
+                {/* Acciones */}
+                <div className="flex gap-2 justify-end pt-2">
+                  {editingId === n.id ? (
+                    <>
+                      <button
+                        onClick={() => saveEdit(n.id)}
+                        className="px-3 py-1 text-xs font-bold text-white bg-red-700 hover:bg-red-800 rounded-lg transition-all"
+                      >
+                        Guardar
+                      </button>
+                      <button
+                        onClick={() => setEditingId(null)}
+                        className="px-3 py-1 text-xs font-bold text-slate-600 hover:text-slate-900 transition-all"
+                      >
+                        Cancelar
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => startEdit(n)}
+                        className="p-1 text-neutral-300 hover:text-red-600 transition-colors"
+                      >
+                        <Edit3 size={14} />
+                      </button>
+                      <button
+                        onClick={() => deleteNota(n.id)}
+                        className="p-1 text-slate-300 hover:text-red-500 transition-colors"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-slate-800 leading-relaxed">{n.texto}</p>
-                <p className="text-[10px] text-slate-400 mt-1">{n.autor} · {n.fecha}</p>
-              </div>
-              <button onClick={() => deleteNota(n.id)} className="p-1 text-slate-300 hover:text-red-500 transition-colors shrink-0">
-                <Trash2 size={14} />
-              </button>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* ── Modal confirmación borrar nota ── */}
+      {confirmDeleteId && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          onClick={() => setConfirmDeleteId(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="p-6 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                  <Trash2 size={18} className="text-red-600" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900">Eliminar nota</h3>
+                  <p className="text-sm text-slate-500 mt-0.5">Esta acción no se puede deshacer.</p>
+                </div>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => setConfirmDeleteId(null)}
+                  className="flex-1 px-4 py-2 text-sm font-medium text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmDeleteNota}
+                  className="flex-1 px-4 py-2 text-sm font-bold text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  Eliminar
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -306,69 +708,578 @@ function TabNotas() {
 }
 
 // ── Tab: Tareas / Plazos ──────────────────────────────────────
-function TabTareas() {
-  const tareas = [
-    { id: 1, titulo: "Ejemplo: Presentar escrito de demanda", plazo: "15/04/2026", estado: "pendiente",  prioridad: "alta",  expediente: "EXP-001" },
-    { id: 2, titulo: "Ejemplo: Revisión de contrato",         plazo: "20/03/2026", estado: "urgente",    prioridad: "media", expediente: "EXP-002" },
-  ];
+// ── Formulario inline de nueva tarea ──────────────────────────
+interface TareaForm {
+  titulo: string; descripcion: string; plazo: string;
+  estado: string; prioridad: string; expediente: string;
+  tipo: string; juzgado: string; num_proc: string;
+}
+const TAREA_EMPTY: TareaForm = {
+  titulo: "", descripcion: "", plazo: "",
+  estado: "pendiente", prioridad: "media", expediente: "",
+  tipo: "otro", juzgado: "", num_proc: "",
+};
+
+const TIPO_CONFIG: Record<string, { label: string; color: string }> = {
+  plazo_procesal: { label: "Plazo Procesal",  color: "bg-red-100 text-red-700" },
+  vista_juicio:   { label: "Vista / Juicio",  color: "bg-purple-100 text-purple-700" },
+  notificacion:   { label: "Notificación",    color: "bg-blue-100 text-blue-700" },
+  reunion:        { label: "Reunión",         color: "bg-green-100 text-green-700" },
+  escrito:        { label: "Escrito",         color: "bg-indigo-100 text-indigo-700" },
+  gestion:        { label: "Gestión",         color: "bg-amber-100 text-amber-700" },
+  pago:           { label: "Pago / Factura",  color: "bg-emerald-100 text-emerald-700" },
+  llamada:        { label: "Llamada",         color: "bg-teal-100 text-teal-700" },
+  diligencia:     { label: "Diligencia",      color: "bg-orange-100 text-orange-700" },
+  otro:           { label: "Otro",            color: "bg-slate-100 text-slate-500" },
+};
+
+function TabTareas({ clientId }: { clientId: string }) {
+  const { getToken } = useAuth();
+  const [tareas, setTareas]       = useState<any[]>([]);
+  const [loading, setLoading]     = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [showForm, setShowForm]   = useState(false);
+  const [form, setForm]           = useState<TareaForm>(TAREA_EMPTY);
+  const [saving, setSaving]       = useState(false);
+  const [editId, setEditId]       = useState<string | null>(null);
+  const [editForm, setEditForm]   = useState<TareaForm>(TAREA_EMPTY);
+  const [filter, setFilter]       = useState<"todas"|"pendiente"|"urgente"|"completada">("todas");
+  const [filterTipo, setFilterTipo]     = useState("");
+  const [filterPrio, setFilterPrio]     = useState("");
+  const [filterVencidas, setFilterVencidas] = useState(false);
+  const [search, setSearch]             = useState("");
+  const [confirmDeleteTareaId, setConfirmDeleteTareaId] = useState<string | null>(null);
 
   const estadoStyle: Record<string, string> = {
-    pendiente: "bg-amber-100 text-amber-700",
-    urgente:   "bg-red-100 text-red-700",
-    completada:"bg-emerald-100 text-emerald-700",
+    pendiente:  "bg-amber-100 text-amber-700",
+    urgente:    "bg-red-100 text-red-700",
+    completada: "bg-emerald-100 text-emerald-700",
+  };
+  const estadoLabel: Record<string, string> = {
+    pendiente: "Pendiente", urgente: "Urgente", completada: "Completada",
+  };
+  const prioridadStyle: Record<string, string> = {
+    alta: "text-red-500", media: "text-amber-500", baja: "text-slate-400",
   };
 
-  const prioridadStyle: Record<string, string> = {
-    alta:  "text-red-500",
-    media: "text-amber-500",
-    baja:  "text-slate-400",
+  const fetchTareas = useCallback(async () => {
+    setFetchError(null);
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/tasks/client/${clientId}`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await safeJson(res);
+      if (res.ok) setTareas(data.data || []);
+      else setFetchError(data.error || "Error al cargar tareas");
+    } catch (e: any) {
+      setFetchError(e.message || "Error de conexión con el servidor");
+    } finally { setLoading(false); }
+  }, [clientId, getToken]);
+
+  useEffect(() => { fetchTareas(); }, [fetchTareas]);
+
+  const handleCreate = async () => {
+    if (!form.titulo.trim()) return;
+    setSaving(true);
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/tasks/client/${clientId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(form),
+      });
+      const data = await safeJson(res);
+      if (res.ok) {
+        setTareas(prev => [data.data, ...prev]);
+        setForm(TAREA_EMPTY);
+        setShowForm(false);
+        window.dispatchEvent(new CustomEvent('historial-changed'));
+      }
+    } finally { setSaving(false); }
   };
+
+  const handleToggleEstado = async (t: any) => {
+    const nuevoEstado = t.estado === "completada" ? "pendiente" : "completada";
+    const token = await getToken({ skipCache: true });
+    const res = await fetch(`/api/tasks/${t.id}/estado`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ estado: nuevoEstado }),
+    });
+    if (res.ok) setTareas(prev => prev.map(x => x.id === t.id ? { ...x, estado: nuevoEstado } : x));
+  };
+
+  const handleDelete = (id: string) => setConfirmDeleteTareaId(id);
+
+  const confirmDeleteTarea = async () => {
+    if (!confirmDeleteTareaId) return;
+    const id = confirmDeleteTareaId;
+    setConfirmDeleteTareaId(null);
+    const token = await getToken({ skipCache: true });
+    const res = await fetch(`/api/tasks/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    if (res.ok) {
+      setTareas(prev => prev.filter(x => x.id !== id));
+      window.dispatchEvent(new CustomEvent('historial-changed'));
+    }
+  };
+
+  const startEdit = (t: any) => {
+    setEditId(t.id);
+    setEditForm({
+      titulo:      t.titulo || "",
+      descripcion: t.descripcion || "",
+      plazo:       t.plazo ? t.plazo.slice(0, 10) : "",
+      estado:      t.estado,
+      prioridad:   t.prioridad,
+      expediente:  t.expediente || "",
+      tipo:        t.tipo || "otro",
+      juzgado:     t.juzgado || "",
+      num_proc:    t.num_proc || "",
+    });
+  };
+
+  const saveEdit = async () => {
+    if (!editId || !editForm.titulo.trim()) return;
+    setSaving(true);
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/tasks/${editId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(editForm),
+      });
+      const data = await safeJson(res);
+      if (res.ok) {
+        setTareas(prev => prev.map(x => x.id === editId ? data.data : x));
+        setEditId(null);
+      }
+    } finally { setSaving(false); }
+  };
+
+  const isVencida = (t: any) => t.plazo && t.estado !== "completada" && new Date(t.plazo) < new Date();
+  const fmtPlazo = (d: string) => {
+    if (!d) return null;
+    return new Date(d).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" });
+  };
+  const visible = tareas.filter(t => {
+    if (filter !== "todas" && t.estado !== filter) return false;
+    if (filterTipo && t.tipo !== filterTipo) return false;
+    if (filterPrio && t.prioridad !== filterPrio) return false;
+    if (filterVencidas && !isVencida(t)) return false;
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      const hay = [t.titulo, t.descripcion, t.expediente, t.juzgado, t.num_proc, t.created_by]
+        .filter(Boolean).join(" ").toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  if (loading) return (
+    <div className="flex justify-center py-16">
+      <Loader2 size={22} className="animate-spin text-slate-300" />
+    </div>
+  );
+
+  if (fetchError) return (
+    <div className="bg-red-50 border border-red-200 rounded-xl p-6 flex flex-col items-center gap-3 text-center">
+      <AlertCircle size={28} className="text-red-400" />
+      <div>
+        <p className="text-sm font-semibold text-red-700">No se pudieron cargar las tareas</p>
+        <p className="text-xs text-red-500 mt-1">{fetchError}</p>
+      </div>
+      <button onClick={fetchTareas}
+        className="mt-1 px-4 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors">
+        Reintentar
+      </button>
+    </div>
+  );
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <div className="flex gap-4 text-xs">
-          <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-red-500 inline-block"></span>
-            <span className="text-slate-500">{tareas.filter(t => t.estado === "urgente").length} urgentes</span>
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-amber-400 inline-block"></span>
-            <span className="text-slate-500">{tareas.filter(t => t.estado === "pendiente").length} pendientes</span>
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block"></span>
-            <span className="text-slate-500">{tareas.filter(t => t.estado === "completada").length} completadas</span>
-          </span>
+      {/* Cabecera */}
+      <div className="space-y-2">
+        {/* Fila 1: estado + botón nueva */}
+        <div className="flex flex-wrap justify-between items-center gap-3">
+          <div className="flex gap-1 bg-slate-100 rounded-xl p-1 text-xs">
+            {(["todas","pendiente","urgente","completada"] as const).map(f => (
+              <button key={f} onClick={() => setFilter(f)}
+                className={`px-3 py-1.5 rounded-lg font-semibold capitalize transition-colors ${filter === f ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+                {f === "todas"      ? `Todas (${tareas.length})` :
+                 f === "pendiente"  ? `Pendientes (${tareas.filter(x => x.estado === "pendiente").length})` :
+                 f === "urgente"    ? `Urgentes (${tareas.filter(x => x.estado === "urgente").length})` :
+                                     `Completadas (${tareas.filter(x => x.estado === "completada").length})`}
+              </button>
+            ))}
+          </div>
+          <button onClick={() => { setShowForm(v => !v); setForm(TAREA_EMPTY); }}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-red-700 hover:bg-red-800 rounded-xl shadow-sm active:scale-95 transition-all">
+            <Plus size={15} /> Nueva tarea
+          </button>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm active:scale-95 transition-all">
-          <Plus size={15} /> Nueva tarea
-        </button>
+
+        {/* Fila 2: búsqueda + tipo + prioridad + vencidas */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Búsqueda */}
+          <div className="relative flex-1 min-w-[160px]">
+            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Buscar tarea…"
+              className="w-full pl-7 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:border-red-400 bg-white"
+            />
+            {search && (
+              <button onClick={() => setSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500">
+                <X size={11} />
+              </button>
+            )}
+          </div>
+
+          {/* Tipo */}
+          <select value={filterTipo} onChange={e => setFilterTipo(e.target.value)}
+            className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-red-400 bg-white text-slate-600">
+            <option value="">Todos los tipos</option>
+            {Object.entries(TIPO_CONFIG).map(([k, v]) => (
+              <option key={k} value={k}>{v.label}</option>
+            ))}
+          </select>
+
+          {/* Prioridad */}
+          <div className="flex gap-1">
+            {[["", "Todas"], ["alta", "Alta"], ["media", "Media"], ["baja", "Baja"]].map(([val, label]) => (
+              <button key={val} onClick={() => setFilterPrio(val)}
+                className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${
+                  filterPrio === val
+                    ? val === "alta"  ? "bg-red-600 text-white"
+                    : val === "media" ? "bg-amber-500 text-white"
+                    : val === "baja"  ? "bg-slate-500 text-white"
+                    : "bg-slate-700 text-white"
+                    : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                }`}>
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Vencidas */}
+          <button onClick={() => setFilterVencidas(v => !v)}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${
+              filterVencidas ? "bg-red-100 text-red-700 border border-red-200" : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+            }`}>
+            <AlertTriangle size={11} /> Vencidas
+          </button>
+
+          {/* Limpiar filtros */}
+          {(filterTipo || filterPrio || filterVencidas || search) && (
+            <button onClick={() => { setFilterTipo(""); setFilterPrio(""); setFilterVencidas(false); setSearch(""); }}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+              <X size={11} /> Limpiar
+            </button>
+          )}
+        </div>
       </div>
 
-      {tareas.length === 0 ? (
-        <div className="bg-white border border-slate-200 rounded-xl p-16 flex flex-col items-center gap-3 text-slate-400">
-          <AlertTriangle size={40} className="opacity-20" />
-          <p className="font-medium text-sm">Sin tareas o plazos pendientes</p>
+      {/* Formulario nueva tarea */}
+      {showForm && (
+        <div className="bg-white border border-red-200 rounded-xl p-5 space-y-4 shadow-sm">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nueva tarea / plazo</p>
+
+          {/* Título */}
+          <input value={form.titulo} onChange={e => setForm(p => ({ ...p, titulo: e.target.value }))}
+            placeholder="Título de la tarea *" autoFocus
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100" />
+
+          {/* Descripción */}
+          <textarea value={form.descripcion} onChange={e => setForm(p => ({ ...p, descripcion: e.target.value }))}
+            placeholder="Descripción / instrucciones (opcional)" rows={2}
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100" />
+
+          {/* Fila 1: Tipo + Fecha límite + Estado + Prioridad */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="col-span-2 md:col-span-1">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tipo de tarea</label>
+              <select value={form.tipo} onChange={e => setForm(p => ({ ...p, tipo: e.target.value }))}
+                className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-red-400 mt-0.5">
+                {Object.entries(TIPO_CONFIG).map(([k, v]) => (
+                  <option key={k} value={k}>{v.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Fecha límite</label>
+              <input type="date" value={form.plazo} onChange={e => setForm(p => ({ ...p, plazo: e.target.value }))}
+                min={new Date().toISOString().split('T')[0]}
+                className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-red-400 mt-0.5" />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Estado</label>
+              <select value={form.estado} onChange={e => setForm(p => ({ ...p, estado: e.target.value }))}
+                className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-red-400 mt-0.5">
+                <option value="pendiente">Pendiente</option>
+                <option value="urgente">Urgente</option>
+                <option value="completada">Completada</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Prioridad</label>
+              <select value={form.prioridad} onChange={e => setForm(p => ({ ...p, prioridad: e.target.value }))}
+                className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-red-400 mt-0.5">
+                <option value="alta">Alta</option>
+                <option value="media">Media</option>
+                <option value="baja">Baja</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Fila 2: Expediente + Juzgado/Tribunal + Nº Procedimiento */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Expediente</label>
+              <input value={form.expediente} onChange={e => setForm(p => ({ ...p, expediente: e.target.value }))}
+                placeholder="EXP-2024-001"
+                className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-red-400 mt-0.5" />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Juzgado / Tribunal</label>
+              <input value={form.juzgado} onChange={e => setForm(p => ({ ...p, juzgado: e.target.value }))}
+                placeholder="Juzgado de 1ª Instancia nº 3"
+                className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-red-400 mt-0.5" />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Nº Procedimiento</label>
+              <input value={form.num_proc} onChange={e => setForm(p => ({ ...p, num_proc: e.target.value }))}
+                placeholder="123/2024"
+                className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-red-400 mt-0.5" />
+            </div>
+          </div>
+
+          <div className="flex gap-2 justify-end pt-1">
+            <button onClick={() => setShowForm(false)}
+              className="px-4 py-1.5 text-sm font-semibold text-slate-500 hover:text-slate-700 transition-colors">
+              Cancelar
+            </button>
+            <button onClick={handleCreate} disabled={saving || !form.titulo.trim()}
+              className="flex items-center gap-2 px-5 py-1.5 text-sm font-bold text-white bg-red-700 hover:bg-red-800 disabled:opacity-50 rounded-lg active:scale-95 transition-all">
+              {saving ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />} Guardar tarea
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Lista de tareas */}
+      {visible.length === 0 ? (
+        <div className="bg-white border border-slate-200 rounded-xl p-14 flex flex-col items-center gap-3 text-slate-400">
+          <CheckCircle2 size={36} className="opacity-20" />
+          <p className="font-medium text-sm">
+            {(search || filterTipo || filterPrio || filterVencidas) ? "No hay tareas con esos filtros" : filter !== "todas" ? `Sin tareas en estado "${filter}"` : "Sin tareas"}
+          </p>
         </div>
       ) : (
         <div className="space-y-2">
-          {tareas.map(t => (
-            <div key={t.id} className="bg-white border border-slate-200 rounded-xl p-4 flex items-start gap-4 hover:border-slate-300 transition-colors">
-              <button className="mt-0.5 h-4 w-4 rounded border-2 border-slate-300 hover:border-red-400 shrink-0 transition-colors" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-slate-800">{t.titulo}</p>
-                <div className="flex items-center gap-3 mt-1 text-[11px] text-slate-400">
-                  <span className="flex items-center gap-1"><Calendar size={10} /> {t.plazo}</span>
-                  <span className="flex items-center gap-1"><Briefcase size={10} /> {t.expediente}</span>
+          {visible.map(t => (
+            <div key={t.id}
+              className={`bg-white border rounded-xl p-4 flex items-start gap-3 transition-colors ${
+                t.estado === "completada" ? "border-slate-100 opacity-60" :
+                isVencida(t) ? "border-red-200 bg-red-50/30" : "border-slate-200 hover:border-slate-300"
+              }`}>
+
+              {/* Checkbox */}
+              <button onClick={() => handleToggleEstado(t)}
+                className={`mt-0.5 h-4 w-4 rounded border-2 shrink-0 flex items-center justify-center transition-colors ${
+                  t.estado === "completada" ? "bg-emerald-500 border-emerald-500" : "border-slate-300 hover:border-red-400"
+                }`}>
+                {t.estado === "completada" && <CheckCircle2 size={10} className="text-white" />}
+              </button>
+
+              {/* Contenido */}
+              {editId === t.id ? (
+                <div className="flex-1 space-y-3">
+                  {/* Título */}
+                  <input value={editForm.titulo} onChange={e => setEditForm(p => ({ ...p, titulo: e.target.value }))}
+                    placeholder="Título *"
+                    className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-red-400" />
+                  {/* Descripción */}
+                  <textarea value={editForm.descripcion} onChange={e => setEditForm(p => ({ ...p, descripcion: e.target.value }))}
+                    rows={2} placeholder="Descripción"
+                    className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-sm resize-none focus:outline-none focus:border-red-400" />
+                  {/* Fila 1 */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <div>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">Tipo</p>
+                      <select value={editForm.tipo} onChange={e => setEditForm(p => ({ ...p, tipo: e.target.value }))}
+                        className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-red-400">
+                        {Object.entries(TIPO_CONFIG).map(([k, v]) => (
+                          <option key={k} value={k}>{v.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">Fecha límite</p>
+                      <input type="date" value={editForm.plazo} onChange={e => setEditForm(p => ({ ...p, plazo: e.target.value }))}
+                        min={new Date().toISOString().split('T')[0]}
+                        className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-red-400" />
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">Estado</p>
+                      <select value={editForm.estado} onChange={e => setEditForm(p => ({ ...p, estado: e.target.value }))}
+                        className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-red-400">
+                        <option value="pendiente">Pendiente</option>
+                        <option value="urgente">Urgente</option>
+                        <option value="completada">Completada</option>
+                      </select>
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">Prioridad</p>
+                      <select value={editForm.prioridad} onChange={e => setEditForm(p => ({ ...p, prioridad: e.target.value }))}
+                        className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-red-400">
+                        <option value="alta">Alta</option>
+                        <option value="media">Media</option>
+                        <option value="baja">Baja</option>
+                      </select>
+                    </div>
+                  </div>
+                  {/* Fila 2 */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                    <div>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">Expediente</p>
+                      <input value={editForm.expediente} onChange={e => setEditForm(p => ({ ...p, expediente: e.target.value }))}
+                        placeholder="EXP-2024-001"
+                        className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-red-400" />
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">Juzgado / Tribunal</p>
+                      <input value={editForm.juzgado} onChange={e => setEditForm(p => ({ ...p, juzgado: e.target.value }))}
+                        placeholder="Juzgado de 1ª Instancia nº 3"
+                        className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-red-400" />
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">Nº Procedimiento</p>
+                      <input value={editForm.num_proc} onChange={e => setEditForm(p => ({ ...p, num_proc: e.target.value }))}
+                        placeholder="123/2024"
+                        className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-red-400" />
+                    </div>
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <button onClick={() => setEditId(null)} className="px-3 py-1 text-xs text-slate-500 hover:text-slate-700">Cancelar</button>
+                    <button onClick={saveEdit} disabled={saving}
+                      className="px-4 py-1 text-xs font-bold text-white bg-red-700 hover:bg-red-800 rounded-lg disabled:opacity-50">
+                      {saving ? "Guardando…" : "Guardar"}
+                    </button>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <span className={`text-[10px] font-bold uppercase ${prioridadStyle[t.prioridad]}`}>● {t.prioridad}</span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${estadoStyle[t.estado]}`}>{t.estado}</span>
-              </div>
+              ) : (
+                <div className="flex-1 min-w-0">
+                  {/* Título */}
+                  <p className={`text-sm font-semibold mb-1.5 ${t.estado === "completada" ? "line-through text-slate-400" : "text-slate-800"}`}>
+                    {t.titulo}
+                  </p>
+
+                  {/* Descripción */}
+                  {t.descripcion && (
+                    <p className="text-xs text-slate-500 mb-2 line-clamp-2 leading-relaxed">{t.descripcion}</p>
+                  )}
+
+                  {/* Badges de tipo + estado + prioridad */}
+                  <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${
+                      TIPO_CONFIG[t.tipo]?.color || "bg-slate-100 text-slate-500 border-slate-200"
+                    }`}>
+                      {TIPO_CONFIG[t.tipo]?.label || "Otro"}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${estadoStyle[t.estado]}`}>
+                      {estadoLabel[t.estado]}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                      t.prioridad === "alta"  ? "bg-red-50 text-red-600 border-red-200" :
+                      t.prioridad === "media" ? "bg-amber-50 text-amber-600 border-amber-200" :
+                                               "bg-slate-50 text-slate-400 border-slate-200"
+                    }`}>
+                      ↑ {t.prioridad}
+                    </span>
+                  </div>
+
+                  {/* Metadatos */}
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px]">
+                    {/* Fecha límite — siempre visible */}
+                    <span className={`flex items-center gap-1 font-medium ${isVencida(t) ? "text-red-600" : t.plazo ? "text-slate-400" : "text-slate-300"}`}>
+                      <Calendar size={10} />
+                      {t.plazo ? (
+                        <>{fmtPlazo(t.plazo)}{isVencida(t) && <span className="font-bold text-red-600 ml-1">VENCIDA</span>}</>
+                      ) : "Sin fecha límite"}
+                    </span>
+                    {/* Fecha de creación */}
+                    <span className="flex items-center gap-1 text-slate-300">
+                      <Clock size={10} /> Creada {new Date(t.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" })}
+                    </span>
+                    {t.expediente && (
+                      <span className="flex items-center gap-1 text-slate-400">
+                        <Briefcase size={10} /> {t.expediente}
+                      </span>
+                    )}
+                    {t.num_proc && (
+                      <span className="flex items-center gap-1 text-slate-400">
+                        <Hash size={10} /> {t.num_proc}
+                      </span>
+                    )}
+                    {t.juzgado && (
+                      <span className="flex items-center gap-1 text-slate-400">
+                        <Gavel size={10} /> {t.juzgado}
+                      </span>
+                    )}
+                    {t.created_by && (
+                      <span className="flex items-center gap-1 text-slate-400">
+                        <User size={10} /> {/^user_[A-Za-z0-9]+$/.test(t.created_by) ? 'Usuario' : t.created_by}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Acciones — siempre visibles */}
+              {editId !== t.id && (
+                <div className="flex flex-col items-end gap-1.5 shrink-0 ml-2">
+                  <button onClick={() => startEdit(t)}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">
+                    <Edit3 size={12} /> Editar
+                  </button>
+                  <button onClick={() => handleDelete(t.id)}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors">
+                    <Trash2 size={12} /> Borrar
+                  </button>
+                </div>
+              )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* ── Modal confirmación borrar tarea ── */}
+      {confirmDeleteTareaId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          onClick={() => setConfirmDeleteTareaId(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden"
+            onClick={e => e.stopPropagation()}>
+            <div className="p-6 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                  <Trash2 size={18} className="text-red-600" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900">Eliminar tarea</h3>
+                  <p className="text-sm text-slate-500">Esta acción no se puede deshacer.</p>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-2 px-6 pb-6">
+              <button onClick={() => setConfirmDeleteTareaId(null)}
+                className="flex-1 px-4 py-2 text-sm font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">
+                Cancelar
+              </button>
+              <button onClick={confirmDeleteTarea}
+                className="flex-1 px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors">
+                Eliminar
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -602,7 +1513,7 @@ small{font-size:10px;color:#888}</style></head><body>
     label: "Carta de Reclamación",
     desc: "Requerimiento previo a demanda",
     icon: FilePlus,
-    color: "bg-red-50 text-red-600 border-red-200",
+    color: "bg-orange-50 text-orange-600 border-orange-200",
     generate: (c: any) => `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
 <title>Carta de Reclamación</title>
 <style>body{font-family:Arial,sans-serif;max-width:800px;margin:40px auto;color:#222;line-height:1.7}
@@ -624,14 +1535,41 @@ small{font-size:10px;color:#888}</style></head><body>
 
 // ── Helpers de archivos ────────────────────────────────────────
 function fileIcon(mime: string, name: string) {
-  if (mime.startsWith("image/"))           return { icon: "🖼️", color: "bg-emerald-100 text-emerald-700" };
-  if (mime === "application/pdf")          return { icon: "📄", color: "bg-red-100 text-red-700" };
-  if (mime.includes("word") || name.endsWith(".doc") || name.endsWith(".docx"))
-                                           return { icon: "📝", color: "bg-blue-100 text-blue-700" };
-  if (mime.includes("excel") || mime.includes("spreadsheet") || name.endsWith(".xlsx") || name.endsWith(".xls"))
-                                           return { icon: "📊", color: "bg-green-100 text-green-700" };
-  if (mime.startsWith("text/"))            return { icon: "📃", color: "bg-slate-100 text-slate-700" };
-  return { icon: "📎", color: "bg-slate-100 text-slate-600" };
+  const n = name.toLowerCase();
+  // Imágenes
+  if (mime.startsWith("image/"))
+    return { icon: "🖼️", color: "bg-emerald-100 text-emerald-600", label: "Imagen" };
+  // PDF
+  if (mime === "application/pdf")
+    return { icon: "📄", color: "bg-red-100 text-red-600", label: "PDF" };
+  // Word
+  if (mime.includes("word") || n.endsWith(".doc") || n.endsWith(".docx"))
+    return { icon: "📝", color: "bg-blue-100 text-blue-600", label: "Word" };
+  // Excel
+  if (mime.includes("excel") || mime.includes("spreadsheet") || n.endsWith(".xlsx") || n.endsWith(".xls") || n.endsWith(".csv"))
+    return { icon: "📊", color: "bg-green-100 text-green-600", label: "Excel" };
+  // PowerPoint
+  if (mime.includes("presentation") || mime.includes("powerpoint") || n.endsWith(".pptx") || n.endsWith(".ppt"))
+    return { icon: "📑", color: "bg-orange-100 text-orange-600", label: "PPT" };
+  // Audio
+  if (mime.startsWith("audio/"))
+    return { icon: "🎵", color: "bg-purple-100 text-purple-600", label: "Audio" };
+  // Video
+  if (mime.startsWith("video/"))
+    return { icon: "🎬", color: "bg-pink-100 text-pink-600", label: "Video" };
+  // ZIP / comprimidos
+  if (mime.includes("zip") || mime.includes("rar") || mime.includes("compress") || n.endsWith(".zip") || n.endsWith(".rar") || n.endsWith(".7z"))
+    return { icon: "🗜️", color: "bg-amber-100 text-amber-600", label: "ZIP" };
+  // Email
+  if (n.endsWith(".eml") || n.endsWith(".msg"))
+    return { icon: "✉️", color: "bg-cyan-100 text-cyan-600", label: "Email" };
+  // Texto plano
+  if (mime.startsWith("text/"))
+    return { icon: "📃", color: "bg-slate-100 text-slate-600", label: "Texto" };
+  // XML / JSON
+  if (mime.includes("xml") || mime.includes("json"))
+    return { icon: "📋", color: "bg-indigo-100 text-indigo-600", label: "Datos" };
+  return { icon: "📎", color: "bg-slate-100 text-slate-500", label: "Archivo" };
 }
 
 function fmtSize(bytes: number) {
@@ -645,11 +1583,26 @@ function isPreviewable(mime: string) {
 }
 
 function isWordFile(mime: string, name: string) {
+  const n = name.toLowerCase();
   return (
     mime.includes("word") ||
     mime.includes("officedocument.wordprocessingml") ||
-    name.toLowerCase().endsWith(".doc") ||
-    name.toLowerCase().endsWith(".docx")
+    n.endsWith(".doc") ||
+    n.endsWith(".docx")
+  );
+}
+
+function isExcelFile(mime: string, name: string) {
+  const n = name.toLowerCase();
+  return (
+    mime.includes("excel") ||
+    mime.includes("spreadsheetml") ||
+    mime.includes("spreadsheet") ||
+    n.endsWith(".xlsx") ||
+    n.endsWith(".xls") ||
+    n.endsWith(".xlsm") ||
+    n.endsWith(".xlsb") ||
+    n.endsWith(".csv")
   );
 }
 
@@ -661,7 +1614,7 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
   const [loadingFiles, setLoadingFiles] = useState(true);
   const [uploading, setUploading]   = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
-  const [preview, setPreview]       = useState<{ url: string; name: string; mime: string } | null>(null);
+  const [preview, setPreview]       = useState<{ url: string; name: string; mime: string; fileId?: string; appType?: 'word' | 'excel' } | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
   const [genLoading, setGenLoading] = useState<string | null>(null);
   // DocPlant templates
@@ -671,10 +1624,16 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
   const [templateTab, setTemplateTab] = useState<'docplant' | 'generated'>('docplant');
   const [templateSearch, setTemplateSearch] = useState('');
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+  // Preview panel de plantillas
+  const [selectedTpl, setSelectedTpl] = useState<{ path: string; name: string; ext: string } | null>(null);
+  const [tplPreviewHtml, setTplPreviewHtml] = useState<string | null>(null);
+  const [tplPreviewLoading, setTplPreviewLoading] = useState(false);
   // Thumbnails de imágenes (blobURL por fileId)
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
   const loadingThumbIds = useRef<Set<string>>(new Set());
   const previewBlobUrl  = useRef<string | null>(null);
+  // Cache de vistas previas: evita re-fetch del mismo archivo
+  const previewCache = useRef<Map<string, { url: string; name: string; mime: string; appType?: 'word' | 'excel' }>>(new Map());
   const fileInputRef   = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   // Modal para editar nombre y tipo de adjunto
@@ -684,6 +1643,10 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
   const [savingMetadata, setSavingMetadata] = useState(false);
   // Plantilla pendiente de guardar
   const [pendingTemplate, setPendingTemplate] = useState<{ filePath: string; fileName: string } | null>(null);
+  // Cola de archivos pendientes de adjuntar (mostrar modal uno a uno)
+  const [uploadQueue, setUploadQueue]       = useState<File[]>([]);
+  const [uploadQueueTotal, setUploadQueueTotal] = useState(0);
+  const pendingUploadFile = useRef<File | null>(null);
   // Vista previa de Word
   const [wordPreview, setWordPreview] = useState<{ id: string; name: string; mime: string } | null>(null);
 
@@ -705,9 +1668,36 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId]);
 
+  // ── Descargar archivo con autenticación ──────────────────────
+  const downloadWithAuth = useCallback(async (fileId: string, fileName: string) => {
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/files/${clientId}/${fileId}/download`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(`Error al descargar: ${err.error || res.status}`);
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    } catch (_e) {
+      alert('Error al descargar el archivo');
+    }
+  }, [clientId, getToken]);
+
   // ── Cargar archivos ──────────────────────────────────────────
-  const loadFiles = useCallback(async () => {
-    setLoadingFiles(true);
+  // silent=true: refresco en segundo plano — no muestra spinner
+  const loadFiles = useCallback(async (silent = false) => {
+    if (!silent) setLoadingFiles(true);
     try {
       const token = await getToken({ skipCache: true });
       const res = await fetch(`/api/files/${clientId}`, { headers: { Authorization: `Bearer ${token}` } });
@@ -720,46 +1710,85 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
         }
       }
     } catch (_e) {}
-    finally { setLoadingFiles(false); }
+    finally { if (!silent) setLoadingFiles(false); }
   }, [clientId, loadThumb]);
 
   useEffect(() => { loadFiles(); }, [loadFiles]);
 
-  // ── Subir archivos ───────────────────────────────────────────
-  const uploadFileList = async (fileList: FileList | File[]) => {
+  // Auto-refrescar adjuntos cada 45s y al volver a la pestaña — silencioso (sin spinner)
+  useAutoRefresh(() => loadFiles(true), { intervalMs: 45_000, enabled: !!clientId });
+
+  // ── Abrir modal para el primer archivo de la cola ────────────
+  const openNextUploadModal = useCallback((file: File, queue: File[], total: number) => {
+    pendingUploadFile.current = file;
+    setUploadQueue(queue);
+    setUploadQueueTotal(total);
+    const baseName = file.name.replace(/\.[^/.]+$/, '');
+    setEditDocName(baseName);
+    setEditAttachmentType('Sin clasificar');
+    setEditingFile({ id: 'PENDING_UPLOAD', document_name: baseName, attachment_type: 'Sin clasificar' });
+  }, []);
+
+  // ── Interceptar selección: mostrar modal en lugar de subir directo ──
+  const enqueueFiles = useCallback((fileList: FileList | File[]) => {
     const arr = Array.from(fileList);
     if (!arr.length) return;
-    setUploading(true);
+    const [first, ...rest] = arr;
+    openNextUploadModal(first, rest, arr.length);
+  }, [openNextUploadModal]);
+
+  // ── Subir UN archivo con nombre y tipo ya confirmados ────────
+  const uploadSingleFile = async () => {
+    const file = pendingUploadFile.current;
+    if (!file) return;
+    setSavingMetadata(true);
     try {
       const token = await getToken({ skipCache: true });
       const fd = new FormData();
-      arr.forEach(f => fd.append("files", f));
+      fd.append('files', file);
       const res = await fetch(`/api/files/${clientId}`, {
-        method: "POST",
+        method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: fd,
       });
       if (res.ok) {
         const data = await res.json();
+        const fileId = data.data?.[0]?.id;
+        if (fileId) {
+          // Aplicar nombre y tipo seleccionados
+          await fetch(`/api/files/${clientId}/${fileId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({
+              document_name: editDocName.trim() || null,
+              attachment_type: editAttachmentType,
+            }),
+          });
+        }
         await loadFiles();
-        // Descargar automáticamente .docx (sin diálogo) — Word lo abrirá automáticamente
-        if (data.data) {
-          for (const f of data.data) {
-            if (f.mimetype?.includes('wordprocessingml') || f.original_name?.endsWith('.docx')) {
-              const downloadUrl = `${window.location.origin}/api/files/${clientId}/${f.id}/download`;
-              const a = document.createElement('a');
-              a.href = downloadUrl;
-              a.download = f.original_name;
-              document.body.appendChild(a);
-              a.click();
-              document.body.removeChild(a);
-              break; // Descargar solo el primer .docx
-            }
-          }
+        window.dispatchEvent(new CustomEvent('historial-changed'));
+        // Abrir en Word / Excel si corresponde
+        const isWord  = file.type.includes('wordprocessingml') || file.name.match(/\.docx?$/i);
+        const isExcel = file.type.includes('spreadsheet') || file.type.includes('excel') || file.name.match(/\.xlsx?$|\.xlsm$|\.xlsb$/i);
+        if (fileId && (isWord || isExcel)) {
+          const ext = file.name.match(/\.[^/.]+$/)?.[0] ?? (isExcel ? '.xlsx' : '.docx');
+          const displayName = editDocName.trim() ? `${editDocName}${ext}` : file.name;
+          openInWord({ id: fileId, original_name: displayName });
         }
       }
     } catch (_e) {}
-    finally { setUploading(false); }
+    finally {
+      setSavingMetadata(false);
+      setEditingFile(null);
+      pendingUploadFile.current = null;
+      // Procesar siguiente archivo de la cola
+      if (uploadQueue.length > 0) {
+        const [next, ...rest] = uploadQueue;
+        openNextUploadModal(next, rest, uploadQueueTotal);
+      } else {
+        setUploadQueueTotal(0);
+      }
+    }
   };
 
   const onDrop = useCallback((e: React.DragEvent) => {
@@ -770,8 +1799,8 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
       const f = item.getAsFile();
       if (f) fileArr.push(f);
     }
-    uploadFileList(fileArr);
-  }, [clientId]);
+    enqueueFiles(fileArr);
+  }, [enqueueFiles]);
 
   // ── Borrar archivo ───────────────────────────────────────────
   const handleDelete = async (fileId: string) => {
@@ -781,38 +1810,63 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
       headers: { Authorization: `Bearer ${token}` },
     });
     setFiles(prev => prev.filter(f => f.id !== fileId));
-    if (preview) setPreview(null);
+    previewCache.current.delete(fileId);
+    if (preview?.fileId === fileId) setPreview(null);
+    window.dispatchEvent(new CustomEvent('historial-changed'));
   };
 
-  // ── Abrir en Word (via backend: abre desde carpeta local) ──
-  const openInWord = async (f: any) => {
+  // ── Abrir en Word: llama al backend que abre el archivo con el SO ──
+  const openInWord = useCallback(async (f: any) => {
     const token = await getToken({ skipCache: true });
     try {
-      const response = await fetch(`/api/files/${clientId}/${f.id}/open-local`, {
+      const res = await fetch(`/api/files/${clientId}/${f.id}/open-local`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!response.ok) {
-        alert('Error al abrir archivo');
+      if (!res.ok) {
+        // Si open-local falla, descargamos como alternativa
+        await downloadWithAuth(f.id, f.original_name || 'documento.docx');
       }
-    } catch (err) {
-      alert('Error al abrir archivo');
+    } catch (_err) {
+      await downloadWithAuth(f.id, f.original_name || 'documento.docx');
     }
-  };
+  }, [clientId, getToken, downloadWithAuth]);
+
+  // ── Abrir PDF en el navegador (pestaña nueva) ─────────────────
+  const openInBrowser = useCallback(async (f: any) => {
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/files/${clientId}/${f.id}/download`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (_e) {}
+  }, [clientId, getToken]);
 
   // ── Vista previa ─────────────────────────────────────────────
   const openPreview = async (f: any) => {
-    if (previewBlobUrl.current) {
-      URL.revokeObjectURL(previewBlobUrl.current);
-      previewBlobUrl.current = null;
+    // Servir desde caché si ya fue cargado antes
+    const cached = previewCache.current.get(f.id);
+    if (cached) {
+      setPreview(cached);
+      return;
     }
+
     const token = await getToken({ skipCache: true });
 
-    // Si es un archivo Word, usar endpoint especial para HTML
-    const isWord = f.mimetype?.includes('wordprocessingml') || f.original_name?.endsWith('.docx');
+    // Detectar tipo de archivo
+    const isWord  = f.mimetype?.includes('wordprocessingml') || f.original_name?.match(/\.docx?$/i);
+    const isExcel = isExcelFile(f.mimetype || '', f.original_name || '');
+
     const endpoint = isWord
       ? `/api/files/${clientId}/${f.id}/preview-html`
-      : `/api/files/${clientId}/${f.id}/download`;
+      : isExcel
+        ? `/api/files/${clientId}/${f.id}/preview-excel`
+        : `/api/files/${clientId}/${f.id}/download`;
 
     const res = await fetch(endpoint, {
       headers: { Authorization: `Bearer ${token}` },
@@ -825,22 +1879,25 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
       const blob = new Blob([errorHtml], { type: 'text/html' });
       const url = URL.createObjectURL(blob);
       previewBlobUrl.current = url;
-      setPreview({ url, name: f.original_name, mime: 'text/html' });
+      setPreview({ url, name: f.original_name, mime: 'text/html', fileId: f.id });
       return;
     }
 
-    if (isWord) {
-      // Para Word, el contenido es HTML directo
+    if (isWord || isExcel) {
       const html = await res.text();
       const blob = new Blob([html], { type: 'text/html' });
       const url = URL.createObjectURL(blob);
       previewBlobUrl.current = url;
-      setPreview({ url, name: f.original_name, mime: 'text/html' });
+      const entry = { url, name: f.original_name, mime: 'text/html', fileId: f.id, appType: (isExcel ? 'excel' : 'word') as 'word' | 'excel' };
+      previewCache.current.set(f.id, entry);
+      setPreview(entry);
     } else {
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       previewBlobUrl.current = url;
-      setPreview({ url, name: f.original_name, mime: f.mimetype });
+      const entry = { url, name: f.original_name, mime: f.mimetype, fileId: f.id };
+      previewCache.current.set(f.id, entry);
+      setPreview(entry);
     }
   };
 
@@ -872,16 +1929,10 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
       if (!res.ok) throw new Error(`Error: ${res.status}`);
       const data = await res.json();
       if (data.success && data.data) {
-        setEditingFile(null); // Cerrar modal
-        await loadFiles(); // Recargar lista de archivos
-        // Descargar automáticamente (sin diálogo) — Word lo abrirá automáticamente
-        const downloadUrl = `${window.location.origin}${data.data.downloadUrl}`;
-        const a = document.createElement('a');
-        a.href = downloadUrl;
-        a.download = data.data.original_name;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        setEditingFile(null);
+        await loadFiles();
+        // Descargar con auth para que Word lo abra
+        await downloadWithAuth(data.data.id, data.data.original_name);
       }
     } catch (_e) {
       // Error al crear documento
@@ -890,11 +1941,33 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
     }
   };
 
+  // ── Cargar preview de una plantilla en el panel derecho ───────
+  const loadTplPreview = async (file: { path: string; name: string; ext: string }) => {
+    setSelectedTpl(file);
+    setTplPreviewHtml(null);
+    setTplPreviewLoading(true);
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/files/templates/preview?path=${encodeURIComponent(file.path)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      // El backend devuelve 200 con HTML tanto para .docx como para .doc (mensaje amigable)
+      const html = await res.text();
+      setTplPreviewHtml(html);
+    } catch (e: any) {
+      setTplPreviewHtml(`<html><body style="padding:20px;font-family:sans-serif;color:#dc2626"><p>Error al cargar vista previa</p><p style="font-size:11px;color:#999">${e.message}</p></body></html>`);
+    } finally {
+      setTplPreviewLoading(false);
+    }
+  };
+
   // ── Abrir modal plantillas y cargar DocPlant ──────────────────
   const openTemplatesModal = async (forceReload = false) => {
     setShowTemplates(true);
     setTemplateTab('docplant');
     setTemplateSearch('');
+    setSelectedTpl(null);
+    setTplPreviewHtml(null);
     if (docPlantFolders.length > 0 && !forceReload) return; // ya cargado
     setDocPlantLoading(true);
     setDocPlantError(null);
@@ -969,19 +2042,8 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
             });
           }
           await loadFiles();
-          const isWord = blob.type.includes('word') || pendingTemplate.fileName.endsWith('.doc') || pendingTemplate.fileName.endsWith('.docx');
-          const fileUrl = `${window.location.origin}/api/files/${clientId}/${fileId}/download`;
-          if (isWord) {
-            // Descargar automáticamente (sin diálogo) — Word lo abrirá automáticamente
-            const a = document.createElement('a');
-            a.href = fileUrl;
-            a.download = finalFileName;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-          } else {
-            window.open(fileUrl, '_blank');
-          }
+          // Descargar con auth (Word o cualquier otro tipo)
+          await downloadWithAuth(fileId, finalFileName);
         }
         setShowTemplates(false); // Cerrar modal de plantillas
         setEditingFile(null); // Cerrar modal de edición
@@ -1012,6 +2074,7 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
         }),
       });
       if (res.ok) {
+        previewCache.current.delete(editingFile.id); // invalidar caché (nombre puede haber cambiado)
         await loadFiles(); // Recargar lista
         setEditingFile(null);
       }
@@ -1077,12 +2140,12 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
       {/* Inputs ocultos */}
       <input
         ref={fileInputRef} type="file" multiple className="hidden"
-        onChange={e => e.target.files && uploadFileList(e.target.files)}
+        onChange={e => { if (e.target.files) { enqueueFiles(e.target.files); e.target.value = ''; } }}
       />
       <input
         ref={folderInputRef} type="file" multiple className="hidden"
         {...({ webkitdirectory: "true", directory: "true" } as any)}
-        onChange={e => e.target.files && uploadFileList(e.target.files)}
+        onChange={e => { if (e.target.files) { enqueueFiles(e.target.files); e.target.value = ''; } }}
       />
 
       {/* Drop zone */}
@@ -1103,9 +2166,9 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
       </div>
 
       {/* Layout: lista + preview */}
-      <div className="flex gap-4">
+      <div className="flex gap-3 items-start">
         {/* Lista de archivos */}
-        <div className={`${preview ? "w-1/2" : "w-full"} transition-all`}>
+        <div className={`${preview ? "w-[42%] shrink-0" : "w-full"} transition-all duration-300`}>
           {loadingFiles ? (
             <div className="bg-white border border-slate-200 rounded-xl p-10 flex justify-center">
               <Loader2 size={24} className="animate-spin text-red-500" />
@@ -1134,16 +2197,19 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
                     const fi = fileIcon(f.mimetype, f.original_name);
                     const canPreview = isPreviewable(f.mimetype);
                     const canWord    = isWordFile(f.mimetype, f.original_name);
+                    const canExcel   = isExcelFile(f.mimetype, f.original_name);
                     const handleNameClick = canPreview
                       ? () => openPreview(f)
                       : canWord
-                        ? () => openInWord(f)
-                        : undefined;
+                        ? () => openPreview(f)
+                        : canExcel
+                          ? () => openPreview(f)
+                          : undefined;
                     return (
                       <tr key={f.id} className="hover:bg-slate-50/60 transition-colors group">
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2.5">
-                            {/* Thumbnail para imágenes, icono para el resto */}
+                            {/* Thumbnail para imágenes, icono con color para el resto */}
                             {f.mimetype?.startsWith('image/') && thumbs[f.id]
                               ? (
                                 <img
@@ -1154,27 +2220,32 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
                                 />
                               ) : (
                                 <span
-                                  className={`h-10 w-10 rounded-lg flex items-center justify-center text-base shrink-0 ${fi.color} ${f.mimetype?.startsWith('image/') ? 'animate-pulse' : ''}`}
-                                  onClick={() => { if (f.mimetype?.startsWith('image/')) loadThumb(f.id); }}
+                                  className={`h-10 w-10 rounded-lg flex items-center justify-center text-lg shrink-0 ${fi.color} ${f.mimetype?.startsWith('image/') ? 'animate-pulse' : ''} cursor-pointer hover:scale-105 transition-transform`}
+                                  onClick={() => { if (f.mimetype?.startsWith('image/')) loadThumb(f.id); else if (canPreview || canWord || canExcel) handleNameClick?.(); }}
                                 >
                                   {fi.icon}
                                 </span>
                               )
                             }
-                            <button
-                              onClick={handleNameClick}
-                              className={`text-sm font-medium text-slate-700 text-left truncate max-w-[180px] ${(canPreview || canWord) ? "hover:text-red-600 hover:underline cursor-pointer" : ""}`}
-                              title={canWord ? "Abrir en Word" : f.original_name}
+                            <div className="min-w-0">
+                              <button
+                                onClick={handleNameClick}
+                                className={`text-sm font-medium text-slate-700 text-left truncate block max-w-[180px] ${(canPreview || canWord || canExcel) ? "hover:text-red-600 hover:underline cursor-pointer" : ""}`}
+                                title={canWord ? "Abrir en Word" : canExcel ? "Abrir en Excel" : f.original_name}
                             >
                               {f.original_name}
                             </button>
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${fi.color}`}>
+                                {fi.label}
+                              </span>
+                            </div>
                           </div>
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-600 hidden lg:table-cell max-w-[150px] truncate" title={f.document_name || "Sin nombre"}>
                           {f.document_name || <span className="text-slate-400 italic">Sin nombre</span>}
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-600 hidden md:table-cell">
-                          <span className="px-2 py-1 bg-slate-100 text-slate-700 rounded text-[10px] font-medium">
+                          <span className={`px-2 py-1 rounded text-[10px] font-medium ${fi.color}`}>
                             {f.attachment_type || 'Sin clasificar'}
                           </span>
                         </td>
@@ -1184,18 +2255,28 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                            {/* Vista previa (PDF, imágenes, texto) */}
                             {canPreview && (
                               <button onClick={() => openPreview(f)} title="Vista previa"
-                                className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                                className="p-1.5 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors">
                                 <Eye size={14} />
                               </button>
                             )}
+                            {/* Vista previa Word */}
                             {canWord && !canPreview && (
                               <button onClick={() => openPreview(f)} title="Vista previa de Word"
-                                className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                                className="p-1.5 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors">
                                 <Eye size={14} />
                               </button>
                             )}
+                            {/* Vista previa Excel */}
+                            {canExcel && !canPreview && (
+                              <button onClick={() => openPreview(f)} title="Vista previa de Excel"
+                                className="p-1.5 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors">
+                                <Eye size={14} />
+                              </button>
+                            )}
+                            {/* Editar metadatos */}
                             <button
                               title="Editar"
                               className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
@@ -1207,13 +2288,46 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
                             >
                               <Edit3 size={14} />
                             </button>
-                            <button
-                              title="Abrir en Word"
-                              className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                              onClick={() => openInWord(f)}
-                            >
-                              <Download size={14} />
-                            </button>
+                            {/* PDF → Abrir en navegador */}
+                            {f.mimetype === 'application/pdf' && (
+                              <button
+                                title="Abrir en navegador"
+                                className="p-1.5 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                                onClick={() => openInBrowser(f)}
+                              >
+                                <ExternalLink size={14} />
+                              </button>
+                            )}
+                            {/* Word → Abrir en Word */}
+                            {canWord && (
+                              <button
+                                title="Abrir en Word"
+                                className="p-1.5 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors"
+                                onClick={() => openInWord(f)}
+                              >
+                                <Download size={14} />
+                              </button>
+                            )}
+                            {/* Excel → Abrir en Excel */}
+                            {canExcel && (
+                              <button
+                                title="Abrir en Excel"
+                                className="p-1.5 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors"
+                                onClick={() => openInWord(f)}
+                              >
+                                <Download size={14} />
+                              </button>
+                            )}
+                            {/* Otros archivos → Descargar */}
+                            {!f.mimetype?.includes('pdf') && !canWord && !canExcel && (
+                              <button
+                                title="Descargar"
+                                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                                onClick={() => downloadWithAuth(f.id, f.original_name)}
+                              >
+                                <Download size={14} />
+                              </button>
+                            )}
                             <button onClick={() => handleDelete(f.id)} title="Eliminar"
                               className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
                               <Trash2 size={14} />
@@ -1229,45 +2343,129 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
           )}
         </div>
 
-        {/* Panel de vista previa */}
+        {/* ── Panel de vista previa ── */}
         {preview && (
-          <div className="w-1/2 bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 border-b border-slate-100">
-              <p className="text-xs font-bold text-slate-600 truncate max-w-[220px]" title={preview.name}>{preview.name}</p>
-              <div className="flex items-center gap-2">
-                {preview.mime === "text/html" && (
+          <div
+            className="flex-1 bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col shadow-lg"
+            style={{ position: "sticky", top: 16, height: "calc(100vh - 200px)" }}
+          >
+            {/* Cabecera del panel */}
+            <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 border-b border-slate-100 shrink-0 gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                {/* Icono según tipo */}
+                <span className="text-base shrink-0">
+                  {preview.mime === "application/pdf" ? "📄"
+                    : preview.mime.startsWith("image/") ? "🖼️"
+                    : preview.appType === 'excel' ? "📊"
+                    : "📝"}
+                </span>
+                <p className="text-xs font-bold text-slate-700 truncate" title={preview.name}>
+                  {preview.name}
+                </p>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                {/* Abrir en Word / Excel (para previsualización HTML) */}
+                {preview.mime === "text/html" && preview.fileId && preview.appType === 'word' && (
                   <button
-                    onClick={() => {
-                      setPreview(null);
-                      const file = files.find(f => f.original_name === preview.name);
-                      if (file) openInWord(file);
-                    }}
-                    className="p-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors text-[11px] font-medium px-2 py-1"
-                    title="Abrir en Word"
+                    onClick={() => openInWord({ id: preview.fileId!, original_name: preview.name })}
+                    className="flex items-center gap-1 text-[11px] font-semibold text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 px-2 py-1 rounded-lg transition-colors border border-neutral-200"
                   >
                     Abrir en Word
                   </button>
                 )}
-                <button onClick={() => { if (previewBlobUrl.current) { URL.revokeObjectURL(previewBlobUrl.current); previewBlobUrl.current = null; } setPreview(null); }} className="p-1 text-slate-400 hover:text-slate-700 rounded transition-colors">
+                {preview.mime === "text/html" && preview.fileId && preview.appType === 'excel' && (
+                  <button
+                    onClick={() => openInWord({ id: preview.fileId!, original_name: preview.name })}
+                    className="flex items-center gap-1 text-[11px] font-semibold text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 px-2 py-1 rounded-lg transition-colors border border-neutral-200"
+                  >
+                    Abrir en Excel
+                  </button>
+                )}
+                {/* Abrir en pestaña nueva */}
+                <a
+                  href={preview.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                  title="Abrir en nueva pestaña"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                </a>
+                {/* Cerrar */}
+                <button
+                  onClick={() => {
+                    if (previewBlobUrl.current) {
+                      URL.revokeObjectURL(previewBlobUrl.current);
+                      previewBlobUrl.current = null;
+                    }
+                    setPreview(null);
+                  }}
+                  className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                  title="Cerrar vista previa"
+                >
                   <X size={14} />
                 </button>
               </div>
             </div>
-            <div className="flex-1 min-h-[400px]">
+
+            {/* Contenido de la preview */}
+            <div className="flex-1 overflow-hidden relative">
+
+              {/* ── PDF: visor nativo completo con zoom y páginas ── */}
               {preview.mime === "application/pdf" && (
-                <iframe src={preview.url} className="w-full h-full min-h-[400px]" title={preview.name} />
+                <object
+                  data={preview.url}
+                  type="application/pdf"
+                  className="w-full h-full"
+                  style={{ minHeight: 0 }}
+                >
+                  {/* Fallback si el navegador no soporta object para PDF */}
+                  <iframe
+                    src={`${preview.url}#toolbar=1&navpanes=1&scrollbar=1&view=FitH`}
+                    className="w-full h-full border-0"
+                    title={preview.name}
+                  />
+                </object>
               )}
+
+              {/* ── Imágenes: visor con fondo oscuro y tamaño completo ── */}
               {preview.mime.startsWith("image/") && (
-                <div className="flex items-center justify-center h-full p-4 bg-slate-50">
-                  <img src={preview.url} alt={preview.name} className="max-h-[500px] max-w-full rounded-lg shadow object-contain" />
+                <div className="w-full h-full flex items-center justify-center bg-slate-800 overflow-auto p-3">
+                  <img
+                    src={preview.url}
+                    alt={preview.name}
+                    className="max-w-full max-h-full object-contain rounded shadow-2xl"
+                    style={{ maxHeight: "calc(100vh - 260px)" }}
+                  />
                 </div>
               )}
-              {preview.mime.startsWith("text/") && (
-                <iframe src={preview.url} className="w-full h-full min-h-[400px] bg-white" title={preview.name} />
+
+              {/* ── Word / HTML: iframe con estilos completos ── */}
+              {preview.mime === "text/html" && (
+                <iframe
+                  src={preview.url}
+                  className="w-full h-full border-0 bg-white"
+                  title={preview.name}
+                  sandbox="allow-same-origin allow-scripts"
+                  style={{ minHeight: 0 }}
+                />
               )}
+
+              {/* ── Texto plano ── */}
+              {preview.mime.startsWith("text/") && preview.mime !== "text/html" && (
+                <iframe
+                  src={preview.url}
+                  className="w-full h-full border-0 bg-white"
+                  title={preview.name}
+                  style={{ minHeight: 0 }}
+                />
+              )}
+
+              {/* ── Error ── */}
               {preview.mime === "error" && (
-                <div className="flex items-center justify-center h-full p-4 bg-slate-50">
-                  <p className="text-sm text-slate-600">Error al cargar vista previa</p>
+                <div className="flex flex-col items-center justify-center h-full gap-3 text-slate-400 p-8">
+                  <span className="text-4xl">⚠️</span>
+                  <p className="text-sm font-medium text-slate-600">No se pudo cargar la vista previa</p>
                 </div>
               )}
             </div>
@@ -1278,140 +2476,179 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
       {/* Modal plantillas */}
       {showTemplates && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowTemplates(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mx-4 overflow-hidden flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl mx-4 overflow-hidden flex flex-col" style={{ height: '88vh' }} onClick={e => e.stopPropagation()}>
 
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
-              <div>
-                <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <Sparkles size={16} className="text-red-600" /> Usar plantilla
-                </h2>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Descarga y edita una plantilla del despacho
-                </p>
+            <div className="flex items-center justify-between px-6 py-3 border-b border-slate-100 shrink-0 bg-slate-50">
+              <div className="flex items-center gap-3">
+                <Sparkles size={16} className="text-red-600" />
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900">Plantillas del despacho</h2>
+                  <p className="text-[11px] text-slate-400">Selecciona una plantilla para previsualizarla</p>
+                </div>
               </div>
-              <button onClick={() => setShowTemplates(false)} className="p-2 text-slate-400 hover:text-slate-700 rounded-lg transition-colors">
-                <X size={16} />
-              </button>
+              <div className="flex items-center gap-2">
+                {/* Tabs inline en el header */}
+                <button
+                  onClick={() => setTemplateTab('docplant')}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${templateTab === 'docplant' ? 'bg-red-600 text-white' : 'text-slate-500 hover:bg-slate-100'}`}
+                >
+                  📁 Plantillas
+                </button>
+                <button
+                  onClick={() => setTemplateTab('generated')}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${templateTab === 'generated' ? 'bg-red-600 text-white' : 'text-slate-500 hover:bg-slate-100'}`}
+                >
+                  ✨ Generar
+                </button>
+                <div className="w-px h-5 bg-slate-200 mx-1" />
+                <button onClick={() => setShowTemplates(false)} className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg transition-colors">
+                  <X size={16} />
+                </button>
+              </div>
             </div>
 
-            {/* Tabs */}
-            <div className="flex border-b border-slate-100 px-6 shrink-0">
-              <button
-                onClick={() => setTemplateTab('docplant')}
-                className={`py-3 px-1 mr-6 text-xs font-bold border-b-2 transition-colors ${templateTab === 'docplant' ? 'border-red-600 text-red-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-              >
-                📁 Plantillas del despacho
-              </button>
-              <button
-                onClick={() => setTemplateTab('generated')}
-                className={`py-3 px-1 text-xs font-bold border-b-2 transition-colors ${templateTab === 'generated' ? 'border-red-600 text-red-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-              >
-                ✨ Generar con datos del cliente
-              </button>
-            </div>
-
-            {/* Tab: DocPlant */}
+            {/* Tab: DocPlant — split layout */}
             {templateTab === 'docplant' && (
-              <div className="flex flex-col flex-1 overflow-hidden">
-                {/* Search */}
-                <div className="px-4 py-3 border-b border-slate-100 shrink-0">
-                  <div className="relative">
-                    <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                      value={templateSearch}
-                      onChange={e => setTemplateSearch(e.target.value)}
-                      placeholder="Buscar plantilla…"
-                      className="w-full pl-8 pr-4 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent"
-                    />
+              <div className="flex flex-1 overflow-hidden">
+
+                {/* LEFT: árbol de carpetas/archivos */}
+                <div className="w-72 shrink-0 border-r border-slate-100 flex flex-col overflow-hidden bg-white">
+                  {/* Search */}
+                  <div className="px-3 py-2.5 border-b border-slate-100 shrink-0">
+                    <div className="relative">
+                      <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        value={templateSearch}
+                        onChange={e => setTemplateSearch(e.target.value)}
+                        placeholder="Buscar plantilla…"
+                        className="w-full pl-7 pr-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+
+                  {/* File tree */}
+                  <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                    {docPlantLoading ? (
+                      <div className="flex flex-col items-center justify-center py-12 gap-3 text-slate-400">
+                        <Loader2 size={22} className="animate-spin text-red-500" />
+                        <p className="text-xs">Cargando plantillas…</p>
+                      </div>
+                    ) : docPlantError ? (
+                      <div className="p-3">
+                        <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-center">
+                          <p className="text-xs font-bold text-amber-700 mb-1">Error al cargar</p>
+                          <p className="text-[11px] text-amber-600">{docPlantError}</p>
+                        </div>
+                        <button
+                          onClick={() => openTemplatesModal(true)}
+                          className="mt-2 w-full flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-all"
+                        >
+                          <Loader2 size={11} /> Reintentar
+                        </button>
+                      </div>
+                    ) : docPlantFolders.length === 0 ? (
+                      <p className="text-center text-xs text-slate-400 py-8">No se encontraron plantillas</p>
+                    ) : (() => {
+                      const q = templateSearch.toLowerCase().trim();
+                      const filteredFolders = docPlantFolders.map(folder => ({
+                        ...folder,
+                        files: q ? folder.files.filter(f => f.name.toLowerCase().includes(q)) : folder.files,
+                      })).filter(f => f.files.length > 0);
+
+                      if (filteredFolders.length === 0) return <p className="text-center text-xs text-slate-400 py-6">Sin resultados</p>;
+
+                      return filteredFolders.map(folder => {
+                        const isOpen = q ? true : expandedFolders.has(folder.name);
+                        return (
+                          <div key={folder.name}>
+                            {/* Folder header */}
+                            <button
+                              onClick={() => {
+                                setExpandedFolders(prev => {
+                                  const next = new Set(prev);
+                                  if (next.has(folder.name)) next.delete(folder.name);
+                                  else next.add(folder.name);
+                                  return next;
+                                });
+                              }}
+                              className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg hover:bg-slate-50 transition-colors text-left"
+                            >
+                              <span className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+                                <FolderOpen size={13} className="text-amber-500 shrink-0" />
+                                <span className="truncate">{folder.name}</span>
+                                <span className="text-[10px] font-normal text-slate-400 shrink-0">({folder.files.length})</span>
+                              </span>
+                              {isOpen ? <ChevronDown size={12} className="text-slate-400 shrink-0" /> : <ChevronR size={12} className="text-slate-400 shrink-0" />}
+                            </button>
+                            {/* Files */}
+                            {isOpen && (
+                              <div className="ml-3 border-l border-slate-100 pl-2 space-y-0.5 mt-0.5 mb-1">
+                                {folder.files.map(f => {
+                                  const isSelected = selectedTpl?.path === f.path;
+                                  return (
+                                    <button
+                                      key={f.path}
+                                      onClick={() => loadTplPreview(f)}
+                                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-colors ${isSelected ? 'bg-red-50 text-red-700' : 'hover:bg-neutral-50 text-neutral-600'}`}
+                                    >
+                                      <span className="shrink-0 text-xs">{f.ext === '.docx' ? '📝' : '📄'}</span>
+                                      <span className="text-xs truncate flex-1" title={f.name}>{f.name.replace(/\.[^.]+$/, '')}</span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      });
+                    })()}
                   </div>
                 </div>
 
-                {/* File tree */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                  {docPlantLoading ? (
-                    <div className="flex flex-col items-center justify-center py-12 gap-3 text-slate-400">
-                      <Loader2 size={28} className="animate-spin text-red-500" />
-                      <p className="text-sm">Cargando plantillas…</p>
+                {/* RIGHT: preview panel */}
+                <div className="flex-1 flex flex-col overflow-hidden bg-slate-50">
+                  {!selectedTpl ? (
+                    <div className="flex-1 flex flex-col items-center justify-center text-slate-400 gap-3">
+                      <svg width="48" height="48" viewBox="0 0 48 48" fill="none" className="opacity-30"><rect x="8" y="4" width="32" height="40" rx="3" fill="#94a3b8"/><rect x="13" y="14" width="22" height="2" rx="1" fill="white"/><rect x="13" y="20" width="22" height="2" rx="1" fill="white"/><rect x="13" y="26" width="14" height="2" rx="1" fill="white"/></svg>
+                      <p className="text-sm">Selecciona una plantilla para previsualizar</p>
                     </div>
-                  ) : docPlantError ? (
-                    <div className="flex flex-col items-center justify-center py-10 gap-4">
-                      <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-center max-w-sm">
-                        <p className="text-sm font-bold text-amber-700 mb-1">No se pudieron cargar las plantillas</p>
-                        <p className="text-xs text-amber-600">{docPlantError}</p>
-                        <p className="text-xs text-amber-500 mt-2">Asegúrate de que el servidor esté en marcha y reinícialo si acabas de actualizar el código.</p>
-                      </div>
-                      <button
-                        onClick={() => openTemplatesModal(true)}
-                        className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl active:scale-95 transition-all"
-                      >
-                        <Loader2 size={12} /> Reintentar
-                      </button>
-                    </div>
-                  ) : docPlantFolders.length === 0 ? (
-                    <p className="text-center text-sm text-slate-400 py-10">No se encontraron plantillas</p>
-                  ) : (() => {
-                    const q = templateSearch.toLowerCase().trim();
-                    const filtered = docPlantFolders.map(folder => ({
-                      ...folder,
-                      files: q
-                        ? folder.files.filter(f => f.name.toLowerCase().includes(q))
-                        : folder.files,
-                    })).filter(f => f.files.length > 0);
-
-                    if (filtered.length === 0) return <p className="text-center text-sm text-slate-400 py-6">Sin resultados para «{templateSearch}»</p>;
-
-                    return filtered.map(folder => {
-                      const isOpen = q ? true : expandedFolders.has(folder.name);
-                      return (
-                        <div key={folder.name} className="border border-slate-200 rounded-xl overflow-hidden">
-                          {/* Folder header */}
-                          <button
-                            onClick={() => {
-                              setExpandedFolders(prev => {
-                                const next = new Set(prev);
-                                if (next.has(folder.name)) next.delete(folder.name);
-                                else next.add(folder.name);
-                                return next;
-                              });
-                            }}
-                            className="w-full flex items-center justify-between px-4 py-2.5 bg-slate-50 hover:bg-slate-100 transition-colors text-left"
-                          >
-                            <span className="text-xs font-bold text-slate-700 flex items-center gap-2">
-                              <FolderOpen size={14} className="text-amber-500" />
-                              {folder.name}
-                              <span className="text-[10px] font-normal text-slate-400">({folder.files.length})</span>
-                            </span>
-                            {isOpen
-                              ? <ChevronDown size={14} className="text-slate-400" />
-                              : <ChevronR size={14} className="text-slate-400" />
-                            }
-                          </button>
-                          {/* Files */}
-                          {isOpen && (
-                            <div className="divide-y divide-slate-50">
-                              {folder.files.map(f => (
-                                <div key={f.path} className="flex items-center justify-between px-4 py-2.5 hover:bg-blue-50/40 group transition-colors">
-                                  <div className="flex items-center gap-2.5 min-w-0">
-                                    <span className={`shrink-0 text-sm ${f.ext === '.docx' ? '📝' : '📄'}`}>{f.ext === '.docx' ? '📝' : '📄'}</span>
-                                    <span className="text-xs text-slate-700 truncate" title={f.name}>{f.name}</span>
-                                    <span className="shrink-0 text-[10px] text-slate-300 font-mono uppercase">{f.ext}</span>
-                                  </div>
-                                  <button
-                                    onClick={() => showTemplateModal(f.path, f.name)}
-                                    className="shrink-0 ml-3 flex items-center gap-1 px-3 py-1 text-[11px] font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-100 rounded-lg opacity-0 group-hover:opacity-100 transition-all active:scale-95"
-                                  >
-                                    <Download size={11} /> Usar
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          )}
+                  ) : (
+                    <>
+                      {/* Preview toolbar */}
+                      <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-200 bg-white shrink-0">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-sm">{selectedTpl.ext === '.docx' ? '📝' : '📄'}</span>
+                          <span className="text-xs font-semibold text-slate-700 truncate">{selectedTpl.name}</span>
+                          <span className="text-[10px] text-slate-400 font-mono uppercase shrink-0">{selectedTpl.ext}</span>
                         </div>
-                      );
-                    });
-                  })()}
+                        <button
+                          onClick={() => showTemplateModal(selectedTpl.path, selectedTpl.name)}
+                          className="shrink-0 ml-3 flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold text-white bg-red-700 hover:bg-red-800 rounded-lg active:scale-95 transition-all"
+                        >
+                          <Download size={12} /> Seleccionar
+                        </button>
+                      </div>
+                      {/* Preview content */}
+                      <div className="flex-1 overflow-hidden relative">
+                        {tplPreviewLoading ? (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-slate-400">
+                            <Loader2 size={28} className="animate-spin text-red-500" />
+                            <p className="text-sm">Cargando vista previa…</p>
+                          </div>
+                        ) : tplPreviewHtml ? (
+                          <iframe
+                            srcDoc={tplPreviewHtml}
+                            className="w-full h-full border-0"
+                            title="Vista previa de plantilla"
+                            sandbox="allow-same-origin"
+                          />
+                        ) : null}
+                      </div>
+                    </>
+                  )}
                 </div>
+
               </div>
             )}
 
@@ -1455,7 +2692,7 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
               <div className="flex items-center gap-3">
-                <FileText size={20} className="text-blue-600" />
+                <FileText size={20} className="text-neutral-700" />
                 <div>
                   <p className="text-sm font-bold text-slate-900">Vista previa</p>
                   <p className="text-xs text-slate-500 mt-0.5 truncate max-w-xs">{wordPreview.name}</p>
@@ -1473,11 +2710,9 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
                 <button
                   onClick={() => {
                     setWordPreview(null);
-                    // Encontrar el archivo y abrirlo
-                    const file = files.find(f => f.id === wordPreview.id);
-                    if (file) openInWord(file);
+                    openInWord({ id: wordPreview.id, original_name: wordPreview.name });
                   }}
-                  className="flex-1 px-4 py-2.5 bg-blue-600 text-white font-medium text-sm rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                  className="flex-1 px-4 py-2.5 bg-red-700 text-white font-medium text-sm rounded-lg hover:bg-red-800 transition-colors flex items-center justify-center gap-2"
                 >
                   <Download size={14} />
                   Abrir en Word
@@ -1501,10 +2736,31 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
 
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <h2 className="text-base font-bold text-slate-900">
-                {editingFile.id === 'NEW_BLANK' ? 'Nuevo documento' : editingFile.id === 'PENDING_TEMPLATE' ? 'Usar plantilla' : 'Editar documento'}
-              </h2>
-              <button onClick={() => setEditingFile(null)} className="p-2 text-slate-400 hover:text-slate-700 rounded-lg transition-colors">
+              <div>
+                <h2 className="text-base font-bold text-slate-900">
+                  {editingFile.id === 'NEW_BLANK'
+                    ? 'Nuevo documento'
+                    : editingFile.id === 'PENDING_TEMPLATE'
+                    ? 'Usar plantilla'
+                    : editingFile.id === 'PENDING_UPLOAD'
+                    ? 'Adjuntar archivo'
+                    : 'Editar documento'}
+                </h2>
+                {editingFile.id === 'PENDING_UPLOAD' && uploadQueueTotal > 1 && (
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Archivo {uploadQueueTotal - uploadQueue.length} de {uploadQueueTotal}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => {
+                  setEditingFile(null);
+                  if (editingFile.id === 'PENDING_UPLOAD') {
+                    setUploadQueue([]); setUploadQueueTotal(0); pendingUploadFile.current = null;
+                  }
+                }}
+                className="p-2 text-slate-400 hover:text-slate-700 rounded-lg transition-colors"
+              >
                 <X size={16} />
               </button>
             </div>
@@ -1522,6 +2778,11 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
                   autoFocus
                 />
+                {editingFile.id === 'PENDING_UPLOAD' && pendingUploadFile.current && (
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Archivo: <span className="font-medium text-slate-500">{pendingUploadFile.current.name}</span>
+                  </p>
+                )}
               </div>
 
               {/* Tipo de adjunto */}
@@ -1545,27 +2806,140 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
             {/* Footer */}
             <div className="flex gap-2 px-6 py-4 border-t border-slate-100 bg-slate-50">
               <button
-                onClick={() => setEditingFile(null)}
+                onClick={() => {
+                  setEditingFile(null);
+                  if (editingFile.id === 'PENDING_UPLOAD') {
+                    setUploadQueue([]); setUploadQueueTotal(0); pendingUploadFile.current = null;
+                  }
+                }}
                 className="flex-1 px-4 py-2 text-sm font-medium text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-100 transition-colors"
               >
-                Cancelar
+                {editingFile.id === 'PENDING_UPLOAD' && uploadQueueTotal > 1 ? 'Cancelar todo' : 'Cancelar'}
               </button>
               <button
                 onClick={() => {
                   if (editingFile.id === 'NEW_BLANK') createBlankDoc();
                   else if (editingFile.id === 'PENDING_TEMPLATE') downloadDocPlantTemplate();
+                  else if (editingFile.id === 'PENDING_UPLOAD') uploadSingleFile();
                   else saveFileMetadata();
                 }}
-                disabled={savingMetadata || !editDocName.trim()}
+                disabled={savingMetadata || (editingFile.id !== 'PENDING_UPLOAD' && !editDocName.trim())}
                 className="flex-1 px-4 py-2 text-sm font-bold text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
               >
-                {savingMetadata ? "Procesando..." : editingFile.id === 'NEW_BLANK' ? "Crear" : editingFile.id === 'PENDING_TEMPLATE' ? "Usar" : "Guardar"}
+                {savingMetadata
+                  ? 'Subiendo...'
+                  : editingFile.id === 'NEW_BLANK'
+                  ? 'Crear'
+                  : editingFile.id === 'PENDING_TEMPLATE'
+                  ? 'Usar'
+                  : editingFile.id === 'PENDING_UPLOAD'
+                  ? (uploadQueue.length > 0 ? `Adjuntar (${uploadQueueTotal - uploadQueue.length}/${uploadQueueTotal})` : 'Adjuntar')
+                  : 'Guardar'}
               </button>
             </div>
           </div>
         </div>
       )}
     </div>
+  );
+}
+
+// ── Panel lateral de indicadores con datos reales ────────────
+function PanelIndicadores({ clientId, onTabChange }: { clientId: string; onTabChange: (tab: string) => void }) {
+  const { getToken } = useAuth();
+  const [ind, setInd]         = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [indError, setIndError] = useState<string | null>(null);
+
+  const fetchIndicators = useCallback(async () => {
+    setIndError(null);
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/tasks/indicators/${clientId}`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await safeJson(res);
+      if (res.ok) setInd(data.data);
+      else setIndError(data.error || "Error al cargar indicadores");
+    } catch (e: any) {
+      setIndError(e.message || "Error de conexión");
+    } finally { setLoading(false); }
+  }, [clientId, getToken]);
+
+  useEffect(() => { fetchIndicators(); }, [fetchIndicators]);
+
+  // Refrescar cuando cambia algo en el cliente (tareas, notas, archivos...)
+  useEffect(() => {
+    const handler = () => fetchIndicators();
+    window.addEventListener('historial-changed', handler);
+    return () => window.removeEventListener('historial-changed', handler);
+  }, [fetchIndicators]);
+
+  // Usa == null para capturar tanto null como undefined
+  const fmt = (n: number | null | undefined, suffix = "") =>
+    n == null ? "—" : `${n}${suffix}`;
+
+  return (
+    <aside className="w-52 shrink-0 space-y-4">
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden sticky top-6">
+        <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+          <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Indicadores</h3>
+          {loading && <Loader2 size={11} className="animate-spin text-slate-300" />}
+        </div>
+
+        <div className="px-4 py-3">
+          {indError && (
+            <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded-lg text-[10px] text-red-600 leading-snug">
+              {indError}
+              <button onClick={fetchIndicators} className="block mt-1 font-bold underline">Reintentar</button>
+            </div>
+          )}
+          {/* Tareas */}
+          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Tareas</p>
+          <Indicador label="Total tareas"      value={fmt(ind?.total_tareas)} />
+          <Indicador label="Pendientes"        value={fmt(ind?.tareas_pendientes)}
+            color={ind?.tareas_pendientes > 0 ? "text-amber-600" : "text-slate-700"} />
+          <Indicador label="Urgentes"          value={fmt(ind?.tareas_urgentes)}
+            color={ind?.tareas_urgentes > 0 ? "text-red-600" : "text-slate-700"} />
+          <Indicador label="Vencidas"          value={fmt(ind?.tareas_vencidas)}
+            color={ind?.tareas_vencidas > 0 ? "text-red-700 font-bold" : "text-slate-700"} />
+          <Indicador label="Completadas"       value={fmt(ind?.tareas_completadas)}
+            color={ind?.tareas_completadas > 0 ? "text-emerald-600" : "text-slate-700"} />
+
+          {/* Documentación */}
+          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-3 mb-1.5">Documentación</p>
+          <Indicador label="Archivos"          value={fmt(ind?.total_archivos)} />
+          <Indicador label="Notas"             value={fmt(ind?.total_notas)} />
+
+          {/* Actividad */}
+          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-3 mb-1.5">Actividad</p>
+          <Indicador label="Actuaciones"        value={fmt(ind?.total_actuaciones)}
+            color={ind?.total_actuaciones > 0 ? "text-blue-600" : "text-slate-700"} />
+          <Indicador label="Expedientes"        value={fmt(ind?.total_expedientes)}
+            color={ind?.total_expedientes > 0 ? "text-indigo-600" : "text-slate-700"} />
+          <Indicador label="Días sin actuac."  value={fmt(ind?.dias_sin_actuacion, " días")}
+            color={ind?.dias_sin_actuacion > 30 ? "text-amber-600" : "text-slate-700"} />
+          <Indicador label="Días desde alta"   value={fmt(ind?.dias_desde_alta, " días")} />
+          <Indicador label="Estado"            value={ind?.client_status || "—"}
+            color={ind?.client_status === "Alta" ? "text-emerald-600" :
+                   ind?.client_status === "Baja" ? "text-red-600" : "text-slate-700"} />
+          <Indicador label="Domicilio"
+            value={ind?.tiene_domicilio ? "Sí" : "No"}
+            color={ind?.tiene_domicilio ? "text-emerald-600" : "text-red-500"} />
+        </div>
+
+        {/* Acciones rápidas */}
+        <div className="px-4 pb-4 space-y-2 border-t border-slate-100 pt-3 mt-1">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Acciones</p>
+          <button onClick={() => onTabChange("tareas")}
+            className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors">
+            <AlertTriangle size={13} className="text-amber-500" /> Ver tareas
+          </button>
+          <button onClick={() => onTabChange("adjuntos")}
+            className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors">
+            <Paperclip size={13} className="text-red-500" /> Adjuntos
+          </button>
+        </div>
+      </div>
+    </aside>
   );
 }
 
@@ -1578,25 +2952,36 @@ export default function ClientDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError]   = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("perfil");
+  const [photoZoom, setPhotoZoom] = useState(false);
+  // Lazy-mount: tabs mount the first time they're visited and stay mounted (hidden via CSS)
+  const [mountedTabs, setMountedTabs] = useState<Set<string>>(new Set(["perfil"]));
+  const handleTabChange = (tabId: string) => {
+    setActiveTab(tabId);
+    setMountedTabs(prev => { const s = new Set(prev); s.add(tabId); return s; });
+  };
 
-  useEffect(() => {
+  const fetchClient = useCallback(async (silent = false) => {
     if (!id) return;
-    (async () => {
-      try {
-        const token = await getToken({ skipCache: true });
-        const res = await fetch(`/api/entities/${id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const result = await safeJson(res);
-        if (res.ok) setClient(result.data);
-        else throw new Error(result.error || "Cliente no encontrado");
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [id]);
+    try {
+      if (!silent) setLoading(true);
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/entities/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const result = await safeJson(res);
+      if (res.ok) setClient(result.data);
+      else if (!silent) throw new Error(result.error || "Cliente no encontrado");
+    } catch (err: any) {
+      if (!silent) setError(err.message);
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }, [id, getToken]);
+
+  useEffect(() => { fetchClient(); }, [fetchClient]);
+
+  // Auto-refrescar datos del cliente: cada 30s, al volver a pestaña
+  useAutoRefresh(() => fetchClient(true), { intervalMs: 30_000, enabled: !!id });
 
   if (loading) return (
     <div className="flex flex-col items-center justify-center h-64 text-slate-400">
@@ -1641,7 +3026,7 @@ export default function ClientDetail() {
             <span className="text-slate-800 font-medium">{client.first_name} {client.last_name}</span>
           </div>
           <div className="flex gap-2">
-            <button onClick={() => navigate(-1)} className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">
+            <button onClick={() => navigate("/dashboard/clientes")} className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">
               <ArrowLeft size={15} /> Volver
             </button>
             <button
@@ -1657,13 +3042,46 @@ export default function ClientDetail() {
         <div className="bg-white border border-slate-200 rounded-xl p-5">
           <div className="flex items-center gap-4">
             {client.photo_url
-              ? <img src={client.photo_url} alt="Foto" className="h-16 w-16 rounded-xl object-cover shrink-0 shadow" />
+              ? (
+                <button
+                  onClick={() => setPhotoZoom(true)}
+                  className="shrink-0 rounded-xl overflow-hidden shadow focus:outline-none focus:ring-2 focus:ring-red-400 cursor-zoom-in"
+                  title="Ver foto ampliada"
+                >
+                  <img src={client.photo_url} alt="Foto" className="h-16 w-16 object-cover hover:scale-105 transition-transform duration-200" />
+                </button>
+              )
               : (
                 <div className="h-16 w-16 bg-gradient-to-br from-red-500 to-red-700 rounded-xl flex items-center justify-center text-white font-bold text-2xl shadow-lg shadow-red-200 shrink-0">
                   {initials}
                 </div>
               )
             }
+
+            {/* Lightbox foto */}
+            {photoZoom && client.photo_url && (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+                onClick={() => setPhotoZoom(false)}
+              >
+                <div className="relative max-w-2xl w-full mx-4" onClick={e => e.stopPropagation()}>
+                  <img
+                    src={client.photo_url}
+                    alt="Foto ampliada"
+                    className="w-full rounded-2xl shadow-2xl object-contain max-h-[90vh]"
+                  />
+                  <button
+                    onClick={() => setPhotoZoom(false)}
+                    className="absolute -top-3 -right-3 bg-white rounded-full p-1.5 shadow-lg text-slate-500 hover:text-slate-800 transition-colors"
+                  >
+                    <X size={16} />
+                  </button>
+                  <p className="text-center text-white/70 text-xs mt-3">
+                    {client.first_name} {client.last_name}
+                  </p>
+                </div>
+              </div>
+            )}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-xl font-bold text-slate-900 truncate">
@@ -1702,7 +3120,7 @@ export default function ClientDetail() {
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => handleTabChange(tab.id)}
                   className={`flex items-center gap-2 px-5 py-3.5 text-[12px] font-bold whitespace-nowrap transition-all border-b-2 ${
                     active
                       ? "border-red-600 text-red-600 bg-red-50/50"
@@ -1716,61 +3134,42 @@ export default function ClientDetail() {
             })}
           </div>
 
-          {/* Contenido del tab activo */}
+          {/* Contenido del tab activo — lazy-mount: monta al primer acceso, oculta con CSS */}
           <div className="p-5">
-            {activeTab === "perfil"      && <TabPerfil client={client} formatDate={formatDate} age={age} />}
-            {activeTab === "expedientes" && <TabExpedientes />}
-            {activeTab === "historial"   && <TabHistorial clientId={id!} />}
-            {activeTab === "notas"       && <TabNotas />}
-            {activeTab === "tareas"      && <TabTareas />}
-            {activeTab === "adjuntos"    && <TabAdjuntos clientId={id!} client={client} />}
+            <div style={{ display: activeTab === "perfil"      ? "block" : "none" }}>
+              <TabPerfil client={client} formatDate={formatDate} age={age} />
+            </div>
+            {mountedTabs.has("expedientes") && (
+              <div style={{ display: activeTab === "expedientes" ? "block" : "none" }}>
+                <TabExpedientes />
+              </div>
+            )}
+            {mountedTabs.has("historial") && (
+              <div style={{ display: activeTab === "historial" ? "block" : "none" }}>
+                <TabHistorial clientId={id!} />
+              </div>
+            )}
+            {mountedTabs.has("notas") && (
+              <div style={{ display: activeTab === "notas" ? "block" : "none" }}>
+                <TabNotas clientId={id!} />
+              </div>
+            )}
+            {mountedTabs.has("tareas") && (
+              <div style={{ display: activeTab === "tareas" ? "block" : "none" }}>
+                <TabTareas clientId={id!} />
+              </div>
+            )}
+            {mountedTabs.has("adjuntos") && (
+              <div style={{ display: activeTab === "adjuntos" ? "block" : "none" }}>
+                <TabAdjuntos clientId={id!} client={client} />
+              </div>
+            )}
           </div>
         </div>
       </div>
 
       {/* ── PANEL INDICADORES ───────────────────────────────── */}
-      <aside className="w-52 shrink-0 space-y-4">
-        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden sticky top-6">
-          <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100">
-            <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Indicadores</h3>
-          </div>
-          <div className="px-4 py-3">
-            <Indicador label="Expedientes"           value="0" />
-            <Indicador label="Expedientes abiertos"  value="0" />
-            <Indicador label="Días sin actuaciones"  value="0 días" />
-            <Indicador label="Actuaciones atrasadas" value="0" />
-            <Indicador label="Días morosidad"        value="0 días" />
-            <Indicador label="Domicilio económico"   value="No" color="text-red-500" />
-            <Indicador label="Domicilio historial"   value="No" color="text-red-500" />
-          </div>
-
-          {/* Acciones rápidas */}
-          <div className="px-4 pb-4 space-y-2">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Acciones</p>
-            <button
-              onClick={() => setActiveTab("expedientes")}
-              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors"
-            >
-              <Briefcase size={13} className="text-red-500" /> Nuevo expediente
-            </button>
-            <button
-              onClick={() => setActiveTab("adjuntos")}
-              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors"
-            >
-              <FileText size={13} className="text-slate-400" /> Nuevo documento
-            </button>
-            <button className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors">
-              <Mail size={13} className="text-slate-400" /> Enviar email
-            </button>
-            <button
-              onClick={() => setActiveTab("notas")}
-              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors"
-            >
-              <StickyNote size={13} className="text-amber-500" /> Añadir nota
-            </button>
-          </div>
-        </div>
-      </aside>
+      <PanelIndicadores clientId={id!} onTabChange={handleTabChange} />
     </div>
   );
 }

@@ -1,1 +1,0 @@
-// Contratos de datos compartidos entre Front y Back
