@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import multer from 'multer';
 import { requireAuth } from '../middleware/auth';
+import { UPLOADS_CHAT_ROOT } from '../config/paths';
 import {
   getCanales, createCanal, updateCanal, archivarCanal, marcarLeido, marcarTodoLeido, getCanalMiembros,
   getMensajes, sendMensaje, editMensaje, deleteMensaje,
@@ -17,7 +18,7 @@ import {
 } from '../controllers/chatController';
 
 const router = Router();
-const uploadDir = path.join(__dirname, '../../uploads/chat');
+const uploadDir = UPLOADS_CHAT_ROOT;
 fs.mkdirSync(uploadDir, { recursive: true });
 
 const chatUpload = multer({

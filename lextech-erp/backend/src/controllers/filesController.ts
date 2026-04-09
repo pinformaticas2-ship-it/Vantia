@@ -3,13 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import pool from '../config/database';
 import { logActivityForReq } from './activityController';
-
-const UPLOADS_ROOT = path.join(__dirname, '../../uploads/clients');
-
-// Ruta local para almacenar archivos de clientes (carpeta por cliente)
-const LOCAL_CLIENT_FILES_ROOT = process.env.CLIENT_FILES_PATH
-  ? path.resolve(process.env.CLIENT_FILES_PATH)
-  : path.join(process.env.USERPROFILE || process.env.HOME || '', 'lextech-client-files');
+import { CLIENT_FILES_ROOT as LOCAL_CLIENT_FILES_ROOT, TEMP_ROOT, UPLOADS_CLIENTS_ROOT as UPLOADS_ROOT } from '../config/paths';
 
 // ─── Tipos de adjunto → subcarpetas ────────────────────────────
 // Cada tipo tiene su propia carpeta dentro del directorio del cliente
@@ -447,7 +441,7 @@ export const previewDocxAsHtml = async (req: any, res: Response) => {
     }
 
     // Crear script Python temporal
-    const tempDir = path.join(__dirname, '../../temp');
+    const tempDir = TEMP_ROOT;
     if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
     const scriptPath = path.join(tempDir, `preview_${fileId}.py`);
 
@@ -1319,7 +1313,7 @@ export const previewTemplateAsHtml = async (req: any, res: Response) => {
   // Helper: genera preview HTML de un .docx dado su ruta en disco
   const runDocxPreview = (docxPath: string) => {
     try {
-      const tempDir = path.join(__dirname, '../../temp');
+      const tempDir = TEMP_ROOT;
       if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
       const scriptId = Buffer.from(relPath + docxPath).toString('hex').slice(0, 20);
       const scriptPath = path.join(tempDir, `tpl_${scriptId}.py`);
@@ -1770,7 +1764,7 @@ except Exception as e:
 
   // ── .doc: convertir a .docx vía Python (win32com → PowerShell → LibreOffice) ─
   if (ext === '.doc') {
-    const tempDir = path.join(__dirname, '../../temp');
+    const tempDir = TEMP_ROOT;
     if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
     const scriptId2 = Buffer.from(relPath).toString('hex').slice(0, 16);

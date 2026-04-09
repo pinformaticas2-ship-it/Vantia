@@ -1,0 +1,47 @@
+services:
+  - type: web
+    name: vantia-backend
+    runtime: node
+    rootDir: backend
+    plan: starter
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    disk:
+      name: vantia-data
+      mountPath: /var/data
+      sizeGB: 5
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 20
+      - key: PGSSL
+        value: "true"
+      - key: PG_FAMILY
+        value: "4"
+      - key: START_LOCAL_FILE_WATCHER
+        value: "false"
+      - key: DATA_ROOT
+        value: /var/data
+      - key: UPLOADS_DIR
+        value: /var/data/uploads
+      - key: CLIENT_FILES_PATH
+        value: /var/data/client-files
+      - key: TEMP_DIR
+        value: /tmp/vantia
+      - key: DATABASE_URL
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: CLERK_SECRET_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: EMAIL_ENC_KEY
+        sync: false
+      - key: EMAIL_ENC_IV
+        sync: false
+      - key: DOCPLANT_PATH
+        sync: false

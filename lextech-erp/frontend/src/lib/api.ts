@@ -1,6 +1,78 @@
 let _clientIp: string | null = null;
 let _ipPromise: Promise<string | null> | null = null;
 const DEVICE_ID_KEY = 'lextech_device_id';
+const RAW_API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.trim() || '';
+const RAW_UPLOADS_BASE_URL = import.meta.env.VITE_UPLOADS_BASE_URL?.trim() || '';
+
+function stripTrailingSlash(value: string): string {
+  return value.replace(/\/+$/, '');
+}
+
+export function getApiBaseUrl(): string {
+  return stripTrailingSlash(RAW_API_BASE_URL);
+}
+
+export function getUploadsBaseUrl(): string {
+  return stripTrailingSlash(RAW_UPLOADS_BASE_URL || RAW_API_BASE_URL);
+}
+
+export function resolveApiUrl(input: string): string {
+  if (!input.startsWith('/api/')) return input;
+  const base = getApiBaseUrl();
+  return base ? `${base}${input}` : input;
+}
+
+export function resolveUploadUrl(input: string | null | undefined): string | null {
+  if (!input) return null;
+  if (/^https?:\/\//i.test(input) || input.startsWith('blob:') || input.startsWith('data:')) {
+    return input;
+  }
+  if (!input.startsWith('/uploads/')) return input;
+  const base = getUploadsBaseUrl();
+  return base ? `${base}${input}` : input;
+}
+
+function normalizeBackendPayload<T>(value: T): T {
+  if (typeof value === 'string') {
+    return resolveUploadUrl(value) as T;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeBackendPayload(item)) as T;
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, item]) => [key, normalizeBackendPayload(item)])
+    ) as T;
+  }
+  return value;
+}
+
+export function installBackendFetchShim(): void {
+  if (typeof window === 'undefined') return;
+  const anyWindow = window as typeof window & { __vantiaFetchShimInstalled?: boolean };
+  if (anyWindow.__vantiaFetchShimInstalled) return;
+
+  const originalFetch = window.fetch.bind(window);
+
+  window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+    if (typeof input === 'string') {
+      return originalFetch(resolveApiUrl(input), init);
+    }
+    if (input instanceof URL) {
+      const resolved = resolveApiUrl(input.toString());
+      return originalFetch(new URL(resolved), init);
+    }
+    if (input instanceof Request) {
+      const resolved = resolveApiUrl(input.url);
+      if (resolved === input.url) return originalFetch(input, init);
+      const proxied = new Request(resolved, input);
+      return originalFetch(proxied, init);
+    }
+    return originalFetch(input, init);
+  }) as typeof window.fetch;
+
+  anyWindow.__vantiaFetchShimInstalled = true;
+}
 
 function createDeviceId(): string {
   const suffix = Math.random().toString(36).slice(2, 10);
@@ -103,7 +175,8 @@ export async function safeJson(response: Response) {
     throw new Error(statusMsg);
   }
 
-  return response.json();
+  const data = await response.json();
+  return normalizeBackendPayload(data);
 }
 
 const inflightGET = new Map<string, Promise<any>>();
@@ -148,7 +221,7 @@ export async function apiFetch(
         }
       }
 
-      const res = await fetch(url, { ...init, headers });
+      const res = await fetch(resolveApiUrl(url), { ...init, headers });
 
       if (res.status === 401 && attempt === 0) continue;
 

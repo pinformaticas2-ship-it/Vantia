@@ -1,13 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import pool from '../config/database';
-
-// Mismas rutas que en filesController para mantener coherencia
-const LOCAL_ROOT = process.env.CLIENT_FILES_PATH
-  ? path.resolve(process.env.CLIENT_FILES_PATH)
-  : path.join(process.env.USERPROFILE || process.env.HOME || '', 'lextech-client-files');
-
-const UPLOADS_ROOT = path.join(__dirname, '../../uploads/clients');
+import { CLIENT_FILES_ROOT as LOCAL_ROOT, UPLOADS_CLIENTS_ROOT as UPLOADS_ROOT } from '../config/paths';
 
 // Mapa de timers pendientes (debounce por archivo)
 const pending = new Map<string, ReturnType<typeof setTimeout>>();

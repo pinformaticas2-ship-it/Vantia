@@ -1,5 +1,10 @@
 {
-	"dependencies": {
-		"@clerk/clerk-react": "^5.60.0"
-	}
+  "private": true,
+  "scripts": {
+    "build": "npm install --prefix frontend && npm run build --prefix frontend",
+    "vercel-build": "npm install --prefix frontend && npm run build --prefix frontend"
+  },
+  "dependencies": {
+    "@clerk/clerk-react": "^5.60.0"
+  }
 }

@@ -1,9 +1,10 @@
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { UPLOADS_DNIS_ROOT } from '../config/paths';
 
 // Asegurarnos de que existe la carpeta donde guardaremos los DNIs
-const uploadDir = path.join(__dirname, '../../../uploads/dnis');
+const uploadDir = UPLOADS_DNIS_ROOT;
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
 }

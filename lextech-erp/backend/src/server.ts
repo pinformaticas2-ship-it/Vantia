@@ -19,11 +19,16 @@ import { startLocalFilesWatcher } from './watchers/localFilesWatcher';
 import { migrateLocalFoldersStructure } from './controllers/filesController';
 import { logServerStart } from './controllers/activityController';
 import pool from './config/database';
+import { SHOULD_START_LOCAL_WATCHER, UPLOADS_ROOT } from './config/paths';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 4000;
+const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
 process.on('unhandledRejection', (reason) => {
   console.error('❌ Unhandled promise rejection:', reason);
@@ -35,7 +40,16 @@ process.on('uncaughtException', (error) => {
 
 // --- MIDDLEWARES GLOBALES ---
 app.use(helmet({ crossOriginResourcePolicy: false }));
-app.use(cors({ origin: true, credentials: true }));
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+    callback(new Error('Origen no permitido por CORS'));
+  },
+  credentials: true,
+}));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -53,7 +67,7 @@ app.use('/api', (_req, res, next) => {
 app.use(compression());
 
 // Servir archivos estáticos (fotos DNI subidas, etc.)
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+app.use('/uploads', express.static(UPLOADS_ROOT));
 
 // --- RUTAS ---
 app.use('/api/entities', entityRoutes);
@@ -104,8 +118,10 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 runMigrations().then(() => {
   app.listen(PORT, async () => {
     console.log(`🛡️  VANTIA Backend corriendo en http://localhost:${PORT}`);
-    startLocalFilesWatcher();
-    migrateLocalFoldersStructure();
+    if (SHOULD_START_LOCAL_WATCHER) {
+      startLocalFilesWatcher();
+      migrateLocalFoldersStructure();
+    }
     // Registrar arranque en trazabilidad
     try { await logServerStart(); } catch (_e) {}
   });

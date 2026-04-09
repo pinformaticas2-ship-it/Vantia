@@ -4,9 +4,10 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import './index.css'
 import { ClerkProvider } from '@clerk/clerk-react'
-import { initClientIp } from './lib/api'
+import { initClientIp, installBackendFetchShim } from './lib/api'
 
 // Obtener IP pública lo antes posible — estará lista antes del primer login
+installBackendFetchShim();
 initClientIp();
 
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY

@@ -3,12 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import pool from '../config/database';
 import { logActivity, logActivityForReq } from './activityController';
-
-const UPLOADS_ROOT = path.join(__dirname, '../../uploads/clients');
-
-const CLIENT_FILES_ROOT = process.env.CLIENT_FILES_PATH
-  ? path.resolve(process.env.CLIENT_FILES_PATH)
-  : path.join(process.env.USERPROFILE || process.env.HOME || '', 'lextech-client-files');
+import { CLIENT_FILES_ROOT, UPLOADS_CLIENTS_ROOT as UPLOADS_ROOT } from '../config/paths';
 
 /** Convierte string vacío a null (evita cast ::date fallido en PostgreSQL) */
 const nullIfEmpty = (v: any) => (v === '' || v === undefined ? null : v);

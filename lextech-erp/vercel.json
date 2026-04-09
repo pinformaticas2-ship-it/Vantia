@@ -1,0 +1,10 @@
+{
+  "buildCommand": "npm run vercel-build",
+  "outputDirectory": "frontend/dist",
+  "rewrites": [
+    {
+      "source": "/((?!api/|assets/|favicon\\.svg|vite\\.svg).*)",
+      "destination": "/index.html"
+    }
+  ]
+}
