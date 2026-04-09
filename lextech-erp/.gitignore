@@ -1,0 +1,29 @@
+Dependencias de Node (no se suben al repo)
+
+node_modules/
+
+Carpetas de compilación
+
+dist/
+build/
+
+Archivos de configuración y secretos (Seguridad)
+
+.env
+.env.local
+
+Datos y Documentos del Despacho (Privacidad Jurídica)
+
+DocPlant/
+Expedientes/
+*.doc
+*.docx
+*.pdf
+
+Carpetas de respaldo y copias locales
+
+lextech-erp - copia*/
+
+Archivos de herramientas externas e IA
+
+.claude/

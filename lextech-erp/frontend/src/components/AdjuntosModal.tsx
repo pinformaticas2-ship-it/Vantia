@@ -5,6 +5,8 @@ import {
   X, Upload, FolderOpen, FilePlus2, Sparkles, Loader2,
   Eye, Download, Trash2, Edit3, ExternalLink, FileText,
   Search, ChevronDown, ChevronRight, Paperclip,
+  Star, Mail, MessageCircle, FileOutput, Table2, Settings2,
+  ChevronLeft, LayoutList, Grid3X3, Folder,
 } from "lucide-react";
 import { safeJson } from "../lib/api";
 
@@ -122,6 +124,15 @@ export default function AdjuntosModal({ entityId, entityName, onClose }: Adjunto
   const [uploadQueueTotal, setUploadQueueTotal] = useState(0);
   const pendingUploadFile                     = useRef<File | null>(null);
 
+  // UI state – new toolbar/sidebar layout
+  const [selectedFileId, setSelectedFileId]   = useState<string | null>(null);
+  const [searchText, setSearchText]           = useState("");
+  const [sidebarSection, setSidebarSection]   = useState<string>("Sin archivar");
+  const [viewMode, setViewMode]               = useState<"list" | "grid">("list");
+  const [favs, setFavs]                       = useState<Set<string>>(new Set());
+  const [filterTipo, setFilterTipo]           = useState<string>("Todos");
+  const [errorMsg, setErrorMsg]               = useState<string | null>(null);
+
   // Close on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -184,23 +195,34 @@ export default function AdjuntosModal({ entityId, entityName, onClose }: Adjunto
         for (const f of (data.data || [])) {
           if (f.mimetype?.startsWith("image/")) loadThumb(f.id);
         }
+      } else {
+        setErrorMsg(data?.error || `Error al cargar archivos (${res.status})`);
       }
-    } catch (_e) {}
+    } catch (e: any) {
+      setErrorMsg(e?.message || "Error de conexión al cargar archivos");
+    }
     finally { if (!silent) setLoadingFiles(false); }
   }, [entityId, loadThumb, getToken]);
 
   useEffect(() => { loadFiles(); }, [loadFiles]);
 
   // ── Upload queue ──────────────────────────────────────────
+  // Tipos concretos de adjunto (excluye "Sin archivar", "Todos", "Favoritos" que son filtros de UI)
+  const CONCRETE_TYPES = ["Sin clasificar","AUTO","ESCRITO PROCESAL","FACTURAS","PODER","EVIDENCIA"] as const;
+
   const openNextUploadModal = useCallback((file: File, queue: File[], total: number) => {
     pendingUploadFile.current = file;
     setUploadQueue(queue);
     setUploadQueueTotal(total);
     const baseName = file.name.replace(/\.[^/.]+$/, "");
+    // Heredar el tipo de la sección activa del sidebar si es un tipo concreto
+    const inheritedType = CONCRETE_TYPES.includes(sidebarSection as any)
+      ? sidebarSection
+      : "Sin clasificar";
     setEditDocName(baseName);
-    setEditAttachmentType("Sin clasificar");
-    setEditingFile({ id: "PENDING_UPLOAD", document_name: baseName, attachment_type: "Sin clasificar" });
-  }, []);
+    setEditAttachmentType(inheritedType);
+    setEditingFile({ id: "PENDING_UPLOAD", document_name: baseName, attachment_type: inheritedType });
+  }, [sidebarSection]);
 
   const enqueueFiles = useCallback((fileList: FileList | File[]) => {
     const arr = Array.from(fileList);
@@ -244,8 +266,13 @@ export default function AdjuntosModal({ entityId, entityName, onClose }: Adjunto
           const displayName = editDocName.trim() ? `${editDocName}${ext}` : file.name;
           await openInWord({ id: fileId, original_name: displayName });
         }
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setErrorMsg(`Error al subir "${file.name}": ${errData?.error || `HTTP ${res.status}`}`);
       }
-    } catch (_e) {}
+    } catch (e: any) {
+      setErrorMsg(`Error al subir "${file?.name}": ${e?.message || "Error de conexión"}`);
+    }
     finally {
       setSavingMetadata(false);
       setEditingFile(null);
@@ -273,15 +300,24 @@ export default function AdjuntosModal({ entityId, entityName, onClose }: Adjunto
   // ── Delete file ───────────────────────────────────────────
   const handleDelete = async (fileId: string) => {
     if (!confirm("¿Eliminar este archivo?")) return;
-    const token = await getToken({ skipCache: true });
-    await fetch(`/api/files/${entityId}/${fileId}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    setFiles(prev => prev.filter(f => f.id !== fileId));
-    previewCache.current.delete(fileId);
-    if (preview?.fileId === fileId) setPreview(null);
-    window.dispatchEvent(new CustomEvent("historial-changed"));
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/files/${entityId}/${fileId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        setErrorMsg(`Error al eliminar: ${errData?.error || `HTTP ${res.status}`}`);
+        return;
+      }
+      setFiles(prev => prev.filter(f => f.id !== fileId));
+      previewCache.current.delete(fileId);
+      if (preview?.fileId === fileId) setPreview(null);
+      window.dispatchEvent(new CustomEvent("historial-changed"));
+    } catch (e: any) {
+      setErrorMsg(`Error al eliminar: ${e?.message || "Error de conexión"}`);
+    }
   };
 
   // ── Open in Word/Excel ─────────────────────────────────────
@@ -359,9 +395,10 @@ export default function AdjuntosModal({ entityId, entityName, onClose }: Adjunto
 
   // ── Blank doc ──────────────────────────────────────────────
   const showCreateBlankModal = () => {
-    setEditingFile({ id: "NEW_BLANK", document_name: "", attachment_type: "Sin clasificar" });
+    const inheritedType = CONCRETE_TYPES.includes(sidebarSection as any) ? sidebarSection : "Sin clasificar";
+    setEditingFile({ id: "NEW_BLANK", document_name: "", attachment_type: inheritedType });
     setEditDocName("");
-    setEditAttachmentType("Sin clasificar");
+    setEditAttachmentType(inheritedType);
   };
 
   const createBlankDoc = async () => {
@@ -431,11 +468,12 @@ export default function AdjuntosModal({ entityId, entityName, onClose }: Adjunto
   };
 
   const showTemplateModal = (filePath: string, fileName: string) => {
+    const inheritedType = CONCRETE_TYPES.includes(sidebarSection as any) ? sidebarSection : "Sin clasificar";
     setPendingTemplate({ filePath, fileName });
     const baseName = fileName.replace(/\.[^/.]+$/, "");
-    setEditingFile({ id: "PENDING_TEMPLATE", document_name: "", attachment_type: "Sin clasificar" });
+    setEditingFile({ id: "PENDING_TEMPLATE", document_name: "", attachment_type: inheritedType });
     setEditDocName(baseName);
-    setEditAttachmentType("Sin clasificar");
+    setEditAttachmentType(inheritedType);
   };
 
   const downloadDocPlantTemplate = async () => {
@@ -495,317 +533,537 @@ export default function AdjuntosModal({ entityId, entityName, onClose }: Adjunto
         previewCache.current.delete(editingFile.id);
         await loadFiles();
         setEditingFile(null);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setErrorMsg(`Error al guardar: ${errData?.error || `HTTP ${res.status}`}`);
       }
-    } catch (_e) {}
+    } catch (e: any) {
+      setErrorMsg(`Error al guardar: ${e?.message || "Error de conexión"}`);
+    }
     finally { setSavingMetadata(false); }
   };
 
   // ── Render ─────────────────────────────────────────────────
+  // Compute filtered files
+  const tipoOptions = ["Todos", "Sin clasificar", "AUTO", "ESCRITO PROCESAL", "FACTURAS", "PODER", "EVIDENCIA"];
+
+  const visibleFiles = files.filter(f => {
+    const matchSearch = !searchText ||
+      (f.original_name || "").toLowerCase().includes(searchText.toLowerCase()) ||
+      (f.document_name  || "").toLowerCase().includes(searchText.toLowerCase());
+    const matchTipo = filterTipo === "Todos" || (f.attachment_type || "Sin clasificar") === filterTipo;
+    const matchSection =
+      sidebarSection === "Todos"       ? true :
+      sidebarSection === "Sin archivar" ? (!f.attachment_type || f.attachment_type === "Sin clasificar") :
+      sidebarSection === "Favoritos"   ? favs.has(f.id) :
+      (f.attachment_type || "Sin clasificar") === sidebarSection;
+    return matchSearch && matchTipo && matchSection;
+  });
+
+  const selectedFile = files.find(f => f.id === selectedFileId) ?? null;
+
   return createPortal(
+    <>
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div
-        className="bg-slate-50 w-full max-w-7xl mx-4 my-4 rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+        className="bg-slate-50 w-full max-w-[1400px] mx-4 my-4 rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-200"
         onClick={e => e.stopPropagation()}
         style={{ maxHeight: "calc(100vh - 32px)" }}
       >
-        {/* ── Modal header ── */}
-        <div className="flex items-center gap-3 px-6 py-3.5 bg-white border-b border-slate-200 shrink-0">
-          <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-red-100">
-            <Paperclip size={17} className="text-red-600" />
+        {/* ── Title bar ── */}
+        <div className="flex items-center justify-between px-5 py-3 bg-white border-b border-slate-200 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-red-100 shrink-0">
+              <Paperclip size={15} className="text-red-600" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-slate-900 leading-tight">Adjuntos</h2>
+              <p className="text-[11px] text-slate-500 truncate max-w-xs">{entityName}</p>
+            </div>
+            <span className="text-[11px] text-slate-400 ml-1 font-medium">
+              {loadingFiles ? "Cargando…" : `${files.length} ${files.length === 1 ? "archivo" : "archivos"}`}
+            </span>
           </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-sm font-bold text-slate-900 leading-tight">Adjuntos</h2>
-            <p className="text-[11px] text-slate-500 truncate">{entityName}</p>
-          </div>
-          <span className="text-xs text-slate-400 font-medium">
-            {loadingFiles ? "Cargando…" : `${files.length} ${files.length === 1 ? "archivo" : "archivos"}`}
-          </span>
-          <button
-            onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors ml-1"
-          >
-            <X size={16} />
+          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors">
+            <X size={15} />
           </button>
         </div>
 
-        {/* ── Body ── */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
-
-          {/* Action bar */}
-          <div className="flex flex-wrap gap-2 justify-end">
-            <button
-              onClick={() => folderInputRef.current?.click()}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl transition-all"
-            >
-              <FolderOpen size={13} /> Importar carpeta
-            </button>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl transition-all"
-            >
-              <Upload size={13} /> Subir archivo
-            </button>
-            <button
-              onClick={showCreateBlankModal}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl transition-all"
-            >
-              <FilePlus2 size={13} /> Nuevo
-            </button>
-            <button
-              onClick={() => openTemplatesModal()}
-              className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm active:scale-95 transition-all"
-            >
-              <Sparkles size={13} /> Usar plantilla
+        {/* ── Error banner ── */}
+        {errorMsg && (
+          <div className="flex items-center justify-between px-4 py-2 bg-red-50 border-b border-red-200 shrink-0">
+            <span className="text-xs text-red-700 font-medium flex-1">{errorMsg}</span>
+            <button onClick={() => setErrorMsg(null)} className="ml-3 text-red-400 hover:text-red-700 shrink-0">
+              <X size={13} />
             </button>
           </div>
+        )}
 
-          {/* Hidden inputs */}
-          <input
-            ref={fileInputRef} type="file" multiple className="hidden"
-            onChange={e => { if (e.target.files) { enqueueFiles(e.target.files); e.target.value = ""; } }}
-          />
-          <input
-            ref={folderInputRef} type="file" multiple className="hidden"
-            {...({ webkitdirectory: "true", directory: "true" } as any)}
-            onChange={e => { if (e.target.files) { enqueueFiles(e.target.files); e.target.value = ""; } }}
-          />
-
-          {/* Drop zone */}
-          <div
-            onDrop={onDrop}
-            onDragOver={e => { e.preventDefault(); setIsDragOver(true); }}
-            onDragLeave={() => setIsDragOver(false)}
+        {/* ── Toolbar ── */}
+        <div className="flex items-center gap-0.5 px-3 py-2 bg-white border-b border-slate-100 shrink-0 flex-wrap">
+          {/* Alta */}
+          <button
             onClick={() => fileInputRef.current?.click()}
-            className={`border-2 border-dashed rounded-xl p-6 flex flex-col items-center gap-2 cursor-pointer transition-all
-              ${isDragOver ? "border-red-400 bg-red-50/50 scale-[1.01]" : "border-slate-200 hover:border-red-300 hover:bg-red-50/20"}`}
+            className="flex flex-col items-center gap-0.5 px-3 py-1.5 text-[10px] font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors min-w-[52px] uppercase tracking-wide"
           >
-            {uploading
-              ? <><Loader2 size={24} className="text-red-500 animate-spin" /><p className="text-sm font-medium text-red-600">Subiendo archivos…</p></>
-              : <><Upload size={24} className={isDragOver ? "text-red-500" : "text-slate-400"} />
-                  <p className={`text-sm font-medium ${isDragOver ? "text-red-600" : "text-slate-500"}`}>Arrastra archivos o carpetas aquí</p>
-                  <p className="text-xs text-slate-400">PDF, Word, Excel, imágenes — máx. 50 MB por archivo</p>
-                </>
-            }
+            <Upload size={15} className="text-emerald-600" />
+            Alta
+          </button>
+          {/* Baja */}
+          <button
+            onClick={() => selectedFile && handleDelete(selectedFile.id)}
+            disabled={!selectedFileId}
+            className="flex flex-col items-center gap-0.5 px-3 py-1.5 text-[10px] font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors min-w-[52px] uppercase tracking-wide disabled:opacity-30"
+          >
+            <Trash2 size={15} className="text-red-500" />
+            Baja
+          </button>
+          {/* Modificar */}
+          <button
+            onClick={() => {
+              if (!selectedFile) return;
+              setEditingFile({ id: selectedFile.id, document_name: selectedFile.document_name || "", attachment_type: selectedFile.attachment_type || "Sin clasificar" });
+              setEditDocName(selectedFile.document_name || "");
+              setEditAttachmentType(selectedFile.attachment_type || "Sin clasificar");
+            }}
+            disabled={!selectedFileId}
+            className="flex flex-col items-center gap-0.5 px-3 py-1.5 text-[10px] font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors min-w-[60px] uppercase tracking-wide disabled:opacity-30"
+          >
+            <Edit3 size={15} className="text-blue-500" />
+            Modificar
+          </button>
+
+          <div className="w-px h-7 bg-slate-200 mx-1.5" />
+
+          {/* Correo */}
+          <button className="flex flex-col items-center gap-0.5 px-3 py-1.5 text-[10px] font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors min-w-[52px] uppercase tracking-wide">
+            <Mail size={15} className="text-blue-500" />
+            Correo
+          </button>
+          {/* Whatsapp */}
+          <button className="flex flex-col items-center gap-0.5 px-3 py-1.5 text-[10px] font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors min-w-[60px] uppercase tracking-wide">
+            <MessageCircle size={15} className="text-green-500" />
+            Whatsapp
+          </button>
+
+          <div className="w-px h-7 bg-slate-200 mx-1.5" />
+
+          {/* Herramientas PDF */}
+          <button
+            onClick={() => selectedFile && openInBrowser(selectedFile)}
+            disabled={!selectedFile || selectedFile?.mimetype !== "application/pdf"}
+            className="flex flex-col items-center gap-0.5 px-3 py-1.5 text-[10px] font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors min-w-[72px] uppercase tracking-wide disabled:opacity-30"
+          >
+            <FileOutput size={15} className="text-red-600" />
+            Herram. PDF
+          </button>
+          {/* Excel */}
+          <button className="flex flex-col items-center gap-0.5 px-3 py-1.5 text-[10px] font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors min-w-[48px] uppercase tracking-wide">
+            <Table2 size={15} className="text-emerald-700" />
+            Excel
+          </button>
+
+          <div className="w-px h-7 bg-slate-200 mx-1.5" />
+
+          {/* Nuevo documento */}
+          <button
+            onClick={showCreateBlankModal}
+            className="flex flex-col items-center gap-0.5 px-3 py-1.5 text-[10px] font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors min-w-[52px] uppercase tracking-wide"
+          >
+            <FilePlus2 size={15} className="text-indigo-500" />
+            Nuevo
+          </button>
+          {/* Plantillas */}
+          <button
+            onClick={() => openTemplatesModal()}
+            className="flex flex-col items-center gap-0.5 px-3 py-1.5 text-[10px] font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors min-w-[60px] uppercase tracking-wide"
+          >
+            <Sparkles size={15} className="text-amber-500" />
+            Plantillas
+          </button>
+          {/* Carpeta */}
+          <button
+            onClick={() => folderInputRef.current?.click()}
+            className="flex flex-col items-center gap-0.5 px-3 py-1.5 text-[10px] font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors min-w-[60px] uppercase tracking-wide"
+          >
+            <FolderOpen size={15} className="text-amber-500" />
+            Importar
+          </button>
+
+          <div className="flex-1" />
+
+          {/* Opciones */}
+          <button className="flex flex-col items-center gap-0.5 px-3 py-1.5 text-[10px] font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors min-w-[56px] uppercase tracking-wide">
+            <Settings2 size={15} className="text-slate-400" />
+            Opciones
+          </button>
+        </div>
+
+        {/* ── Filter bar ── */}
+        <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border-b border-slate-200 shrink-0">
+          <div className="relative flex-1 max-w-xs">
+            <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              value={searchText}
+              onChange={e => setSearchText(e.target.value)}
+              placeholder="Buscar adjunto…"
+              className="w-full pl-7 pr-3 py-1.5 text-xs border border-slate-200 bg-white rounded-lg focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100"
+            />
+          </div>
+          <select className="text-xs border border-slate-200 bg-white rounded-lg px-2 py-1.5 focus:outline-none focus:border-red-400 text-slate-600">
+            <option>Nombre Adjunto</option>
+            <option>Tipo Adjunto</option>
+            <option>Fecha Adjunto</option>
+          </select>
+          <div className="w-px h-5 bg-slate-200" />
+          <span className="text-xs text-slate-500 font-medium">Tipo:</span>
+          <select
+            value={filterTipo}
+            onChange={e => setFilterTipo(e.target.value)}
+            className="text-xs border border-slate-200 bg-white rounded-lg px-2 py-1.5 focus:outline-none focus:border-red-400 text-slate-600"
+          >
+            {tipoOptions.map(t => <option key={t}>{t}</option>)}
+          </select>
+          <div className="flex-1" />
+          {/* View mode */}
+          <button
+            onClick={() => setViewMode("list")}
+            className={`p-1.5 rounded-lg transition-colors ${viewMode === "list" ? "bg-red-600 text-white" : "text-slate-400 hover:bg-slate-200"}`}
+          ><LayoutList size={13} /></button>
+          <button
+            onClick={() => setViewMode("grid")}
+            className={`p-1.5 rounded-lg transition-colors ${viewMode === "grid" ? "bg-red-600 text-white" : "text-slate-400 hover:bg-slate-200"}`}
+          ><Grid3X3 size={13} /></button>
+        </div>
+
+        {/* ── Hidden inputs ── */}
+        <input ref={fileInputRef} type="file" multiple className="hidden"
+          onChange={e => { if (e.target.files) { enqueueFiles(e.target.files); e.target.value = ""; } }}
+        />
+        <input ref={folderInputRef} type="file" multiple className="hidden"
+          {...({ webkitdirectory: "true", directory: "true" } as any)}
+          onChange={e => { if (e.target.files) { enqueueFiles(e.target.files); e.target.value = ""; } }}
+        />
+
+        {/* ── Main area: sidebar + content ── */}
+        <div className="flex flex-1 overflow-hidden">
+
+          {/* Sidebar */}
+          <div className="w-48 shrink-0 bg-white border-r border-slate-200 overflow-y-auto">
+            {/* Storage folder */}
+            <div className="px-2 pt-3 pb-1">
+              <div className="flex items-center gap-1.5 px-2 py-1.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                <Folder size={13} className="text-amber-500 shrink-0" />
+                <span className="truncate">Almacenamiento</span>
+              </div>
+            </div>
+            <div className="px-2 pb-3 space-y-0.5">
+              {[
+                { label: "Todos", count: files.length, indent: false },
+                { label: "Sin archivar", count: files.filter(f => !f.attachment_type || f.attachment_type === "Sin clasificar").length, indent: true },
+                { label: "Favoritos", count: favs.size, indent: true },
+                { label: "AUTO", count: files.filter(f => f.attachment_type === "AUTO").length, indent: true },
+                { label: "ESCRITO PROCESAL", count: files.filter(f => f.attachment_type === "ESCRITO PROCESAL").length, indent: true },
+                { label: "FACTURAS", count: files.filter(f => f.attachment_type === "FACTURAS").length, indent: true },
+                { label: "PODER", count: files.filter(f => f.attachment_type === "PODER").length, indent: true },
+                { label: "EVIDENCIA", count: files.filter(f => f.attachment_type === "EVIDENCIA").length, indent: true },
+              ].map(item => (
+                <button
+                  key={item.label}
+                  onClick={() => setSidebarSection(item.label)}
+                  className={`w-full flex items-center justify-between px-2 py-1.5 text-xs rounded-lg transition-colors text-left ${
+                    sidebarSection === item.label
+                      ? "bg-red-600 text-white font-semibold"
+                      : "text-slate-600 hover:bg-slate-100 font-medium"
+                  } ${item.indent ? "ml-2 w-[calc(100%-8px)]" : ""}`}
+                >
+                  <span className="truncate">{item.label}</span>
+                  {item.count > 0 && (
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 ml-1 ${
+                      sidebarSection === item.label ? "bg-red-500 text-white" : "bg-slate-100 text-slate-500"
+                    }`}>
+                      {item.count}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* File list + preview */}
-          <div className="flex gap-3 items-start">
-            {/* List */}
-            <div className={`${preview ? "w-[42%] shrink-0" : "w-full"} transition-all duration-300`}>
-              {loadingFiles ? (
-                <div className="bg-white border border-slate-200 rounded-xl p-10 flex justify-center">
-                  <Loader2 size={24} className="animate-spin text-red-500" />
-                </div>
-              ) : files.length === 0 ? (
-                <div className="bg-white border border-slate-200 rounded-xl p-12 flex flex-col items-center gap-2 text-slate-400">
-                  <FileText size={36} className="opacity-20" />
-                  <p className="text-sm font-medium">No hay documentos adjuntos</p>
-                  <p className="text-xs text-slate-300">Sube archivos o crea documentos con las plantillas</p>
-                </div>
-              ) : (
-                <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-                  <table className="w-full text-left">
-                    <thead className="bg-slate-50 border-b border-slate-100">
-                      <tr>
-                        <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Archivo</th>
-                        <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden lg:table-cell">Documento</th>
-                        <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Tipo</th>
-                        <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Tamaño</th>
-                        <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Fecha</th>
-                        <th className="px-4 py-3"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50">
-                      {files.map((f: any) => {
-                        const fi = fileIcon(f.mimetype, f.original_name);
-                        const canPreview = isPreviewable(f.mimetype);
-                        const canWord    = isWordFile(f.mimetype, f.original_name);
-                        const canExcel   = isExcelFile(f.mimetype, f.original_name);
-                        const handleNameClick = (canPreview || canWord || canExcel) ? () => openPreview(f) : undefined;
-                        return (
-                          <tr key={f.id} className="hover:bg-slate-50/60 transition-colors group">
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-2.5">
-                                {f.mimetype?.startsWith("image/") && thumbs[f.id]
-                                  ? (
-                                    <img
-                                      src={thumbs[f.id]}
-                                      alt=""
-                                      className="h-10 w-10 rounded-lg object-cover shrink-0 border border-slate-100 shadow-sm cursor-pointer hover:scale-105 transition-transform"
-                                      onClick={() => openPreview(f)}
-                                    />
-                                  ) : (
-                                    <span
-                                      className={`h-10 w-10 rounded-lg flex items-center justify-center text-lg shrink-0 ${fi.color} ${f.mimetype?.startsWith("image/") ? "animate-pulse" : ""} cursor-pointer hover:scale-105 transition-transform`}
-                                      onClick={() => { if (f.mimetype?.startsWith("image/")) loadThumb(f.id); else if (canPreview || canWord || canExcel) handleNameClick?.(); }}
-                                    >
-                                      {fi.icon}
-                                    </span>
-                                  )
-                                }
-                                <div className="min-w-0">
-                                  <button
-                                    onClick={handleNameClick}
-                                    className={`text-sm font-medium text-slate-700 text-left truncate block max-w-[180px] ${(canPreview || canWord || canExcel) ? "hover:text-red-600 hover:underline cursor-pointer" : ""}`}
-                                    title={canWord ? "Abrir en Word" : canExcel ? "Abrir en Excel" : f.original_name}
-                                  >
-                                    {f.original_name}
-                                  </button>
-                                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${fi.color}`}>
-                                    {fi.label}
-                                  </span>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-xs text-slate-600 hidden lg:table-cell max-w-[150px] truncate" title={f.document_name || "Sin nombre"}>
-                              {f.document_name || <span className="text-slate-400 italic">Sin nombre</span>}
-                            </td>
-                            <td className="px-4 py-3 text-xs text-slate-600 hidden md:table-cell">
-                              <span className={`px-2 py-1 rounded text-[10px] font-medium ${fi.color}`}>
-                                {f.attachment_type || "Sin clasificar"}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-xs text-slate-400 hidden md:table-cell">{fmtSize(f.size_bytes)}</td>
-                            <td className="px-4 py-3 text-xs text-slate-400 hidden md:table-cell">
-                              {new Date(f.created_at).toLocaleDateString("es-ES")}
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
-                                {(canPreview || canWord || canExcel) && (
-                                  <button onClick={() => openPreview(f)} title="Vista previa"
-                                    className="p-1.5 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors">
-                                    <Eye size={14} />
-                                  </button>
-                                )}
-                                <button
-                                  title="Editar"
-                                  className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                                  onClick={() => {
-                                    setEditingFile({ id: f.id, document_name: f.document_name || "", attachment_type: f.attachment_type || "Sin clasificar" });
-                                    setEditDocName(f.document_name || "");
-                                    setEditAttachmentType(f.attachment_type || "Sin clasificar");
-                                  }}
-                                >
-                                  <Edit3 size={14} />
-                                </button>
-                                {f.mimetype === "application/pdf" && (
-                                  <button title="Abrir en navegador"
-                                    className="p-1.5 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-                                    onClick={() => openInBrowser(f)}>
-                                    <ExternalLink size={14} />
-                                  </button>
-                                )}
-                                {canWord && (
-                                  <button title="Abrir en Word"
-                                    className="p-1.5 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors"
-                                    onClick={() => openInWord(f)}>
-                                    <Download size={14} />
-                                  </button>
-                                )}
-                                {canExcel && (
-                                  <button title="Abrir en Excel"
-                                    className="p-1.5 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors"
-                                    onClick={() => openInWord(f)}>
-                                    <Download size={14} />
-                                  </button>
-                                )}
-                                {!f.mimetype?.includes("pdf") && !canWord && !canExcel && (
-                                  <button title="Descargar"
-                                    className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                                    onClick={() => downloadWithAuth(f.id, f.original_name)}>
-                                    <Download size={14} />
-                                  </button>
-                                )}
-                                <button onClick={() => handleDelete(f.id)} title="Eliminar"
-                                  className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-                                  <Trash2 size={14} />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-
-            {/* Preview panel */}
-            {preview && (
-              <div
-                className="flex-1 bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col shadow-lg"
-                style={{ position: "sticky", top: 0, height: "calc(100vh - 260px)" }}
-              >
-                <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 border-b border-slate-100 shrink-0 gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-base shrink-0">
-                      {preview.mime === "application/pdf" ? "📄"
-                        : preview.mime.startsWith("image/") ? "🖼️"
-                        : preview.appType === "excel" ? "📊"
-                        : "📝"}
-                    </span>
-                    <p className="text-xs font-bold text-slate-700 truncate" title={preview.name}>
-                      {preview.name}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    {preview.mime === "text/html" && preview.fileId && preview.appType === "word" && (
-                      <button
-                        onClick={() => openInWord({ id: preview.fileId!, original_name: preview.name })}
-                        className="flex items-center gap-1 text-[11px] font-semibold text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 px-2 py-1 rounded-lg transition-colors border border-neutral-200"
-                      >
-                        Abrir en Word
-                      </button>
-                    )}
-                    {preview.mime === "text/html" && preview.fileId && preview.appType === "excel" && (
-                      <button
-                        onClick={() => openInWord({ id: preview.fileId!, original_name: preview.name })}
-                        className="flex items-center gap-1 text-[11px] font-semibold text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 px-2 py-1 rounded-lg transition-colors border border-neutral-200"
-                      >
-                        Abrir en Excel
-                      </button>
-                    )}
-                    <a href={preview.url} target="_blank" rel="noopener noreferrer"
-                      className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-                      title="Abrir en nueva pestaña">
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                    </a>
-                    <button
-                      onClick={() => {
-                        if (previewBlobUrl.current) { URL.revokeObjectURL(previewBlobUrl.current); previewBlobUrl.current = null; }
-                        setPreview(null);
-                      }}
-                      className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Cerrar vista previa"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                </div>
-                <div className="flex-1 overflow-hidden relative">
-                  {preview.mime === "application/pdf" && (
-                    <object data={preview.url} type="application/pdf" className="w-full h-full" style={{ minHeight: 0 }}>
-                      <iframe src={`${preview.url}#toolbar=1&navpanes=1&scrollbar=1&view=FitH`} className="w-full h-full border-0" title={preview.name} />
-                    </object>
-                  )}
-                  {preview.mime.startsWith("image/") && (
-                    <div className="w-full h-full flex items-center justify-center bg-slate-800 overflow-auto p-3">
-                      <img src={preview.url} alt={preview.name} className="max-w-full max-h-full object-contain rounded shadow-2xl" />
-                    </div>
-                  )}
-                  {preview.mime === "text/html" && (
-                    <iframe src={preview.url} className="w-full h-full border-0 bg-white" title={preview.name} sandbox="allow-same-origin allow-scripts" style={{ minHeight: 0 }} />
-                  )}
-                  {preview.mime.startsWith("text/") && preview.mime !== "text/html" && (
-                    <iframe src={preview.url} className="w-full h-full border-0 bg-white" title={preview.name} style={{ minHeight: 0 }} />
-                  )}
-                </div>
+          {/* Content area */}
+          <div
+            className="flex-1 overflow-hidden flex flex-col relative"
+            onDrop={onDrop}
+            onDragOver={e => { e.preventDefault(); e.stopPropagation(); setIsDragOver(true); }}
+            onDragEnter={e => { e.preventDefault(); e.stopPropagation(); setIsDragOver(true); }}
+            onDragLeave={e => {
+              // Solo desactivar si salimos completamente del contenedor
+              if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDragOver(false);
+            }}
+          >
+            {/* Drag overlay */}
+            {isDragOver && (
+              <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-red-50/95 border-2 border-dashed border-red-400 rounded-lg pointer-events-none">
+                <Upload size={40} className="text-red-500 mb-3 animate-bounce" />
+                <p className="text-base font-bold text-red-600">Suelta los archivos para subirlos</p>
+                <p className="text-xs text-red-400 mt-1">Se guardarán en «{sidebarSection}»</p>
               </div>
             )}
+
+            {loadingFiles ? (
+              <div className="flex-1 flex items-center justify-center">
+                <Loader2 size={28} className="animate-spin text-red-500" />
+              </div>
+            ) : viewMode === "list" ? (
+              /* ── Table view ── */
+              <div className="flex-1 overflow-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead className="bg-slate-50 sticky top-0 z-10 border-b border-slate-200">
+                    <tr>
+                      <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest w-8 text-center">Fav.</th>
+                      <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Fecha</th>
+                      <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Nombre Adjunto</th>
+                      <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden lg:table-cell">Nombre Documento</th>
+                      <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Tipo</th>
+                      <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Tamaño</th>
+                      <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden xl:table-cell">Usuario</th>
+                      <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest w-24"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {visibleFiles.length === 0 ? (
+                      <tr>
+                        <td colSpan={8}>
+                          {/* Empty state con zona de drop visual */}
+                          <div
+                            className="flex flex-col items-center justify-center py-16 text-slate-400 cursor-pointer group"
+                            onClick={() => fileInputRef.current?.click()}
+                          >
+                            <div className="w-20 h-20 rounded-2xl bg-slate-100 group-hover:bg-red-50 flex items-center justify-center mb-4 transition-colors border-2 border-dashed border-slate-200 group-hover:border-red-300">
+                              <Upload size={28} className="text-slate-300 group-hover:text-red-500 transition-colors" />
+                            </div>
+                            <p className="text-sm font-semibold text-slate-500 group-hover:text-red-600 transition-colors">
+                              {files.length === 0
+                                ? "No hay documentos adjuntos"
+                                : `Sin archivos en «${sidebarSection}»`}
+                            </p>
+                            <p className="text-xs text-slate-400 mt-1">Haz clic aquí o arrastra archivos para subir</p>
+                            <button
+                              onClick={e => { e.stopPropagation(); fileInputRef.current?.click(); }}
+                              className="mt-4 flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm active:scale-95 transition-all"
+                            >
+                              <Upload size={13} /> Subir archivo
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : visibleFiles.map((f: any) => {
+                      const fi = fileIcon(f.mimetype, f.original_name);
+                      const canPreview = isPreviewable(f.mimetype);
+                      const canWord    = isWordFile(f.mimetype, f.original_name);
+                      const canExcel   = isExcelFile(f.mimetype, f.original_name);
+                      const isSelected = selectedFileId === f.id;
+                      return (
+                        <tr
+                          key={f.id}
+                          onClick={() => setSelectedFileId(isSelected ? null : f.id)}
+                          onDoubleClick={() => { if (canPreview || canWord || canExcel) openPreview(f); }}
+                          className={`cursor-pointer transition-colors group ${
+                            isSelected
+                              ? "bg-red-50 border-l-2 border-l-red-500"
+                              : "bg-white hover:bg-slate-50/60"
+                          }`}
+                        >
+                          {/* Fav */}
+                          <td className="px-3 py-2.5 text-center">
+                            <button
+                              onClick={e => { e.stopPropagation(); setFavs(prev => { const n = new Set(prev); n.has(f.id) ? n.delete(f.id) : n.add(f.id); return n; }); }}
+                              className="text-slate-200 hover:text-amber-400 transition-colors"
+                            >
+                              <Star size={12} fill={favs.has(f.id) ? "#fbbf24" : "none"} className={favs.has(f.id) ? "text-amber-400" : ""} />
+                            </button>
+                          </td>
+                          {/* Fecha */}
+                          <td className="px-3 py-2.5 text-xs text-slate-400 whitespace-nowrap">
+                            {new Date(f.created_at).toLocaleDateString("es-ES")}
+                          </td>
+                          {/* Nombre archivo — click abre previsualización si es posible */}
+                          <td className="px-3 py-2.5 max-w-[200px]">
+                            <div
+                              className="flex items-center gap-2"
+                              onClick={e => {
+                                e.stopPropagation();
+                                if (canPreview || canWord || canExcel) openPreview(f);
+                              }}
+                            >
+                              <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg text-sm shrink-0 ${fi.color}`}>{fi.icon}</span>
+                              <span
+                                className={`truncate text-sm font-medium ${(canPreview || canWord || canExcel) ? "text-red-600 hover:underline cursor-pointer" : "text-slate-700"}`}
+                                title={f.original_name}
+                              >{f.original_name}</span>
+                            </div>
+                          </td>
+                          {/* Nombre documento */}
+                          <td className="px-3 py-2.5 text-xs text-slate-500 max-w-[170px] hidden lg:table-cell">
+                            <span className="truncate block" title={f.document_name}>{f.document_name || <span className="italic text-slate-300">—</span>}</span>
+                          </td>
+                          {/* Tipo */}
+                          <td className="px-3 py-2.5 hidden md:table-cell">
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${fi.color}`}>
+                              {f.attachment_type || "Sin clasificar"}
+                            </span>
+                          </td>
+                          {/* Tamaño */}
+                          <td className="px-3 py-2.5 text-xs text-slate-400 whitespace-nowrap hidden md:table-cell">{fmtSize(f.size_bytes)}</td>
+                          {/* Usuario */}
+                          <td className="px-3 py-2.5 text-xs text-slate-400 max-w-[110px] hidden xl:table-cell">
+                            <span className="truncate block">{f.created_by || "—"}</span>
+                          </td>
+                          {/* Acciones — visibles en hover o cuando está seleccionado */}
+                          <td className="px-3 py-2.5">
+                            <div className={`flex items-center gap-1 transition-opacity ${isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`} onClick={e => e.stopPropagation()}>
+                              {(canPreview || canWord || canExcel) && (
+                                <button onClick={() => openPreview(f)} title="Vista previa"
+                                  className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                                  <Eye size={13} />
+                                </button>
+                              )}
+                              {(canWord || canExcel) && (
+                                <button title={canWord ? "Abrir en Word" : "Abrir en Excel"}
+                                  className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                                  onClick={() => openInWord(f)}>
+                                  <ExternalLink size={13} />
+                                </button>
+                              )}
+                              {!canWord && !canExcel && (
+                                <button title="Descargar"
+                                  className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                                  onClick={() => downloadWithAuth(f.id, f.original_name)}>
+                                  <Download size={13} />
+                                </button>
+                              )}
+                              <button
+                                title="Editar nombre/tipo"
+                                className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                                onClick={() => {
+                                  setEditingFile({ id: f.id, document_name: f.document_name || "", attachment_type: f.attachment_type || "Sin clasificar" });
+                                  setEditDocName(f.document_name || "");
+                                  setEditAttachmentType(f.attachment_type || "Sin clasificar");
+                                }}
+                              >
+                                <Edit3 size={13} />
+                              </button>
+                              <button onClick={() => handleDelete(f.id)} title="Eliminar"
+                                className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              /* ── Grid view ── */
+              <div className="flex-1 overflow-auto p-4">
+                {visibleFiles.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+                    <FileText size={36} className="opacity-20 mb-2" />
+                    <p className="text-sm font-medium">No hay documentos adjuntos en esta sección</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                    {visibleFiles.map((f: any) => {
+                      const fi = fileIcon(f.mimetype, f.original_name);
+                      const canPreview = isPreviewable(f.mimetype);
+                      const canWord    = isWordFile(f.mimetype, f.original_name);
+                      const canExcel   = isExcelFile(f.mimetype, f.original_name);
+                      const isSelected = selectedFileId === f.id;
+                      return (
+                        <div
+                          key={f.id}
+                          onClick={() => setSelectedFileId(isSelected ? null : f.id)}
+                          onDoubleClick={() => { if (canPreview || canWord || canExcel) openPreview(f); }}
+                          className={`flex flex-col items-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${
+                            isSelected
+                              ? "border-red-400 bg-red-50 shadow-sm"
+                              : "border-slate-200 bg-white hover:border-red-300 hover:shadow-sm"
+                          }`}
+                        >
+                          {f.mimetype?.startsWith("image/") && thumbs[f.id]
+                            ? <img src={thumbs[f.id]} alt="" className="w-12 h-12 object-cover rounded-lg" />
+                            : <span className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl ${fi.color}`}>{fi.icon}</span>
+                          }
+                          <span className="text-[10px] text-slate-700 text-center font-medium truncate w-full" title={f.document_name || f.original_name}>
+                            {f.document_name || f.original_name}
+                          </span>
+                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${fi.color}`}>{fi.label}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Status bar */}
+            <div className="shrink-0 flex items-center justify-between px-4 py-2 bg-white border-t border-slate-200 text-[11px] text-slate-500">
+              <span className="font-medium">{visibleFiles.length} elemento(s)</span>
+              {selectedFile && (
+                <span className="truncate max-w-xs text-slate-600">
+                  <strong className="text-slate-700">{selectedFile.document_name || selectedFile.original_name}</strong> — {fmtSize(selectedFile.size_bytes)}
+                </span>
+              )}
+              <span className="font-medium">{loadingFiles ? "Cargando…" : `Total: ${files.length}`}</span>
+            </div>
           </div>
+
+          {/* Preview panel */}
+          {preview && (
+            <div className="w-[380px] shrink-0 border-l border-slate-200 bg-white flex flex-col overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 border-b border-slate-100 shrink-0">
+                <span className="text-xs font-bold text-slate-700 truncate flex-1">{preview.name}</span>
+                <div className="flex items-center gap-1 shrink-0 ml-2">
+                  {preview.mime === "text/html" && preview.fileId && (
+                    <button
+                      onClick={() => openInWord({ id: preview.fileId!, original_name: preview.name })}
+                      className="text-[11px] font-semibold text-slate-700 hover:bg-slate-200 px-2 py-1 rounded-lg border border-slate-200 transition-colors"
+                    >
+                      {preview.appType === "excel" ? "Abrir Excel" : "Abrir Word"}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => { if (previewBlobUrl.current) { URL.revokeObjectURL(previewBlobUrl.current); previewBlobUrl.current = null; } setPreview(null); }}
+                    className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-lg transition-colors"
+                  ><X size={13} /></button>
+                </div>
+              </div>
+              <div className="flex-1 overflow-hidden relative">
+                {preview.mime === "application/pdf" && (
+                  <object data={preview.url} type="application/pdf" className="w-full h-full" style={{ minHeight: 0 }}>
+                    <iframe src={`${preview.url}#toolbar=1`} className="w-full h-full border-0" title={preview.name} />
+                  </object>
+                )}
+                {preview.mime.startsWith("image/") && (
+                  <div className="w-full h-full flex items-center justify-center bg-gray-800 overflow-auto p-3">
+                    <img src={preview.url} alt={preview.name} className="max-w-full max-h-full object-contain rounded shadow-2xl" />
+                  </div>
+                )}
+                {preview.mime === "text/html" && (
+                  <iframe src={preview.url} className="w-full h-full border-0 bg-white" title={preview.name} sandbox="allow-same-origin allow-scripts" style={{ minHeight: 0 }} />
+                )}
+                {preview.mime.startsWith("text/") && preview.mime !== "text/html" && (
+                  <iframe src={preview.url} className="w-full h-full border-0 bg-white" title={preview.name} style={{ minHeight: 0 }} />
+                )}
+              </div>
+            </div>
+          )}
         </div>
+
       </div>
+    </div>
 
       {/* ── Templates modal ── */}
       {showTemplates && (
@@ -1053,7 +1311,7 @@ export default function AdjuntosModal({ entityId, entityName, onClose }: Adjunto
           </div>
         </div>
       )}
-    </div>,
+    </>,
     document.body
   );
 }

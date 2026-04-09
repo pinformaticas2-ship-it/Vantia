@@ -12,11 +12,13 @@ export default defineConfig({
   },
   server: {
     proxy: {
-  '/api': {
-    target: 'http://localhost:4000',
-    changeOrigin: true,
-    // NO uses rewrite si tu server.ts ya tiene "/api" en las rutas
-    // rewrite: (path) => path.replace(/^\/api/, ''), 
+      '/api': {
+        target: 'http://127.0.0.1:4000',
+        changeOrigin: true,
+      },
+      '/uploads': {
+        target: 'http://127.0.0.1:4000',
+        changeOrigin: true,
       }
     }
   },

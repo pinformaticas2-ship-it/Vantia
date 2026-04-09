@@ -1,0 +1,29 @@
+2026-04-09 12:21:48,471  INFO      ════════════════════════════════════════════════════════════
+2026-04-09 12:21:48,472  INFO        VANTIA — Migración local → Supabase
+2026-04-09 12:21:48,472  INFO        2026-04-09 12:21:48
+2026-04-09 12:21:48,472  INFO      ════════════════════════════════════════════════════════════
+2026-04-09 12:21:48,472  INFO      🔌 Conectando a lextech_db (local)...
+2026-04-09 12:21:48,525  INFO      🔌 Conectando a Supabase...
+2026-04-09 12:21:49,003  INFO      ━━━━ Migrando: entities ━━━━
+2026-04-09 12:21:49,023  INFO         📦 2 registros encontrados
+2026-04-09 12:21:49,422  INFO         ✅ entities: 2/2
+2026-04-09 12:21:49,422  INFO      ━━━━ Migrando: expedientes ━━━━
+2026-04-09 12:21:49,428  INFO         📦 3 registros encontrados
+2026-04-09 12:21:50,007  INFO         ✅ expedientes: 3/3
+2026-04-09 12:21:50,008  INFO      ━━━━ Migrando: client_tasks ━━━━
+2026-04-09 12:21:50,014  INFO         📦 7 registros encontrados
+2026-04-09 12:21:50,727  INFO         ✅ client_tasks: 7/7
+2026-04-09 12:21:50,727  INFO      ━━━━ Migrando: agenda_events ━━━━
+2026-04-09 12:21:50,731  INFO         📦 3 registros encontrados
+2026-04-09 12:21:50,954  INFO         ✅ agenda_events: 3/3
+2026-04-09 12:21:50,954  INFO      ━━━━ Migrando: notes ━━━━
+2026-04-09 12:21:50,960  INFO         📦 20 registros encontrados
+2026-04-09 12:21:52,820  INFO         ✅ notes: 20/20
+2026-04-09 12:21:52,954  INFO      ━━━━ VALIDACIÓN ━━━━
+2026-04-09 12:21:53,044  INFO         ✅  entities                  local=     2  supabase=     2
+2026-04-09 12:21:53,092  INFO         ✅  expedientes               local=     3  supabase=     3
+2026-04-09 12:21:53,137  INFO         ✅  client_tasks              local=     7  supabase=     7
+2026-04-09 12:21:53,182  INFO         ✅  agenda_events             local=     3  supabase=     4
+2026-04-09 12:21:53,226  INFO         ✅  notes                     local=    20  supabase=    20
+2026-04-09 12:21:53,227  INFO      🎉 Sin errores
+2026-04-09 12:21:53,227  INFO        Fin: 2026-04-09 12:21:53

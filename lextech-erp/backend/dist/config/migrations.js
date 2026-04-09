@@ -174,6 +174,23 @@ async function runMigrations() {
             await client.query(`CREATE INDEX IF NOT EXISTS idx_activity_log_user_id    ON activity_log (user_id);`);
         }
         catch (_e) { }
+        const activityCols = [
+            ['ip_address', 'VARCHAR(100)'],
+            ['event_type', "VARCHAR(30) NOT NULL DEFAULT 'ACTION'"],
+            ['session_id', 'VARCHAR(200)'],
+            ['user_agent', 'VARCHAR(500)'],
+            ['device_id', 'VARCHAR(120)'],
+        ];
+        for (const [col, def] of activityCols) {
+            try {
+                await client.query(`ALTER TABLE activity_log ADD COLUMN IF NOT EXISTS ${col} ${def};`);
+            }
+            catch (_e) { }
+        }
+        try {
+            await client.query(`CREATE INDEX IF NOT EXISTS idx_activity_log_event_type ON activity_log (event_type);`);
+        }
+        catch (_e) { }
         await client.query(`
       CREATE TABLE IF NOT EXISTS vantia_chat_history (
         id          UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -373,6 +390,248 @@ async function runMigrations() {
         for (const [col, def] of expedientesCols) {
             try {
                 await client.query(`ALTER TABLE expedientes ADD COLUMN IF NOT EXISTS ${col} ${def};`);
+            }
+            catch (_e) { }
+        }
+        try {
+            await client.query(`ALTER TABLE client_files DROP CONSTRAINT IF EXISTS client_files_client_id_fkey;`);
+        }
+        catch (_e) { }
+        try {
+            await client.query(`
+        DO $$
+        DECLARE r RECORD;
+        BEGIN
+          FOR r IN
+            SELECT tc.constraint_name
+            FROM information_schema.table_constraints tc
+            JOIN information_schema.key_column_usage kcu
+              ON tc.constraint_name = kcu.constraint_name
+            WHERE tc.table_name = 'client_files'
+              AND tc.constraint_type = 'FOREIGN KEY'
+              AND kcu.column_name = 'client_id'
+          LOOP
+            EXECUTE 'ALTER TABLE client_files DROP CONSTRAINT IF EXISTS ' || quote_ident(r.constraint_name);
+          END LOOP;
+        END $$;
+      `);
+        }
+        catch (_e) { }
+        for (const col of [
+            `ALTER TABLE client_tasks ADD COLUMN IF NOT EXISTS user_id       VARCHAR(150)`,
+            `ALTER TABLE client_tasks ADD COLUMN IF NOT EXISTS expediente_id UUID`,
+            `ALTER TABLE client_tasks ADD COLUMN IF NOT EXISTS client_name   VARCHAR(300)`,
+        ]) {
+            try {
+                await client.query(col);
+            }
+            catch (_e) { }
+        }
+        try {
+            await client.query(`CREATE INDEX IF NOT EXISTS idx_client_tasks_user_id ON client_tasks (user_id)`);
+        }
+        catch (_e) { }
+        for (const col of [
+            `ALTER TABLE client_tasks ADD COLUMN IF NOT EXISTS fecha_aviso DATE`,
+            `ALTER TABLE client_tasks ADD COLUMN IF NOT EXISTS importe     NUMERIC(12,2)`,
+            `ALTER TABLE client_tasks ADD COLUMN IF NOT EXISTS notas       TEXT`,
+            `ALTER TABLE client_tasks ADD COLUMN IF NOT EXISTS etapa       VARCHAR(200)`,
+        ]) {
+            try {
+                await client.query(col);
+            }
+            catch (_e) { }
+        }
+        await client.query(`
+      CREATE TABLE IF NOT EXISTS task_etapas (
+        id         UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        nombre     VARCHAR(200) NOT NULL UNIQUE,
+        orden      INTEGER      NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      );
+    `);
+        await client.query(`
+      INSERT INTO task_etapas (nombre, orden) VALUES
+        ('Sin Iniciar',                                  1),
+        ('Backlog',                                      2),
+        ('Sin Hacer',                                    3),
+        ('En Curso',                                     4),
+        ('Checkear',                                     5),
+        ('CAMPOS RELLENADOS',                            6),
+        ('CONTESTACIÓN A LA DEMANDA',                    7),
+        ('CUESTION CONVENIENTE U OPORTUNA',              8),
+        ('CONCLUSIONES',                                 9),
+        ('SOLUCIONES EN LAS QUE ESTOY TRABAJANDO ACTUALMENTE', 10),
+        ('En Duda',                                      11),
+        ('Realizada',                                    12),
+        ('HECHO',                                        13),
+        ('Cancelada',                                    14)
+      ON CONFLICT (nombre) DO NOTHING;
+    `);
+        await client.query(`
+      CREATE TABLE IF NOT EXISTS agenda_events (
+        id             UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id        VARCHAR(150) NOT NULL,
+        user_name      VARCHAR(200),
+        title          VARCHAR(300) NOT NULL,
+        description    TEXT,
+        start_at       TIMESTAMPTZ  NOT NULL,
+        end_at         TIMESTAMPTZ,
+        all_day        BOOLEAN      NOT NULL DEFAULT false,
+        type           VARCHAR(50)  NOT NULL DEFAULT 'cita',
+        status         VARCHAR(50)  NOT NULL DEFAULT 'pendiente',
+        expediente_id  UUID,
+        cliente_id     UUID,
+        location       VARCHAR(300),
+        color          VARCHAR(20),
+        created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      );
+    `);
+        for (const idx of [
+            `CREATE INDEX IF NOT EXISTS idx_agenda_events_start_at   ON agenda_events (start_at DESC)`,
+            `CREATE INDEX IF NOT EXISTS idx_agenda_events_user_id    ON agenda_events (user_id)`,
+            `CREATE INDEX IF NOT EXISTS idx_agenda_events_status     ON agenda_events (status)`,
+        ]) {
+            try {
+                await client.query(idx);
+            }
+            catch (_e) { }
+        }
+        try {
+            await client.query(`
+        CREATE OR REPLACE TRIGGER trg_agenda_events_updated_at
+          BEFORE UPDATE ON agenda_events
+          FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+      `);
+        }
+        catch (_e) { }
+        await client.query(`
+      CREATE TABLE IF NOT EXISTS chat_canales (
+        id            UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        nombre        VARCHAR(100) NOT NULL,
+        descripcion   TEXT,
+        tipo          VARCHAR(20)  NOT NULL DEFAULT 'publico',
+        expediente_id UUID,
+        cliente_id    UUID,
+        created_by    VARCHAR(150) NOT NULL,
+        archivado     BOOLEAN      NOT NULL DEFAULT false,
+        created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      );
+    `);
+        await client.query(`
+      CREATE TABLE IF NOT EXISTS chat_miembros (
+        id           UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        canal_id     UUID         NOT NULL REFERENCES chat_canales(id) ON DELETE CASCADE,
+        user_id      VARCHAR(150) NOT NULL,
+        user_name    VARCHAR(200),
+        role         VARCHAR(20)  NOT NULL DEFAULT 'miembro',
+        last_read_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        joined_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        UNIQUE(canal_id, user_id)
+      );
+    `);
+        await client.query(`
+      CREATE TABLE IF NOT EXISTS chat_mensajes (
+        id           UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        canal_id     UUID         NOT NULL REFERENCES chat_canales(id) ON DELETE CASCADE,
+        user_id      VARCHAR(150) NOT NULL,
+        user_name    VARCHAR(200),
+        contenido    TEXT         NOT NULL,
+        tipo         VARCHAR(20)  NOT NULL DEFAULT 'texto',
+        reply_to_id  UUID         REFERENCES chat_mensajes(id) ON DELETE SET NULL,
+        editado      BOOLEAN      NOT NULL DEFAULT false,
+        deleted_at   TIMESTAMPTZ,
+        created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      );
+    `);
+        await client.query(`
+      CREATE TABLE IF NOT EXISTS chat_reacciones (
+        id          UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        mensaje_id  UUID         NOT NULL REFERENCES chat_mensajes(id) ON DELETE CASCADE,
+        user_id     VARCHAR(150) NOT NULL,
+        user_name   VARCHAR(200),
+        emoji       VARCHAR(10)  NOT NULL,
+        created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        UNIQUE(mensaje_id, user_id, emoji)
+      );
+    `);
+        await client.query(`
+      CREATE TABLE IF NOT EXISTS chat_fijados (
+        id          UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        canal_id    UUID         NOT NULL REFERENCES chat_canales(id) ON DELETE CASCADE,
+        mensaje_id  UUID         NOT NULL REFERENCES chat_mensajes(id) ON DELETE CASCADE,
+        fijado_por  VARCHAR(150) NOT NULL,
+        fijado_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        UNIQUE(canal_id, mensaje_id)
+      );
+    `);
+        await client.query(`
+      CREATE TABLE IF NOT EXISTS chat_favoritos (
+        id           UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id      VARCHAR(150) NOT NULL,
+        canal_id     UUID         NOT NULL REFERENCES chat_canales(id) ON DELETE CASCADE,
+        mensaje_id   UUID         NOT NULL REFERENCES chat_mensajes(id) ON DELETE CASCADE,
+        favorito_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        UNIQUE(user_id, mensaje_id)
+      );
+    `);
+        await client.query(`
+      CREATE TABLE IF NOT EXISTS chat_typing_status (
+        canal_id    UUID         NOT NULL REFERENCES chat_canales(id) ON DELETE CASCADE,
+        user_id     VARCHAR(150) NOT NULL,
+        user_name   VARCHAR(200),
+        avatar_url  VARCHAR(500),
+        updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (canal_id, user_id)
+      );
+    `);
+        for (const idx of [
+            `CREATE INDEX IF NOT EXISTS idx_chat_mensajes_canal    ON chat_mensajes (canal_id, created_at DESC)`,
+            `CREATE INDEX IF NOT EXISTS idx_chat_mensajes_reply    ON chat_mensajes (reply_to_id)`,
+            `CREATE INDEX IF NOT EXISTS idx_chat_miembros_user     ON chat_miembros (user_id)`,
+            `CREATE INDEX IF NOT EXISTS idx_chat_miembros_canal    ON chat_miembros (canal_id)`,
+            `CREATE INDEX IF NOT EXISTS idx_chat_reacciones_msg    ON chat_reacciones (mensaje_id)`,
+            `CREATE INDEX IF NOT EXISTS idx_chat_favoritos_user    ON chat_favoritos (user_id, favorito_at DESC)`,
+            `CREATE INDEX IF NOT EXISTS idx_chat_favoritos_canal   ON chat_favoritos (canal_id, favorito_at DESC)`,
+            `CREATE INDEX IF NOT EXISTS idx_chat_typing_canal      ON chat_typing_status (canal_id, updated_at DESC)`,
+        ]) {
+            try {
+                await client.query(idx);
+            }
+            catch (_e) { }
+        }
+        try {
+            await client.query(`
+        INSERT INTO chat_canales (nombre, descripcion, tipo, created_by)
+        VALUES ('general', 'Canal general del despacho', 'publico', 'SYSTEM'),
+               ('avisos',  'Comunicaciones y avisos internos', 'publico', 'SYSTEM'),
+               ('juridico','Debates y consultas jurídicas', 'publico', 'SYSTEM')
+        ON CONFLICT DO NOTHING;
+      `);
+        }
+        catch (_e) { }
+        const chatMiembrosCols = [
+            ['avatar_url', `VARCHAR(500)`],
+            ['role_label', `VARCHAR(100) DEFAULT 'Miembro'`],
+            ['status', `VARCHAR(30) DEFAULT 'disponible'`],
+        ];
+        for (const [col, def] of chatMiembrosCols) {
+            try {
+                await client.query(`ALTER TABLE chat_miembros ADD COLUMN IF NOT EXISTS ${col} ${def};`);
+            }
+            catch (_e) { }
+        }
+        const chatMensajesCols = [
+            ['avatar_url', `VARCHAR(500)`],
+            ['gif_url', `VARCHAR(1000)`],
+            ['image_url', `VARCHAR(1000)`],
+        ];
+        for (const [col, def] of chatMensajesCols) {
+            try {
+                await client.query(`ALTER TABLE chat_mensajes ADD COLUMN IF NOT EXISTS ${col} ${def};`);
             }
             catch (_e) { }
         }

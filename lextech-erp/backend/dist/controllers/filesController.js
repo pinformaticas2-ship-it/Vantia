@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.downloadBlank = exports.downloadTemplate = exports.listTemplates = exports.previewTemplateAsHtml = exports.UPLOADS_ROOT = exports.testPreviewImages = exports.previewExcelAsHtml = exports.previewDocxAsHtml = exports.openFileLocally = exports.createBlankDocument = exports.updateFileMetadata = exports.deleteFile = exports.downloadFile = exports.uploadFiles = exports.listFiles = void 0;
 exports.ensureClientDir = ensureClientDir;
+exports.migrateLocalFoldersStructure = migrateLocalFoldersStructure;
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const database_1 = __importDefault(require("../config/database"));
@@ -14,21 +15,53 @@ exports.UPLOADS_ROOT = UPLOADS_ROOT;
 const LOCAL_CLIENT_FILES_ROOT = process.env.CLIENT_FILES_PATH
     ? path_1.default.resolve(process.env.CLIENT_FILES_PATH)
     : path_1.default.join(process.env.USERPROFILE || process.env.HOME || '', 'lextech-client-files');
+const ATTACHMENT_TYPE_FOLDERS = [
+    'Sin clasificar',
+    'AUTO',
+    'ESCRITO PROCESAL',
+    'FACTURAS',
+    'PODER',
+    'EVIDENCIA',
+];
+function typeFolderName(attachmentType) {
+    return (attachmentType && attachmentType.trim()) ? attachmentType.trim() : 'Sin clasificar';
+}
 function ensureClientDir(clientId) {
     const dir = path_1.default.join(UPLOADS_ROOT, clientId);
     if (!fs_1.default.existsSync(dir))
         fs_1.default.mkdirSync(dir, { recursive: true });
     return dir;
 }
-function ensureLocalClientDir(clientId) {
-    const dir = path_1.default.join(LOCAL_CLIENT_FILES_ROOT, clientId);
+function ensureLocalClientDir(clientId, attachmentType) {
+    const typeFolder = typeFolderName(attachmentType);
+    const dir = path_1.default.join(LOCAL_CLIENT_FILES_ROOT, clientId, typeFolder);
     if (!fs_1.default.existsSync(dir))
         fs_1.default.mkdirSync(dir, { recursive: true });
     return dir;
 }
-function syncFileToLocal(clientId, fileName, sourceFilePath) {
+async function initClientFolders(clientId) {
     try {
-        const localDir = ensureLocalClientDir(clientId);
+        for (const folder of ATTACHMENT_TYPE_FOLDERS) {
+            const dir = path_1.default.join(LOCAL_CLIENT_FILES_ROOT, clientId, folder);
+            if (!fs_1.default.existsSync(dir))
+                fs_1.default.mkdirSync(dir, { recursive: true });
+        }
+        const info = await database_1.default.query(`SELECT first_name, last_name, commercial_name, nif_cif, internal_number
+       FROM entities WHERE id = $1 LIMIT 1`, [clientId]);
+        if (info.rows.length) {
+            const r = info.rows[0];
+            const displayName = [r.first_name, r.last_name].filter(Boolean).join(' ') || r.commercial_name || r.nif_cif || clientId;
+            const txtPath = path_1.default.join(LOCAL_CLIENT_FILES_ROOT, clientId, '_CLIENTE.txt');
+            if (!fs_1.default.existsSync(txtPath)) {
+                fs_1.default.writeFileSync(txtPath, `Cliente: ${displayName}\nNIF/CIF: ${r.nif_cif || '—'}\nNº Interno: ${r.internal_number || '—'}\nID: ${clientId}\n`, 'utf8');
+            }
+        }
+    }
+    catch (_) { }
+}
+function syncFileToLocal(clientId, fileName, sourceFilePath, attachmentType) {
+    try {
+        const localDir = ensureLocalClientDir(clientId, attachmentType);
         const destPath = path_1.default.join(localDir, fileName);
         fs_1.default.copyFileSync(sourceFilePath, destPath);
         return destPath;
@@ -37,11 +70,46 @@ function syncFileToLocal(clientId, fileName, sourceFilePath) {
         return null;
     }
 }
+function moveLocalFile(clientId, oldOriginalName, newOriginalName, oldType, newType) {
+    try {
+        const oldFolder = typeFolderName(oldType);
+        const newFolder = typeFolderName(newType);
+        const clientRoot = path_1.default.join(LOCAL_CLIENT_FILES_ROOT, clientId);
+        let sourcePath = path_1.default.join(clientRoot, oldFolder, oldOriginalName);
+        if (!fs_1.default.existsSync(sourcePath)) {
+            for (const folder of ATTACHMENT_TYPE_FOLDERS) {
+                const candidate = path_1.default.join(clientRoot, folder, oldOriginalName);
+                if (fs_1.default.existsSync(candidate)) {
+                    sourcePath = candidate;
+                    break;
+                }
+            }
+            if (!fs_1.default.existsSync(sourcePath)) {
+                const rootCandidate = path_1.default.join(clientRoot, oldOriginalName);
+                if (fs_1.default.existsSync(rootCandidate))
+                    sourcePath = rootCandidate;
+            }
+        }
+        if (!fs_1.default.existsSync(sourcePath))
+            return;
+        const destDir = ensureLocalClientDir(clientId, newType);
+        const destPath = path_1.default.join(destDir, newOriginalName);
+        if (sourcePath === destPath)
+            return;
+        fs_1.default.copyFileSync(sourcePath, destPath);
+        try {
+            fs_1.default.unlinkSync(sourcePath);
+        }
+        catch (_) { }
+    }
+    catch (_) { }
+}
 const listFiles = async (req, res) => {
     const { clientId } = req.params;
     try {
         const result = await database_1.default.query(`SELECT id, original_name, stored_name, mimetype, size_bytes, category, document_name, attachment_type, created_by, created_at
        FROM client_files WHERE client_id = $1 ORDER BY created_at DESC`, [clientId]);
+        initClientFolders(clientId).catch(() => { });
         res.json({ success: true, data: result.rows });
     }
     catch (err) {
@@ -65,7 +133,7 @@ const uploadFiles = async (req, res) => {
          VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`, [clientId, baseFileName, file.filename, file.mimetype, file.size, userId]);
             inserted.push(result.rows[0]);
             const sourceFile = path_1.default.join(clientDir, file.filename);
-            syncFileToLocal(clientId, baseFileName, sourceFile);
+            syncFileToLocal(clientId, baseFileName, sourceFile, 'Sin clasificar');
             (0, activityController_1.logActivityForReq)(req, `Archivo subido: ${baseFileName}`, 'CLIENT', clientId);
         }
         res.status(201).json({ success: true, data: inserted });
@@ -101,14 +169,22 @@ const deleteFile = async (req, res) => {
     const { clientId, fileId } = req.params;
     const userId = req.auth?.userId || 'SYSTEM';
     try {
-        const result = await database_1.default.query(`DELETE FROM client_files WHERE id = $1 AND client_id = $2 RETURNING stored_name, original_name`, [fileId, clientId]);
+        const result = await database_1.default.query(`DELETE FROM client_files WHERE id = $1 AND client_id = $2 RETURNING stored_name, original_name, attachment_type`, [fileId, clientId]);
         if (result.rows.length === 0) {
             return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
         }
-        const { stored_name, original_name } = result.rows[0];
+        const { stored_name, original_name, attachment_type } = result.rows[0];
         const filePath = path_1.default.join(UPLOADS_ROOT, clientId, stored_name);
         if (fs_1.default.existsSync(filePath))
             fs_1.default.unlinkSync(filePath);
+        const localTypeDir = path_1.default.join(LOCAL_CLIENT_FILES_ROOT, clientId, typeFolderName(attachment_type));
+        const localFilePath = path_1.default.join(localTypeDir, original_name);
+        if (fs_1.default.existsSync(localFilePath)) {
+            try {
+                fs_1.default.unlinkSync(localFilePath);
+            }
+            catch (_) { }
+        }
         (0, activityController_1.logActivityForReq)(req, `Archivo eliminado: ${original_name || stored_name}`, 'CLIENT', clientId);
         res.json({ success: true });
     }
@@ -121,12 +197,18 @@ const updateFileMetadata = async (req, res) => {
     const { clientId, fileId } = req.params;
     const { document_name, attachment_type } = req.body;
     try {
+        const existing = await database_1.default.query(`SELECT original_name, attachment_type FROM client_files WHERE id = $1 AND client_id = $2`, [fileId, clientId]);
+        if (existing.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
+        }
+        const oldOriginalName = existing.rows[0].original_name;
+        const oldAttachType = existing.rows[0].attachment_type;
         let originalNameUpdate = '';
         let params;
+        let newOriginalName = oldOriginalName;
         if (document_name) {
-            const existing = await database_1.default.query(`SELECT original_name FROM client_files WHERE id = $1 AND client_id = $2`, [fileId, clientId]);
-            const ext = path_1.default.extname(existing.rows[0]?.original_name || '.docx');
-            const newOriginalName = `${document_name}${ext}`;
+            const ext = path_1.default.extname(oldOriginalName || '.docx');
+            newOriginalName = `${document_name}${ext}`;
             originalNameUpdate = `, original_name = $5`;
             params = [document_name, attachment_type || 'Sin clasificar', fileId, clientId, newOriginalName];
         }
@@ -142,6 +224,12 @@ const updateFileMetadata = async (req, res) => {
         const result = await database_1.default.query(query, params);
         if (result.rows.length === 0) {
             return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
+        }
+        const newAttachType = attachment_type || 'Sin clasificar';
+        const typeChanged = typeFolderName(oldAttachType) !== typeFolderName(newAttachType);
+        const nameChanged = newOriginalName !== oldOriginalName;
+        if (typeChanged || nameChanged) {
+            moveLocalFile(clientId, oldOriginalName, newOriginalName, oldAttachType, newAttachType);
         }
         res.json({ success: true, data: result.rows[0] });
     }
@@ -164,7 +252,7 @@ const createBlankDocument = async (req, res) => {
         const clientDir = ensureClientDir(clientId);
         const filePath = path_1.default.join(clientDir, storedName);
         fs_1.default.writeFileSync(filePath, blankDocx);
-        syncFileToLocal(clientId, originalName, filePath);
+        syncFileToLocal(clientId, originalName, filePath, attachment_type || 'Sin clasificar');
         const result = await database_1.default.query(`INSERT INTO client_files (client_id, original_name, stored_name, mimetype, size_bytes, document_name, attachment_type, created_by)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, original_name`, [clientId, originalName, storedName, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', blankDocx.length, document_name || null, attachment_type || 'Sin clasificar', userId]);
         const fileId = result.rows[0].id;
@@ -197,7 +285,9 @@ const openFileLocally = async (req, res) => {
         if (!fs_1.default.existsSync(serverPath)) {
             return res.status(404).json({ success: false, error: 'Archivo no encontrado en disco.' });
         }
-        const localDir = ensureLocalClientDir(clientId);
+        const typeResult = await database_1.default.query(`SELECT attachment_type FROM client_files WHERE id = $1 AND client_id = $2`, [fileId, clientId]);
+        const attachType = typeResult.rows[0]?.attachment_type || 'Sin clasificar';
+        const localDir = ensureLocalClientDir(clientId, attachType);
         const localPath = path_1.default.join(localDir, original_name);
         fs_1.default.copyFileSync(serverPath, localPath);
         const { spawn } = require('child_process');
@@ -1654,6 +1744,50 @@ else:
 </body></html>`);
 };
 exports.previewTemplateAsHtml = previewTemplateAsHtml;
+async function migrateLocalFoldersStructure() {
+    if (!fs_1.default.existsSync(LOCAL_CLIENT_FILES_ROOT))
+        return;
+    try {
+        console.log('📂 Migración de carpetas locales: verificando estructura…');
+        const result = await database_1.default.query(`SELECT client_id, original_name, attachment_type FROM client_files ORDER BY client_id`);
+        let moved = 0;
+        for (const row of result.rows) {
+            const { client_id, original_name, attachment_type } = row;
+            const typeFolder = typeFolderName(attachment_type);
+            const clientRoot = path_1.default.join(LOCAL_CLIENT_FILES_ROOT, client_id);
+            const flatPath = path_1.default.join(clientRoot, original_name);
+            const subPath = path_1.default.join(clientRoot, typeFolder, original_name);
+            if (fs_1.default.existsSync(flatPath) && !fs_1.default.existsSync(subPath)) {
+                try {
+                    const destDir = path_1.default.join(clientRoot, typeFolder);
+                    if (!fs_1.default.existsSync(destDir))
+                        fs_1.default.mkdirSync(destDir, { recursive: true });
+                    fs_1.default.copyFileSync(flatPath, subPath);
+                    fs_1.default.unlinkSync(flatPath);
+                    moved++;
+                }
+                catch (_) { }
+            }
+        }
+        const clientDirs = fs_1.default.existsSync(LOCAL_CLIENT_FILES_ROOT)
+            ? fs_1.default.readdirSync(LOCAL_CLIENT_FILES_ROOT, { withFileTypes: true })
+                .filter(d => d.isDirectory())
+                .map(d => d.name)
+            : [];
+        for (const clientId of clientDirs) {
+            await initClientFolders(clientId);
+        }
+        if (moved > 0) {
+            console.log(`✅ Migración completada: ${moved} archivo(s) movido(s) a subcarpetas.`);
+        }
+        else {
+            console.log('✅ Migración: estructura de carpetas ya actualizada.');
+        }
+    }
+    catch (err) {
+        console.error('⚠️  Error en migración de carpetas locales:', err.message);
+    }
+}
 const listTemplates = (_req, res) => {
     try {
         const root = DOCPLANT_ROOT;

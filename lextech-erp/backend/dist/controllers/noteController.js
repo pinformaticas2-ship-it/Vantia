@@ -48,9 +48,10 @@ const createNote = async (req, res) => {
             return res.status(404).json({ success: false, error: "Cliente no encontrado." });
         }
         const userId = req.auth?.userId || 'SYSTEM';
+        const userName = userId === 'SYSTEM' ? 'Sistema' : await (0, activityController_1.resolveUserName)(userId);
         const result = await database_1.default.query(`INSERT INTO notes (client_id, content, category, priority, color, created_by)
        VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING id, client_id, content, category, priority, color, created_by, created_at, updated_at`, [clientId, content.trim(), category, priority, color, userId]);
+       RETURNING id, client_id, content, category, priority, color, created_by, created_at, updated_at`, [clientId, content.trim(), category, priority, color, userName]);
         const preview = content.trim().length > 80 ? content.trim().slice(0, 80) + '…' : content.trim();
         (0, activityController_1.logActivityForReq)(req, `Nota añadida: ${preview}`, 'CLIENT', clientId);
         return res.status(201).json({ success: true, data: result.rows[0] });

@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
 import {
-  ArrowLeft, Edit3, Loader2, AlertCircle,
+  Edit3, Loader2, AlertCircle,
   Mail, Phone, MapPin, User, Briefcase,
   Calendar, Hash, FileText, Shield, StickyNote,
   Paperclip, Clock, AlertTriangle, CheckCircle2,
@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { safeJson } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
+import { EtapaSelect } from "../components/EtapaSelect";
+import BackButton from "../components/BackButton";
 
 // ── helpers ───────────────────────────────────────────────────
 const statusColor: Record<string, string> = {
@@ -120,49 +122,134 @@ function TabPerfil({ client, formatDate, age }: any) {
 }
 
 // ── Tab: Expedientes ──────────────────────────────────────────
-function TabExpedientes() {
-  const expedientes: any[] = []; // TODO: cargar desde /api/expedientes?clientId=...
+const ESTADO_COLOR: Record<string, string> = {
+  abierto:    "bg-emerald-100 text-emerald-700",
+  cerrado:    "bg-slate-100   text-slate-500",
+  suspendido: "bg-amber-100   text-amber-700",
+  archivado:  "bg-red-100     text-red-600",
+};
+const TIPO_SHORT: Record<string, string> = {
+  judicial:         "JUDICIAL",
+  extrajudicial:    "EXTRAJUDICIAL",
+  monitorio:        "MONITORIO",
+  obligacion_hacer: "OBLIG. HACER",
+  prejudicial:      "PREJUDICIAL",
+  diligencias:      "DILIGENCIAS",
+  penal:            "PENAL",
+  laboral:          "LABORAL",
+  contencioso:      "CONTENCIOSO",
+  otro:             "OTRO",
+};
+
+function TabExpedientes({ clientId }: { clientId: string }) {
+  const { getToken } = useAuth();
+  const navigate     = useNavigate();
+  const [expedientes, setExpedientes] = useState<any[]>([]);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const token = await getToken({ skipCache: true });
+        const res = await fetch(`/api/expedientes?clienteId=${clientId}&limit=200`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error(`Error ${res.status}`);
+        const data = await res.json();
+        if (!cancelled) setExpedientes(data.data || []);
+      } catch (e: any) {
+        if (!cancelled) setError(e?.message || "Error al cargar expedientes");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [clientId, getToken]);
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-20">
+      <Loader2 size={28} className="animate-spin text-red-400" />
+    </div>
+  );
+
+  if (error) return (
+    <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center text-red-700 text-sm">{error}</div>
+  );
 
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <p className="text-sm text-slate-500">{expedientes.length} expedientes vinculados</p>
-        <button className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm active:scale-95 transition-all">
+        <p className="text-sm text-slate-500">
+          {expedientes.length} expediente{expedientes.length !== 1 ? "s" : ""} vinculado{expedientes.length !== 1 ? "s" : ""}
+        </p>
+        <Link
+          to="/dashboard/expedientes?nuevo=1"
+          className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm active:scale-95 transition-all"
+        >
           <Plus size={15} /> Nuevo expediente
-        </button>
+        </Link>
       </div>
 
       {expedientes.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded-xl p-16 flex flex-col items-center gap-3 text-slate-400">
           <Gavel size={40} className="opacity-20" />
           <p className="font-medium text-sm">No hay expedientes vinculados</p>
-          <p className="text-xs text-slate-300">Crea el primero usando el botón de arriba</p>
+          <p className="text-xs text-slate-300">Crea un expediente y asígnale este cliente</p>
         </div>
       ) : (
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
           <table className="w-full text-left">
             <thead className="bg-slate-50 border-b border-slate-100">
               <tr>
-                <th className="px-5 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Referencia</th>
-                <th className="px-5 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Asunto</th>
-                <th className="px-5 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Estado</th>
-                <th className="px-5 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Fecha apertura</th>
-                <th className="px-5 py-3"></th>
+                <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Referencia</th>
+                <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Asunto</th>
+                <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Tipo</th>
+                <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Estado</th>
+                <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden lg:table-cell">Contrario</th>
+                <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden lg:table-cell">Apertura</th>
+                <th className="px-4 py-3 w-8"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {expedientes.map((exp: any) => (
-                <tr key={exp.id} className="hover:bg-slate-50/70 transition-colors">
-                  <td className="px-5 py-3 font-mono text-xs text-slate-600">{exp.reference}</td>
-                  <td className="px-5 py-3 text-sm font-medium text-slate-800">{exp.subject}</td>
-                  <td className="px-5 py-3">
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">
-                      {exp.status}
+                <tr
+                  key={exp.id}
+                  onClick={() => window.open(`/dashboard/expedientes/${exp.id}`, "_blank")}
+                  className="hover:bg-slate-50/70 transition-colors cursor-pointer group"
+                >
+                  <td className="px-4 py-3">
+                    <span className="font-mono text-xs font-bold text-red-700">
+                      {exp.anio}/{String(exp.num_exp).padStart(3, "0")}
+                    </span>
+                    {exp.ref_propia && (
+                      <span className="block text-[10px] text-slate-400 font-normal">{exp.ref_propia}</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 max-w-[220px]">
+                    <span className="text-sm font-medium text-slate-800 line-clamp-1">{exp.descripcion || "—"}</span>
+                  </td>
+                  <td className="px-4 py-3 hidden md:table-cell">
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">
+                      {TIPO_SHORT[exp.tipo] || exp.tipo || "—"}
                     </span>
                   </td>
-                  <td className="px-5 py-3 text-xs text-slate-500">{exp.opened_at}</td>
-                  <td className="px-5 py-3 text-right">
-                    <ChevronRight size={16} className="text-slate-300 inline" />
+                  <td className="px-4 py-3">
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${ESTADO_COLOR[exp.estado] || "bg-slate-100 text-slate-500"}`}>
+                      {exp.estado?.charAt(0).toUpperCase() + exp.estado?.slice(1)}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-xs text-slate-500 hidden lg:table-cell max-w-[160px]">
+                    <span className="truncate block">{exp.contrario || <span className="text-slate-300">—</span>}</span>
+                  </td>
+                  <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap hidden lg:table-cell">
+                    {exp.fecha_inicio ? new Date(exp.fecha_inicio).toLocaleDateString("es-ES") : "—"}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <ChevronRight size={14} className="text-slate-300 group-hover:text-red-400 transition-colors inline" />
                   </td>
                 </tr>
               ))}
@@ -179,8 +266,25 @@ interface ActividadEntry {
   id: string;
   user_id: string;
   user_name: string;
+  avatar_url?: string | null;
   action_type: string;
   created_at: string;
+}
+
+const activityAvatarUrl = (url?: string | null) => {
+  if (!url) return null;
+  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) return url;
+  return url.startsWith("/") ? url : `/${url}`;
+};
+
+function activityInitials(name?: string | null) {
+  const safeName = name && !/^user_[A-Za-z0-9]+$/.test(name) ? name : "Usuario";
+  return safeName
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("") || "U";
 }
 
 // Ícono y color según tipo de movimiento
@@ -303,6 +407,8 @@ function TabHistorial({ clientId }: { clientId: string }) {
           <div className="divide-y divide-slate-50">
             {actividades.map((a, idx) => {
               const { dot, badge, label, detail } = actividadMeta(a.action_type);
+              const displayName = a.user_name && !/^user_[A-Za-z0-9]+$/.test(a.user_name) ? a.user_name : "Usuario";
+              const avatarUrl = activityAvatarUrl(a.avatar_url);
               return (
                 <div key={a.id} className="flex items-start gap-4 px-5 py-3.5 hover:bg-slate-50/60 transition-colors">
                   {/* Línea vertical + punto */}
@@ -321,9 +427,18 @@ function TabHistorial({ clientId }: { clientId: string }) {
                     <p className="text-[11px] text-slate-400 mt-0.5">{fmtDate(a.created_at)}</p>
                   </div>
                   {/* Usuario */}
-                  <span className="text-[11px] text-slate-400 shrink-0 hidden md:block pt-0.5">
-                    {a.user_name && !/^user_[A-Za-z0-9]+$/.test(a.user_name) ? a.user_name : 'Usuario'}
-                  </span>
+                  <div className="hidden md:flex items-center gap-2 shrink-0 pt-0.5">
+                    {avatarUrl ? (
+                      <img src={avatarUrl} alt={displayName} className="h-7 w-7 rounded-full object-cover border border-slate-200" />
+                    ) : (
+                      <div className="h-7 w-7 rounded-full bg-red-100 text-red-700 text-[10px] font-bold flex items-center justify-center border border-red-200">
+                        {activityInitials(displayName)}
+                      </div>
+                    )}
+                    <span className="text-[11px] text-slate-400">
+                      {displayName}
+                    </span>
+                  </div>
                 </div>
               );
             })}
@@ -710,14 +825,16 @@ function TabNotas({ clientId }: { clientId: string }) {
 // ── Tab: Tareas / Plazos ──────────────────────────────────────
 // ── Formulario inline de nueva tarea ──────────────────────────
 interface TareaForm {
-  titulo: string; descripcion: string; plazo: string;
+  titulo: string; descripcion: string; plazo: string; fecha_aviso: string;
   estado: string; prioridad: string; expediente: string;
   tipo: string; juzgado: string; num_proc: string;
+  importe: string; notas: string; etapa: string;
 }
 const TAREA_EMPTY: TareaForm = {
-  titulo: "", descripcion: "", plazo: "",
+  titulo: "", descripcion: "", plazo: "", fecha_aviso: "",
   estado: "pendiente", prioridad: "media", expediente: "",
   tipo: "otro", juzgado: "", num_proc: "",
+  importe: "", notas: "", etapa: "",
 };
 
 const TIPO_CONFIG: Record<string, { label: string; color: string }> = {
@@ -828,12 +945,16 @@ function TabTareas({ clientId }: { clientId: string }) {
       titulo:      t.titulo || "",
       descripcion: t.descripcion || "",
       plazo:       t.plazo ? t.plazo.slice(0, 10) : "",
+      fecha_aviso: t.fecha_aviso ? t.fecha_aviso.slice(0, 10) : "",
       estado:      t.estado,
       prioridad:   t.prioridad,
       expediente:  t.expediente || "",
       tipo:        t.tipo || "otro",
       juzgado:     t.juzgado || "",
       num_proc:    t.num_proc || "",
+      importe:     t.importe != null ? String(t.importe) : "",
+      notas:       t.notas || "",
+      etapa:       t.etapa || "",
     });
   };
 
@@ -1052,6 +1173,38 @@ function TabTareas({ clientId }: { clientId: string }) {
             </div>
           </div>
 
+          {/* Fila 3: Fecha aviso + Importe */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">🔔 Fecha de aviso</label>
+              <input type="date" value={form.fecha_aviso} onChange={e => setForm(p => ({ ...p, fecha_aviso: e.target.value }))}
+                className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-red-400 mt-0.5" />
+              <p className="text-[10px] text-slate-400 mt-0.5">Recordatorio antes del plazo límite</p>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">💶 Importe (€)</label>
+              <input type="number" step="0.01" min="0" value={form.importe}
+                onChange={e => setForm(p => ({ ...p, importe: e.target.value }))}
+                placeholder="0,00"
+                className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-red-400 mt-0.5" />
+              <p className="text-[10px] text-slate-400 mt-0.5">Para pagos, honorarios, tasas...</p>
+            </div>
+          </div>
+
+          {/* Fila 4: Etapa + Notas internas */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">🏷️ Etapa</label>
+              <EtapaSelect value={form.etapa} onChange={v => setForm(p => ({ ...p, etapa: v }))} getToken={getToken} />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">📝 Notas internas</label>
+              <textarea value={form.notas} onChange={e => setForm(p => ({ ...p, notas: e.target.value }))}
+                rows={2} placeholder="Observaciones internas, apuntes del letrado..."
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100 mt-0.5" />
+            </div>
+          </div>
+
           <div className="flex gap-2 justify-end pt-1">
             <button onClick={() => setShowForm(false)}
               className="px-4 py-1.5 text-sm font-semibold text-slate-500 hover:text-slate-700 transition-colors">
@@ -1158,6 +1311,34 @@ function TabTareas({ clientId }: { clientId: string }) {
                         className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-red-400" />
                     </div>
                   </div>
+                  {/* Fila 3: Aviso + Importe */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">🔔 Fecha de aviso</p>
+                      <input type="date" value={editForm.fecha_aviso} onChange={e => setEditForm(p => ({ ...p, fecha_aviso: e.target.value }))}
+                        className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-red-400" />
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">💶 Importe (€)</p>
+                      <input type="number" step="0.01" min="0" value={editForm.importe}
+                        onChange={e => setEditForm(p => ({ ...p, importe: e.target.value }))}
+                        placeholder="0,00"
+                        className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-red-400" />
+                    </div>
+                  </div>
+                  {/* Etapa + Notas internas */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">🏷️ Etapa</p>
+                      <EtapaSelect value={editForm.etapa} onChange={v => setEditForm(p => ({ ...p, etapa: v }))} getToken={getToken} />
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase mb-0.5">📝 Notas internas</p>
+                      <textarea value={editForm.notas} onChange={e => setEditForm(p => ({ ...p, notas: e.target.value }))}
+                        rows={2} placeholder="Observaciones internas..."
+                        className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs resize-none focus:outline-none focus:border-red-400" />
+                    </div>
+                  </div>
                   <div className="flex gap-2 justify-end">
                     <button onClick={() => setEditId(null)} className="px-3 py-1 text-xs text-slate-500 hover:text-slate-700">Cancelar</button>
                     <button onClick={saveEdit} disabled={saving}
@@ -1225,12 +1406,33 @@ function TabTareas({ clientId }: { clientId: string }) {
                         <Gavel size={10} /> {t.juzgado}
                       </span>
                     )}
+                    {t.fecha_aviso && (
+                      <span className={`flex items-center gap-1 font-medium ${new Date(t.fecha_aviso) < new Date() && t.estado !== 'completada' ? 'text-amber-600' : 'text-slate-400'}`}>
+                        🔔 Aviso: {fmtPlazo(t.fecha_aviso)}
+                      </span>
+                    )}
+                    {t.importe != null && Number(t.importe) > 0 && (
+                      <span className="flex items-center gap-1 text-emerald-600 font-semibold">
+                        💶 {Number(t.importe).toLocaleString('es-ES', { minimumFractionDigits: 2 })} €
+                      </span>
+                    )}
+                    {t.etapa && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                        🏷️ {t.etapa}
+                      </span>
+                    )}
                     {t.created_by && (
                       <span className="flex items-center gap-1 text-slate-400">
                         <User size={10} /> {/^user_[A-Za-z0-9]+$/.test(t.created_by) ? 'Usuario' : t.created_by}
                       </span>
                     )}
                   </div>
+                  {/* Notas internas */}
+                  {t.notas && (
+                    <div className="mt-2 px-2 py-1.5 bg-amber-50 border border-amber-100 rounded-lg text-[11px] text-amber-800 leading-relaxed">
+                      <span className="font-bold">📝 Nota: </span>{t.notas}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -2992,8 +3194,8 @@ export default function ClientDetail() {
 
   if (error || !client) return (
     <div className="space-y-4">
-      <Link to="/dashboard/clientes" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-800">
-        <ArrowLeft size={16} /> Volver
+      <Link to="/dashboard/clientes">
+        <BackButton />
       </Link>
       <div className="flex items-center gap-3 p-5 bg-red-50 border border-red-200 rounded-xl text-red-700">
         <AlertCircle size={20} className="shrink-0" />
@@ -3026,9 +3228,7 @@ export default function ClientDetail() {
             <span className="text-slate-800 font-medium">{client.first_name} {client.last_name}</span>
           </div>
           <div className="flex gap-2">
-            <button onClick={() => navigate("/dashboard/clientes")} className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 rounded-lg">
-              <ArrowLeft size={15} /> Volver
-            </button>
+            <BackButton onClick={() => navigate("/dashboard/clientes")} />
             <button
               onClick={() => navigate(`/dashboard/clientes/${id}/edit`)}
               className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm active:scale-95 transition-all"
@@ -3141,7 +3341,7 @@ export default function ClientDetail() {
             </div>
             {mountedTabs.has("expedientes") && (
               <div style={{ display: activeTab === "expedientes" ? "block" : "none" }}>
-                <TabExpedientes />
+                <TabExpedientes clientId={id!} />
               </div>
             )}
             {mountedTabs.has("historial") && (

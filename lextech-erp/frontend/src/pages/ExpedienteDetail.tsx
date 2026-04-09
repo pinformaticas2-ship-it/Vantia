@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
 import {
-  ArrowLeft, Edit3, Loader2, AlertCircle, FolderOpen,
+  Edit3, Loader2, AlertCircle, FolderOpen,
   Users, ClipboardList, MoreHorizontal, Activity,
   Paperclip, RefreshCw,
 } from "lucide-react";
@@ -11,6 +11,7 @@ import {
   TIPOS, ESTADOS, EXP_EMPTY, BOTTOM_TABS, TabKey,
   ExpedienteModal,
 } from "../components/ExpedienteModal";
+import BackButton from "../components/BackButton";
 
 // ── Helpers de visualización ──────────────────────────────────
 function fmtDate(d: string | null | undefined) {
@@ -120,8 +121,8 @@ export default function ExpedienteDetail() {
 
   if (error) return (
     <div className="space-y-4">
-      <Link to="/dashboard/expedientes" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-800">
-        <ArrowLeft size={16} /> Volver a expedientes
+      <Link to="/dashboard/expedientes">
+        <BackButton label="Volver a expedientes" />
       </Link>
       <div className="flex items-center gap-3 p-5 bg-red-50 border border-red-200 rounded-xl text-red-700">
         <AlertCircle size={20} className="shrink-0" />
@@ -195,9 +196,8 @@ export default function ExpedienteDetail() {
 
       {/* ── Cabecera ── */}
       <div className="shrink-0 bg-white border border-slate-200 rounded-xl px-4 py-3 mb-4 flex items-center gap-3">
-        <Link to="/dashboard/expedientes"
-          className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors shrink-0">
-          <ArrowLeft size={16} />
+        <Link to="/dashboard/expedientes" className="shrink-0">
+          <BackButton />
         </Link>
 
         <div className="flex items-center gap-2.5 flex-1 min-w-0">

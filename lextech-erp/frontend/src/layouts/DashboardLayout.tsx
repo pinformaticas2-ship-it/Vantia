@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import {
-  LayoutDashboard, Briefcase, Users, FileText, Settings,
+  LayoutDashboard, Briefcase, Users, Settings,
   Menu, Search, X, Bell, ShieldCheck, Calendar,
-  MessageCircle, Bot, Send, ChevronRight, Loader2,
+  MessageCircle, Bot, Send, ChevronRight, Loader2, History, CheckCircle2,
+  MessageSquare, LogOut, Mail,
 } from "lucide-react";
-import { UserButton, useUser, useAuth } from "@clerk/clerk-react";
-import { safeJson } from "../lib/api";
+import { UserButton, useUser, useAuth, useClerk } from "@clerk/clerk-react";
+import { getDeviceId, safeJson, waitForClientIp } from "../lib/api";
+import { useChatUnread } from "../contexts/ChatUnreadContext";
 
 // ── Módulos buscables ────────────────────────────────────────────────────────
 const MODULES = [
@@ -14,8 +16,11 @@ const MODULES = [
   { name: "Expedientes",    path: "/dashboard/expedientes",  icon: Briefcase,       desc: "Gestión de expedientes" },
   { name: "Clientes",       path: "/dashboard/clientes",     icon: Users,           desc: "Base de datos de clientes" },
   { name: "Nuevo Cliente",  path: "/dashboard/clientes/new", icon: Users,           desc: "Alta de nuevo cliente" },
+  { name: "Trazabilidad",   path: "/dashboard/trazabilidad", icon: History,         desc: "Historial de acciones por usuario" },
   { name: "Agenda",         path: "/dashboard/agenda",       icon: Calendar,        desc: "Calendario y citas" },
-  { name: "Documentos",     path: "/dashboard/documentos",   icon: FileText,        desc: "Gestión documental" },
+  { name: "Tareas",         path: "/dashboard/tareas",       icon: CheckCircle2,    desc: "Tareas y plazos del usuario" },
+  { name: "Chat",           path: "/dashboard/chat",         icon: MessageSquare,   desc: "Chat de equipo" },
+  { name: "Correo",         path: "/dashboard/correo",       icon: Mail,            desc: "Gestor de correo electrónico" },
   { name: "Configuración",  path: "/dashboard/config",       icon: Settings,        desc: "Ajustes del sistema" },
 ];
 
@@ -23,8 +28,11 @@ const NAV_ITEMS = [
   { name: "Dashboard",    href: "/dashboard",             icon: LayoutDashboard },
   { name: "Expedientes",  href: "/dashboard/expedientes", icon: Briefcase },
   { name: "Clientes",     href: "/dashboard/clientes",    icon: Users },
+  { name: "Trazabilidad", href: "/dashboard/trazabilidad", icon: History },
   { name: "Agenda",       href: "/dashboard/agenda",      icon: Calendar },
-  { name: "Documentos",   href: "/dashboard/documentos",  icon: FileText },
+  { name: "Tareas",       href: "/dashboard/tareas",      icon: CheckCircle2 },
+  { name: "Chat",         href: "/dashboard/chat",        icon: MessageSquare },
+  { name: "Correo",       href: "/dashboard/correo",      icon: Mail },
 ];
 
 // ── Contexto VantIA por módulo ───────────────────────────────────────────────
@@ -35,8 +43,10 @@ function getVantIAContext(pathname: string): string {
     return "Eres VantIA, especializado en gestión de expedientes judiciales. Conoces el flujo de un expediente legal, plazos procesales, tipos de procedimientos y cómo gestionar casos en un despacho. Responde siempre en español.";
   if (pathname.startsWith("/dashboard/agenda"))
     return "Eres VantIA, especializado en gestión de agenda y citas para un despacho legal. Ayudas con vistas, reuniones, plazos judiciales, y organización del tiempo. Responde siempre en español.";
-  if (pathname.startsWith("/dashboard/documentos"))
-    return "Eres VantIA, especializado en gestión documental jurídica. Conoces tipos de documentos legales, contratos, escrituras, demandas y buenas prácticas de archivo. Responde siempre en español.";
+  if (pathname.startsWith("/dashboard/chat"))
+    return "Eres VantIA, asistente del despacho. En este momento el usuario está en el chat de equipo. Puedes ayudar a redactar mensajes, resumir conversaciones o resolver dudas jurídicas puntuales. Responde siempre en español.";
+  if (pathname.startsWith("/dashboard/correo"))
+    return "Eres VantIA, asistente de correo del despacho. Ayudas a redactar emails profesionales, responder comunicaciones, resumir correos y organizar la bandeja de entrada. Responde siempre en español.";
   if (pathname.startsWith("/dashboard/config"))
     return "Eres VantIA, asistente de configuración de VANTIA Legis ERP. Ayudas con ajustes del sistema, usuarios, permisos y personalización. Responde siempre en español.";
   return "Eres VantIA, el asistente inteligente de VANTIA Legis ERP, un ERP para despachos de abogados. Tienes conocimientos generales de derecho español, gestión de despachos, expedientes, clientes y documentación. Eres útil, conciso y profesional. Responde siempre en español.";
@@ -46,7 +56,8 @@ function getVantIALabel(pathname: string): string {
   if (pathname.startsWith("/dashboard/clientes"))    return "Especialista en Clientes";
   if (pathname.startsWith("/dashboard/expedientes")) return "Especialista en Expedientes";
   if (pathname.startsWith("/dashboard/agenda"))      return "Especialista en Agenda";
-  if (pathname.startsWith("/dashboard/documentos"))  return "Especialista en Documentos";
+  if (pathname.startsWith("/dashboard/chat"))         return "Asistente de Equipo";
+  if (pathname.startsWith("/dashboard/correo"))       return "Asistente de Correo";
   return "Asistente General";
 }
 
@@ -162,14 +173,14 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
              style={{ height: "460px" }}>
 
           {/* Header */}
-          <div className="bg-red-700 px-4 py-3 flex items-center justify-between shrink-0">
+          <div className="bg-[#ab0433] px-4 py-3 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2">
               <div className="h-7 w-7 bg-white/20 rounded-lg flex items-center justify-center">
                 <Bot size={14} className="text-white" />
               </div>
               <div>
                 <p className="text-white text-sm font-bold leading-none">VantIA</p>
-                <p className="text-red-200 text-[10px]">{getVantIALabel(pathname)}</p>
+                <p className="text-white/75 text-[10px]">{getVantIALabel(pathname)}</p>
               </div>
             </div>
             <button onClick={() => setOpen(false)} className="text-white/70 hover:text-white">
@@ -183,7 +194,7 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
               <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                 <div className={`max-w-[88%] px-3 py-2 rounded-2xl text-xs leading-relaxed whitespace-pre-wrap ${
                   msg.role === "user"
-                    ? "bg-red-700 text-white rounded-br-sm"
+                    ? "bg-[#ab0433] text-white rounded-br-sm"
                     : "bg-neutral-100 text-neutral-700 rounded-bl-sm"
                 }`}>
                   {msg.text}
@@ -209,12 +220,12 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()}
               placeholder="Escribe tu consulta..."
-              className="flex-1 text-xs bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-red-600/20 focus:border-red-300"
+              className="flex-1 text-xs bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-[#ab0433]/20 focus:border-[#ab0433]/30"
             />
             <button
               onClick={send}
               disabled={!input.trim() || loading}
-              className="h-8 w-8 bg-red-700 disabled:opacity-40 text-white rounded-xl flex items-center justify-center hover:bg-red-800 transition-colors"
+              className="h-8 w-8 bg-[#ab0433] disabled:opacity-40 text-white rounded-xl flex items-center justify-center hover:bg-[#92042c] transition-colors"
             >
               <Send size={12} />
             </button>
@@ -228,7 +239,7 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
         className={`h-12 w-12 rounded-2xl shadow-xl flex items-center justify-center transition-all active:scale-95 ${
           open
             ? "bg-neutral-800 shadow-neutral-900/30"
-            : "bg-red-700 shadow-red-700/30 hover:shadow-red-700/50 hover:scale-105"
+            : "bg-[#ab0433] shadow-red-700/30 hover:shadow-red-700/50 hover:scale-105"
         }`}
         title="VantIA — Asistente IA"
       >
@@ -371,16 +382,20 @@ function SearchDropdown({ query, onSelect }: { query: string; onSelect: () => vo
 }
 
 // ── Sidebar ──────────────────────────────────────────────────────────────────
-function SidebarContent({ pathname, onClose }: { pathname: string; onClose?: () => void }) {
+function SidebarContent({ pathname, onClose, onSignOut }: { pathname: string; onClose?: () => void; onSignOut?: () => void }) {
+  const { user } = useUser();
+  const { totalUnread } = useChatUnread();
   return (
     <div className="flex flex-col h-full bg-slate-900 border-r border-slate-800">
       {/* Logo */}
       <div className="p-7">
-        <div className="flex items-center gap-3 mb-1.5">
-          <div className="h-10 w-10 bg-red-600 rounded-2xl flex items-center justify-center shadow-lg shadow-red-600/20 text-white font-black text-2xl">V</div>
-          <h1 className="text-xl font-bold tracking-tighter text-white uppercase italic">Vantia <span className="text-red-500">Legis</span></h1>
+        <div className="px-2 py-2">
+          <img
+            src="/vantia-sidebar-slate.png"
+            alt="Vantia Legis"
+            className="h-12 w-full object-contain"
+          />
         </div>
-        <p className="text-[10px] uppercase font-bold text-slate-500 tracking-[0.4em] ml-1">ERP para despachos</p>
       </div>
 
       {/* Nav principal */}
@@ -388,14 +403,21 @@ function SidebarContent({ pathname, onClose }: { pathname: string; onClose?: () 
         {NAV_ITEMS.map((item) => {
           const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
           const Icon = item.icon;
+          const isChat = item.href === "/dashboard/chat";
+          const chatBadge = isChat && !isActive && totalUnread > 0;
           return (
             <Link key={item.name} to={item.href} onClick={onClose}
               className={`flex items-center gap-3 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all duration-200 ${
-                isActive ? "bg-red-600 text-white shadow-xl shadow-red-900/40 translate-x-1"
+                isActive ? "bg-[#ab0433] text-white shadow-xl shadow-red-900/40 translate-x-1"
                          : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-100"
               }`}>
               <Icon className={`h-5 w-5 ${isActive ? "text-white" : "text-slate-500"}`} />
-              {item.name}
+              <span className="flex-1">{item.name}</span>
+              {chatBadge && (
+                <span className="ml-auto min-w-[20px] h-5 bg-[#ab0433] text-white text-[10px] font-black rounded-full flex items-center justify-center px-1.5 shadow-lg shadow-red-900/40">
+                  {totalUnread > 99 ? "99+" : totalUnread}
+                </span>
+              )}
             </Link>
           );
         })}
@@ -414,10 +436,30 @@ function SidebarContent({ pathname, onClose }: { pathname: string; onClose?: () 
       <div className="px-4 pb-3">
         <Link to="/dashboard/config" onClick={onClose}
           className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold transition-all ${
-            pathname === "/dashboard/config" ? "bg-red-600 text-white" : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-100"
+            pathname === "/dashboard/config" ? "bg-[#ab0433] text-white" : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-100"
           }`}>
           <Settings className="h-5 w-5" /> Configuración
         </Link>
+      </div>
+
+      {/* Usuario */}
+      <div className="px-4 pb-4">
+        <div className="flex items-center gap-3 px-3 py-2.5 rounded-2xl bg-slate-800/30 border border-slate-800/50">
+          <UserButton afterSignOutUrl="/" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-slate-200 truncate leading-tight">{user?.fullName || user?.firstName || "Usuario"}</p>
+            <p className="text-[10px] text-slate-500 truncate">{user?.primaryEmailAddress?.emailAddress || ""}</p>
+          </div>
+          {onSignOut && (
+            <button
+              onClick={onSignOut}
+              title="Cerrar sesión"
+              className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-400/10 transition-colors shrink-0"
+            >
+              <LogOut size={14} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Badge */}
@@ -436,9 +478,10 @@ function SidebarContent({ pathname, onClose }: { pathname: string; onClose?: () 
 
 // ── LAYOUT PRINCIPAL ─────────────────────────────────────────────────────────
 export default function DashboardLayout() {
-  const location   = useLocation();
-  const { user }   = useUser();
+  const location     = useLocation();
+  const { user }     = useUser();
   const { getToken } = useAuth();
+  const clerk        = useClerk();
 
   const [isMobileOpen,  setIsMobileOpen]  = useState(false);
   const [isNotifOpen,   setIsNotifOpen]   = useState(false);
@@ -447,8 +490,62 @@ export default function DashboardLayout() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [notifLoading,  setNotifLoading]  = useState(false);
 
-  const searchRef = useRef<HTMLDivElement>(null);
-  const notifRef  = useRef<HTMLDivElement>(null);
+  const searchRef      = useRef<HTMLDivElement>(null);
+  const notifRef       = useRef<HTMLDivElement>(null);
+  const loginFiredRef  = useRef<string | null>(null); // tracks which userId we've already logged-in
+
+  // ── Registrar LOGIN en trazabilidad cuando el usuario se autentica ──────
+  useEffect(() => {
+    if (!user?.id) return;
+    if (loginFiredRef.current === user.id) return;
+    loginFiredRef.current = user.id;
+
+    (async () => {
+      try {
+        // Esperar a que ipify responda (máx 5s) para tener la IP real
+        const [token, ip] = await Promise.all([
+          getToken({ skipCache: true }),
+          waitForClientIp(),
+        ]);
+        if (!token) return;
+        await fetch('/api/activity/login', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            ...(ip ? { 'x-client-ip': ip } : {}),
+            'x-device-id': getDeviceId(),
+          },
+          body: JSON.stringify({ publicIp: ip }),
+        });
+      } catch (_e) { /* silencioso */ }
+    })();
+  }, [user?.id, getToken]);
+
+  // ── Sign-out con registro de LOGOUT en trazabilidad ─────────────────────
+  const handleSignOut = useCallback(async () => {
+    try {
+      // Esperar IP antes de cerrar sesión (ipify responde en < 1s normalmente)
+      const [token, ip] = await Promise.all([
+        getToken({ skipCache: true }),
+        waitForClientIp(),
+      ]);
+      if (token) {
+        await fetch('/api/activity/logout', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            ...(ip ? { 'x-client-ip': ip } : {}),
+            'x-device-id': getDeviceId(),
+          },
+          body: JSON.stringify({ publicIp: ip }),
+        });
+      }
+    } catch (_e) { /* silencioso */ } finally {
+      clerk.signOut({ redirectUrl: '/' });
+    }
+  }, [getToken, clerk]);
 
   // Cerrar paneles al clicar fuera
   useEffect(() => {
@@ -482,7 +579,7 @@ export default function DashboardLayout() {
 
       {/* Sidebar Desktop */}
       <aside className="hidden md:flex w-64 flex-col fixed inset-y-0 z-30">
-        <SidebarContent pathname={location.pathname} />
+        <SidebarContent pathname={location.pathname} onSignOut={handleSignOut} />
       </aside>
 
       {/* Menú Móvil */}
@@ -493,7 +590,7 @@ export default function DashboardLayout() {
             <button onClick={() => setIsMobileOpen(false)} className="absolute right-4 top-6 text-slate-400 hover:text-white z-10">
               <X className="h-6 w-6" />
             </button>
-            <SidebarContent pathname={location.pathname} onClose={() => setIsMobileOpen(false)} />
+            <SidebarContent pathname={location.pathname} onClose={() => setIsMobileOpen(false)} onSignOut={handleSignOut} />
           </div>
         </div>
       )}
@@ -546,21 +643,12 @@ export default function DashboardLayout() {
               )}
             </div>
 
-            <div className="h-7 w-[1px] bg-slate-200 hidden sm:block" />
-
-            {/* Usuario */}
-            <div className="flex items-center gap-3">
-              <div className="text-right hidden sm:block">
-                <p className="text-sm font-bold text-slate-700 leading-none">{user?.fullName || "Usuario"}</p>
-              </div>
-              <UserButton afterSignOutUrl="/" />
-            </div>
           </div>
         </header>
 
         {/* Contenido */}
         <div className="flex-1 overflow-y-auto">
-          <div className="max-w-[1600px] mx-auto p-4 md:p-8">
+          <div key={location.pathname} className="max-w-[1600px] mx-auto p-4 md:p-8 module-page">
             <Outlet />
           </div>
         </div>

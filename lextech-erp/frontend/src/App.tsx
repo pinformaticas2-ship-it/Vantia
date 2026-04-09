@@ -1,6 +1,7 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { SignedIn, SignedOut } from "@clerk/clerk-react";
+import { ChatUnreadProvider } from './contexts/ChatUnreadContext';
 
 // Layouts
 import DashboardLayout from './layouts/DashboardLayout';
@@ -13,11 +14,17 @@ import ClientForm from './pages/ClientForm';
 import ClientDetail from './pages/ClientDetail';
 import ExpedienteList from './pages/ExpedienteList';
 import ExpedienteDetail from './pages/ExpedienteDetail';
+import Trazabilidad from './pages/Trazabilidad';
+import Agenda from './pages/Agenda';
+import Tareas from './pages/Tareas';
+import Chat   from './pages/Chat';
+import Email  from './pages/Email';
 
 export default function App() {
   return (
     <>
       <SignedIn>
+        <ChatUnreadProvider>
         <Routes>
           {/* Redirigir raíz al dashboard */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -31,15 +38,18 @@ export default function App() {
             <Route path="clientes/:id" element={<ClientDetail />} />
             <Route path="expedientes" element={<ExpedienteList />} />
             <Route path="expedientes/:id" element={<ExpedienteDetail />} />
-            {/* Módulos en construcción */}
-            <Route path="agenda" element={<ModuloEnCarga nombre="Agenda" />} />
-            <Route path="documentos" element={<ModuloEnCarga nombre="Documentos" />} />
+            <Route path="trazabilidad" element={<Trazabilidad />} />
+            <Route path="agenda" element={<Agenda />} />
+            <Route path="tareas" element={<Tareas />} />
+            <Route path="chat"   element={<Chat />} />
+            <Route path="correo" element={<Email />} />
             <Route path="config" element={<ModuloEnCarga nombre="Configuración" />} />
           </Route>
 
           {/* Capturar rutas desconocidas */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
+        </ChatUnreadProvider>
       </SignedIn>
 
       <SignedOut>

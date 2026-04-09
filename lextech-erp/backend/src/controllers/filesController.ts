@@ -11,24 +11,80 @@ const LOCAL_CLIENT_FILES_ROOT = process.env.CLIENT_FILES_PATH
   ? path.resolve(process.env.CLIENT_FILES_PATH)
   : path.join(process.env.USERPROFILE || process.env.HOME || '', 'lextech-client-files');
 
-// Asegura que el directorio del cliente existe (servidor)
+// ─── Tipos de adjunto → subcarpetas ────────────────────────────
+// Cada tipo tiene su propia carpeta dentro del directorio del cliente
+const ATTACHMENT_TYPE_FOLDERS = [
+  'Sin clasificar',
+  'AUTO',
+  'ESCRITO PROCESAL',
+  'FACTURAS',
+  'PODER',
+  'EVIDENCIA',
+] as const;
+
+/** Sanea el nombre del tipo para usarlo como nombre de carpeta */
+function typeFolderName(attachmentType?: string | null): string {
+  return (attachmentType && attachmentType.trim()) ? attachmentType.trim() : 'Sin clasificar';
+}
+
+// Asegura que el directorio del cliente existe (servidor — estructura plana)
 function ensureClientDir(clientId: string) {
   const dir = path.join(UPLOADS_ROOT, clientId);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   return dir;
 }
 
-// Asegura que la carpeta local del cliente existe
-function ensureLocalClientDir(clientId: string) {
-  const dir = path.join(LOCAL_CLIENT_FILES_ROOT, clientId);
+/**
+ * Asegura que la subcarpeta local del cliente para un tipo concreto existe.
+ * Estructura:  {LOCAL_CLIENT_FILES_ROOT}/{clientId}/{attachmentType}/
+ */
+function ensureLocalClientDir(clientId: string, attachmentType?: string | null): string {
+  const typeFolder = typeFolderName(attachmentType);
+  const dir = path.join(LOCAL_CLIENT_FILES_ROOT, clientId, typeFolder);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   return dir;
 }
 
-// Sincroniza archivo del servidor a carpeta local del cliente
-function syncFileToLocal(clientId: string, fileName: string, sourceFilePath: string) {
+/**
+ * Crea TODAS las subcarpetas de tipos para un cliente.
+ * También genera un fichero _CLIENTE.txt con el nombre legible si se pasa.
+ */
+async function initClientFolders(clientId: string): Promise<void> {
   try {
-    const localDir = ensureLocalClientDir(clientId);
+    // Crear subcarpeta para cada tipo de adjunto
+    for (const folder of ATTACHMENT_TYPE_FOLDERS) {
+      const dir = path.join(LOCAL_CLIENT_FILES_ROOT, clientId, folder);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    }
+    // Obtener nombre del cliente y escribir fichero informativo
+    const info = await pool.query(
+      `SELECT first_name, last_name, commercial_name, nif_cif, internal_number
+       FROM entities WHERE id = $1 LIMIT 1`,
+      [clientId]
+    );
+    if (info.rows.length) {
+      const r = info.rows[0];
+      const displayName = [r.first_name, r.last_name].filter(Boolean).join(' ') || r.commercial_name || r.nif_cif || clientId;
+      const txtPath = path.join(LOCAL_CLIENT_FILES_ROOT, clientId, '_CLIENTE.txt');
+      if (!fs.existsSync(txtPath)) {
+        fs.writeFileSync(txtPath,
+          `Cliente: ${displayName}\nNIF/CIF: ${r.nif_cif || '—'}\nNº Interno: ${r.internal_number || '—'}\nID: ${clientId}\n`,
+          'utf8'
+        );
+      }
+    }
+  } catch (_) {/* fallo silencioso */}
+}
+
+// Sincroniza archivo del servidor a la subcarpeta local del tipo correspondiente
+function syncFileToLocal(
+  clientId: string,
+  fileName: string,
+  sourceFilePath: string,
+  attachmentType?: string | null
+): string | null {
+  try {
+    const localDir = ensureLocalClientDir(clientId, attachmentType);
     const destPath = path.join(localDir, fileName);
     fs.copyFileSync(sourceFilePath, destPath);
     return destPath;
@@ -36,6 +92,52 @@ function syncFileToLocal(clientId: string, fileName: string, sourceFilePath: str
     // Fallar silenciosamente si no se puede copiar a local
     return null;
   }
+}
+
+/**
+ * Mueve el archivo local cuando cambia su tipo o nombre.
+ * Busca en todos los subfolders si no lo encuentra en el esperado.
+ */
+function moveLocalFile(
+  clientId: string,
+  oldOriginalName: string,
+  newOriginalName: string,
+  oldType: string | null,
+  newType: string | null
+): void {
+  try {
+    const oldFolder = typeFolderName(oldType);
+    const newFolder = typeFolderName(newType);
+    const clientRoot = path.join(LOCAL_CLIENT_FILES_ROOT, clientId);
+
+    // Intentar encontrar el archivo: primero en la carpeta esperada
+    let sourcePath = path.join(clientRoot, oldFolder, oldOriginalName);
+
+    // Si no está en la carpeta esperada, buscar en todas las subcarpetas
+    if (!fs.existsSync(sourcePath)) {
+      for (const folder of ATTACHMENT_TYPE_FOLDERS) {
+        const candidate = path.join(clientRoot, folder, oldOriginalName);
+        if (fs.existsSync(candidate)) { sourcePath = candidate; break; }
+      }
+      // Último recurso: raíz del cliente (archivos no migrados)
+      if (!fs.existsSync(sourcePath)) {
+        const rootCandidate = path.join(clientRoot, oldOriginalName);
+        if (fs.existsSync(rootCandidate)) sourcePath = rootCandidate;
+      }
+    }
+
+    if (!fs.existsSync(sourcePath)) return; // no existe localmente, nada que mover
+
+    const destDir  = ensureLocalClientDir(clientId, newType);
+    const destPath = path.join(destDir, newOriginalName);
+
+    // Si origen y destino son el mismo fichero, no hacer nada
+    if (sourcePath === destPath) return;
+
+    fs.copyFileSync(sourcePath, destPath);
+    // Borrar el original sólo si era un fichero diferente
+    try { fs.unlinkSync(sourcePath); } catch (_) {}
+  } catch (_) {/* fallo silencioso */}
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -49,6 +151,8 @@ export const listFiles = async (req: any, res: Response) => {
        FROM client_files WHERE client_id = $1 ORDER BY created_at DESC`,
       [clientId]
     );
+    // Asegurar que las carpetas del cliente existen (silencioso, en background)
+    initClientFolders(clientId).catch(() => {});
     res.json({ success: true, data: result.rows });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
@@ -80,9 +184,9 @@ export const uploadFiles = async (req: any, res: Response) => {
       );
       inserted.push(result.rows[0]);
 
-      // Sincronizar archivo a carpeta local del cliente
+      // Sincronizar archivo a subcarpeta local del tipo (por defecto "Sin clasificar")
       const sourceFile = path.join(clientDir, file.filename);
-      syncFileToLocal(clientId, baseFileName, sourceFile);
+      syncFileToLocal(clientId, baseFileName, sourceFile, 'Sin clasificar');
 
       // Registrar en historial
       logActivityForReq(req, `Archivo subido: ${baseFileName}`, 'CLIENT', clientId);
@@ -133,15 +237,20 @@ export const deleteFile = async (req: any, res: Response) => {
   const userId = req.auth?.userId || 'SYSTEM';
   try {
     const result = await pool.query(
-      `DELETE FROM client_files WHERE id = $1 AND client_id = $2 RETURNING stored_name, original_name`,
+      `DELETE FROM client_files WHERE id = $1 AND client_id = $2 RETURNING stored_name, original_name, attachment_type`,
       [fileId, clientId]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
     }
-    const { stored_name, original_name } = result.rows[0];
+    const { stored_name, original_name, attachment_type } = result.rows[0];
+    // Borrar del servidor (almacenamiento plano con UUID)
     const filePath = path.join(UPLOADS_ROOT, clientId, stored_name);
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    // Borrar del directorio local (subcarpeta por tipo)
+    const localTypeDir = path.join(LOCAL_CLIENT_FILES_ROOT, clientId, typeFolderName(attachment_type));
+    const localFilePath = path.join(localTypeDir, original_name);
+    if (fs.existsSync(localFilePath)) { try { fs.unlinkSync(localFilePath); } catch (_) {} }
     logActivityForReq(req, `Archivo eliminado: ${original_name || stored_name}`, 'CLIENT', clientId);
     res.json({ success: true });
   } catch (err: any) {
@@ -157,18 +266,25 @@ export const updateFileMetadata = async (req: any, res: Response) => {
   const { document_name, attachment_type } = req.body;
 
   try {
+    // Leer valores actuales ANTES de actualizar (para mover el fichero local)
+    const existing = await pool.query(
+      `SELECT original_name, attachment_type FROM client_files WHERE id = $1 AND client_id = $2`,
+      [fileId, clientId]
+    );
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
+    }
+    const oldOriginalName  = existing.rows[0].original_name as string;
+    const oldAttachType    = existing.rows[0].attachment_type as string | null;
+
     let originalNameUpdate = '';
     let params: any[];
+    let newOriginalName    = oldOriginalName;
 
     if (document_name) {
-      // Leer la extensión real del archivo para no sobreescribirla
-      const existing = await pool.query(
-        `SELECT original_name FROM client_files WHERE id = $1 AND client_id = $2`,
-        [fileId, clientId]
-      );
-      const ext = path.extname(existing.rows[0]?.original_name || '.docx');
-      const newOriginalName = `${document_name}${ext}`;
-      originalNameUpdate = `, original_name = $5`;
+      const ext = path.extname(oldOriginalName || '.docx');
+      newOriginalName     = `${document_name}${ext}`;
+      originalNameUpdate  = `, original_name = $5`;
       params = [document_name, attachment_type || 'Sin clasificar', fileId, clientId, newOriginalName];
     } else {
       params = [null, attachment_type || 'Sin clasificar', fileId, clientId];
@@ -185,6 +301,15 @@ export const updateFileMetadata = async (req: any, res: Response) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
     }
+
+    // Mover fichero local si cambió el tipo o el nombre
+    const newAttachType = attachment_type || 'Sin clasificar';
+    const typeChanged   = typeFolderName(oldAttachType) !== typeFolderName(newAttachType);
+    const nameChanged   = newOriginalName !== oldOriginalName;
+    if (typeChanged || nameChanged) {
+      moveLocalFile(clientId, oldOriginalName, newOriginalName, oldAttachType, newAttachType);
+    }
+
     res.json({ success: true, data: result.rows[0] });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
@@ -216,8 +341,8 @@ export const createBlankDocument = async (req: any, res: Response) => {
     // Guardar archivo en disco
     fs.writeFileSync(filePath, blankDocx);
 
-    // Sincronizar a carpeta local del cliente
-    syncFileToLocal(clientId, originalName, filePath);
+    // Sincronizar a subcarpeta local del tipo correspondiente
+    syncFileToLocal(clientId, originalName, filePath, attachment_type || 'Sin clasificar');
 
     // Guardar en base de datos con metadatos
     const result = await pool.query(
@@ -267,8 +392,15 @@ export const openFileLocally = async (req: any, res: Response) => {
       return res.status(404).json({ success: false, error: 'Archivo no encontrado en disco.' });
     }
 
-    // Copiar versión fresca a la carpeta local del cliente
-    const localDir  = ensureLocalClientDir(clientId);
+    // Obtener tipo del archivo para abrir desde la subcarpeta correcta
+    const typeResult = await pool.query(
+      `SELECT attachment_type FROM client_files WHERE id = $1 AND client_id = $2`,
+      [fileId, clientId]
+    );
+    const attachType = typeResult.rows[0]?.attachment_type || 'Sin clasificar';
+
+    // Copiar versión fresca a la subcarpeta local del tipo
+    const localDir  = ensureLocalClientDir(clientId, attachType);
     const localPath = path.join(localDir, original_name);
     fs.copyFileSync(serverPath, localPath);
 
@@ -1773,6 +1905,64 @@ else:
 <body style="padding:24px;font-family:sans-serif;color:#856404">
   <p>Vista previa no disponible para <strong>${ext}</strong></p>
 </body></html>`);
+}
+
+// ─────────────────────────────────────────────────────────────
+// MIGRACIÓN: mueve archivos de la estructura plana antigua
+// ({clientId}/archivo.ext) a la nueva ({clientId}/{tipo}/archivo.ext)
+// Se llama una vez al arrancar el servidor.
+// ─────────────────────────────────────────────────────────────
+export async function migrateLocalFoldersStructure(): Promise<void> {
+  if (!fs.existsSync(LOCAL_CLIENT_FILES_ROOT)) return;
+
+  try {
+    console.log('📂 Migración de carpetas locales: verificando estructura…');
+
+    // Obtener todos los registros de archivos agrupados por cliente
+    const result = await pool.query(
+      `SELECT client_id, original_name, attachment_type FROM client_files ORDER BY client_id`
+    );
+
+    let moved = 0;
+
+    for (const row of result.rows) {
+      const { client_id, original_name, attachment_type } = row;
+      const typeFolder   = typeFolderName(attachment_type);
+      const clientRoot   = path.join(LOCAL_CLIENT_FILES_ROOT, client_id);
+      const flatPath     = path.join(clientRoot, original_name);   // ruta antigua (plana)
+      const subPath      = path.join(clientRoot, typeFolder, original_name); // ruta nueva
+
+      // Si el archivo existe en la raíz del cliente (estructura plana) pero NO en la subcarpeta
+      if (fs.existsSync(flatPath) && !fs.existsSync(subPath)) {
+        try {
+          const destDir = path.join(clientRoot, typeFolder);
+          if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
+          fs.copyFileSync(flatPath, subPath);
+          fs.unlinkSync(flatPath);
+          moved++;
+        } catch (_) { /* fallo silencioso por archivo */ }
+      }
+    }
+
+    // Crear las carpetas de tipos para todos los clientes con directorio local
+    const clientDirs = fs.existsSync(LOCAL_CLIENT_FILES_ROOT)
+      ? fs.readdirSync(LOCAL_CLIENT_FILES_ROOT, { withFileTypes: true })
+          .filter(d => d.isDirectory())
+          .map(d => d.name)
+      : [];
+
+    for (const clientId of clientDirs) {
+      await initClientFolders(clientId);
+    }
+
+    if (moved > 0) {
+      console.log(`✅ Migración completada: ${moved} archivo(s) movido(s) a subcarpetas.`);
+    } else {
+      console.log('✅ Migración: estructura de carpetas ya actualizada.');
+    }
+  } catch (err: any) {
+    console.error('⚠️  Error en migración de carpetas locales:', err.message);
+  }
 }
 
 // GET /api/files/templates

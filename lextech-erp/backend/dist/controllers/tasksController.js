@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getIndicators = exports.deleteTask = exports.patchTaskEstado = exports.updateTask = exports.createTask = exports.getTasks = void 0;
+exports.createEtapa = exports.getEtapas = exports.getIndicators = exports.deleteTask = exports.patchTaskEstado = exports.updateTask = exports.createTask = exports.getMyTasks = exports.getTasks = void 0;
 const database_1 = __importDefault(require("../config/database"));
 const activityController_1 = require("./activityController");
 const getTasks = async (req, res) => {
@@ -20,26 +20,59 @@ const getTasks = async (req, res) => {
     }
 };
 exports.getTasks = getTasks;
+const getMyTasks = async (req, res) => {
+    const userId = req.auth?.userId;
+    if (!userId)
+        return res.status(401).json({ error: 'No autenticado' });
+    try {
+        const result = await database_1.default.query(`SELECT ct.*,
+              COALESCE(e.commercial_name, e.first_name || ' ' || COALESCE(e.last_name,'')) AS client_name_resolved
+       FROM client_tasks ct
+       LEFT JOIN entities e ON e.id = ct.client_id
+       WHERE ct.user_id = $1
+       ORDER BY
+         CASE ct.estado WHEN 'urgente' THEN 0 WHEN 'pendiente' THEN 1 ELSE 2 END,
+         ct.plazo ASC NULLS LAST,
+         ct.created_at DESC`, [userId]);
+        res.json({ data: result.rows });
+    }
+    catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+};
+exports.getMyTasks = getMyTasks;
 const createTask = async (req, res) => {
     const { clientId } = req.params;
-    const { titulo, descripcion, plazo, estado, prioridad, expediente, tipo, juzgado, num_proc } = req.body;
+    const { titulo, descripcion, plazo, fecha_aviso, estado, prioridad, expediente, expediente_id, tipo, juzgado, num_proc, importe, notas, etapa } = req.body;
     if (!titulo?.trim())
         return res.status(400).json({ error: 'El título es obligatorio' });
+    const userId = req.auth?.userId || 'SYSTEM';
+    const userName = await (0, activityController_1.resolveUserName)(userId);
     try {
-        const result = await database_1.default.query(`INSERT INTO client_tasks (client_id, titulo, descripcion, plazo, estado, prioridad, expediente, tipo, juzgado, num_proc, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+        const clientRow = await database_1.default.query(`SELECT COALESCE(commercial_name, first_name || ' ' || COALESCE(last_name,'')) AS name FROM entities WHERE id = $1`, [clientId]);
+        const clientName = clientRow.rows[0]?.name || null;
+        const result = await database_1.default.query(`INSERT INTO client_tasks
+         (client_id, client_name, titulo, descripcion, plazo, fecha_aviso, estado, prioridad,
+          expediente, expediente_id, tipo, juzgado, num_proc, importe, notas, etapa, created_by, user_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
        RETURNING *`, [
-            clientId,
+            clientId, clientName,
             titulo.trim(),
             descripcion?.trim() || null,
             plazo || null,
+            fecha_aviso || null,
             estado || 'pendiente',
             prioridad || 'media',
             expediente?.trim() || null,
+            expediente_id || null,
             tipo || 'otro',
             juzgado?.trim() || null,
             num_proc?.trim() || null,
-            req.auth?.userId || 'SYSTEM',
+            importe ? parseFloat(importe) : null,
+            notas?.trim() || null,
+            etapa?.trim() || null,
+            userName,
+            userId,
         ]);
         (0, activityController_1.logActivityForReq)(req, `Tarea creada: ${titulo.trim()}`, 'CLIENT', clientId);
         res.status(201).json({ data: result.rows[0] });
@@ -51,22 +84,27 @@ const createTask = async (req, res) => {
 exports.createTask = createTask;
 const updateTask = async (req, res) => {
     const { id } = req.params;
-    const { titulo, descripcion, plazo, estado, prioridad, expediente, tipo, juzgado, num_proc } = req.body;
+    const { titulo, descripcion, plazo, fecha_aviso, estado, prioridad, expediente, tipo, juzgado, num_proc, importe, notas, etapa } = req.body;
     try {
         const result = await database_1.default.query(`UPDATE client_tasks
-       SET titulo=$1, descripcion=$2, plazo=$3, estado=$4, prioridad=$5, expediente=$6,
-           tipo=$7, juzgado=$8, num_proc=$9, updated_at=NOW()
-       WHERE id=$10
+       SET titulo=$1, descripcion=$2, plazo=$3, fecha_aviso=$4, estado=$5, prioridad=$6,
+           expediente=$7, tipo=$8, juzgado=$9, num_proc=$10,
+           importe=$11, notas=$12, etapa=$13, updated_at=NOW()
+       WHERE id=$14
        RETURNING *`, [
             titulo?.trim(),
             descripcion?.trim() || null,
             plazo || null,
+            fecha_aviso || null,
             estado,
             prioridad,
             expediente?.trim() || null,
             tipo || 'otro',
             juzgado?.trim() || null,
             num_proc?.trim() || null,
+            importe ? parseFloat(importe) : null,
+            notas?.trim() || null,
+            etapa?.trim() || null,
             id,
         ]);
         if (result.rows.length === 0)
@@ -124,7 +162,8 @@ const getIndicators = async (req, res) => {
         const actQ = await database_1.default.query(`SELECT MAX(created_at) AS ultima_actuacion,
               COUNT(*)::int   AS total_actuaciones
        FROM activity_log
-       WHERE entity_id = $1 AND entity_type = 'CLIENT'`, [clientId]);
+       WHERE entity_id = $1 AND entity_type = 'CLIENT'
+         AND action_type NOT LIKE 'Nota%'`, [clientId]);
         const expQ = await database_1.default.query(`SELECT COUNT(*)::int AS total_expedientes FROM expedientes WHERE cliente_id = $1`, [clientId]);
         const clientQ = await database_1.default.query(`SELECT date_alta, client_status, address_street, address_town FROM entities WHERE id = $1`, [clientId]);
         const t = tasksQ.rows[0];
@@ -160,3 +199,30 @@ const getIndicators = async (req, res) => {
     }
 };
 exports.getIndicators = getIndicators;
+const getEtapas = async (_req, res) => {
+    try {
+        const result = await database_1.default.query(`SELECT id, nombre, orden FROM task_etapas ORDER BY orden ASC, nombre ASC`);
+        res.json({ data: result.rows });
+    }
+    catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+};
+exports.getEtapas = getEtapas;
+const createEtapa = async (req, res) => {
+    const { nombre } = req.body;
+    if (!nombre?.trim())
+        return res.status(400).json({ error: 'El nombre es obligatorio' });
+    try {
+        const maxRes = await database_1.default.query(`SELECT COALESCE(MAX(orden),0) AS max FROM task_etapas`);
+        const nextOrden = Number(maxRes.rows[0].max) + 1;
+        const result = await database_1.default.query(`INSERT INTO task_etapas (nombre, orden) VALUES ($1, $2)
+       ON CONFLICT (nombre) DO UPDATE SET nombre = EXCLUDED.nombre
+       RETURNING *`, [nombre.trim(), nextOrden]);
+        res.status(201).json({ data: result.rows[0] });
+    }
+    catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+};
+exports.createEtapa = createEtapa;

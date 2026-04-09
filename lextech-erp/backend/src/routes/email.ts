@@ -1,0 +1,41 @@
+import { Router } from 'express';
+import {
+  getAccounts,
+  createAccount,
+  deleteAccount,
+  syncAccount,
+  getMessages,
+  getMessage,
+  markRead,
+  toggleStar,
+  deleteMessage,
+  sendMail,
+  saveDraft,
+  getDrafts,
+  getStats,
+} from '../controllers/emailController';
+
+const router = Router();
+
+// ── Cuentas ──────────────────────────────────────────────────────────────────
+router.get('/accounts',           getAccounts);
+router.post('/accounts',          createAccount);
+router.delete('/accounts/:id',    deleteAccount);
+router.post('/accounts/:id/sync', syncAccount);
+
+// ── Mensajes ─────────────────────────────────────────────────────────────────
+router.get('/messages',           getMessages);
+router.get('/messages/:id',       getMessage);
+router.patch('/messages/:id/read',   markRead);
+router.patch('/messages/:id/star',   toggleStar);
+router.delete('/messages/:id',    deleteMessage);
+
+// ── Envío y borradores ───────────────────────────────────────────────────────
+router.post('/send',              sendMail);
+router.post('/drafts',            saveDraft);
+router.get('/drafts',             getDrafts);
+
+// ── Stats ────────────────────────────────────────────────────────────────────
+router.get('/stats',              getStats);
+
+export default router;

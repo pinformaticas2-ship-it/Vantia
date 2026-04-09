@@ -20,6 +20,7 @@ const getExpedientes = async (req, res) => {
         const estado = (req.query.estado || '');
         const tipo = (req.query.tipo || '');
         const anio = parseInt(req.query.anio) || 0;
+        const clienteId = (req.query.clienteId || '').trim();
         const limit = Math.min(parseInt(req.query.limit) || 300, 500);
         const offset = Math.max(parseInt(req.query.offset) || 0, 0);
         const conds = [];
@@ -37,18 +38,23 @@ const getExpedientes = async (req, res) => {
             p++;
         }
         if (estado) {
-            conds.push(`e.estado = $${p}`);
+            conds.push(`e.estado     = $${p}`);
             vals.push(estado);
             p++;
         }
         if (tipo) {
-            conds.push(`e.tipo   = $${p}`);
+            conds.push(`e.tipo       = $${p}`);
             vals.push(tipo);
             p++;
         }
         if (anio) {
-            conds.push(`e.anio   = $${p}`);
+            conds.push(`e.anio       = $${p}`);
             vals.push(anio);
+            p++;
+        }
+        if (clienteId) {
+            conds.push(`e.cliente_id = $${p}`);
+            vals.push(clienteId);
             p++;
         }
         const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';

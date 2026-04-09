@@ -17,15 +17,32 @@ function isTemp(name) {
         name.startsWith('~') ||
         name.endsWith('.tmp') ||
         name.endsWith('.TMP') ||
-        name.startsWith('.'));
+        name.startsWith('.') ||
+        name === '_CLIENTE.txt');
 }
-async function syncToServer(clientId, originalName) {
-    const localPath = path_1.default.join(LOCAL_ROOT, clientId, originalName);
+async function syncToServer(clientId, originalName, typeFolder) {
+    const localPath = typeFolder
+        ? path_1.default.join(LOCAL_ROOT, clientId, typeFolder, originalName)
+        : path_1.default.join(LOCAL_ROOT, clientId, originalName);
     if (!fs_1.default.existsSync(localPath))
         return;
     try {
         const { size } = fs_1.default.statSync(localPath);
-        const result = await database_1.default.query(`SELECT stored_name FROM client_files WHERE client_id = $1 AND original_name = $2 LIMIT 1`, [clientId, originalName]);
+        let result;
+        if (typeFolder) {
+            result = await database_1.default.query(`SELECT stored_name FROM client_files
+         WHERE client_id = $1 AND original_name = $2
+         AND (attachment_type = $3 OR attachment_type IS NULL)
+         LIMIT 1`, [clientId, originalName, typeFolder]);
+            if (!result.rows.length) {
+                result = await database_1.default.query(`SELECT stored_name FROM client_files
+           WHERE client_id = $1 AND original_name = $2 LIMIT 1`, [clientId, originalName]);
+            }
+        }
+        else {
+            result = await database_1.default.query(`SELECT stored_name FROM client_files
+         WHERE client_id = $1 AND original_name = $2 LIMIT 1`, [clientId, originalName]);
+        }
         if (!result.rows.length)
             return;
         const { stored_name } = result.rows[0];
@@ -35,7 +52,8 @@ async function syncToServer(clientId, originalName) {
             fs_1.default.mkdirSync(serverDir, { recursive: true });
         fs_1.default.copyFileSync(localPath, serverPath);
         await database_1.default.query(`UPDATE client_files SET size_bytes = $1 WHERE client_id = $2 AND original_name = $3`, [size, clientId, originalName]);
-        console.log(`✅ Auto-sync: ${clientId}/${originalName} (${size} bytes)`);
+        const subfolder = typeFolder ? `${typeFolder}/` : '';
+        console.log(`✅ Auto-sync: ${clientId}/${subfolder}${originalName} (${size} bytes)`);
     }
     catch (err) {
         console.error(`❌ Auto-sync error [${clientId}/${originalName}]:`, err.message);
@@ -51,19 +69,33 @@ function startLocalFilesWatcher() {
             if (!filename)
                 return;
             const parts = filename.split(/[\\/]/);
-            if (parts.length < 2)
-                return;
-            const clientId = parts[0];
-            const originalName = parts[1];
-            if (!originalName || isTemp(originalName))
-                return;
-            const key = `${clientId}/${originalName}`;
-            if (pending.has(key))
-                clearTimeout(pending.get(key));
-            pending.set(key, setTimeout(() => {
-                pending.delete(key);
-                syncToServer(clientId, originalName);
-            }, 1500));
+            if (parts.length === 2) {
+                const clientId = parts[0];
+                const originalName = parts[1];
+                if (!originalName || isTemp(originalName))
+                    return;
+                const key = `${clientId}/${originalName}`;
+                if (pending.has(key))
+                    clearTimeout(pending.get(key));
+                pending.set(key, setTimeout(() => {
+                    pending.delete(key);
+                    syncToServer(clientId, originalName, undefined);
+                }, 1500));
+            }
+            else if (parts.length >= 3) {
+                const clientId = parts[0];
+                const typeFolder = parts[1];
+                const originalName = parts[2];
+                if (!originalName || isTemp(originalName))
+                    return;
+                const key = `${clientId}/${typeFolder}/${originalName}`;
+                if (pending.has(key))
+                    clearTimeout(pending.get(key));
+                pending.set(key, setTimeout(() => {
+                    pending.delete(key);
+                    syncToServer(clientId, originalName, typeFolder);
+                }, 1500));
+            }
         });
         console.log('👁️  Watcher de cambios locales activo en:', LOCAL_ROOT);
     }

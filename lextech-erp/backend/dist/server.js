@@ -16,12 +16,22 @@ const vantia_1 = __importDefault(require("./routes/vantia"));
 const files_1 = __importDefault(require("./routes/files"));
 const tasks_1 = __importDefault(require("./routes/tasks"));
 const expedientes_1 = __importDefault(require("./routes/expedientes"));
+const agenda_1 = __importDefault(require("./routes/agenda"));
+const chat_1 = __importDefault(require("./routes/chat"));
 const migrations_1 = require("./config/migrations");
 const localFilesWatcher_1 = require("./watchers/localFilesWatcher");
+const filesController_1 = require("./controllers/filesController");
+const activityController_1 = require("./controllers/activityController");
 const database_1 = __importDefault(require("./config/database"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 4000;
+process.on('unhandledRejection', (reason) => {
+    console.error('❌ Unhandled promise rejection:', reason);
+});
+process.on('uncaughtException', (error) => {
+    console.error('❌ Uncaught exception:', error);
+});
 app.use((0, helmet_1.default)({ crossOriginResourcePolicy: false }));
 app.use((0, cors_1.default)({ origin: true, credentials: true }));
 app.use(express_1.default.json({ limit: '10mb' }));
@@ -43,6 +53,8 @@ app.use('/api/vantia', vantia_1.default);
 app.use('/api/files', files_1.default);
 app.use('/api/tasks', tasks_1.default);
 app.use('/api/expedientes', expedientes_1.default);
+app.use('/api/agenda', agenda_1.default);
+app.use('/api/chat', chat_1.default);
 app.get('/health', (_req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
@@ -72,8 +84,15 @@ app.use((err, _req, res, _next) => {
     res.status(500).json({ success: false, error: 'Error interno del servidor' });
 });
 (0, migrations_1.runMigrations)().then(() => {
-    app.listen(PORT, () => {
+    app.listen(PORT, async () => {
         console.log(`🛡️  VANTIA Backend corriendo en http://localhost:${PORT}`);
         (0, localFilesWatcher_1.startLocalFilesWatcher)();
+        (0, filesController_1.migrateLocalFoldersStructure)();
+        try {
+            await (0, activityController_1.logServerStart)();
+        }
+        catch (_e) { }
     });
+}).catch((error) => {
+    console.error('❌ Error arrancando backend:', error);
 });

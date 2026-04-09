@@ -2,11 +2,12 @@ import React, { useState, useRef, useCallback, useEffect } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import {
-  Save, X, ArrowLeft, ScanLine, Upload, Image as ImageIcon,
+  Save, X, ScanLine, Upload, Image as ImageIcon,
   Loader2, Sparkles, RotateCcw, AlertTriangle, CheckCircle2,
   Camera, Edit3, Users, MapPin, Phone, Briefcase, BarChart2,
 } from "lucide-react";
 import { safeJson } from "../lib/api";
+import BackButton from "../components/BackButton";
 
 // ── UI helpers ────────────────────────────────────────────────
 const F = ({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) => (
@@ -322,8 +323,8 @@ export default function ClientForm() {
 
   if (loadError) return (
     <div className="space-y-4">
-      <Link to="/dashboard/clientes" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-800">
-        <ArrowLeft size={16} /> Volver
+      <Link to="/dashboard/clientes">
+        <BackButton />
       </Link>
       <div className="flex items-center gap-3 p-5 bg-red-50 border border-red-200 rounded-xl text-red-700">
         <AlertTriangle size={20} className="shrink-0" />
@@ -341,11 +342,8 @@ export default function ClientForm() {
         {/* Cabecera */}
         <div className="flex justify-between items-center bg-white border border-slate-200 rounded-xl px-4 py-3">
           <div className="flex items-center gap-3">
-            <Link
-              to={isEdit ? `/dashboard/clientes/${id}` : "/dashboard/clientes"}
-              className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
-            >
-              <ArrowLeft size={16} />
+            <Link to={isEdit ? `/dashboard/clientes/${id}` : "/dashboard/clientes"}>
+              <BackButton />
             </Link>
             <div className="flex items-center gap-2.5">
               <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-red-50 border border-red-100">

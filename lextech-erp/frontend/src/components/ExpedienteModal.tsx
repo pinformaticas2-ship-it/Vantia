@@ -1,10 +1,13 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
-  FolderOpen, Loader2, X, Paperclip, Activity, FileSpreadsheet,
+  FolderOpen, Loader2, Paperclip, Activity, FileSpreadsheet,
   Users, ClipboardList, MoreHorizontal,
+  Upload, Trash2, Eye, Download, ExternalLink, Maximize2,
 } from "lucide-react";
+import { useAuth } from "@clerk/clerk-react";
 import { safeJson } from "../lib/api";
 import AdjuntosModal from "./AdjuntosModal";
+import BackButton from "./BackButton";
 
 // ── Constantes compartidas ────────────────────────────────────
 export const TIPOS: Record<string, { label: string; short: string; color: string }> = {
@@ -87,6 +90,205 @@ export const BOTTOM_TABS: { key: TabKey; label: string }[] = [
   { key: "tareas",     label: "Tareas-Plazos" },
 ];
 
+// ── helpers locales ──────────────────────────────────────────
+function fmtSize(b: number) {
+  if (b < 1024) return `${b} B`;
+  if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
+  return `${(b / (1024 * 1024)).toFixed(1)} MB`;
+}
+function fileEmoji(mime: string, name: string) {
+  const n = name.toLowerCase();
+  if (mime.startsWith("image/")) return "🖼️";
+  if (mime === "application/pdf") return "📄";
+  if (mime.includes("word") || n.endsWith(".doc") || n.endsWith(".docx")) return "📝";
+  if (mime.includes("excel") || mime.includes("spreadsheet") || n.endsWith(".xlsx") || n.endsWith(".xls")) return "📊";
+  if (mime.startsWith("text/")) return "📃";
+  return "📎";
+}
+
+// ── AdjuntosPanel — lista inline de adjuntos para el panel inferior ──
+function AdjuntosPanel({ entityId, entityName, onOpenFull }: {
+  entityId: string;
+  entityName: string;
+  onOpenFull: () => void;
+}) {
+  const { getToken } = useAuth();
+  const [files, setFiles]           = useState<any[]>([]);
+  const [loading, setLoading]       = useState(true);
+  const [uploading, setUploading]   = useState(false);
+  const [error, setError]           = useState<string | null>(null);
+  const [isDrag, setIsDrag]         = useState(false);
+  const fileRef                     = useRef<HTMLInputElement>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/files/${entityId}`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await safeJson(res);
+      if (res.ok) setFiles(data.data || []);
+      else setError(data?.error || "Error al cargar");
+    } catch (e: any) { setError(e?.message || "Error de conexión"); }
+    finally { setLoading(false); }
+  }, [entityId, getToken]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const upload = async (fileList: FileList | File[]) => {
+    const arr = Array.from(fileList);
+    if (!arr.length) return;
+    setUploading(true);
+    setError(null);
+    try {
+      const token = await getToken({ skipCache: true });
+      const fd = new FormData();
+      arr.forEach(f => fd.append("files", f));
+      const res = await fetch(`/api/files/${entityId}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setError(d?.error || `Error ${res.status}`);
+      } else {
+        await load();
+        window.dispatchEvent(new CustomEvent("historial-changed"));
+      }
+    } catch (e: any) { setError(e?.message || "Error al subir"); }
+    finally { setUploading(false); }
+  };
+
+  const del = async (fileId: string, name: string) => {
+    if (!confirm(`¿Eliminar "${name}"?`)) return;
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/files/${entityId}/${fileId}`, {
+        method: "DELETE", headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) { setFiles(p => p.filter(f => f.id !== fileId)); window.dispatchEvent(new CustomEvent("historial-changed")); }
+      else { const d = await res.json().catch(() => ({})); setError(d?.error || "Error al eliminar"); }
+    } catch (e: any) { setError(e?.message || "Error al eliminar"); }
+  };
+
+  const downloadFile = async (fileId: string, fileName: string) => {
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/files/${entityId}/${fileId}/download`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a"); a.href = url; a.download = fileName;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    } catch (_) {}
+  };
+
+  return (
+    <div
+      className="flex flex-col h-full"
+      onDragOver={e => { e.preventDefault(); setIsDrag(true); }}
+      onDragEnter={e => { e.preventDefault(); setIsDrag(true); }}
+      onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDrag(false); }}
+      onDrop={e => { e.preventDefault(); setIsDrag(false); upload(e.dataTransfer.files); }}
+    >
+      {/* toolbar */}
+      <div className="flex items-center gap-2 px-3 py-1.5 border-b border-slate-100 shrink-0 bg-slate-50">
+        <button
+          onClick={() => fileRef.current?.click()}
+          disabled={uploading}
+          className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-lg transition-colors"
+        >
+          {uploading ? <Loader2 size={11} className="animate-spin" /> : <Upload size={11} />}
+          Subir
+        </button>
+        <span className="text-[11px] text-slate-400">{loading ? "Cargando…" : `${files.length} archivo${files.length !== 1 ? "s" : ""}`}</span>
+        {error && <span className="text-[11px] text-red-600 font-medium truncate flex-1">{error}</span>}
+        <button
+          onClick={onOpenFull}
+          title="Abrir en ventana completa"
+          className="ml-auto flex items-center gap-1 px-2 py-1 text-[11px] text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded-lg transition-colors"
+        >
+          <Maximize2 size={11} /> Ventana completa
+        </button>
+        <input ref={fileRef} type="file" multiple className="hidden"
+          onChange={e => { if (e.target.files) { upload(e.target.files); e.target.value = ""; } }} />
+      </div>
+
+      {/* file list */}
+      <div className="flex-1 overflow-y-auto relative">
+        {isDrag && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-red-50/95 border-2 border-dashed border-red-400 rounded pointer-events-none">
+            <Upload size={24} className="text-red-500 mb-1 animate-bounce" />
+            <p className="text-xs font-bold text-red-600">Suelta para subir</p>
+          </div>
+        )}
+        {loading ? (
+          <div className="flex items-center justify-center h-full"><Loader2 size={20} className="animate-spin text-red-400" /></div>
+        ) : files.length === 0 ? (
+          <div
+            onClick={() => fileRef.current?.click()}
+            className="flex flex-col items-center justify-center h-full text-slate-300 gap-2 cursor-pointer hover:text-slate-400 transition-colors group"
+          >
+            <Upload size={24} className="group-hover:text-red-400 transition-colors" />
+            <span className="text-xs font-medium">Sin adjuntos — haz clic o arrastra archivos</span>
+          </div>
+        ) : (
+          <table className="w-full text-left border-collapse">
+            <thead className="bg-slate-50 sticky top-0 z-10 border-b border-slate-100">
+              <tr>
+                <th className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Nombre</th>
+                <th className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden sm:table-cell">Tipo</th>
+                <th className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Tamaño</th>
+                <th className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Fecha</th>
+                <th className="px-3 py-1.5 w-16"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {files.map((f: any) => (
+                <tr key={f.id} className="bg-white hover:bg-slate-50/60 group transition-colors">
+                  <td className="px-3 py-1.5 max-w-[180px]">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm shrink-0">{fileEmoji(f.mimetype, f.original_name)}</span>
+                      <span className="text-xs font-medium text-slate-700 truncate" title={f.document_name || f.original_name}>
+                        {f.document_name || f.original_name}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-3 py-1.5 hidden sm:table-cell">
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">
+                      {f.attachment_type || "Sin clasificar"}
+                    </span>
+                  </td>
+                  <td className="px-3 py-1.5 text-[11px] text-slate-400 whitespace-nowrap hidden md:table-cell">{fmtSize(f.size_bytes)}</td>
+                  <td className="px-3 py-1.5 text-[11px] text-slate-400 whitespace-nowrap hidden md:table-cell">
+                    {new Date(f.created_at).toLocaleDateString("es-ES")}
+                  </td>
+                  <td className="px-3 py-1.5">
+                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={() => downloadFile(f.id, f.original_name)}
+                        title="Descargar"
+                        className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors"
+                      ><Download size={12} /></button>
+                      <button
+                        onClick={() => del(f.id, f.document_name || f.original_name)}
+                        title="Eliminar"
+                        className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                      ><Trash2 size={12} /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Modal de alta / edición ───────────────────────────────────
 export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, saving }: {
   initial: typeof EXP_EMPTY;
@@ -133,7 +335,7 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
 
         <button
           onClick={() => onSave(form)}
-          disabled={saving || !form.descripcion.trim()}
+          disabled={saving || !form.descripcion.trim() || !form.cliente_id}
           className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-40 rounded-xl shadow-sm active:scale-95 transition-all">
           {saving && <Loader2 size={13} className="animate-spin" />}
           {editId ? "Guardar cambios" : "Crear expediente"}
@@ -162,10 +364,9 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
           <FileSpreadsheet size={12} /> Económico
         </button>
 
-        <button onClick={onClose}
-          className="ml-auto p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
-          <X size={16} />
-        </button>
+        <div className="ml-auto">
+          <BackButton onClick={onClose} />
+        </div>
       </div>
 
       {/* ── Cuerpo ── */}
@@ -341,30 +542,18 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
               </div>
               <div className="p-3 space-y-2.5">
                 <div>
-                  <label className={lbl}>Nombre</label>
+                  <label className={lbl}>Nombre <span className="text-red-500">*</span></label>
                   <select value={form.cliente_id}
                     onChange={e => handleClienteChange(e.target.value)}
+                    required
                     className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm text-slate-700 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 bg-white">
-                    <option value="">— Sin asignar —</option>
+                    <option value="" disabled>— Selecciona un cliente —</option>
                     {clientes.map((c: any) => (
                       <option key={c.id} value={c.id}>
                         {`${c.first_name || ""} ${c.last_name || ""}`.trim() || c.commercial_name || c.nif_cif}
                       </option>
                     ))}
                   </select>
-                </div>
-                <div>
-                  <label className={lbl}>Persona de Contacto</label>
-                  <input value={form.persona_contacto}
-                    onChange={e => set("persona_contacto", e.target.value)}
-                    placeholder="Nombre del contacto"
-                    className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm text-slate-700 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 bg-white" />
-                </div>
-                <div>
-                  <label className={lbl}>Teléfono / Email</label>
-                  <input value={form.contacto} onChange={e => set("contacto", e.target.value)}
-                    placeholder="612 345 678"
-                    className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm text-slate-700 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 bg-white" />
                 </div>
               </div>
             </div>
@@ -427,13 +616,19 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
               <span className="text-[10px] text-slate-300 italic">Más pestañas próximamente</span>
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto p-4 bg-white">
+          <div className={`flex-1 overflow-hidden bg-white ${tab !== "adjuntos" ? "overflow-y-auto p-4" : ""}`}>
             {tab === "notas" ? (
               <textarea
                 value={form.observaciones}
                 onChange={e => set("observaciones", e.target.value)}
                 placeholder="Escribe aquí las notas internas del expediente…"
                 className="w-full h-full text-sm text-slate-700 border border-slate-200 rounded-lg px-3 py-2.5 focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100 resize-none placeholder:text-slate-300"
+              />
+            ) : tab === "adjuntos" ? (
+              <AdjuntosPanel
+                entityId={editId}
+                entityName={form.descripcion || `Expediente ${form.anio}`}
+                onOpenFull={() => setShowAdj(true)}
               />
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-slate-300 gap-2">

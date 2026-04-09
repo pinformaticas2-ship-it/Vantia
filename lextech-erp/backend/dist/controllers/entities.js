@@ -65,6 +65,7 @@ const getEntities = async (req, res) => {
         e.photo_url, e.created_at, e.date_alta, e.lopd,
         (SELECT COUNT(*) FROM activity_log al
          WHERE al.entity_id = e.id AND al.entity_type = 'CLIENT'
+           AND al.action_type NOT LIKE 'Nota%'
         )::int AS total_actuaciones,
         (SELECT COUNT(*) FROM expedientes exp
          WHERE exp.cliente_id = e.id

@@ -26,32 +26,28 @@ function actionIcon(type: string) {
   return "⚡";
 }
 
-// ── Agenda placeholder ───────────────────────────────────────────────────────
-const today = new Date();
-const d = (offset: number) => new Date(today.getFullYear(), today.getMonth(), today.getDate() + offset);
-const fmt = (date: Date) => date.toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short" });
-
-const AGENDA_EVENTS = [
-  { id: 1, date: d(0),  time: "10:00", title: "Reunión con cliente Martínez", type: "reunion",    place: "Sala A" },
-  { id: 2, date: d(0),  time: "16:30", title: "Llamada Exp-0034 — parte contraria", type: "llamada", place: "Tel." },
-  { id: 3, date: d(1),  time: "09:00", title: "Vista oral Juzgado 1ª Instancia nº5", type: "juicio",  place: "Juzgado" },
-  { id: 4, date: d(2),  time: "12:00", title: "Firma de escritura notarial", type: "firma",    place: "Notaría" },
-  { id: 5, date: d(3),  time: "11:30", title: "Videoconferencia perito económico", type: "video",    place: "Online" },
-];
-
+// ── Agenda helpers ───────────────────────────────────────────────────────────
 const EVENT_STYLES: Record<string, { color: string; icon: any }> = {
-  reunion:  { color: "bg-blue-500",    icon: Clock },
-  llamada:  { color: "bg-green-500",   icon: Phone },
-  juicio:   { color: "bg-red-500",     icon: MapPin },
-  firma:    { color: "bg-amber-500",   icon: CheckCircle2 },
-  video:    { color: "bg-violet-500",  icon: Video },
+  cita:    { color: "bg-blue-500",    icon: Clock },
+  reunion: { color: "bg-violet-500",  icon: Clock },
+  llamada: { color: "bg-green-500",   icon: Phone },
+  vista:   { color: "bg-red-500",     icon: MapPin },
+  plazo:   { color: "bg-amber-500",   icon: CheckCircle2 },
+  video:   { color: "bg-cyan-500",    icon: Video },
+  otro:    { color: "bg-slate-400",   icon: Clock },
 };
 
-function dayLabel(date: Date): string {
-  const diff = Math.round((date.getTime() - today.setHours(0,0,0,0)) / 86400000);
+function eventDayLabel(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now  = new Date();
+  const diff = Math.round((date.setHours(0,0,0,0) - now.setHours(0,0,0,0)) / 86400000);
   if (diff === 0) return "Hoy";
   if (diff === 1) return "Mañana";
-  return fmt(date);
+  return new Date(dateStr).toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short" });
+}
+
+function fmtEventTime(dateStr: string): string {
+  return new Date(dateStr).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
 }
 
 // ── DashboardHome ────────────────────────────────────────────────────────────
@@ -59,23 +55,49 @@ export default function DashboardHome() {
   const { user } = useUser();
   const { getToken } = useAuth();
 
-  const [activity, setActivity]     = useState<any[]>([]);
-  const [actLoading, setActLoading] = useState(true);
+  const [activity,       setActivity]       = useState<any[]>([]);
+  const [actLoading,     setActLoading]     = useState(true);
+  const [agendaEvents,   setAgendaEvents]   = useState<any[]>([]);
+  const [agendaLoading,  setAgendaLoading]  = useState(true);
+  const [taskStats,      setTaskStats]      = useState({ vencidas: 0, proximas: 0 });
 
   const fetchData = useCallback(async (silent = false) => {
-    if (!silent) setActLoading(true);
+    if (!silent) { setActLoading(true); setAgendaLoading(true); }
     try {
       const token = await getToken({ skipCache: true });
-      const res   = await fetch("/api/activity", { headers: { Authorization: `Bearer ${token}` } });
-      const data  = await safeJson(res);
-      if (res.ok) setActivity(data.data || []);
+      const [actRes, agendaRes, tasksRes] = await Promise.all([
+        fetch("/api/activity",               { headers: { Authorization: `Bearer ${token}` } }),
+        fetch("/api/agenda/upcoming?limit=5", { headers: { Authorization: `Bearer ${token}` } }),
+        fetch("/api/tasks/me",               { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
+      const [actData, agendaData, tasksData] = await Promise.all([
+        safeJson(actRes), safeJson(agendaRes), safeJson(tasksRes),
+      ]);
+      if (actRes.ok)    setActivity(actData.data || []);
+      if (agendaRes.ok) setAgendaEvents(agendaData.data || []);
+      if (tasksRes.ok) {
+        const tasks: any[] = tasksData.data || [];
+        const now = new Date();
+        const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+        const vencidas = tasks.filter((t: any) =>
+          t.estado !== 'completado' && t.estado !== 'cancelado' &&
+          t.plazo && new Date(t.plazo) < now
+        ).length;
+        const proximas = tasks.filter((t: any) =>
+          t.estado !== 'completado' && t.estado !== 'cancelado' &&
+          t.plazo && new Date(t.plazo) >= now && new Date(t.plazo) <= sevenDaysFromNow
+        ).length;
+        setTaskStats({ vencidas, proximas });
+      }
     } catch (_e) {
-    } finally { if (!silent) setActLoading(false); }
+    } finally {
+      if (!silent) { setActLoading(false); setAgendaLoading(false); }
+    }
   }, [getToken]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Auto-refrescar actividad: cada 20s, al volver a pestaña, al reconectar
+  // Auto-refrescar: cada 20s, al volver a pestaña, al reconectar
   useAutoRefresh(() => fetchData(true), { intervalMs: 20_000 });
 
   return (
@@ -97,9 +119,12 @@ export default function DashboardHome() {
               <Plus size={15} /> Nuevo Cliente
             </button>
           </Link>
-          <button className="flex items-center gap-2 bg-red-600 text-white px-3.5 py-2 rounded-xl hover:bg-red-700 font-semibold text-sm shadow-md shadow-red-200">
+          <Link
+            to="/dashboard/expedientes?nuevo=1"
+            className="flex items-center gap-2 bg-red-600 text-white px-3.5 py-2 rounded-xl hover:bg-red-700 font-semibold text-sm shadow-md shadow-red-200"
+          >
             <Plus size={15} /> Nuevo Expediente
-          </button>
+          </Link>
         </div>
       </div>
 
@@ -120,48 +145,55 @@ export default function DashboardHome() {
             </Link>
           </div>
 
-          <div className="divide-y divide-slate-50">
-            {AGENDA_EVENTS.map((ev) => {
-              const style = EVENT_STYLES[ev.type] || EVENT_STYLES.reunion;
-              const Icon  = style.icon;
-              const label = dayLabel(ev.date);
-              const isToday = label === "Hoy";
-              return (
-                <Link key={ev.id} to="/dashboard/agenda" className="flex items-center gap-4 px-6 py-3.5 hover:bg-slate-50 transition-colors group">
-                  {/* color bar */}
-                  <div className={`w-1 h-10 rounded-full shrink-0 ${style.color}`} />
-
-                  {/* fecha / hora */}
-                  <div className="w-20 shrink-0 text-right">
-                    <p className={`text-xs font-bold ${isToday ? "text-red-500" : "text-slate-500"}`}>{label}</p>
-                    <p className="text-sm font-black text-slate-700">{ev.time}</p>
-                  </div>
-
-                  {/* título y lugar */}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-800 truncate group-hover:text-red-600 transition-colors">
-                      {ev.title}
-                    </p>
-                    <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
-                      <Icon size={10} /> {ev.place}
-                    </p>
-                  </div>
-
-                  {isToday && (
-                    <span className="shrink-0 text-[10px] font-bold text-red-500 bg-red-50 border border-red-100 px-2 py-0.5 rounded-full">
-                      Hoy
-                    </span>
-                  )}
-                </Link>
-              );
-            })}
-          </div>
-
-          <div className="px-6 py-3 bg-slate-50 border-t border-slate-100 text-center">
-            <p className="text-[11px] text-slate-400">
-              Conecta el módulo Agenda para ver eventos reales · <Link to="/dashboard/agenda" className="text-red-500 font-semibold hover:underline">Ir a Agenda</Link>
-            </p>
-          </div>
+          {agendaLoading ? (
+            <div className="flex justify-center py-10">
+              <Loader2 size={18} className="animate-spin text-slate-300" />
+            </div>
+          ) : agendaEvents.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 gap-2 text-slate-400">
+              <Calendar size={28} className="opacity-20" />
+              <p className="text-xs text-center">Sin próximos eventos</p>
+              <Link to="/dashboard/agenda" className="text-xs font-bold text-red-500 hover:underline">
+                + Crear evento
+              </Link>
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-50">
+              {agendaEvents.map((ev: any) => {
+                const style   = EVENT_STYLES[ev.type] || EVENT_STYLES.otro;
+                const Icon    = style.icon;
+                const label   = eventDayLabel(ev.start_at);
+                const isToday = label === "Hoy";
+                return (
+                  <Link key={ev.id} to="/dashboard/agenda" className="flex items-center gap-4 px-6 py-3.5 hover:bg-slate-50 transition-colors group">
+                    <div className={`w-1 h-10 rounded-full shrink-0 ${style.color}`} />
+                    <div className="w-20 shrink-0 text-right">
+                      <p className={`text-xs font-bold ${isToday ? "text-red-500" : "text-slate-500"}`}>{label}</p>
+                      {!ev.all_day
+                        ? <p className="text-sm font-black text-slate-700">{fmtEventTime(ev.start_at)}</p>
+                        : <p className="text-xs text-slate-400 font-semibold">Todo el día</p>
+                      }
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-slate-800 truncate group-hover:text-red-600 transition-colors">
+                        {ev.title}
+                      </p>
+                      {ev.location && (
+                        <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
+                          <Icon size={10} /> {ev.location}
+                        </p>
+                      )}
+                    </div>
+                    {isToday && (
+                      <span className="shrink-0 text-[10px] font-bold text-red-500 bg-red-50 border border-red-100 px-2 py-0.5 rounded-full">
+                        Hoy
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* ── COLUMNA DERECHA ── */}
@@ -178,18 +210,22 @@ export default function DashboardHome() {
               </div>
               <div className="grid grid-cols-2">
                 <div className="p-5 bg-red-50 border-r border-red-100">
-                  <p className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-1">Caducadas</p>
-                  <p className="text-4xl font-black text-red-600 leading-none">0</p>
+                  <p className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-1">Vencidas</p>
+                  <p className={`text-4xl font-black leading-none ${taskStats.vencidas > 0 ? "text-red-600" : "text-red-300"}`}>
+                    {taskStats.vencidas}
+                  </p>
                   <p className="text-[10px] text-red-400 mt-1.5">tareas vencidas</p>
                 </div>
                 <div className="p-5 bg-orange-50">
                   <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-1">Próximas</p>
-                  <p className="text-4xl font-black text-orange-500 leading-none">0</p>
-                  <p className="text-[10px] text-orange-400 mt-1.5">vencen pronto</p>
+                  <p className={`text-4xl font-black leading-none ${taskStats.proximas > 0 ? "text-orange-500" : "text-orange-300"}`}>
+                    {taskStats.proximas}
+                  </p>
+                  <p className="text-[10px] text-orange-400 mt-1.5">vencen en 7 días</p>
                 </div>
               </div>
               <div className="px-4 py-2 bg-slate-50 border-t border-slate-100 text-center">
-                <span className="text-[11px] text-slate-400">Módulo de tareas · próximamente</span>
+                <span className="text-[11px] text-slate-400">Ver mis tareas y plazos →</span>
               </div>
             </div>
           </Link>
@@ -219,7 +255,13 @@ export default function DashboardHome() {
                     <span className="text-sm">{actionIcon(item.action_type)}</span>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold text-slate-700 truncate">{item.action_type}</p>
-                      {item.entity_name && <p className="text-[11px] text-slate-400 truncate">{item.entity_name}</p>}
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        {item.user_name && (
+                          <span className="text-[10px] font-semibold text-red-500 shrink-0">{item.user_name}</span>
+                        )}
+                        {item.user_name && item.entity_name && <span className="text-slate-200 text-[10px]">·</span>}
+                        {item.entity_name && <p className="text-[10px] text-slate-400 truncate">{item.entity_name}</p>}
+                      </div>
                     </div>
                     <span className="text-[10px] text-slate-400 shrink-0">{timeAgo(item.created_at)}</span>
                   </div>

@@ -1181,7 +1181,7 @@ export default function ClientList() {
         ══════════════════════════════════════════════════════ */}
         {viewMode === "list" && (
           <div className="overflow-auto flex-1">
-            <table className="w-full text-left text-xs min-w-[900px]">
+            <table className="w-full text-left text-sm min-w-[900px]">
               <thead className="bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
                 <tr>
                   <Th label="Nº"                 sortKey="internal_number" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="w-14 pl-4" />
@@ -1228,44 +1228,44 @@ export default function ClientList() {
                       onDoubleClick={() => navigate(`/dashboard/clientes/${client.id}`)}
                       className={`border-b border-slate-50 cursor-pointer transition-colors group ${isSelected ? "bg-red-50 border-l-2 border-l-red-500" : "hover:bg-slate-50/80"}`}
                     >
-                      <td className={`pl-4 pr-3 py-2 font-mono text-slate-400 ${isSelected ? "text-red-400" : ""}`}>{client.internal_number || "—"}</td>
-                      <td className="px-3 py-2">
+                      <td className={`pl-4 pr-3 py-3 font-mono text-slate-400 ${isSelected ? "text-red-400" : ""}`}>{client.internal_number || "—"}</td>
+                      <td className="px-3 py-3">
                         <div className="flex items-center gap-2.5">
                           {client.photo_url
-                            ? <img src={client.photo_url} alt="" className="h-7 w-7 rounded-lg object-cover shrink-0 border border-slate-100" />
-                            : <div className={`h-7 w-7 rounded-lg flex items-center justify-center text-[11px] font-bold shrink-0 ${isSelected ? "bg-red-200 text-red-700" : "bg-slate-100 text-slate-500"}`}>{((client.first_name || "?")[0] || "?").toUpperCase()}</div>
+                            ? <img src={client.photo_url} alt="" className="h-9 w-9 rounded-lg object-cover shrink-0 border border-slate-100" />
+                            : <div className={`h-9 w-9 rounded-lg flex items-center justify-center text-sm font-bold shrink-0 ${isSelected ? "bg-red-200 text-red-700" : "bg-slate-100 text-slate-500"}`}>{((client.first_name || "?")[0] || "?").toUpperCase()}</div>
                           }
                           <div className="min-w-0">
                             <p className={`font-semibold leading-tight truncate ${isSelected ? "text-red-700" : "text-slate-800"}`}>{client.first_name} {client.last_name}</p>
-                            {client.commercial_name && <p className="text-[10px] text-slate-400 truncate leading-tight">{client.commercial_name}</p>}
+                            {client.commercial_name && <p className="text-xs text-slate-400 truncate leading-tight">{client.commercial_name}</p>}
                           </div>
                         </div>
                       </td>
-                      <td className="px-3 py-2 font-mono text-slate-500">{client.nif_cif || <span className="text-slate-300">—</span>}</td>
-                      <td className="px-3 py-2 text-slate-500 hidden lg:table-cell">{client.phone_mobile || <span className="text-slate-300">—</span>}</td>
-                      <td className="px-3 py-2 text-slate-500 hidden xl:table-cell">{client.phone_1 || <span className="text-slate-300">—</span>}</td>
-                      <td className="px-3 py-2 text-slate-500 hidden lg:table-cell truncate max-w-[160px]">{client.email || <span className="text-slate-300">—</span>}</td>
-                      <td className="px-3 py-2 hidden md:table-cell"><span className={`font-semibold ${tipoColor[client.type] || "text-slate-600"}`}>{client.type || "—"}</span></td>
-                      <td className="px-3 py-2 hidden xl:table-cell">
-                        {client.lopd ? <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${lopdColor[client.lopd] || "bg-slate-50 text-slate-500"}`}>{client.lopd}</span> : <span className="text-slate-300">—</span>}
+                      <td className="px-3 py-3 font-mono text-slate-500">{client.nif_cif || <span className="text-slate-300">—</span>}</td>
+                      <td className="px-3 py-3 text-slate-500 hidden lg:table-cell">{client.phone_mobile || <span className="text-slate-300">—</span>}</td>
+                      <td className="px-3 py-3 text-slate-500 hidden xl:table-cell">{client.phone_1 || <span className="text-slate-300">—</span>}</td>
+                      <td className="px-3 py-3 text-slate-500 hidden lg:table-cell truncate max-w-[160px]">{client.email || <span className="text-slate-300">—</span>}</td>
+                      <td className="px-3 py-3 hidden md:table-cell"><span className={`font-semibold ${tipoColor[client.type] || "text-slate-600"}`}>{client.type || "—"}</span></td>
+                      <td className="px-3 py-3 hidden xl:table-cell">
+                        {client.lopd ? <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${lopdColor[client.lopd] || "bg-slate-50 text-slate-500"}`}>{client.lopd}</span> : <span className="text-slate-300">—</span>}
                       </td>
-                      <td className="px-3 py-2 text-slate-500 hidden md:table-cell whitespace-nowrap">{fmtDate(client.date_alta ?? client.created_at)}</td>
-                      <td className="px-3 py-2">
-                        {client.client_status ? <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${statusColor[client.client_status] || "bg-slate-100 text-slate-600"}`}>{client.client_status}</span> : <span className="text-slate-300">—</span>}
+                      <td className="px-3 py-3 text-slate-500 hidden md:table-cell whitespace-nowrap">{fmtDate(client.date_alta ?? client.created_at)}</td>
+                      <td className="px-3 py-3">
+                        {client.client_status ? <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${statusColor[client.client_status] || "bg-slate-100 text-slate-600"}`}>{client.client_status}</span> : <span className="text-slate-300">—</span>}
                       </td>
-                      <td className="px-3 py-2 hidden xl:table-cell text-center">
+                      <td className="px-3 py-3 hidden xl:table-cell text-center">
                         {(client.total_actuaciones ?? 0) > 0
-                          ? <span className="inline-flex items-center justify-center min-w-[22px] h-[18px] px-1.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700">{client.total_actuaciones}</span>
-                          : <span className="text-slate-300 text-[10px]">—</span>}
+                          ? <span className="inline-flex items-center justify-center min-w-[22px] h-5 px-1.5 rounded-full text-xs font-bold bg-blue-100 text-blue-700">{client.total_actuaciones}</span>
+                          : <span className="text-slate-300 text-xs">—</span>}
                       </td>
-                      <td className="px-3 py-2 hidden xl:table-cell text-center">
+                      <td className="px-3 py-3 hidden xl:table-cell text-center">
                         {(client.total_expedientes ?? 0) > 0
-                          ? <span className="inline-flex items-center justify-center min-w-[22px] h-[18px] px-1.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700">{client.total_expedientes}</span>
-                          : <span className="text-slate-300 text-[10px]">—</span>}
+                          ? <span className="inline-flex items-center justify-center min-w-[22px] h-5 px-1.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-700">{client.total_expedientes}</span>
+                          : <span className="text-slate-300 text-xs">—</span>}
                       </td>
-                      <td className="px-3 py-2 text-right">
+                      <td className="px-3 py-3 text-right">
                         <Link to={`/dashboard/clientes/${client.id}`} onClick={e => e.stopPropagation()} className="p-1 rounded-lg text-slate-200 hover:text-red-500 hover:bg-red-50 transition-colors inline-flex opacity-0 group-hover:opacity-100" title="Abrir ficha">
-                          <ExternalLink size={13} />
+                          <ExternalLink size={14} />
                         </Link>
                       </td>
                     </tr>

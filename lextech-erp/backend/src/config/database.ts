@@ -1,5 +1,6 @@
 import { Pool } from 'pg';
 import dotenv from 'dotenv';
+import dns from 'dns';
 
 dotenv.config();
 
@@ -21,9 +22,23 @@ try {
   process.exit(-1);
 }
 
+const parsedUrl = new URL(rawUrl);
+const shouldUseSsl = process.env.PGSSL === 'true' || rawUrl.includes('supabase.co');
+const connectionFamily = Number(process.env.PG_FAMILY || (rawUrl.includes('supabase.co') ? 4 : 0)) || undefined;
+const lookup = connectionFamily
+  ? ((hostname: string, _options: any, callback: any) => dns.lookup(hostname, { family: connectionFamily }, callback))
+  : undefined;
+
 const pool = new Pool({
   connectionString: rawUrl,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  host: parsedUrl.hostname,
+  port: parsedUrl.port ? Number(parsedUrl.port) : undefined,
+  database: parsedUrl.pathname.replace(/^\//, '') || undefined,
+  user: decodeURIComponent(parsedUrl.username || ''),
+  password: decodeURIComponent(parsedUrl.password || ''),
+  ...(connectionFamily ? { family: connectionFamily } : {}),
+  ...(lookup ? { lookup } : {}),
+  ssl: shouldUseSsl ? { rejectUnauthorized: false } : false,
 
   // ── Optimización del pool de conexiones ──────────────────
   max: 20,                        // Máximo de conexiones simultáneas (default era 10)

@@ -10,15 +10,26 @@ function reqUserName(req: any): string {
     || c.email || req.auth?.userId || 'Sistema';
 }
 
-// ── GET /api/expedientes ────────────────────────────────────────
+function clampImportStatus(status: any): string {
+  const value = String(status || '').toLowerCase();
+  const allowed = new Set(['uploaded', 'configuring', 'reviewing', 'processing', 'completed', 'failed']);
+  return allowed.has(value) ? value : 'uploaded';
+}
+
+function normalizeCount(value: any): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 0;
+}
+
 export const getExpedientes = async (req: any, res: Response) => {
   try {
-    const q      = (req.query.q      as string || '').trim();
-    const estado = (req.query.estado as string || '');
-    const tipo   = (req.query.tipo   as string || '');
-    const anio   = parseInt(req.query.anio as string) || 0;
-    const limit  = Math.min(parseInt(req.query.limit  as string) || 300, 500);
-    const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
+    const q = ((req.query.q as string) || '').trim();
+    const estado = (req.query.estado as string) || '';
+    const tipo = (req.query.tipo as string) || '';
+    const anio = parseInt(req.query.anio as string, 10) || 0;
+    const clienteId = ((req.query.clienteId as string) || '').trim();
+    const limit = Math.min(parseInt(req.query.limit as string, 10) || 300, 500);
+    const offset = Math.max(parseInt(req.query.offset as string, 10) || 0, 0);
 
     const conds: string[] = [];
     const vals: any[] = [];
@@ -32,11 +43,13 @@ export const getExpedientes = async (req: any, res: Response) => {
         OR e.num_autos ILIKE $${p}
         OR CAST(e.num_exp AS TEXT) ILIKE $${p}
       )`);
-      vals.push(`%${q}%`); p++;
+      vals.push(`%${q}%`);
+      p++;
     }
     if (estado) { conds.push(`e.estado = $${p}`); vals.push(estado); p++; }
-    if (tipo)   { conds.push(`e.tipo   = $${p}`); vals.push(tipo);   p++; }
-    if (anio)   { conds.push(`e.anio   = $${p}`); vals.push(anio);   p++; }
+    if (tipo) { conds.push(`e.tipo = $${p}`); vals.push(tipo); p++; }
+    if (anio) { conds.push(`e.anio = $${p}`); vals.push(anio); p++; }
+    if (clienteId) { conds.push(`e.cliente_id = $${p}`); vals.push(clienteId); p++; }
 
     const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
 
@@ -57,23 +70,22 @@ export const getExpedientes = async (req: any, res: Response) => {
       pool.query(countSql, vals.slice(0, -2)),
     ]);
 
-    res.json({ data: rows.rows, total: parseInt(countRow.rows[0].count) });
+    res.json({ data: rows.rows, total: parseInt(countRow.rows[0].count, 10) });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
 };
 
-// ── GET /api/expedientes/stats ──────────────────────────────────
 export const getStats = async (_req: any, res: Response) => {
   try {
     const r = await pool.query(`
       SELECT
-        COUNT(*)                                         AS total,
-        COUNT(*) FILTER (WHERE estado = 'abierto')       AS abiertos,
-        COUNT(*) FILTER (WHERE estado = 'cerrado')       AS cerrados,
-        COUNT(*) FILTER (WHERE estado = 'suspendido')    AS suspendidos,
-        COUNT(*) FILTER (WHERE estado = 'archivado')     AS archivados,
-        EXTRACT(YEAR FROM NOW())::int                    AS anio_actual,
+        COUNT(*) AS total,
+        COUNT(*) FILTER (WHERE estado = 'abierto') AS abiertos,
+        COUNT(*) FILTER (WHERE estado = 'cerrado') AS cerrados,
+        COUNT(*) FILTER (WHERE estado = 'suspendido') AS suspendidos,
+        COUNT(*) FILTER (WHERE estado = 'archivado') AS archivados,
+        EXTRACT(YEAR FROM NOW())::int AS anio_actual,
         COUNT(*) FILTER (WHERE anio = EXTRACT(YEAR FROM NOW())::int) AS este_anio
       FROM expedientes
     `);
@@ -83,7 +95,189 @@ export const getStats = async (_req: any, res: Response) => {
   }
 };
 
-// ── GET /api/expedientes/:id ────────────────────────────────────
+export const getImportHistory = async (req: any, res: Response) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit as string, 10) || 50, 200);
+    const r = await pool.query(
+      `SELECT id, file_name, status, total_count, completed_count, error_count, pending_count,
+              notes, created_at, updated_at, user_id, user_name
+       FROM expediente_import_batches
+       ORDER BY created_at DESC
+       LIMIT $1`,
+      [limit]
+    );
+
+    res.json({ data: r.rows });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+};
+
+export const getImportBatchDetail = async (req: any, res: Response) => {
+  try {
+    const [batchResult, itemsResult] = await Promise.all([
+      pool.query(
+        `SELECT id, file_name, status, total_count, completed_count, error_count, pending_count,
+                notes, created_at, updated_at, user_id, user_name
+         FROM expediente_import_batches
+         WHERE id = $1`,
+        [req.params.id]
+      ),
+      pool.query(
+        `SELECT id, row_number, reference, status, error_message, payload, created_expediente_id,
+                created_at, updated_at
+         FROM expediente_import_items
+         WHERE batch_id = $1
+         ORDER BY row_number ASC NULLS LAST, created_at ASC`,
+        [req.params.id]
+      ),
+    ]);
+
+    if (!batchResult.rows.length) {
+      return res.status(404).json({ error: 'Lote de importacion no encontrado' });
+    }
+
+    res.json({ data: { ...batchResult.rows[0], items: itemsResult.rows } });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+};
+
+export const createImportBatch = async (req: any, res: Response) => {
+  const client = await pool.connect();
+
+  try {
+    const fileName = String(req.body?.file_name || '').trim();
+    if (!fileName) {
+      return res.status(400).json({ error: 'file_name es obligatorio' });
+    }
+
+    const status = clampImportStatus(req.body?.status);
+    const totalCount = normalizeCount(req.body?.total_count);
+    const completedCount = normalizeCount(req.body?.completed_count);
+    const errorCount = normalizeCount(req.body?.error_count);
+    const pendingCount = req.body?.pending_count != null
+      ? normalizeCount(req.body?.pending_count)
+      : Math.max(totalCount - completedCount - errorCount, 0);
+    const notes = typeof req.body?.notes === 'string' ? req.body.notes.trim() || null : null;
+    const items = Array.isArray(req.body?.items) ? req.body.items : [];
+    const userId = req.auth?.userId || 'SYSTEM';
+    const userName = reqUserName(req);
+
+    await client.query('BEGIN');
+
+    const batchInsert = await client.query(
+      `INSERT INTO expediente_import_batches
+         (user_id, user_name, file_name, status, total_count, completed_count, error_count, pending_count, notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+       RETURNING id, file_name, status, total_count, completed_count, error_count, pending_count,
+                 notes, created_at, updated_at, user_id, user_name`,
+      [userId, userName, fileName, status, totalCount, completedCount, errorCount, pendingCount, notes]
+    );
+
+    const batch = batchInsert.rows[0];
+
+    for (const rawItem of items) {
+      const rowNumber = rawItem?.row_number != null ? normalizeCount(rawItem.row_number) : null;
+      const reference = typeof rawItem?.reference === 'string' ? rawItem.reference.trim() || null : null;
+      const rawStatus = String(rawItem?.status || '').toLowerCase();
+      const itemStatus = rawStatus === 'completed' || rawStatus === 'failed' || rawStatus === 'processing'
+        ? rawStatus
+        : 'uploaded';
+      const errorMessage = typeof rawItem?.error_message === 'string' ? rawItem.error_message.trim() || null : null;
+      const payload = rawItem?.payload ?? null;
+      const createdExpedienteId = typeof rawItem?.created_expediente_id === 'string'
+        ? rawItem.created_expediente_id
+        : null;
+
+      await client.query(
+        `INSERT INTO expediente_import_items
+           (batch_id, row_number, reference, status, error_message, payload, created_expediente_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        [batch.id, rowNumber, reference, itemStatus, errorMessage, payload, createdExpedienteId]
+      );
+    }
+
+    await client.query('COMMIT');
+
+    await logActivityForReq(
+      req,
+      `Importacion CSV registrada: ${fileName}`,
+      'EXPEDIENTE_IMPORT',
+      batch.id,
+      fileName,
+      'UPLOAD'
+    );
+
+    res.status(201).json({ data: batch });
+  } catch (e: any) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: e.message });
+  } finally {
+    client.release();
+  }
+};
+
+export const updateImportBatch = async (req: any, res: Response) => {
+  try {
+    const status = req.body?.status != null ? clampImportStatus(req.body.status) : null;
+    const notes = req.body?.notes != null
+      ? (typeof req.body.notes === 'string' ? req.body.notes.trim() || null : null)
+      : undefined;
+    const totalCount = req.body?.total_count != null ? normalizeCount(req.body.total_count) : undefined;
+    const completedCount = req.body?.completed_count != null ? normalizeCount(req.body.completed_count) : undefined;
+    const errorCount = req.body?.error_count != null ? normalizeCount(req.body.error_count) : undefined;
+    const pendingCount = req.body?.pending_count != null ? normalizeCount(req.body.pending_count) : undefined;
+
+    const current = await pool.query(
+      `SELECT id, file_name, status, total_count, completed_count, error_count, pending_count, notes
+       FROM expediente_import_batches
+       WHERE id = $1`,
+      [req.params.id]
+    );
+
+    if (!current.rows.length) {
+      return res.status(404).json({ error: 'Lote de importacion no encontrado' });
+    }
+
+    const prev = current.rows[0];
+    const nextTotal = totalCount ?? prev.total_count ?? 0;
+    const nextCompleted = completedCount ?? prev.completed_count ?? 0;
+    const nextErrors = errorCount ?? prev.error_count ?? 0;
+    const nextPending = pendingCount ?? Math.max(nextTotal - nextCompleted - nextErrors, 0);
+
+    const r = await pool.query(
+      `UPDATE expediente_import_batches
+       SET status = $1,
+           total_count = $2,
+           completed_count = $3,
+           error_count = $4,
+           pending_count = $5,
+           notes = $6,
+           updated_at = NOW()
+       WHERE id = $7
+       RETURNING id, file_name, status, total_count, completed_count, error_count, pending_count,
+                 notes, created_at, updated_at, user_id, user_name`,
+      [status ?? prev.status, nextTotal, nextCompleted, nextErrors, nextPending, notes === undefined ? prev.notes : notes, req.params.id]
+    );
+
+    const batch = r.rows[0];
+
+    await logActivityForReq(
+      req,
+      `Importacion CSV actualizada: ${batch.file_name} (${batch.status})`,
+      'EXPEDIENTE_IMPORT',
+      batch.id,
+      batch.file_name,
+      batch.status === 'failed' ? 'ACTION' : 'UPLOAD'
+    );
+
+    res.json({ data: batch });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+};
+
 export const getExpediente = async (req: any, res: Response) => {
   try {
     const r = await pool.query(
@@ -101,7 +295,6 @@ export const getExpediente = async (req: any, res: Response) => {
   }
 };
 
-// ── POST /api/expedientes ───────────────────────────────────────
 export const createExpediente = async (req: any, res: Response) => {
   const {
     anio, ref_propia, ref_expediente, descripcion, tipo, cliente_id, cliente_nombre,
@@ -112,14 +305,13 @@ export const createExpediente = async (req: any, res: Response) => {
   } = req.body;
 
   try {
-    // Siguiente número de expediente para el año
     const yr = anio || new Date().getFullYear();
     const maxR = await pool.query(
-      `SELECT COALESCE(MAX(num_exp), 0) + 1 AS next FROM expedientes WHERE anio = $1`, [yr]
+      `SELECT COALESCE(MAX(num_exp), 0) + 1 AS next FROM expedientes WHERE anio = $1`,
+      [yr]
     );
-    const num_exp = maxR.rows[0].next;
+    const numExp = maxR.rows[0].next;
 
-    // Nombre del cliente si se enlazó
     let nombre = cliente_nombre || null;
     if (cliente_id && !nombre) {
       const cr = await pool.query(
@@ -141,39 +333,38 @@ export const createExpediente = async (req: any, res: Response) => {
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31)
        RETURNING *`,
       [
-        yr, num_exp,
-        ref_propia?.trim()    || null, ref_expediente?.trim() || null,
-        descripcion?.trim()   || null, tipo || 'judicial',
+        yr, numExp,
+        ref_propia?.trim() || null, ref_expediente?.trim() || null,
+        descripcion?.trim() || null, tipo || 'judicial',
         cliente_id || null, nombre,
-        contrario?.trim()     || null, procurador?.trim()    || null,
-        juzgado?.trim()       || null, tipo_proc?.trim()     || null,
-        num_autos?.trim()     || null, nig?.trim()           || null,
+        contrario?.trim() || null, procurador?.trim() || null,
+        juzgado?.trim() || null, tipo_proc?.trim() || null,
+        num_autos?.trim() || null, nig?.trim() || null,
         estado || 'abierto',
         observaciones?.trim() || null,
         fecha_inicio || null, fecha_cierre || null,
         importe || null,
-        tipos_asunto?.trim()    || null,
+        tipos_asunto?.trim() || null,
         cuantia_principal != null ? cuantia_principal : null,
         intereses != null ? intereses : null,
-        costas    != null ? costas    : null,
+        costas != null ? costas : null,
         cuantia_total != null ? cuantia_total : null,
         indeterminado === true || indeterminado === 'true',
-        etapa?.trim()            || null,
+        etapa?.trim() || null,
         persona_contacto?.trim() || null,
-        contacto?.trim()         || null,
-        centro?.trim()           || null,
-        color?.trim()            || 'ninguno',
+        contacto?.trim() || null,
+        centro?.trim() || null,
+        color?.trim() || 'ninguno',
         reqUserName(req),
       ]
     );
-    logActivityForReq(req, `Expediente creado: ${yr}/${num_exp} — ${descripcion || ''}`, 'EXPEDIENTE', r.rows[0].id);
+    logActivityForReq(req, `Expediente creado: ${yr}/${numExp} - ${descripcion || ''}`, 'EXPEDIENTE', r.rows[0].id);
     res.status(201).json({ data: r.rows[0] });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
 };
 
-// ── PUT /api/expedientes/:id ────────────────────────────────────
 export const updateExpediente = async (req: any, res: Response) => {
   const {
     ref_propia, ref_expediente, descripcion, tipo, cliente_id, cliente_nombre,
@@ -206,27 +397,27 @@ export const updateExpediente = async (req: any, res: Response) => {
          updated_at=NOW()
        WHERE id=$29 RETURNING *`,
       [
-        ref_propia?.trim()    || null, ref_expediente?.trim() || null,
-        descripcion?.trim()   || null, tipo || 'judicial',
+        ref_propia?.trim() || null, ref_expediente?.trim() || null,
+        descripcion?.trim() || null, tipo || 'judicial',
         cliente_id || null, nombre,
-        contrario?.trim()     || null, procurador?.trim()    || null,
-        juzgado?.trim()       || null, tipo_proc?.trim()     || null,
-        num_autos?.trim()     || null, nig?.trim()           || null,
+        contrario?.trim() || null, procurador?.trim() || null,
+        juzgado?.trim() || null, tipo_proc?.trim() || null,
+        num_autos?.trim() || null, nig?.trim() || null,
         estado || 'abierto',
         observaciones?.trim() || null,
         fecha_inicio || null, fecha_cierre || null,
         importe || null,
-        tipos_asunto?.trim()    || null,
+        tipos_asunto?.trim() || null,
         cuantia_principal != null ? cuantia_principal : null,
         intereses != null ? intereses : null,
-        costas    != null ? costas    : null,
+        costas != null ? costas : null,
         cuantia_total != null ? cuantia_total : null,
         indeterminado === true || indeterminado === 'true',
-        etapa?.trim()            || null,
+        etapa?.trim() || null,
         persona_contacto?.trim() || null,
-        contacto?.trim()         || null,
-        centro?.trim()           || null,
-        color?.trim()            || 'ninguno',
+        contacto?.trim() || null,
+        centro?.trim() || null,
+        color?.trim() || 'ninguno',
         req.params.id,
       ]
     );
@@ -237,7 +428,6 @@ export const updateExpediente = async (req: any, res: Response) => {
   }
 };
 
-// ── DELETE /api/expedientes/:id ─────────────────────────────────
 export const deleteExpediente = async (req: any, res: Response) => {
   try {
     const r = await pool.query(

@@ -11,14 +11,27 @@ import vantiaRoutes from './routes/vantia';
 import filesRoutes from './routes/files';
 import tasksRoutes from './routes/tasks';
 import expedientesRoutes from './routes/expedientes';
+import agendaRoutes from './routes/agenda';
+import chatRoutes   from './routes/chat';
+import emailRoutes  from './routes/email';
 import { runMigrations } from './config/migrations';
 import { startLocalFilesWatcher } from './watchers/localFilesWatcher';
+import { migrateLocalFoldersStructure } from './controllers/filesController';
+import { logServerStart } from './controllers/activityController';
 import pool from './config/database';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 4000;
+
+process.on('unhandledRejection', (reason) => {
+  console.error('❌ Unhandled promise rejection:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('❌ Uncaught exception:', error);
+});
 
 // --- MIDDLEWARES GLOBALES ---
 app.use(helmet({ crossOriginResourcePolicy: false }));
@@ -50,6 +63,9 @@ app.use('/api/vantia', vantiaRoutes);
 app.use('/api/files',  filesRoutes);
 app.use('/api/tasks',       tasksRoutes);
 app.use('/api/expedientes', expedientesRoutes);
+app.use('/api/agenda',      agendaRoutes);
+app.use('/api/chat',        chatRoutes);
+app.use('/api/email',       emailRoutes);
 
 // Health check básico
 app.get('/health', (_req, res) => {
@@ -86,8 +102,13 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 
 // Arrancar servidor después de ejecutar migraciones
 runMigrations().then(() => {
-  app.listen(PORT, () => {
+  app.listen(PORT, async () => {
     console.log(`🛡️  VANTIA Backend corriendo en http://localhost:${PORT}`);
     startLocalFilesWatcher();
+    migrateLocalFoldersStructure();
+    // Registrar arranque en trazabilidad
+    try { await logServerStart(); } catch (_e) {}
   });
+}).catch((error) => {
+  console.error('❌ Error arrancando backend:', error);
 });

@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "ts-node src/server.ts",
     "dev:win": ".\\node_modules\\.bin\\ts-node src/server.ts",
+    "dev:stable": "npm run build && node dist/server.js",
     "build": "tsc",
     "start": "node dist/server.js"
   },

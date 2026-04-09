@@ -190,6 +190,19 @@ export async function runMigrations(): Promise<void> {
       await client.query(`CREATE INDEX IF NOT EXISTS idx_activity_log_user_id    ON activity_log (user_id);`);
     } catch (_e: any) {}
 
+    // ── Columnas nuevas en activity_log (idempotente) ─────────────────────────────
+    const activityCols: [string, string][] = [
+      ['ip_address',  'VARCHAR(100)'],
+      ['event_type',  "VARCHAR(30) NOT NULL DEFAULT 'ACTION'"],
+      ['session_id',  'VARCHAR(200)'],
+      ['user_agent',  'VARCHAR(500)'],
+      ['device_id',   'VARCHAR(120)'],
+    ];
+    for (const [col, def] of activityCols) {
+      try { await client.query(`ALTER TABLE activity_log ADD COLUMN IF NOT EXISTS ${col} ${def};`); } catch (_e: any) {}
+    }
+    try { await client.query(`CREATE INDEX IF NOT EXISTS idx_activity_log_event_type ON activity_log (event_type);`); } catch (_e: any) {}
+
     // ── Tabla vantia_chat_history (historial de conversaciones) ─────────────────
     await client.query(`
       CREATE TABLE IF NOT EXISTS vantia_chat_history (
@@ -397,6 +410,313 @@ export async function runMigrations(): Promise<void> {
         await client.query(`ALTER TABLE expedientes ADD COLUMN IF NOT EXISTS ${col} ${def};`);
       } catch (_e: any) {}
     }
+    // -- Tabla de lotes de importacion de expedientes --
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS expediente_import_batches (
+        id               UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id          VARCHAR(150) NOT NULL DEFAULT 'SYSTEM',
+        user_name        VARCHAR(200) NOT NULL DEFAULT 'Sistema',
+        file_name        VARCHAR(255) NOT NULL,
+        status           VARCHAR(30)  NOT NULL DEFAULT 'uploaded'
+                         CHECK (status IN ('uploaded','configuring','reviewing','processing','completed','failed')),
+        total_count      INTEGER      NOT NULL DEFAULT 0,
+        completed_count  INTEGER      NOT NULL DEFAULT 0,
+        error_count      INTEGER      NOT NULL DEFAULT 0,
+        pending_count    INTEGER      NOT NULL DEFAULT 0,
+        notes            TEXT,
+        created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      );
+    `);
+    for (const idx of [
+      `CREATE INDEX IF NOT EXISTS idx_exp_import_batches_created_at ON expediente_import_batches (created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_exp_import_batches_status ON expediente_import_batches (status)`,
+      `CREATE INDEX IF NOT EXISTS idx_exp_import_batches_user_id ON expediente_import_batches (user_id)`,
+    ]) {
+      try { await client.query(idx); } catch (_e: any) {}
+    }
+    try {
+      await client.query(`
+        CREATE TRIGGER trg_expediente_import_batches_updated_at
+          BEFORE UPDATE ON expediente_import_batches
+          FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+      `);
+    } catch (_e: any) {}
+
+    // -- Tabla de filas/items de importacion de expedientes --
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS expediente_import_items (
+        id                    UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        batch_id              UUID         NOT NULL REFERENCES expediente_import_batches(id) ON DELETE CASCADE,
+        row_number            INTEGER,
+        reference             VARCHAR(150),
+        status                VARCHAR(30)  NOT NULL DEFAULT 'uploaded'
+                              CHECK (status IN ('uploaded','processing','completed','failed')),
+        error_message         TEXT,
+        payload               JSONB,
+        created_expediente_id UUID         REFERENCES expedientes(id) ON DELETE SET NULL,
+        created_at            TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at            TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      );
+    `);
+    for (const idx of [
+      `CREATE INDEX IF NOT EXISTS idx_exp_import_items_batch_id ON expediente_import_items (batch_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_exp_import_items_status ON expediente_import_items (status)`,
+      `CREATE INDEX IF NOT EXISTS idx_exp_import_items_created_expediente ON expediente_import_items (created_expediente_id)`,
+    ]) {
+      try { await client.query(idx); } catch (_e: any) {}
+    }
+    try {
+      await client.query(`
+        CREATE TRIGGER trg_expediente_import_items_updated_at
+          BEFORE UPDATE ON expediente_import_items
+          FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+      `);
+    } catch (_e: any) {}
+
+
+    // ── Eliminar FK de client_files.client_id → entities ──────────
+    // client_files se usa también para expedientes (que no están en entities),
+    // por lo que la restricción de clave foránea impide subir archivos en expedientes.
+    try {
+      await client.query(`ALTER TABLE client_files DROP CONSTRAINT IF EXISTS client_files_client_id_fkey;`);
+    } catch (_e: any) {}
+    // Por si el constraint tiene otro nombre generado por el sistema
+    try {
+      await client.query(`
+        DO $$
+        DECLARE r RECORD;
+        BEGIN
+          FOR r IN
+            SELECT tc.constraint_name
+            FROM information_schema.table_constraints tc
+            JOIN information_schema.key_column_usage kcu
+              ON tc.constraint_name = kcu.constraint_name
+            WHERE tc.table_name = 'client_files'
+              AND tc.constraint_type = 'FOREIGN KEY'
+              AND kcu.column_name = 'client_id'
+          LOOP
+            EXECUTE 'ALTER TABLE client_files DROP CONSTRAINT IF EXISTS ' || quote_ident(r.constraint_name);
+          END LOOP;
+        END $$;
+      `);
+    } catch (_e: any) {}
+
+    // ── client_tasks: añadir user_id y expediente_id si no existen ───────────
+    for (const col of [
+      `ALTER TABLE client_tasks ADD COLUMN IF NOT EXISTS user_id       VARCHAR(150)`,
+      `ALTER TABLE client_tasks ADD COLUMN IF NOT EXISTS expediente_id UUID`,
+      `ALTER TABLE client_tasks ADD COLUMN IF NOT EXISTS client_name   VARCHAR(300)`,
+    ]) {
+      try { await client.query(col); } catch (_e: any) {}
+    }
+    try { await client.query(`CREATE INDEX IF NOT EXISTS idx_client_tasks_user_id ON client_tasks (user_id)`); } catch (_e: any) {}
+
+    // ── client_tasks: campos adicionales (recordatorio, importe, notas, etapa) ─
+    for (const col of [
+      `ALTER TABLE client_tasks ADD COLUMN IF NOT EXISTS fecha_aviso DATE`,
+      `ALTER TABLE client_tasks ADD COLUMN IF NOT EXISTS importe     NUMERIC(12,2)`,
+      `ALTER TABLE client_tasks ADD COLUMN IF NOT EXISTS notas       TEXT`,
+      `ALTER TABLE client_tasks ADD COLUMN IF NOT EXISTS etapa       VARCHAR(200)`,
+    ]) {
+      try { await client.query(col); } catch (_e: any) {}
+    }
+
+    // ── Tabla task_etapas (etapas configurables por el despacho) ─────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS task_etapas (
+        id         UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        nombre     VARCHAR(200) NOT NULL UNIQUE,
+        orden      INTEGER      NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      );
+    `);
+    // Insertar etapas por defecto (sólo si la tabla está vacía)
+    await client.query(`
+      INSERT INTO task_etapas (nombre, orden) VALUES
+        ('Sin Iniciar',                                  1),
+        ('Backlog',                                      2),
+        ('Sin Hacer',                                    3),
+        ('En Curso',                                     4),
+        ('Checkear',                                     5),
+        ('CAMPOS RELLENADOS',                            6),
+        ('CONTESTACIÓN A LA DEMANDA',                    7),
+        ('CUESTION CONVENIENTE U OPORTUNA',              8),
+        ('CONCLUSIONES',                                 9),
+        ('SOLUCIONES EN LAS QUE ESTOY TRABAJANDO ACTUALMENTE', 10),
+        ('En Duda',                                      11),
+        ('Realizada',                                    12),
+        ('HECHO',                                        13),
+        ('Cancelada',                                    14)
+      ON CONFLICT (nombre) DO NOTHING;
+    `);
+
+    // ── Tabla agenda_events ───────────────────────────────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS agenda_events (
+        id             UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id        VARCHAR(150) NOT NULL,
+        user_name      VARCHAR(200),
+        title          VARCHAR(300) NOT NULL,
+        description    TEXT,
+        start_at       TIMESTAMPTZ  NOT NULL,
+        end_at         TIMESTAMPTZ,
+        all_day        BOOLEAN      NOT NULL DEFAULT false,
+        type           VARCHAR(50)  NOT NULL DEFAULT 'cita',
+        status         VARCHAR(50)  NOT NULL DEFAULT 'pendiente',
+        expediente_id  UUID,
+        cliente_id     UUID,
+        location       VARCHAR(300),
+        color          VARCHAR(20),
+        created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      );
+    `);
+    for (const idx of [
+      `CREATE INDEX IF NOT EXISTS idx_agenda_events_start_at   ON agenda_events (start_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_agenda_events_user_id    ON agenda_events (user_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_agenda_events_status     ON agenda_events (status)`,
+    ]) {
+      try { await client.query(idx); } catch (_e: any) {}
+    }
+    // trigger updated_at
+    try {
+      await client.query(`
+        CREATE OR REPLACE TRIGGER trg_agenda_events_updated_at
+          BEFORE UPDATE ON agenda_events
+          FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+      `);
+    } catch (_e: any) {}
+
+    // ── Chat de equipo ─────────────────────────────────────────────────────────
+    // Canales
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS chat_canales (
+        id            UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        nombre        VARCHAR(100) NOT NULL,
+        descripcion   TEXT,
+        tipo          VARCHAR(20)  NOT NULL DEFAULT 'publico',
+        expediente_id UUID,
+        cliente_id    UUID,
+        created_by    VARCHAR(150) NOT NULL,
+        archivado     BOOLEAN      NOT NULL DEFAULT false,
+        created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      );
+    `);
+    // Miembros
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS chat_miembros (
+        id           UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        canal_id     UUID         NOT NULL REFERENCES chat_canales(id) ON DELETE CASCADE,
+        user_id      VARCHAR(150) NOT NULL,
+        user_name    VARCHAR(200),
+        role         VARCHAR(20)  NOT NULL DEFAULT 'miembro',
+        last_read_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        joined_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        UNIQUE(canal_id, user_id)
+      );
+    `);
+    // Mensajes
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS chat_mensajes (
+        id           UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        canal_id     UUID         NOT NULL REFERENCES chat_canales(id) ON DELETE CASCADE,
+        user_id      VARCHAR(150) NOT NULL,
+        user_name    VARCHAR(200),
+        contenido    TEXT         NOT NULL,
+        tipo         VARCHAR(20)  NOT NULL DEFAULT 'texto',
+        reply_to_id  UUID         REFERENCES chat_mensajes(id) ON DELETE SET NULL,
+        editado      BOOLEAN      NOT NULL DEFAULT false,
+        deleted_at   TIMESTAMPTZ,
+        created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      );
+    `);
+    // Reacciones
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS chat_reacciones (
+        id          UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        mensaje_id  UUID         NOT NULL REFERENCES chat_mensajes(id) ON DELETE CASCADE,
+        user_id     VARCHAR(150) NOT NULL,
+        user_name   VARCHAR(200),
+        emoji       VARCHAR(10)  NOT NULL,
+        created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        UNIQUE(mensaje_id, user_id, emoji)
+      );
+    `);
+    // Mensajes fijados
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS chat_fijados (
+        id          UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        canal_id    UUID         NOT NULL REFERENCES chat_canales(id) ON DELETE CASCADE,
+        mensaje_id  UUID         NOT NULL REFERENCES chat_mensajes(id) ON DELETE CASCADE,
+        fijado_por  VARCHAR(150) NOT NULL,
+        fijado_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        UNIQUE(canal_id, mensaje_id)
+      );
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS chat_favoritos (
+        id           UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id      VARCHAR(150) NOT NULL,
+        canal_id     UUID         NOT NULL REFERENCES chat_canales(id) ON DELETE CASCADE,
+        mensaje_id   UUID         NOT NULL REFERENCES chat_mensajes(id) ON DELETE CASCADE,
+        favorito_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        UNIQUE(user_id, mensaje_id)
+      );
+    `);
+    // Índices de chat
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS chat_typing_status (
+        canal_id    UUID         NOT NULL REFERENCES chat_canales(id) ON DELETE CASCADE,
+        user_id     VARCHAR(150) NOT NULL,
+        user_name   VARCHAR(200),
+        avatar_url  VARCHAR(500),
+        updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (canal_id, user_id)
+      );
+    `);
+    for (const idx of [
+      `CREATE INDEX IF NOT EXISTS idx_chat_mensajes_canal    ON chat_mensajes (canal_id, created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_chat_mensajes_reply    ON chat_mensajes (reply_to_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_chat_miembros_user     ON chat_miembros (user_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_chat_miembros_canal    ON chat_miembros (canal_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_chat_reacciones_msg    ON chat_reacciones (mensaje_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_chat_favoritos_user    ON chat_favoritos (user_id, favorito_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_chat_favoritos_canal   ON chat_favoritos (canal_id, favorito_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_chat_typing_canal      ON chat_typing_status (canal_id, updated_at DESC)`,
+    ]) {
+      try { await client.query(idx); } catch (_e: any) {}
+    }
+    // Canal general por defecto (idempotente por nombre único)
+    try {
+      await client.query(`
+        INSERT INTO chat_canales (nombre, descripcion, tipo, created_by)
+        VALUES ('general', 'Canal general del despacho', 'publico', 'SYSTEM'),
+               ('avisos',  'Comunicaciones y avisos internos', 'publico', 'SYSTEM'),
+               ('juridico','Debates y consultas jurídicas', 'publico', 'SYSTEM')
+        ON CONFLICT DO NOTHING;
+      `);
+    } catch (_e: any) {}
+
+    // ── Chat: columnas extra (idempotente) ────────────────────────────────────
+    const chatMiembrosCols: [string, string][] = [
+      ['avatar_url',  `VARCHAR(500)`],
+      ['role_label',  `VARCHAR(100) DEFAULT 'Miembro'`],
+      ['status',      `VARCHAR(30) DEFAULT 'disponible'`],
+    ];
+    for (const [col, def] of chatMiembrosCols) {
+      try { await client.query(`ALTER TABLE chat_miembros ADD COLUMN IF NOT EXISTS ${col} ${def};`); } catch (_e: any) {}
+    }
+    const chatMensajesCols: [string, string][] = [
+      ['avatar_url', `VARCHAR(500)`],
+      ['gif_url',    `VARCHAR(1000)`],
+      ['image_url',  `VARCHAR(1000)`],
+    ];
+    for (const [col, def] of chatMensajesCols) {
+      try { await client.query(`ALTER TABLE chat_mensajes ADD COLUMN IF NOT EXISTS ${col} ${def};`); } catch (_e: any) {}
+    }
 
     // ── Limpieza automática de activity_log (solo últimas 10.000 entradas) ──
     try {
@@ -407,6 +727,70 @@ export async function runMigrations(): Promise<void> {
         );
       `);
     } catch (_e: any) {}
+
+    // ── Módulo de Correo ──────────────────────────────────────────────────────
+
+    // Cuentas de correo configuradas por cada usuario
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS email_accounts (
+        id            UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id       VARCHAR(150) NOT NULL,
+        label         VARCHAR(100) NOT NULL DEFAULT 'Mi cuenta',
+        email         VARCHAR(200) NOT NULL,
+        imap_host     VARCHAR(200) NOT NULL,
+        imap_port     INTEGER      NOT NULL DEFAULT 993,
+        imap_secure   BOOLEAN      NOT NULL DEFAULT true,
+        smtp_host     VARCHAR(200) NOT NULL,
+        smtp_port     INTEGER      NOT NULL DEFAULT 587,
+        smtp_secure   BOOLEAN      NOT NULL DEFAULT false,
+        username      VARCHAR(200) NOT NULL,
+        password_enc  TEXT         NOT NULL,
+        active        BOOLEAN      NOT NULL DEFAULT true,
+        last_sync_at  TIMESTAMPTZ,
+        created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      );
+    `);
+    for (const idx of [
+      `CREATE INDEX IF NOT EXISTS idx_email_accounts_user_id ON email_accounts (user_id)`,
+    ]) { try { await client.query(idx); } catch (_e: any) {} }
+
+    // Emails cacheados desde IMAP
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS emails (
+        id              UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        account_id      UUID         NOT NULL REFERENCES email_accounts(id) ON DELETE CASCADE,
+        user_id         VARCHAR(150) NOT NULL,
+        uid             BIGINT,
+        message_id      VARCHAR(500),
+        folder          VARCHAR(100) NOT NULL DEFAULT 'INBOX',
+        from_email      VARCHAR(300),
+        from_name       VARCHAR(300),
+        to_emails       TEXT,
+        cc_emails       TEXT,
+        subject         VARCHAR(1000),
+        snippet         TEXT,
+        body_text       TEXT,
+        body_html       TEXT,
+        is_read         BOOLEAN      NOT NULL DEFAULT false,
+        is_starred      BOOLEAN      NOT NULL DEFAULT false,
+        is_draft        BOOLEAN      NOT NULL DEFAULT false,
+        has_attachments BOOLEAN      NOT NULL DEFAULT false,
+        size_bytes      INTEGER      DEFAULT 0,
+        sent_at         TIMESTAMPTZ,
+        expediente_id   UUID,
+        cliente_id      UUID,
+        created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        UNIQUE(account_id, uid, folder)
+      );
+    `);
+    for (const idx of [
+      `CREATE INDEX IF NOT EXISTS idx_emails_account_folder  ON emails (account_id, folder, sent_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_emails_user_id         ON emails (user_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_emails_is_read         ON emails (is_read)`,
+      `CREATE INDEX IF NOT EXISTS idx_emails_is_starred      ON emails (is_starred)`,
+      `CREATE INDEX IF NOT EXISTS idx_emails_from_email      ON emails (from_email)`,
+    ]) { try { await client.query(idx); } catch (_e: any) {} }
 
     // VACUUM ANALYZE para mantener las estadísticas de consulta frescas
     try {
