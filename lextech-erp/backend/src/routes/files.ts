@@ -5,7 +5,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 const uuidv4 = () => crypto.randomUUID();
 import { ClerkExpressRequireAuth } from '@clerk/clerk-sdk-node';
-import { listFiles, uploadFiles, downloadFile, deleteFile, UPLOADS_ROOT, listTemplates, downloadTemplate, downloadBlank, createBlankDocument, updateFileMetadata, openFileLocally, previewDocxAsHtml, previewExcelAsHtml, previewTemplateAsHtml, testPreviewImages } from '../controllers/filesController';
+import { listFiles, uploadFiles, downloadFile, deleteFile, UPLOADS_ROOT, listTemplates, downloadTemplate, downloadBlank, createBlankDocument, updateFileMetadata, openFileLocally, previewDocxAsHtml, previewExcelAsHtml, previewTemplateAsHtml, testPreviewImages, previewWordAsPdf, previewTemplateAsPdf } from '../controllers/filesController';
 
 const requireAuth = ClerkExpressRequireAuth({});
 const router = Router();
@@ -31,6 +31,7 @@ const upload = multer({
 
 // ── Rutas de plantillas (ANTES de las rutas dinámicas) ──────────
 router.get('/templates',              requireAuth, listTemplates);
+router.get('/templates/preview-pdf',  requireAuth, previewTemplateAsPdf);
 router.get('/templates/preview',      requireAuth, previewTemplateAsHtml);
 router.get('/templates/download',     requireAuth, downloadTemplate);
 router.get('/templates/blank.docx',   requireAuth, downloadBlank);
@@ -42,6 +43,7 @@ router.get('/:clientId',                            requireAuth, listFiles);
 router.post('/:clientId',                           requireAuth, upload.array('files', 50), uploadFiles);
 router.put('/:clientId/:fileId',                    requireAuth, updateFileMetadata);
 router.post('/:clientId/:fileId/open-local',        requireAuth, openFileLocally);
+router.get('/:clientId/:fileId/preview-pdf',        requireAuth, previewWordAsPdf);
 router.get('/:clientId/:fileId/preview-html',       requireAuth, previewDocxAsHtml);
 router.get('/:clientId/:fileId/preview-excel',      requireAuth, previewExcelAsHtml);
 router.get('/:clientId/:fileId/download',           requireAuth, downloadFile);

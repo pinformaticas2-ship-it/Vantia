@@ -4,11 +4,12 @@ import {
   LayoutDashboard, Briefcase, Users, Settings,
   Menu, Search, X, Bell, ShieldCheck, Calendar,
   MessageCircle, Bot, Send, ChevronRight, Loader2, History, CheckCircle2,
-  MessageSquare, LogOut, Mail,
+  MessageSquare, LogOut, Mail, Library, Receipt, Mic, Sparkles,
 } from "lucide-react";
 import { UserButton, useUser, useAuth, useClerk } from "@clerk/clerk-react";
 import { getDeviceId, safeJson, waitForClientIp } from "../lib/api";
 import { useChatUnread } from "../contexts/ChatUnreadContext";
+import { useEmailUnread } from "../contexts/EmailUnreadContext";
 
 // ── Módulos buscables ────────────────────────────────────────────────────────
 const MODULES = [
@@ -20,7 +21,12 @@ const MODULES = [
   { name: "Agenda",         path: "/dashboard/agenda",       icon: Calendar,        desc: "Calendario y citas" },
   { name: "Tareas",         path: "/dashboard/tareas",       icon: CheckCircle2,    desc: "Tareas y plazos del usuario" },
   { name: "Chat",           path: "/dashboard/chat",         icon: MessageSquare,   desc: "Chat de equipo" },
+  { name: "WhatsApp",       path: "/dashboard/whatsapp",     icon: MessageCircle,   desc: "Mensajería y comunicación por WhatsApp" },
   { name: "Correo",         path: "/dashboard/correo",       icon: Mail,            desc: "Gestor de correo electrónico" },
+  { name: "Documental",     path: "/dashboard/documental",   icon: Library,         desc: "Cendoj, BOE y Lexnet" },
+  { name: "Facturación",    path: "/dashboard/facturacion",  icon: Receipt,         desc: "Contabilidad y facturación" },
+  { name: "Plaud IA",       path: "/dashboard/plaud-ia",     icon: Mic,             desc: "Grabación y asistencia con IA" },
+  { name: "Chat IA",        path: "/dashboard/chat-ia",      icon: Sparkles,        desc: "Asistente IA con herramientas e historial" },
   { name: "Configuración",  path: "/dashboard/config",       icon: Settings,        desc: "Ajustes del sistema" },
 ];
 
@@ -32,7 +38,27 @@ const NAV_ITEMS = [
   { name: "Agenda",       href: "/dashboard/agenda",      icon: Calendar },
   { name: "Tareas",       href: "/dashboard/tareas",      icon: CheckCircle2 },
   { name: "Chat",         href: "/dashboard/chat",        icon: MessageSquare },
+  { name: "WhatsApp",     href: "/dashboard/whatsapp",    icon: MessageCircle },
   { name: "Correo",       href: "/dashboard/correo",      icon: Mail },
+  { name: "Documental",   href: "/dashboard/documental",  icon: Library },
+  { name: "Facturación",  href: "/dashboard/facturacion", icon: Receipt },
+  { name: "Plaud IA",     href: "/dashboard/plaud-ia",    icon: Mic },
+  { name: "Chat IA",      href: "/dashboard/chat-ia",     icon: Sparkles },
+];
+
+const NAV_GROUPS = [
+  {
+    label: "Principal",
+    items: ["Dashboard", "Expedientes", "Clientes", "Trazabilidad"],
+  },
+  {
+    label: "Productividad",
+    items: ["Agenda", "Tareas", "Chat", "WhatsApp", "Correo", "Facturación"],
+  },
+  {
+    label: "Conocimiento",
+    items: ["Documental", "Plaud IA", "Chat IA"],
+  },
 ];
 
 // ── Contexto VantIA por módulo ───────────────────────────────────────────────
@@ -45,8 +71,18 @@ function getVantIAContext(pathname: string): string {
     return "Eres VantIA, especializado en gestión de agenda y citas para un despacho legal. Ayudas con vistas, reuniones, plazos judiciales, y organización del tiempo. Responde siempre en español.";
   if (pathname.startsWith("/dashboard/chat"))
     return "Eres VantIA, asistente del despacho. En este momento el usuario está en el chat de equipo. Puedes ayudar a redactar mensajes, resumir conversaciones o resolver dudas jurídicas puntuales. Responde siempre en español.";
+  if (pathname.startsWith("/dashboard/whatsapp"))
+    return "Eres VantIA, asistente de WhatsApp del despacho. Ayudas con mensajería comercial y operativa, respuestas rápidas, seguimiento de conversaciones y comunicación con clientes. Responde siempre en español.";
   if (pathname.startsWith("/dashboard/correo"))
     return "Eres VantIA, asistente de correo del despacho. Ayudas a redactar emails profesionales, responder comunicaciones, resumir correos y organizar la bandeja de entrada. Responde siempre en español.";
+  if (pathname.startsWith("/dashboard/documental"))
+    return "Eres VantIA, asistente documental del despacho. Ayudas con búsquedas en CENDOJ, BOE y LexNET, resúmenes normativos y localización de documentación jurídica. Responde siempre en español.";
+  if (pathname.startsWith("/dashboard/facturacion"))
+    return "Eres VantIA, asistente de contabilidad y facturación del despacho. Ayudas con honorarios, facturas, cobros, vencimientos y control económico. Responde siempre en español.";
+  if (pathname.startsWith("/dashboard/plaud-ia"))
+    return "Eres VantIA, asistente de Plaud IA. Ayudas con grabaciones, transcripciones, resúmenes y extracción de tareas o acuerdos relevantes. Responde siempre en español.";
+  if (pathname.startsWith("/dashboard/chat-ia"))
+    return "Eres VantIA, asistente IA avanzado del despacho. Ayudas con consultas complejas, uso de herramientas, recuperación de historial y apoyo transversal a todos los módulos. Responde siempre en español.";
   if (pathname.startsWith("/dashboard/config"))
     return "Eres VantIA, asistente de configuración de VANTIA Legis ERP. Ayudas con ajustes del sistema, usuarios, permisos y personalización. Responde siempre en español.";
   return "Eres VantIA, el asistente inteligente de VANTIA Legis ERP, un ERP para despachos de abogados. Tienes conocimientos generales de derecho español, gestión de despachos, expedientes, clientes y documentación. Eres útil, conciso y profesional. Responde siempre en español.";
@@ -57,7 +93,12 @@ function getVantIALabel(pathname: string): string {
   if (pathname.startsWith("/dashboard/expedientes")) return "Especialista en Expedientes";
   if (pathname.startsWith("/dashboard/agenda"))      return "Especialista en Agenda";
   if (pathname.startsWith("/dashboard/chat"))         return "Asistente de Equipo";
+  if (pathname.startsWith("/dashboard/whatsapp"))     return "Asistente de WhatsApp";
   if (pathname.startsWith("/dashboard/correo"))       return "Asistente de Correo";
+  if (pathname.startsWith("/dashboard/documental"))   return "Asistente Documental";
+  if (pathname.startsWith("/dashboard/facturacion"))  return "Asistente de Facturación";
+  if (pathname.startsWith("/dashboard/plaud-ia"))     return "Asistente Plaud IA";
+  if (pathname.startsWith("/dashboard/chat-ia"))      return "Asistente IA Avanzado";
   return "Asistente General";
 }
 
@@ -251,6 +292,7 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
 
 // ── WhatsApp mini popup ──────────────────────────────────────────────────────
 function WhatsAppWidget() {
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -263,14 +305,7 @@ function WhatsAppWidget() {
   }, []);
 
   const openChat = () => {
-    // Número configurable — cambia por el número real del despacho
-    const NUMERO = "34600000000";
-    const MENSAJE = encodeURIComponent("Hola, me pongo en contacto desde VANTIA Legis ERP.");
-    window.open(
-      `https://wa.me/${NUMERO}?text=${MENSAJE}`,
-      "whatsapp_chat",
-      "width=480,height=700,left=100,top=100,resizable=yes,scrollbars=yes"
-    );
+    navigate("/dashboard/whatsapp");
     setOpen(false);
   };
 
@@ -314,7 +349,7 @@ function WhatsAppWidget() {
               className="w-full flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#1ebe5d] text-white text-sm font-bold py-2.5 rounded-xl transition-colors"
             >
               <MessageCircle size={15} />
-              Abrir WhatsApp
+              Abrir módulo
             </button>
           </div>
         </div>
@@ -385,6 +420,7 @@ function SearchDropdown({ query, onSelect }: { query: string; onSelect: () => vo
 function SidebarContent({ pathname, onClose, onSignOut }: { pathname: string; onClose?: () => void; onSignOut?: () => void }) {
   const { user } = useUser();
   const { totalUnread } = useChatUnread();
+  const { unreadCount: emailUnreadCount } = useEmailUnread();
   return (
     <div className="flex flex-col h-full bg-slate-900 border-r border-slate-800">
       {/* Logo */}
@@ -399,38 +435,50 @@ function SidebarContent({ pathname, onClose, onSignOut }: { pathname: string; on
       </div>
 
       {/* Nav principal */}
-      <nav className="flex-1 px-4 space-y-1">
-        {NAV_ITEMS.map((item) => {
-          const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
-          const Icon = item.icon;
-          const isChat = item.href === "/dashboard/chat";
-          const chatBadge = isChat && !isActive && totalUnread > 0;
+      <nav className="modules-scrollbar flex-1 px-4 overflow-y-auto">
+        {NAV_GROUPS.map((group) => {
+          const items = group.items
+            .map((name) => NAV_ITEMS.find((item) => item.name === name))
+            .filter((item): item is (typeof NAV_ITEMS)[number] => !!item);
+
+          if (!items.length) return null;
+
           return (
-            <Link key={item.name} to={item.href} onClick={onClose}
-              className={`flex items-center gap-3 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all duration-200 ${
-                isActive ? "bg-[#ab0433] text-white shadow-xl shadow-red-900/40 translate-x-1"
-                         : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-100"
-              }`}>
-              <Icon className={`h-5 w-5 ${isActive ? "text-white" : "text-slate-500"}`} />
-              <span className="flex-1">{item.name}</span>
-              {chatBadge && (
-                <span className="ml-auto min-w-[20px] h-5 bg-[#ab0433] text-white text-[10px] font-black rounded-full flex items-center justify-center px-1.5 shadow-lg shadow-red-900/40">
-                  {totalUnread > 99 ? "99+" : totalUnread}
-                </span>
-              )}
-            </Link>
+            <div key={group.label} className="mb-5">
+              <p className="px-2 pb-2 text-[10px] font-bold uppercase tracking-[0.24em] text-slate-600">
+                {group.label}
+              </p>
+              <div className="space-y-1">
+                {items.map((item) => {
+                  const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
+                  const Icon = item.icon;
+                  const isChat = item.href === "/dashboard/chat";
+                  const isEmail = item.href === "/dashboard/correo";
+                  const chatBadge = isChat && !isActive && totalUnread > 0;
+                  const emailBadge = isEmail && !isActive && emailUnreadCount > 0;
+                  return (
+                    <Link key={item.name} to={item.href} onClick={onClose}
+                      className={`flex items-center gap-3 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all duration-200 ${
+                        isActive ? "bg-[#ab0433] text-white shadow-xl shadow-red-900/40 translate-x-1"
+                                 : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-100"
+                      }`}>
+                      <Icon className={`h-5 w-5 ${isActive ? "text-white" : "text-slate-500"}`} />
+                      <span className="flex-1">{item.name}</span>
+                      {(chatBadge || emailBadge) && (
+                        <span className="ml-auto min-w-[20px] h-5 bg-[#ab0433] text-white text-[10px] font-black rounded-full flex items-center justify-center px-1.5 shadow-lg shadow-red-900/40">
+                          {chatBadge
+                            ? (totalUnread > 99 ? "99+" : totalUnread)
+                            : (emailUnreadCount > 99 ? "99+" : emailUnreadCount)}
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
           );
         })}
       </nav>
-
-      {/* ── Herramientas (encima de Configuración) ── */}
-      <div className="px-4 pb-2">
-        <p className="text-[9px] uppercase font-bold text-slate-600 tracking-[0.3em] px-1 mb-2">Herramientas</p>
-        <div className="flex">
-          {/* WhatsApp mini popup */}
-          <WhatsAppWidget />
-        </div>
-      </div>
 
       {/* Configuración */}
       <div className="px-4 pb-3">
@@ -479,9 +527,11 @@ function SidebarContent({ pathname, onClose, onSignOut }: { pathname: string; on
 // ── LAYOUT PRINCIPAL ─────────────────────────────────────────────────────────
 export default function DashboardLayout() {
   const location     = useLocation();
+  const navigate     = useNavigate();
   const { user }     = useUser();
   const { getToken } = useAuth();
   const clerk        = useClerk();
+  const { unreadCount: emailUnreadCount, latestUnread, clearLatestUnread } = useEmailUnread();
 
   const [isMobileOpen,  setIsMobileOpen]  = useState(false);
   const [isNotifOpen,   setIsNotifOpen]   = useState(false);
@@ -572,7 +622,18 @@ export default function DashboardLayout() {
   }, [getToken]);
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2] flex font-sans antialiased text-neutral-900">
+    <div className="erp-shell min-h-screen flex font-sans antialiased text-neutral-900">
+
+      {latestUnread && (
+        <EmailToast
+          email={latestUnread}
+          onClose={clearLatestUnread}
+          onOpen={() => {
+            navigate(`/dashboard/correo?openEmail=${encodeURIComponent(latestUnread.id)}`);
+            clearLatestUnread();
+          }}
+        />
+      )}
 
       {/* VantIA flotante — siempre visible, contextual según la ruta */}
       <VantIAWidget pathname={location.pathname} getToken={getToken} />
@@ -596,10 +657,18 @@ export default function DashboardLayout() {
       )}
 
       {/* Contenedor principal */}
-      <main className="flex-1 md:pl-64 flex flex-col min-w-0">
+      <main className="relative flex-1 md:pl-64 flex flex-col min-w-0 overflow-hidden">
+        <div className="erp-ornaments pointer-events-none absolute inset-0" aria-hidden="true">
+          <div className="erp-orb erp-orb-top-right" />
+          <div className="erp-orb erp-orb-bottom-left" />
+          <div className="erp-panel erp-panel-top-left" />
+          <div className="erp-panel erp-panel-bottom-right" />
+          <div className="erp-line erp-line-top" />
+          <div className="erp-line erp-line-bottom" />
+        </div>
 
         {/* Topbar */}
-        <header className="h-18 border-b bg-white/80 backdrop-blur-md flex items-center justify-between px-5 md:px-8 sticky top-0 z-20 py-4">
+        <header className="relative h-18 border-b bg-white/80 backdrop-blur-md flex items-center justify-between px-5 md:px-8 sticky top-0 z-20 py-4">
           <div className="flex items-center gap-4">
             <button className="md:hidden p-2 rounded-xl hover:bg-slate-100 text-slate-600" onClick={() => setIsMobileOpen(true)}>
               <Menu className="h-5 w-5" />
@@ -630,7 +699,7 @@ export default function DashboardLayout() {
                 className="relative p-2.5 rounded-xl hover:bg-slate-50 text-slate-500 border border-slate-100 transition-colors"
               >
                 <Bell className="h-5 w-5" />
-                {notifications.length > 0 && (
+                {(notifications.length > 0 || emailUnreadCount > 0) && (
                   <span className="absolute top-2 right-2 h-2 w-2 bg-red-500 rounded-full border-2 border-white" />
                 )}
               </button>
@@ -647,12 +716,61 @@ export default function DashboardLayout() {
         </header>
 
         {/* Contenido */}
-        <div className="flex-1 overflow-y-auto">
-          <div key={location.pathname} className="max-w-[1600px] mx-auto p-4 md:p-8 module-page">
+        <div className="relative z-10 flex-1 overflow-y-auto">
+          <div
+            key={location.pathname}
+            className={
+              location.pathname === '/dashboard/correo'
+                ? 'w-full h-full module-page'
+                : 'max-w-[1600px] mx-auto p-4 md:p-8 module-page'
+            }>
             <Outlet />
           </div>
         </div>
       </main>
+    </div>
+  );
+}
+
+function EmailToast({
+  email,
+  onOpen,
+  onClose,
+}: {
+  email: { subject: string; from: string; snippet: string };
+  onOpen: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed bottom-6 right-24 z-50 w-[360px] max-w-[calc(100vw-2rem)] rounded-2xl border border-red-100 bg-white shadow-2xl overflow-hidden">
+      <div className="flex items-start gap-3 px-4 py-4 bg-gradient-to-r from-red-50 to-white">
+        <div className="h-10 w-10 rounded-2xl bg-[#ab0433] text-white flex items-center justify-center shrink-0">
+          <Mail className="h-5 w-5" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-black tracking-[0.18em] uppercase text-[#ab0433]">Nuevo correo</p>
+          <p className="text-sm font-semibold text-slate-800 truncate">{email.subject}</p>
+          <p className="text-xs text-slate-500 truncate">{email.from}</p>
+          {email.snippet && <p className="text-xs text-slate-400 mt-1 line-clamp-2">{email.snippet}</p>}
+        </div>
+        <button onClick={onClose} className="text-slate-400 hover:text-slate-700">
+          <X size={14} />
+        </button>
+      </div>
+      <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-end gap-2">
+        <button
+          onClick={onClose}
+          className="px-3 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:bg-slate-100"
+        >
+          Cerrar
+        </button>
+        <button
+          onClick={onOpen}
+          className="px-3 py-2 rounded-xl text-xs font-semibold bg-[#ab0433] text-white hover:bg-[#8f022a]"
+        >
+          Abrir correo
+        </button>
+      </div>
     </div>
   );
 }

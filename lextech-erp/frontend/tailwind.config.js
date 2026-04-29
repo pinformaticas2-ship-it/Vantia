@@ -51,6 +51,15 @@ module.exports = {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      keyframes: {
+        "fade-in": {
+          from: { opacity: "0", transform: "translateY(-4px) scale(0.98)" },
+          to:   { opacity: "1", transform: "translateY(0)   scale(1)"    },
+        },
+      },
+      animation: {
+        "fade-in": "fade-in 0.12s ease-out forwards",
+      },
     },
   },
   plugins: [],

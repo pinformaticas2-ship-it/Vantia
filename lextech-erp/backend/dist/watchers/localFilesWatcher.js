@@ -7,10 +7,7 @@ exports.startLocalFilesWatcher = startLocalFilesWatcher;
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 const database_1 = __importDefault(require("../config/database"));
-const LOCAL_ROOT = process.env.CLIENT_FILES_PATH
-    ? path_1.default.resolve(process.env.CLIENT_FILES_PATH)
-    : path_1.default.join(process.env.USERPROFILE || process.env.HOME || '', 'lextech-client-files');
-const UPLOADS_ROOT = path_1.default.join(__dirname, '../../uploads/clients');
+const paths_1 = require("../config/paths");
 const pending = new Map();
 function isTemp(name) {
     return (name.startsWith('~$') ||
@@ -22,8 +19,8 @@ function isTemp(name) {
 }
 async function syncToServer(clientId, originalName, typeFolder) {
     const localPath = typeFolder
-        ? path_1.default.join(LOCAL_ROOT, clientId, typeFolder, originalName)
-        : path_1.default.join(LOCAL_ROOT, clientId, originalName);
+        ? path_1.default.join(paths_1.CLIENT_FILES_ROOT, clientId, typeFolder, originalName)
+        : path_1.default.join(paths_1.CLIENT_FILES_ROOT, clientId, originalName);
     if (!fs_1.default.existsSync(localPath))
         return;
     try {
@@ -46,7 +43,7 @@ async function syncToServer(clientId, originalName, typeFolder) {
         if (!result.rows.length)
             return;
         const { stored_name } = result.rows[0];
-        const serverDir = path_1.default.join(UPLOADS_ROOT, clientId);
+        const serverDir = path_1.default.join(paths_1.UPLOADS_CLIENTS_ROOT, clientId);
         const serverPath = path_1.default.join(serverDir, stored_name);
         if (!fs_1.default.existsSync(serverDir))
             fs_1.default.mkdirSync(serverDir, { recursive: true });
@@ -60,12 +57,12 @@ async function syncToServer(clientId, originalName, typeFolder) {
     }
 }
 function startLocalFilesWatcher() {
-    if (!fs_1.default.existsSync(LOCAL_ROOT)) {
-        console.log('ℹ️  Watcher no iniciado — la carpeta local aún no existe:', LOCAL_ROOT);
+    if (!fs_1.default.existsSync(paths_1.CLIENT_FILES_ROOT)) {
+        console.log('ℹ️  Watcher no iniciado — la carpeta local aún no existe:', paths_1.CLIENT_FILES_ROOT);
         return;
     }
     try {
-        fs_1.default.watch(LOCAL_ROOT, { recursive: true }, (_event, filename) => {
+        fs_1.default.watch(paths_1.CLIENT_FILES_ROOT, { recursive: true }, (_event, filename) => {
             if (!filename)
                 return;
             const parts = filename.split(/[\\/]/);
@@ -97,7 +94,7 @@ function startLocalFilesWatcher() {
                 }, 1500));
             }
         });
-        console.log('👁️  Watcher de cambios locales activo en:', LOCAL_ROOT);
+        console.log('👁️  Watcher de cambios locales activo en:', paths_1.CLIENT_FILES_ROOT);
     }
     catch (err) {
         console.error('❌ Error al iniciar watcher:', err.message);

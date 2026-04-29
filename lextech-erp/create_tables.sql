@@ -367,15 +367,27 @@ CREATE TABLE IF NOT EXISTS agenda_events (
   status         VARCHAR(50)  NOT NULL DEFAULT 'pendiente',
   expediente_id  UUID,
   cliente_id     UUID,
+  related_user_id VARCHAR(150),
+  related_user_name VARCHAR(200),
+  organization_context TEXT,
   location       VARCHAR(300),
   color          VARCHAR(20),
+  source         VARCHAR(40)  NOT NULL DEFAULT 'manual',
+  external_provider VARCHAR(40),
+  external_id    VARCHAR(255),
+  external_url   TEXT,
   created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   updated_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_agenda_events_start_at ON agenda_events (start_at DESC);
 CREATE INDEX IF NOT EXISTS idx_agenda_events_user_id  ON agenda_events (user_id);
+CREATE INDEX IF NOT EXISTS idx_agenda_events_related_user_id ON agenda_events (related_user_id);
 CREATE INDEX IF NOT EXISTS idx_agenda_events_status   ON agenda_events (status);
+CREATE INDEX IF NOT EXISTS idx_agenda_events_external ON agenda_events (external_provider, external_id);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_agenda_events_google_unique
+  ON agenda_events (external_provider, external_id)
+  WHERE external_provider IS NOT NULL AND external_id IS NOT NULL;
 
 CREATE TRIGGER trg_agenda_events_updated_at
   BEFORE UPDATE ON agenda_events
@@ -545,6 +557,27 @@ CREATE INDEX IF NOT EXISTS idx_emails_user_id        ON emails (user_id);
 CREATE INDEX IF NOT EXISTS idx_emails_is_read        ON emails (is_read);
 CREATE INDEX IF NOT EXISTS idx_emails_is_starred     ON emails (is_starred);
 CREATE INDEX IF NOT EXISTS idx_emails_from_email     ON emails (from_email);
+
+
+-- ────────────────────────────────────────────────────────────
+-- 20. email_contacts (destinatarios sugeridos y recientes)
+-- ────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS email_contacts (
+  id            UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id       VARCHAR(150) NOT NULL,
+  email         VARCHAR(300) NOT NULL,
+  name          VARCHAR(300),
+  source        VARCHAR(50)  NOT NULL DEFAULT 'manual',
+  usage_count   INTEGER      NOT NULL DEFAULT 1,
+  last_used_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  UNIQUE(user_id, email)
+);
+
+CREATE INDEX IF NOT EXISTS idx_email_contacts_user_id      ON email_contacts (user_id);
+CREATE INDEX IF NOT EXISTS idx_email_contacts_last_used_at ON email_contacts (user_id, last_used_at DESC);
+CREATE INDEX IF NOT EXISTS idx_email_contacts_email        ON email_contacts (email);
 
 
 -- ────────────────────────────────────────────────────────────

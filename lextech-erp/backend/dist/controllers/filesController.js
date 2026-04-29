@@ -10,11 +10,8 @@ const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const database_1 = __importDefault(require("../config/database"));
 const activityController_1 = require("./activityController");
-const UPLOADS_ROOT = path_1.default.join(__dirname, '../../uploads/clients');
-exports.UPLOADS_ROOT = UPLOADS_ROOT;
-const LOCAL_CLIENT_FILES_ROOT = process.env.CLIENT_FILES_PATH
-    ? path_1.default.resolve(process.env.CLIENT_FILES_PATH)
-    : path_1.default.join(process.env.USERPROFILE || process.env.HOME || '', 'lextech-client-files');
+const paths_1 = require("../config/paths");
+Object.defineProperty(exports, "UPLOADS_ROOT", { enumerable: true, get: function () { return paths_1.UPLOADS_CLIENTS_ROOT; } });
 const ATTACHMENT_TYPE_FOLDERS = [
     'Sin clasificar',
     'AUTO',
@@ -27,14 +24,14 @@ function typeFolderName(attachmentType) {
     return (attachmentType && attachmentType.trim()) ? attachmentType.trim() : 'Sin clasificar';
 }
 function ensureClientDir(clientId) {
-    const dir = path_1.default.join(UPLOADS_ROOT, clientId);
+    const dir = path_1.default.join(paths_1.UPLOADS_CLIENTS_ROOT, clientId);
     if (!fs_1.default.existsSync(dir))
         fs_1.default.mkdirSync(dir, { recursive: true });
     return dir;
 }
 function ensureLocalClientDir(clientId, attachmentType) {
     const typeFolder = typeFolderName(attachmentType);
-    const dir = path_1.default.join(LOCAL_CLIENT_FILES_ROOT, clientId, typeFolder);
+    const dir = path_1.default.join(paths_1.CLIENT_FILES_ROOT, clientId, typeFolder);
     if (!fs_1.default.existsSync(dir))
         fs_1.default.mkdirSync(dir, { recursive: true });
     return dir;
@@ -42,7 +39,7 @@ function ensureLocalClientDir(clientId, attachmentType) {
 async function initClientFolders(clientId) {
     try {
         for (const folder of ATTACHMENT_TYPE_FOLDERS) {
-            const dir = path_1.default.join(LOCAL_CLIENT_FILES_ROOT, clientId, folder);
+            const dir = path_1.default.join(paths_1.CLIENT_FILES_ROOT, clientId, folder);
             if (!fs_1.default.existsSync(dir))
                 fs_1.default.mkdirSync(dir, { recursive: true });
         }
@@ -51,7 +48,7 @@ async function initClientFolders(clientId) {
         if (info.rows.length) {
             const r = info.rows[0];
             const displayName = [r.first_name, r.last_name].filter(Boolean).join(' ') || r.commercial_name || r.nif_cif || clientId;
-            const txtPath = path_1.default.join(LOCAL_CLIENT_FILES_ROOT, clientId, '_CLIENTE.txt');
+            const txtPath = path_1.default.join(paths_1.CLIENT_FILES_ROOT, clientId, '_CLIENTE.txt');
             if (!fs_1.default.existsSync(txtPath)) {
                 fs_1.default.writeFileSync(txtPath, `Cliente: ${displayName}\nNIF/CIF: ${r.nif_cif || '—'}\nNº Interno: ${r.internal_number || '—'}\nID: ${clientId}\n`, 'utf8');
             }
@@ -74,7 +71,7 @@ function moveLocalFile(clientId, oldOriginalName, newOriginalName, oldType, newT
     try {
         const oldFolder = typeFolderName(oldType);
         const newFolder = typeFolderName(newType);
-        const clientRoot = path_1.default.join(LOCAL_CLIENT_FILES_ROOT, clientId);
+        const clientRoot = path_1.default.join(paths_1.CLIENT_FILES_ROOT, clientId);
         let sourcePath = path_1.default.join(clientRoot, oldFolder, oldOriginalName);
         if (!fs_1.default.existsSync(sourcePath)) {
             for (const folder of ATTACHMENT_TYPE_FOLDERS) {
@@ -151,7 +148,7 @@ const downloadFile = async (req, res) => {
             return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
         }
         const { stored_name, original_name, mimetype } = result.rows[0];
-        const filePath = path_1.default.join(UPLOADS_ROOT, clientId, stored_name);
+        const filePath = path_1.default.join(paths_1.UPLOADS_CLIENTS_ROOT, clientId, stored_name);
         if (!fs_1.default.existsSync(filePath)) {
             return res.status(404).json({ success: false, error: 'Archivo no encontrado en disco.' });
         }
@@ -174,10 +171,10 @@ const deleteFile = async (req, res) => {
             return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
         }
         const { stored_name, original_name, attachment_type } = result.rows[0];
-        const filePath = path_1.default.join(UPLOADS_ROOT, clientId, stored_name);
+        const filePath = path_1.default.join(paths_1.UPLOADS_CLIENTS_ROOT, clientId, stored_name);
         if (fs_1.default.existsSync(filePath))
             fs_1.default.unlinkSync(filePath);
-        const localTypeDir = path_1.default.join(LOCAL_CLIENT_FILES_ROOT, clientId, typeFolderName(attachment_type));
+        const localTypeDir = path_1.default.join(paths_1.CLIENT_FILES_ROOT, clientId, typeFolderName(attachment_type));
         const localFilePath = path_1.default.join(localTypeDir, original_name);
         if (fs_1.default.existsSync(localFilePath)) {
             try {
@@ -281,7 +278,7 @@ const openFileLocally = async (req, res) => {
             return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
         }
         const { stored_name, original_name } = result.rows[0];
-        const serverPath = path_1.default.join(UPLOADS_ROOT, clientId, stored_name);
+        const serverPath = path_1.default.join(paths_1.UPLOADS_CLIENTS_ROOT, clientId, stored_name);
         if (!fs_1.default.existsSync(serverPath)) {
             return res.status(404).json({ success: false, error: 'Archivo no encontrado en disco.' });
         }
@@ -318,11 +315,11 @@ const previewDocxAsHtml = async (req, res) => {
         if (!mimetype?.includes('wordprocessingml') && !original_name?.endsWith('.docx')) {
             return res.status(400).json({ success: false, error: 'Este tipo de archivo no es soportado para previsualización.' });
         }
-        const filePath = path_1.default.join(UPLOADS_ROOT, clientId, stored_name);
+        const filePath = path_1.default.join(paths_1.UPLOADS_CLIENTS_ROOT, clientId, stored_name);
         if (!fs_1.default.existsSync(filePath)) {
             return res.status(404).json({ success: false, error: 'Archivo no encontrado en disco.' });
         }
-        const tempDir = path_1.default.join(__dirname, '../../temp');
+        const tempDir = paths_1.TEMP_ROOT;
         if (!fs_1.default.existsSync(tempDir))
             fs_1.default.mkdirSync(tempDir, { recursive: true });
         const scriptPath = path_1.default.join(tempDir, `preview_${fileId}.py`);
@@ -778,7 +775,7 @@ const previewExcelAsHtml = async (req, res) => {
             return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
         }
         const { stored_name } = result.rows[0];
-        const filePath = path_1.default.join(UPLOADS_ROOT, clientId, stored_name);
+        const filePath = path_1.default.join(paths_1.UPLOADS_CLIENTS_ROOT, clientId, stored_name);
         if (!fs_1.default.existsSync(filePath)) {
             return res.status(404).json({ success: false, error: 'Archivo no encontrado en disco.' });
         }
@@ -1148,7 +1145,7 @@ const previewTemplateAsHtml = async (req, res) => {
     const ext = path_1.default.extname(resolved).toLowerCase();
     const runDocxPreview = (docxPath) => {
         try {
-            const tempDir = path_1.default.join(__dirname, '../../temp');
+            const tempDir = paths_1.TEMP_ROOT;
             if (!fs_1.default.existsSync(tempDir))
                 fs_1.default.mkdirSync(tempDir, { recursive: true });
             const scriptId = Buffer.from(relPath + docxPath).toString('hex').slice(0, 20);
@@ -1607,7 +1604,7 @@ except Exception as e:
         return runDocxPreview(resolved);
     }
     if (ext === '.doc') {
-        const tempDir = path_1.default.join(__dirname, '../../temp');
+        const tempDir = paths_1.TEMP_ROOT;
         if (!fs_1.default.existsSync(tempDir))
             fs_1.default.mkdirSync(tempDir, { recursive: true });
         const scriptId2 = Buffer.from(relPath).toString('hex').slice(0, 16);
@@ -1745,7 +1742,7 @@ else:
 };
 exports.previewTemplateAsHtml = previewTemplateAsHtml;
 async function migrateLocalFoldersStructure() {
-    if (!fs_1.default.existsSync(LOCAL_CLIENT_FILES_ROOT))
+    if (!fs_1.default.existsSync(paths_1.CLIENT_FILES_ROOT))
         return;
     try {
         console.log('📂 Migración de carpetas locales: verificando estructura…');
@@ -1754,7 +1751,7 @@ async function migrateLocalFoldersStructure() {
         for (const row of result.rows) {
             const { client_id, original_name, attachment_type } = row;
             const typeFolder = typeFolderName(attachment_type);
-            const clientRoot = path_1.default.join(LOCAL_CLIENT_FILES_ROOT, client_id);
+            const clientRoot = path_1.default.join(paths_1.CLIENT_FILES_ROOT, client_id);
             const flatPath = path_1.default.join(clientRoot, original_name);
             const subPath = path_1.default.join(clientRoot, typeFolder, original_name);
             if (fs_1.default.existsSync(flatPath) && !fs_1.default.existsSync(subPath)) {
@@ -1769,8 +1766,8 @@ async function migrateLocalFoldersStructure() {
                 catch (_) { }
             }
         }
-        const clientDirs = fs_1.default.existsSync(LOCAL_CLIENT_FILES_ROOT)
-            ? fs_1.default.readdirSync(LOCAL_CLIENT_FILES_ROOT, { withFileTypes: true })
+        const clientDirs = fs_1.default.existsSync(paths_1.CLIENT_FILES_ROOT)
+            ? fs_1.default.readdirSync(paths_1.CLIENT_FILES_ROOT, { withFileTypes: true })
                 .filter(d => d.isDirectory())
                 .map(d => d.name)
             : [];

@@ -1,10 +1,12 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useUser, useAuth } from "@clerk/clerk-react";
 import {
   Clock, Plus, CheckCircle2, Loader2, RefreshCw,
   ChevronRight, Calendar, MapPin, Video, Phone,
+  ChevronDown, FileSpreadsheet, ClipboardList,
+  ScanLine, ExternalLink,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { safeJson } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
 
@@ -52,14 +54,37 @@ function fmtEventTime(dateStr: string): string {
 
 // ── DashboardHome ────────────────────────────────────────────────────────────
 export default function DashboardHome() {
-  const { user } = useUser();
+  const { user }    = useUser();
   const { getToken } = useAuth();
+  const navigate    = useNavigate();
+  const [showAltaMenu,    setShowAltaMenu]    = useState(false);
+  const [showClienteMenu, setShowClienteMenu] = useState(false);
+  const altaMenuRef    = useRef<HTMLDivElement>(null);
+  const clienteMenuRef = useRef<HTMLDivElement>(null);
+
+  // Cerrar dropdowns al clicar fuera
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (altaMenuRef.current && !altaMenuRef.current.contains(e.target as Node))
+        setShowAltaMenu(false);
+      if (clienteMenuRef.current && !clienteMenuRef.current.contains(e.target as Node))
+        setShowClienteMenu(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   const [activity,       setActivity]       = useState<any[]>([]);
   const [actLoading,     setActLoading]     = useState(true);
   const [agendaEvents,   setAgendaEvents]   = useState<any[]>([]);
   const [agendaLoading,  setAgendaLoading]  = useState(true);
-  const [taskStats,      setTaskStats]      = useState({ vencidas: 0, proximas: 0 });
+  const [taskStats,      setTaskStats]      = useState({
+    vencidas: 0,
+    proximas: 0,
+    urgentes: 0,
+    pendientes: 0,
+    completadas: 0,
+  });
 
   const fetchData = useCallback(async (silent = false) => {
     if (!silent) { setActLoading(true); setAgendaLoading(true); }
@@ -79,15 +104,22 @@ export default function DashboardHome() {
         const tasks: any[] = tasksData.data || [];
         const now = new Date();
         const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+        const isFinished = (estado: string) => estado === "completada";
+
         const vencidas = tasks.filter((t: any) =>
-          t.estado !== 'completado' && t.estado !== 'cancelado' &&
-          t.plazo && new Date(t.plazo) < now
+          !isFinished(t.estado) && t.plazo && new Date(t.plazo) < now
         ).length;
         const proximas = tasks.filter((t: any) =>
-          t.estado !== 'completado' && t.estado !== 'cancelado' &&
-          t.plazo && new Date(t.plazo) >= now && new Date(t.plazo) <= sevenDaysFromNow
+          !isFinished(t.estado) &&
+          t.plazo &&
+          new Date(t.plazo) >= now &&
+          new Date(t.plazo) <= sevenDaysFromNow
         ).length;
-        setTaskStats({ vencidas, proximas });
+        const urgentes = tasks.filter((t: any) => t.estado === "urgente").length;
+        const pendientes = tasks.filter((t: any) => t.estado === "pendiente").length;
+        const completadas = tasks.filter((t: any) => t.estado === "completada").length;
+
+        setTaskStats({ vencidas, proximas, urgentes, pendientes, completadas });
       }
     } catch (_e) {
     } finally {
@@ -113,18 +145,132 @@ export default function DashboardHome() {
             {new Date().toLocaleDateString("es-ES", { weekday:"long", day:"numeric", month:"long", year:"numeric" })}
           </p>
         </div>
-        <div className="flex gap-2">
-          <Link to="/dashboard/clientes/new">
-            <button className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-3.5 py-2 rounded-xl hover:bg-slate-50 font-semibold text-sm shadow-sm">
-              <Plus size={15} /> Nuevo Cliente
+        <div className="flex gap-2 items-center">
+          {/* Dropdown Alta Cliente */}
+          <div className="relative" ref={clienteMenuRef}>
+            <button
+              onClick={() => setShowClienteMenu(v => !v)}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-semibold text-sm shadow-sm border transition-all select-none ${
+                showClienteMenu
+                  ? "bg-slate-100 text-slate-800 border-slate-300"
+                  : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+              }`}
+            >
+              <Plus size={15} />
+              Nuevo Cliente
+              <ChevronDown size={13} className={`transition-transform ${showClienteMenu ? "rotate-180" : ""}`} />
             </button>
-          </Link>
-          <Link
-            to="/dashboard/expedientes?nuevo=1"
-            className="flex items-center gap-2 bg-red-600 text-white px-3.5 py-2 rounded-xl hover:bg-red-700 font-semibold text-sm shadow-md shadow-red-200"
-          >
-            <Plus size={15} /> Nuevo Expediente
-          </Link>
+
+            {showClienteMenu && (
+              <div className="absolute left-0 top-full z-50 mt-2 w-[300px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-300/40">
+                <div className="border-b border-slate-100 px-5 py-4">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-400">Alta de clientes</p>
+                  <h3 className="mt-1 text-[15px] font-bold text-slate-900">Elige cómo quieres agregar clientes</h3>
+                </div>
+                <div className="px-3 py-3">
+                  <button
+                    onClick={() => { setShowClienteMenu(false); navigate("/dashboard/clientes/new"); }}
+                    className="flex w-full items-start gap-3 rounded-2xl px-3 py-3 text-left hover:bg-slate-50 transition-colors"
+                  >
+                    <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600">
+                      <Plus size={17} />
+                    </div>
+                    <div>
+                      <p className="text-base font-bold text-slate-800">Crear manualmente</p>
+                      <p className="mt-1 text-sm leading-6 text-slate-500">Crea un cliente desde cero introduciendo sus datos manualmente.</p>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => { setShowClienteMenu(false); navigate("/dashboard/clientes/new?mode=dni"); }}
+                    className="flex w-full items-start gap-3 rounded-2xl px-3 py-3 text-left hover:bg-slate-50 transition-colors"
+                  >
+                    <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-blue-100 text-blue-600">
+                      <ScanLine size={17} />
+                    </div>
+                    <div>
+                      <p className="text-base font-bold text-slate-800">Con DNI</p>
+                      <p className="mt-1 text-sm leading-6 text-slate-500">Sube anverso y reverso del DNI para rellenar la ficha automáticamente.</p>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => { setShowClienteMenu(false); navigate("/dashboard/clientes/invitar"); }}
+                    className="flex w-full items-start gap-3 rounded-2xl px-3 py-3 text-left hover:bg-slate-50 transition-colors"
+                  >
+                    <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-600">
+                      <ExternalLink size={17} />
+                    </div>
+                    <div>
+                      <p className="text-base font-bold text-slate-800">Con enlace</p>
+                      <p className="mt-1 text-sm leading-6 text-slate-500">Genera un enlace para que el cliente rellene sus datos directamente.</p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Dropdown Alta Expediente */}
+          <div className="relative" ref={altaMenuRef}>
+            <button
+              onClick={() => setShowAltaMenu(v => !v)}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-semibold text-sm shadow-md shadow-red-200 transition-all select-none ${
+                showAltaMenu ? "bg-red-800 text-white" : "bg-red-600 hover:bg-red-700 text-white"
+              }`}
+            >
+              <Plus size={15} />
+              Nuevo Expediente
+              <ChevronDown size={13} className={`transition-transform ${showAltaMenu ? "rotate-180" : ""}`} />
+            </button>
+
+            {showAltaMenu && (
+              <div className="absolute right-0 top-full z-50 mt-2 w-[300px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+                <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
+                  <p className="text-sm font-semibold text-slate-600">Elige cómo quieres agregar expedientes</p>
+                </div>
+                <div className="p-2">
+                  {/* Crear manualmente */}
+                  <button
+                    onClick={() => { setShowAltaMenu(false); navigate("/dashboard/expedientes?nuevo=1"); }}
+                    className="flex w-full items-start gap-3 rounded-xl px-3 py-3 text-left hover:bg-slate-50 transition-colors"
+                  >
+                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-green-100 text-green-600">
+                      <Plus size={15} />
+                    </div>
+                    <div>
+                      <p className="text-[15px] font-semibold text-slate-800">Crear manualmente</p>
+                      <p className="mt-0.5 text-sm leading-6 text-slate-500">Crea un expediente desde cero introduciendo los datos</p>
+                    </div>
+                  </button>
+                  {/* Importar CSV */}
+                  <button
+                    onClick={() => { setShowAltaMenu(false); navigate("/dashboard/expedientes?mode=csv"); }}
+                    className="flex w-full items-start gap-3 rounded-xl px-3 py-3 text-left hover:bg-slate-50 transition-colors"
+                  >
+                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
+                      <FileSpreadsheet size={15} />
+                    </div>
+                    <div>
+                      <p className="text-[15px] font-semibold text-slate-800">Importar desde CSV</p>
+                      <p className="mt-0.5 text-sm leading-6 text-slate-500">Sube un archivo CSV con múltiples expedientes</p>
+                    </div>
+                  </button>
+                  {/* Desde documentos */}
+                  <button
+                    onClick={() => { setShowAltaMenu(false); navigate("/dashboard/expedientes?mode=docs"); }}
+                    className="flex w-full items-start gap-3 rounded-xl px-3 py-3 text-left hover:bg-slate-50 transition-colors"
+                  >
+                    <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+                      <ClipboardList size={15} />
+                    </div>
+                    <div>
+                      <p className="text-[15px] font-semibold text-slate-800">Desde documentos</p>
+                      <p className="mt-0.5 text-sm leading-6 text-slate-500">Procesa documentos para crear expedientes</p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -211,62 +357,61 @@ export default function DashboardHome() {
               <div className="grid grid-cols-2">
                 <div className="p-5 bg-red-50 border-r border-red-100">
                   <p className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-1">Vencidas</p>
-                  <p className={`text-4xl font-black leading-none ${taskStats.vencidas > 0 ? "text-red-600" : "text-red-300"}`}>
+                  <p className={`text-4xl font-black leading-none ${taskStats.vencidas > 0 ? "text-red-600" : "text-slate-300"}`}>
                     {taskStats.vencidas}
                   </p>
-                  <p className="text-[10px] text-red-400 mt-1.5">tareas vencidas</p>
+                  <p className="text-[10px] text-red-300 mt-1">vencidas</p>
                 </div>
-                <div className="p-5 bg-orange-50">
-                  <p className="text-[10px] font-bold text-orange-400 uppercase tracking-widest mb-1">Próximas</p>
-                  <p className={`text-4xl font-black leading-none ${taskStats.proximas > 0 ? "text-orange-500" : "text-orange-300"}`}>
+                <div className="p-5">
+                  <p className="text-[10px] font-bold text-amber-400 uppercase tracking-widest mb-1">Próximas</p>
+                  <p className={`text-4xl font-black leading-none ${taskStats.proximas > 0 ? "text-amber-500" : "text-slate-300"}`}>
                     {taskStats.proximas}
                   </p>
-                  <p className="text-[10px] text-orange-400 mt-1.5">vencen en 7 días</p>
+                  <p className="text-[10px] text-amber-300 mt-1">esta semana</p>
                 </div>
               </div>
-              <div className="px-4 py-2 bg-slate-50 border-t border-slate-100 text-center">
-                <span className="text-[11px] text-slate-400">Ver mis tareas y plazos →</span>
+              <div className="grid grid-cols-3 border-t border-slate-100">
+                <div className="p-4 text-center border-r border-slate-100">
+                  <p className="text-2xl font-black text-slate-700">{taskStats.urgentes}</p>
+                  <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Urgentes</p>
+                </div>
+                <div className="p-4 text-center border-r border-slate-100">
+                  <p className="text-2xl font-black text-slate-700">{taskStats.pendientes}</p>
+                  <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Pendientes</p>
+                </div>
+                <div className="p-4 text-center">
+                  <p className="text-2xl font-black text-emerald-500">{taskStats.completadas}</p>
+                  <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Hechas</p>
+                </div>
               </div>
             </div>
           </Link>
 
-          {/* TRAZABILIDAD MINI */}
+          {/* ACTIVIDAD RECIENTE */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                <Clock size={15} className="text-slate-400" /> Actividad
+              <h3 className="font-bold text-slate-800 flex items-center gap-2 text-sm">
+                <RefreshCw size={14} className="text-slate-400" /> Actividad reciente
               </h3>
-              <button onClick={() => fetchData()} className="p-1 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600">
-                <RefreshCw size={12} />
-              </button>
             </div>
             {actLoading ? (
               <div className="flex justify-center py-8">
                 <Loader2 size={18} className="animate-spin text-slate-300" />
               </div>
             ) : activity.length === 0 ? (
-              <div className="py-8 text-center text-slate-400">
-                <p className="text-xs">Sin actividad todavía</p>
-              </div>
+              <p className="text-xs text-slate-400 text-center py-8">Sin actividad reciente</p>
             ) : (
-              <div className="divide-y divide-slate-50">
-                {activity.slice(0, 5).map((item: any) => (
-                  <div key={item.id} className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 transition-colors">
-                    <span className="text-sm">{actionIcon(item.action_type)}</span>
+              <ul className="divide-y divide-slate-50 max-h-64 overflow-y-auto">
+                {activity.slice(0, 10).map((item: any, i: number) => (
+                  <li key={i} className="flex items-start gap-3 px-5 py-3 hover:bg-slate-50 transition-colors">
+                    <span className="text-base mt-0.5 shrink-0">{actionIcon(item.action_type || "")}</span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-slate-700 truncate">{item.action_type}</p>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        {item.user_name && (
-                          <span className="text-[10px] font-semibold text-red-500 shrink-0">{item.user_name}</span>
-                        )}
-                        {item.user_name && item.entity_name && <span className="text-slate-200 text-[10px]">·</span>}
-                        {item.entity_name && <p className="text-[10px] text-slate-400 truncate">{item.entity_name}</p>}
-                      </div>
+                      <p className="text-xs text-slate-700 leading-snug line-clamp-2">{item.description || item.action_type}</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">{timeAgo(item.created_at)}</p>
                     </div>
-                    <span className="text-[10px] text-slate-400 shrink-0">{timeAgo(item.created_at)}</span>
-                  </div>
+                  </li>
                 ))}
-              </div>
+              </ul>
             )}
           </div>
 

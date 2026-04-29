@@ -106,9 +106,404 @@
 }
 
 @layer components {
+  .modules-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148, 163, 184, 0.55) transparent;
+  }
+
+  .modules-scrollbar::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  .modules-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .modules-scrollbar::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(148, 163, 184, 0.22), rgba(100, 116, 139, 0.58));
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background-clip: padding-box;
+  }
+
+  .modules-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(171, 4, 51, 0.32), rgba(146, 4, 44, 0.75));
+    background-clip: padding-box;
+  }
+
+  .erp-shell {
+    background:
+      linear-gradient(180deg, #f7f8fb 0%, #eef2f7 58%, #f4f6fa 100%);
+  }
+
+  .erp-ornaments {
+    overflow: hidden;
+    z-index: 0;
+  }
+
+  .erp-orb,
+  .erp-panel,
+  .erp-line {
+    position: absolute;
+  }
+
+  .erp-orb {
+    border-radius: 9999px;
+    animation: erp-ornament-float 16s ease-in-out infinite;
+  }
+
+  .erp-orb-top-right {
+    top: 4.5rem;
+    right: 2rem;
+    width: 12rem;
+    height: 12rem;
+    border: 1px solid rgba(30, 47, 69, 0.08);
+    background: radial-gradient(circle at 35% 35%, rgba(255, 255, 255, 0.8), rgba(171, 4, 51, 0.06));
+  }
+
+  .erp-orb-bottom-left {
+    bottom: 2rem;
+    left: 2rem;
+    width: 9rem;
+    height: 9rem;
+    border: 1px solid rgba(171, 4, 51, 0.08);
+    background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.74), rgba(30, 47, 69, 0.06));
+    animation-delay: -6s;
+  }
+
+  .erp-panel {
+    border-radius: 2rem;
+    border: 1px solid rgba(30, 47, 69, 0.08);
+    background: rgba(255, 255, 255, 0.34);
+    backdrop-filter: blur(3px);
+    animation: erp-ornament-tilt 18s ease-in-out infinite;
+  }
+
+  .erp-panel-top-left {
+    top: 8rem;
+    left: 4rem;
+    width: 7.5rem;
+    height: 7.5rem;
+    --erp-panel-rotate: -10deg;
+    transform: rotate(-10deg);
+  }
+
+  .erp-panel-bottom-right {
+    right: 5rem;
+    bottom: 8rem;
+    width: 6.5rem;
+    height: 6.5rem;
+    border-color: rgba(171, 4, 51, 0.08);
+    background: rgba(255, 255, 255, 0.28);
+    --erp-panel-rotate: 14deg;
+    transform: rotate(14deg);
+    animation-delay: -8s;
+  }
+
+  .erp-line {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(30, 47, 69, 0.18), transparent);
+    animation: erp-line-shift 14s ease-in-out infinite;
+  }
+
+  .erp-line-top {
+    top: 5.5rem;
+    left: 50%;
+    width: 10rem;
+    --erp-line-shift-x: -50%;
+    transform: translateX(-50%);
+  }
+
+  .erp-line-bottom {
+    bottom: 4rem;
+    left: 18%;
+    width: 8rem;
+    --erp-line-shift-x: 0px;
+    animation-delay: -5s;
+  }
+
+  .agenda-google-shell {
+    background:
+      radial-gradient(circle at top right, rgba(171, 4, 51, 0.08), transparent 22%),
+      radial-gradient(circle at bottom left, rgba(37, 99, 235, 0.05), transparent 24%),
+      linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+    border: 1px solid #dbe3ee;
+    border-radius: 28px;
+    color: #0f172a;
+    box-shadow: 0 28px 80px rgba(15, 23, 42, 0.1);
+    overflow: hidden;
+  }
+
+  .agenda-google-topbar {
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(18px);
+    border-bottom-color: #dfe7f0;
+  }
+
+  .agenda-google-topbar h1 {
+    color: #0f172a;
+  }
+
+  .agenda-google-topbar p {
+    color: #64748b;
+  }
+
+  .agenda-google-topbar > div:first-child > div:first-child {
+    background: rgba(171, 4, 51, 0.06);
+    border: 1px solid rgba(171, 4, 51, 0.12);
+    border-radius: 18px;
+    box-shadow: 0 10px 30px rgba(171, 4, 51, 0.08);
+  }
+
+  .agenda-google-topbar > div:first-child > div:first-child svg {
+    color: #ab0433;
+  }
+
+  .agenda-google-topbar button {
+    border-radius: 999px;
+  }
+
+  .agenda-google-topbar > div:last-child > div:first-child {
+    background: transparent;
+    border-color: transparent;
+    padding-inline: 0;
+  }
+
+  .agenda-google-topbar > div:last-child > div:first-child button {
+    color: #64748b;
+  }
+
+  .agenda-google-topbar > div:last-child > div:first-child button:hover {
+    color: #ab0433;
+    background: rgba(171, 4, 51, 0.05);
+  }
+
+  .agenda-google-topbar > div:last-child > div:first-child span {
+    color: #0f172a;
+    min-width: 170px;
+  }
+
+  .agenda-google-topbar > div:last-child > button,
+  .agenda-google-topbar > div:last-child > div,
+  .agenda-google-topbar > div:last-child > span {
+    background: #f8fafc;
+    border-color: #dbe3ee;
+    color: #334155;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+  }
+
+  .agenda-google-topbar > div:last-child > div button svg {
+    color: inherit;
+  }
+
+  .agenda-google-topbar > div:last-child > button:hover {
+    background: #ffffff;
+  }
+
+  .agenda-google-topbar .text-emerald-700 {
+    color: #0f766e !important;
+  }
+
+  .agenda-google-topbar .bg-white.border-emerald-200 {
+    background: #ffffff !important;
+    border-color: #bbf7d0 !important;
+  }
+
+  .agenda-google-topbar .bg-red-600 {
+    background: #ab0433 !important;
+    border-color: #ab0433 !important;
+    color: #ffffff !important;
+  }
+
+  .agenda-google-topbar .bg-red-600:hover {
+    background: #92042c !important;
+  }
+
+  .agenda-google-topbar .bg-red-50,
+  .agenda-google-topbar .bg-emerald-50 {
+    border-radius: 999px;
+  }
+
+  .agenda-google-topbar .bg-red-50 {
+    background: #fef2f2 !important;
+    border-color: #fecaca !important;
+    color: #dc2626 !important;
+  }
+
+  .agenda-google-topbar .bg-emerald-50 {
+    background: #ecfdf5 !important;
+    border-color: #bbf7d0 !important;
+    color: #059669 !important;
+  }
+
+  .agenda-google-body {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.6), rgba(248, 250, 252, 0.92));
+  }
+
+  .agenda-google-grid {
+    order: 2;
+    border-right-color: #dfe7f0;
+    background: #f8fafc;
+  }
+
+  .agenda-google-grid > .grid:first-child {
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    border-bottom-color: #dfe7f0;
+  }
+
+  .agenda-google-grid > .grid:first-child > div {
+    color: #475569;
+    letter-spacing: 0.18em;
+  }
+
+  .agenda-google-grid .grid.grid-cols-7.auto-rows-fr > div {
+    border-right-color: #e2e8f0 !important;
+    border-bottom-color: #e2e8f0 !important;
+    background: rgba(255, 255, 255, 0.92) !important;
+    min-height: 120px;
+    padding: 0.55rem;
+  }
+
+  .agenda-google-grid .grid.grid-cols-7.auto-rows-fr > div:hover {
+    background: #fffafc !important;
+  }
+
+  .agenda-google-grid .grid.grid-cols-7.auto-rows-fr > div .bg-red-600 {
+    background: #ab0433 !important;
+    color: #ffffff !important;
+  }
+
+  .agenda-google-grid .grid.grid-cols-7.auto-rows-fr > div .text-red-600 {
+    color: #ab0433 !important;
+  }
+
+  .agenda-google-grid .grid.grid-cols-7.auto-rows-fr > div .text-slate-600 {
+    color: #334155 !important;
+  }
+
+  .agenda-google-grid .grid.grid-cols-7.auto-rows-fr > div .text-slate-400,
+  .agenda-google-grid .grid.grid-cols-7.auto-rows-fr > div .text-slate-300 {
+    color: #94a3b8 !important;
+  }
+
+  .agenda-google-grid .grid.grid-cols-7.auto-rows-fr > div .hover\:text-red-500:hover {
+    color: #ab0433 !important;
+  }
+
+  .agenda-google-grid .grid.grid-cols-7.auto-rows-fr > div .rounded.text-\[10px\] {
+    border-radius: 10px;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    color: #0f172a;
+    border: 1px solid #dbe3ee;
+    padding: 0.35rem 0.5rem;
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.05);
+  }
+
+  .agenda-google-grid .grid.grid-cols-7.auto-rows-fr > div .text-blue-700 {
+    color: #1d4ed8 !important;
+  }
+
+  .agenda-google-grid .grid.grid-cols-7.auto-rows-fr > div .text-blue-400 {
+    color: #60a5fa !important;
+  }
+
+  .agenda-google-grid .grid.grid-cols-7.auto-rows-fr > div img.w-2.h-2 {
+    display: none;
+  }
+
+  .agenda-google-sidebar {
+    order: 1;
+    width: 18rem;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 250, 252, 0.96) 100%);
+    border-right: 1px solid #dfe7f0;
+  }
+
+  .agenda-google-sidebar > div:first-child {
+    background: transparent;
+    border-bottom-color: #dfe7f0;
+  }
+
+  .agenda-google-sidebar > div:first-child button {
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    border-color: #dbe3ee;
+    color: #0f172a;
+    border-radius: 18px;
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+  }
+
+  .agenda-google-sidebar > div:first-child button:hover {
+    background: #ffffff;
+  }
+
+  .agenda-google-sidebar > div:nth-child(2),
+  .agenda-google-sidebar > div:nth-child(3) {
+    border-bottom-color: #dfe7f0;
+  }
+
+  .agenda-google-sidebar .text-slate-800,
+  .agenda-google-sidebar .text-slate-700 {
+    color: #0f172a !important;
+  }
+
+  .agenda-google-sidebar .bg-slate-50\/50,
+  .agenda-google-sidebar .bg-white,
+  .agenda-google-sidebar .bg-slate-50 {
+    background: transparent !important;
+  }
+
+  .agenda-google-sidebar .border-slate-100,
+  .agenda-google-sidebar .border-slate-200,
+  .agenda-google-sidebar .border-blue-100 {
+    border-color: #dfe7f0 !important;
+  }
+
+  .agenda-google-sidebar .text-slate-400,
+  .agenda-google-sidebar .text-slate-500 {
+    color: #64748b !important;
+  }
+
+  .agenda-google-sidebar .text-red-500 {
+    color: #ab0433 !important;
+  }
+
+  .agenda-google-sidebar .bg-red-600 {
+    background: #ab0433 !important;
+    color: #ffffff !important;
+  }
+
+  .agenda-google-sidebar .rounded-xl.border,
+  .agenda-google-sidebar .rounded-xl.border-blue-100 {
+    background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%) !important;
+    border-color: #dfe7f0 !important;
+    border-radius: 18px !important;
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05) !important;
+  }
+
+  .agenda-google-sidebar .rounded-xl.border-blue-100 {
+    background: #eff6ff !important;
+    border-color: #bfdbfe !important;
+  }
+
+  .agenda-google-sidebar .text-blue-800 {
+    color: #1e3a8a !important;
+  }
+
+  .agenda-google-sidebar .text-blue-500,
+  .agenda-google-sidebar .text-blue-400 {
+    color: #3b82f6 !important;
+  }
+
+  .agenda-google-sidebar .group:hover {
+    background: inherit;
+  }
+
   .module-page {
     animation: module-enter 280ms cubic-bezier(0.22, 1, 0.36, 1);
     will-change: transform, opacity;
+    position: relative;
+    z-index: 1;
   }
 
   .module-page > * {
@@ -170,6 +565,120 @@
   .module-page > *:nth-child(3) { animation-delay: 70ms; }
   .module-page > *:nth-child(4) { animation-delay: 105ms; }
   .module-page > *:nth-child(5) { animation-delay: 140ms; }
+
+  .document-upload-mark {
+    filter: drop-shadow(0 12px 26px rgba(15, 23, 42, 0.06));
+  }
+
+  .group:hover .document-upload-glow {
+    opacity: 1;
+  }
+
+  .document-upload-glow {
+    background:
+      radial-gradient(circle at 50% 50%, rgba(226, 232, 240, 0.4), transparent 58%),
+      radial-gradient(circle at 50% 50%, rgba(241, 245, 249, 0.7), transparent 76%);
+    animation: document-glow 4.4s ease-in-out infinite;
+  }
+
+  .document-upload-core {
+    animation: document-core-float 4.4s ease-in-out infinite;
+    transform-origin: center bottom;
+    transition: transform 280ms ease, box-shadow 280ms ease;
+  }
+
+  .group:hover .document-upload-core {
+    transform: translateY(-3px) scale(1.015);
+  }
+
+  .document-upload-ring {
+    border: 1px solid rgba(203, 213, 225, 0.72);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      0 0 0 6px rgba(248, 250, 252, 0.92);
+  }
+
+  .document-upload-plus {
+    animation: document-plus-pulse 4.4s ease-in-out infinite;
+    transition: transform 280ms ease, opacity 280ms ease;
+  }
+
+  .group:hover .document-upload-plus {
+    transform: scale(1.06);
+  }
+
+  .document-upload-sheet {
+    position: absolute;
+    overflow: hidden;
+    transition: transform 320ms ease, opacity 320ms ease;
+    box-shadow: 0 18px 34px -30px rgba(15, 23, 42, 0.16);
+  }
+
+  .document-upload-sheet::before {
+    content: "";
+    position: absolute;
+    left: 11px;
+    right: 11px;
+    top: 16px;
+    height: 2px;
+    border-radius: 999px;
+    background: rgba(203, 213, 225, 0.92);
+    box-shadow:
+      0 9px 0 rgba(203, 213, 225, 0.78),
+      0 18px 0 rgba(203, 213, 225, 0.62),
+      0 27px 0 rgba(203, 213, 225, 0.46);
+  }
+
+  .document-upload-sheet-left {
+    animation: document-sheet-left 4.4s ease-in-out infinite;
+  }
+
+  .group:hover .document-upload-sheet-left {
+    transform: translateY(-4px) rotate(-28deg) scale(1.02);
+  }
+
+  .document-upload-sheet-right {
+    animation: document-sheet-right 4.4s ease-in-out infinite;
+  }
+
+  .group:hover .document-upload-sheet-right {
+    transform: translateY(-4px) rotate(28deg) scale(1.02);
+  }
+
+  .document-upload-click-burst {
+    border: 1px solid rgba(203, 213, 225, 0.44);
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+@keyframes erp-ornament-float {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(0, -10px, 0) scale(1.02);
+  }
+}
+
+@keyframes erp-ornament-tilt {
+  0%, 100% {
+    transform: rotate(var(--erp-panel-rotate, 0deg)) translate3d(0, 0, 0);
+  }
+  50% {
+    transform: rotate(calc(var(--erp-panel-rotate, 0deg) + 2deg)) translate3d(0, -6px, 0);
+  }
+}
+
+@keyframes erp-line-shift {
+  0%, 100% {
+    opacity: 0.4;
+    transform: translateX(var(--erp-line-shift-x, 0px));
+  }
+  50% {
+    opacity: 0.8;
+    transform: translateX(calc(var(--erp-line-shift-x, 0px) + 10px));
+  }
 }
 
 @keyframes module-enter {
@@ -202,5 +711,58 @@
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes document-core-float {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-4px) scale(1.015);
+  }
+}
+
+@keyframes document-sheet-left {
+  0%, 100% {
+    transform: translateY(0) rotate(-14deg) translateX(0) scale(1);
+    opacity: 0.88;
+  }
+  50% {
+    transform: translateY(-3px) rotate(-24deg) translateX(-4px) scale(1.02);
+    opacity: 1;
+  }
+}
+
+@keyframes document-sheet-right {
+  0%, 100% {
+    transform: translateY(0) rotate(14deg) translateX(0) scale(1);
+    opacity: 0.88;
+  }
+  50% {
+    transform: translateY(-3px) rotate(24deg) translateX(4px) scale(1.02);
+    opacity: 1;
+  }
+}
+
+@keyframes document-plus-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.78;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+}
+
+@keyframes document-glow {
+  0%, 100% {
+    transform: scale(0.98);
+    opacity: 0.32;
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 0.58;
   }
 }

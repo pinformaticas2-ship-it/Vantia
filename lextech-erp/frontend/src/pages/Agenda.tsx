@@ -1,9 +1,9 @@
 import React, {
-  useEffect, useState, useCallback, useMemo, useRef,
+  useDeferredValue, useEffect, useState, useCallback, useMemo, useRef,
 } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import {
-  Calendar, ChevronLeft, ChevronRight, Plus, X,
+  Calendar, ChevronLeft, ChevronRight, Plus,
   Loader2, Clock, MapPin, Briefcase, Users,
   Trash2, Edit3, CheckCircle2, AlertCircle,
   Phone, Video, FileText, Flag, Circle,
@@ -42,7 +42,7 @@ declare global {
   }
 }
 
-const GCAL_SCOPES   = "https://www.googleapis.com/auth/calendar.readonly";
+const GCAL_SCOPES   = "https://www.googleapis.com/auth/calendar";
 const GCAL_TOKEN_KEY = "lextech-gcal-token-v1";
 const GCAL_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 
@@ -60,8 +60,31 @@ interface AgendaEvent {
   status: string;
   expediente_id: string | null;
   cliente_id: string | null;
+  related_user_id?: string | null;
+  related_user_name?: string | null;
+  organization_context?: string | null;
   location: string | null;
   color: string | null;
+  source?: string | null;
+  external_provider?: string | null;
+  external_id?: string | null;
+  external_url?: string | null;
+}
+
+interface AgendaOrganizationUser {
+  user_id: string;
+  user_name: string;
+  avatar_url?: string | null;
+}
+
+interface AgendaOrganizationExpediente {
+  id: string;
+  ref_expediente?: string | null;
+  ref_propia?: string | null;
+  descripcion?: string | null;
+  cliente_id?: string | null;
+  cliente_nombre?: string | null;
+  related_users?: AgendaOrganizationUser[];
 }
 
 // ── Config de tipos de evento ─────────────────────────────────────────────────
@@ -86,7 +109,10 @@ const DIAS    = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 const MESES   = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 
 function isoDate(date: Date) {
-  return date.toISOString().slice(0, 10);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+function localDateKey(dateStr: string): string {
+  return isoDate(new Date(dateStr));
 }
 function fmtTime(dateStr: string): string {
   return new Date(dateStr).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
@@ -97,12 +123,47 @@ function fmtDateShort(dateStr: string): string {
 function localDatetimeInput(dateStr: string | null | undefined): string {
   if (!dateStr) return "";
   const d = new Date(dateStr);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}T${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 function inputToISO(val: string): string {
   if (!val) return "";
   return new Date(val).toISOString();
+}
+
+function moveIsoToDateKeepingTime(iso: string, targetDateKey: string) {
+  const original = new Date(iso);
+  const [year, month, day] = targetDateKey.split("-").map(Number);
+  const moved = new Date(original);
+  moved.setFullYear(year, month - 1, day);
+  return moved.toISOString();
+}
+
+function stripHtml(value?: string | null) {
+  return String(value || "").replace(/<[^>]+>/g, "").trim();
+}
+
+function buildGooglePayload(data: any) {
+  const payload: Record<string, any> = {
+    summary: data.title,
+    description: data.description || "",
+    location: data.location || "",
+  };
+
+  if (data.all_day) {
+    const startDate = data.start_at.slice(0, 10);
+    const endDate = data.end_at
+      ? data.end_at.slice(0, 10)
+      : startDate;
+    const endDateObj = new Date(`${endDate}T12:00:00`);
+    endDateObj.setDate(endDateObj.getDate() + 1);
+    payload.start = { date: startDate };
+    payload.end = { date: isoDate(endDateObj) };
+  } else {
+    payload.start = { dateTime: data.start_at };
+    payload.end = { dateTime: data.end_at || data.start_at };
+  }
+
+  return payload;
 }
 
 // Generar días del calendario para un mes dado
@@ -132,12 +193,17 @@ const emptyForm = (date?: string) => ({
   location: "",
   expediente_id: "",
   cliente_id: "",
+  related_user_id: "",
+  related_user_name: "",
+  organization_context: "",
 });
 
 // ── Modal de evento ───────────────────────────────────────────────────────────
 function EventModal({
   event,
   defaultDate,
+  organizationExpedientes,
+  organizationUsers,
   onClose,
   onSave,
   onDelete,
@@ -146,6 +212,8 @@ function EventModal({
 }: {
   event: AgendaEvent | null;
   defaultDate: string | null;
+  organizationExpedientes: AgendaOrganizationExpediente[];
+  organizationUsers: AgendaOrganizationUser[];
   onClose: () => void;
   onSave: (data: any) => void;
   onDelete: (id: string) => void;
@@ -164,6 +232,9 @@ function EventModal({
         location:     event.location || "",
         expediente_id: event.expediente_id || "",
         cliente_id:   event.cliente_id || "",
+        related_user_id: event.related_user_id || "",
+        related_user_name: event.related_user_name || "",
+        organization_context: event.organization_context || "",
       }
     : emptyForm(defaultDate || undefined)
   );
@@ -171,6 +242,32 @@ function EventModal({
   const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }));
   const typeConf = EVENT_TYPES[form.type] || EVENT_TYPES.otro;
   const statusConf = STATUS_OPTS.find(s => s.value === form.status) || STATUS_OPTS[0];
+  const [activeTab, setActiveTab] = useState<"details" | "organization">(
+    event?.expediente_id || event?.cliente_id ? "organization" : "details"
+  );
+  const selectedExpediente = useMemo(
+    () => organizationExpedientes.find((item) => item.id === form.expediente_id) || null,
+    [organizationExpedientes, form.expediente_id]
+  );
+  const usersForSelectedExpediente = useMemo(() => {
+    const related = selectedExpediente?.related_users || [];
+    if (!related.length) return organizationUsers;
+    const allowedIds = new Set(related.map((item) => item.user_id));
+    return organizationUsers.filter((item) => allowedIds.has(item.user_id));
+  }, [organizationUsers, selectedExpediente]);
+  const expedientesForSelectedUser = useMemo(() => {
+    if (!form.related_user_id) return organizationExpedientes;
+    const filtered = organizationExpedientes.filter((item) =>
+      (item.related_users || []).some((user) => user.user_id === form.related_user_id)
+    );
+    return filtered.length ? filtered : organizationExpedientes;
+  }, [organizationExpedientes, form.related_user_id]);
+  const missingTitle = !form.title.trim();
+  const saveDisabledReason = saving
+    ? "Guardando..."
+    : missingTitle
+      ? "Añade un título para poder guardar"
+      : "";
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -178,22 +275,79 @@ function EventModal({
       ...form,
       start_at: inputToISO(form.start_at),
       end_at:   form.end_at ? inputToISO(form.end_at) : null,
-      expediente_id: form.expediente_id || null,
-      cliente_id:    form.cliente_id    || null,
+      expediente_id: activeTab === "organization" ? (form.expediente_id || null) : null,
+      cliente_id:    activeTab === "organization" ? (form.cliente_id || null) : null,
+      related_user_id: activeTab === "organization" ? (form.related_user_id || null) : null,
+      related_user_name: activeTab === "organization" ? (form.related_user_name || null) : null,
+      organization_context: activeTab === "organization" ? (form.organization_context || null) : null,
     });
   };
 
   return createPortal(
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
+      <div className="relative w-full max-w-6xl overflow-hidden rounded-[30px] border border-slate-200 bg-[#fbfcfe] shadow-[0_40px_100px_rgba(15,23,42,0.22)] animate-in zoom-in-95 duration-200">
         {/* cabecera */}
-        <div className={`px-5 py-4 flex items-center justify-between ${typeConf.bg} text-white`}>
-          <div className="flex items-center gap-2.5">
-            <typeConf.icon size={18} />
-            <span className="font-bold text-sm">{event ? "Editar evento" : "Nuevo evento"}</span>
+        <div className="border-b border-slate-200 bg-white/90 px-6 pb-5 pt-5 backdrop-blur">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex min-w-0 flex-1 items-start gap-3">
+              <BackButton onClick={onClose} />
+              <div className="min-w-0 flex-1">
+                <div className="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">
+                  <typeConf.icon size={14} className="text-red-600" />
+                  {event ? "Editar evento" : "Nuevo evento"}
+                </div>
+                <input
+                  value={form.title}
+                  onChange={e => set("title", e.target.value)}
+                  placeholder="Añade un titulo"
+                  required
+                  className="w-full border-0 border-b-2 border-slate-200 bg-transparent px-0 pb-3 text-3xl font-semibold text-slate-900 placeholder:text-slate-400 focus:border-red-400 focus:outline-none"
+                />
+                {missingTitle && <p className="mt-2 text-xs font-medium text-amber-600">Escribe un título para poder guardar el evento.</p>}
+              </div>
+            </div>
+            <button
+              type="submit"
+              form="agenda-event-form"
+              disabled={saving || missingTitle}
+              title={saveDisabledReason}
+              className="flex shrink-0 items-center gap-2 rounded-full bg-red-600 px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+            >
+              {saving && <Loader2 size={14} className="animate-spin" />}
+              Guardar
+            </button>
           </div>
-          <BackButton onClick={onClose} variant="dark" />
+
+          <div className="mt-5 flex flex-wrap items-center gap-2">
+            <input
+              type={form.all_day ? "date" : "datetime-local"}
+              value={form.all_day ? form.start_at.slice(0, 10) : form.start_at}
+              onChange={e => set("start_at", form.all_day ? e.target.value + "T00:00" : e.target.value)}
+              required
+              className="rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-700 shadow-sm focus:border-red-400 focus:outline-none"
+            />
+            {!form.all_day && (
+              <>
+                <span className="px-1 text-sm font-semibold text-slate-500">a</span>
+                <input
+                  type="datetime-local"
+                  value={form.end_at}
+                  onChange={e => set("end_at", e.target.value)}
+                  className="rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-700 shadow-sm focus:border-red-400 focus:outline-none"
+                />
+              </>
+            )}
+            <label className="ml-2 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-700 shadow-sm">
+              <input
+                type="checkbox"
+                checked={form.all_day}
+                onChange={e => set("all_day", e.target.checked)}
+                className="rounded border-slate-300 text-red-600 focus:ring-red-400"
+              />
+              Todo el dia
+            </label>
+          </div>
         </div>
 
         {errorMsg && (
@@ -202,9 +356,9 @@ function EventModal({
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto max-h-[70vh]">
+        <form id="agenda-event-form" onSubmit={handleSubmit} className="grid gap-6 overflow-y-auto max-h-[72vh] px-6 py-6 lg:grid-cols-[minmax(0,1.4fr)_320px]">
           {/* Título */}
-          <div>
+          <div className="hidden">
             <label className="block text-xs font-bold text-slate-700 mb-1">Título <span className="text-red-500">*</span></label>
             <input
               value={form.title}
@@ -216,13 +370,39 @@ function EventModal({
           </div>
 
           {/* Tipo + Estado */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className={`rounded-[28px] border p-5 shadow-[0_16px_40px_rgba(15,23,42,0.05)] lg:col-start-1 ${activeTab === "details" ? "border-red-100 bg-gradient-to-br from-white to-red-50/40" : "border-red-100 bg-white"}`}>
+            <div className="mb-5 flex items-center gap-6 border-b border-slate-200 pb-3 text-sm font-semibold">
+              <button
+                type="button"
+                onClick={() => setActiveTab("details")}
+                className={`pb-2 ${activeTab === "details" ? "border-b-2 border-red-500 text-red-600" : "text-slate-400"}`}
+              >
+                Detalles del evento
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("organization")}
+                className={`pb-2 ${activeTab === "organization" ? "border-b-2 border-red-500 text-red-600" : "text-slate-400"}`}
+              >
+                Organizacion
+              </button>
+            </div>
+            <div className={`mb-4 rounded-2xl border px-4 py-3 text-sm ${
+              activeTab === "details"
+                ? "border-slate-200 bg-slate-50 text-slate-600"
+                : "border-red-100 bg-red-50/70 text-slate-700"
+            }`}>
+              {activeTab === "details"
+                ? "Usa esta pestaña para eventos generales que no estén vinculados a ningún expediente."
+                : "Usa esta pestaña cuando el evento esté relacionado con un expediente o con un cliente del despacho."}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Tipo</label>
               <select
                 value={form.type}
                 onChange={e => set("type", e.target.value)}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-red-400 bg-white"
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none"
               >
                 {Object.entries(EVENT_TYPES).map(([k, v]) => (
                   <option key={k} value={k}>{v.label}</option>
@@ -234,17 +414,18 @@ function EventModal({
               <select
                 value={form.status}
                 onChange={e => set("status", e.target.value)}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-red-400 bg-white"
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none"
               >
                 {STATUS_OPTS.map(s => (
                   <option key={s.value} value={s.value}>{s.label}</option>
                 ))}
               </select>
             </div>
+            </div>
           </div>
 
           {/* Todo el día */}
-          <label className="flex items-center gap-2 cursor-pointer">
+          <label className="hidden">
             <input
               type="checkbox"
               checked={form.all_day}
@@ -255,7 +436,7 @@ function EventModal({
           </label>
 
           {/* Fechas */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="hidden">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
                 {form.all_day ? "Fecha" : "Inicio"} <span className="text-red-500">*</span>
@@ -282,59 +463,301 @@ function EventModal({
           </div>
 
           {/* Lugar */}
-          <div>
+          <div className={`rounded-[28px] border p-5 shadow-[0_16px_40px_rgba(15,23,42,0.05)] lg:col-start-1 ${activeTab === "details" ? "border-red-100 bg-white" : "hidden"}`}>
             <label className="block text-xs font-bold text-slate-700 mb-1">Lugar / ubicación</label>
             <input
               value={form.location}
               onChange={e => set("location", e.target.value)}
               placeholder="Ej: Sala A, Juzgado nº3, Online…"
-              className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-red-400"
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none"
             />
           </div>
 
           {/* Descripción */}
-          <div>
+          <div className={`rounded-[28px] border p-5 shadow-[0_16px_40px_rgba(15,23,42,0.05)] lg:col-start-1 ${activeTab === "details" ? "border-red-100 bg-white" : "hidden"}`}>
             <label className="block text-xs font-bold text-slate-700 mb-1">Notas</label>
             <textarea
               value={form.description}
               onChange={e => set("description", e.target.value)}
               placeholder="Notas adicionales sobre el evento…"
-              rows={2}
-              className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-red-400 resize-none"
+              rows={8}
+              className="w-full rounded-[24px] border border-slate-200 bg-slate-50/70 px-4 py-4 text-sm text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none resize-none"
             />
           </div>
 
-          {/* Botones */}
-          <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-            {event ? (
-              <button
-                type="button"
-                onClick={() => onDelete(event.id)}
-                disabled={saving}
-                className="flex items-center gap-1.5 text-xs text-red-500 hover:text-red-700 font-semibold px-3 py-2 rounded-xl hover:bg-red-50 transition-colors"
-              >
-                <Trash2 size={13} /> Eliminar
-              </button>
-            ) : <span />}
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={saving || !form.title.trim()}
-                className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl disabled:opacity-50 transition-colors"
-              >
-                {saving && <Loader2 size={12} className="animate-spin" />}
-                {event ? "Guardar cambios" : "Crear evento"}
-              </button>
+          <div className={`rounded-[28px] border p-5 shadow-[0_16px_40px_rgba(15,23,42,0.05)] lg:col-start-1 ${activeTab === "organization" ? "border-red-100 bg-gradient-to-br from-white to-red-50/40" : "hidden"}`}>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Contexto</label>
+                <textarea
+                  value={form.organization_context}
+                  onChange={e => set("organization_context", e.target.value)}
+                  placeholder="Escribe el contexto del evento dentro del expediente..."
+                  rows={4}
+                  className="w-full rounded-[24px] border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700 focus:border-red-400 focus:outline-none resize-none"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Expediente existente</label>
+                  <select
+                    value={form.expediente_id}
+                    onChange={e => {
+                      const nextId = e.target.value;
+                      const expediente = organizationExpedientes.find((item) => item.id === nextId);
+                      set("expediente_id", nextId);
+                      set("cliente_id", expediente?.cliente_id || "");
+                    }}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-red-400 focus:outline-none"
+                  >
+                    <option value="">Seleccionar expediente...</option>
+                    {expedientesForSelectedUser.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {(item.ref_expediente || item.ref_propia || item.id)} · {item.descripcion || "Sin descripcion"}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Usuario existente</label>
+                  <select
+                    value={form.related_user_id}
+                    onChange={e => {
+                      const nextId = e.target.value;
+                      const selectedUser = organizationUsers.find((item) => item.user_id === nextId);
+                      set("related_user_id", nextId);
+                      set("related_user_name", selectedUser?.user_name || "");
+                    }}
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-red-400 focus:outline-none"
+                  >
+                    <option value="">Seleccionar usuario...</option>
+                    {usersForSelectedExpediente.map((item) => (
+                      <option key={item.user_id} value={item.user_id}>
+                        {item.user_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Cliente vinculado</label>
+                  <input
+                    value={selectedExpediente?.cliente_nombre || form.cliente_id || ""}
+                    onChange={e => set("cliente_id", e.target.value)}
+                    placeholder="Cliente del expediente"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-red-400 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Usuario seleccionado</label>
+                  <input
+                    value={form.related_user_name || ""}
+                    onChange={e => set("related_user_name", e.target.value)}
+                    placeholder="Nombre del usuario relacionado"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-red-400 focus:outline-none"
+                  />
+                </div>
+              </div>
+              <div className="rounded-2xl border border-red-100 bg-red-50/70 px-4 py-4 text-sm text-slate-600">
+                <div className="font-semibold text-red-700">Contexto del ERP</div>
+                <p className="mt-1">Puedes seleccionar un expediente existente, un usuario existente vinculado a ese expediente y dejar por escrito el contexto del evento.</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4 lg:col-start-2">
+            <div className="rounded-[28px] border border-red-100 bg-gradient-to-br from-white to-red-50/40 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.05)]">
+              <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-800">
+                <Users size={16} className="text-red-600" />
+                Resumen
+              </div>
+              <div className="space-y-3 text-sm">
+                <div className="rounded-2xl border border-red-100 bg-white px-4 py-3">
+                  <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Tipo</div>
+                  <div className="mt-1 font-semibold text-slate-700">{typeConf.label}</div>
+                </div>
+                <div className="rounded-2xl border border-amber-100 bg-amber-50/60 px-4 py-3">
+                  <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Estado</div>
+                  <div className={`mt-1 inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${statusConf.cls}`}>
+                    {statusConf.label}
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-blue-100 bg-blue-50/60 px-4 py-3">
+                  <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Sincronizacion</div>
+                  <div className="mt-1 text-slate-600">
+                    {event?.external_provider === "google"
+                      ? "Este evento esta vinculado con Google Calendar."
+                      : "Si Google esta conectado, se sincronizara al guardar."}
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Relacion</div>
+                  <div className="mt-1 text-slate-700">
+                    {activeTab === "organization"
+                      ? "Relacionado con expediente"
+                      : "Evento independiente"}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_16px_40px_rgba(15,23,42,0.05)]">
+              <div className="mb-3 text-sm font-semibold text-slate-800">Acciones</div>
+              <div className="space-y-2">
+                {event ? (
+                  <button
+                    type="button"
+                    onClick={() => onDelete(event.id)}
+                    disabled={saving}
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600 transition-colors hover:bg-red-100 disabled:opacity-50"
+                  >
+                    <Trash2 size={14} /> Eliminar evento
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50"
+                >
+                  Cancelar
+                </button>
+              </div>
             </div>
           </div>
         </form>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+function GoogleEventModal({
+  event,
+  importing,
+  onClose,
+  onImport,
+}: {
+  event: GCalEvent;
+  importing: boolean;
+  onClose: () => void;
+  onImport: (event: GCalEvent) => Promise<void>;
+}) {
+  const startDate = event.start.dateTime
+    ? new Date(event.start.dateTime)
+    : (event.start.date ? new Date(`${event.start.date}T12:00:00`) : null);
+  const endDate = event.end.dateTime
+    ? new Date(event.end.dateTime)
+    : (event.end.date ? new Date(`${event.end.date}T12:00:00`) : null);
+  const isAllDay = !event.start.dateTime;
+
+  const readOnlyField =
+    "w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-700 bg-slate-50/80";
+
+  return createPortal(
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="px-5 py-4 flex items-center justify-between bg-blue-600 text-white">
+          <div className="flex items-center gap-2.5">
+            <img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_16dp.png" alt="Google Calendar" className="w-5 h-5" />
+            <span className="font-bold text-sm">Evento de Google Calendar</span>
+          </div>
+          <BackButton onClick={onClose} variant="dark" />
+        </div>
+
+        <div className="p-5 space-y-4 overflow-y-auto max-h-[70vh]">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Titulo</label>
+            <input value={event.summary || "(Sin titulo)"} readOnly className={readOnlyField} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Tipo</label>
+              <input value="Google Calendar" readOnly className={readOnlyField} />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Estado</label>
+              <input value={event.status || "confirmado"} readOnly className={readOnlyField} />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Todo el dia</label>
+            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/80 px-3.5 py-2.5 text-sm text-slate-700">
+              <CheckCircle2 size={15} className={isAllDay ? "text-emerald-500" : "text-slate-300"} />
+              <span>{isAllDay ? "Si" : "No"}</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">{isAllDay ? "Fecha" : "Inicio"}</label>
+              <input
+                value={startDate ? startDate.toLocaleString("es-ES") : ""}
+                readOnly
+                className={readOnlyField}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">{isAllDay ? "Fin" : "Fin"}</label>
+              <input
+                value={endDate ? endDate.toLocaleString("es-ES") : (isAllDay ? "Todo el dia" : "")}
+                readOnly
+                className={readOnlyField}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Lugar / ubicacion</label>
+            <input value={event.location || "Sin ubicacion"} readOnly className={readOnlyField} />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Notas</label>
+            <textarea
+              value={stripHtml(event.description) || "Sin descripcion"}
+              readOnly
+              rows={3}
+              className={`${readOnlyField} resize-none`}
+            />
+          </div>
+
+          <div className="rounded-2xl border border-blue-100 bg-blue-50/70 px-4 py-3">
+            <div className="flex items-center gap-2 text-blue-700 text-sm font-semibold">
+              <img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_16dp.png" alt="" className="w-4 h-4" />
+              Acciones de Google Calendar
+            </div>
+            <p className="text-xs text-blue-600 mt-1">
+              Este evento viene de Google. Puedes abrirlo alli o traerlo al ERP manteniendo el vinculo.
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+            <span className="text-xs text-slate-400">Evento externo vinculado con Google</span>
+            <div className="flex gap-2">
+              <a
+                href={event.htmlLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-xl hover:bg-blue-100 transition-colors"
+              >
+                <ExternalLink size={12} /> Abrir en Google
+              </a>
+              <button
+                type="button"
+                onClick={() => onImport(event)}
+                disabled={importing}
+                className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl disabled:opacity-50 transition-colors"
+              >
+                {importing ? <Loader2 size={12} className="animate-spin" /> : <Link2 size={12} />}
+                Importar al ERP
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>,
     document.body
@@ -353,6 +776,9 @@ export default function Agenda() {
 
   // Datos LexTech
   const [events,   setEvents]   = useState<AgendaEvent[]>([]);
+  const [draggingEventId, setDraggingEventId] = useState<string | null>(null);
+  const [dragOverDay, setDragOverDay] = useState<string | null>(null);
+  const [movingEventId, setMovingEventId] = useState<string | null>(null);
   const [loading,  setLoading]  = useState(true);
 
   // ── Google Calendar ──────────────────────────────────────────────────────────
@@ -363,6 +789,8 @@ export default function Agenda() {
   const [gcalLoading,  setGcalLoading]  = useState(false);
   const [gcalError,    setGcalError]    = useState<string | null>(null);
   const [gcalEnabled,  setGcalEnabled]  = useState(!!gcalToken);
+  const [gcalNotice,   setGcalNotice]   = useState<string | null>(null);
+  const [gcalImporting, setGcalImporting] = useState(false);
 
   const fetchGcalEvents = useCallback(async (token: string, year: number, month: number) => {
     setGcalLoading(true);
@@ -385,6 +813,10 @@ export default function Agenda() {
         return;
       }
       const data = await res.json();
+      if (!res.ok) {
+        setGcalError(data?.error?.message || "No se pudieron leer los eventos de Google Calendar.");
+        return;
+      }
       setGcalEvents(data.items || []);
     } catch {
       setGcalError("Error al obtener eventos de Google Calendar.");
@@ -414,6 +846,7 @@ export default function Agenda() {
         setGcalToken(token);
         setGcalEnabled(true);
         setGcalError(null);
+        setGcalNotice("Google Calendar conectado correctamente.");
         try { sessionStorage.setItem(GCAL_TOKEN_KEY, token); } catch {}
         fetchGcalEvents(token, viewYear, viewMonth);
       },
@@ -426,8 +859,61 @@ export default function Agenda() {
     setGcalEnabled(false);
     setGcalEvents([]);
     setGcalError(null);
+    setGcalNotice("Google Calendar desconectado.");
     try { sessionStorage.removeItem(GCAL_TOKEN_KEY); } catch {}
   }, []);
+
+  const requestGoogleCalendar = useCallback(async (
+    path: string,
+    options: RequestInit = {},
+  ) => {
+    if (!gcalToken) {
+      throw new Error("Conecta Google Calendar para sincronizar este evento.");
+    }
+
+    const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary${path}`, {
+      ...options,
+      headers: {
+        Authorization: `Bearer ${gcalToken}`,
+        "Content-Type": "application/json",
+        ...(options.headers || {}),
+      },
+    });
+
+    const data = await safeJson(res);
+
+    if (!res.ok) {
+      const message =
+        data?.error?.message ||
+        data?.error_description ||
+        data?.error ||
+        "Error al sincronizar con Google Calendar.";
+      throw new Error(message);
+    }
+
+    return data;
+  }, [gcalToken]);
+
+  const createGoogleCalendarEvent = useCallback(async (data: any) => {
+    return requestGoogleCalendar("/events", {
+      method: "POST",
+      body: JSON.stringify(buildGooglePayload(data)),
+    });
+  }, [requestGoogleCalendar]);
+
+  const updateGoogleCalendarEvent = useCallback(async (externalId: string, data: any) => {
+    return requestGoogleCalendar(`/events/${externalId}`, {
+      method: "PUT",
+      body: JSON.stringify(buildGooglePayload(data)),
+    });
+  }, [requestGoogleCalendar]);
+
+  const deleteGoogleCalendarEvent = useCallback(async (externalId: string) => {
+    await requestGoogleCalendar(`/events/${externalId}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "text/plain;charset=UTF-8" },
+    });
+  }, [requestGoogleCalendar]);
 
   // Re-fetch gcal events cuando cambia el mes o el token
   useEffect(() => {
@@ -440,15 +926,44 @@ export default function Agenda() {
   const gcalEventsByDay = useMemo(() => {
     const map: Record<string, GCalEvent[]> = {};
     for (const ev of gcalEvents) {
+      const alreadyImported = events.some(
+        (agendaEv) => agendaEv.external_provider === "google" && agendaEv.external_id === ev.id
+      );
+      if (alreadyImported) continue;
       const dateStr = ev.start.dateTime
-        ? ev.start.dateTime.slice(0, 10)
+        ? localDateKey(ev.start.dateTime)
         : ev.start.date || "";
       if (!dateStr) continue;
       if (!map[dateStr]) map[dateStr] = [];
       map[dateStr].push(ev);
     }
     return map;
-  }, [gcalEvents]);
+  }, [gcalEvents, events]);
+
+  const importedGoogleEventMap = useMemo(() => {
+    const map = new Map<string, AgendaEvent>();
+    for (const ev of events) {
+      if (ev.external_provider === "google" && ev.external_id) {
+        map.set(ev.external_id, ev);
+      }
+    }
+    return map;
+  }, [events]);
+
+  const visiblePendingGcalEvents = useMemo(
+    () => gcalEvents.filter((ev) => !importedGoogleEventMap.has(ev.id)),
+    [gcalEvents, importedGoogleEventMap]
+  );
+
+  const importedVisibleGcalCount = useMemo(
+    () => gcalEvents.filter((ev) => importedGoogleEventMap.has(ev.id)).length,
+    [gcalEvents, importedGoogleEventMap]
+  );
+  const smoothVisiblePendingGcalCount = useDeferredValue(visiblePendingGcalEvents.length);
+  const smoothImportedVisibleGcalCount = useDeferredValue(importedVisibleGcalCount);
+  const smoothGcalVisibleCount = useDeferredValue(gcalEvents.length);
+  const smoothGcalError = useDeferredValue(gcalError);
+  const smoothGcalNotice = useDeferredValue(gcalNotice);
 
   // Modal
   const [showModal,    setShowModal]    = useState(false);
@@ -460,6 +975,8 @@ export default function Agenda() {
 
   // Modal Google Calendar event (solo lectura)
   const [gcalModal,    setGcalModal]    = useState<GCalEvent | null>(null);
+  const [organizationExpedientes, setOrganizationExpedientes] = useState<AgendaOrganizationExpediente[]>([]);
+  const [organizationUsers, setOrganizationUsers] = useState<AgendaOrganizationUser[]>([]);
 
   // Cargar eventos del mes visible + buffer
   const fetchEvents = useCallback(async (silent = false) => {
@@ -482,6 +999,138 @@ export default function Agenda() {
   useEffect(() => { fetchEvents(); }, [fetchEvents]);
   useAutoRefresh(() => fetchEvents(true), { intervalMs: 30_000 });
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await getToken({ skipCache: true });
+        const [optionsRes, usersRes] = await Promise.all([
+          fetch("/api/agenda/options", { headers: { Authorization: `Bearer ${token}` } }),
+          fetch("/api/chat/usuarios", { headers: { Authorization: `Bearer ${token}` } }),
+        ]);
+        const [optionsJson, usersJson] = await Promise.all([safeJson(optionsRes), safeJson(usersRes)]);
+        if (cancelled) return;
+        if (optionsRes.ok) {
+          setOrganizationExpedientes(optionsJson?.data?.expedientes || []);
+        }
+        if (usersRes.ok) {
+          setOrganizationUsers(usersJson?.data || []);
+        }
+      } catch (_e) {}
+    })();
+    return () => { cancelled = true; };
+  }, [getToken]);
+
+  const importGoogleEventsToAgenda = useCallback(async (items: GCalEvent[]) => {
+    if (!items.length) {
+      setGcalNotice("No hay eventos nuevos de Google para importar en este periodo.");
+      return;
+    }
+
+    setGcalImporting(true);
+    setGcalError(null);
+    setGcalNotice(null);
+
+    try {
+      const token = await getToken({ skipCache: true });
+      const payload = items.map((ev) => ({
+        id: ev.id,
+        summary: ev.summary,
+        description: ev.description,
+        location: ev.location,
+        start: ev.start,
+        end: ev.end,
+        htmlLink: ev.htmlLink,
+        status: ev.status,
+      }));
+
+      const res = await fetch("/api/agenda/import-google", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ events: payload }),
+      });
+      const data = await safeJson(res);
+
+      if (!res.ok) {
+        setGcalError(data?.error || "No se pudieron importar los eventos de Google.");
+        return;
+      }
+
+      const summary = data?.data?.summary;
+      const imported = Number(summary?.imported || 0);
+      const skipped = Number(summary?.skipped || 0);
+      const errors = Number(summary?.errors || 0);
+      const firstError = data?.data?.errors?.[0]?.error as string | undefined;
+
+      if (errors > 0 && firstError) {
+        setGcalError(`Error al importar desde Google: ${firstError}`);
+      }
+
+      setGcalNotice(
+        `Sincronizacion completada: ${imported} importados, ${skipped} ya vinculados y ${errors} con error.`
+      );
+      await fetchEvents(true);
+    } catch (_e) {
+      setGcalError("Error de conexion al importar eventos de Google.");
+    } finally {
+      setGcalImporting(false);
+    }
+  }, [fetchEvents, getToken]);
+
+  const syncGoogleEventsToErp = useCallback(async (items: GCalEvent[]) => {
+    if (!gcalEnabled || !gcalToken) return;
+
+    try {
+      const token = await getToken({ skipCache: true });
+      const from = new Date(viewYear, viewMonth - 1, 15).toISOString();
+      const to = new Date(viewYear, viewMonth + 2, 15).toISOString();
+      const payload = items.map((ev) => ({
+        id: ev.id,
+        summary: ev.summary,
+        description: stripHtml(ev.description),
+        location: ev.location,
+        start: ev.start,
+        end: ev.end,
+        htmlLink: ev.htmlLink,
+        status: ev.status,
+      }));
+
+      const res = await fetch("/api/agenda/sync-google", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ events: payload, from, to }),
+      });
+      const data = await safeJson(res);
+
+      if (!res.ok) {
+        setGcalError(data?.error || "No se pudo sincronizar Google Calendar con el ERP.");
+        return;
+      }
+
+      const summary = data?.data?.summary;
+      const changed = Number(summary?.created || 0) + Number(summary?.updated || 0) + Number(summary?.deleted || 0);
+      if (changed > 0) {
+        setGcalNotice(
+          `Google sincronizado: ${summary?.created || 0} creados, ${summary?.updated || 0} actualizados y ${summary?.deleted || 0} eliminados en ERP.`
+        );
+      }
+      await fetchEvents(true);
+    } catch (_e) {
+      setGcalError("Error al sincronizar automaticamente Google Calendar con el ERP.");
+    }
+  }, [fetchEvents, getToken, gcalEnabled, gcalToken, viewMonth, viewYear]);
+
+  useEffect(() => {
+    if (!gcalEnabled || !gcalToken || gcalEvents.length === 0) return;
+    syncGoogleEventsToErp(gcalEvents);
+  }, [gcalEnabled, gcalToken, gcalEvents, syncGoogleEventsToErp]);
+
   // Navegar mes
   const prevMonth = () => {
     if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11); }
@@ -501,7 +1150,7 @@ export default function Agenda() {
   const eventsByDay = useMemo(() => {
     const map: Record<string, AgendaEvent[]> = {};
     for (const ev of events) {
-      const key = ev.start_at.slice(0, 10);
+      const key = localDateKey(ev.start_at);
       if (!map[key]) map[key] = [];
       map[key].push(ev);
     }
@@ -527,13 +1176,82 @@ export default function Agenda() {
       const res    = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          source: editEvent?.source || data.source,
+          external_provider: editEvent?.external_provider || data.external_provider,
+          external_id: editEvent?.external_id || data.external_id,
+          external_url: editEvent?.external_url || data.external_url,
+        }),
       });
       const json = await safeJson(res);
       if (!res.ok) { setErrorMsg(json?.error || "Error al guardar"); return; }
+      const savedEvent = json?.data as AgendaEvent | undefined;
+      let syncWarning: string | null = null;
+      if (savedEvent && gcalEnabled) {
+        try {
+          if (savedEvent.external_provider === "google" && savedEvent.external_id) {
+            const googleUpdated = await updateGoogleCalendarEvent(savedEvent.external_id, {
+              ...data,
+              start_at: savedEvent.start_at,
+              end_at: savedEvent.end_at,
+            });
+
+            const syncRes = await fetch(`/api/agenda/${savedEvent.id}`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+              body: JSON.stringify({
+                ...savedEvent,
+                external_url: googleUpdated?.htmlLink || savedEvent.external_url,
+                source: savedEvent.source || "manual",
+                external_provider: "google",
+                external_id: savedEvent.external_id,
+              }),
+            });
+
+            if (!syncRes.ok) {
+              const syncJson = await safeJson(syncRes);
+              syncWarning = syncJson?.error || "El evento se guardo en el ERP, pero no se pudo actualizar en Google.";
+            } else {
+              setGcalNotice("Evento actualizado en el ERP y en Google Calendar.");
+            }
+          } else {
+            const googleCreated = await createGoogleCalendarEvent({
+              ...data,
+              start_at: savedEvent.start_at,
+              end_at: savedEvent.end_at,
+            });
+
+            const syncRes = await fetch(`/api/agenda/${savedEvent.id}`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+              body: JSON.stringify({
+                ...savedEvent,
+                source: savedEvent.source || "manual",
+                external_provider: "google",
+                external_id: googleCreated?.id,
+                external_url: googleCreated?.htmlLink,
+              }),
+            });
+
+            if (!syncRes.ok) {
+              const syncJson = await safeJson(syncRes);
+              syncWarning = syncJson?.error || "El evento se guardo en el ERP, pero no se pudo registrar en Google.";
+            } else {
+              setGcalNotice("Evento sincronizado tambien con Google Calendar.");
+            }
+          }
+        } catch (syncError: any) {
+          syncWarning = syncError?.message || "El evento se guardo en el ERP, pero fallo la sincronizacion con Google.";
+        }
+      } else if (savedEvent?.external_provider === "google" && !gcalEnabled) {
+        syncWarning = "El evento esta vinculado con Google, pero no hay una sesion activa para actualizarlo alli.";
+      }
+
       setShowModal(false);
       setEditEvent(null);
       await fetchEvents(true);
+      if (syncWarning) setGcalError(syncWarning);
     } catch (_e) {
       setErrorMsg("Error de conexión");
     } finally {
@@ -545,12 +1263,27 @@ export default function Agenda() {
   const handleDelete = async (id: string) => {
     setSaving(true); setErrorMsg(null);
     try {
+      const deletingEvent = events.find((ev) => ev.id === id) || editEvent;
       const token = await getToken({ skipCache: true });
       const res = await fetch(`/api/agenda/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) { const j = await safeJson(res); setErrorMsg(j?.error || "Error al eliminar"); return; }
+
+      if (deletingEvent?.external_provider === "google" && deletingEvent.external_id) {
+        try {
+          if (!gcalEnabled) {
+            setGcalError("El evento se elimino del ERP, pero sigue en Google porque no hay una sesion activa para borrarlo alli.");
+          } else {
+            await deleteGoogleCalendarEvent(deletingEvent.external_id);
+            setGcalNotice("Evento eliminado en el ERP y en Google Calendar.");
+          }
+        } catch (syncError: any) {
+          setGcalError(syncError?.message || "El evento se elimino del ERP, pero no se pudo borrar de Google.");
+        }
+      }
+
       setShowModal(false);
       setEditEvent(null);
       setDeleteConfirm(null);
@@ -559,6 +1292,114 @@ export default function Agenda() {
       setErrorMsg("Error de conexión");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleQuickMoveEvent = async (ev: AgendaEvent, targetDateKey: string) => {
+    const originalDateKey = localDateKey(ev.start_at);
+    if (originalDateKey === targetDateKey) return;
+
+    const nextStart = moveIsoToDateKeepingTime(ev.start_at, targetDateKey);
+    const nextEnd = ev.end_at ? moveIsoToDateKeepingTime(ev.end_at, targetDateKey) : null;
+    const previousEvents = events;
+    const optimisticEvent = { ...ev, start_at: nextStart, end_at: nextEnd };
+
+    try {
+      setErrorMsg(null);
+      setMovingEventId(ev.id);
+      setSelectedDay(targetDateKey);
+      setEvents((prev) => prev.map((item) => item.id === ev.id ? optimisticEvent : item));
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/agenda/${ev.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          ...ev,
+          start_at: nextStart,
+          end_at: nextEnd,
+        }),
+      });
+      const json = await safeJson(res);
+      if (!res.ok) {
+        setEvents(previousEvents);
+        setErrorMsg(json?.error || "No se pudo mover el evento");
+        return;
+      }
+      const savedEvent = json?.data as AgendaEvent | undefined;
+      let syncWarning: string | null = null;
+
+      if (savedEvent && gcalEnabled) {
+        try {
+          if (savedEvent.external_provider === "google" && savedEvent.external_id) {
+            const googleUpdated = await updateGoogleCalendarEvent(savedEvent.external_id, {
+              ...savedEvent,
+              start_at: savedEvent.start_at,
+              end_at: savedEvent.end_at,
+            });
+
+            const syncRes = await fetch(`/api/agenda/${savedEvent.id}`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+              body: JSON.stringify({
+                ...savedEvent,
+                external_url: googleUpdated?.htmlLink || savedEvent.external_url,
+                source: savedEvent.source || "manual",
+                external_provider: "google",
+                external_id: savedEvent.external_id,
+              }),
+            });
+
+            if (!syncRes.ok) {
+              const syncJson = await safeJson(syncRes);
+              syncWarning = syncJson?.error || "El evento se movio en el ERP, pero no se pudo actualizar en Google.";
+            } else {
+              setGcalNotice("Evento movido en el ERP y en Google Calendar.");
+            }
+          } else if (!savedEvent.external_provider) {
+            const googleCreated = await createGoogleCalendarEvent({
+              ...savedEvent,
+              start_at: savedEvent.start_at,
+              end_at: savedEvent.end_at,
+            });
+
+            const syncRes = await fetch(`/api/agenda/${savedEvent.id}`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+              body: JSON.stringify({
+                ...savedEvent,
+                source: savedEvent.source || "manual",
+                external_provider: "google",
+                external_id: googleCreated?.id,
+                external_url: googleCreated?.htmlLink,
+              }),
+            });
+
+            if (!syncRes.ok) {
+              const syncJson = await safeJson(syncRes);
+              syncWarning = syncJson?.error || "El evento se movio en el ERP, pero no se pudo registrar en Google.";
+            } else {
+              setGcalNotice("Evento movido y sincronizado tambien con Google Calendar.");
+            }
+          }
+        } catch (syncError: any) {
+          syncWarning = syncError?.message || "El evento se movio en el ERP, pero fallo la sincronizacion con Google.";
+        }
+      } else if (savedEvent?.external_provider === "google" && !gcalEnabled) {
+        syncWarning = "El evento se movio en el ERP, pero no hay una sesion activa para actualizarlo en Google.";
+      }
+
+      await fetchEvents(true);
+      if (gcalEnabled && gcalToken) {
+        await fetchGcalEvents(gcalToken, viewYear, viewMonth);
+      }
+      if (syncWarning) setGcalError(syncWarning);
+    } catch (_e) {
+      setEvents(previousEvents);
+      setErrorMsg("Error al mover el evento");
+    } finally {
+      setMovingEventId(null);
+      setDraggingEventId(null);
+      setDragOverDay(null);
     }
   };
 
@@ -577,9 +1418,9 @@ export default function Agenda() {
   const todayStr = isoDate(today);
 
   return (
-    <div className="flex flex-col animate-in fade-in duration-500 -mx-6 -mt-6 h-[calc(100vh-80px)]">
+    <div className="agenda-google-shell flex flex-col animate-in fade-in duration-500 -mx-6 -mt-6 h-[calc(100vh-80px)]">
       {/* ── Cabecera ─────────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-100 bg-white shrink-0">
+      <div className="agenda-google-topbar flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-100 bg-white shrink-0">
         <div className="flex items-center gap-3">
           <div className="h-9 w-9 bg-red-50 rounded-xl flex items-center justify-center">
             <Calendar size={18} className="text-red-600" />
@@ -612,19 +1453,47 @@ export default function Agenda() {
 
           {/* ── Google Calendar ── */}
           {gcalEnabled ? (
-            <div className="flex items-center gap-1">
-              <div className="flex items-center gap-1.5 px-3 py-2 bg-white border border-emerald-200 rounded-xl">
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex min-w-[280px] items-center gap-2 rounded-xl border border-emerald-200 bg-white px-3 py-2 shadow-sm transition-all duration-300">
                 <img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_16dp.png" alt="GCal" className="w-4 h-4" />
-                <span className="text-xs font-semibold text-emerald-700">Google Calendar</span>
-                {gcalLoading && <Loader2 size={11} className="animate-spin text-emerald-500" />}
+                <div className="leading-tight">
+                  <div className="text-xs font-semibold text-emerald-700">Google Calendar vinculado</div>
+                  <div className="hidden text-[10px] text-slate-500 tabular-nums">
+                    {gcalEvents.length} visibles · {visiblePendingGcalEvents.length} por importar · {importedVisibleGcalCount} ya en ERP
+                  </div>
+                  <div className="text-[10px] text-slate-500 tabular-nums">
+                    <span key={`visible-${smoothGcalVisibleCount}`} className="inline-block animate-in fade-in slide-in-from-top-1 duration-300">
+                      {smoothGcalVisibleCount} visibles
+                    </span>
+                    <span className="mx-1.5 text-slate-300">·</span>
+                    <span key={`pending-${smoothVisiblePendingGcalCount}`} className="inline-block animate-in fade-in slide-in-from-top-1 duration-300">
+                      {smoothVisiblePendingGcalCount} por importar
+                    </span>
+                    <span className="mx-1.5 text-slate-300">·</span>
+                    <span key={`imported-${smoothImportedVisibleGcalCount}`} className="inline-block animate-in fade-in slide-in-from-top-1 duration-300">
+                      {smoothImportedVisibleGcalCount} ya en ERP
+                    </span>
+                  </div>
+                </div>
+                <div className={`ml-auto transition-all duration-300 ${gcalLoading ? "opacity-100 scale-100" : "opacity-0 scale-95"}`}>
+                  <Loader2 size={11} className="animate-spin text-emerald-500" />
+                </div>
               </div>
               <button
                 onClick={() => gcalToken && fetchGcalEvents(gcalToken, viewYear, viewMonth)}
-                disabled={gcalLoading}
-                title="Sincronizar ahora"
+                disabled={gcalLoading || gcalImporting}
+                title="Refrescar Google Calendar"
                 className="p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-50"
               >
                 <RefreshCw size={13} className={`text-slate-500 ${gcalLoading ? "animate-spin" : ""}`} />
+              </button>
+              <button
+                onClick={() => importGoogleEventsToAgenda(visiblePendingGcalEvents)}
+                disabled={gcalLoading || gcalImporting || visiblePendingGcalEvents.length === 0}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-red-600 border border-red-600 rounded-xl hover:bg-red-700 disabled:opacity-50 transition-colors shadow-sm"
+              >
+                {gcalImporting ? <Loader2 size={12} className="animate-spin" /> : <Link2 size={12} />}
+                Importar a agenda
               </button>
               <button
                 onClick={disconnectGcal}
@@ -644,11 +1513,14 @@ export default function Agenda() {
             </button>
           )}
 
-          {gcalError && (
-            <span className="text-xs text-red-600 bg-red-50 border border-red-200 px-2 py-1 rounded-lg max-w-xs truncate" title={gcalError}>
+          <div className="flex min-h-[32px] items-center gap-2">
+            <span className={`max-w-xs overflow-hidden rounded-lg border px-2 py-1 text-xs text-red-600 transition-all duration-300 ${smoothGcalError ? "translate-y-0 border-red-200 bg-red-50 opacity-100" : "pointer-events-none -translate-y-1 border-transparent bg-transparent opacity-0"}`} title={smoothGcalError || ""}>
               ⚠ {gcalError}
             </span>
-          )}
+            <span className={`max-w-sm overflow-hidden rounded-lg border px-2 py-1 text-xs text-emerald-700 transition-all duration-300 ${smoothGcalNotice ? "translate-y-0 border-emerald-200 bg-emerald-50 opacity-100" : "pointer-events-none -translate-y-1 border-transparent bg-transparent opacity-0"}`} title={smoothGcalNotice || ""}>
+              {smoothGcalNotice || " "}
+            </span>
+          </div>
 
           <button
             onClick={() => openNew()}
@@ -660,10 +1532,10 @@ export default function Agenda() {
       </div>
 
       {/* ── Cuerpo: calendario + panel día ────────────────────── */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <div className="agenda-google-body flex flex-1 min-h-0 overflow-hidden">
 
         {/* ── Rejilla calendario ─────────────────────────────── */}
-        <div className="flex-1 min-w-0 flex flex-col overflow-hidden border-r border-slate-100">
+        <div className="agenda-google-grid flex-1 min-w-0 flex flex-col overflow-hidden border-r border-slate-100">
           {/* Días de la semana */}
           <div className="grid grid-cols-7 border-b border-slate-100 bg-slate-50 shrink-0">
             {DIAS.map(d => (
@@ -699,9 +1571,37 @@ export default function Agenda() {
                   return (
                     <div
                       key={key}
-                      onClick={() => setSelectedDay(key)}
-                      className={`border-b border-r border-slate-100 min-h-[90px] p-1.5 cursor-pointer transition-colors ${
-                        isSel   ? "bg-red-50/60"
+                      onDragOver={e => {
+                        if (!draggingEventId) return;
+                        e.preventDefault();
+                        if (dragOverDay !== key) setDragOverDay(key);
+                      }}
+                      onDragLeave={() => {
+                        if (dragOverDay === key) setDragOverDay(null);
+                      }}
+                      onDrop={async e => {
+                        e.preventDefault();
+                        const eventId = e.dataTransfer.getData("text/plain");
+                        const draggedEvent = events.find((item) => item.id === eventId);
+                        if (!draggedEvent) {
+                          setDraggingEventId(null);
+                          setDragOverDay(null);
+                          return;
+                        }
+                        await handleQuickMoveEvent(draggedEvent, key);
+                      }}
+                      onClick={() => {
+                        if (draggingEventId) return;
+                        setSelectedDay(key);
+                      }}
+                      onDoubleClick={() => {
+                        if (draggingEventId) return;
+                        setSelectedDay(key);
+                        openNew(key);
+                      }}
+                      className={`border-b border-r border-slate-100 min-h-[90px] p-1.5 cursor-pointer transition-all ${
+                        dragOverDay === key ? "bg-emerald-50/90 ring-2 ring-inset ring-emerald-300 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.08)]"
+                        : isSel   ? "bg-red-50/60"
                         : isToday ? "bg-amber-50/40"
                         : "hover:bg-slate-50"
                       }`}
@@ -730,16 +1630,37 @@ export default function Agenda() {
                           return (
                             <div
                               key={ev.id}
-                              onClick={e => { e.stopPropagation(); setSelectedDay(key); openEdit(ev); }}
-                              className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold truncate cursor-pointer hover:opacity-80 transition-opacity ${
-                                ev.status === "cancelado" ? "opacity-40 line-through" : ""
+                              draggable
+                              onDragStart={e => {
+                                e.dataTransfer.setData("text/plain", ev.id);
+                                e.dataTransfer.effectAllowed = "move";
+                                setDraggingEventId(ev.id);
+                                setDragOverDay(key);
+                              }}
+                              onDragEnd={() => {
+                                setDraggingEventId(null);
+                                setDragOverDay(null);
+                              }}
+                              onClick={e => { e.stopPropagation(); setSelectedDay(key); }}
+                              onDoubleClick={e => { e.stopPropagation(); setSelectedDay(key); openEdit(ev); }}
+                              className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold truncate cursor-move transition-all ${
+                                movingEventId === ev.id ? "opacity-70 scale-[0.98] shadow-sm ring-1 ring-emerald-200 bg-emerald-50/70" :
+                                ev.status === "cancelado" ? "opacity-40 line-through" : "hover:opacity-80"
                               }`}
+                              title="Arrastra para mover a otro día"
                             >
                               <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${tc.dot}`} />
                               <span className="truncate text-slate-700">
                                 {!ev.all_day && <span className="text-slate-400 mr-0.5">{fmtTime(ev.start_at)}</span>}
                                 {ev.title}
                               </span>
+                              {ev.external_provider === "google" && (
+                                <img
+                                  src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_16dp.png"
+                                  alt="Google Calendar"
+                                  className="w-2.5 h-2.5 shrink-0"
+                                />
+                              )}
                             </div>
                           );
                         })}
@@ -751,7 +1672,8 @@ export default function Agenda() {
                           return (
                             <div
                               key={`gcal-${ev.id}`}
-                              onClick={e => { e.stopPropagation(); setSelectedDay(key); setGcalModal(ev); }}
+                              onClick={e => { e.stopPropagation(); setSelectedDay(key); }}
+                              onDoubleClick={e => { e.stopPropagation(); setSelectedDay(key); setGcalModal(ev); }}
                               className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold truncate cursor-pointer hover:opacity-80 transition-opacity"
                             >
                               <img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_16dp.png" alt="" className="w-2 h-2 shrink-0" />
@@ -777,7 +1699,7 @@ export default function Agenda() {
         </div>
 
         {/* ── Panel día seleccionado ──────────────────────────── */}
-        <aside className="w-64 shrink-0 flex flex-col overflow-hidden bg-white">
+        <aside className="agenda-google-sidebar w-64 shrink-0 flex flex-col overflow-hidden bg-white">
           {/* cabecera panel */}
           <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50 shrink-0">
             <div className="flex items-center justify-between">
@@ -851,6 +1773,11 @@ export default function Agenda() {
                             <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${stConf.cls}`}>
                               {stConf.label}
                             </span>
+                            {ev.external_provider === "google" && (
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full border border-blue-200 bg-blue-50 text-blue-700">
+                                Google
+                              </span>
+                            )}
                           </div>
                         </div>
                         <Edit3 size={11} className="text-slate-200 group-hover:text-slate-400 shrink-0 mt-0.5 transition-colors" />
@@ -906,6 +1833,8 @@ export default function Agenda() {
         <EventModal
           event={editEvent}
           defaultDate={defaultDate}
+          organizationExpedientes={organizationExpedientes}
+          organizationUsers={organizationUsers}
           onClose={() => { setShowModal(false); setEditEvent(null); setErrorMsg(null); }}
           onSave={handleSave}
           onDelete={handleDelete}
@@ -914,84 +1843,16 @@ export default function Agenda() {
         />
       )}
 
-      {/* ── Modal detalle Google Calendar (solo lectura) ──────── */}
-      {gcalModal && createPortal(
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setGcalModal(null)} />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
-            {/* Cabecera */}
-            <div className="px-5 py-4 flex items-center justify-between bg-blue-600 text-white">
-              <div className="flex items-center gap-2.5">
-                <img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_16dp.png" alt="GCal" className="w-5 h-5" />
-                <span className="font-bold text-sm">Google Calendar</span>
-              </div>
-              <button onClick={() => setGcalModal(null)} className="p-1 rounded-lg hover:bg-white/20 transition-colors">
-                <X size={16} />
-              </button>
-            </div>
-
-            <div className="p-5 space-y-4">
-              {/* Título */}
-              <h2 className="text-lg font-bold text-slate-800">{gcalModal.summary}</h2>
-
-              {/* Fecha y hora */}
-              <div className="flex items-start gap-2 text-sm text-slate-600">
-                <Clock size={15} className="text-blue-500 mt-0.5 shrink-0" />
-                <div>
-                  {gcalModal.start.dateTime ? (
-                    <>
-                      <p>{new Date(gcalModal.start.dateTime).toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</p>
-                      <p className="text-slate-500">
-                        {new Date(gcalModal.start.dateTime).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
-                        {gcalModal.end.dateTime && <> – {new Date(gcalModal.end.dateTime).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}</>}
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <p>{gcalModal.start.date ? new Date(gcalModal.start.date + "T12:00:00").toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : ""}</p>
-                      <p className="text-slate-400">Todo el día</p>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Lugar */}
-              {gcalModal.location && (
-                <div className="flex items-center gap-2 text-sm text-slate-600">
-                  <MapPin size={15} className="text-blue-500 shrink-0" />
-                  <span>{gcalModal.location}</span>
-                </div>
-              )}
-
-              {/* Descripción */}
-              {gcalModal.description && (
-                <div className="bg-slate-50 rounded-xl p-3 text-sm text-slate-600 max-h-40 overflow-y-auto whitespace-pre-wrap">
-                  {gcalModal.description.replace(/<[^>]+>/g, "")}
-                </div>
-              )}
-
-              {/* Estado */}
-              <div className="flex items-center gap-2">
-                <CheckCircle2 size={14} className="text-emerald-500" />
-                <span className="text-xs text-slate-500 capitalize">{gcalModal.status}</span>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="px-5 pb-5 flex items-center justify-between">
-              <span className="text-xs text-slate-400">Solo lectura · Google Calendar</span>
-              <a
-                href={gcalModal.htmlLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors"
-              >
-                <ExternalLink size={12} /> Abrir en Google
-              </a>
-            </div>
-          </div>
-        </div>,
-        document.body
+      {gcalModal && (
+        <GoogleEventModal
+          event={gcalModal}
+          importing={gcalImporting}
+          onClose={() => setGcalModal(null)}
+          onImport={async (event) => {
+            await importGoogleEventsToAgenda([event]);
+            setGcalModal(null);
+          }}
+        />
       )}
     </div>
   );

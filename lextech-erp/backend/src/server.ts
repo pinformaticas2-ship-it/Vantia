@@ -12,8 +12,12 @@ import filesRoutes from './routes/files';
 import tasksRoutes from './routes/tasks';
 import expedientesRoutes from './routes/expedientes';
 import agendaRoutes from './routes/agenda';
-import chatRoutes   from './routes/chat';
-import emailRoutes  from './routes/email';
+import chatRoutes           from './routes/chat';
+import emailRoutes          from './routes/email';
+import whatsappRoutes       from './routes/whatsapp';
+import documentImportRoutes from './routes/documentImport';
+import documentalRoutes     from './routes/documental';
+import clientInviteRoutes   from './routes/clientInvite';
 import { runMigrations } from './config/migrations';
 import { startLocalFilesWatcher } from './watchers/localFilesWatcher';
 import { migrateLocalFoldersStructure } from './controllers/filesController';
@@ -78,8 +82,12 @@ app.use('/api/files',  filesRoutes);
 app.use('/api/tasks',       tasksRoutes);
 app.use('/api/expedientes', expedientesRoutes);
 app.use('/api/agenda',      agendaRoutes);
-app.use('/api/chat',        chatRoutes);
-app.use('/api/email',       emailRoutes);
+app.use('/api/chat',              chatRoutes);
+app.use('/api/email',             emailRoutes);
+app.use('/api/whatsapp',          whatsappRoutes);
+app.use('/api/expedientes/documents', documentImportRoutes);
+app.use('/api/documental',        documentalRoutes);
+app.use('/api/clientes/invites',  clientInviteRoutes);
 
 // Health check básico
 app.get('/health', (_req, res) => {
@@ -123,8 +131,6 @@ runMigrations().then(() => {
       migrateLocalFoldersStructure();
     }
     // Registrar arranque en trazabilidad
-    try { await logServerStart(); } catch (_e) {}
+    try { await logServerStart(); } catch { /**/ }
   });
-}).catch((error) => {
-  console.error('❌ Error arrancando backend:', error);
 });

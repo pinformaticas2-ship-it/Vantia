@@ -7,10 +7,11 @@ import {
   Trash2, Edit3, CornerDownRight, Users, Loader2, ChevronDown,
   Check, MessageSquare, Settings, LogOut, UserPlus, Crown,
   Globe, ChevronRight, MoreHorizontal, AtSign, Gavel,
-  Image as ImageIcon, Bell, Bold, Italic, Underline, Strikethrough,
+  Image as ImageIcon, Bell, BellOff, Bold, Italic, Underline, Strikethrough,
   Link2, List, ListOrdered, Code, AlignLeft, Paperclip, Mic,
   Video, Pencil, ChevronUp, Layers, MessagesSquare, Star, Download,
-  Share2, ExternalLink, Copy, Minus, RotateCcw,
+  Share2, ExternalLink, Copy, Minus, RotateCcw, Sparkles, Clock3, Eye,
+  PawPrint, UtensilsCrossed, Trophy, Flag, User, type LucideIcon,
 } from "lucide-react";
 import { safeJson } from "../lib/api";
 import { createPortal } from "react-dom";
@@ -53,7 +54,7 @@ interface SysUser {
 }
 interface Miembro {
   user_id: string; user_name: string; avatar_url: string | null;
-  role: string; role_label: string; status: string;
+  role: string; role_label: string; status: string; last_read_at?: string | null;
 }
 interface TypingUser {
   user_id: string;
@@ -81,220 +82,140 @@ const STATUS_CFG: Record<string, { label: string; color: string }> = {
   ausente:     { label:"Ausente",     color:"bg-slate-400"  },
   no_molestar: { label:"No molestar", color:"bg-red-900"    },
 };
-const GIPHY_KEY = "dc6zaTOxFJmzC";
 const CHAT_CANALES_CACHE_KEY = "chat-canales-cache-v1";
 const CHAT_USERS_CACHE_KEY = "chat-users-cache-v1";
 const CHAT_DM_ORDER_CACHE_KEY = "chat-dm-order-cache-v1";
 const CHAT_EMOJI_RECENTS_KEY = "chat-emoji-recents-v1";
+const CHAT_GIF_CACHE_KEY = "chat-gif-cache-v1";
+const CHAT_CUSTOM_STATUS_KEY = "chat-custom-status-v1";
+const CHAT_CUSTOM_STATUS_EMOJI_KEY = "chat-custom-status-emoji-v1";
+const CHAT_CUSTOM_STATUS_COLOR_KEY = "chat-custom-status-color-v1";
+const CHAT_NOTIFICATIONS_PAUSED_KEY = "chat-notifications-paused-v1";
 const API_ORIGIN = typeof window !== "undefined" ? window.location.origin : "";
 const MAX_RECENT_EMOJIS = 24;
+const EMOJI_API_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const GIF_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 const IMAGE_PLACEHOLDER_TEXT = "Imagen";
 const AVALENTIA_RED = "#ab0433";
 const AVALENTIA_RED_DARK = "#92042c";
-const EMOJI_SKIN_TONES = ["🏻", "🏼", "🏽", "🏾", "🏿"] as const;
+const GIPHY_API_KEY = import.meta.env.VITE_GIPHY_API_KEY?.trim() || "";
+const GIPHY_RATING = "g";
+const EMOJI_API_ACCESS_KEY = import.meta.env.VITE_EMOJI_API_KEY?.trim() || "";
+const EMOJI_API_URL = "https://emoji-api.com/emojis";
+const CUSTOM_STATUS_EMOJIS = ["💼", "⚖️", "🧠", "☕", "🏛️", "📞", "📝", "🚗"];
+const CUSTOM_STATUS_COLORS = [
+  { key: "emerald", className: "bg-emerald-500" },
+  { key: "blue", className: "bg-blue-500" },
+  { key: "amber", className: "bg-amber-500" },
+  { key: "violet", className: "bg-violet-500" },
+  { key: "rose", className: "bg-rose-500" },
+  { key: "slate", className: "bg-slate-500" },
+] as const;
 
-function withSkinToneVariants(emojis: string[]) {
-  return emojis.flatMap((emoji) => [emoji, ...EMOJI_SKIN_TONES.map((tone) => `${emoji}${tone}`)]);
+interface GiphyGif {
+  id: string;
+  title?: string;
+  slug?: string;
+  images: {
+    fixed_height_small?: { url: string };
+    fixed_height?: { url: string };
+    downsized_medium?: { url: string };
+    original?: { url: string };
+  };
 }
 
-const EMOJI_GROUPS = [
-  { key: "recent", label: "Recientes", icon: "🕘", emojis: [] as string[] },
-  { key: "smileys", label: "Caritas y emociones", icon: "😀", emojis: [
-    "😀","😃","😄","😁","😆","😅","🤣","😂","🙂","🙃","🫠","😉","😊","😇","🥰","😍","🤩","😘","😗","😚","😙","🥲","😋","😛","😜","🤪","😝","🤑","🤗","🫗","🤭","🫢","🫣","🤫","🤔","🫡","🤐","🤨","😐","😑","😶","🫥","😶‍🌫️","🙄","😬","🤥","🫨","😌","😔","😪","🤤","😴","😷","🤒","🤕","🤢","🤮","🤧","🥵","🥶","🥴","😵","😵‍💫","🤯","🤠","🥳","🥸","😎","🤓","🧐","😕","🫤","😟","🙁","☹️","😮","😯","😲","😳","🥺","🥹","😦","😧","😨","😰","😥","😢","😭","😱","😖","😣","😞","😓","😩","😫","🥱","😤","😡","😠","🤬","😈","👿","💀","☠️","💩","🤡","👹","👺","👻","👽","👾","🤖",
-    "😺","😸","😹","😻","😼","😽","🙀","😿","😾",
-    "💋","💌","💘","💝","💖","💗","💓","💞","💕","💟","❣️","💔","❤️‍🔥","❤️‍🩹","❤️","🩷","🧡","💛","💚","💙","🩵","💜","🤎","🖤","🩶","🤍",
-    "💯","💢","💥","💫","💦","💨","🕳️","💬","💭","💤"
-  ]},
-  { key: "people", label: "Personas y cuerpo", icon: "👋", emojis: [
-    ...withSkinToneVariants(["👋","🤚","🖐️","✋","🖖","🫱","🫲","🫳","🫴","🫷","🫸","👌","🤌","🤏","✌️","🤞","🫰","🤟","🤘","🤙","👈","👉","👆","👇","☝️","🫵","👍","👎","✊","👊","🤛","🤜","👏","🙌","🫶","👐","🤲","🤝","🙏","✍️","💅","🤳","💪","🦵","🦶","👂","🦻","👃","👶","🧒","👦","👧","🧑","👱","👨","🧔","👩","🧓","👴","👵","🙍","🙎","🙅","🙆","💁","🙋","🧏","🙇","🤦","🤷","👮","🕵️","💂","🥷","👷","🫅","🤴","👸","👳","👲","🧕","🤵","👰","🤰","🫃","🫄","🤱","👼","🎅","🤶","🦸","🦹","🧙","🧝","🧛","🧟","🧞","🧜","🧚","💆","💇","🚶","🧍","🧎","🏃","💃","🕺","👯","🧖","🧗","🏋️","🤼","🤸","🤾","🏌️","🏄","🚣","🧘"]),
-    "👋","🤚","🖐️","✋","🖖","🫱","🫲","🫳","🫴","🫷","🫸","👌","🤌","🤏","✌️","🤞","🫰","🤟","🤘","🤙","👈","👉","👆","🖕","👇","☝️","🫵","👍","👎","✊","👊","🤛","🤜","👏","🙌","🫶","👐","🤲","🤝","🙏","✍️","💅","🤳","💪","🦾","🦿","🦵","🦶","👂","🦻","👃","🫀","🫁","🧠","🦷","🦴","👀","👁️","👅","👄","🫦","👶","🧒","👦","👧","🧑","👱","👨","🧔","👩","🧓","👴","👵",
-    "🙍","🙎","🙅","🙆","💁","🙋","🧏","🙇","🤦","🤷",
-    "👮","🕵️","💂","🥷","👷","🫅","🤴","👸","👳","👲","🧕","🤵","👰","🤰","🫃","🫄","🤱","👼","🎅","🤶","🧑‍🎄","🦸","🦹","🧙","🧝","🧛","🧟","🧌","🧞","🧜","🧚","🧑‍🦰","🧑‍🦱","🧑‍🦳","🧑‍🦲",
-    "🧑‍⚕️","🧑‍🎓","🧑‍🏫","🧑‍⚖️","🧑‍🌾","🧑‍🍳","🧑‍🔧","🧑‍🏭","🧑‍💼","🧑‍🔬","🧑‍🎨","🧑‍🚒","🧑‍✈️","🧑‍🚀","🧑‍💻","🧑‍🎤","🧑‍🎨","🧑‍🦯","🧑‍🦼","🧑‍🦽",
-    "💆","💇","🚶","🧍","🧎","🏃","💃","🕺","🕴️","👯","🧖","🧗","🏇","🏋️","🤼","🤸","🤺","⛹️","🤾","🏌️","🏄","🚣","🧘","🛀","🛌","🧑‍🤝‍🧑","👫","👬","👭","💑","💏","👨‍👩‍👦","👨‍👩‍👧","👨‍👩‍👧‍👦","👨‍👦","👩‍👦","👨‍👧","👩‍👧",
-    "🗣️","👤","👥","🫂","🐾","👣"
-  ]},
-  { key: "animals", label: "Animales y naturaleza", icon: "🐶", emojis: [
-    "🐶","🐱","🐭","🐹","🐰","🦊","🐻","🐼","🐨","🐯","🦁","🐮","🐷","🐽","🐸","🐵","🙈","🙉","🙊","🐒","🐔","🐧","🐦","🐤","🐣","🐥","🦆","🦅","🦉","🦇","🐺","🐗","🐴","🦄","🐝","🪱","🐛","🦋","🐌","🐞","🐜","🪲","🦟","🦗","🪳","🕷️","🦂","🐢","🐍","🦎","🐊","🦕","🦖","🦏","🦛","🦍","🦧","🐘","🦣","🦒","🦘","🦬","🐃","🐂","🐄","🐎","🐖","🐏","🐑","🦙","🐐","🦌","🐕","🐩","🦮","🐈","🐈‍⬛","🐓","🦃","🦤","🦚","🦜","🦢","🦩","🕊️","🐇","🦝","🦨","🦡","🦫","🦦","🦥","🐁","🐀","🐿️","🦔",
-    "🌵","🎄","🌲","🌳","🌴","🪵","🌱","🌿","☘️","🍀","🎍","🪴","🎋","🍃","🍂","🍁","🪺","🪹","🍄","🌾","💐","🌷","🌹","🥀","🌺","🌸","🌼","🌻","🌞","🌝","🌛","🌜","🌚","🌕","🌖","🌗","🌘","🌑","🌒","🌓","🌔","🌙","🌟","⭐","🌠","🌌","☀️","🌤️","⛅","🌥️","☁️","🌦️","🌧️","⛈️","🌩️","🌨️","❄️","☃️","⛄","🌬️","💨","🌀","🌈","🌂","☂️","☔","⛱️","⚡","❄️","🌊","🌫️","🌁"
-  ]},
-  { key: "food", label: "Comida y bebida", icon: "🍔", emojis: [
-    "🍏","🍎","🍐","🍊","🍋","🍌","🍉","🍇","🍓","🫐","🍈","🍒","🍑","🥭","🍍","🥥","🥝","🍅","🍆","🥑","🫒","🥦","🥬","🥒","🌶️","🫑","🥑","🧄","🧅","🥔","🍠","🫚","🫛","🥐","🥯","🍞","🥖","🥨","🧀","🥚","🍳","🧈","🥞","🧇","🥓","🥩","🍗","🍖","🌭","🍔","🍟","🍕","🫓","🥙","🧆","🌮","🌯","🫔","🥗","🥘","🫕","🥫","🍝","🍜","🍲","🍛","🍣","🍱","🥟","🦪","🍤","🍙","🍚","🍘","🍥","🥮","🍢","🧁","🍰","🎂","🍮","🍭","🍬","🍫","🍿","🍩","🍪","🌰","🥜","🍯",
-    "🍼","🥛","☕","🫖","🍵","🧃","🥤","🧋","🍶","🍺","🍻","🥂","🍷","🥃","🍸","🍹","🧉","🍾","🧊","🥄","🍴","🍽️","🥣","🥗","🥘","🫕","🧂"
-  ]},
-  { key: "activities", label: "Actividades", icon: "⚽", emojis: [
-    "⚽","🏀","🏈","⚾","🥎","🎾","🏐","🏉","🥏","🎱","🏓","🏸","🏒","🏑","🥍","🏏","🪃","🥅","⛳","🪁","🏹","🎣","🤿","🥊","🥋","🎽","🛹","🛼","🛷","⛸️","🥌","🎿","⛷️","🏂","🪂","🏋️","🤼","🤸","🤺","⛹️","🤾","🏌️","🏇","🧘","🏄","🚣","🧗","🚵","🚴","🏆","🥇","🥈","🥉","🏅","🎖️","🏵️","🎗️","🎫","🎟️","🎪","🤹","🎭","🩰","🎨","🎬","🎤","🎧","🎼","🎹","🥁","🪘","🎷","🎺","🪗","🎸","🎻","🪕","🎲","♟️","🎯","🎳","🎮","🕹️","🎰","🧩",
-    "🎠","🎡","🎢","🎪","🎭","🎆","🎇","🧨","✨","🎉","🎊","🎈","🎋","🎍","🎎","🎏","🎐","🎑","🎃","🎄","🎆","🎇","🧧","🎀","🎁","🎗️","🎟️","🎫"
-  ]},
-  { key: "travel", label: "Viajes y lugares", icon: "✈️", emojis: [
-    "🚗","🚕","🚙","🚌","🚎","🏎️","🚓","🚑","🚒","🚐","🛻","🚚","🚛","🚜","🏗️","🛵","🦽","🦼","🛺","🚲","🛴","🛹","🛼","🚏","🛣️","🛤️","⛽","🚨","🚥","🚦","🛑","🚧","⚓","🛟","⛵","🚤","🛥️","🛳️","⛴️","🚢","✈️","🛩️","🛫","🛬","🪂","💺","🚁","🚟","🚠","🚡","🛰️","🚀","🛸",
-    "🌍","🌎","🌏","🗺️","🧭","🏔️","⛰️","🌋","🗻","🏕️","🏖️","🏜️","🏝️","🏞️","🏟️","🏛️","🏗️","🧱","🪨","🪵","🛖","🏘️","🏚️","🏠","🏡","🏢","🏣","🏤","🏥","🏦","🏨","🏩","🏪","🏫","🏬","🏭","🏯","🏰","💒","🗼","🗽","⛪","🕌","🛕","🕍","⛩️","🕋","⛲","⛺","🌁","🌃","🏙️","🌄","🌅","🌆","🌇","🌉","🌌","🌠","🎇","🎆","🌇","🌆","🗾","🌐"
-  ]},
-  { key: "objects", label: "Objetos", icon: "💡", emojis: [
-    "⌚","📱","📲","💻","⌨️","🖥️","🖨️","🖱️","🖲️","💽","💾","💿","📀","🧮","📷","📸","📹","🎥","📽️","🎞️","📞","☎️","📟","📠","📺","📻","🧭","⏱️","⏲️","⏰","🕰️","⌛","⏳","📡","🔋","🪫","🔌","💡","🔦","🕯️","🪔","🧯","🛢️","💸","💵","💴","💶","💷","🪙","💰","💳","💹","📈","📉","📊",
-    "📦","📫","📪","📬","📭","📮","🗳️","✏️","✒️","🖊️","🖋️","📝","📁","📂","🗂️","🗒️","🗓️","📆","📅","🗑️","📇","📋","📌","📍","🗺️","📏","📐","✂️","🗃️","🗄️","🗑️","🔒","🔓","🔏","🔐","🔑","🗝️","🔨","🪓","⛏️","⚒️","🛠️","🗡️","⚔️","🛡️","🪚","🔧","🪛","🔩","⚙️","🗜️","⚖️","🦯","🔗","⛓️","🪝","🧰","🪜","🧲","🪜",
-    "🧪","🧫","🧬","🔭","🔬","🩺","🩻","🩹","💊","💉","🩸","🧴","🧷","🧹","🧺","🧻","🪣","🧼","🫧","🪥","🧽","🧯","🛒","🚪","🪞","🪟","🛏️","🛋️","🪑","🚽","🪠","🚿","🛁","🪤","🪒","🧸","🪆","🖼️","🧵","🪡","🧶","🪢","🎀","🎁","🛍️","🎊","🎉","🪅","🪩"
-  ]},
-  { key: "symbols", label: "Símbolos", icon: "🔣", emojis: [
-    "❤️","🩷","🧡","💛","💚","💙","🩵","💜","🖤","🩶","🤍","🤎","💔","❤️‍🔥","❤️‍🩹","❣️","💕","💞","💓","💗","💖","💘","💝","💟",
-    "☮️","✝️","☪️","🕉️","☸️","🪯","✡️","🔯","🕎","☯️","☦️","🛐","⛎","♈","♉","♊","♋","♌","♍","♎","♏","♐","♑","♒","♓","🆔","⚛️","🉑","☢️","☣️","📴","📳","🈶","🈚","🈸","🈺","🈷️","✴️","🆚","💮","🉐","㊙️","㊗️","🈴","🈵","🈹","🈲","🅰️","🅱️","🆎","🆑","🅾️","🆘","❌","⭕","🛑","⛔","📛","🚫","💯","💢","♨️","🚷","🚯","🚳","🚱","🔞","📵","🔕",
-    "🔇","📢","📣","🔔","🔕","🎵","🎶","⚠️","🚸","⚡","🌀","🔱","⚜️","♻️","✅","🈳","❎","🌐","💠","Ⓜ️","🌀","💤","🏧","🚾","♿","🅿️","🛗","🈂️","🛂","🛃","🛄","🛅",
-    "🚹","🚺","🚻","🚼","🚾","⚠️","🚧","🔃","🔄","🔙","🔚","🛛","🔜","🔝","🆕","🆙","🆒","🆓","🆗","🆖","🅰️","🅱️","🆎","🆑","🅾️","🆘","✔️","☑️","🔘","🔵","🟤","⚫","⚪","🟣","🔴","🟠","🟡","🟢","🔷","🔹","🔶","🔸","🔺","🔻","💠","🔲","🔳","▪️","▫️","◾","◽","◼️","◻️","⬛","⬜","⬆️","↗️","➡️","↘️","⬇️","↙️","⬅️","↖️","↕️","↔️","↩️","↪️","⤴️","⤵️","🔃","🔄","🔙","🔚","🔛","🔜","🔝","🛐","⚛️","🕉️","✡️","☸️","☯️","✝️","☦️","☪️","☮️","🕎","🔯","♈","♉","♊","♋","♌","♍","♎","♏","♐","♑","♒","♓","⛎",
-    "#️⃣","*️⃣","0️⃣","1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣","🔟","🔠","🔡","🔢","🔣","🔤","🅰️","🆎","🅱️","🆑","🆒","🆓","ℹ️","🆔","Ⓜ️","🆕","🆖","🅾️","🆗","🅿️","🆘","🆙","🆚"
-  ]},
-  { key: "flags", label: "Banderas", icon: "🏁", emojis: [
-    "🏁","🚩","🎌","🏴","🏳️","🏳️‍🌈","🏳️‍⚧️","🏴‍☠️",
-    "🇦🇨","🇦🇩","🇦🇪","🇦🇫","🇦🇬","🇦🇮","🇦🇱","🇦🇲","🇦🇴","🇦🇶","🇦🇷","🇦🇸","🇦🇹","🇦🇺","🇦🇼","🇦🇽","🇦🇿",
-    "🇧🇦","🇧🇧","🇧🇩","🇧🇪","🇧🇫","🇧🇬","🇧🇭","🇧🇮","🇧🇯","🇧🇱","🇧🇲","🇧🇳","🇧🇴","🇧🇶","🇧🇷","🇧🇸","🇧🇹","🇧🇻","🇧🇼","🇧🇾","🇧🇿",
-    "🇨🇦","🇨🇨","🇨🇩","🇨🇫","🇨🇬","🇨🇭","🇨🇮","🇨🇰","🇨🇱","🇨🇲","🇨🇳","🇨🇴","🇨🇵","🇨🇷","🇨🇺","🇨🇻","🇨🇼","🇨🇽","🇨🇾","🇨🇿",
-    "🇩🇪","🇩🇬","🇩🇯","🇩🇰","🇩🇲","🇩🇴","🇩🇿",
-    "🇪🇦","🇪🇨","🇪🇪","🇪🇬","🇪🇭","🇪🇷","🇪🇸","🇪🇹","🇪🇺",
-    "🇫🇮","🇫🇯","🇫🇰","🇫🇲","🇫🇴","🇫🇷",
-    "🇬🇦","🇬🇧","🇬🇩","🇬🇪","🇬🇫","🇬🇬","🇬🇭","🇬🇮","🇬🇱","🇬🇲","🇬🇳","🇬🇵","🇬🇶","🇬🇷","🇬🇸","🇬🇹","🇬🇺","🇬🇼","🇬🇾",
-    "🇭🇰","🇭🇲","🇭🇳","🇭🇷","🇭🇹","🇭🇺",
-    "🇮🇨","🇮🇩","🇮🇪","🇮🇱","🇮🇲","🇮🇳","🇮🇴","🇮🇶","🇮🇷","🇮🇸","🇮🇹",
-    "🇯🇪","🇯🇲","🇯🇴","🇯🇵",
-    "🇰🇪","🇰🇬","🇰🇭","🇰🇮","🇰🇲","🇰🇳","🇰🇵","🇰🇷","🇰🇼","🇰🇾","🇰🇿",
-    "🇱🇦","🇱🇧","🇱🇨","🇱🇮","🇱🇰","🇱🇷","🇱🇸","🇱🇹","🇱🇺","🇱🇻","🇱🇾",
-    "🇲🇦","🇲🇨","🇲🇩","🇲🇪","🇲🇫","🇲🇬","🇲🇭","🇲🇰","🇲🇱","🇲🇲","🇲🇳","🇲🇴","🇲🇵","🇲🇶","🇲🇷","🇲🇸","🇲🇹","🇲🇺","🇲🇻","🇲🇼","🇲🇽","🇲🇾","🇲🇿",
-    "🇳🇦","🇳🇨","🇳🇪","🇳🇫","🇳🇬","🇳🇮","🇳🇱","🇳🇴","🇳🇵","🇳🇷","🇳🇺","🇳🇿",
-    "🇴🇲","🇵🇦","🇵🇪","🇵🇫","🇵🇬","🇵🇭","🇵🇰","🇵🇱","🇵🇲","🇵🇳","🇵🇷","🇵🇸","🇵🇹","🇵🇼","🇵🇾",
-    "🇶🇦","🇷🇪","🇷🇴","🇷🇸","🇷🇺","🇷🇼",
-    "🇸🇦","🇸🇧","🇸🇨","🇸🇩","🇸🇪","🇸🇬","🇸🇭","🇸🇮","🇸🇯","🇸🇰","🇸🇱","🇸🇲","🇸🇳","🇸🇴","🇸🇷","🇸🇸","🇸🇹","🇸🇻","🇸🇽","🇸🇾","🇸🇿",
-    "🇹🇦","🇹🇨","🇹🇩","🇹🇫","🇹🇬","🇹🇭","🇹🇯","🇹🇰","🇹🇱","🇹🇲","🇹🇳","🇹🇴","🇹🇷","🇹🇹","🇹🇻","🇹🇼","🇹🇿",
-    "🇺🇦","🇺🇬","🇺🇲","🇺🇳","🇺🇸","🇺🇾","🇺🇿",
-    "🇻🇦","🇻🇨","🇻🇪","🇻🇬","🇻🇮","🇻🇳","🇻🇺",
-    "🇼🇫","🇼🇸","🇽🇰","🇾🇪","🇾🇹","🇿🇦","🇿🇲","🇿🇼",
-    "🏴󠁧󠁢󠁥󠁮󠁧󠁿","🏴󠁧󠁢󠁳󠁣󠁴󠁿","🏴󠁧󠁢󠁷󠁬󠁳󠁿"
-  ]},
-];
-const EMOJI_FONT_STACK = "\"Noto Color Emoji\", \"Segoe UI Emoji\", \"Apple Color Emoji\", sans-serif";
-const EMOJI_SEARCH_TAGS: Record<string, string[]> = {
-  "😀":["cara","feliz","sonrisa","smile","happy"],
-  "😃":["cara","feliz","sonrisa"],
-  "😄":["cara","feliz","sonrisa"],
-  "😁":["cara","feliz","risa"],
-  "😅":["cara","nervios","sudor","alivio"],
-  "😂":["cara","risa","llorar","gracioso","laugh"],
-  "🤣":["cara","risa","gracioso"],
-  "🙂":["cara","ok","bien"],
-  "😊":["cara","agradable","contento"],
-  "😉":["cara","guiño"],
-  "😍":["cara","amor","ojos","corazon"],
-  "😘":["cara","beso","amor"],
-  "😎":["cara","gafas","cool"],
-  "🤓":["cara","friki","gafas"],
-  "🤩":["cara","estrellas","wow"],
-  "🥳":["cara","fiesta","celebrar"],
-  "😇":["cara","angel"],
-  "🙃":["cara","vuelta"],
-  "😌":["cara","calma","relax"],
-  "😴":["cara","sueño","dormir"],
-  "🤔":["cara","pensando","duda"],
-  "🫡":["cara","saludo","respeto"],
-  "😬":["cara","incomodo"],
-  "😮":["cara","sorpresa"],
-  "😢":["cara","triste","llorar"],
-  "😭":["cara","llorar","triste"],
-  "😡":["cara","enfado","rabia"],
-  "🤯":["cara","mente","explota"],
-  "🥲":["cara","emocion"],
-  "👍":["gesto","ok","bien","like"],
-  "👎":["gesto","mal","dislike"],
-  "👏":["gesto","aplauso","bravo"],
-  "🙌":["gesto","celebrar"],
-  "🙏":["gesto","gracias","rezar"],
-  "🤝":["gesto","trato","acuerdo","saludo"],
-  "👋":["gesto","hola","saludo"],
-  "💪":["gesto","fuerza"],
-  "✍️":["gesto","escribir","firma"],
-  "🫶":["gesto","amor","corazon"],
-  "👌":["gesto","perfecto"],
-  "✌️":["gesto","paz","victoria"],
-  "🤞":["gesto","suerte"],
-  "☝️":["gesto","arriba","idea"],
-  "👀":["ojos","mirar","atento"],
-  "💯":["simbolo","cien","perfecto"],
-  "✅":["simbolo","check","hecho","ok"],
-  "⚠️":["simbolo","aviso","alerta","warning"],
-  "🚀":["objeto","cohete","lanzamiento"],
-  "🎯":["objetivo","meta","target"],
-  "🔥":["fuego","top","urgente"],
-  "💡":["idea","bombilla"],
-  "📌":["trabajo","pin","marcar"],
-  "❤️":["amor","corazon","love"],
-  "💼":["trabajo","maletin","oficina"],
-  "📁":["trabajo","carpeta"],
-  "📂":["trabajo","carpeta","abrir"],
-  "📎":["trabajo","clip","adjunto"],
-  "🗂️":["trabajo","archivo","organizar"],
-  "📝":["trabajo","nota","escribir"],
-  "📊":["trabajo","grafico","datos"],
-  "📈":["trabajo","sube","crecimiento"],
-  "📉":["trabajo","baja","caida"],
-  "🧠":["trabajo","mente","pensar"],
-  "⚖️":["trabajo","legal","ley","justicia"],
-  "🏛️":["trabajo","juzgado","institucion"],
-  "📚":["trabajo","libros","estudiar"],
-  "📖":["trabajo","leer","libro"],
-  "🖋️":["trabajo","firma","pluma"],
-  "🧾":["trabajo","recibo","factura"],
-  "🔍":["trabajo","buscar","lupa"],
-  "💬":["chat","mensaje","hablar"],
-  "📣":["trabajo","anuncio","comunicar"],
-  "💻":["trabajo","ordenador"],
-  "⌨️":["trabajo","teclado"],
-  "📅":["trabajo","fecha","calendario"],
-  "🕒":["trabajo","hora","reloj"],
-  "✈️":["viaje","avion"],
-  "🚗":["viaje","coche"],
-  "🚕":["viaje","taxi"],
-  "🚆":["viaje","tren"],
-  "🛫":["viaje","salida"],
-  "🛬":["viaje","llegada"],
-  "🧳":["viaje","maleta"],
-  "🌍":["viaje","mundo"],
-  "🌎":["viaje","mundo"],
-  "🌏":["viaje","mundo"],
-  "🗺️":["viaje","mapa"],
-  "🏖️":["viaje","playa"],
-  "🏔️":["viaje","montaña"],
-  "🏨":["viaje","hotel"],
-  "📍":["viaje","ubicacion","pin"],
-  "🧭":["viaje","brujula"],
-  "☀️":["tiempo","sol"],
-  "🌤️":["tiempo","sol","nubes"],
-  "🌧️":["tiempo","lluvia"],
-  "⛅":["tiempo","nubes"],
-  "🌙":["tiempo","noche","luna"],
-  "⭐":["simbolo","estrella","favorito"],
-  "🎉":["fiesta","celebrar"],
-  "🎊":["fiesta","celebrar"],
-  "❌":["simbolo","error","cerrar"],
-  "❗":["simbolo","importante"],
-  "❓":["simbolo","pregunta"],
-  "➕":["simbolo","sumar","mas"],
-  "➖":["simbolo","menos","restar"],
-  "➗":["simbolo","dividir"],
-  "✖️":["simbolo","multiplicar","cerrar"],
-  "🔁":["simbolo","repetir","refresh"],
-  "🔒":["simbolo","bloquear","cerrado"],
-  "🔓":["simbolo","abrir","desbloquear"],
-  "🔵":["simbolo","azul"],
-  "🔴":["simbolo","rojo"],
-  "🟡":["simbolo","amarillo"],
-  "🟢":["simbolo","verde"],
-  "⚪":["simbolo","blanco"],
-  "⚫":["simbolo","negro"],
-  "⬆️":["simbolo","arriba"],
-  "⬇️":["simbolo","abajo"],
-  "➡️":["simbolo","derecha"],
-  "⬅️":["simbolo","izquierda"],
+interface EmojiApiEntry {
+  slug?: string;
+  character?: string;
+  unicodeName?: string;
+  codePoint?: string;
+  group?: string;
+  subGroup?: string;
+}
+
+const CHAT_EMOJI_API_CACHE_KEY = "chat-emoji-api-cache-v2";
+const EMOJI_GROUP_META = [
+  { key: "smileys", label: "Caritas y emociones", icon: "😀" },
+  { key: "people", label: "Personas y cuerpo", icon: "👋" },
+  { key: "animals", label: "Animales y naturaleza", icon: "🐶" },
+  { key: "food", label: "Comida y bebida", icon: "🍔" },
+  { key: "activities", label: "Actividades", icon: "⚽" },
+  { key: "travel", label: "Viajes y lugares", icon: "✈️" },
+  { key: "objects", label: "Objetos", icon: "💡" },
+  { key: "symbols", label: "Símbolos", icon: "🔣" },
+  { key: "flags", label: "Banderas", icon: "🏁" },
+] as const;
+const EMOJI_API_GROUP_MAP: Record<string, typeof EMOJI_GROUP_META[number]["key"] | null> = {
+  "smileys-emotion": "smileys",
+  "people-body": "people",
+  "component": null,
+  "animals-nature": "animals",
+  "food-drink": "food",
+  "activities": "activities",
+  "travel-places": "travel",
+  "objects": "objects",
+  "symbols": "symbols",
+  "flags": "flags",
 };
+
+const EMOJI_FONT_STACK = "\"Noto Color Emoji\", \"Segoe UI Emoji\", \"Apple Color Emoji\", sans-serif";
+const TWEMOJI_CDN_BASE = "https://cdn.jsdelivr.net/gh/jdecked/twemoji@latest/assets/svg";
+const EMOJI_TEXT_SEGMENT_REGEX = /((?:[\u{1F1E6}-\u{1F1FF}]{2})|(?:\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic})*))/gu;
+const EMOJI_TEXT_SEGMENT_TEST_REGEX = /^(?:[\u{1F1E6}-\u{1F1FF}]{2}|\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic})*)$/u;
 
 // ══════════════════════════════════════════════════════════════════════════════
 // HELPERS
 // ══════════════════════════════════════════════════════════════════════════════
+
+function getEmojiCodepoints(emoji: string) {
+  return Array.from(emoji)
+    .map((char) => char.codePointAt(0)?.toString(16).toLowerCase())
+    .filter((codepoint): codepoint is string => !!codepoint && codepoint !== "fe0f");
+}
+
+function isFlagEmoji(emoji: string) {
+  const codepoints = getEmojiCodepoints(emoji);
+  if (codepoints.length === 0) return false;
+  return codepoints.some((codepoint) => {
+    const value = Number.parseInt(codepoint, 16);
+    return (
+      (value >= 0x1f1e6 && value <= 0x1f1ff) ||
+      value === 0x1f3c1 ||
+      value === 0x1f6a9 ||
+      value === 0x1f38c ||
+      value === 0x1f3f3 ||
+      value === 0x1f3f4
+    );
+  });
+}
+
+const EMOJI_CATEGORY_ICONS: Record<string, LucideIcon> = {
+  all: Sparkles,
+  recent: Clock3,
+  smileys: Smile,
+  people: Users,
+  animals: PawPrint,
+  food: UtensilsCrossed,
+  activities: Trophy,
+  travel: Globe,
+  objects: Paperclip,
+  symbols: Layers,
+  flags: Flag,
+};
+
+function EmojiCategoryIcon({
+  categoryKey,
+  size = 18,
+  className = "",
+}: {
+  categoryKey: string;
+  size?: number | string;
+  className?: string;
+}) {
+  const Icon = EMOJI_CATEGORY_ICONS[categoryKey];
+  if (Icon) return <Icon size={size} className={className} />;
+  return <Sparkles size={size} className={className} />;
+}
 
 const EmojiImg = React.memo(function EmojiImg({
   emoji,
@@ -305,6 +226,19 @@ const EmojiImg = React.memo(function EmojiImg({
   size?: number;
   className?: string;
 }) {
+  if (isFlagEmoji(emoji)) {
+    const codepoints = getEmojiCodepoints(emoji).join("-");
+    return (
+      <img
+        src={`${TWEMOJI_CDN_BASE}/${codepoints}.svg`}
+        alt={emoji}
+        draggable={false}
+        className={`inline-block select-none object-contain ${className}`}
+        style={{ width: size, height: size }}
+      />
+    );
+  }
+
   return (
     <span
       role="img"
@@ -362,6 +296,23 @@ function areCanalesEquivalent(a: Canal[], b: Canal[]) {
   });
 }
 
+function areMensajesEquivalent(a: Mensaje[], b: Mensaje[]) {
+  if (a.length !== b.length) return false;
+  return a.every((mensaje, index) => {
+    const other = b[index];
+    return !!other &&
+      mensaje.id === other.id &&
+      mensaje.created_at === other.created_at &&
+      mensaje.deleted_at === other.deleted_at &&
+      mensaje.contenido === other.contenido &&
+      mensaje.tipo === other.tipo &&
+      mensaje.editado === other.editado &&
+      mensaje.user_id === other.user_id &&
+      mensaje.reply_to_id === other.reply_to_id &&
+      JSON.stringify(mensaje.reacciones || []) === JSON.stringify(other.reacciones || []);
+  });
+}
+
 function ImageLightbox({
   src,
   alt,
@@ -411,7 +362,6 @@ function ImageLightbox({
     const raf = window.requestAnimationFrame(() => setIsVisible(true));
     return () => window.cancelAnimationFrame(raf);
   }, []);
-
   useEffect(() => {
     if (!feedback) return undefined;
     const timeout = window.setTimeout(() => setFeedback(null), 2200);
@@ -722,16 +672,24 @@ function sortByDmOrder<T extends { user: { user_id: string; user_name: string } 
 
 function renderText(s: string): React.ReactNode {
   const renderEmojiRichText = (text: string, keyPrefix: string) => text
-    .split(/(\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic})*)/gu)
+    .split(EMOJI_TEXT_SEGMENT_REGEX)
     .filter(Boolean)
     .map((segment, index) => (
-      /(\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic})*)/u.test(segment)
+      EMOJI_TEXT_SEGMENT_TEST_REGEX.test(segment)
         ? <EmojiImg key={`${keyPrefix}-emoji-${index}`} emoji={segment} size={18} className="mx-[1px] inline-block align-[-0.2em]" />
         : <React.Fragment key={`${keyPrefix}-text-${index}`}>{segment}</React.Fragment>
     ));
 
-  return s.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|https?:\/\/\S+|@\S+)/g)
+  return s.split(/(\[[^\]]+\]\(https?:\/\/[^)\s]+\)|\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|https?:\/\/\S+|@\S+)/g)
     .map((p, i) => {
+      const markdownLink = p.match(/^\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)$/);
+      if (markdownLink) {
+        return (
+          <a key={i} href={markdownLink[2]} target="_blank" rel="noreferrer" className="text-blue-500 underline hover:text-blue-600">
+            {renderEmojiRichText(markdownLink[1], `link-label-${i}`)}
+          </a>
+        );
+      }
       if (p.startsWith("**")&&p.endsWith("**")) return <strong key={i}>{renderEmojiRichText(p.slice(2,-2), `strong-${i}`)}</strong>;
       if (p.startsWith("*") &&p.endsWith("*"))  return <em key={i}>{renderEmojiRichText(p.slice(1,-1), `em-${i}`)}</em>;
       if (p.startsWith("`") &&p.endsWith("`"))  return <code key={i} className="bg-slate-100 text-red-700 px-1 rounded font-mono text-[13px]">{renderEmojiRichText(p.slice(1,-1), `code-${i}`)}</code>;
@@ -756,21 +714,104 @@ function normalizeEmojiSearch(value: string) {
     .trim();
 }
 
-function emojiSearchScore(emoji: string, query: string, groupLabel?: string) {
-  const normalizedQuery = normalizeEmojiSearch(query);
-  if (!normalizedQuery) return 1;
-  const words = normalizedQuery.split(/\s+/).filter(Boolean);
-  const tags = (EMOJI_SEARCH_TAGS[emoji] || []).map(normalizeEmojiSearch);
-  const haystacks = [normalizeEmojiSearch(groupLabel || ""), ...tags, normalizeEmojiSearch(emoji)];
-  let score = 0;
-  for (const word of words) {
-    const exact = haystacks.some(item => item === word);
-    const starts = haystacks.some(item => item.startsWith(word));
-    const includes = haystacks.some(item => item.includes(word));
-    if (!includes) return 0;
-    score += exact ? 5 : starts ? 3 : 1;
-  }
-  return score;
+function normalizeGifCacheKey(query: string) {
+  return query.trim().toLowerCase() || "__trending__";
+}
+
+function htmlToComposerText(html: string, plainTextFallback: string) {
+  if (typeof window === "undefined") return plainTextFallback;
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, "text/html");
+
+  const visit = (node: Node, olDepth = 0): string => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return node.textContent || "";
+    }
+
+    if (!(node instanceof HTMLElement)) return "";
+
+    const tag = node.tagName.toLowerCase();
+    const childText = Array.from(node.childNodes).map((child) => visit(child, olDepth)).join("");
+    const normalizedChild = childText.replace(/\u00a0/g, " ");
+
+    switch (tag) {
+      case "strong":
+      case "b":
+        return `**${normalizedChild.trim() || ""}**`;
+      case "em":
+      case "i":
+        return `*${normalizedChild.trim() || ""}*`;
+      case "code":
+        return `\`${normalizedChild.trim() || ""}\``;
+      case "br":
+        return "\n";
+      case "a": {
+        const href = node.getAttribute("href")?.trim() || "";
+        const label = normalizedChild.trim();
+        if (!href) return label;
+        if (!label || label === href) return href;
+        return `[${label}](${href})`;
+      }
+      case "li": {
+        const prefix = node.parentElement?.tagName.toLowerCase() === "ol" ? `${olDepth + 1}. ` : "- ";
+        return `${prefix}${normalizedChild.trim()}\n`;
+      }
+      case "ul":
+        return `\n${Array.from(node.childNodes).map((child) => visit(child, olDepth)).join("")}\n`;
+      case "ol":
+        return `\n${Array.from(node.children).map((child, index) => visit(child, index)).join("")}\n`;
+      case "p":
+      case "div":
+      case "section":
+      case "article":
+      case "blockquote":
+      case "h1":
+      case "h2":
+      case "h3":
+      case "h4":
+      case "h5":
+      case "h6":
+        return `${normalizedChild.trim()}\n`;
+      default:
+        return normalizedChild;
+    }
+  };
+
+  const converted = Array.from(doc.body.childNodes).map((child) => visit(child)).join("")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .trim();
+
+  return converted || plainTextFallback;
+}
+
+
+function buildEmojiApiGroups(entries: EmojiApiEntry[]) {
+  const buckets = new Map<string, { key: string; label: string; icon: string; emojis: string[] }>();
+  EMOJI_GROUP_META.forEach((meta) => {
+    buckets.set(meta.key, { ...meta, emojis: [] });
+  });
+
+  const searchIndex: Record<string, string[]> = {};
+
+  entries.forEach((entry) => {
+    const emoji = entry.character?.trim();
+    const mappedGroupKey = entry.group ? EMOJI_API_GROUP_MAP[entry.group] : null;
+    if (!emoji || !mappedGroupKey) return;
+
+    const bucket = buckets.get(mappedGroupKey);
+    if (!bucket) return;
+    if (!bucket.emojis.includes(emoji)) bucket.emojis.push(emoji);
+
+    const tags = [entry.unicodeName || "", entry.slug || "", entry.subGroup || "", entry.group || ""].filter(Boolean);
+    searchIndex[emoji] = [...new Set([...(searchIndex[emoji] || []), ...tags])];
+  });
+
+  return {
+    groups: EMOJI_GROUP_META.map((meta) => buckets.get(meta.key)!).filter((group) => group.emojis.length > 0),
+    searchIndex,
+  };
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -794,19 +835,38 @@ function Av({ url, name, size=8 }: { url?: string|null; name: string; size?: num
 // ══════════════════════════════════════════════════════════════════════════════
 function EmojiPicker({
   onPick,
+  onPickGif,
   onClose,
   anchorRef,
   align = "left",
+  defaultTab = "emoji",
+  enableGifs = !!onPickGif,
 }: {
   onPick:(e:string)=>void;
+  onPickGif?:(url:string)=>void;
   onClose:()=>void;
   anchorRef?: React.RefObject<HTMLElement | null>;
   align?: "left" | "right";
+  defaultTab?: "emoji" | "gif";
+  enableGifs?: boolean;
 }) {
+  const [mediaTab, setMediaTab] = useState<"emoji" | "gif">(defaultTab);
   const [cat, setCat] = useState(0);
-  const [query, setQuery] = useState("");
+  const [emojiQuery, setEmojiQuery] = useState("");
   const [recentEmojis, setRecentEmojis] = useState<string[]>([]);
+  const [apiGroups, setApiGroups] = useState<Array<{ key: string; label: string; icon: string; emojis: string[] }> | null>(null);
+  const [apiSearchTags, setApiSearchTags] = useState<Record<string, string[]>>({});
+  const [emojiApiLoading, setEmojiApiLoading] = useState(true);
+  const [emojiApiError, setEmojiApiError] = useState<string | null>(null);
+  const [gifQuery, setGifQuery] = useState("");
+  const [gifs, setGifs] = useState<GiphyGif[]>([]);
+  const [gifCategories, setGifCategories] = useState<string[]>([]);
+  const [gifSuggestions, setGifSuggestions] = useState<string[]>([]);
+  const [gifLoading, setGifLoading] = useState(false);
+  const [gifError, setGifError] = useState<string | null>(null);
   const [isVisible, setIsVisible] = useState(false);
+  const gifCacheRef = useRef<Map<string, GiphyGif[]>>(new Map());
+  const gifSearchSeqRef = useRef(0);
   const ref = useRef<HTMLDivElement>(null);
   const [pickerStyle, setPickerStyle] = useState<React.CSSProperties>({
     position: "fixed",
@@ -830,6 +890,10 @@ function EmojiPicker({
     const raf = window.requestAnimationFrame(() => setIsVisible(true));
     return () => window.cancelAnimationFrame(raf);
   }, []);
+
+  useEffect(() => {
+    setMediaTab(defaultTab);
+  }, [defaultTab]);
 
   useEffect(() => {
     const updatePosition = () => {
@@ -883,28 +947,153 @@ function EmojiPicker({
     }
   }, []);
 
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(CHAT_GIF_CACHE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { savedAt?: number; items?: Record<string, GiphyGif[]> };
+      if (!parsed?.savedAt || !parsed.items) return;
+      if (Date.now() - parsed.savedAt > GIF_CACHE_TTL_MS) return;
+      gifCacheRef.current = new Map(
+        Object.entries(parsed.items).filter(([, value]) => Array.isArray(value))
+      );
+    } catch {
+      // ignore cache errors
+    }
+  }, []);
+
+  const buildGiphyUrl = useCallback((endpoint: string, params: Record<string, string | number>) => {
+    const url = new URL(`https://api.giphy.com/v1/gifs/${endpoint}`);
+    url.searchParams.set("api_key", GIPHY_API_KEY);
+    url.searchParams.set("rating", GIPHY_RATING);
+    Object.entries(params).forEach(([key, value]) => {
+      url.searchParams.set(key, String(value));
+    });
+    return url.toString();
+  }, []);
+
+  const resolveGifPreview = useCallback((gif: GiphyGif) => (
+    gif.images.fixed_height_small?.url ||
+    gif.images.fixed_height?.url ||
+    gif.images.downsized_medium?.url ||
+    gif.images.original?.url ||
+    ""
+  ), []);
+
+  const resolveGifUrl = useCallback((gif: GiphyGif) => (
+    gif.images.fixed_height?.url ||
+    gif.images.downsized_medium?.url ||
+    gif.images.original?.url ||
+    gif.images.fixed_height_small?.url ||
+    ""
+  ), []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const hydrateFromEntries = (entries: EmojiApiEntry[]) => {
+      const next = buildEmojiApiGroups(entries);
+      if (cancelled) return;
+      setApiGroups(next.groups);
+      setApiSearchTags(next.searchIndex);
+      setEmojiApiError(null);
+    };
+
+    const loadEmojiApi = async () => {
+      setEmojiApiLoading(true);
+      let hasFreshCache = false;
+      try {
+        const rawCache = window.localStorage.getItem(CHAT_EMOJI_API_CACHE_KEY);
+        if (rawCache) {
+          const parsed = JSON.parse(rawCache) as { savedAt?: number; entries?: EmojiApiEntry[] };
+          if (Array.isArray(parsed.entries) && parsed.entries.length > 0) {
+            hydrateFromEntries(parsed.entries);
+            hasFreshCache = !!parsed.savedAt && Date.now() - parsed.savedAt < EMOJI_API_CACHE_TTL_MS;
+          }
+        }
+      } catch {
+        // ignore cache errors
+      }
+
+      if (hasFreshCache) {
+        if (!cancelled) setEmojiApiLoading(false);
+        return;
+      }
+
+      try {
+        if (!EMOJI_API_ACCESS_KEY) {
+          if (!cancelled) setEmojiApiError("Configura VITE_EMOJI_API_KEY para cargar los emojis.");
+          return;
+        }
+        const url = new URL(EMOJI_API_URL);
+        url.searchParams.set("access_key", EMOJI_API_ACCESS_KEY);
+        const res = await fetch(url.toString());
+        if (!res.ok) throw new Error(`emoji-api ${res.status}`);
+        const data = await res.json();
+        if (!Array.isArray(data) || cancelled) return;
+        try {
+          window.localStorage.setItem(
+            CHAT_EMOJI_API_CACHE_KEY,
+            JSON.stringify({ savedAt: Date.now(), entries: data })
+          );
+        } catch {
+          // ignore cache errors
+        }
+        hydrateFromEntries(data);
+      } catch {
+        if (!cancelled) {
+          setEmojiApiError("No se pudieron cargar los emojis desde la API.");
+        }
+      } finally {
+        if (!cancelled) setEmojiApiLoading(false);
+      }
+    };
+
+    loadEmojiApi();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const groups = useMemo(() => {
-    const baseGroups = EMOJI_GROUPS.map(group => (
-      group.key === "recent" ? { ...group, emojis: recentEmojis } : group
-    ));
+    const sourceGroups = apiGroups && apiGroups.length ? apiGroups : [];
+    const recentGroup = { key: "recent", label: "Recientes", icon: "🕘", emojis: recentEmojis };
+    const baseGroups = [recentGroup, ...sourceGroups];
     const allEmojis = [...new Set(baseGroups.filter(group => group.key !== "recent").flatMap(group => group.emojis))];
     return [{ key: "all", label: "Todos", icon: "✨", emojis: allEmojis }, ...baseGroups];
-  }, [recentEmojis]);
+  }, [apiGroups, recentEmojis]);
 
   const activeGroup = groups[cat] ?? groups[0];
   const visibleEmojis = useMemo(() => {
-    const normalizedQuery = normalizeEmojiSearch(query);
-    const candidates = query.trim()
+    const normalizedQuery = normalizeEmojiSearch(emojiQuery);
+    const candidates = emojiQuery.trim()
       ? groups.flatMap(group => group.emojis.map(emoji => ({ emoji, label: group.label })))
       : activeGroup.emojis.map(emoji => ({ emoji, label: activeGroup.label }));
 
     return candidates
       .filter((item, index, arr) => arr.findIndex(other => other.emoji === item.emoji) === index)
-      .map(item => ({ ...item, score: emojiSearchScore(item.emoji, normalizedQuery, item.label) }))
+      .map(item => {
+        const mergedTags = [...new Set(apiSearchTags[item.emoji] || [])];
+        const score = !normalizedQuery
+          ? 1
+          : (() => {
+              const haystacks = [normalizeEmojiSearch(item.label), ...mergedTags.map(normalizeEmojiSearch), normalizeEmojiSearch(item.emoji)];
+              let computed = 0;
+              for (const word of normalizedQuery.split(" ").filter(Boolean)) {
+                const exact = haystacks.some((value) => value === word);
+                const starts = haystacks.some((value) => value.startsWith(word));
+                const includes = haystacks.some((value) => value.includes(word));
+                if (!includes) return 0;
+                computed += exact ? 5 : starts ? 3 : 1;
+              }
+              return computed;
+            })();
+        return { ...item, score };
+      })
       .filter(item => !normalizedQuery || item.score > 0)
       .sort((a, b) => b.score - a.score)
       .map(item => item.emoji);
-  }, [activeGroup.emojis, groups, query]);
+  }, [activeGroup.emojis, apiSearchTags, groups, emojiQuery]);
 
   const pickEmoji = (emoji: string) => {
     setRecentEmojis(prev => {
@@ -919,6 +1108,84 @@ function EmojiPicker({
     onPick(emoji);
   };
 
+  const loadGifCategories = useCallback(async () => {
+    setGifCategories(["Legal", "Tribunales", "Contrato", "Equipo", "Celebración", "Urgente"]);
+  }, []);
+
+  const loadGifSuggestions = useCallback(async (query: string) => {
+    if (query.trim().length < 2) {
+      setGifSuggestions([]);
+      return;
+    }
+    const seed = ["gracias", "perfecto", "celebración", "tribunal", "contrato", "equipo", "aprobado", "urgente", "documentos"];
+    const normalized = query.trim().toLowerCase();
+    setGifSuggestions(seed.filter((item) => item.includes(normalized)).slice(0, 5));
+  }, []);
+
+  const searchGifs = useCallback(async (query: string) => {
+    if (!GIPHY_API_KEY) {
+      setGifError("Configura VITE_GIPHY_API_KEY para activar los GIFs del chat.");
+      setGifs([]);
+      setGifLoading(false);
+      return;
+    }
+    const cacheKey = normalizeGifCacheKey(query);
+    const cached = gifCacheRef.current.get(cacheKey);
+    if (cached) {
+      setGifError(null);
+      setGifs(cached);
+      setGifLoading(false);
+      return;
+    }
+    setGifLoading(true);
+    setGifError(null);
+    const requestSeq = ++gifSearchSeqRef.current;
+    try {
+      const endpoint = query.trim() ? "search" : "trending";
+      const url = query.trim()
+        ? buildGiphyUrl(endpoint, { q: query.trim(), limit: 18, lang: "es" })
+        : buildGiphyUrl(endpoint, { limit: 18 });
+      const res = await fetch(url);
+      const data = await res.json();
+      if (requestSeq !== gifSearchSeqRef.current) return;
+      const nextGifs = Array.isArray(data.data) ? data.data : [];
+      gifCacheRef.current.set(cacheKey, nextGifs);
+      try {
+        window.localStorage.setItem(
+          CHAT_GIF_CACHE_KEY,
+          JSON.stringify({
+            savedAt: Date.now(),
+            items: Object.fromEntries(gifCacheRef.current.entries()),
+          })
+        );
+      } catch {
+        // ignore cache errors
+      }
+      setGifs(nextGifs);
+    } catch {
+      if (requestSeq !== gifSearchSeqRef.current) return;
+      setGifs([]);
+      setGifError("No se pudieron cargar los GIFs de GIPHY.");
+    }
+    if (requestSeq !== gifSearchSeqRef.current) return;
+    setGifLoading(false);
+  }, [buildGiphyUrl]);
+
+  useEffect(() => {
+    if (!enableGifs) return;
+    loadGifCategories();
+    searchGifs("");
+  }, [enableGifs, loadGifCategories, searchGifs]);
+
+  useEffect(() => {
+    if (!enableGifs) return;
+    const t = setTimeout(() => {
+      loadGifSuggestions(gifQuery);
+      searchGifs(gifQuery);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [enableGifs, gifQuery, loadGifSuggestions, searchGifs]);
+
   return createPortal(
     <div
       ref={ref}
@@ -929,38 +1196,137 @@ function EmojiPicker({
       }`}
     >
       <div className="border-b border-slate-200 bg-white px-3 pt-3">
+        {enableGifs ? (
+          <div className="mb-3 grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1">
+            <button
+              onClick={() => setMediaTab("emoji")}
+              className={`rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${mediaTab === "emoji" ? "bg-white text-red-700 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+            >
+              Emojis
+            </button>
+            <button
+              onClick={() => setMediaTab("gif")}
+              className={`rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${mediaTab === "gif" ? "bg-white text-red-700 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+            >
+              GIFs
+            </button>
+          </div>
+        ) : (
+          <div className="mb-3 border-b border-slate-200 px-1">
+            <div className="inline-flex border-b-2 border-slate-900 px-1 pb-2 text-base font-semibold text-slate-900">
+              Emojis
+            </div>
+          </div>
+        )}
         <div className="mb-3 flex items-center gap-2 rounded-2xl border border-blue-200 bg-slate-50 px-3 py-2.5 shadow-sm">
           <Search size={15} className="text-slate-400" />
           <input
-            value={query}
-            onChange={e=>setQuery(e.target.value)}
-            placeholder="Buscar todos los emojis"
+            value={mediaTab === "emoji" ? emojiQuery : gifQuery}
+            onChange={e=> mediaTab === "emoji" ? setEmojiQuery(e.target.value) : setGifQuery(e.target.value)}
+            placeholder={mediaTab === "emoji" ? "Buscar todos los emojis" : "Buscar GIFs en GIPHY"}
             className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder-slate-400"
           />
         </div>
-        <div className="flex items-center gap-1 overflow-x-auto pb-3">
-          {groups.map((c,i)=>(
-          <button key={c.key} onClick={()=>setCat(i)} title={c.label}
-            className={`flex h-10 min-w-10 items-center justify-center rounded-full border transition-all ${
-              cat===i
-                ? "border-blue-200 bg-blue-50 shadow-sm"
-                : "border-transparent bg-transparent hover:border-slate-200 hover:bg-slate-50"
-            }`}>
-            <EmojiImg emoji={c.icon} size={20} />
-          </button>
-        ))}
-        </div>
+        {mediaTab === "emoji" ? (
+          emojiApiLoading && !apiGroups ? (
+            <div className="flex items-center justify-center pb-3 pt-1 text-slate-400">
+              <Loader2 size={16} className="animate-spin" />
+            </div>
+          ) : emojiApiError && (!apiGroups || apiGroups.length === 0) ? (
+            <div className="pb-3 text-xs text-red-600">
+              {emojiApiError}
+            </div>
+          ) : <div className="flex items-center gap-1.5 overflow-x-auto pb-3">
+            {groups.map((c,i)=>(
+            <button key={c.key} onClick={()=>setCat(i)} title={c.label}
+              className={`flex h-10 min-w-10 items-center justify-center rounded-2xl border transition-all ${
+                cat===i
+                  ? "border-blue-200 bg-blue-50 text-blue-700 shadow-sm"
+                  : "border-transparent bg-white text-slate-500 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-700"
+              }`}>
+              <EmojiCategoryIcon categoryKey={c.key} size={18} />
+            </button>
+          ))}
+          </div>
+        ) : <div className="flex flex-wrap gap-1.5 pb-3">
+          {(gifSuggestions.length > 0 ? gifSuggestions : gifCategories).slice(0, 6).map((item, index) => (
+            <button
+              key={`${item}-${index}`}
+              onClick={() => setGifQuery(item)}
+              className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-700"
+            >
+              {item}
+            </button>
+          ))}
+        </div>}
       </div>
       <div className="max-h-[26rem] overflow-y-auto px-3 pb-3">
+        {mediaTab === "gif" ? (
+          <>
+            <div className="mb-2 flex items-center justify-between">
+              <p className="pt-3 text-sm font-semibold text-slate-700">
+                {gifQuery.trim() ? "Resultados GIF" : "GIFs populares"}
+              </p>
+              {!gifLoading && !gifError && (
+                <span className="pt-3 text-xs text-slate-400">GIPHY</span>
+              )}
+            </div>
+            {gifError ? (
+              <div className="rounded-xl border border-dashed border-red-200 bg-red-50 px-4 py-6 text-center text-sm text-red-600">
+                {gifError}
+              </div>
+            ) : gifLoading ? (
+              <div className="flex items-center justify-center py-10 text-slate-400">
+                <Loader2 size={18} className="animate-spin" />
+              </div>
+            ) : gifs.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-400">
+                No hay GIFs para mostrar
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2 pb-1">
+                {gifs.map((gif) => {
+                  const previewUrl = resolveGifPreview(gif);
+                  const fullUrl = resolveGifUrl(gif);
+                  if (!previewUrl || !fullUrl) return null;
+                  return (
+                    <button
+                      key={gif.id}
+                      onMouseDown={(event) => {
+                        event.preventDefault();
+                        onPickGif?.(fullUrl);
+                      }}
+                      className="group overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 text-left transition-all hover:border-red-200 hover:bg-white hover:shadow-sm"
+                    >
+                      <img src={previewUrl} alt={gif.title || gif.slug || "GIF"} className="h-24 w-full object-cover" />
+                      <div className="px-2.5 py-2 text-[11px] font-medium text-slate-500 transition-colors group-hover:text-red-700">
+                        {gif.title || gif.slug || "GIF"}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        ) : (
+        <>
         <div className="mb-2 flex items-center justify-between">
           <p className="pt-3 text-sm font-semibold text-slate-700">
-            {query.trim() ? "Resultados" : activeGroup.label}
+            {emojiQuery.trim() ? "Resultados" : activeGroup.label}
           </p>
-          {!query.trim() && activeGroup.key === "recent" && recentEmojis.length === 0 && (
+          {!emojiQuery.trim() && activeGroup.key === "recent" && recentEmojis.length === 0 && (
             <span className="pt-3 text-xs text-slate-400">Se llenará con tu uso</span>
           )}
         </div>
-        {visibleEmojis.length === 0 ? (
+        {emojiApiLoading && (!apiGroups || apiGroups.length === 0) ? (
+          <div className="flex items-center justify-center py-10 text-slate-400">
+            <Loader2 size={18} className="animate-spin" />
+          </div>
+        ) : emojiApiError && (!apiGroups || apiGroups.length === 0) ? (
+          <div className="rounded-xl border border-dashed border-red-200 bg-red-50 px-4 py-6 text-center text-sm text-red-600">
+            {emojiApiError}
+          </div>
+        ) : visibleEmojis.length === 0 ? (
           <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-400">
             No hay emojis para mostrar
           </div>
@@ -974,6 +1340,8 @@ function EmojiPicker({
             ))}
           </div>
         )}
+        </>
+        )}
       </div>
     </div>,
     document.body
@@ -983,45 +1351,310 @@ function EmojiPicker({
 // ══════════════════════════════════════════════════════════════════════════════
 // GIF PICKER
 // ══════════════════════════════════════════════════════════════════════════════
-function GifPicker({ onPick, onClose }: { onPick:(url:string)=>void; onClose:()=>void }) {
+function GifPicker({
+  onPick,
+  onClose,
+  anchorRef,
+}: {
+  onPick:(url:string)=>void;
+  onClose:()=>void;
+  anchorRef?: React.RefObject<HTMLElement | null>;
+}) {
   const [q, setQ] = useState("");
-  const [gifs, setGifs] = useState<any[]>([]);
+  const [gifs, setGifs] = useState<GiphyGif[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isVisible, setIsVisible] = useState(false);
+  const gifCacheRef = useRef<Map<string, GiphyGif[]>>(new Map());
+  const gifSearchSeqRef = useRef(0);
   const ref = useRef<HTMLDivElement>(null);
+  const [pickerStyle, setPickerStyle] = useState<React.CSSProperties>({
+    position: "fixed",
+    left: 12,
+    top: 12,
+    width: 416,
+    maxHeight: 520,
+    transformOrigin: "bottom left",
+  });
+  const buildGiphyUrl = useCallback((endpoint: string, params: Record<string, string | number>) => {
+    const url = new URL(`https://api.giphy.com/v1/gifs/${endpoint}`);
+    url.searchParams.set("api_key", GIPHY_API_KEY);
+    url.searchParams.set("rating", GIPHY_RATING);
+    Object.entries(params).forEach(([key, value]) => {
+      url.searchParams.set(key, String(value));
+    });
+    return url.toString();
+  }, []);
+
+  const resolveGifPreview = useCallback((gif: GiphyGif) => {
+    return (
+      gif.images.fixed_height_small?.url ||
+      gif.images.fixed_height?.url ||
+      gif.images.downsized_medium?.url ||
+      gif.images.original?.url ||
+      ""
+    );
+  }, []);
+
+  const resolveGifUrl = useCallback((gif: GiphyGif) => {
+    return (
+      gif.images.fixed_height?.url ||
+      gif.images.downsized_medium?.url ||
+      gif.images.original?.url ||
+      gif.images.fixed_height_small?.url ||
+      ""
+    );
+  }, []);
+
   useEffect(() => {
-    const h = (e: MouseEvent) => { if(ref.current && !ref.current.contains(e.target as Node)) onClose(); };
+    const h = (e: MouseEvent) => {
+      const target = e.target as Node;
+      const clickedInsidePicker = !!ref.current && ref.current.contains(target);
+      const clickedAnchorButton = !!anchorRef?.current && anchorRef.current.contains(target);
+      if (!clickedInsidePicker && !clickedAnchorButton) onClose();
+    };
     setTimeout(() => document.addEventListener("mousedown", h), 50);
     return () => document.removeEventListener("mousedown", h);
-  }, [onClose]);
-  const search = useCallback(async (query: string) => {
-    setLoading(true);
-    try {
-      const url = query.trim()
-        ? `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_KEY}&q=${encodeURIComponent(query)}&limit=18&rating=g`
-        : `https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_KEY}&limit=18&rating=g`;
-      const d = await (await fetch(url)).json();
-      setGifs(d.data || []);
-    } catch { setGifs([]); }
-    setLoading(false);
+  }, [anchorRef, onClose]);
+
+  useEffect(() => {
+    const raf = window.requestAnimationFrame(() => setIsVisible(true));
+    return () => window.cancelAnimationFrame(raf);
   }, []);
-  useEffect(() => { search(""); }, [search]);
-  useEffect(() => { const t = setTimeout(()=>search(q),400); return ()=>clearTimeout(t); }, [q, search]);
-  return (
-    <div ref={ref} className="absolute bottom-full mb-2 left-0 z-50 bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl w-80 overflow-hidden">
-      <div className="p-2 border-b border-slate-700">
-        <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Buscar GIFs…"
-          className="w-full bg-slate-700 text-white text-sm px-3 py-1.5 rounded-lg outline-none placeholder-slate-400"/>
+
+  useEffect(() => {
+    const updatePosition = () => {
+      const anchor = anchorRef?.current;
+      if (!anchor) return;
+      const rect = anchor.getBoundingClientRect();
+      const width = 416;
+      const estimatedHeight = 470;
+      const left = Math.min(window.innerWidth - width - 12, Math.max(12, rect.left - 24));
+
+      if (rect.top > window.innerHeight / 2) {
+        setPickerStyle({
+          position: "fixed",
+          left,
+          bottom: Math.max(12, window.innerHeight - rect.top + 12),
+          width,
+          maxHeight: Math.min(520, window.innerHeight - 24),
+          transformOrigin: "bottom left",
+        });
+        return;
+      }
+
+      const top = Math.min(window.innerHeight - estimatedHeight - 12, rect.bottom + 12);
+      setPickerStyle({
+        position: "fixed",
+        left,
+        top,
+        width,
+        maxHeight: Math.min(520, window.innerHeight - 24),
+        transformOrigin: "top left",
+      });
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [anchorRef]);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(CHAT_GIF_CACHE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { savedAt?: number; items?: Record<string, GiphyGif[]> };
+      if (!parsed?.savedAt || !parsed.items) return;
+      if (Date.now() - parsed.savedAt > GIF_CACHE_TTL_MS) return;
+      gifCacheRef.current = new Map(
+        Object.entries(parsed.items).filter(([, value]) => Array.isArray(value))
+      );
+    } catch {
+      // ignore cache errors
+    }
+  }, []);
+
+  const loadCategories = useCallback(async () => {
+    setCategories(["Legal", "Tribunales", "Contrato", "Equipo", "Celebración", "Urgente"]);
+  }, []);
+
+  const loadSuggestions = useCallback(async (query: string) => {
+    if (query.trim().length < 2) {
+      setSuggestions([]);
+      return;
+    }
+    const seed = [
+      "gracias",
+      "perfecto",
+      "celebración",
+      "tribunal",
+      "contrato",
+      "equipo",
+      "aprobado",
+      "urgente",
+      "documentos",
+    ];
+    const normalized = query.trim().toLowerCase();
+    setSuggestions(seed.filter((item) => item.includes(normalized)).slice(0, 5));
+  }, []);
+
+  const search = useCallback(async (query: string) => {
+    if (!GIPHY_API_KEY) {
+      setError("Configura VITE_GIPHY_API_KEY para activar los GIFs del chat.");
+      setGifs([]);
+      setLoading(false);
+      return;
+    }
+    const cacheKey = normalizeGifCacheKey(query);
+    const cached = gifCacheRef.current.get(cacheKey);
+    if (cached) {
+      setError(null);
+      setGifs(cached);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    const requestSeq = ++gifSearchSeqRef.current;
+    try {
+      const endpoint = query.trim() ? "search" : "trending";
+      const url = query.trim()
+        ? buildGiphyUrl(endpoint, { q: query.trim(), limit: 18, lang: "es" })
+        : buildGiphyUrl(endpoint, { limit: 18 });
+      const res = await fetch(url);
+      const data = await res.json();
+      if (requestSeq !== gifSearchSeqRef.current) return;
+      const nextGifs = Array.isArray(data.data) ? data.data : [];
+      gifCacheRef.current.set(cacheKey, nextGifs);
+      try {
+        window.localStorage.setItem(
+          CHAT_GIF_CACHE_KEY,
+          JSON.stringify({
+            savedAt: Date.now(),
+            items: Object.fromEntries(gifCacheRef.current.entries()),
+          })
+        );
+      } catch {
+        // ignore cache errors
+      }
+      setGifs(nextGifs);
+    } catch {
+      if (requestSeq !== gifSearchSeqRef.current) return;
+      setGifs([]);
+      setError("No se pudieron cargar los GIFs de GIPHY.");
+    }
+    if (requestSeq !== gifSearchSeqRef.current) return;
+    setLoading(false);
+  }, [buildGiphyUrl]);
+
+  useEffect(() => {
+    search("");
+    loadCategories();
+  }, [loadCategories, search]);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      search(q);
+      loadSuggestions(q);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [q, search, loadSuggestions]);
+
+  return createPortal(
+    <div
+      ref={ref}
+      style={pickerStyle}
+      onMouseDown={(event) => event.stopPropagation()}
+      className={`z-[80] overflow-hidden rounded-[1.35rem] border border-slate-200 bg-white shadow-[0_28px_90px_-35px_rgba(15,23,42,0.45)] transition-[opacity,transform] duration-200 ease-out ${
+        isVisible ? "translate-y-0 scale-100 opacity-100" : "translate-y-3 scale-[0.98] opacity-0"
+      }`}
+    >
+      <div className="border-b border-slate-100 bg-gradient-to-r from-white to-red-50/40 p-3">
+        <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
+          <Search size={15} className="text-slate-400" />
+          <input
+            value={q}
+            onChange={e=>setQ(e.target.value)}
+            placeholder="Buscar GIFs en GIPHY"
+            className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
+          />
+        </div>
+        {suggestions.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {suggestions.map((item) => (
+              <button
+                key={item}
+                onClick={() => setQ(item)}
+                className="rounded-full border border-red-100 bg-red-50 px-2.5 py-1 text-[11px] font-medium text-red-700 transition-colors hover:bg-red-100"
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+        )}
+        {!q.trim() && categories.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {categories.slice(0, 6).map((category, index) => {
+              return (
+                <button
+                  key={`${category}-${index}`}
+                  onClick={() => setQ(category)}
+                  className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-700"
+                >
+                  {category}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
-      <div className="grid grid-cols-3 gap-1 p-2 max-h-52 overflow-y-auto">
-        {loading?<div className="col-span-3 flex justify-center py-4"><Loader2 className="animate-spin text-slate-400" size={20}/></div>
-          :gifs.map(g=>(
-          <button key={g.id} onClick={()=>onPick(g.images.fixed_height_small.url)}
-            className="rounded-lg overflow-hidden hover:ring-2 hover:ring-red-500 transition-all">
-            <img src={g.images.fixed_height_small.url} alt={g.title} className="w-full object-cover"/>
-          </button>
-        ))}
+
+      <div className="max-h-[23rem] overflow-y-auto p-2">
+        {loading ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="animate-spin text-slate-400" size={20}/>
+          </div>
+        ) : error ? (
+          <div className="rounded-2xl border border-dashed border-red-200 bg-red-50 px-4 py-5 text-center">
+            <p className="text-sm font-medium text-red-700">{error}</p>
+            <p className="mt-1 text-xs text-red-500">Añade la clave en `frontend/.env` y reinicia Vite.</p>
+          </div>
+        ) : gifs.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-center text-sm text-slate-500">
+            No he encontrado GIFs para esa búsqueda
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 gap-2">
+            {gifs.map((gif) => {
+              const previewUrl = resolveGifPreview(gif);
+              const fullUrl = resolveGifUrl(gif);
+              if (!previewUrl || !fullUrl) return null;
+              return (
+                <button
+                  key={gif.id}
+                  onClick={() => onPick(fullUrl)}
+                  className="group overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 transition-all hover:-translate-y-0.5 hover:border-red-200 hover:ring-2 hover:ring-red-100"
+                >
+                  <img src={previewUrl} alt={gif.title || gif.slug || "GIF"} className="h-24 w-full object-cover" />
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
-    </div>
+
+      <div className="flex items-center justify-between border-t border-slate-100 px-3 py-2 text-[11px] text-slate-400">
+        <span>GIFs con GIPHY</span>
+        <span className="font-medium text-slate-500">{q.trim() ? "Resultados de búsqueda" : "Tendencias"}</span>
+      </div>
+    </div>,
+    document.body
   );
 }
 
@@ -1047,25 +1680,254 @@ function MentionDropdown({ miembros, query, onSelect }: { miembros: Miembro[]; q
 // ══════════════════════════════════════════════════════════════════════════════
 // STATUS SELECTOR
 // ══════════════════════════════════════════════════════════════════════════════
-function StatusSelector({ current, onSelect, onClose }: { current: string; onSelect:(s:string)=>void; onClose:()=>void }) {
+function StatusSelector({
+  anchorRef,
+  current,
+  currentLabel,
+  currentColorClass,
+  customStatusText,
+  customStatusEmoji,
+  customStatusColor,
+  userName,
+  userAvatar,
+  notificationsPaused,
+  onSelect,
+  onSaveCustomStatus,
+  onClearCustomStatus,
+  onToggleNotifications,
+  onProfile,
+  onPreferences,
+  onDownloads,
+  onClose,
+}: {
+  anchorRef: React.RefObject<HTMLElement | null>;
+  current: string;
+  currentLabel: string;
+  currentColorClass: string;
+  customStatusText: string;
+  customStatusEmoji: string;
+  customStatusColor: (typeof CUSTOM_STATUS_COLORS)[number]["key"];
+  userName: string;
+  userAvatar?: string | null;
+  notificationsPaused: boolean;
+  onSelect:(s:string)=>void;
+  onSaveCustomStatus:(value:string, emoji:string, colorKey:string)=>void;
+  onClearCustomStatus:()=>void;
+  onToggleNotifications:()=>void;
+  onProfile:()=>void;
+  onPreferences:()=>void;
+  onDownloads:()=>void;
+  onClose:()=>void;
+}) {
   const ref = useRef<HTMLDivElement>(null);
+  const [draftStatus, setDraftStatus] = useState(customStatusText || "");
+  const [draftEmoji, setDraftEmoji] = useState(customStatusEmoji || CUSTOM_STATUS_EMOJIS[0]);
+  const [draftColor, setDraftColor] = useState<(typeof CUSTOM_STATUS_COLORS)[number]["key"]>(customStatusColor || "emerald");
+  const [isVisible, setIsVisible] = useState(false);
+  const [pickerStyle, setPickerStyle] = useState<React.CSSProperties>({
+    position: "fixed",
+    left: 24,
+    top: 24,
+    width: 340,
+    maxHeight: Math.min(760, typeof window !== "undefined" ? window.innerHeight - 32 : 760),
+  });
   useEffect(() => {
-    const h = (e: MouseEvent) => { if(ref.current && !ref.current.contains(e.target as Node)) onClose(); };
-    setTimeout(() => document.addEventListener("mousedown", h), 50);
-    return () => document.removeEventListener("mousedown", h);
-  }, [onClose]);
-  return (
-    <div ref={ref} className="absolute bottom-full mb-2 left-0 z-50 bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl w-52 overflow-hidden">
-      <p className="text-xs text-slate-500 px-3 pt-2 pb-1 font-semibold uppercase tracking-wider">Mi estado</p>
-      {Object.entries(STATUS_CFG).map(([k,v])=>(
-        <button key={k} onClick={()=>onSelect(k)}
-          className={`flex items-center gap-2.5 w-full px-3 py-2 hover:bg-slate-700 transition-colors ${current===k?"bg-slate-700":""}`}>
-          <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${v.color}`}/>
-          <span className="text-slate-200 text-sm">{v.label}</span>
-          {current===k&&<Check size={12} className="ml-auto text-green-400"/>}
+    const h = (e: MouseEvent) => {
+      const target = e.target as Node;
+      const clickedInsidePicker = !!ref.current && ref.current.contains(target);
+      const clickedAnchorButton = !!anchorRef?.current && anchorRef.current.contains(target);
+      if (!clickedInsidePicker && !clickedAnchorButton) onClose();
+    };
+    const timer = window.setTimeout(() => document.addEventListener("mousedown", h), 50);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener("mousedown", h);
+    };
+  }, [anchorRef, onClose]);
+
+  useEffect(() => {
+    const updatePosition = () => {
+      const anchor = anchorRef?.current;
+      if (!anchor) return;
+      const rect = anchor.getBoundingClientRect();
+      const width = 340;
+      const margin = 12;
+      const gap = 12;
+      let left = rect.right + gap;
+      if (left + width > window.innerWidth - margin) {
+        left = rect.left - width - gap;
+      }
+      left = Math.max(margin, Math.min(left, window.innerWidth - width - margin));
+      const maxHeight = Math.min(760, window.innerHeight - 32);
+      let top = rect.bottom - maxHeight;
+      top = Math.max(16, Math.min(top, window.innerHeight - maxHeight - 16));
+      setPickerStyle({
+        position: "fixed",
+        left,
+        top,
+        width,
+        maxHeight,
+      });
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [anchorRef]);
+
+  useEffect(() => {
+    setDraftStatus(customStatusText || "");
+    setDraftEmoji(customStatusEmoji || CUSTOM_STATUS_EMOJIS[0]);
+    setDraftColor(customStatusColor || "emerald");
+  }, [customStatusColor, customStatusEmoji, customStatusText]);
+
+  useEffect(() => {
+    const raf = window.requestAnimationFrame(() => setIsVisible(true));
+    return () => window.cancelAnimationFrame(raf);
+  }, []);
+
+  return createPortal(
+    <div
+      ref={ref}
+      style={pickerStyle}
+      className={`z-[120] overflow-y-auto rounded-3xl border border-slate-200 bg-white shadow-2xl transition-all duration-180 ${
+        isVisible ? "translate-y-0 scale-100 opacity-100" : "translate-y-2 scale-[0.985] opacity-0"
+      }`}
+    >
+      <div className="flex items-center gap-3 px-4 py-4">
+        <Av url={userAvatar || null} name={userName} size={10}/>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-base font-semibold text-slate-900">{userName}</p>
+          <div className="mt-0.5 flex items-center gap-2 text-sm text-slate-500">
+            <span className={`h-2.5 w-2.5 rounded-full ${currentColorClass}`}/>
+            <span className="truncate">{currentLabel}</span>
+            {notificationsPaused ? (
+              <BellOff size={13} className="shrink-0 text-slate-400" />
+            ) : (
+              <Bell size={13} className="shrink-0 text-slate-400" />
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="px-4 pb-3">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-400">Estado</p>
+          <div className="grid grid-cols-2 gap-2">
+            {Object.entries(STATUS_CFG).map(([k,v])=>(
+              <button type="button" key={k} onClick={()=>onSelect(k)}
+                className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm transition-all duration-150 active:scale-[0.985] ${
+                  current===k
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
+                }`}>
+                <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${v.color}`}/>
+                <span className="truncate">{v.label}</span>
+                {current===k&&<Check size={12} className="ml-auto shrink-0 text-emerald-500"/>}
+              </button>
+            ))}
+          </div>
+          <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
+            <p className="mb-2 text-sm font-medium text-slate-700">Crear estado personalizado</p>
+            <div className="mb-3 flex flex-wrap gap-2">
+              {CUSTOM_STATUS_EMOJIS.map((emoji) => (
+                <button
+                  type="button"
+                  key={emoji}
+                  onClick={() => setDraftEmoji(emoji)}
+                  className={`flex h-10 w-10 items-center justify-center rounded-xl border text-lg transition-all duration-150 active:scale-95 ${
+                    draftEmoji === emoji
+                      ? "border-[#ab0433]/25 bg-red-50 shadow-sm"
+                      : "border-slate-200 bg-slate-50 hover:bg-slate-100"
+                  }`}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+            <div className="mb-3 flex flex-wrap gap-2">
+              {CUSTOM_STATUS_COLORS.map((color) => (
+                <button
+                  type="button"
+                  key={color.key}
+                  onClick={() => setDraftColor(color.key)}
+                  className={`flex h-9 w-9 items-center justify-center rounded-full border-2 transition-all duration-150 active:scale-95 ${
+                    draftColor === color.key ? "border-slate-900 scale-105" : "border-transparent"
+                  }`}
+                >
+                  <span className={`h-5 w-5 rounded-full ${color.className}`} />
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                value={draftStatus}
+                onChange={(e)=>setDraftStatus(e.target.value)}
+                placeholder="Ej. En audiencia, revisando demanda..."
+                className="h-10 flex-1 rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-[#ab0433]/35 focus:ring-2 focus:ring-[#ab0433]/10"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (!draftStatus.trim()) return;
+                onSaveCustomStatus(draftStatus.trim(), draftEmoji, draftColor);
+                setDraftStatus("");
+              }}
+              className="mt-3 w-full rounded-xl bg-[#ab0433] px-3 py-2.5 text-sm font-semibold text-white transition-all duration-150 hover:bg-[#92042c] active:scale-[0.985]"
+            >
+              Guardar estado personalizado
+            </button>
+            <button
+              type="button"
+              onClick={onClearCustomStatus}
+              className="mt-2 text-xs font-medium text-slate-500 transition hover:text-slate-700"
+            >
+              Quitar estado personalizado
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => onSelect("ausente")}
+            className="mt-3 flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-left text-sm text-slate-700 transition-all duration-150 hover:bg-slate-100 active:scale-[0.985]"
+          >
+            <span>Cambiar tu estado a <span className="font-semibold">ausente</span></span>
+            <ChevronRight size={14} className="text-slate-400"/>
+          </button>
+          <button
+            type="button"
+            onClick={onToggleNotifications}
+            className="mt-2 flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-left text-sm text-slate-700 transition-all duration-150 hover:bg-slate-100 active:scale-[0.985]"
+          >
+            <span>{notificationsPaused ? "Reanudar notificaciones" : "Pausar las notificaciones"}</span>
+            <ChevronRight size={14} className="text-slate-400"/>
+          </button>
+        </div>
+      </div>
+
+      <div className="border-t border-slate-200 py-1">
+        <button type="button" onClick={onProfile} className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-slate-700 transition hover:bg-slate-50">
+          <User size={15} className="text-slate-400"/>
+          Perfil
         </button>
-      ))}
-    </div>
+        <button type="button" onClick={onPreferences} className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-slate-700 transition hover:bg-slate-50">
+          <Settings size={15} className="text-slate-400"/>
+          Preferencias
+        </button>
+      </div>
+
+      <div className="border-t border-slate-200 py-1">
+        <button type="button" onClick={onDownloads} className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-slate-700 transition hover:bg-slate-50">
+          <Download size={15} className="text-slate-400"/>
+          Descargas
+        </button>
+      </div>
+    </div>,
+    document.body
   );
 }
 
@@ -1643,8 +2505,9 @@ function PanelFavoritos({ canalId, getToken, onClose, onGoTo, onToggleFavorite, 
   );
 }
 
-function MensajeItem({ msg, prevMsg, currentUserId, isHighlighted, isFreshIncoming = false, onReply, onReact, onEdit, onDelete, onPin, onFavorite, isFavorite, resolveDisplayName, resolveAvatarUrl }: {
+function MensajeItem({ msg, prevMsg, currentUserId, isHighlighted, isFreshIncoming = false, showReadReceipt = false, isReadByRecipient = false, onReply, onReact, onEdit, onDelete, onPin, onFavorite, isFavorite, resolveDisplayName, resolveAvatarUrl }: {
   msg: Mensaje; prevMsg: Mensaje|null; currentUserId: string; isHighlighted: boolean; isFreshIncoming?: boolean;
+  showReadReceipt?: boolean; isReadByRecipient?: boolean;
   onReply:(m:Mensaje)=>void; onReact:(id:string,e:string)=>void;
   onEdit:(m:Mensaje)=>void; onDelete:(id:string)=>void; onPin:(id:string)=>void; onFavorite:(id:string)=>void;
   isFavorite?: boolean;
@@ -1654,7 +2517,11 @@ function MensajeItem({ msg, prevMsg, currentUserId, isHighlighted, isFreshIncomi
   const [hover, setHover] = useState(false);
   const [showEmoji, setShowEmoji] = useState(false);
   const [showImageLightbox, setShowImageLightbox] = useState(false);
+  const [dragOffset, setDragOffset] = useState(0);
+  const [dragReplyReady, setDragReplyReady] = useState(false);
   const emojiButtonRef = useRef<HTMLButtonElement>(null);
+  const dragStartRef = useRef<{ x: number; y: number; pointerId: number } | null>(null);
+  const didTriggerReplyRef = useRef(false);
   const isMe = msg.user_id === currentUserId;
   const sameAuthor = !!(prevMsg &&
     prevMsg.user_id === msg.user_id &&
@@ -1670,6 +2537,49 @@ function MensajeItem({ msg, prevMsg, currentUserId, isHighlighted, isFreshIncomi
     return [...map.entries()].map(([e,v])=>({emoji:e,...v}));
   }, [msg.reacciones, currentUserId]);
   const imageSrc = mediaUrl(msg.image_url);
+  const dragDirection = isMe ? -1 : 1;
+  const dragMagnitude = Math.abs(dragOffset);
+
+  const resetDrag = useCallback(() => {
+    dragStartRef.current = null;
+    didTriggerReplyRef.current = false;
+    setDragOffset(0);
+    setDragReplyReady(false);
+  }, []);
+
+  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    dragStartRef.current = { x: event.clientX, y: event.clientY, pointerId: event.pointerId };
+    didTriggerReplyRef.current = false;
+    setDragOffset(0);
+    setDragReplyReady(false);
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  };
+
+  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const start = dragStartRef.current;
+    if (!start || start.pointerId !== event.pointerId) return;
+    const deltaX = (event.clientX - start.x) * dragDirection;
+    const deltaY = Math.abs(event.clientY - start.y);
+    if (deltaY > 48) {
+      resetDrag();
+      return;
+    }
+    const clamped = Math.max(0, Math.min(deltaX, 92));
+    setDragOffset(clamped * dragDirection);
+    setDragReplyReady(clamped >= 68);
+    if (clamped >= 68 && !didTriggerReplyRef.current) {
+      didTriggerReplyRef.current = true;
+      onReply(msg);
+    }
+  };
+
+  const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (dragStartRef.current?.pointerId === event.pointerId) {
+      event.currentTarget.releasePointerCapture?.(event.pointerId);
+    }
+    resetDrag();
+  };
 
   if (msg.deleted_at) return (
     <div className={`px-4 py-0.5 text-slate-400 italic text-xs ${!sameAuthor?"mt-2":""}`}>
@@ -1697,12 +2607,30 @@ function MensajeItem({ msg, prevMsg, currentUserId, isHighlighted, isFreshIncomi
               <span className="font-bold text-slate-800 text-sm">{resolveDisplayName(msg.user_id, msg.user_name, isMe)}</span>
               {isMe&&<span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded font-semibold">{"T\u00FA"}</span>}
               <span className="text-xs text-slate-400">{fmtTime(msg.created_at)}</span>
+              {isMe && showReadReceipt && (
+                <span
+                  title={isReadByRecipient ? "Leído por el destinatario" : "Pendiente de leer"}
+                  className={`inline-flex items-center rounded-full px-1.5 py-0.5 ${
+                    isReadByRecipient ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-400"
+                  }`}
+                >
+                  <Eye size={11} />
+                </span>
+              )}
               {msg.editado&&<span className="text-[10px] text-slate-400 italic">(editado)</span>}
             </div>
           )}
 
           {/* Message body */}
-          <div className={isMe ? "pr-[46px]" : "pl-[46px]"}>
+          <div className={`relative ${isMe ? "pr-[46px]" : "pl-[46px]"}`}>
+        <div
+          className={`pointer-events-none absolute top-1/2 z-0 flex -translate-y-1/2 items-center gap-1 rounded-full border border-red-100 bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-600 shadow-sm transition-all duration-200 ${
+            isMe ? "right-full mr-3" : "left-full ml-3"
+          } ${dragMagnitude > 6 ? "opacity-100" : "opacity-0"}`}
+        >
+          <CornerDownRight size={12} className={dragReplyReady ? "text-red-700" : "text-red-400"} />
+          <span>{dragReplyReady ? "Respondiendo..." : "Arrastra para responder"}</span>
+        </div>
         {/* Reply quote */}
         {msg.reply_to&&(
           <div className="flex items-start gap-1.5 mb-1 pl-2 border-l-2 border-slate-300 bg-slate-100/60 rounded-r py-1 pr-2">
@@ -1712,11 +2640,20 @@ function MensajeItem({ msg, prevMsg, currentUserId, isHighlighted, isFreshIncomi
           </div>
         )}
         <div
-          className={`rounded-2xl transition-all duration-500 ${
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          className={`relative rounded-[1.35rem] border px-3 py-2.5 transition-all duration-300 touch-pan-y select-none ${
+            isMe
+              ? "border-red-100 bg-gradient-to-br from-red-50 via-white to-white shadow-[0_12px_30px_-22px_rgba(171,4,51,0.35)]"
+              : "border-slate-200 bg-white shadow-[0_12px_30px_-24px_rgba(15,23,42,0.22)]"
+          } ${
             isFreshIncoming && !isMe
               ? "translate-y-0 scale-[1.01] bg-gradient-to-br from-red-50 via-white to-white ring-1 ring-red-100 shadow-[0_14px_40px_-22px_rgba(220,38,38,0.45)]"
               : ""
           }`}
+          style={{ transform: `translateX(${dragOffset}px)` }}
         >
           {/* Content */}
           {imageSrc && (
@@ -1749,7 +2686,7 @@ function MensajeItem({ msg, prevMsg, currentUserId, isHighlighted, isFreshIncomi
           )}
           {msg.gif_url
             ?<img src={msg.gif_url} alt="GIF" className="max-w-[240px] rounded-xl mt-1 border border-slate-200 shadow-sm"/>
-            : msg.contenido !== IMAGE_PLACEHOLDER_TEXT && <p className="text-slate-700 text-sm leading-relaxed break-words px-0.5 py-0.5">{renderText(msg.contenido)}</p>
+            : msg.contenido !== IMAGE_PLACEHOLDER_TEXT && <p className="whitespace-pre-wrap text-slate-700 text-sm leading-relaxed break-words">{renderText(msg.contenido)}</p>
           }
           {/* Reactions */}
           {reactions.length>0&&(
@@ -1761,6 +2698,11 @@ function MensajeItem({ msg, prevMsg, currentUserId, isHighlighted, isFreshIncomi
                   <span>{r.count}</span>
                 </button>
               ))}
+            </div>
+          )}
+          {sameAuthor && (
+            <div className={`mt-2 flex items-center gap-2 text-[10px] ${isMe ? "justify-end text-slate-400" : "justify-start text-slate-400"}`}>
+              <span>{fmtTime(msg.created_at)}</span>
             </div>
           )}
         </div>
@@ -1821,8 +2763,7 @@ function MessageInput({ canalId, canalNombre, replyTo, editingMsg, miembros, cur
 }) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
-  const [showEmoji, setShowEmoji] = useState(false);
-  const [showGif, setShowGif] = useState(false);
+  const [showMediaPicker, setShowMediaPicker] = useState(false);
   const [mentionQ, setMentionQ] = useState<string|null>(null);
   const [selectedImage, setSelectedImage] = useState<{ file: File; previewUrl: string } | null>(null);
   const [isDraggingImage, setIsDraggingImage] = useState(false);
@@ -1834,6 +2775,7 @@ function MessageInput({ canalId, canalNombre, replyTo, editingMsg, miembros, cur
   const typingStopTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingHeartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const dragCounterRef = useRef(0);
+  const sendLockRef = useRef(false);
   const { getToken } = useAuth();
 
   useEffect(() => {
@@ -1896,43 +2838,53 @@ function MessageInput({ canalId, canalNombre, replyTo, editingMsg, miembros, cur
   }, [text.length]);
 
   const handleKey = (e: React.KeyboardEvent) => {
-    if (e.key==="Enter" && !e.shiftKey) { e.preventDefault(); doSend(); }
+    if (e.key==="Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if (sending || sendLockRef.current) return;
+      void doSend();
+    }
     if (e.key==="Escape") { onCancelReply(); onCancelEdit(); setText(""); stopTypingSignal(); }
   };
 
   const doSend = async () => {
+    if (sendLockRef.current) return;
     const trimmed = text.trim();
     if (!trimmed && !editingMsg && !selectedImage) return;
+    sendLockRef.current = true;
     stopTypingSignal();
     setSending(true);
-    if (editingMsg && !selectedImage) {
-      await onSend(trimmed||editingMsg.contenido, undefined, undefined, editingMsg.id);
-      setText(""); setSending(false); return;
-    }
-    let imageUrl: string | undefined;
-    if (selectedImage) {
-      const form = new FormData();
-      form.append("image", selectedImage.file);
-      const token = await getToken();
-      const res = await fetch("/api/chat/uploads/image", {
-        method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        body: form,
-      });
-      const data = await safeJson(res);
-      if (!res.ok) {
-        setSending(false);
+    try {
+      if (editingMsg && !selectedImage) {
+        await onSend(trimmed||editingMsg.contenido, undefined, undefined, editingMsg.id);
+        setText("");
         return;
       }
-      imageUrl = data.data?.image_url;
+      let imageUrl: string | undefined;
+      if (selectedImage) {
+        const form = new FormData();
+        form.append("image", selectedImage.file);
+        const token = await getToken();
+        const res = await fetch("/api/chat/uploads/image", {
+          method: "POST",
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+          body: form,
+        });
+        const data = await safeJson(res);
+        if (!res.ok) {
+          return;
+        }
+        imageUrl = data.data?.image_url;
+      }
+      await onSend(trimmed || (imageUrl ? IMAGE_PLACEHOLDER_TEXT : ""), undefined, replyTo?.id, undefined, imageUrl);
+      setText("");
+      if (selectedImage?.previewUrl) URL.revokeObjectURL(selectedImage.previewUrl);
+      setSelectedImage(null);
+      if (fileRef.current) fileRef.current.value = "";
+      taRef.current && (taRef.current.style.height="auto");
+    } finally {
+      setSending(false);
+      sendLockRef.current = false;
     }
-    await onSend(trimmed || (imageUrl ? IMAGE_PLACEHOLDER_TEXT : ""), undefined, replyTo?.id, undefined, imageUrl);
-    setText("");
-    if (selectedImage?.previewUrl) URL.revokeObjectURL(selectedImage.previewUrl);
-    setSelectedImage(null);
-    if (fileRef.current) fileRef.current.value = "";
-    taRef.current && (taRef.current.style.height="auto");
-    setSending(false);
   };
 
   const insertFmt = (wrap: string) => {
@@ -1955,7 +2907,7 @@ function MessageInput({ canalId, canalNombre, replyTo, editingMsg, miembros, cur
     const cursor = safeStart + emoji.length;
     selectionRef.current = { start: cursor, end: cursor };
     setText(nextText);
-    setShowEmoji(false);
+    setShowMediaPicker(false);
     requestAnimationFrame(() => {
       taRef.current?.focus();
       taRef.current?.setSelectionRange(cursor, cursor);
@@ -1976,6 +2928,35 @@ function MessageInput({ canalId, canalNombre, replyTo, editingMsg, miembros, cur
     else stopTypingSignal();
   };
 
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const html = e.clipboardData.getData("text/html");
+    if (!html) return;
+
+    const plain = e.clipboardData.getData("text/plain");
+    const formatted = htmlToComposerText(html, plain);
+    if (!formatted || formatted === plain) return;
+
+    e.preventDefault();
+    const ta = taRef.current;
+    if (!ta) return;
+
+    const start = ta.selectionStart ?? text.length;
+    const end = ta.selectionEnd ?? text.length;
+    const nextText = `${text.slice(0, start)}${formatted}${text.slice(end)}`;
+    const cursor = start + formatted.length;
+
+    setText(nextText);
+    selectionRef.current = { start: cursor, end: cursor };
+    setMentionQ(null);
+    requestAnimationFrame(() => {
+      ta.focus();
+      ta.setSelectionRange(cursor, cursor);
+      autoResize();
+    });
+    if (nextText.trim()) startTypingSignal();
+    else stopTypingSignal();
+  };
+
   const insertMention = (name: string) => {
     const ta = taRef.current; if (!ta) return;
     const cur = ta.selectionStart;
@@ -1986,9 +2967,17 @@ function MessageInput({ canalId, canalNombre, replyTo, editingMsg, miembros, cur
   };
 
   const sendGif = async (url: string) => {
-    setShowGif(false);
+    if (sendLockRef.current) return;
+    sendLockRef.current = true;
+    setShowMediaPicker(false);
     stopTypingSignal();
-    await onSend("GIF", url, replyTo?.id);
+    setSending(true);
+    try {
+      await onSend("GIF", url, replyTo?.id);
+    } finally {
+      setSending(false);
+      sendLockRef.current = false;
+    }
   };
 
   const chooseImage = (file?: File | null) => {
@@ -1998,8 +2987,7 @@ function MessageInput({ canalId, canalNombre, replyTo, editingMsg, miembros, cur
       if (prev?.previewUrl) URL.revokeObjectURL(prev.previewUrl);
       return { file, previewUrl: URL.createObjectURL(file) };
     });
-    setShowGif(false);
-    setShowEmoji(false);
+    setShowMediaPicker(false);
   };
 
   const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
@@ -2124,7 +3112,7 @@ function MessageInput({ canalId, canalNombre, replyTo, editingMsg, miembros, cur
               <p className="mt-2 truncate text-xs font-medium text-slate-500">{selectedImage.file.name}</p>
             </div>
           )}
-          <textarea ref={taRef} value={text} onChange={handleChange} onKeyDown={handleKey}
+          <textarea ref={taRef} value={text} onChange={handleChange} onKeyDown={handleKey} onPaste={handlePaste}
             onClick={syncSelection}
             onKeyUp={syncSelection}
             onSelect={syncSelection}
@@ -2148,37 +3136,38 @@ function MessageInput({ canalId, canalNombre, replyTo, editingMsg, miembros, cur
             <button
               ref={emojiButtonRef}
               onMouseDown={(event)=>event.preventDefault()}
-              onClick={()=>{syncSelection();setShowEmoji(v=>!v);setShowGif(false);}}
+              onClick={() => {
+                syncSelection();
+                setShowMediaPicker((prev) => !prev);
+              }}
               title="Emoji"
               className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors">
               <Smile size={16}/>
-            </button>
-            <button title="Texto alternativo"
-              className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors text-[11px] font-bold">
-              Aa
             </button>
             <button onClick={()=>{ const ta=taRef.current; if(!ta) return; const s=ta.selectionStart; setText(t=>t.slice(0,s)+"@"+t.slice(s)); setTimeout(()=>{ta.focus(); ta.setSelectionRange(s+1,s+1);},0); }} title="Mencionar"
               className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors">
               <AtSign size={16}/>
             </button>
-            <button onClick={()=>{setShowGif(v=>!v);setShowEmoji(false);}} title="GIF"
-              className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors">
-              <ImageIcon size={16}/>
-            </button>
-            <button title="Añadir imagen" onClick={()=>fileRef.current?.click()}
+            <button title="Adjuntar imagen" onClick={()=>fileRef.current?.click()}
               className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors">
               <Paperclip size={16}/>
-            </button>
-            <button title="Subir foto" onClick={()=>fileRef.current?.click()}
-              className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors">
-              <ImageIcon size={16}/>
             </button>
             <button title="Nota de voz"
               className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors">
               <Mic size={16}/>
             </button>
-            {showEmoji&&<EmojiPicker anchorRef={emojiButtonRef} onPick={insertEmojiAtCursor} onClose={()=>setShowEmoji(false)}/>}
-            {showGif&&<GifPicker onPick={sendGif} onClose={()=>setShowGif(false)}/>}
+            {showMediaPicker&&(
+              <EmojiPicker
+                anchorRef={emojiButtonRef}
+                enableGifs
+                onPick={insertEmojiAtCursor}
+                onPickGif={(url) => {
+                  setShowMediaPicker(false);
+                  sendGif(url);
+                }}
+                onClose={()=>setShowMediaPicker(false)}
+              />
+            )}
           </div>
           <button onClick={doSend} disabled={!canSend||sending}
             className={`w-9 h-9 flex items-center justify-center rounded-xl text-sm font-bold transition-all ${
@@ -2230,18 +3219,23 @@ function UserDMItem({ user: u, dmCanal, activo, loading, onClick, unreadCount = 
   const st = STATUS_CFG.disponible; // status por defecto
   const safeUnreadCount = loading ? 0 : unreadCount;
   const hasUnread = safeUnreadCount > 0 && !activo;
+  const displayName = u.user_name?.trim() || dmCanal?.dm_target_user_name?.trim() || "Usuario";
+  const displayRole = u.role_label?.trim() || "Colaborador";
   return (
     <button onClick={onClick} disabled={loading}
-      className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-xl text-left transition-all duration-200 text-xs group ${
+      className={`w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl text-left transition-all duration-200 text-xs group ${
         activo ? "bg-[#ab0433] text-white shadow-lg shadow-red-950/30 -translate-y-[1px]" :
         hasUnread ? "text-white bg-slate-800/70 hover:bg-slate-700/80 shadow-sm" :
         "text-slate-400 hover:bg-slate-800/70 hover:text-slate-200"
       }`}>
       <div className="relative shrink-0">
-        <Av url={u.avatar_url} name={u.user_name} size={6}/>
+        <Av url={u.avatar_url} name={displayName} size={6}/>
         <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 ${activo?"border-red-600":"border-slate-900"} ${st.color}`}/>
       </div>
-      <span className={`flex-1 truncate ${hasUnread ? "font-bold text-white" : "font-medium"}`}>{u.user_name}</span>
+      <div className="min-w-0 flex-1">
+        <p className={`truncate text-sm ${hasUnread ? "font-bold text-white" : "font-medium"}`}>{displayName}</p>
+        <p className={`truncate text-[11px] ${activo || hasUnread ? "text-white/75" : "text-slate-500 group-hover:text-slate-300"}`}>{displayRole}</p>
+      </div>
       {loading && <Loader2 size={10} className="animate-spin shrink-0 opacity-60"/>}
       {hasUnread && (
         <div className="shrink-0 flex items-center gap-1">
@@ -2308,6 +3302,22 @@ export default function Chat() {
   const [highlightId, setHighlightId]     = useState<string|null>(null);
   const [myStatus, setMyStatus]           = useState("disponible");
   const [showStatus, setShowStatus]       = useState(false);
+  const [customStatusLabel, setCustomStatusLabel] = useState(
+    () => (typeof window !== "undefined" ? localStorage.getItem(CHAT_CUSTOM_STATUS_KEY) || "" : "")
+  );
+  const [customStatusEmoji, setCustomStatusEmoji] = useState(
+    () => (typeof window !== "undefined" ? localStorage.getItem(CHAT_CUSTOM_STATUS_EMOJI_KEY) || "" : "")
+  );
+  const [customStatusColor, setCustomStatusColor] = useState<(typeof CUSTOM_STATUS_COLORS)[number]["key"]>(
+    () => {
+      if (typeof window === "undefined") return "emerald";
+      const saved = localStorage.getItem(CHAT_CUSTOM_STATUS_COLOR_KEY);
+      return (CUSTOM_STATUS_COLORS.some((color) => color.key === saved) ? saved : "emerald") as (typeof CUSTOM_STATUS_COLORS)[number]["key"];
+    }
+  );
+  const [notificationsPaused, setNotificationsPaused] = useState(
+    () => (typeof window !== "undefined" ? localStorage.getItem(CHAT_NOTIFICATIONS_PAUSED_KEY) === "1" : false)
+  );
   const [showCrear, setShowCrear]         = useState(false);
   const [showChannelMenu, setShowChannelMenu] = useState(false);
   const [isPageVisible, setIsPageVisible] = useState(
@@ -2334,6 +3344,7 @@ export default function Chat() {
 
   const listRef          = useRef<HTMLDivElement>(null);
   const composerRef      = useRef<HTMLDivElement>(null);
+  const statusButtonRef  = useRef<HTMLButtonElement>(null);
   const pollRef          = useRef<ReturnType<typeof setInterval>|null>(null);
   const typingPollRef    = useRef<ReturnType<typeof setInterval>|null>(null);
   const sidebarPollRef   = useRef<ReturnType<typeof setInterval>|null>(null);
@@ -2353,9 +3364,11 @@ export default function Chat() {
   const fetchMensajesInFlightRef = useRef(false);
   const pollMensajesInFlightRef = useRef(false);
   const loadMoreInFlightRef = useRef(false);
-  const activePollMs = isPageVisible ? 1800 : 4500;
-  const sidebarPollMs = isPageVisible ? 3000 : 6500;
-  const typingPollMs = isPageVisible ? 1800 : 4000;
+  const pollCycleRef = useRef(0);
+  const activePollMs = isPageVisible ? 700 : 1800;
+  const sidebarPollMs = isPageVisible ? 1400 : 3200;
+  const typingPollMs = isPageVisible ? 1200 : 2600;
+  const activeFullSyncEvery = isPageVisible ? 3 : 2;
   const canalActivoId = canalActivo?.id ?? null;
   const canalActivoDmTargetId = canalActivo?.dm_target_user_id ?? null;
 
@@ -2600,20 +3613,23 @@ export default function Chat() {
     fetchMensajesInFlightRef.current = true;
     setLoadingMsgs(mensajesCountRef.current === 0);
     setHasMore(true); lastAt.current=null;
+    const shouldStickToBottom = mensajesCountRef.current === 0 || atBottom.current;
     try {
       const h = await hdr();
       const res = await fetch(`/api/chat/canales/${canal.id}/mensajes`, { headers: h });
       const d = await safeJson(res);
       if (res.ok) {
         const msgs: Mensaje[] = d.data||[];
-        setMensajes(msgs);
+        setMensajes(prev => (areMensajesEquivalent(prev, msgs) ? prev : msgs));
         setFirstUnreadMarkerId(() => {
           if (initialUnreadCount <= 0 || initialUnreadCount > msgs.length) return null;
           return msgs[msgs.length - initialUnreadCount]?.id ?? null;
         });
         if (msgs.length) lastAt.current = msgs[msgs.length-1].created_at;
         if (msgs.length<60) setHasMore(false);
-        setTimeout(() => scrollToBottom("instant"), 80);
+        if (shouldStickToBottom) {
+          setTimeout(() => scrollToBottom("instant"), 80);
+        }
         await fetch(`/api/chat/canales/${canal.id}/leido`, { method:"PUT", headers: h });
         clearUnread(canal.id, canal.dm_target_user_id);
         void refreshUnread();
@@ -2632,6 +3648,28 @@ export default function Chat() {
     if (res.ok) setMiembros(d.data||[]);
   }, [hdr]);
 
+  const readReceiptByMessageId = useMemo(() => {
+    const next = new Map<string, boolean>();
+    const otherMembers = miembros.filter((member) => member.user_id !== currentUserId);
+    if (!otherMembers.length) return next;
+
+    for (const message of mensajes) {
+      if (message.user_id !== currentUserId) continue;
+      const messageAt = new Date(message.created_at).getTime();
+      if (Number.isNaN(messageAt)) continue;
+
+      const readByAllOthers = otherMembers.every((member) => {
+        if (!member.last_read_at) return false;
+        const readAt = new Date(member.last_read_at).getTime();
+        return !Number.isNaN(readAt) && readAt >= messageAt;
+      });
+
+      next.set(message.id, readByAllOthers);
+    }
+
+    return next;
+  }, [currentUserId, miembros, mensajes]);
+
   // ── Poll mensajes
   const pollMensajes = useCallback(async () => {
     if (!canalActivoId || !lastAt.current || fetchMensajesInFlightRef.current || pollMensajesInFlightRef.current) return;
@@ -2648,7 +3686,9 @@ export default function Chat() {
         const ids = new Set(prev.map(m=>m.id));
         const fresh = nuevos.filter(m=>!ids.has(m.id));
         freshCount = fresh.length;
-        const incomingFreshIds = fresh.filter(m => m.user_id !== currentUserId).map(m => m.id);
+        const incomingFreshIds = notificationsPaused
+          ? []
+          : fresh.filter(m => m.user_id !== currentUserId).map(m => m.id);
         if (incomingFreshIds.length) markFreshIncomingMessages(incomingFreshIds);
         return fresh.length ? [...prev, ...fresh] : prev;
       });
@@ -2662,17 +3702,17 @@ export default function Chat() {
         ultimo_mensaje_at: latestMsg.created_at,
       } : c));
       if (atBottom.current) {
-        setTimeout(() => scrollToBottom("smooth"), 60);
+        setTimeout(() => scrollToBottom("instant"), 60);
         await fetch(`/api/chat/canales/${canalActivoId}/leido`, { method:"PUT", headers: h });
         clearUnread(canalActivoId, canalActivoDmTargetId);
         void refreshUnread();
-      } else {
+      } else if (!notificationsPaused) {
         setNewMsgCount(c=>c+freshCount);
       }
     } finally {
       pollMensajesInFlightRef.current = false;
     }
-  }, [canalActivoDmTargetId, canalActivoId, clearUnread, currentUserId, hdr, markFreshIncomingMessages, refreshUnread]);
+  }, [canalActivoDmTargetId, canalActivoId, clearUnread, currentUserId, hdr, markFreshIncomingMessages, notificationsPaused, refreshUnread]);
 
   // ── Scroll helpers
   const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
@@ -2739,24 +3779,41 @@ export default function Chat() {
       setTypingUsers([]);
       return;
     }
+    pollCycleRef.current = 0;
     void fetchMensajesRef.current(canalActivo);
     void fetchMiembrosRef.current(canalActivo.id);
     void fetchTypingUsersRef.current(canalActivo.id);
     if (pollRef.current) clearInterval(pollRef.current);
     if (typingPollRef.current) clearInterval(typingPollRef.current);
-    pollRef.current = setInterval(() => { void pollMensajesRef.current(); }, activePollMs);
+    pollRef.current = setInterval(() => {
+      pollCycleRef.current += 1;
+      if (pollCycleRef.current % activeFullSyncEvery === 0) {
+        void fetchMensajesRef.current(canalActivo);
+      } else {
+        void pollMensajesRef.current();
+      }
+      void fetchMiembrosRef.current(canalActivo.id);
+    }, activePollMs);
     typingPollRef.current = setInterval(() => { void fetchTypingUsersRef.current(canalActivo.id); }, typingPollMs);
     return ()=>{
       if(pollRef.current) clearInterval(pollRef.current);
       if(typingPollRef.current) clearInterval(typingPollRef.current);
     };
-  }, [canalActivoId, activePollMs, typingPollMs]);
+  }, [activeFullSyncEvery, canalActivo, canalActivoId, activePollMs, typingPollMs]);
   useEffect(() => {
     if (pollRef.current) {
       clearInterval(pollRef.current);
-      pollRef.current = setInterval(() => { void pollMensajesRef.current(); }, activePollMs);
+      pollRef.current = setInterval(() => {
+        pollCycleRef.current += 1;
+        if (canalActivo && pollCycleRef.current % activeFullSyncEvery === 0) {
+          void fetchMensajesRef.current(canalActivo);
+        } else {
+          void pollMensajesRef.current();
+        }
+        if (canalActivoId) void fetchMiembrosRef.current(canalActivoId);
+      }, activePollMs);
     }
-  }, [activePollMs]);
+  }, [activeFullSyncEvery, activePollMs, canalActivo, canalActivoId]);
   useEffect(() => {
     if (!canalActivo || !typingPollRef.current) return;
     clearInterval(typingPollRef.current);
@@ -2793,7 +3850,7 @@ export default function Chat() {
       if (!document.hidden && !fetchMensajesInFlightRef.current && !loadMoreInFlightRef.current) {
         void fetchMensajesRef.current(canalActivo);
       }
-    }, 15000);
+    }, 4000);
     return () => window.clearInterval(syncInterval);
   }, [canalActivoId]);
 
@@ -2823,6 +3880,7 @@ export default function Chat() {
     if (canalActivo?.id===c.id) return;
     setIsSwitchingChat(true);
     setFreshIncomingMessageIds(new Set());
+    atBottom.current = true;
     const unreadAtOpen = getUnreadCountForCanal(c);
     setInitialUnreadCount(unreadAtOpen);
     setFirstUnreadMarkerId(null);
@@ -2886,7 +3944,7 @@ export default function Chat() {
         ultimo_mensaje_autor: newMsg.user_name,
         ultimo_mensaje_at: newMsg.created_at,
       } : c));
-      setTimeout(() => scrollToBottom("smooth"), 60);
+      setTimeout(() => scrollToBottom("instant"), 60);
       setReplyTo(null);
       clearUnread(canalActivo.id, canalActivo.dm_target_user_id);
       void refreshUnread();
@@ -2978,11 +4036,49 @@ export default function Chat() {
     setDmLoadingId(null);
   };
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (customStatusLabel.trim()) localStorage.setItem(CHAT_CUSTOM_STATUS_KEY, customStatusLabel.trim());
+    else localStorage.removeItem(CHAT_CUSTOM_STATUS_KEY);
+  }, [customStatusLabel]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (customStatusEmoji.trim()) localStorage.setItem(CHAT_CUSTOM_STATUS_EMOJI_KEY, customStatusEmoji.trim());
+    else localStorage.removeItem(CHAT_CUSTOM_STATUS_EMOJI_KEY);
+  }, [customStatusEmoji]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(CHAT_CUSTOM_STATUS_COLOR_KEY, customStatusColor);
+  }, [customStatusColor]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(CHAT_NOTIFICATIONS_PAUSED_KEY, notificationsPaused ? "1" : "0");
+  }, [notificationsPaused]);
+
   const handleStatusChange = async (s: string) => {
-    setMyStatus(s); setShowStatus(false);
+    setMyStatus(s);
+    setCustomStatusLabel("");
+    setCustomStatusEmoji("");
+    setCustomStatusColor("emerald");
+    setShowStatus(false);
     const h = await hdr();
     await fetch("/api/chat/me/status", { method:"PUT", headers: h, body: JSON.stringify({ status:s }) });
   };
+
+  const handleSaveCustomStatus = useCallback((value: string, emoji: string, colorKey: string) => {
+    setCustomStatusLabel(value);
+    setCustomStatusEmoji(emoji);
+    setCustomStatusColor(colorKey as (typeof CUSTOM_STATUS_COLORS)[number]["key"]);
+  }, []);
+
+  const handleClearCustomStatus = useCallback(() => {
+    setCustomStatusLabel("");
+    setCustomStatusEmoji("");
+    setCustomStatusColor("emerald");
+  }, []);
 
   const joinFromSearch = async (c: CanalBuscado) => {
     setJoiningId(c.id);
@@ -3019,6 +4115,11 @@ export default function Chat() {
   const canalesPrivados   = canales.filter(c=>c.tipo==="privado");
   const canalDMs          = canales.filter(c=>c.tipo==="directo");
   const statusCfg         = STATUS_CFG[myStatus]||STATUS_CFG.disponible;
+  const customStatusColorClass = CUSTOM_STATUS_COLORS.find((color) => color.key === customStatusColor)?.className || "bg-emerald-500";
+  const displayedStatusLabel = customStatusLabel.trim()
+    ? `${customStatusEmoji || "💼"} ${customStatusLabel.trim()}`
+    : statusCfg.label;
+  const displayedStatusColorClass = customStatusLabel.trim() ? customStatusColorClass : statusCfg.color;
   const getUnreadCountForCanal = useCallback((canal?: Canal) => {
     if (!canal) return 0;
     if (!unreadLoaded) return canal.no_leidos ?? 0;
@@ -3094,6 +4195,24 @@ export default function Chat() {
     () => new Map(sysUsers.map(u => [u.user_id, u])),
     [sysUsers]
   );
+  const activeDirectUser = useMemo(() => {
+    if (!canalActivo || canalActivo.tipo !== "directo") return null;
+    if (canalActivo.dm_target_user_id) {
+      const knownUser = sysUsersById.get(canalActivo.dm_target_user_id);
+      if (knownUser) return knownUser;
+    }
+    return sysUsers.find((u) => (
+      !!u.user_name?.trim() &&
+      !!canalActivo.dm_target_user_name?.trim() &&
+      u.user_name.trim().toLowerCase() === canalActivo.dm_target_user_name.trim().toLowerCase()
+    )) || null;
+  }, [canalActivo, sysUsers, sysUsersById]);
+  const activeChatTitle = canalActivo?.tipo === "directo"
+    ? activeDirectUser?.user_name?.trim() || canalActivo?.dm_target_user_name?.trim() || canalActivo?.nombre || "Conversación"
+    : canalActivo?.nombre || "";
+  const activeChatSubtitle = canalActivo?.tipo === "directo"
+    ? activeDirectUser?.role_label?.trim() || "Colaborador"
+    : canalActivo?.descripcion || null;
   const resolveDisplayName = useCallback((userId?: string | null, name?: string | null, isSelf = false) => {
     if (isSelf || (userId && userId === currentUserId)) return "T\u00FA";
     const knownUser = userId ? sysUsersById.get(userId) : null;
@@ -3311,19 +4430,56 @@ export default function Chat() {
 
         {/* Footer usuario */}
         <div className="px-3 py-3 border-t border-slate-700/50 shrink-0 relative">
-          <button onClick={()=>setShowStatus(v=>!v)}
-            className="w-full flex items-center gap-2.5 p-2 rounded-xl hover:bg-slate-800 transition-colors group">
+          <button ref={statusButtonRef} onClick={()=>setShowStatus(v=>!v)}
+            className="w-full flex items-center gap-2.5 p-2 rounded-xl hover:bg-slate-800 transition-all duration-150 active:scale-[0.985] group">
             <div className="relative shrink-0">
               <Av url={user?.imageUrl} name={user?.fullName||"Tú"} size={8}/>
-              <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-slate-900 ${statusCfg.color}`}/>
+              <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-slate-900 ${displayedStatusColorClass}`}/>
             </div>
             <div className="flex-1 min-w-0 text-left">
               <p className="text-white text-xs font-semibold truncate">{user?.fullName||"Tú"}</p>
-              <p className="text-slate-400 text-[10px] truncate">{statusCfg.label}</p>
+              <div className="flex items-center gap-1 text-slate-400 text-[10px]">
+                <p className="truncate">{displayedStatusLabel}</p>
+                {notificationsPaused ? (
+                  <BellOff size={11} className="shrink-0" />
+                ) : (
+                  <Bell size={11} className="shrink-0" />
+                )}
+              </div>
             </div>
             <Settings size={13} className="text-slate-600 group-hover:text-slate-400 transition-colors shrink-0"/>
           </button>
-          {showStatus&&<StatusSelector current={myStatus} onSelect={handleStatusChange} onClose={()=>setShowStatus(false)}/>}
+          {showStatus&&(
+            <StatusSelector
+              anchorRef={statusButtonRef}
+              current={myStatus}
+              currentLabel={displayedStatusLabel}
+              currentColorClass={displayedStatusColorClass}
+              customStatusText={customStatusLabel}
+              customStatusEmoji={customStatusEmoji}
+              customStatusColor={customStatusColor}
+              userName={user?.fullName || "Tú"}
+              userAvatar={user?.imageUrl}
+              notificationsPaused={notificationsPaused}
+              onSelect={handleStatusChange}
+              onSaveCustomStatus={handleSaveCustomStatus}
+              onClearCustomStatus={handleClearCustomStatus}
+              onToggleNotifications={() => setNotificationsPaused((prev) => !prev)}
+              onProfile={() => {
+                setShowStatus(false);
+                window.location.assign("/dashboard/config");
+              }}
+              onPreferences={() => {
+                setShowStatus(false);
+                window.location.assign("/dashboard/config");
+              }}
+              onDownloads={() => {
+                setShowStatus(false);
+                window.location.assign("/dashboard/correo");
+              }}
+              onClose={()=>setShowStatus(false)}
+            />
+          )}
         </div>
       </aside>
 
@@ -3353,13 +4509,18 @@ export default function Chat() {
                   :canalActivo.tipo==="directo"
                   ?<MessageSquare size={16} className="text-slate-400 shrink-0"/>
                   :<Hash size={16} className="text-slate-400 shrink-0"/>}
-                <span className="font-bold text-slate-800 text-sm">{canalActivo.nombre}</span>
+                <div className="min-w-0">
+                  <p className="truncate font-bold text-slate-800 text-sm">{activeChatTitle}</p>
+                  {canalActivo.tipo==="directo" && activeChatSubtitle && (
+                    <p className="truncate text-[11px] text-slate-400">{activeChatSubtitle}</p>
+                  )}
+                </div>
                 {canalActivo.tipo!=="directo"&&(
                   <span className="hidden sm:flex items-center gap-0.5 text-slate-400 text-xs bg-slate-100 px-2 py-0.5 rounded-full shrink-0">
                     <Users size={10}/> {canalActivo.total_miembros}
                   </span>
                 )}
-                {canalActivo.descripcion&&(
+                {canalActivo.tipo!=="directo" && canalActivo.descripcion&&(
                   <>
                     <span className="text-slate-200 hidden md:block">·</span>
                     <span className="text-slate-400 text-xs truncate hidden md:block">{canalActivo.descripcion}</span>
@@ -3446,6 +4607,8 @@ export default function Chat() {
                           <MensajeItem msg={m} prevMsg={prevMsg}
                             currentUserId={currentUserId} isHighlighted={highlightId===m.id}
                             isFreshIncoming={freshIncomingMessageIds.has(m.id)}
+                            showReadReceipt={canalActivo.tipo==="directo"}
+                            isReadByRecipient={readReceiptByMessageId.get(m.id) ?? false}
                             onReply={setReplyTo} onReact={handleReact}
                             onEdit={setEditingMsg} onDelete={handleDelete} onPin={handlePin} onFavorite={handleFavorite}
                             isFavorite={favoriteIds.has(m.id)}

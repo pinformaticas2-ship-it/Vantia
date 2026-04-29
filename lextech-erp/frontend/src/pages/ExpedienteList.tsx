@@ -1,6 +1,7 @@
 import React, {
   useEffect, useState, useCallback, useMemo, useRef,
 } from "react";
+import { createPortal } from "react-dom";
 import { useAuth } from "@clerk/clerk-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -11,16 +12,18 @@ import {
   AlertTriangle, ClipboardList, ChevronRight, Star,
   Palette, Zap, Bell, Copy, GitMerge, Smartphone,
   Bug, History, TrendingUp, UserMinus, Pencil, Bookmark,
-  AlignJustify, LayoutList, ListChecks, Upload, Eye, Settings2, SlidersHorizontal, Check,
+  AlignJustify, LayoutList, ListChecks, Upload, Eye, Settings2, SlidersHorizontal, Check, Search, CheckCircle2,
+  Download, FileCode2, FileText, ArrowRight, ArrowLeft, ChevronsRight, ChevronsLeft,
 } from "lucide-react";
 import { AtajosButton } from "../components/AtajosSystem";
 import AdjuntosModal from "../components/AdjuntosModal";
 import BackButton from "../components/BackButton";
 
-type ViewMode = "list" | "detail" | "multiselect" | "csvImport" | "csvImportConfigure" | "csvImportReview" | "csvImportComplete" | "csvImportHistory" | "csvImportErrorDetail";
+type ViewMode = "list" | "detail" | "multiselect" | "csvImport" | "csvImportConfigure" | "csvImportReview" | "csvImportComplete" | "csvImportHistory" | "csvImportErrorDetail" | "documentImport" | "documentImportVerify";
 import { safeJson } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
-import { TIPOS, ESTADOS, EXP_EMPTY, ExpedienteModal } from "../components/ExpedienteModal";
+import { TIPOS, ESTADOS, EXP_EMPTY, ExpedienteModal, lbl, inp } from "../components/ExpedienteModal";
+import AppSelect from "../components/AppSelect";
 
 type SortKey = "anio" | "num_exp" | "descripcion" | "tipo" | "cliente_nombre" | "contrario" | "juzgado" | "estado" | "fecha_inicio";
 type SortDir = "asc" | "desc";
@@ -41,6 +44,30 @@ interface ImportBatch {
   updated_at: string;
   user_id: string;
   user_name: string;
+}
+
+interface DocumentImportItem {
+  id: string;
+  row_number: number;
+  reference: string | null;
+  status: string;
+  error_message: string | null;
+  payload?: {
+    fileName?: string;
+    extractedData?: Record<string, unknown>;
+    draft?: Record<string, unknown>;
+    previewUrl?: string;
+    mimeType?: string;
+    textPreview?: string;
+    userError?: string | null;
+    developerError?: string | null;
+  } | null;
+  created_expediente_id?: string | null;
+  anio?: number | null;
+  num_exp?: number | null;
+  descripcion?: string | null;
+  tipo?: string | null;
+  cliente_nombre?: string | null;
 }
 
 interface CsvFieldMapping {
@@ -480,6 +507,291 @@ function importStatusMeta(status: string) {
   }
 }
 
+type ExportFormat = "excel" | "xml" | "word";
+type ExportFieldDef = { id: string; label: string; getValue: (row: any) => string };
+type ExportTemplate = { id: string; name: string; format: ExportFormat; fields: string[]; builtIn?: boolean };
+
+const EXPEDIENTE_EXPORT_STORAGE_KEY = "expedientes-export-templates-v1";
+
+const EXPEDIENTE_EXPORT_FIELDS: ExportFieldDef[] = [
+  { id: "abogado_propio", label: "Abogado Propio", getValue: (row) => row.procurador || "" },
+  { id: "estado", label: "Estado", getValue: (row) => ESTADOS[row.estado]?.label || row.estado || "" },
+  { id: "num_exp", label: "Núm. Exp", getValue: (row) => String(row.num_exp || "") },
+  { id: "anio", label: "Año", getValue: (row) => String(row.anio || "") },
+  { id: "ref_propia", label: "Ref. Propia", getValue: (row) => row.ref_propia || "" },
+  { id: "ref_expediente", label: "Ref. Expediente", getValue: (row) => row.ref_expediente || "" },
+  { id: "tipo_expediente", label: "Tipo de Expediente", getValue: (row) => TIPOS[row.tipo]?.label || row.tipo || "" },
+  { id: "descripcion", label: "Descripción Expediente", getValue: (row) => row.descripcion || "" },
+  { id: "cliente", label: "Cliente", getValue: (row) => row.cliente_nombre || "" },
+  { id: "contrario", label: "Contrario", getValue: (row) => row.contrario || "" },
+  { id: "juzgado", label: "Juzgado Principal", getValue: (row) => row.juzgado || "" },
+  { id: "nig", label: "NIG", getValue: (row) => row.nig || "" },
+  { id: "num_autos", label: "Núm. Autos", getValue: (row) => row.num_autos || "" },
+  { id: "tipo_proc", label: "Tipo de Procedimiento", getValue: (row) => row.tipo_proc || "" },
+  { id: "fecha_alta", label: "Fecha Alta", getValue: (row) => row.fecha_inicio ? fmtDate(row.fecha_inicio) : "" },
+  { id: "fecha_cierre", label: "Fecha Cierre", getValue: (row) => row.fecha_cierre ? fmtDate(row.fecha_cierre) : "" },
+  { id: "importe", label: "Importe", getValue: (row) => row.importe != null ? String(row.importe) : "" },
+  { id: "cuantia_principal", label: "Imp. Cobros Vencidos Pdtes.", getValue: (row) => row.cuantia_principal != null ? String(row.cuantia_principal) : "" },
+  { id: "intereses", label: "Intereses", getValue: (row) => row.intereses != null ? String(row.intereses) : "" },
+  { id: "costas", label: "Costas", getValue: (row) => row.costas != null ? String(row.costas) : "" },
+  { id: "usuario", label: "Usuario", getValue: (row) => row.created_by || "" },
+  { id: "observaciones", label: "Descripción Última Act. Rzda.", getValue: (row) => row.observaciones || "" },
+];
+
+const CURRENT_EXPEDIENTE_LIST_EXPORT_FIELDS = [
+  "anio",
+  "num_exp",
+  "ref_propia",
+  "descripcion",
+  "tipo_expediente",
+  "cliente",
+  "contrario",
+  "abogado_propio",
+  "juzgado",
+  "tipo_proc",
+  "num_autos",
+  "nig",
+  "estado",
+] as const;
+
+const DEFAULT_EXPEDIENTE_EXPORT_TEMPLATE: ExportTemplate = {
+  id: "default-excel",
+  name: "Listado actual",
+  format: "excel",
+  builtIn: true,
+  fields: [...CURRENT_EXPEDIENTE_LIST_EXPORT_FIELDS],
+};
+
+const EXPEDIENTE_ROW_COLOR_STYLES: Record<string, {
+  row: string;
+  rowSelected: string;
+  year: string;
+  yearSelected: string;
+  number: string;
+  numberSelected: string;
+  descriptionSelected: string;
+  card: string;
+  cardSelected: string;
+  cardNumber: string;
+  cardNumberSelected: string;
+  cardDescriptionSelected: string;
+}> = {
+  ninguno: {
+    row: "hover:bg-slate-50/80",
+    rowSelected: "bg-red-50 border-l-2 border-l-red-500",
+    year: "text-slate-400",
+    yearSelected: "text-red-400",
+    number: "text-red-600",
+    numberSelected: "text-red-700",
+    descriptionSelected: "text-red-700",
+    card: "border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm",
+    cardSelected: "border-red-300 bg-red-50 shadow-sm",
+    cardNumber: "text-red-500",
+    cardNumberSelected: "text-red-600",
+    cardDescriptionSelected: "text-red-800",
+  },
+  azul: {
+    row: "bg-sky-50/45 hover:bg-sky-100/70",
+    rowSelected: "bg-sky-100 border-l-2 border-l-sky-500",
+    year: "text-sky-500",
+    yearSelected: "text-sky-700",
+    number: "text-sky-700",
+    numberSelected: "text-sky-800",
+    descriptionSelected: "text-sky-900",
+    card: "border-sky-200 bg-sky-50/60 hover:border-sky-300 hover:shadow-sm",
+    cardSelected: "border-sky-400 bg-sky-100 shadow-sm",
+    cardNumber: "text-sky-600",
+    cardNumberSelected: "text-sky-800",
+    cardDescriptionSelected: "text-sky-950",
+  },
+  verde: {
+    row: "bg-emerald-50/45 hover:bg-emerald-100/70",
+    rowSelected: "bg-emerald-100 border-l-2 border-l-emerald-500",
+    year: "text-emerald-500",
+    yearSelected: "text-emerald-700",
+    number: "text-emerald-700",
+    numberSelected: "text-emerald-800",
+    descriptionSelected: "text-emerald-900",
+    card: "border-emerald-200 bg-emerald-50/60 hover:border-emerald-300 hover:shadow-sm",
+    cardSelected: "border-emerald-400 bg-emerald-100 shadow-sm",
+    cardNumber: "text-emerald-600",
+    cardNumberSelected: "text-emerald-800",
+    cardDescriptionSelected: "text-emerald-950",
+  },
+  amarillo: {
+    row: "bg-amber-50/50 hover:bg-amber-100/70",
+    rowSelected: "bg-amber-100 border-l-2 border-l-amber-500",
+    year: "text-amber-500",
+    yearSelected: "text-amber-700",
+    number: "text-amber-700",
+    numberSelected: "text-amber-800",
+    descriptionSelected: "text-amber-900",
+    card: "border-amber-200 bg-amber-50/60 hover:border-amber-300 hover:shadow-sm",
+    cardSelected: "border-amber-400 bg-amber-100 shadow-sm",
+    cardNumber: "text-amber-600",
+    cardNumberSelected: "text-amber-800",
+    cardDescriptionSelected: "text-amber-950",
+  },
+  naranja: {
+    row: "bg-orange-50/50 hover:bg-orange-100/70",
+    rowSelected: "bg-orange-100 border-l-2 border-l-orange-500",
+    year: "text-orange-500",
+    yearSelected: "text-orange-700",
+    number: "text-orange-700",
+    numberSelected: "text-orange-800",
+    descriptionSelected: "text-orange-900",
+    card: "border-orange-200 bg-orange-50/60 hover:border-orange-300 hover:shadow-sm",
+    cardSelected: "border-orange-400 bg-orange-100 shadow-sm",
+    cardNumber: "text-orange-600",
+    cardNumberSelected: "text-orange-800",
+    cardDescriptionSelected: "text-orange-950",
+  },
+  rojo: {
+    row: "bg-rose-50/45 hover:bg-rose-100/70",
+    rowSelected: "bg-rose-100 border-l-2 border-l-rose-500",
+    year: "text-rose-500",
+    yearSelected: "text-rose-700",
+    number: "text-rose-700",
+    numberSelected: "text-rose-800",
+    descriptionSelected: "text-rose-900",
+    card: "border-rose-200 bg-rose-50/60 hover:border-rose-300 hover:shadow-sm",
+    cardSelected: "border-rose-400 bg-rose-100 shadow-sm",
+    cardNumber: "text-rose-600",
+    cardNumberSelected: "text-rose-800",
+    cardDescriptionSelected: "text-rose-950",
+  },
+  morado: {
+    row: "bg-violet-50/45 hover:bg-violet-100/70",
+    rowSelected: "bg-violet-100 border-l-2 border-l-violet-500",
+    year: "text-violet-500",
+    yearSelected: "text-violet-700",
+    number: "text-violet-700",
+    numberSelected: "text-violet-800",
+    descriptionSelected: "text-violet-900",
+    card: "border-violet-200 bg-violet-50/60 hover:border-violet-300 hover:shadow-sm",
+    cardSelected: "border-violet-400 bg-violet-100 shadow-sm",
+    cardNumber: "text-violet-600",
+    cardNumberSelected: "text-violet-800",
+    cardDescriptionSelected: "text-violet-950",
+  },
+};
+
+function getExportFieldLabel(fieldId: string) {
+  return EXPEDIENTE_EXPORT_FIELDS.find((field) => field.id === fieldId)?.label || fieldId;
+}
+
+function loadStoredExpedienteExportTemplates(): ExportTemplate[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(EXPEDIENTE_EXPORT_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item) => item && item.id && item.name && Array.isArray(item.fields));
+  } catch {
+    return [];
+  }
+}
+
+function saveStoredExpedienteExportTemplates(templates: ExportTemplate[]) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(EXPEDIENTE_EXPORT_STORAGE_KEY, JSON.stringify(templates));
+}
+
+function downloadTextFile(content: string, filename: string, mimeType: string) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function escapeXml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+function toExcelColumnLabel(index: number) {
+  let n = index + 1;
+  let label = "";
+  while (n > 0) {
+    const rem = (n - 1) % 26;
+    label = String.fromCharCode(65 + rem) + label;
+    n = Math.floor((n - 1) / 26);
+  }
+  return label;
+}
+
+function buildExcelLikeHtml(headers: string[], rows: string[][], title: string) {
+  const columnLetters = headers.map((_, index) => `<th class="col-letter">${toExcelColumnLabel(index)}</th>`).join("");
+  const headerCells = headers.map((header) => `<th>${escapeXml(header)}</th>`).join("");
+  const bodyRows = rows.map((row, rowIndex) => `<tr><th class="row-number">${rowIndex + 1}</th>${row.map((cell) => `<td>${escapeXml(cell)}</td>`).join("")}</tr>`).join("");
+  return `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>${escapeXml(title)}</title>
+    <style>
+      body { font-family: Calibri, Arial, sans-serif; background: #f3f6fb; margin: 0; padding: 18px; }
+      .sheet { background: #ffffff; border: 1px solid #cfd8e3; box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08); overflow: hidden; }
+      table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+      th, td { border: 1px solid #d9e1ea; padding: 6px 8px; font-size: 11px; color: #111827; vertical-align: top; word-wrap: break-word; line-height: 1.35; }
+      .corner, .col-letter, .row-number { background: #eef2f6; color: #5b6878; font-weight: 700; text-align: center; }
+      .corner, .row-number { width: 44px; }
+      .col-letter { padding: 5px 0; }
+      thead .header-title { background: #dbe5f1; font-weight: 700; text-align: center; color: #233247; }
+      tbody tr:nth-child(even) td { background: #fbfcfe; }
+    </style>
+  </head>
+  <body>
+    <div class="sheet">
+      <table>
+        <thead>
+          <tr><th class="corner"></th>${columnLetters}</tr>
+          <tr><th class="row-number">1</th>${headerCells.replace(/<th>/g, '<th class="header-title">')}</tr>
+        </thead>
+        <tbody>${bodyRows}</tbody>
+      </table>
+    </div>
+  </body>
+</html>`;
+}
+
+function exportFormatMeta(format: ExportFormat) {
+  switch (format) {
+    case "xml":
+      return {
+        label: "XML",
+        icon: FileCode2,
+        className: "from-amber-50 to-orange-50 border-amber-200 text-amber-700",
+        badgeClassName: "bg-amber-100 text-amber-700",
+        description: "Estructurado para integraciones y otros sistemas.",
+      };
+    case "word":
+      return {
+        label: "Word",
+        icon: FileText,
+        className: "from-blue-50 to-sky-50 border-blue-200 text-blue-700",
+        badgeClassName: "bg-blue-100 text-blue-700",
+        description: "Documento editable con apariencia de tabla.",
+      };
+    default:
+      return {
+        label: "Excel",
+        icon: FileSpreadsheet,
+        className: "from-emerald-50 to-lime-50 border-emerald-200 text-emerald-700",
+        badgeClassName: "bg-emerald-100 text-emerald-700",
+        description: "Listado tipo hoja de cálculo con la plantilla por defecto.",
+      };
+  }
+}
+
 // ── Botón de toolbar ──────────────────────────────────────────
 function ToolBtn({
   icon: Icon, label, onClick, disabled = false, primary = false, danger = false,
@@ -510,6 +822,119 @@ function ToolBtn({
   );
 }
 
+function DropdownToolBtn({
+  icon: Icon,
+  label,
+  disabled = false,
+  items,
+}: {
+  icon: any;
+  label: string;
+  disabled?: boolean;
+  items: {
+    label: string;
+    icon?: any;
+    onClick?: () => void;
+    divider?: boolean;
+    children?: { label: string; icon?: any; onClick: () => void }[];
+  }[];
+}) {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (
+        btnRef.current && !btnRef.current.contains(e.target as Node) &&
+        menuRef.current && !menuRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  return (
+    <div className="relative shrink-0">
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={() => !disabled && setOpen((prev) => !prev)}
+        disabled={disabled}
+        className={`
+          flex items-center gap-0 rounded-xl text-xs font-semibold transition-all active:scale-[0.98] border overflow-hidden shadow-sm
+          ${disabled ? "text-slate-300 cursor-not-allowed border-slate-100 bg-white" : "text-slate-600 bg-white hover:bg-slate-50 border-slate-200"}
+        `}
+      >
+        <span className="flex items-center gap-1.5 px-3 py-2">
+          <Icon size={13} />
+          <span className="hidden sm:inline whitespace-nowrap">{label}</span>
+        </span>
+        <span className={`px-1.5 py-2 border-l ${disabled ? "border-slate-100" : "border-slate-200 hover:bg-slate-100"}`}>
+          <ChevronDown size={10} />
+        </span>
+      </button>
+
+      {open && (
+        <div
+          ref={menuRef}
+          className="absolute left-0 top-full z-[9999] mt-2 min-w-[220px] max-w-[280px] rounded-2xl border border-slate-200 bg-white py-1.5 shadow-2xl shadow-slate-300/40"
+        >
+          {items.map((item, index) =>
+            item.divider ? (
+              <div key={`divider-${index}`} className="my-1 h-px bg-slate-100" />
+            ) : item.children?.length ? (
+              <div key={`${item.label}-${index}`} className="group relative">
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between gap-2.5 px-3 py-2 text-left text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-700"
+                >
+                  <span className="flex items-center gap-2.5">
+                    {item.icon && <item.icon size={12} className="shrink-0 text-slate-400" />}
+                    {item.label}
+                  </span>
+                  <ChevronRight size={11} className="text-slate-300" />
+                </button>
+                <div className="invisible absolute left-full top-0 ml-2 min-w-[180px] rounded-2xl border border-slate-200 bg-white py-1.5 opacity-0 shadow-2xl shadow-slate-300/40 transition-all group-hover:visible group-hover:opacity-100">
+                  {item.children.map((child, childIndex) => (
+                    <button
+                      key={`${child.label}-${childIndex}`}
+                      type="button"
+                      onClick={() => {
+                        child.onClick();
+                        setOpen(false);
+                      }}
+                      className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-700"
+                    >
+                      {child.icon && <child.icon size={12} className="shrink-0 text-slate-400" />}
+                      {child.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <button
+                key={`${item.label}-${index}`}
+                type="button"
+                onClick={() => {
+                  item.onClick?.();
+                  setOpen(false);
+                }}
+                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-700"
+              >
+                {item.icon && <item.icon size={12} className="shrink-0 text-slate-400" />}
+                {item.label}
+              </button>
+            )
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Cabecera columna ordenable ─────────────────────────────────
 function AltaOption({
   icon: Icon,
@@ -537,6 +962,122 @@ function AltaOption({
         <p className="mt-0.5 text-sm leading-6 text-slate-500">{description}</p>
       </div>
     </button>
+  );
+}
+
+function PrettyAssignSelect({
+  label,
+  placeholder,
+  value,
+  options,
+  emptyMessage,
+  searchablePlaceholder,
+  onChange,
+}: {
+  label: string;
+  placeholder: string;
+  value: string;
+  options: { value: string; label: string; meta?: string }[];
+  emptyMessage: string;
+  searchablePlaceholder: string;
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (ref.current && !ref.current.contains(event.target as Node)) {
+        setOpen(false);
+        setSearch("");
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const selectedOption = options.find((option) => option.value === value);
+  const filteredOptions = options.filter((option) => {
+    const query = search.trim().toLowerCase();
+    if (!query) return true;
+    return (
+      option.label.toLowerCase().includes(query)
+      || option.value.toLowerCase().includes(query)
+      || (option.meta || "").toLowerCase().includes(query)
+    );
+  });
+
+  return (
+    <div className="relative" ref={ref}>
+      <span className="mb-2 block text-[15px] font-semibold text-slate-900">{label}</span>
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className={`flex h-11 w-full items-center justify-between rounded-2xl border bg-white px-4 text-left text-[15px] shadow-sm outline-none transition-all ${
+          open
+            ? "border-[#ab0433]/35 ring-4 ring-[#ab0433]/10"
+            : "border-slate-200 hover:border-slate-300"
+        }`}
+      >
+        <span className={selectedOption ? "text-slate-700" : "text-slate-400"}>
+          {selectedOption?.label || placeholder}
+        </span>
+        <ChevronDown size={16} className={`text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="absolute z-50 mt-2 w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_20px_50px_-24px_rgba(15,23,42,0.22)]">
+          <div className="border-b border-slate-100 p-3">
+            <div className="relative">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={searchablePlaceholder}
+                className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm text-slate-700 outline-none transition-all focus:border-[#ab0433]/35 focus:bg-white focus:ring-4 focus:ring-[#ab0433]/10"
+                autoFocus
+              />
+            </div>
+          </div>
+
+          <div className="max-h-72 overflow-y-auto py-2">
+            {!filteredOptions.length ? (
+              <div className="px-4 py-6 text-center text-sm text-slate-400">{emptyMessage}</div>
+            ) : (
+              filteredOptions.map((option) => {
+                const isSelected = value === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => {
+                      onChange(option.value);
+                      setOpen(false);
+                      setSearch("");
+                    }}
+                    className={`mx-2 flex w-[calc(100%-16px)] items-center justify-between rounded-xl px-3 py-3 text-left transition-colors ${
+                      isSelected ? "bg-amber-100/80" : "hover:bg-slate-50"
+                    }`}
+                  >
+                    <div className="min-w-0">
+                      <p className={`truncate text-sm font-semibold ${isSelected ? "text-slate-900" : "text-slate-700"}`}>
+                        {option.label}
+                      </p>
+                      {option.meta && (
+                        <p className="mt-0.5 truncate text-xs text-slate-400">{option.meta}</p>
+                      )}
+                    </div>
+                    {isSelected ? <Check size={16} className="ml-3 shrink-0 text-slate-700" /> : <span className="ml-3 w-4 shrink-0" />}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1710,6 +2251,1013 @@ function CsvImportErrorDetailView({
   );
 }
 
+// ── ZipUploadIllustration ─────────────────────────────────────────────────────
+// Ilustración 3D reactiva al ratón para el área de subida de ZIP
+function ZipUploadIllustration({ hasFile, clicked }: { hasFile: boolean; clicked: boolean }) {
+  const ref    = useRef<HTMLDivElement>(null);
+  const rafRef = useRef<number>(0);
+  const [tilt, setTilt] = useState({ x: 0, y: 0, active: false });
+
+  const onMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const el = ref.current;
+    if (!el) return;
+    cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(() => {
+      const rect = el.getBoundingClientRect();
+      const cx   = rect.left + rect.width  / 2;
+      const cy   = rect.top  + rect.height / 2;
+      const x    = Math.max(-1, Math.min(1, (e.clientX - cx) / (rect.width  / 2)));
+      const y    = Math.max(-1, Math.min(1, (e.clientY - cy) / (rect.height / 2)));
+      setTilt({ x, y, active: true });
+    });
+  }, []);
+
+  const onMouseLeave = useCallback(() => {
+    cancelAnimationFrame(rafRef.current);
+    setTilt({ x: 0, y: 0, active: false });
+  }, []);
+
+  // Factores de paralaje
+  const rotY   =  tilt.x * 14;
+  const rotX   = -tilt.y * 10;
+  const shiftX =  tilt.x * 6;
+  const shiftY =  tilt.y * 4;
+
+  // Sheets: se abren más al hover, y EXPLOSIÓN al click
+  const fanL   = clicked ? -62 : tilt.active ? -18 + tilt.x * -14 : -14;
+  const fanR   = clicked ?  62 : tilt.active ?  18 + tilt.x *  14 :  14;
+  const sheetsY = clicked ? -22 : tilt.active ? tilt.y * -8 : 0;
+  const sheetsScale = clicked ? 1.12 : tilt.active ? 1.04 : 1;
+
+  // Glow sigue al ratón
+  const glowX = 50 + tilt.x * 30;
+  const glowY = 50 + tilt.y * 30;
+
+  const ease = clicked
+    ? '350ms cubic-bezier(.34,1.56,.64,1)'   // resorte al explotar
+    : tilt.active
+      ? '80ms linear'
+      : '500ms cubic-bezier(.22,1,.36,1)';   // snap-back suave
+
+  return (
+    <div
+      ref={ref}
+      className="relative flex h-40 w-40 items-center justify-center select-none"
+      onMouseMove={onMouseMove}
+      onMouseLeave={onMouseLeave}
+      style={{
+        perspective: '700px',
+        filter: 'drop-shadow(0 14px 28px rgba(15,23,42,0.08))',
+      }}
+    >
+      {/* Contenedor 3D */}
+      <div style={{
+        width: '100%', height: '100%',
+        position: 'relative',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        transform: `perspective(700px) rotateY(${rotY}deg) rotateX(${rotX}deg) translate(${shiftX}px,${shiftY}px)`,
+        transition: ease,
+        transformStyle: 'preserve-3d',
+        willChange: 'transform',
+      }}>
+        {/* Glow de fondo */}
+        <div style={{
+          position: 'absolute', inset: '-20%', borderRadius: '50%',
+          background: `radial-gradient(circle at ${glowX}% ${glowY}%, rgba(171,4,51,0.12) 0%, transparent 65%)`,
+          opacity: tilt.active ? 1 : 0.4,
+          transition: ease,
+          pointerEvents: 'none',
+        }} />
+
+        {/* Hoja izquierda */}
+        <div style={{
+          position: 'absolute', left: 14, top: 28, width: 60, height: 76,
+          borderRadius: 18, border: '1px solid #d7deea',
+          background: 'linear-gradient(160deg,#fff 0%,#f8fafc 100%)',
+          boxShadow: '0 16px 32px -20px rgba(15,23,42,0.18)',
+          transform: `translateY(${sheetsY - 2}px) rotate(${fanL}deg) scale(${sheetsScale})`,
+          transition: ease,
+          overflow: 'hidden',
+        }}>
+          {/* Líneas simuladas */}
+          {[14, 26, 38, 50].map(top => (
+            <div key={top} style={{
+              position: 'absolute', left: 10, right: 10, top,
+              height: 2, borderRadius: 99,
+              background: `rgba(203,213,225,${0.9 - top * 0.008})`,
+            }} />
+          ))}
+        </div>
+
+        {/* Hoja derecha */}
+        <div style={{
+          position: 'absolute', right: 14, top: 28, width: 60, height: 76,
+          borderRadius: 18, border: '1px solid #d7deea',
+          background: 'linear-gradient(160deg,#fff 0%,#f8fafc 100%)',
+          boxShadow: '0 16px 32px -20px rgba(15,23,42,0.18)',
+          transform: `translateY(${sheetsY - 2}px) rotate(${fanR}deg) scale(${sheetsScale})`,
+          transition: ease,
+          overflow: 'hidden',
+        }}>
+          {[14, 26, 38, 50].map(top => (
+            <div key={top} style={{
+              position: 'absolute', left: 10, right: 10, top,
+              height: 2, borderRadius: 99,
+              background: `rgba(203,213,225,${0.9 - top * 0.008})`,
+            }} />
+          ))}
+        </div>
+
+        {/* Tarjeta central */}
+        <div style={{
+          position: 'relative', width: 76, height: 92,
+          borderRadius: 18, border: '1px solid #d8dee8',
+          background: 'linear-gradient(180deg,#fff 0%,#fbfcfe 100%)',
+          boxShadow: `0 ${tilt.active ? 28 : 22}px ${tilt.active ? 56 : 40}px -24px rgba(15,23,42,${tilt.active ? 0.3 : 0.2})`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          transform: `translateY(${tilt.active ? -3 : 0}px) scale(${tilt.active ? 1.03 : 1})`,
+          transition: ease,
+          zIndex: 2,
+        }}>
+          {/* Borde interior */}
+          <div style={{
+            position: 'absolute', inset: 0, borderRadius: 18,
+            border: '1px solid rgba(203,213,225,0.72)',
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9), 0 0 0 5px rgba(248,250,252,0.9)',
+          }} />
+
+          {/* Icono */}
+          <div style={{
+            width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            transform: `scale(${tilt.active ? 1.1 : 1})`,
+            transition: ease,
+          }}>
+            {hasFile
+              ? <CheckCircle2 size={22} style={{ color: '#10b981' }} strokeWidth={2.1} />
+              : <Plus size={22} style={{ color: '#c7ced9', transition: ease, opacity: tilt.active ? 1 : 0.78 }} strokeWidth={2.05} />
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── ZipDropArea ───────────────────────────────────────────────────────────────
+// Área de drag-and-drop para ZIP — hooks correctamente en componente propio
+function ZipDropArea({ zipFileName, onSelectFile, onFileChange }: {
+  zipFileName: string | null;
+  onSelectFile: () => void;
+  onFileChange: (file: File) => void;
+}) {
+  const [isDragging, setIsDragging] = useState(false);
+  const [isClicked,  setIsClicked]  = useState(false);
+
+  const handleClick = useCallback(() => {
+    setIsClicked(true);
+    setTimeout(() => { setIsClicked(false); onSelectFile(); }, 320);
+  }, [onSelectFile]);
+
+  return (
+    <button
+      onClick={handleClick}
+      onDragOver={e  => { e.preventDefault(); setIsDragging(true); }}
+      onDragEnter={e => { e.preventDefault(); setIsDragging(true); }}
+      onDragLeave={() => setIsDragging(false)}
+      onDrop={e => {
+        e.preventDefault(); setIsDragging(false);
+        const file = e.dataTransfer.files?.[0];
+        if (file) onFileChange(file);
+      }}
+      className={`mt-6 flex min-h-[390px] w-full flex-col items-center justify-center rounded-[24px] border-2 px-6 py-10 text-center transition-all duration-200 ${
+        isDragging
+          ? 'border-[#ab0433] bg-red-50/40 scale-[1.01]'
+          : isClicked
+            ? 'border-[#ab0433]/40 bg-red-50/20 scale-[0.995]'
+            : 'border-slate-200 bg-white hover:border-[#ab0433]/30 hover:bg-red-50/10'
+      }`}
+    >
+      <div className="mb-8">
+        <ZipUploadIllustration hasFile={!!zipFileName} clicked={isClicked} />
+      </div>
+
+      <p className={`text-2xl font-semibold transition-colors duration-200 ${
+        isDragging || isClicked ? 'text-[#ab0433]' : 'text-slate-700'
+      }`}>
+        {isDragging ? '¡Suelta el archivo aquí!'
+          : isClicked ? 'Abriendo selector...'
+          : zipFileName ?? 'Añade un archivo ZIP con documentos'}
+      </p>
+      <p className="mt-3 max-w-xl text-base leading-7 text-slate-400">
+        {zipFileName
+          ? 'Haz click para cambiar el archivo'
+          : 'Arrastra un ZIP aquí, o haz click para seleccionarlo'}
+      </p>
+      {zipFileName && (
+        <div className="mt-4 flex items-center gap-2 rounded-full bg-green-50 px-4 py-1.5">
+          <CheckCircle2 size={14} className="text-green-500" />
+          <span className="text-sm font-medium text-green-700">Archivo listo para procesar</span>
+        </div>
+      )}
+    </button>
+  );
+}
+
+function DocumentImportView({
+  zipFile,
+  zipFileName,
+  autoAssignOrganizations,
+  selectedClientId,
+  selectedProcurador,
+  clients,
+  importBusy,
+  uploadProgress,
+  uploadStage,
+  importError,
+  activeBatch,
+  activeItems,
+  history,
+  loadingHistory,
+  historyError,
+  successNotice,
+  onBack,
+  onOpenSettings,
+  onToggleAutoAssign,
+  onChangeClient,
+  onChangeProcurador,
+  onSelectFile,
+  onFileChange,
+  onStartImport,
+  onReloadHistory,
+  onVerifyItem,
+  inputRef,
+}: {
+  zipFile: File | null;
+  zipFileName: string | null;
+  autoAssignOrganizations: boolean;
+  selectedClientId: string;
+  selectedProcurador: string;
+  clients: any[];
+  importBusy: boolean;
+  uploadProgress: number;
+  uploadStage: "idle" | "uploading" | "processing";
+  importError: string | null;
+  activeBatch: ImportBatch | null;
+  activeItems: DocumentImportItem[];
+  history: ImportBatch[];
+  loadingHistory: boolean;
+  historyError: string | null;
+  successNotice: string | null;
+  onBack: () => void;
+  onOpenSettings: () => void;
+  onToggleAutoAssign: () => void;
+  onChangeClient: (value: string) => void;
+  onChangeProcurador: (value: string) => void;
+  onSelectFile: () => void;
+  onFileChange: (file?: File | null) => void;
+  onStartImport: () => void;
+  onReloadHistory: () => void;
+  onVerifyItem: (item: DocumentImportItem) => void;
+  inputRef: React.RefObject<HTMLInputElement>;
+}) {
+  const navigate = useNavigate();
+  const procuradorOptions = Array.from(
+    new Set(
+      clients
+        .map((client) => [client.procurador, client.procurador_name, client.contacto].find(Boolean))
+        .filter(Boolean)
+        .map((value) => String(value).trim())
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b, "es"));
+  const clientOptions = clients.map((client) => ({
+    value: client.id,
+    label: `${client.first_name || ""} ${client.last_name || ""}`.trim()
+      || client.commercial_name
+      || client.nif_cif
+      || "Cliente sin nombre",
+    meta: client.nif_cif || client.email || undefined,
+  }));
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-300">
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".zip,application/zip,application/x-zip-compressed"
+        className="hidden"
+        onChange={(e) => onFileChange(e.target.files?.[0] ?? null)}
+      />
+
+      <div className="flex items-center justify-between gap-4">
+        <BackButton label="Volver a Expedientes" onClick={onBack} />
+
+        <button
+          onClick={onOpenSettings}
+          className="rounded-xl border border-slate-200 bg-white p-3 text-slate-600 shadow-sm transition-colors hover:border-[#ab0433]/30 hover:bg-red-50 hover:text-[#ab0433]"
+          title="Configuracion"
+        >
+          <Settings2 size={16} />
+        </button>
+      </div>
+
+      <div>
+        <h1 className="text-3xl font-black text-slate-900">Importar Expedientes desde Documentos</h1>
+        <p className="mt-2 text-lg text-slate-500">Sube tus archivos para crear nuevos expedientes automáticamente.</p>
+      </div>
+
+      <section className="rounded-[24px] border border-slate-200 bg-white px-6 py-6 shadow-sm">
+        <h2 className="text-[15px] font-bold text-slate-900">Configuración de Asignación (Opcional)</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          Puedes asignar automáticamente los expedientes creados a otras organizaciones.
+        </p>
+
+        <button
+          type="button"
+          onClick={onToggleAutoAssign}
+          className="mt-6 inline-flex items-center gap-3 text-left"
+        >
+          <span
+            className={`relative inline-flex h-7 w-12 shrink-0 rounded-full transition-colors ${
+              autoAssignOrganizations ? "bg-[#ab0433]" : "bg-slate-200"
+            }`}
+          >
+            <span
+              className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+                autoAssignOrganizations ? "translate-x-6" : "translate-x-1"
+              }`}
+            />
+          </span>
+          <span className="text-[15px] font-semibold text-slate-900">Asignar automáticamente organizaciones</span>
+        </button>
+
+        {autoAssignOrganizations && (
+          <div className="mt-8 grid gap-5 md:grid-cols-2">
+            <PrettyAssignSelect
+              label="Cliente"
+              placeholder="Seleccionar cliente..."
+              value={selectedClientId}
+              options={clientOptions}
+              emptyMessage="No hay clientes disponibles"
+              searchablePlaceholder="Buscar por nombre o ID..."
+              onChange={onChangeClient}
+            />
+
+            <label className="block">
+              <span className="mb-2 block text-[15px] font-semibold text-slate-900">Procurador</span>
+              <input
+                type="text"
+                value={selectedProcurador}
+                onChange={(e) => onChangeProcurador(e.target.value)}
+                placeholder="Escribir procurador..."
+                className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-[15px] text-slate-700 shadow-sm outline-none transition-all placeholder:text-slate-400 focus:border-[#ab0433]/35 focus:ring-4 focus:ring-[#ab0433]/10"
+              />
+            </label>
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-[24px] border border-slate-200 bg-white px-6 py-6 shadow-sm">
+        <h2 className="text-[15px] font-bold text-slate-900">Importar Expedientes</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          Sube un archivo ZIP que contenga documentos del expediente. Cada documento se procesará como un nuevo expediente.
+        </p>
+
+        <ZipDropArea
+          zipFileName={zipFileName}
+          onSelectFile={onSelectFile}
+          onFileChange={onFileChange}
+        />
+
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+          <div>
+            <p className="text-sm font-semibold text-slate-900">
+              {zipFile ? "Archivo listo para importar" : "Selecciona un ZIP para comenzar"}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              {zipFile
+                ? `${zipFile.name} · ${(zipFile.size / (1024 * 1024)).toFixed(2)} MB`
+                : "El sistema extraerá texto de cada documento y creará un expediente por archivo."}
+            </p>
+            {importError && (
+              <p className="mt-2 text-xs font-medium text-red-600">{importError}</p>
+            )}
+            {importBusy && (
+              <div className="mt-3 w-full max-w-md">
+                <div className="mb-1 flex items-center justify-between text-[11px] font-medium text-slate-500">
+                  <span>{uploadStage === "uploading" ? "Subiendo ZIP..." : "Procesando documentos..."}</span>
+                  <span>{uploadStage === "uploading" ? `${uploadProgress}%` : "Servidor trabajando"}</span>
+                </div>
+                <div className="h-2.5 overflow-hidden rounded-full bg-slate-200">
+                  <div
+                    className={`h-full rounded-full transition-all duration-300 ${uploadStage === "uploading" ? "bg-[#ab0433]" : "bg-amber-500 animate-pulse"}`}
+                    style={{ width: `${uploadStage === "uploading" ? Math.max(uploadProgress, 6) : 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={onStartImport}
+            disabled={!zipFile || importBusy}
+            className={`inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-bold transition-all ${
+              !zipFile || importBusy
+                ? "cursor-not-allowed bg-slate-200 text-slate-400"
+                : "bg-[#ab0433] text-white shadow-lg shadow-red-200 hover:bg-[#92042c]"
+            }`}
+          >
+            {importBusy ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+            {importBusy ? "Importando documentos..." : "Procesar ZIP e importar"}
+          </button>
+        </div>
+      </section>
+
+      {successNotice && (
+        <section className="rounded-[24px] border border-emerald-200 bg-emerald-50 px-6 py-4 shadow-sm">
+          <div className="flex items-center gap-3 text-sm font-medium text-emerald-800">
+            <CheckCircle2 size={18} />
+            <span>{successNotice}</span>
+          </div>
+        </section>
+      )}
+
+      {(activeBatch || activeItems.length > 0) && (
+        <section className="rounded-[24px] border border-slate-200 bg-white px-6 py-6 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-[15px] font-bold text-slate-900">Última importación</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Estado del lote y expedientes creados a partir de tus documentos.
+              </p>
+            </div>
+            {activeBatch && (
+              <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
+                activeBatch.status === "completed"
+                  ? "bg-emerald-50 text-emerald-700"
+                  : activeBatch.status === "failed"
+                  ? "bg-red-50 text-red-700"
+                  : "bg-amber-50 text-amber-700"
+              }`}>
+                {activeBatch.status === "completed" ? "Completada" : activeBatch.status === "failed" ? "Fallida" : "Procesando"}
+              </span>
+            )}
+          </div>
+
+          {activeBatch && (
+            <div className="mt-5 grid gap-3 md:grid-cols-4">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs uppercase tracking-wide text-slate-400">Archivo</p>
+                <p className="mt-1 text-sm font-semibold text-slate-900 break-all">{activeBatch.file_name}</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs uppercase tracking-wide text-slate-400">Total</p>
+                <p className="mt-1 text-2xl font-black text-slate-900">{activeBatch.total_count || 0}</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs uppercase tracking-wide text-slate-400">Creados</p>
+                <p className="mt-1 text-2xl font-black text-emerald-600">{activeBatch.completed_count || 0}</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs uppercase tracking-wide text-slate-400">Errores</p>
+                <p className="mt-1 text-2xl font-black text-red-600">{activeBatch.error_count || 0}</p>
+              </div>
+            </div>
+          )}
+
+          <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200">
+            <div className="grid grid-cols-[88px_minmax(0,1.3fr)_120px_minmax(0,1.2fr)_120px] gap-3 bg-slate-50 px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+              <span>Fila</span>
+              <span>Documento</span>
+              <span>Estado</span>
+              <span>Resultado</span>
+              <span>Acción</span>
+            </div>
+
+            {activeItems.length === 0 ? (
+              <div className="px-4 py-6 text-sm text-slate-400">Todavía no hay elementos para mostrar.</div>
+            ) : (
+              activeItems.map((item) => {
+                const fileName = item.payload?.fileName || item.reference || `Documento ${item.row_number}`;
+                const expedienteLabel = item.anio && item.num_exp
+                  ? `${item.anio}/${item.num_exp}`
+                  : item.descripcion || "Expediente creado";
+                return (
+                  <div key={item.id} className="grid grid-cols-[88px_minmax(0,1.3fr)_120px_minmax(0,1.2fr)_120px] gap-3 border-t border-slate-100 px-4 py-3 text-sm">
+                    <span className="font-mono text-slate-500">{item.row_number}</span>
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-slate-800">{fileName}</p>
+                      {item.descripcion && <p className="truncate text-xs text-slate-400">{item.descripcion}</p>}
+                    </div>
+                    <span className={`inline-flex h-fit items-center rounded-full px-2.5 py-1 text-xs font-semibold ${
+                      item.status === "completed"
+                        ? "bg-emerald-50 text-emerald-700"
+                        : item.status === "uploaded"
+                        ? "bg-amber-50 text-amber-700"
+                        : "bg-red-50 text-red-700"
+                    }`}>
+                      {item.status === "completed" ? "Creado" : item.status === "uploaded" ? "Pendiente" : "Error"}
+                    </span>
+                    <div className="min-w-0">
+                      {item.status === "completed" ? (
+                        <p className="truncate text-slate-700">{expedienteLabel}</p>
+                      ) : item.status === "uploaded" ? (
+                        <p className="truncate text-amber-700">Documento listo para revisión y verificación</p>
+                      ) : (
+                        <p className="truncate text-red-600">{item.payload?.userError || item.error_message || "No se pudo procesar"}</p>
+                      )}
+                    </div>
+                    <div>
+                      {(item.status === "uploaded" || item.status === "failed") && (
+                        <button
+                          type="button"
+                          onClick={() => onVerifyItem(item)}
+                          className="mb-1 inline-flex items-center gap-1 text-xs font-semibold text-[#ab0433] hover:text-[#92042c]"
+                        >
+                          <Eye size={12} />
+                          {item.status === "uploaded" ? "Verificar" : "Revisar"}
+                        </button>
+                      )}
+                      {item.created_expediente_id ? (
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/dashboard/expedientes/${item.created_expediente_id}`)}
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-[#ab0433] hover:text-[#92042c]"
+                        >
+                          <ExternalLink size={12} />
+                          Abrir
+                        </button>
+                      ) : (
+                        <span className="text-xs text-slate-300">—</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </section>
+      )}
+
+      <section className="rounded-[24px] border border-slate-200 bg-white px-6 py-6 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-[15px] font-bold text-slate-900">Historial reciente</h2>
+            <p className="mt-1 text-sm text-slate-500">Últimos lotes importados desde documentos.</p>
+          </div>
+          <button
+            type="button"
+            onClick={onReloadHistory}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50"
+          >
+            <RefreshCw size={13} />
+            Recargar
+          </button>
+        </div>
+
+        {historyError && <p className="mt-4 text-sm text-red-600">{historyError}</p>}
+        {loadingHistory ? (
+          <div className="mt-5 flex items-center gap-2 text-sm text-slate-400">
+            <Loader2 size={16} className="animate-spin" />
+            Cargando historial...
+          </div>
+        ) : history.length === 0 ? (
+          <p className="mt-5 text-sm text-slate-400">Aún no hay importaciones documentales registradas.</p>
+        ) : (
+          <div className="mt-5 space-y-3">
+            {history.map((batch) => (
+              <div key={batch.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-slate-900">{batch.file_name}</p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    {new Date(batch.created_at).toLocaleString("es-ES")} · {batch.completed_count}/{batch.total_count} creados
+                  </p>
+                </div>
+                <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
+                  batch.status === "completed"
+                    ? "bg-emerald-50 text-emerald-700"
+                    : batch.status === "failed"
+                    ? "bg-red-50 text-red-700"
+                    : "bg-amber-50 text-amber-700"
+                }`}>
+                  {batch.status}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+// ── Helpers para días hábiles ──────────────────────────────────────────────────
+function addWorkingDays(startStr: string, days: number): Date | null {
+  if (!startStr) return null;
+  const start = new Date(startStr + "T12:00:00");
+  if (isNaN(start.getTime())) return null;
+  const cur = new Date(start);
+  let count = 0;
+  while (count < days) {
+    cur.setDate(cur.getDate() + 1);
+    const d = cur.getDay();
+    if (d !== 0 && d !== 6) count++;
+  }
+  return cur;
+}
+
+function buildCalendarStrip(startStr: string, deadline: Date) {
+  if (!startStr) return [];
+  const start = new Date(startStr + "T12:00:00");
+  if (isNaN(start.getTime())) return [];
+  const items: { day: number; month: number; isWeekend: boolean; isDeadline: boolean }[] = [];
+  const cur = new Date(start);
+  cur.setDate(cur.getDate() + 1);
+  while (cur <= deadline) {
+    const dow = cur.getDay();
+    const isLast = cur.toDateString() === deadline.toDateString();
+    items.push({ day: cur.getDate(), month: cur.getMonth(), isWeekend: dow === 0 || dow === 6, isDeadline: isLast });
+    cur.setDate(cur.getDate() + 1);
+  }
+  return items;
+}
+
+function fmtDateObj(d: Date) {
+  return d.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+function fmtDateHuman(str: string) {
+  if (!str) return "";
+  const d = new Date(str + "T12:00:00");
+  if (isNaN(d.getTime())) return str;
+  return d.toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" });
+}
+
+// ── Sección del panel derecho ──────────────────────────────────────────────────
+function PanelSection({ title, onAdd, children }: { title: string; onAdd?: () => void; children: React.ReactNode }) {
+  return (
+    <div className="border-b border-slate-100 last:border-0">
+      <div className="flex items-center justify-between px-4 pt-4 pb-2">
+        <span className="text-xs font-bold text-slate-800">{title}</span>
+        {onAdd && (
+          <button type="button" onClick={onAdd}
+            className="flex items-center justify-center w-5 h-5 rounded-full border border-slate-300 text-slate-500 hover:border-[#ab0433] hover:text-[#ab0433] transition-colors">
+            <Plus size={11} />
+          </button>
+        )}
+      </div>
+      <div className="px-4 pb-4">{children}</div>
+    </div>
+  );
+}
+
+// ── PartyRow: fila de parte con selector persona física/jurídica ───────────────
+function PartyRow({ color, value, onChange, onRemove }: {
+  color: "blue" | "red"; value: string;
+  onChange: (v: string) => void; onRemove?: () => void;
+}) {
+  const dot = color === "blue" ? "bg-blue-500" : "bg-red-500";
+  return (
+    <div className="flex items-center gap-1.5 mt-2">
+      <div className={`w-2 h-2 rounded-full shrink-0 ${dot}`} />
+      <input
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        className="flex-1 min-w-0 border border-slate-200 rounded-lg px-2 py-1.5 text-sm text-slate-700 focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100 bg-white"
+      />
+      <select className="shrink-0 border border-slate-200 rounded-lg px-1.5 py-1.5 text-xs text-slate-600 bg-white focus:outline-none focus:border-red-400 max-w-[82px]">
+        <option value="fisica">Persona fisi...</option>
+        <option value="juridica">Persona jur...</option>
+      </select>
+      {onRemove && (
+        <button type="button" onClick={onRemove}
+          className="shrink-0 p-1 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors">
+          <X size={13} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ── DocumentImportVerifyView ─────────────────────────────────────────────
+function DocumentImportVerifyView({
+  item,
+  clients,
+  form,
+  saving,
+  error,
+  onBack,
+  onChange,
+  onAccept,
+}: {
+  item: DocumentImportItem;
+  clients: any[];
+  form: typeof EXP_EMPTY;
+  saving: boolean;
+  error: string | null;
+  onBack: () => void;
+  onChange: (key: keyof typeof EXP_EMPTY, value: any) => void;
+  onAccept: () => void;
+}) {
+  const previewUrl    = item.payload?.previewUrl || "";
+  const mimeType      = item.payload?.mimeType || "";
+  const textPreview   = String(item.payload?.textPreview || "").trim();
+  const userError     = item.payload?.userError || item.error_message;
+  const developerError = item.payload?.developerError || null;
+  const fileName      = item.payload?.fileName || item.reference || `Documento ${item.row_number}`;
+
+  const safeClienteId        = String(form.cliente_id ?? "");
+  const safeClienteNombre    = String(form.cliente_nombre ?? "");
+  const safeDescripcion      = String(form.descripcion ?? "");
+  const safeContrario        = String(form.contrario ?? "");
+  const safeProcurador       = String(form.procurador ?? "");
+  const safeJuzgado          = String(form.juzgado ?? "");
+  const safeTipoProc         = String(form.tipo_proc ?? "");
+  const safeTipoAsunto       = String(form.tipos_asunto ?? "");
+  const safeNumAutos         = String(form.num_autos ?? "");
+  const safeNig              = String(form.nig ?? "");
+  const safeRefExpediente    = String(form.ref_expediente ?? "");
+  const safeFechaInicio      = String(form.fecha_inicio ?? "");
+  const safeCentro           = String(form.centro ?? "");
+  const safeObservaciones    = String(form.observaciones ?? "");
+  const safeCuantiaPrincipal = form.cuantia_principal == null ? "" : String(form.cuantia_principal);
+
+  const clientOptions = clients.map(c => ({
+    value: c.id,
+    label: `${c.first_name || ""} ${c.last_name || ""}`.trim() || c.commercial_name || c.nif_cif || "Cliente sin nombre",
+  }));
+  const selectedClientLabel = clientOptions.find(o => o.value === safeClienteId)?.label || "";
+  const clientInputValue    = selectedClientLabel || safeClienteNombre || "";
+
+  const handleClientInputChange = (value: string) => {
+    const norm = value.trim().toLowerCase();
+    const match = clientOptions.find(o => o.label.trim().toLowerCase() === norm);
+    if (match) { onChange("cliente_id", match.value); onChange("cliente_nombre", match.label); return; }
+    onChange("cliente_id", "");
+    onChange("cliente_nombre", value);
+  };
+
+  // Cálculo fecha límite (20 días hábiles)
+  const deadlineDate   = addWorkingDays(safeFechaInicio, 20);
+  const calendarStrip  = deadlineDate ? buildCalendarStrip(safeFechaInicio, deadlineDate) : [];
+
+  const canAccept = !saving && safeDescripcion.trim() && (safeClienteId || safeClienteNombre.trim());
+
+  // Visor del documento
+  const renderPreview = () => {
+    if (mimeType === "application/pdf" && previewUrl) {
+      return <iframe title={fileName} src={previewUrl} className="w-full h-full rounded-none border-0 bg-white" />;
+    }
+    if (mimeType.startsWith("image/") && previewUrl) {
+      return (
+        <div className="flex h-full w-full items-center justify-center bg-slate-100 p-6">
+          <img src={previewUrl} alt={fileName} className="max-h-full max-w-full rounded-xl object-contain shadow-xl" />
+        </div>
+      );
+    }
+    return (
+      <div className="h-full overflow-auto p-6">
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <p className="text-sm font-semibold text-slate-900">{fileName}</p>
+          {previewUrl && (
+            <a href={previewUrl} target="_blank" rel="noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#ab0433]">
+              <ExternalLink size={12} /> Abrir archivo
+            </a>
+          )}
+        </div>
+        <pre className="whitespace-pre-wrap rounded-2xl bg-white border border-slate-200 p-4 text-xs text-slate-700">
+          {textPreview || "No hay previsualización disponible para este documento."}
+        </pre>
+      </div>
+    );
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex flex-col bg-white overflow-hidden">
+
+      {/* ── Cabecera ──────────────────────────────────────────── */}
+      <div className="shrink-0 flex items-center justify-between gap-3 px-5 py-3 bg-white border-b border-slate-200 shadow-sm">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="shrink-0 p-2 bg-red-50 rounded-xl">
+            <FolderOpen size={15} className="text-red-600" />
+          </div>
+          <span className="text-sm font-bold text-slate-900 truncate">{fileName}</span>
+        </div>
+        <button type="button" onClick={onBack}
+          className="shrink-0 p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-500">
+          <X size={18} />
+        </button>
+      </div>
+
+      {/* ── Contenido principal ────────────────────────────────────── */}
+      <div className="flex-1 flex overflow-hidden min-h-0">
+
+        {/* Visor PDF */}
+        <div className="min-w-0 basis-[56%] overflow-hidden bg-slate-200">
+          {renderPreview()}
+        </div>
+
+        {/* Panel de detalles */}
+        <div className="min-w-[520px] basis-[44%] shrink-0 border-l border-slate-200 bg-white overflow-y-auto flex flex-col">
+
+          {/* Detalles del documento */}
+          <PanelSection title="Detalles del documento">
+            <div className="flex items-center gap-2 text-sm text-slate-600 mt-1">
+              <FolderOpen size={13} className="text-slate-400 shrink-0" />
+              <span className="truncate font-medium text-slate-800">{fileName}</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-slate-500 mt-2">
+              <span className="shrink-0">Recibido el</span>
+              <input
+                type="date"
+                value={safeFechaInicio}
+                onChange={e => onChange("fecha_inicio", e.target.value)}
+                className="ml-auto border border-slate-200 rounded-lg px-2 py-1 text-sm text-slate-700 focus:outline-none focus:border-red-400 bg-white"
+              />
+            </div>
+            {safeFechaInicio && (
+              <p className="mt-1 text-xs text-slate-400">{fmtDateHuman(safeFechaInicio)}</p>
+            )}
+          </PanelSection>
+
+          {/* Fecha límite de respuesta */}
+          {deadlineDate && (
+            <PanelSection title="Fecha límite de respuesta">
+              <div className="flex items-center justify-between mt-1">
+                <span className="text-base font-bold text-slate-900">{fmtDateObj(deadlineDate)}</span>
+                <span className="text-xs text-slate-400">20 días hábiles</span>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-1">
+                {calendarStrip.map((d, i) => (
+                  <div key={i}
+                    title={d.isDeadline ? "Fecha límite" : d.isWeekend ? "Fin de semana" : "Día hábil"}
+                    className={`w-7 h-7 rounded-md flex items-center justify-center text-[11px] font-semibold select-none ${
+                      d.isDeadline  ? "bg-[#ab0433] text-white shadow-sm" :
+                      d.isWeekend   ? "bg-slate-50 text-slate-300"        :
+                                      "bg-emerald-100 text-emerald-700"
+                    }`}
+                  >
+                    {d.day}
+                  </div>
+                ))}
+              </div>
+            </PanelSection>
+          )}
+
+          {/* Detalles del procedimiento */}
+          <PanelSection title="Detalles del procedimiento">
+            <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 mt-1">
+              <div>
+                <p className={lbl}>Tipo procedimiento</p>
+                <input value={safeTipoProc} onChange={e => onChange("tipo_proc", e.target.value)} className={inp} />
+              </div>
+              <div>
+                <p className={lbl}>Juzgado</p>
+                <input value={safeJuzgado} onChange={e => onChange("juzgado", e.target.value)} className={inp} />
+              </div>
+              <div>
+                <p className={lbl}>Tipo expediente</p>
+                <AppSelect value={String(form.tipo ?? "judicial")} onChange={e => onChange("tipo", e.target.value)}>
+                  {Object.entries(TIPOS).map(([v, info]) => <option key={v} value={v}>{info.label}</option>)}
+                </AppSelect>
+              </div>
+              <div>
+                <p className={lbl}>Tipo asunto</p>
+                <input value={safeTipoAsunto} onChange={e => onChange("tipos_asunto", e.target.value)} className={inp} placeholder="Civil, Penal…" />
+              </div>
+              <div>
+                <p className={lbl}>NIG</p>
+                <input value={safeNig} onChange={e => onChange("nig", e.target.value)} className={inp} />
+              </div>
+              <div>
+                <p className={lbl}>Núm. procedimiento</p>
+                <input value={safeNumAutos} onChange={e => onChange("num_autos", e.target.value)} className={inp} />
+              </div>
+            </div>
+          </PanelSection>
+
+          {/* Descripción */}
+          <PanelSection title="Descripción del expediente">
+            <div className="mt-1">
+              <input value={safeDescripcion} onChange={e => onChange("descripcion", e.target.value)} className={inp}
+                placeholder="Resumen del expediente…" />
+            </div>
+          </PanelSection>
+
+          {/* Demandantes */}
+          <PanelSection title="Demandantes">
+            <PartyRow
+              color="blue"
+              value={clientInputValue}
+              onChange={handleClientInputChange}
+            />
+            <datalist id={`doc-import-clients-${item.id}`}>
+              {clientOptions.map(o => <option key={o.value} value={o.label} />)}
+            </datalist>
+          </PanelSection>
+
+          {/* Demandados */}
+          <PanelSection title="Demandados">
+            <PartyRow
+              color="red"
+              value={safeContrario}
+              onChange={v => onChange("contrario", v)}
+            />
+          </PanelSection>
+
+          {/* Representación contraria */}
+          <PanelSection title="Representación contraria">
+            {safeProcurador ? (
+              <div className="flex items-center gap-2 mt-2">
+                <div className="w-2 h-2 rounded-full bg-slate-400 shrink-0" />
+                <input value={safeProcurador} onChange={e => onChange("procurador", e.target.value)}
+                  className="flex-1 border border-slate-200 rounded-lg px-2 py-1.5 text-sm text-slate-700 focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100 bg-white" />
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400 italic mt-1">Sin representación detectada</p>
+            )}
+          </PanelSection>
+
+          {/* Campos adicionales */}
+          <PanelSection title="Más datos">
+            <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 mt-1">
+              <div>
+                <p className={lbl}>Ref. expediente</p>
+                <input value={safeRefExpediente} onChange={e => onChange("ref_expediente", e.target.value)} className={inp} />
+              </div>
+              <div>
+                <p className={lbl}>Cuantía principal</p>
+                <input type="number" value={safeCuantiaPrincipal} onChange={e => onChange("cuantia_principal", e.target.value)} className={inp} />
+              </div>
+              <div>
+                <p className={lbl}>Centro</p>
+                <input value={safeCentro} onChange={e => onChange("centro", e.target.value)} className={inp} />
+              </div>
+              <div>
+                <p className={lbl}>Estado</p>
+                <AppSelect value={String(form.estado ?? "abierto")} onChange={e => onChange("estado", e.target.value)}>
+                  {Object.entries(ESTADOS).map(([v, info]) => <option key={v} value={v}>{info.label}</option>)}
+                </AppSelect>
+              </div>
+              <div className="col-span-2">
+                <p className={lbl}>Observaciones</p>
+                <textarea value={safeObservaciones} onChange={e => onChange("observaciones", e.target.value)}
+                  className={`${inp} min-h-[72px] resize-y`} />
+              </div>
+            </div>
+          </PanelSection>
+
+          {/* Errores de lectura */}
+          {(userError || developerError || error) && (
+            <div className="border-t border-amber-200 bg-amber-50 p-4 space-y-3">
+              {(error || userError) && (
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-amber-600 mb-1">Aviso de lectura</p>
+                  <p className="text-xs text-amber-900">{error || userError}</p>
+                </div>
+              )}
+              {developerError && (
+                <details className="text-xs">
+                  <summary className="font-semibold text-slate-500 cursor-pointer">Detalle técnico</summary>
+                  <pre className="mt-1 whitespace-pre-wrap text-slate-600 bg-white rounded-lg p-2 border border-slate-200">{developerError}</pre>
+                </details>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Barra inferior ─────────────────────────────────────────── */}
+      <div className="shrink-0 flex items-center justify-between gap-3 px-5 py-3 bg-white border-t border-slate-200">
+        <button type="button" onClick={onBack}
+          className="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors">
+          Cancelar
+        </button>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={onBack}
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-slate-700 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
+            <ExternalLink size={14} />
+            Ver expediente
+          </button>
+          <button type="button" onClick={onAccept} disabled={!canAccept}
+            className={`inline-flex items-center gap-2 px-5 py-2 text-sm font-bold rounded-xl transition-all ${
+              canAccept
+                ? "bg-[#ab0433] text-white shadow-md shadow-red-200 hover:bg-[#8f0329] active:scale-[0.98]"
+                : "bg-slate-200 text-slate-400 cursor-not-allowed"
+            }`}
+          >
+            {saving ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
+            {saving ? "Creando…" : "Verificar datos"}
+          </button>
+        </div>
+      </div>
+    </div>
+  , document.body);
+}
+
+
 function ImportStep({
   icon: Icon,
   label,
@@ -1837,15 +3385,21 @@ export default function ExpedienteList() {
   const [saving,    setSaving]    = useState(false);
   const [clientes,  setClientes]  = useState<any[]>([]);
 
-  // Abrir modal de alta automáticamente si la URL contiene ?nuevo=1
+  // Abrir vista correspondiente si la URL contiene ?nuevo=1 / ?mode=csv / ?mode=docs
   useEffect(() => {
+    const mode = searchParams.get("mode");
     if (searchParams.get("nuevo") === "1") {
       setEditItem(null);
       setShowModal(true);
-      // Limpiar el parámetro de la URL sin recargar
       setSearchParams(prev => { prev.delete("nuevo"); return prev; }, { replace: true });
+    } else if (mode === "csv") {
+      setViewMode("csvImport");
+      setSearchParams(prev => { prev.delete("mode"); return prev; }, { replace: true });
+    } else if (mode === "docs") {
+      setViewMode("documentImport");
+      setSearchParams(prev => { prev.delete("mode"); return prev; }, { replace: true });
     }
-  }, []); // solo al montar
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Confirmación borrado
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -1854,7 +3408,27 @@ export default function ExpedienteList() {
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const switchView = (v: ViewMode) => setViewMode(v);
   const csvInputRef = useRef<HTMLInputElement>(null);
+  const documentImportInputRef = useRef<HTMLInputElement>(null);
   const [csvFileName, setCsvFileName] = useState<string | null>(null);
+  const [documentImportZipFile, setDocumentImportZipFile] = useState<File | null>(null);
+  const [documentImportZipFileName, setDocumentImportZipFileName] = useState<string | null>(null);
+  const [documentImportAutoAssignOrganizations, setDocumentImportAutoAssignOrganizations] = useState(false);
+  const [documentImportAssignedClientId, setDocumentImportAssignedClientId] = useState("");
+  const [documentImportAssignedProcurador, setDocumentImportAssignedProcurador] = useState("");
+  const [documentImportSubmitting, setDocumentImportSubmitting] = useState(false);
+  const [documentImportUploadProgress, setDocumentImportUploadProgress] = useState(0);
+  const [documentImportUploadStage, setDocumentImportUploadStage] = useState<"idle" | "uploading" | "processing">("idle");
+  const [documentImportError, setDocumentImportError] = useState<string | null>(null);
+  const [documentImportActiveBatch, setDocumentImportActiveBatch] = useState<ImportBatch | null>(null);
+  const [documentImportItems, setDocumentImportItems] = useState<DocumentImportItem[]>([]);
+  const [documentImportHistory, setDocumentImportHistory] = useState<ImportBatch[]>([]);
+  const [documentImportHistoryLoading, setDocumentImportHistoryLoading] = useState(false);
+  const [documentImportHistoryError, setDocumentImportHistoryError] = useState<string | null>(null);
+  const [documentImportSuccessNotice, setDocumentImportSuccessNotice] = useState<string | null>(null);
+  const [documentImportVerifyItem, setDocumentImportVerifyItem] = useState<DocumentImportItem | null>(null);
+  const [documentImportVerifyForm, setDocumentImportVerifyForm] = useState<typeof EXP_EMPTY>(EXP_EMPTY);
+  const [documentImportVerifySaving, setDocumentImportVerifySaving] = useState(false);
+  const [documentImportVerifyError, setDocumentImportVerifyError] = useState<string | null>(null);
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [csvPreviewRows, setCsvPreviewRows] = useState<CsvPreviewRow[]>([]);
   const [csvFieldMappings, setCsvFieldMappings] = useState<CsvFieldMapping[]>(() => buildCsvMappings([], []));
@@ -1872,6 +3446,27 @@ export default function ExpedienteList() {
 
   // Adjuntos modal
   const [showAdjuntos, setShowAdjuntos] = useState(false);
+  const [showRelacionarModal, setShowRelacionarModal] = useState(false);
+  const [relatedExpedientes, setRelatedExpedientes] = useState<any[]>([]);
+  const [loadingRelatedExpedientes, setLoadingRelatedExpedientes] = useState(false);
+  const [relacionarQuery, setRelacionarQuery] = useState("");
+  const [relacionarSearching, setRelacionarSearching] = useState(false);
+  const [relacionarResults, setRelacionarResults] = useState<any[]>([]);
+  const [relacionarHasSearched, setRelacionarHasSearched] = useState(false);
+  const [relacionarSavingId, setRelacionarSavingId] = useState<string | null>(null);
+  const [relacionarSearchError, setRelacionarSearchError] = useState("");
+  const [relacionarAssociateError, setRelacionarAssociateError] = useState("");
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [showExportTemplateEditor, setShowExportTemplateEditor] = useState(false);
+  const [exportEditorMode, setExportEditorMode] = useState<"create" | "edit">("create");
+  const [customExportTemplates, setCustomExportTemplates] = useState<ExportTemplate[]>(() => loadStoredExpedienteExportTemplates());
+  const [selectedExportTemplateId, setSelectedExportTemplateId] = useState<string>(DEFAULT_EXPEDIENTE_EXPORT_TEMPLATE.id);
+  const [selectedExportFormat, setSelectedExportFormat] = useState<ExportFormat>("excel");
+  const [exportTemplateName, setExportTemplateName] = useState("");
+  const [exportVisibleFields, setExportVisibleFields] = useState<string[]>(DEFAULT_EXPEDIENTE_EXPORT_TEMPLATE.fields);
+  const [exportAvailableSelected, setExportAvailableSelected] = useState<string[]>([]);
+  const [exportVisibleSelected, setExportVisibleSelected] = useState<string[]>([]);
+  const [exportError, setExportError] = useState("");
 
   // Dropdowns click-based
   const [showOpciones, setShowOpciones] = useState(false);
@@ -1900,10 +3495,183 @@ export default function ExpedienteList() {
     setViewMode("csvImport");
   };
 
-  const openDemandImport = () => {
+  const openDocumentImport = () => {
     setShowAltaMenu(false);
-    alert("La creacion desde cedulas o demandas la dejamos preparada en el menu, pero aun no esta implementada.");
+    setViewMode("documentImport");
   };
+
+  const handleDocumentImportZipSelected = (file?: File | null) => {
+    if (!file) {
+      setDocumentImportZipFile(null);
+      setDocumentImportZipFileName(null);
+      return;
+    }
+    const isZip = file.name.toLowerCase().endsWith(".zip");
+    if (!isZip) {
+      setDocumentImportError("Selecciona un archivo ZIP válido.");
+      return;
+    }
+    setDocumentImportError(null);
+    setDocumentImportZipFile(file);
+    setDocumentImportZipFileName(file.name);
+    if (documentImportInputRef.current) documentImportInputRef.current.value = "";
+  };
+
+  const fetchDocumentImportBatch = useCallback(async (batchId: string) => {
+    const token = await getToken({ skipCache: true });
+    const res = await fetch(`/api/expedientes/documents/batch/${batchId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await safeJson(res);
+    if (!res.ok) throw new Error(data.error || "No se pudo cargar el detalle de la importación");
+    setDocumentImportActiveBatch(data.data?.batch || null);
+    setDocumentImportItems(data.data?.items || []);
+  }, [getToken]);
+
+  const fetchDocumentImportHistory = useCallback(async (silent = false) => {
+    try {
+      if (!silent) {
+        setDocumentImportHistoryLoading(true);
+        setDocumentImportHistoryError(null);
+      }
+      const token = await getToken({ skipCache: true });
+      const res = await fetch("/api/expedientes/documents/batches", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await safeJson(res);
+      if (!res.ok) throw new Error(data.error || "No se pudo cargar el historial de importación documental");
+      setDocumentImportHistory(data.data || []);
+    } catch (e: any) {
+      if (!silent) setDocumentImportHistoryError(e.message || "No se pudo cargar el historial de importación documental");
+    } finally {
+      if (!silent) setDocumentImportHistoryLoading(false);
+    }
+  }, [getToken]);
+
+  const openDocumentImportVerify = useCallback((item: DocumentImportItem) => {
+    const draft = (item.payload?.draft || {}) as Partial<typeof EXP_EMPTY>;
+    setDocumentImportVerifyItem(item);
+    setDocumentImportVerifyError(null);
+    setDocumentImportVerifyForm({
+      ...EXP_EMPTY,
+      ...draft,
+      cuantia_principal: draft.cuantia_principal != null ? String(draft.cuantia_principal) : "",
+    });
+    setViewMode("documentImportVerify");
+  }, []);
+
+  const handleAcceptDocumentImportItem = useCallback(async () => {
+    if (!documentImportActiveBatch || !documentImportVerifyItem) return;
+    if (!String(documentImportVerifyForm.descripcion ?? "").trim()) {
+      setDocumentImportVerifyError("Añade una descripción antes de aceptar el expediente.");
+      return;
+    }
+    if (!String(documentImportVerifyForm.cliente_id ?? "").trim() && !String(documentImportVerifyForm.cliente_nombre ?? "").trim()) {
+      setDocumentImportVerifyError("Indica un cliente escribiendo el nombre o seleccionando uno existente antes de aceptar el expediente.");
+      return;
+    }
+
+    setDocumentImportVerifySaving(true);
+    setDocumentImportVerifyError(null);
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/expedientes/documents/batch/${documentImportActiveBatch.id}/items/${documentImportVerifyItem.id}/accept`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ draft: documentImportVerifyForm }),
+      });
+      const data = await safeJson(res);
+      if (!res.ok) throw new Error(data.error || "No se pudo crear el expediente desde el documento verificado");
+
+      await Promise.all([
+        fetchDocumentImportBatch(documentImportActiveBatch.id),
+        fetchDocumentImportHistory(true),
+      ]);
+
+      setDocumentImportSuccessNotice(`Se creó el expediente correctamente desde "${documentImportVerifyItem.payload?.fileName || documentImportVerifyItem.reference || `Documento ${documentImportVerifyItem.row_number}`}".`);
+      setDocumentImportVerifyItem(null);
+      setViewMode("documentImport");
+    } catch (e: any) {
+      setDocumentImportVerifyError(e.message || "No se pudo aceptar el documento");
+    } finally {
+      setDocumentImportVerifySaving(false);
+    }
+  }, [
+    documentImportActiveBatch,
+    documentImportVerifyForm,
+    documentImportVerifyItem,
+    fetchDocumentImportBatch,
+    fetchDocumentImportHistory,
+    getToken,
+  ]);
+
+  async function handleStartDocumentImport() {
+    if (!documentImportZipFile) {
+      setDocumentImportError("Selecciona primero un archivo ZIP.");
+      return;
+    }
+    if (documentImportAutoAssignOrganizations && !documentImportAssignedClientId) {
+      setDocumentImportError("Selecciona un cliente para la asignación automática.");
+      return;
+    }
+
+    setDocumentImportSubmitting(true);
+    setDocumentImportUploadProgress(0);
+    setDocumentImportUploadStage("uploading");
+    setDocumentImportError(null);
+    setDocumentImportSuccessNotice(null);
+    try {
+      const token = await getToken({ skipCache: true });
+      const formData = new FormData();
+      formData.append("zip", documentImportZipFile);
+      formData.append("auto_assign", String(documentImportAutoAssignOrganizations));
+      if (documentImportAssignedClientId) formData.append("cliente_id", documentImportAssignedClientId);
+      if (documentImportAssignedProcurador.trim()) formData.append("procurador", documentImportAssignedProcurador.trim());
+
+      const data = await new Promise<any>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", "/api/expedientes/documents/upload");
+        xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            setDocumentImportUploadStage("uploading");
+            setDocumentImportUploadProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)));
+          }
+        };
+        xhr.onload = async () => {
+          setDocumentImportUploadStage("processing");
+          setDocumentImportUploadProgress(100);
+          try {
+            const parsed = xhr.responseText ? JSON.parse(xhr.responseText) : {};
+            if (xhr.status < 200 || xhr.status >= 300) {
+              reject(new Error(parsed.error || "No se pudo importar el ZIP"));
+              return;
+            }
+            resolve(parsed);
+          } catch (parseError: any) {
+            reject(new Error(parseError?.message || "No se pudo interpretar la respuesta de la importación"));
+          }
+        };
+        xhr.onerror = () => reject(new Error("No se pudo subir el ZIP al servidor"));
+        xhr.send(formData);
+      });
+
+      const batchId = data.data?.batchId;
+      if (batchId) await fetchDocumentImportBatch(batchId);
+      await Promise.all([
+        fetchDocumentImportHistory(true),
+        fetchExpedientes(true),
+      ]);
+    } catch (e: any) {
+      setDocumentImportError(e.message || "No se pudo importar el ZIP");
+    } finally {
+      setDocumentImportUploadStage("idle");
+      setDocumentImportSubmitting(false);
+    }
+  }
 
   const handleCsvSelected = async (file?: File | null) => {
     if (!file) return;
@@ -2073,13 +3841,18 @@ export default function ExpedienteList() {
   };
 
   // ── Carga de expedientes ──────────────────────────────────────
-  const fetchExpedientes = useCallback(async (silent = false) => {
+  const fetchExpedientes = useCallback(async (silent = false, _retry = false) => {
     try {
       if (!silent) { setLoading(true); setError(null); }
       const token = await getToken({ skipCache: true });
       const res = await fetch("/api/expedientes?limit=500", {
         headers: { Authorization: `Bearer ${token}` },
       });
+      // Backend recien arrancado: si devuelve 401, esperar y reintentar una vez
+      if (res.status === 401 && !_retry) {
+        await new Promise(r => setTimeout(r, 1500));
+        return fetchExpedientes(silent, true);
+      }
       const d = await safeJson(res);
       if (res.ok) setExpedientes(d.data || []);
       else throw new Error(d.error || "Error al cargar expedientes");
@@ -2116,6 +3889,19 @@ export default function ExpedienteList() {
   useEffect(() => {
     if (viewMode === "csvImportHistory") fetchImportHistory();
   }, [viewMode, fetchImportHistory]);
+
+  useEffect(() => {
+    if (viewMode === "documentImport") void fetchDocumentImportHistory();
+  }, [viewMode, fetchDocumentImportHistory]);
+
+  useEffect(() => {
+    if (documentImportActiveBatch?.status !== "processing") return undefined;
+    const interval = window.setInterval(() => {
+      void fetchDocumentImportBatch(documentImportActiveBatch.id);
+      void fetchDocumentImportHistory(true);
+    }, 3000);
+    return () => window.clearInterval(interval);
+  }, [documentImportActiveBatch?.id, documentImportActiveBatch?.status, fetchDocumentImportBatch, fetchDocumentImportHistory]);
 
   // Cargar clientes para el modal
   const fetchClientes = useCallback(async () => {
@@ -2174,10 +3960,11 @@ export default function ExpedienteList() {
     try {
       const token = await getToken({ skipCache: true });
       const isEdit = !!editItem?.id;
+      const payload = { ...form, color: form.color || "ninguno" };
       const res = await fetch(isEdit ? `/api/expedientes/${editItem.id}` : "/api/expedientes", {
         method: isEdit ? "PUT" : "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
       const d = await safeJson(res);
       if (!res.ok) { alert(d.error || "Error al guardar"); return; }
@@ -2201,6 +3988,126 @@ export default function ExpedienteList() {
 
   // ── Acciones toolbar ──────────────────────────────────────────
   const selectedExp = useMemo(() => expedientes.find(e => e.id === selected), [expedientes, selected]);
+  const assignExpedienteColor = useCallback(async (color: string) => {
+    if (!selectedExp) return;
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/expedientes/${selectedExp.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ ...selectedExp, color }),
+      });
+      const d = await safeJson(res);
+      if (!res.ok) throw new Error(d.error || "No se pudo asignar el color");
+      setExpedientes((prev) => prev.map((item) => (item.id === selectedExp.id ? { ...item, color } : item)));
+      setShowOpciones(false);
+    } catch (e: any) {
+      alert(e?.message || "No se pudo asignar el color");
+    }
+  }, [getToken, selectedExp]);
+  const relatedExpedienteIds = useMemo(() => new Set(relatedExpedientes.map((item) => item.id)), [relatedExpedientes]);
+
+  const loadRelatedExpedientes = useCallback(async (expedienteId: string, silent = false) => {
+    try {
+      if (!silent) setLoadingRelatedExpedientes(true);
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/expedientes/${expedienteId}/related`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await safeJson(res);
+      if (!res.ok) throw new Error(data.error || "No se pudieron cargar los expedientes relacionados");
+      setRelatedExpedientes(data.data || []);
+    } catch (_e) {
+      if (!silent) setRelatedExpedientes([]);
+    } finally {
+      if (!silent) setLoadingRelatedExpedientes(false);
+    }
+  }, [getToken]);
+
+  const searchRelacionarExpedientes = useCallback(async (searchValue: string) => {
+    if (!selected) return;
+    try {
+      setRelacionarSearching(true);
+      setRelacionarSearchError("");
+      const token = await getToken({ skipCache: true });
+      const term = searchValue.trim();
+      const url = term
+        ? `/api/expedientes?limit=100&q=${encodeURIComponent(term)}`
+        : "/api/expedientes?limit=25";
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await safeJson(res);
+      if (!res.ok) throw new Error(data.error || "No se pudieron buscar expedientes");
+      setRelacionarResults((data.data || []).filter((item: any) => item.id !== selected && !relatedExpedienteIds.has(item.id)));
+    } catch (e: any) {
+      setRelacionarResults([]);
+      setRelacionarSearchError(e?.message || "No se pudieron buscar expedientes");
+    } finally {
+      setRelacionarSearching(false);
+    }
+  }, [getToken, relatedExpedienteIds, selected]);
+
+  const openRelacionarModal = useCallback(async () => {
+    if (!selected || !selectedExp) return;
+    setShowRelacionarModal(true);
+    setRelacionarQuery("");
+    setRelacionarResults([]);
+    setRelacionarHasSearched(true);
+    setRelacionarSearchError("");
+    setRelacionarAssociateError("");
+    await loadRelatedExpedientes(selectedExp.id);
+    await searchRelacionarExpedientes("");
+  }, [loadRelatedExpedientes, searchRelacionarExpedientes, selected, selectedExp]);
+
+  const handleRelacionarSearchSubmit = useCallback(async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    const term = relacionarQuery.trim();
+    if (!term) {
+      setRelacionarHasSearched(false);
+      setRelacionarResults([]);
+      return;
+    }
+    setRelacionarHasSearched(true);
+    await searchRelacionarExpedientes(term);
+  }, [relacionarQuery, searchRelacionarExpedientes]);
+
+  const associateExpedienteFromList = useCallback(async (relatedId: string) => {
+    if (!selected) return;
+    try {
+      setRelacionarSavingId(relatedId);
+      setRelacionarAssociateError("");
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/expedientes/${selected}/related`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ related_expediente_id: relatedId }),
+      });
+      const data = await safeJson(res);
+      if (!res.ok) throw new Error(data.error || "No se pudo asociar el expediente");
+      setShowRelacionarModal(false);
+      setRelacionarQuery("");
+      setRelacionarResults([]);
+      setRelacionarHasSearched(false);
+      await loadRelatedExpedientes(selected, true);
+    } catch (e: any) {
+      setRelacionarAssociateError(e?.message || "No se pudo asociar el expediente");
+    } finally {
+      setRelacionarSavingId(null);
+    }
+  }, [getToken, loadRelatedExpedientes, selected]);
+
+  useEffect(() => {
+    if (!showRelacionarModal) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [showRelacionarModal]);
 
   const handleRefresh = async () => {
     setRefreshSpin(true);
@@ -2208,19 +4115,146 @@ export default function ExpedienteList() {
     setTimeout(() => setRefreshSpin(false), 600);
   };
 
-  const exportCSV = () => {
-    const headers = ["Año","Núm.","Ref. Propia","Descripción","Tipo","Cliente","Contrario","Procurador","Juzgado","Tipo Proc.","Núm. Autos","NIG","Estado"];
-    const rows = filtered.map(e => [
-      e.anio, e.num_exp, e.ref_propia ?? "", e.descripcion ?? "",
-      TIPOS[e.tipo]?.label ?? e.tipo, e.cliente_nombre ?? "",
-      e.contrario ?? "", e.procurador ?? "", e.juzgado ?? "",
-      e.tipo_proc ?? "", e.num_autos ?? "", e.nig ?? "", e.estado ?? "",
-    ]);
-    const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(";")).join("\n");
-    const a = document.createElement("a");
-    a.href = "data:text/csv;charset=utf-8,%EF%BB%BF" + encodeURIComponent(csv);
-    a.download = `expedientes_${new Date().toISOString().slice(0,10)}.csv`;
-    a.click();
+  const exportTemplates = useMemo(
+    () => [DEFAULT_EXPEDIENTE_EXPORT_TEMPLATE, ...customExportTemplates],
+    [customExportTemplates]
+  );
+
+  const selectedExportTemplate = useMemo(
+    () => exportTemplates.find((template) => template.id === selectedExportTemplateId) || DEFAULT_EXPEDIENTE_EXPORT_TEMPLATE,
+    [exportTemplates, selectedExportTemplateId]
+  );
+
+  const exportPreviewRows = useMemo(() => filtered.slice(0, 12), [filtered]);
+
+  useEffect(() => {
+    saveStoredExpedienteExportTemplates(customExportTemplates);
+  }, [customExportTemplates]);
+
+  useEffect(() => {
+    if (!exportTemplates.some((template) => template.id === selectedExportTemplateId)) {
+      setSelectedExportTemplateId(DEFAULT_EXPEDIENTE_EXPORT_TEMPLATE.id);
+      setSelectedExportFormat(DEFAULT_EXPEDIENTE_EXPORT_TEMPLATE.format);
+    }
+  }, [exportTemplates, selectedExportTemplateId]);
+
+  const availableExportFields = useMemo(
+    () => EXPEDIENTE_EXPORT_FIELDS.filter((field) => !exportVisibleFields.includes(field.id)),
+    [exportVisibleFields]
+  );
+
+  const openExportModal = () => {
+    setShowExportModal(true);
+    setExportError("");
+  };
+
+  const openCreateExportTemplate = () => {
+    setExportEditorMode("create");
+    setExportTemplateName(`Nueva plantilla ${new Date().toLocaleDateString("es-ES")}`);
+    setSelectedExportFormat(selectedExportTemplate?.format || "excel");
+    setExportVisibleFields(selectedExportTemplate?.fields?.length ? selectedExportTemplate.fields : DEFAULT_EXPEDIENTE_EXPORT_TEMPLATE.fields);
+    setExportAvailableSelected([]);
+    setExportVisibleSelected([]);
+    setExportError("");
+    setShowExportTemplateEditor(true);
+  };
+
+  const openEditExportTemplate = () => {
+    setExportEditorMode("edit");
+    setExportTemplateName(selectedExportTemplate.name);
+    setSelectedExportFormat(selectedExportTemplate.format);
+    setExportVisibleFields(selectedExportTemplate.fields);
+    setExportAvailableSelected([]);
+    setExportVisibleSelected([]);
+    setExportError("");
+    setShowExportTemplateEditor(true);
+  };
+
+  const moveFieldsToVisible = (fieldIds: string[]) => {
+    if (!fieldIds.length) return;
+    setExportVisibleFields((prev) => [...prev, ...fieldIds.filter((fieldId) => !prev.includes(fieldId))]);
+    setExportAvailableSelected([]);
+  };
+
+  const moveFieldsToAvailable = (fieldIds: string[]) => {
+    if (!fieldIds.length) return;
+    setExportVisibleFields((prev) => prev.filter((fieldId) => !fieldIds.includes(fieldId)));
+    setExportVisibleSelected([]);
+  };
+
+  const saveExportTemplate = () => {
+    const trimmedName = exportTemplateName.trim();
+    if (!trimmedName) {
+      setExportError("Escribe un nombre para la plantilla.");
+      return;
+    }
+    if (!exportVisibleFields.length) {
+      setExportError("Selecciona al menos un campo visible.");
+      return;
+    }
+    if (exportEditorMode === "edit" && selectedExportTemplate.builtIn) {
+      const copyId = `template-${Date.now()}`;
+      const nextTemplate: ExportTemplate = {
+        id: copyId,
+        name: trimmedName,
+        format: selectedExportFormat,
+        fields: exportVisibleFields,
+      };
+      setCustomExportTemplates((prev) => [nextTemplate, ...prev]);
+      setSelectedExportTemplateId(copyId);
+    } else if (exportEditorMode === "edit") {
+      setCustomExportTemplates((prev) => prev.map((template) => (
+        template.id === selectedExportTemplate.id
+          ? { ...template, name: trimmedName, format: selectedExportFormat, fields: exportVisibleFields }
+          : template
+      )));
+    } else {
+      const nextTemplate: ExportTemplate = {
+        id: `template-${Date.now()}`,
+        name: trimmedName,
+        format: selectedExportFormat,
+        fields: exportVisibleFields,
+      };
+      setCustomExportTemplates((prev) => [nextTemplate, ...prev]);
+      setSelectedExportTemplateId(nextTemplate.id);
+    }
+    setShowExportTemplateEditor(false);
+    setExportError("");
+  };
+
+  const deleteSelectedTemplate = () => {
+    if (selectedExportTemplate.builtIn) return;
+    setCustomExportTemplates((prev) => prev.filter((template) => template.id !== selectedExportTemplate.id));
+    setSelectedExportTemplateId(DEFAULT_EXPEDIENTE_EXPORT_TEMPLATE.id);
+  };
+
+  const runExport = () => {
+    const fields = selectedExportTemplate.fields;
+    if (!fields.length) {
+      setExportError("La plantilla seleccionada no tiene campos configurados.");
+      return;
+    }
+    const resolvedFields = fields
+      .map((fieldId) => EXPEDIENTE_EXPORT_FIELDS.find((field) => field.id === fieldId))
+      .filter(Boolean) as ExportFieldDef[];
+    const headers = resolvedFields.map((field) => field.label);
+    const rows = filtered.map((row) => resolvedFields.map((field) => field.getValue(row)));
+    const filenameBase = `expedientes_${new Date().toISOString().slice(0, 10)}`;
+
+    if (selectedExportFormat === "xml") {
+      const xmlRows = filtered.map((row) => (
+        `<expediente>${resolvedFields.map((field) => `<${field.id}>${escapeXml(field.getValue(row))}</${field.id}>`).join("")}</expediente>`
+      )).join("");
+      downloadTextFile(`<?xml version="1.0" encoding="UTF-8"?><expedientes>${xmlRows}</expedientes>`, `${filenameBase}.xml`, "application/xml;charset=utf-8");
+    } else if (selectedExportFormat === "word") {
+      const html = buildExcelLikeHtml(headers, rows, "Exportación de expedientes");
+      downloadTextFile(html, `${filenameBase}.doc`, "application/msword;charset=utf-8");
+    } else {
+      const html = buildExcelLikeHtml(headers, rows, "Exportación de expedientes");
+      downloadTextFile(html, `${filenameBase}.xls`, "application/vnd.ms-excel;charset=utf-8");
+    }
+
+    setShowExportModal(false);
   };
 
   // ── Teclado: Enter abre seleccionado, Ctrl+F foco búsqueda ────
@@ -2346,6 +4380,67 @@ export default function ExpedienteList() {
     );
   }
 
+  if (viewMode === "documentImport") {
+    return (
+      <DocumentImportView
+        zipFile={documentImportZipFile}
+        zipFileName={documentImportZipFileName}
+        autoAssignOrganizations={documentImportAutoAssignOrganizations}
+        selectedClientId={documentImportAssignedClientId}
+        selectedProcurador={documentImportAssignedProcurador}
+        clients={clientes}
+        importBusy={documentImportSubmitting}
+        uploadProgress={documentImportUploadProgress}
+        uploadStage={documentImportUploadStage}
+        importError={documentImportError}
+        activeBatch={documentImportActiveBatch}
+        activeItems={documentImportItems}
+        history={documentImportHistory}
+        loadingHistory={documentImportHistoryLoading}
+        historyError={documentImportHistoryError}
+        successNotice={documentImportSuccessNotice}
+        onBack={() => switchView("list")}
+        onOpenSettings={() => alert("La configuración avanzada de importación documental la dejamos preparada para la siguiente fase.")}
+        onToggleAutoAssign={() => {
+          setDocumentImportAutoAssignOrganizations((prev) => {
+            const next = !prev;
+            if (!next) {
+              setDocumentImportAssignedClientId("");
+              setDocumentImportAssignedProcurador("");
+            }
+            return next;
+          });
+        }}
+        onChangeClient={setDocumentImportAssignedClientId}
+        onChangeProcurador={setDocumentImportAssignedProcurador}
+        onSelectFile={() => documentImportInputRef.current?.click()}
+        onFileChange={(file) => handleDocumentImportZipSelected(file)}
+        onStartImport={handleStartDocumentImport}
+        onReloadHistory={() => fetchDocumentImportHistory()}
+        onVerifyItem={openDocumentImportVerify}
+        inputRef={documentImportInputRef}
+      />
+    );
+  }
+
+  if (viewMode === "documentImportVerify" && documentImportVerifyItem) {
+    return (
+      <DocumentImportVerifyView
+        item={documentImportVerifyItem}
+        clients={clientes}
+        form={documentImportVerifyForm}
+        saving={documentImportVerifySaving}
+        error={documentImportVerifyError}
+        onBack={() => {
+          setDocumentImportVerifyError(null);
+          setViewMode("documentImport");
+        }}
+        onChange={(key, value) => setDocumentImportVerifyForm((prev) => ({ ...prev, [key]: value }))}
+        onAccept={handleAcceptDocumentImportItem}
+      />
+    );
+  }
+
   // ── Render principal ──────────────────────────────────────────
   return (
     <>
@@ -2353,9 +4448,392 @@ export default function ExpedienteList() {
       {showAdjuntos && selected && (
         <AdjuntosModal
           entityId={selected}
+          autoOpenAfterAttach={false}
           entityName={selectedExp ? `${selectedExp.ref_expediente || selectedExp.ref_propia || "Exp."} — ${selectedExp.descripcion || ""}` : "Expediente"}
           onClose={() => setShowAdjuntos(false)}
         />
+      )}
+
+      {showRelacionarModal && selectedExp && typeof document !== "undefined" && createPortal(
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/40 backdrop-blur-sm px-4"
+          onClick={() => setShowRelacionarModal(false)}
+        >
+          <div
+            className="w-full max-w-2xl rounded-3xl bg-white border border-slate-200 shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-slate-100">
+              <div>
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Relacionar expediente</p>
+                <h3 className="text-lg font-bold text-slate-900">
+                  Asociar expedientes a {selectedExp.ref_expediente || `${selectedExp.anio}/${selectedExp.num_exp}`}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowRelacionarModal(false)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-400 hover:text-slate-700 hover:border-slate-300 transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <form onSubmit={handleRelacionarSearchSubmit} className="flex items-center gap-3">
+                <div className="relative flex-1">
+                  <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
+                  <input
+                    value={relacionarQuery}
+                    onChange={(e) => {
+                      const nextValue = e.target.value;
+                      setRelacionarQuery(nextValue);
+                      if (!nextValue.trim()) {
+                        setRelacionarHasSearched(false);
+                        setRelacionarResults([]);
+                      }
+                    }}
+                    placeholder="Buscar por referencia, descripción, NIG, juzgado..."
+                    autoFocus
+                    spellCheck={false}
+                    autoComplete="off"
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 pl-11 pr-4 py-3 text-sm text-slate-700 placeholder:text-slate-400 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={!relacionarQuery.trim() || relacionarSearching}
+                  className="inline-flex items-center gap-2 px-4 py-3 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {relacionarSearching ? <Loader2 size={12} className="animate-spin" /> : <Search size={12} />}
+                  Buscar
+                </button>
+              </form>
+
+              {relacionarSearchError && (
+                <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {relacionarSearchError}
+                </div>
+              )}
+
+              {relacionarAssociateError && (
+                <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {relacionarAssociateError}
+                </div>
+              )}
+
+              <div className="max-h-[420px] overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50/70">
+                {!relacionarHasSearched ? (
+                  <div className="px-5 py-10 text-center">
+                    <p className="text-sm font-medium text-slate-600">Empieza escribiendo para buscar expedientes</p>
+                    <p className="mt-1 text-xs text-slate-400">Busca por referencia, descripción, NIG o juzgado.</p>
+                  </div>
+                ) : relacionarSearching || loadingRelatedExpedientes ? (
+                  <div className="flex items-center gap-2 px-5 py-8 text-sm text-slate-400">
+                    <Loader2 size={15} className="animate-spin" />
+                    Buscando expedientes...
+                  </div>
+                ) : relacionarResults.length === 0 ? (
+                  <div className="px-5 py-10 text-center">
+                    <p className="text-sm font-medium text-slate-600">No hay expedientes disponibles para asociar</p>
+                    <p className="mt-1 text-xs text-slate-400">Prueba con otra búsqueda o revisa si ya están relacionados.</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-200">
+                    {relacionarResults.map((item) => (
+                      <div key={item.id} className="flex items-center justify-between gap-4 px-5 py-4">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-slate-800 break-words">
+                            {item.descripcion || `Expediente ${item.ref_expediente || `${item.anio}/${item.num_exp}`}`}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500 break-words">
+                            {item.ref_expediente || `${item.anio}/${item.num_exp}`}
+                            {item.nig ? ` · NIG ${item.nig}` : ""}
+                            {item.juzgado ? ` · ${item.juzgado}` : ""}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => associateExpedienteFromList(item.id)}
+                          disabled={relacionarSavingId === item.id}
+                          className="shrink-0 inline-flex items-center gap-2 px-3 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                        >
+                          {relacionarSavingId === item.id ? <Loader2 size={12} className="animate-spin" /> : <span className="text-[12px] leading-none">🤝</span>}
+                          Asociar
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {showExportModal && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-[125] flex items-center justify-center bg-slate-950/40 backdrop-blur-sm p-3 sm:p-4 animate-in fade-in duration-200" onClick={() => setShowExportModal(false)}>
+          <div className="flex h-[min(860px,calc(100vh-24px))] w-full max-w-[min(1380px,calc(100vw-24px))] flex-col rounded-3xl border border-slate-200 bg-white shadow-2xl overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-2 duration-200" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-5 py-3">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.25em] text-slate-400">Exportar expedientes</p>
+                <h3 className="text-[17px] font-bold text-slate-900">Plantillas de exportación</h3>
+              </div>
+              <button type="button" onClick={() => setShowExportModal(false)} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-400 hover:border-slate-300 hover:text-slate-700">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="border-b border-slate-100 px-4 py-3 sm:px-5">
+              <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
+                <div className="grid gap-2 md:grid-cols-3">
+                  {(["excel", "xml", "word"] as ExportFormat[]).map((format) => {
+                    const meta = exportFormatMeta(format);
+                    const Icon = meta.icon;
+                    const active = selectedExportFormat === format;
+                    return (
+                      <button
+                        key={format}
+                        type="button"
+                        onClick={() => setSelectedExportFormat(format)}
+                        className={`group rounded-2xl border bg-gradient-to-br px-3 py-2.5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${meta.className} ${active ? "ring-2 ring-red-500/70 shadow-md scale-[1.01]" : "opacity-90 hover:opacity-100"}`}
+                      >
+                        <div className="flex items-start justify-between gap-2.5">
+                          <div className="flex items-center gap-2.5">
+                            <div className={`flex h-8 w-8 items-center justify-center rounded-xl ${meta.badgeClassName}`}>
+                              <Icon size={16} />
+                            </div>
+                            <div>
+                              <p className="text-[13px] font-bold leading-none">{meta.label}</p>
+                              <p className="mt-1 text-[10px] leading-4 text-slate-500">{meta.description}</p>
+                            </div>
+                          </div>
+                          {active && <CheckCircle2 size={16} className="text-red-500 shrink-0" />}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex flex-wrap items-center gap-2 justify-end">
+                  <button type="button" onClick={openCreateExportTemplate} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-medium text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm">Alta</button>
+                  <button type="button" onClick={deleteSelectedTemplate} disabled={selectedExportTemplate.builtIn} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-medium text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-40">Baja</button>
+                  <button type="button" onClick={openEditExportTemplate} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-medium text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm">Modificar</button>
+                  <button type="button" onClick={() => setShowExportModal(false)} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-medium text-slate-600 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm">Cancelar</button>
+                  <button type="button" onClick={runExport} className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-all hover:-translate-y-0.5 hover:bg-red-700 hover:shadow-lg">
+                    <Download size={13} />
+                    Exportar
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid min-h-0 flex-1 grid-cols-[260px_minmax(0,1fr)] gap-0">
+              <div className="border-r border-slate-200 p-3">
+                <p className="mb-3 text-[13px] leading-5 text-slate-500">Selecciona una plantilla de exportación o configura una nueva con los campos que quieras exportar.</p>
+                <div className="overflow-hidden rounded-2xl border border-slate-200">
+                  <div className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold uppercase tracking-wider text-slate-500">Plantilla</div>
+                  <div className="max-h-[calc(100vh-360px)] overflow-y-auto">
+                    {exportTemplates.map((template) => (
+                      <button
+                        key={template.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedExportTemplateId(template.id);
+                          setSelectedExportFormat(template.format);
+                        }}
+                        className={`w-full border-b border-slate-100 px-4 py-2.5 text-left last:border-b-0 transition-all duration-150 ${selectedExportTemplateId === template.id ? "bg-gradient-to-r from-lime-300 via-lime-200 to-white text-slate-900 shadow-inner" : "hover:bg-slate-50 text-slate-700 hover:translate-x-1"}`}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-[13px] font-semibold leading-5">{template.name}</p>
+                            <p className="mt-1 text-xs uppercase tracking-wide opacity-70">{template.format}</p>
+                          </div>
+                          {selectedExportTemplateId === template.id && <CheckCircle2 size={16} className="text-red-500" />}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="min-h-0 p-3">
+                <div className="grid min-h-0 gap-3 xl:grid-cols-[260px_minmax(0,1fr)]">
+                  <div className="overflow-hidden rounded-2xl border border-slate-200">
+                    <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold uppercase tracking-wider text-slate-500">
+                      <span>Campos a exportar</span>
+                      <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] text-slate-600 normal-case">{selectedExportTemplate.fields.length} columnas</span>
+                    </div>
+                    <div className="max-h-[calc(100vh-360px)] overflow-y-auto px-4 py-3 text-[13px] text-slate-700">
+                      {selectedExportTemplate.fields.map((fieldId) => (
+                        <div key={fieldId} className="py-0.5">{getExportFieldLabel(fieldId)}</div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="overflow-hidden rounded-2xl border border-slate-200">
+                    <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold uppercase tracking-wider text-slate-500">
+                      <span>Vista previa</span>
+                      <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] text-slate-600 normal-case">{exportPreviewRows.length} filas</span>
+                    </div>
+                    <div className="h-[calc(100vh-360px)] overflow-auto bg-[#f3f6fb] p-3">
+                      <div className="inline-block min-w-full overflow-hidden border border-[#cfd8e3] bg-white shadow-[0_12px_28px_rgba(15,23,42,0.08)]">
+                      <table className="min-w-max border-collapse text-[10px] text-slate-800">
+                        <thead>
+                          <tr>
+                            <th className="w-10 border border-[#d9e1ea] bg-[#eef2f6] px-2 py-1 text-center font-bold text-slate-500" />
+                            {selectedExportTemplate.fields.map((fieldId, index) => (
+                              <th key={`${fieldId}-letter`} className="whitespace-nowrap border border-[#d9e1ea] bg-[#eef2f6] px-2 py-1 text-center font-bold text-slate-500">
+                                {toExcelColumnLabel(index)}
+                              </th>
+                            ))}
+                          </tr>
+                          <tr>
+                            <th className="w-10 border border-[#d9e1ea] bg-[#eef2f6] px-2 py-1 text-center font-bold text-slate-500">1</th>
+                            {selectedExportTemplate.fields.map((fieldId) => (
+                              <th key={fieldId} className="whitespace-nowrap border border-[#d9e1ea] bg-[#dbe5f1] px-2.5 py-2 text-center font-semibold tracking-wide text-slate-700">
+                                {getExportFieldLabel(fieldId)}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {exportPreviewRows.map((row, rowIndex) => (
+                            <tr key={row.id} className={rowIndex % 2 === 0 ? "bg-white" : "bg-[#fbfcfe]"}>
+                              <td className="border border-[#d9e1ea] bg-[#eef2f6] px-2 py-2 text-center font-semibold text-slate-500">{rowIndex + 2}</td>
+                              {selectedExportTemplate.fields.map((fieldId) => {
+                                const field = EXPEDIENTE_EXPORT_FIELDS.find((item) => item.id === fieldId);
+                                return (
+                                  <td key={`${row.id}-${fieldId}`} className="border border-[#d9e1ea] px-2.5 py-2 align-top leading-5">
+                                    {field ? field.getValue(row) : ""}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {exportError && (
+                  <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {exportError}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {showExportTemplateEditor && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-[126] flex items-center justify-center bg-slate-950/40 backdrop-blur-sm px-4 animate-in fade-in duration-200" onClick={() => setShowExportTemplateEditor(false)}>
+          <div className="w-full max-w-5xl rounded-3xl border border-slate-200 bg-white shadow-2xl overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-2 duration-200" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+              <h3 className="text-lg font-bold text-slate-900">{exportEditorMode === "create" ? "Nueva plantilla de exportación" : "Modificar plantilla de exportación"}</h3>
+              <button type="button" onClick={() => setShowExportTemplateEditor(false)} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-400 hover:text-slate-700">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-6">
+              <div className="grid gap-6 lg:grid-cols-[1fr_84px_1fr]">
+                <div>
+                  <div className="mb-3 flex items-center justify-between">
+                    <h4 className="font-semibold text-slate-800">Campos disponibles</h4>
+                    <div className="relative">
+                      <select
+                        value="expedientes"
+                        disabled
+                        className="appearance-none rounded-xl border border-slate-200 bg-white px-4 py-2 pr-9 text-sm text-slate-700 outline-none disabled:opacity-100"
+                      >
+                        <option>Expedientes</option>
+                      </select>
+                      <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    </div>
+                  </div>
+                  <div className="h-[340px] overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50/40 p-3">
+                    {availableExportFields.map((field) => (
+                      <label key={field.id} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 transition-all hover:bg-white hover:shadow-sm">
+                        <input
+                          type="checkbox"
+                          checked={exportAvailableSelected.includes(field.id)}
+                          onChange={(e) => {
+                            setExportAvailableSelected((prev) => e.target.checked ? [...prev, field.id] : prev.filter((id) => id !== field.id));
+                          }}
+                        />
+                        <span className="text-sm text-slate-700">{field.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-col items-center justify-center gap-3">
+                  <button type="button" onClick={() => moveFieldsToVisible(exportAvailableSelected)} className="rounded-xl border border-slate-200 bg-white p-2 text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm"><ArrowRight size={18} /></button>
+                  <button type="button" onClick={() => moveFieldsToAvailable(exportVisibleSelected)} className="rounded-xl border border-slate-200 bg-white p-2 text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm"><ArrowLeft size={18} /></button>
+                  <button type="button" onClick={() => moveFieldsToVisible(availableExportFields.map((field) => field.id))} className="rounded-xl border border-slate-200 bg-white p-2 text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm"><ChevronsRight size={18} /></button>
+                  <button type="button" onClick={() => moveFieldsToAvailable([...exportVisibleFields])} className="rounded-xl border border-slate-200 bg-white p-2 text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm"><ChevronsLeft size={18} /></button>
+                </div>
+
+                <div>
+                  <div className="mb-3 flex items-center justify-between">
+                    <h4 className="font-semibold text-slate-800">Campos visibles</h4>
+                    <div className="relative">
+                      <select
+                        value={selectedExportFormat}
+                        onChange={(e) => setSelectedExportFormat(e.target.value as ExportFormat)}
+                        className="appearance-none rounded-xl border border-slate-200 bg-white px-4 py-2 pr-9 text-sm text-slate-700 outline-none"
+                      >
+                        <option value="excel">Excel</option>
+                        <option value="xml">XML</option>
+                        <option value="word">Word</option>
+                      </select>
+                      <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    </div>
+                  </div>
+                  <div className="h-[340px] overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50/40 p-3">
+                    {exportVisibleFields.map((fieldId) => (
+                      <label key={fieldId} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 transition-all hover:bg-white hover:shadow-sm">
+                        <input
+                          type="checkbox"
+                          checked={exportVisibleSelected.includes(fieldId)}
+                          onChange={(e) => {
+                            setExportVisibleSelected((prev) => e.target.checked ? [...prev, fieldId] : prev.filter((id) => id !== fieldId));
+                          }}
+                        />
+                        <span className="text-sm text-slate-700">{getExportFieldLabel(fieldId)}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6">
+                <label className="mb-2 block text-sm font-semibold text-slate-700">Nombre de la plantilla</label>
+                <input
+                  value={exportTemplateName}
+                  onChange={(e) => setExportTemplateName(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-700 outline-none focus:border-slate-300"
+                  placeholder="Ej. Listado actual"
+                />
+              </div>
+
+              {exportError && (
+                <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {exportError}
+                </div>
+              )}
+
+              <div className="mt-6 flex items-center justify-end gap-3">
+                <button type="button" onClick={() => setShowExportTemplateEditor(false)} className="rounded-xl border border-slate-200 px-4 py-2 font-medium text-slate-600 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm">Cancelar</button>
+                <button type="button" onClick={saveExportTemplate} className="rounded-xl bg-red-600 px-4 py-2 font-semibold text-white transition-all hover:-translate-y-0.5 hover:bg-red-700 hover:shadow-lg">Guardar</button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
 
       {/* ── Modal alta / edición ────────────────────────────── */}
@@ -2481,10 +4959,10 @@ export default function ExpedienteList() {
                     />
                     <AltaOption
                       icon={ClipboardList}
-                      title="Desde cédulas o demandas"
-                      description="Procesa documentos judiciales para crear expedientes"
+                      title="Desde documentos"
+                      description="Procesa documentos para crear expedientes"
                       iconClassName="bg-amber-100 text-amber-700"
-                      onClick={openDemandImport}
+                      onClick={openDocumentImport}
                     />
                   </div>
                 </div>
@@ -2496,18 +4974,83 @@ export default function ExpedienteList() {
 
             <div className="w-px h-5 bg-slate-200 mx-0.5" />
 
-            <ToolBtn icon={Mail}         label="Enviar Correo"  disabled={!selected} onClick={() => {}} />
+            <DropdownToolBtn
+              icon={Mail}
+              label="Enviar Correo"
+              disabled={!selected}
+              items={[
+                {
+                  label: "Nuevo",
+                  icon: Mail,
+                  onClick: () => {
+                    if (!selectedExp) return;
+                    const subject = encodeURIComponent(`Expediente ${selectedExp.anio}/${selectedExp.num_exp} - ${selectedExp.descripcion || ""}`);
+                    window.open(`mailto:?subject=${subject}`);
+                  },
+                },
+                {
+                  label: "Con Plantilla",
+                  icon: FileText,
+                  onClick: () => {
+                    if (!selectedExp) return;
+                    const subject = encodeURIComponent(`Plantilla - Expediente ${selectedExp.anio}/${selectedExp.num_exp}`);
+                    const body = encodeURIComponent(`Hola,\n\nTe escribo en relación con el expediente ${selectedExp.ref_expediente || `${selectedExp.anio}/${selectedExp.num_exp}`}.\n`);
+                    window.open(`mailto:?subject=${subject}&body=${body}`);
+                  },
+                },
+                { divider: true, label: "" },
+                {
+                  label: "Con Adjuntos",
+                  icon: Paperclip,
+                  children: [
+                    {
+                      label: "Nuevo",
+                      icon: Mail,
+                      onClick: () => {
+                        if (!selectedExp) return;
+                        const subject = encodeURIComponent(`Expediente ${selectedExp.anio}/${selectedExp.num_exp} - con adjuntos`);
+                        window.open(`mailto:?subject=${subject}`);
+                      },
+                    },
+                    {
+                      label: "Con Plantilla",
+                      icon: FileText,
+                      onClick: () => {
+                        if (!selectedExp) return;
+                        const subject = encodeURIComponent(`Plantilla con adjuntos - Expediente ${selectedExp.anio}/${selectedExp.num_exp}`);
+                        window.open(`mailto:?subject=${subject}`);
+                      },
+                    },
+                  ],
+                },
+                {
+                  label: "Correo Corporativo",
+                  icon: ExternalLink,
+                  onClick: () => {
+                    if (!selectedExp) return;
+                    const subject = encodeURIComponent(`Expediente ${selectedExp.anio}/${selectedExp.num_exp}`);
+                    window.open(`https://mail.google.com/mail/?view=cm&su=${subject}`, "_blank");
+                  },
+                },
+                {
+                  label: "MN Sign",
+                  icon: Pencil,
+                  onClick: () => selected && navigate(`/dashboard/expedientes/${selected}#firma`),
+                },
+              ]}
+            />
             <ToolBtn icon={MessageSquare}label="WhatsApp"       disabled={!selected} onClick={() => {}} />
 
             <div className="w-px h-5 bg-slate-200 mx-0.5" />
 
             <ToolBtn icon={ClipboardList}label="Actuación"     disabled={!selected} onClick={() => selected && navigate(`/dashboard/expedientes/${selected}`)} />
+            <ToolBtn icon={GitMerge}     label="Asociar"       disabled={!selectedExp} onClick={openRelacionarModal} />
             <ToolBtn icon={Paperclip}    label="Adjuntos"      disabled={!selected} onClick={() => selected && setShowAdjuntos(true)} />
             <ToolBtn icon={Users}        label="Ir a cliente"  disabled={!selectedExp?.cliente_id} onClick={() => selectedExp?.cliente_id && navigate(`/dashboard/clientes/${selectedExp.cliente_id}`)} />
 
             <div className="w-px h-5 bg-slate-200 mx-0.5" />
 
-            <ToolBtn icon={FileSpreadsheet} label="Excel"    onClick={exportCSV} />
+            <ToolBtn icon={FileSpreadsheet} label="Excel"    onClick={openExportModal} />
             <ToolBtn icon={Printer}         label="Imprimir" onClick={() => window.print()} />
 
             <div className="w-px h-5 bg-slate-200 mx-0.5" />
@@ -2526,17 +5069,9 @@ export default function ExpedienteList() {
               <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[230px] py-1.5">
 
                 {/* Grupo 1: acciones principales */}
-                <button onClick={exportCSV}
+                <button onClick={openExportModal}
                   className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
                   <FileSpreadsheet size={12} className="text-slate-400" /> Excel
-                </button>
-                <button onClick={() => selected && alert("Dar de baja: " + selected)}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                  <UserMinus size={12} className="text-slate-400" /> Baja
-                </button>
-                <button onClick={() => selected && selectedExp && (setEditItem(selectedExp), setShowModal(true))}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                  <Pencil size={12} className="text-slate-400" /> Modificar
                 </button>
                 <button onClick={() => alert("Seleccionar opciones favoritas")}
                   className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
@@ -2554,7 +5089,7 @@ export default function ExpedienteList() {
                     </span>
                     <ChevronRight size={11} className="text-slate-300" />
                   </button>
-                  <div className="absolute left-full top-0 ml-1 z-50 bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[180px] py-1.5 hidden group-hover/sub:block">
+                  <div className="absolute right-full top-0 mr-1 z-50 bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[180px] py-1.5 hidden group-hover/sub:block">
                     <button onClick={() => selectedExp?.cliente_id && navigate(`/dashboard/clientes/${selectedExp.cliente_id}`)}
                       className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
                       <Users size={12} className="text-slate-400" /> Ir a Cliente
@@ -2570,10 +5105,38 @@ export default function ExpedienteList() {
                   </div>
                 </div>
 
-                <button onClick={() => alert("Asignar color al expediente")}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                  <Palette size={12} className="text-slate-400" /> Asignar Color
-                </button>
+                <div className="relative group/color">
+                  <button className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
+                    <span className="flex items-center gap-2.5">
+                      <Palette size={12} className="text-slate-400" /> Asignar Color
+                    </span>
+                    <ChevronRight size={11} className="text-slate-300" />
+                  </button>
+                  <div className="absolute right-full top-0 mr-1 z-50 hidden min-w-[190px] rounded-xl border border-slate-200 bg-white py-1.5 shadow-2xl group-hover/color:block">
+                    {[
+                      { value: "ninguno", label: "Sin color", dot: "bg-slate-300" },
+                      { value: "azul", label: "Azul suave", dot: "bg-sky-400" },
+                      { value: "verde", label: "Verde suave", dot: "bg-emerald-400" },
+                      { value: "amarillo", label: "Amarillo suave", dot: "bg-amber-400" },
+                      { value: "naranja", label: "Naranja suave", dot: "bg-orange-400" },
+                      { value: "rojo", label: "Rojo suave", dot: "bg-rose-400" },
+                      { value: "morado", label: "Morado suave", dot: "bg-violet-400" },
+                    ].map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => assignExpedienteColor(option.value)}
+                        className="flex w-full items-center justify-between gap-2.5 px-3.5 py-2 text-left text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-700"
+                      >
+                        <span className="flex items-center gap-2.5">
+                          <span className={`h-2.5 w-2.5 rounded-full ${option.dot}`} />
+                          {option.label}
+                        </span>
+                        {selectedExp?.color === option.value && <Check size={11} className="text-red-500" />}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
                 <div className="h-px bg-slate-100 my-1.5" />
 
@@ -2615,7 +5178,7 @@ export default function ExpedienteList() {
                     </span>
                     <ChevronRight size={11} className="text-slate-300" />
                   </button>
-                  <div className="absolute left-full top-0 ml-1 z-50 bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[180px] py-1.5 hidden group-hover/dep:block">
+                  <div className="absolute right-full top-0 mr-1 z-50 bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[180px] py-1.5 hidden group-hover/dep:block">
                     <button onClick={() => console.log("Expediente:", selectedExp)}
                       className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
                       <Bug size={12} className="text-slate-400" /> Ver en consola
@@ -2635,7 +5198,7 @@ export default function ExpedienteList() {
                     </span>
                     <ChevronRight size={11} className="text-slate-300" />
                   </button>
-                  <div className="absolute left-full top-0 ml-1 z-50 bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[180px] py-1.5 hidden group-hover/ver:block">
+                  <div className="absolute right-full top-0 mr-1 z-50 bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[180px] py-1.5 hidden group-hover/ver:block">
                     <button onClick={() => alert("Restaurar versión anterior")}
                       className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
                       <History size={12} className="text-slate-400" /> Ver historial versiones
@@ -2664,7 +5227,7 @@ export default function ExpedienteList() {
             </div>
 
             {/* Expediente seleccionado */}
-            {selectedExp && (
+            {false && selectedExp && (
               <div className="ml-auto flex items-center gap-1.5 px-2 py-1 bg-red-50 border border-red-100 rounded-lg shrink-0">
                 <div className="w-2 h-2 bg-red-500 rounded-full" />
                 <span className="text-xs text-red-700 font-medium max-w-[200px] truncate">
@@ -2807,20 +5370,21 @@ export default function ExpedienteList() {
                   const isSel      = selected === exp.id;
                   const tipoConf   = TIPOS[exp.tipo]   || TIPOS.otro;
                   const estadoConf = ESTADOS[exp.estado] || ESTADOS.abierto;
+                  const colorStyle = EXPEDIENTE_ROW_COLOR_STYLES[exp.color || "ninguno"] || EXPEDIENTE_ROW_COLOR_STYLES.ninguno;
                   return (
                     <tr
                       key={exp.id}
                       onClick={() => setSelected(isSel ? null : exp.id)}
                       onDoubleClick={() => navigate(`/dashboard/expedientes/${exp.id}`)}
                       className={`border-b border-slate-50 cursor-pointer transition-colors group
-                        ${isSel ? "bg-red-50 border-l-2 border-l-red-500" : "hover:bg-slate-50/80"}`}
+                        ${isSel ? colorStyle.rowSelected : colorStyle.row}`}
                     >
                       {/* Año */}
-                      <td className={`pl-4 pr-3 py-3 font-mono ${isSel ? "text-red-400" : "text-slate-400"}`}>{exp.anio}</td>
+                      <td className={`pl-4 pr-3 py-3 font-mono ${isSel ? colorStyle.yearSelected : colorStyle.year}`}>{exp.anio}</td>
 
                       {/* Núm */}
                       <td className="px-3 py-3">
-                        <span className={`font-extrabold text-base ${isSel ? "text-red-700" : "text-red-600"}`}>{exp.num_exp}</span>
+                        <span className={`font-extrabold text-base ${isSel ? colorStyle.numberSelected : colorStyle.number}`}>{exp.num_exp}</span>
                       </td>
 
                       {/* Ref */}
@@ -2830,7 +5394,7 @@ export default function ExpedienteList() {
 
                       {/* Descripción */}
                       <td className="px-3 py-3">
-                        <span className={`font-semibold truncate block max-w-[220px] ${isSel ? "text-red-700" : "text-slate-800"}`}>
+                        <span className={`font-semibold truncate block max-w-[220px] ${isSel ? colorStyle.descriptionSelected : "text-slate-800"}`}>
                           {exp.descripcion || <span className="text-slate-300 font-normal">Sin descripción</span>}
                         </span>
                       </td>
@@ -2909,13 +5473,13 @@ export default function ExpedienteList() {
 
           {/* ══════════════════════════════════════════════════
               VISTA DETALLE — tarjetas expandibles
-          ══════════════════════════════════════════════════ */}
+          \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 */}
           {viewMode === "detail" && (
             <div className="overflow-auto flex-1 p-4">
               {filtered.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-40 gap-3 text-slate-400">
                   <FolderOpen size={36} className="opacity-15" />
-                  <p className="font-medium text-sm">{hasActiveFilters || filters.length > 1 ? "No hay expedientes con esos filtros" : "No hay expedientes todavía"}</p>
+                  <p className="font-medium text-sm">{(hasActiveFilters || filters.length > 1) ? "No hay expedientes con esos filtros" : "No hay expedientes"}</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -2923,36 +5487,49 @@ export default function ExpedienteList() {
                     const tipoConf   = TIPOS[exp.tipo]   || TIPOS.otro;
                     const estadoConf = ESTADOS[exp.estado] || ESTADOS.abierto;
                     const isSel = selected === exp.id;
+                    const colorStyle = EXPEDIENTE_ROW_COLOR_STYLES[exp.color || "ninguno"] || EXPEDIENTE_ROW_COLOR_STYLES.ninguno;
                     return (
                       <div
                         key={exp.id}
                         onClick={() => setSelected(isSel ? null : exp.id)}
                         onDoubleClick={() => navigate(`/dashboard/expedientes/${exp.id}`)}
-                        className={`rounded-xl border cursor-pointer transition-all ${isSel ? "border-red-300 bg-red-50 shadow-sm" : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm"}`}
+                        className={`rounded-xl border cursor-pointer transition-all ${isSel ? colorStyle.cardSelected : colorStyle.card}`}
                       >
                         <div className="px-4 py-3 flex items-center gap-4">
                           <div className="shrink-0 w-20 text-right">
-                            <span className={`font-extrabold text-base ${isSel ? "text-red-600" : "text-red-500"}`}>{exp.anio}/{exp.num_exp}</span>
+                            <span className={`font-extrabold text-base ${isSel ? colorStyle.cardNumberSelected : colorStyle.cardNumber}`}>{exp.anio}/{exp.num_exp}</span>
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className={`font-semibold text-sm truncate ${isSel ? "text-red-800" : "text-slate-800"}`}>{exp.descripcion || "Sin descripción"}</p>
-                            <p className="text-xs text-slate-400 truncate mt-0.5">
-                              {exp.cliente_nombre && <span className="text-emerald-600 font-medium">{exp.cliente_nombre}</span>}
-                              {exp.contrario && <><span className="mx-1 text-slate-300">vs</span><span className="text-red-500">{exp.contrario}</span></>}
-                              {exp.juzgado && <><span className="mx-1 text-slate-200">·</span><span>{exp.juzgado}</span></>}
+                            <p className={`font-semibold text-sm truncate ${isSel ? colorStyle.cardDescriptionSelected : "text-slate-800"}`}>
+                              {exp.descripcion || <span className="text-slate-300 font-normal">Sin descripci\u00f3n</span>}
                             </p>
+                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${tipoConf.color}`}>{tipoConf.short}</span>
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${estadoConf.color}`}>{estadoConf.label}</span>
+                              {exp.cliente_nombre && <span className="text-xs text-slate-500 truncate max-w-[160px]">{exp.cliente_nombre}</span>}
+                            </div>
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${tipoConf.color}`}>{tipoConf.short}</span>
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${estadoConf.color}`}>{estadoConf.label}</span>
+                            {exp.juzgado && <span className="text-xs text-slate-400 hidden sm:block truncate max-w-[120px]">{exp.juzgado}</span>}
+                            <button
+                              onClick={e => { e.stopPropagation(); navigate(`/dashboard/expedientes/${exp.id}`); }}
+                              className="p-1 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                              title="Abrir expediente">
+                              <ExternalLink size={14} />
+                            </button>
                           </div>
-                          <button
-                            onClick={e => { e.stopPropagation(); navigate(`/dashboard/expedientes/${exp.id}`); }}
-                            className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
-                          >
-                            <ExternalLink size={14} />
-                          </button>
                         </div>
+                        {isSel && (
+                          <div className="px-4 pb-3 pt-2 border-t border-red-100 grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2">
+                            {exp.contrario  && <div><p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Contrario</p><p className="text-xs text-slate-700 truncate">{exp.contrario}</p></div>}
+                            {exp.juzgado    && <div><p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Juzgado</p><p className="text-xs text-slate-700 truncate">{exp.juzgado}</p></div>}
+                            {exp.num_autos  && <div><p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Núm. autos</p><p className="text-xs text-slate-700 font-mono">{exp.num_autos}</p></div>}
+                            {exp.nig        && <div><p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">NIG</p><p className="text-xs text-slate-700 font-mono truncate">{exp.nig}</p></div>}
+                            {exp.procurador && <div><p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Procurador</p><p className="text-xs text-slate-700 truncate">{exp.procurador}</p></div>}
+                            {exp.tipo_proc  && <div><p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Tipo proc.</p><p className="text-xs text-slate-700 uppercase">{exp.tipo_proc}</p></div>}
+                            {exp.fecha_inicio && <div><p className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Inicio</p><p className="text-xs text-slate-700">{fmtDateHuman(exp.fecha_inicio)}</p></div>}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -2960,56 +5537,6 @@ export default function ExpedienteList() {
               )}
             </div>
           )}
-
-          {/* ══════════════════════════════════════════════════
-              VISTA MULTISELECT — cuadrícula de tarjetas
-          ══════════════════════════════════════════════════ */}
-          {viewMode === "multiselect" && (
-            <div className="overflow-auto flex-1 p-4">
-              <div className="mb-3 px-1">
-                <span className="text-xs text-slate-400">{filtered.length} expedientes</span>
-              </div>
-              {filtered.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-40 gap-3 text-slate-400">
-                  <FolderOpen size={36} className="opacity-15" />
-                  <p className="font-medium text-sm">{hasActiveFilters || filters.length > 1 ? "No hay expedientes con esos filtros" : "No hay expedientes todavía"}</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-                  {filtered.map(exp => {
-                    const isSel = selected === exp.id;
-                    const estadoConf = ESTADOS[exp.estado] || ESTADOS.abierto;
-                    return (
-                      <div
-                        key={exp.id}
-                        onClick={() => setSelected(isSel ? null : exp.id)}
-                        onDoubleClick={() => navigate(`/dashboard/expedientes/${exp.id}`)}
-                        className={`rounded-xl border cursor-pointer p-3 flex flex-col gap-1.5 transition-all ${isSel ? "border-red-300 bg-red-50 shadow-md" : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm"}`}
-                      >
-                        <div className={`text-xs font-extrabold ${isSel ? "text-red-600" : "text-red-500"}`}>{exp.anio}/{exp.num_exp}</div>
-                        <p className="text-xs font-semibold text-slate-700 line-clamp-2 leading-snug">{exp.descripcion || "Sin descripción"}</p>
-                        {exp.cliente_nombre && <p className="text-[10px] text-emerald-600 truncate font-medium">{exp.cliente_nombre}</p>}
-                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full self-start mt-auto ${estadoConf.color}`}>{estadoConf.label}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ── Barra de estado inferior ─────────────────────── */}
-          <div className="flex items-center gap-6 px-4 py-2 border-t border-slate-100 bg-slate-50/60 text-[11px] text-slate-500 shrink-0">
-            <span><span className="font-semibold text-slate-700">Total expedientes:</span> <span className="font-mono">{stats.total.toLocaleString("es-ES")}</span></span>
-            <span><span className="font-semibold text-emerald-600">Abiertos:</span> <span className="font-mono">{stats.abiertos}</span></span>
-            <span><span className="font-semibold text-slate-500">Cerrados:</span> <span className="font-mono">{stats.cerrados}</span></span>
-            <span><span className="font-semibold text-amber-500">Suspendidos:</span> <span className="font-mono">{stats.suspendidos}</span></span>
-            <span><span className="font-semibold text-red-600">Año {new Date().getFullYear()}:</span> <span className="font-mono">{stats.esteAnio}</span></span>
-            {hasActiveFilters && (
-              <span className="text-amber-600 font-medium">↳ Mostrando {filtered.length} de {expedientes.length} con filtros activos</span>
-            )}
-            <span className="ml-auto text-slate-300">Doble clic para abrir · Enter abre seleccionado · Ctrl+F para filtrar</span>
-          </div>
 
         </div>
       </div>

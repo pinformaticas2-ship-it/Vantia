@@ -393,6 +393,74 @@ async function runMigrations() {
             }
             catch (_e) { }
         }
+        await client.query(`
+      CREATE TABLE IF NOT EXISTS expediente_import_batches (
+        id               UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id          VARCHAR(150) NOT NULL DEFAULT 'SYSTEM',
+        user_name        VARCHAR(200) NOT NULL DEFAULT 'Sistema',
+        file_name        VARCHAR(255) NOT NULL,
+        status           VARCHAR(30)  NOT NULL DEFAULT 'uploaded'
+                         CHECK (status IN ('uploaded','configuring','reviewing','processing','completed','failed')),
+        total_count      INTEGER      NOT NULL DEFAULT 0,
+        completed_count  INTEGER      NOT NULL DEFAULT 0,
+        error_count      INTEGER      NOT NULL DEFAULT 0,
+        pending_count    INTEGER      NOT NULL DEFAULT 0,
+        notes            TEXT,
+        created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      );
+    `);
+        for (const idx of [
+            `CREATE INDEX IF NOT EXISTS idx_exp_import_batches_created_at ON expediente_import_batches (created_at DESC)`,
+            `CREATE INDEX IF NOT EXISTS idx_exp_import_batches_status ON expediente_import_batches (status)`,
+            `CREATE INDEX IF NOT EXISTS idx_exp_import_batches_user_id ON expediente_import_batches (user_id)`,
+        ]) {
+            try {
+                await client.query(idx);
+            }
+            catch (_e) { }
+        }
+        try {
+            await client.query(`
+        CREATE TRIGGER trg_expediente_import_batches_updated_at
+          BEFORE UPDATE ON expediente_import_batches
+          FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+      `);
+        }
+        catch (_e) { }
+        await client.query(`
+      CREATE TABLE IF NOT EXISTS expediente_import_items (
+        id                    UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        batch_id              UUID         NOT NULL REFERENCES expediente_import_batches(id) ON DELETE CASCADE,
+        row_number            INTEGER,
+        reference             VARCHAR(150),
+        status                VARCHAR(30)  NOT NULL DEFAULT 'uploaded'
+                              CHECK (status IN ('uploaded','processing','completed','failed')),
+        error_message         TEXT,
+        payload               JSONB,
+        created_expediente_id UUID         REFERENCES expedientes(id) ON DELETE SET NULL,
+        created_at            TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at            TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      );
+    `);
+        for (const idx of [
+            `CREATE INDEX IF NOT EXISTS idx_exp_import_items_batch_id ON expediente_import_items (batch_id)`,
+            `CREATE INDEX IF NOT EXISTS idx_exp_import_items_status ON expediente_import_items (status)`,
+            `CREATE INDEX IF NOT EXISTS idx_exp_import_items_created_expediente ON expediente_import_items (created_expediente_id)`,
+        ]) {
+            try {
+                await client.query(idx);
+            }
+            catch (_e) { }
+        }
+        try {
+            await client.query(`
+        CREATE TRIGGER trg_expediente_import_items_updated_at
+          BEFORE UPDATE ON expediente_import_items
+          FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+      `);
+        }
+        catch (_e) { }
         try {
             await client.query(`ALTER TABLE client_files DROP CONSTRAINT IF EXISTS client_files_client_id_fkey;`);
         }
@@ -482,16 +550,42 @@ async function runMigrations() {
         status         VARCHAR(50)  NOT NULL DEFAULT 'pendiente',
         expediente_id  UUID,
         cliente_id     UUID,
+        related_user_id VARCHAR(150),
+        related_user_name VARCHAR(200),
+        organization_context TEXT,
         location       VARCHAR(300),
         color          VARCHAR(20),
+        source         VARCHAR(40)  NOT NULL DEFAULT 'manual',
+        external_provider VARCHAR(40),
+        external_id    VARCHAR(255),
+        external_url   TEXT,
         created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
         updated_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW()
       );
     `);
+        for (const col of [
+            `ALTER TABLE agenda_events ADD COLUMN IF NOT EXISTS source VARCHAR(40) NOT NULL DEFAULT 'manual'`,
+            `ALTER TABLE agenda_events ADD COLUMN IF NOT EXISTS external_provider VARCHAR(40)`,
+            `ALTER TABLE agenda_events ADD COLUMN IF NOT EXISTS external_id VARCHAR(255)`,
+            `ALTER TABLE agenda_events ADD COLUMN IF NOT EXISTS external_url TEXT`,
+            `ALTER TABLE agenda_events ADD COLUMN IF NOT EXISTS related_user_id VARCHAR(150)`,
+            `ALTER TABLE agenda_events ADD COLUMN IF NOT EXISTS related_user_name VARCHAR(200)`,
+            `ALTER TABLE agenda_events ADD COLUMN IF NOT EXISTS organization_context TEXT`,
+        ]) {
+            try {
+                await client.query(col);
+            }
+            catch (_e) { }
+        }
         for (const idx of [
             `CREATE INDEX IF NOT EXISTS idx_agenda_events_start_at   ON agenda_events (start_at DESC)`,
             `CREATE INDEX IF NOT EXISTS idx_agenda_events_user_id    ON agenda_events (user_id)`,
+            `CREATE INDEX IF NOT EXISTS idx_agenda_events_related_user_id ON agenda_events (related_user_id)`,
             `CREATE INDEX IF NOT EXISTS idx_agenda_events_status     ON agenda_events (status)`,
+            `CREATE INDEX IF NOT EXISTS idx_agenda_events_external   ON agenda_events (external_provider, external_id)`,
+            `CREATE UNIQUE INDEX IF NOT EXISTS ux_agenda_events_google_unique
+         ON agenda_events (external_provider, external_id)
+         WHERE external_provider IS NOT NULL AND external_id IS NOT NULL`,
         ]) {
             try {
                 await client.query(idx);
@@ -644,6 +738,98 @@ async function runMigrations() {
       `);
         }
         catch (_e) { }
+        await client.query(`
+      CREATE TABLE IF NOT EXISTS email_accounts (
+        id            UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id       VARCHAR(150) NOT NULL,
+        label         VARCHAR(100) NOT NULL DEFAULT 'Mi cuenta',
+        email         VARCHAR(200) NOT NULL,
+        imap_host     VARCHAR(200) NOT NULL,
+        imap_port     INTEGER      NOT NULL DEFAULT 993,
+        imap_secure   BOOLEAN      NOT NULL DEFAULT true,
+        smtp_host     VARCHAR(200) NOT NULL,
+        smtp_port     INTEGER      NOT NULL DEFAULT 587,
+        smtp_secure   BOOLEAN      NOT NULL DEFAULT false,
+        username      VARCHAR(200) NOT NULL,
+        password_enc  TEXT         NOT NULL,
+        active        BOOLEAN      NOT NULL DEFAULT true,
+        last_sync_at  TIMESTAMPTZ,
+        created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      );
+    `);
+        for (const idx of [
+            `CREATE INDEX IF NOT EXISTS idx_email_accounts_user_id ON email_accounts (user_id)`,
+        ]) {
+            try {
+                await client.query(idx);
+            }
+            catch (_e) { }
+        }
+        await client.query(`
+      CREATE TABLE IF NOT EXISTS emails (
+        id              UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        account_id      UUID         NOT NULL REFERENCES email_accounts(id) ON DELETE CASCADE,
+        user_id         VARCHAR(150) NOT NULL,
+        uid             BIGINT,
+        message_id      VARCHAR(500),
+        folder          VARCHAR(100) NOT NULL DEFAULT 'INBOX',
+        from_email      VARCHAR(300),
+        from_name       VARCHAR(300),
+        to_emails       TEXT,
+        cc_emails       TEXT,
+        subject         VARCHAR(1000),
+        snippet         TEXT,
+        body_text       TEXT,
+        body_html       TEXT,
+        is_read         BOOLEAN      NOT NULL DEFAULT false,
+        is_starred      BOOLEAN      NOT NULL DEFAULT false,
+        is_draft        BOOLEAN      NOT NULL DEFAULT false,
+        has_attachments BOOLEAN      NOT NULL DEFAULT false,
+        size_bytes      INTEGER      DEFAULT 0,
+        sent_at         TIMESTAMPTZ,
+        expediente_id   UUID,
+        cliente_id      UUID,
+        created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        UNIQUE(account_id, uid, folder)
+      );
+    `);
+        for (const idx of [
+            `CREATE INDEX IF NOT EXISTS idx_emails_account_folder  ON emails (account_id, folder, sent_at DESC)`,
+            `CREATE INDEX IF NOT EXISTS idx_emails_user_id         ON emails (user_id)`,
+            `CREATE INDEX IF NOT EXISTS idx_emails_is_read         ON emails (is_read)`,
+            `CREATE INDEX IF NOT EXISTS idx_emails_is_starred      ON emails (is_starred)`,
+            `CREATE INDEX IF NOT EXISTS idx_emails_from_email      ON emails (from_email)`,
+        ]) {
+            try {
+                await client.query(idx);
+            }
+            catch (_e) { }
+        }
+        await client.query(`
+      CREATE TABLE IF NOT EXISTS email_contacts (
+        id            UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id       VARCHAR(150) NOT NULL,
+        email         VARCHAR(300) NOT NULL,
+        name          VARCHAR(300),
+        source        VARCHAR(50)  NOT NULL DEFAULT 'manual',
+        usage_count   INTEGER      NOT NULL DEFAULT 1,
+        last_used_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        UNIQUE(user_id, email)
+      );
+    `);
+        for (const idx of [
+            `CREATE INDEX IF NOT EXISTS idx_email_contacts_user_id      ON email_contacts (user_id)`,
+            `CREATE INDEX IF NOT EXISTS idx_email_contacts_last_used_at ON email_contacts (user_id, last_used_at DESC)`,
+            `CREATE INDEX IF NOT EXISTS idx_email_contacts_email        ON email_contacts (email)`,
+        ]) {
+            try {
+                await client.query(idx);
+            }
+            catch (_e) { }
+        }
         try {
             await client.query(`ANALYZE entities;`);
             await client.query(`ANALYZE notes;`);

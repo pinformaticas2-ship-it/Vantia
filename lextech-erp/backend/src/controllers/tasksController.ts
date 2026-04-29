@@ -2,6 +2,69 @@ import { Request, Response } from 'express';
 import pool from '../config/database';
 import { logActivityForReq, resolveUserName } from './activityController';
 
+const explainTaskError = (error: any) => {
+  const raw = String(error?.message || "");
+
+  if (
+    raw.includes("invalid input syntax for type timestamp with time zone") ||
+    raw.includes("invalid input syntax for type timestamp") ||
+    raw.includes("invalid input syntax for type date")
+  ) {
+    return "No se pudo guardar la tarea porque una fecha u hora tiene un formato inválido. Revisa el plazo, el recordatorio o la fecha vinculada del calendario.";
+  }
+
+  if (raw.includes("violates foreign key constraint")) {
+    return "No se pudo guardar la tarea porque falta o no existe el cliente o expediente vinculado.";
+  }
+
+  if (raw.includes("null value in column")) {
+    return "No se pudo guardar la tarea porque falta un dato obligatorio.";
+  }
+
+  return "No se pudo guardar la tarea por un error interno. Revisa los datos y vuelve a intentarlo.";
+};
+
+const taskDateToAgendaStart = (value?: string | null) => {
+  if (!value) return null;
+  return `${String(value).slice(0, 10)}T08:00:00.000Z`;
+};
+
+const taskDateToAgendaEnd = (value?: string | null) => {
+  if (!value) return null;
+  return `${String(value).slice(0, 10)}T18:00:00.000Z`;
+};
+
+const mapTaskEstadoToAgendaStatus = (estado?: string | null) =>
+  estado === 'completada' ? 'completado' : 'pendiente';
+
+const mapTaskTipoToAgendaType = (tipo?: string | null) => {
+  if (!tipo) return 'plazo';
+  if (['reunion'].includes(tipo)) return 'reunion';
+  if (['vista_juicio'].includes(tipo)) return 'vista';
+  return 'plazo';
+};
+
+const buildTaskAgendaPayload = (task: any) => {
+  const eventDate = task.fecha_aviso || task.plazo;
+  if (!eventDate) return null;
+
+  const descriptionParts = [task.descripcion, task.notas].filter(Boolean);
+  return {
+    title: task.titulo,
+    description: descriptionParts.join('\n\n') || null,
+    start_at: taskDateToAgendaStart(eventDate),
+    end_at: taskDateToAgendaEnd(eventDate),
+    all_day: true,
+    type: mapTaskTipoToAgendaType(task.tipo),
+    status: mapTaskEstadoToAgendaStatus(task.estado),
+    expediente_id: task.expediente_id || null,
+    cliente_id: task.client_id || null,
+    organization_context: task.expediente || null,
+    source: 'task-sync',
+    task_id: task.id,
+  };
+};
+
 // ── GET /api/tasks/client/:clientId ────────────────────────────
 export const getTasks = async (req: any, res: Response) => {
   const { clientId } = req.params;
@@ -15,7 +78,7 @@ export const getTasks = async (req: any, res: Response) => {
     );
     res.json({ data: result.rows });
   } catch (e: any) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: explainTaskError(e) });
   }
 };
 
@@ -38,7 +101,7 @@ export const getMyTasks = async (req: any, res: Response) => {
     );
     res.json({ data: result.rows });
   } catch (e: any) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: explainTaskError(e) });
   }
 };
 
@@ -86,10 +149,46 @@ export const createTask = async (req: any, res: Response) => {
         userId,
       ]
     );
+    const createdTask = result.rows[0];
+    const agendaPayload = buildTaskAgendaPayload(createdTask);
+
+    if (agendaPayload) {
+      const agendaRes = await pool.query(
+        `INSERT INTO agenda_events
+           (user_id, user_name, title, description, start_at, end_at, all_day,
+            type, status, expediente_id, cliente_id, organization_context, source, task_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+         RETURNING *`,
+        [
+          userId,
+          userName,
+          agendaPayload.title,
+          agendaPayload.description,
+          agendaPayload.start_at,
+          agendaPayload.end_at,
+          agendaPayload.all_day,
+          agendaPayload.type,
+          agendaPayload.status,
+          agendaPayload.expediente_id,
+          agendaPayload.cliente_id,
+          agendaPayload.organization_context,
+          agendaPayload.source,
+          agendaPayload.task_id,
+        ]
+      );
+
+      const linkedAgenda = agendaRes.rows[0];
+      await pool.query(
+        `UPDATE client_tasks SET agenda_event_id = $1, updated_at = NOW() WHERE id = $2`,
+        [linkedAgenda.id, createdTask.id]
+      );
+      createdTask.agenda_event_id = linkedAgenda.id;
+    }
+
     logActivityForReq(req, `Tarea creada: ${titulo.trim()}`, 'CLIENT', clientId);
-    res.status(201).json({ data: result.rows[0] });
+    res.status(201).json({ data: createdTask });
   } catch (e: any) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: explainTaskError(e) });
   }
 };
 
@@ -99,6 +198,12 @@ export const updateTask = async (req: any, res: Response) => {
   const { titulo, descripcion, plazo, fecha_aviso, estado, prioridad, expediente, tipo, juzgado, num_proc, importe, notas, etapa } = req.body;
 
   try {
+    const existingQ = await pool.query(`SELECT * FROM client_tasks WHERE id = $1`, [id]);
+    if (existingQ.rows.length === 0) return res.status(404).json({ error: 'Tarea no encontrada' });
+    const existingTask = existingQ.rows[0];
+    const userId = req.auth?.userId || existingTask.user_id || 'SYSTEM';
+    const userName = existingTask.created_by || await resolveUserName(userId);
+
     const result = await pool.query(
       `UPDATE client_tasks
        SET titulo=$1, descripcion=$2, plazo=$3, fecha_aviso=$4, estado=$5, prioridad=$6,
@@ -123,10 +228,72 @@ export const updateTask = async (req: any, res: Response) => {
         id,
       ]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Tarea no encontrada' });
-    res.json({ data: result.rows[0] });
+    const updatedTask = result.rows[0];
+    const agendaPayload = buildTaskAgendaPayload(updatedTask);
+
+    if (agendaPayload && updatedTask.agenda_event_id) {
+      await pool.query(
+        `UPDATE agenda_events
+         SET title=$1, description=$2, start_at=$3, end_at=$4, all_day=$5,
+             type=$6, status=$7, expediente_id=$8, cliente_id=$9,
+             organization_context=$10, task_id=$11, updated_at=NOW()
+         WHERE id=$12`,
+        [
+          agendaPayload.title,
+          agendaPayload.description,
+          agendaPayload.start_at,
+          agendaPayload.end_at,
+          agendaPayload.all_day,
+          agendaPayload.type,
+          agendaPayload.status,
+          agendaPayload.expediente_id,
+          agendaPayload.cliente_id,
+          agendaPayload.organization_context,
+          agendaPayload.task_id,
+          updatedTask.agenda_event_id,
+        ]
+      );
+    } else if (agendaPayload && !updatedTask.agenda_event_id) {
+      const agendaRes = await pool.query(
+        `INSERT INTO agenda_events
+           (user_id, user_name, title, description, start_at, end_at, all_day,
+            type, status, expediente_id, cliente_id, organization_context, source, task_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+         RETURNING *`,
+        [
+          userId,
+          userName,
+          agendaPayload.title,
+          agendaPayload.description,
+          agendaPayload.start_at,
+          agendaPayload.end_at,
+          agendaPayload.all_day,
+          agendaPayload.type,
+          agendaPayload.status,
+          agendaPayload.expediente_id,
+          agendaPayload.cliente_id,
+          agendaPayload.organization_context,
+          agendaPayload.source,
+          agendaPayload.task_id,
+        ]
+      );
+      updatedTask.agenda_event_id = agendaRes.rows[0].id;
+      await pool.query(
+        `UPDATE client_tasks SET agenda_event_id = $1, updated_at = NOW() WHERE id = $2`,
+        [updatedTask.agenda_event_id, updatedTask.id]
+      );
+    } else if (!agendaPayload && updatedTask.agenda_event_id) {
+      await pool.query(`DELETE FROM agenda_events WHERE id = $1`, [updatedTask.agenda_event_id]);
+      await pool.query(
+        `UPDATE client_tasks SET agenda_event_id = NULL, updated_at = NOW() WHERE id = $1`,
+        [updatedTask.id]
+      );
+      updatedTask.agenda_event_id = null;
+    }
+
+    res.json({ data: updatedTask });
   } catch (e: any) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: explainTaskError(e) });
   }
 };
 
@@ -143,9 +310,16 @@ export const patchTaskEstado = async (req: any, res: Response) => {
       [estado, id]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Tarea no encontrada' });
-    res.json({ data: result.rows[0] });
+    const updatedTask = result.rows[0];
+    if (updatedTask.agenda_event_id) {
+      await pool.query(
+        `UPDATE agenda_events SET status = $1, updated_at = NOW() WHERE id = $2`,
+        [mapTaskEstadoToAgendaStatus(estado), updatedTask.agenda_event_id]
+      );
+    }
+    res.json({ data: updatedTask });
   } catch (e: any) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: explainTaskError(e) });
   }
 };
 
@@ -153,8 +327,13 @@ export const patchTaskEstado = async (req: any, res: Response) => {
 export const deleteTask = async (req: any, res: Response) => {
   const { id } = req.params;
   try {
+    const beforeDelete = await pool.query(`SELECT agenda_event_id FROM client_tasks WHERE id = $1`, [id]);
     const { rows } = await pool.query(`DELETE FROM client_tasks WHERE id=$1 RETURNING titulo, client_id`, [id]);
     if (rows.length === 0) return res.status(404).json({ error: 'Tarea no encontrada' });
+    const agendaEventId = beforeDelete.rows[0]?.agenda_event_id;
+    if (agendaEventId) {
+      await pool.query(`DELETE FROM agenda_events WHERE id = $1`, [agendaEventId]);
+    }
     logActivityForReq(req, `Tarea eliminada: ${rows[0].titulo}`, 'CLIENT', rows[0].client_id);
     res.json({ ok: true });
   } catch (e: any) {

@@ -4,6 +4,7 @@ import {
   Users, ClipboardList, MoreHorizontal,
   Upload, Trash2, Eye, Download, ExternalLink, Maximize2,
 } from "lucide-react";
+import AppSelect from "./AppSelect";
 import { useAuth } from "@clerk/clerk-react";
 import { safeJson } from "../lib/api";
 import AdjuntosModal from "./AdjuntosModal";
@@ -49,11 +50,64 @@ export const EXP_EMPTY = {
   contrario: "", procurador: "", juzgado: "", tipo_proc: "",
   num_autos: "", nig: "", estado: "abierto", observaciones: "",
   fecha_inicio: new Date().toISOString().slice(0, 10), fecha_cierre: "",
+  fecha_notificacion: "",
   importe: "",
   tipos_asunto: "", cuantia_principal: "", intereses: "", costas: "",
   cuantia_total: "", indeterminado: false as boolean | string, etapa: "",
   persona_contacto: "", contacto: "", centro: "", color: "ninguno",
+  // Campos multi-parte (usados en la vista de verificación de importación)
+  demandantes: [] as string[],
+  demandados:  [] as string[],
+  representacion_contraria: [] as Array<{ nombre: string; rol: string; colegiado: string }>,
 };
+
+const TIPOS_ASUNTO_GROUPS: Array<{ label: string; items: string[] }> = [
+  {
+    label: "General",
+    items: [
+      "CIVIL",
+      "PENAL",
+      "SOCIAL",
+      "CONTENCIOSO - ADMINISTRATIVO",
+      "EXTRAJUDICIAL",
+      "MERCANTIL",
+      "CONCURSAL",
+    ],
+  },
+  {
+    label: "Familia y persona",
+    items: [
+      "FAMILIA",
+      "HERENCIA",
+      "MENORES",
+      "VIOLENCIA DE GENERO",
+      "MEDIDAS DE APOYO A PERSONAS CON DISCAPACIDAD",
+    ],
+  },
+  {
+    label: "Administrativo y plazos",
+    items: [
+      "VIA ADMINISTRATIVA",
+      "CONTESTACION A LA DEMANDA",
+      "PLAZO_APELACION",
+      "FECHA_FIN_PLAZO_CONTESTAR_DEMANDA",
+    ],
+  },
+  {
+    label: "Bancario y consumo",
+    items: [
+      "DERECHO BANCARIO",
+      "USURA Y TRANSPARENCIA - MICROCREDITOS",
+    ],
+  },
+  {
+    label: "Demandas especiales",
+    items: [
+      "DEMANDA ODH",
+      "DEMANDA UT",
+    ],
+  },
+];
 
 // ── Estilos de formulario ─────────────────────────────────────
 export const lbl   = "text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5 block";
@@ -107,7 +161,7 @@ function fileEmoji(mime: string, name: string) {
 }
 
 // ── AdjuntosPanel — lista inline de adjuntos para el panel inferior ──
-function AdjuntosPanel({ entityId, entityName, onOpenFull }: {
+export function AdjuntosPanel({ entityId, entityName, onOpenFull }: {
   entityId: string;
   entityName: string;
   onOpenFull: () => void;
@@ -393,11 +447,11 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
             </div>
             <div>
               <label className={lbl}>Estado</label>
-              <select value={form.estado} onChange={e => set("estado", e.target.value)} className={inp}>
+              <AppSelect value={form.estado} onChange={e => set("estado", e.target.value)} searchable searchPlaceholder="Buscar estado...">
                 {Object.entries(ESTADOS).map(([k, v]) => (
                   <option key={k} value={k}>{v.label}</option>
                 ))}
-              </select>
+              </AppSelect>
             </div>
             <div className="col-span-2">
               <label className={lbl}>Descripción Expediente *</label>
@@ -406,22 +460,46 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
             </div>
             <div className="col-span-2">
               <label className={lbl}>Tipo de Expediente</label>
-              <select value={form.tipo} onChange={e => set("tipo", e.target.value)} className={inp}>
+              <AppSelect value={form.tipo} onChange={e => set("tipo", e.target.value)} searchable searchPlaceholder="Buscar tipo de expediente...">
                 {Object.entries(TIPOS).map(([k, v]) => (
                   <option key={k} value={k}>{v.label}</option>
                 ))}
-              </select>
+              </AppSelect>
             </div>
             <div className="col-span-2">
               <label className={lbl}>Tipos de Asunto</label>
-              <input value={form.tipos_asunto} onChange={e => set("tipos_asunto", e.target.value)}
-                placeholder="Civil, Penal…" className={inp} />
+              <AppSelect value={form.tipos_asunto} onChange={e => set("tipos_asunto", e.target.value)} searchable searchPlaceholder="Buscar tipo de asunto...">
+                <option value="">— Seleccionar —</option>
+                <option value="CIVIL">CIVIL</option>
+                <option value="PENAL">PENAL</option>
+                <option value="SOCIAL">SOCIAL</option>
+                <option value="CONTENCIOSO - ADMINISTRATIVO">CONTENCIOSO - ADMINISTRATIVO</option>
+                <option value="EXTRAJUDICIAL">EXTRAJUDICIAL</option>
+                <option value="DERECHO BANCARIO">DERECHO BANCARIO</option>
+                <option value="FAMILIA">FAMILIA</option>
+                <option value="VÍA ADMINISTRATIVA">VÍA ADMINISTRATIVA</option>
+                <option value="HERENCIA">HERENCIA</option>
+                <option value="MENORES">MENORES</option>
+                <option value="VIOLENCIA DE GÉNERO">VIOLENCIA DE GÉNERO</option>
+                <option value="CONCURSAL">CONCURSAL</option>
+                <option value="MERCANTIL">MERCANTIL</option>
+                <option value="MEDIDAS DE APOYO A PERSONAS CON DISCAPACIDAD">MEDIDAS DE APOYO A PERSONAS CON DISCAPACIDAD</option>
+                <option value="USURA Y TRANSPARENCIA - MICROCREDITOS">USURA Y TRANSPARENCIA - MICROCREDITOS</option>
+                <option value="FECHA_FIN_PLAZO_CONTESTAR_DEMANDA">FECHA_FIN_PLAZO_CONTESTAR_DEMANDA</option>
+                <option value="CONTESTACIÓN A LA DEMANDA">CONTESTACIÓN A LA DEMANDA</option>
+                <option value="PLAZO_APELACION">PLAZO_APELACION</option>
+                <option value="DEMANDA ODH">DEMANDA ODH</option>
+                <option value="DEMANDA UT">DEMANDA UT</option>
+              </AppSelect>
+              <p className="mt-1 text-[11px] text-slate-400">
+                Puedes escribir para filtrar y encontrar el asunto mas rapido.
+              </p>
             </div>
             <div>
               <label className={lbl}>Etapa</label>
-              <select value={form.etapa} onChange={e => set("etapa", e.target.value)} className={inp}>
+              <AppSelect value={form.etapa} onChange={e => set("etapa", e.target.value)} searchable searchPlaceholder="Buscar etapa...">
                 {ETAPAS.map(et => <option key={et} value={et}>{et || "— Seleccionar —"}</option>)}
-              </select>
+              </AppSelect>
             </div>
             <div>
               <label className={lbl}>Fecha Cierre</label>
@@ -518,9 +596,9 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
             </div>
             <div>
               <label className={lbl}>Color</label>
-              <select value={form.color} onChange={e => set("color", e.target.value)} className={inp}>
+              <AppSelect value={form.color} onChange={e => set("color", e.target.value)}>
                 {COLORES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-              </select>
+              </AppSelect>
             </div>
           </SecCard>
 
@@ -543,17 +621,19 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
               <div className="p-3 space-y-2.5">
                 <div>
                   <label className={lbl}>Nombre <span className="text-red-500">*</span></label>
-                  <select value={form.cliente_id}
+                  <AppSelect
+                    value={form.cliente_id}
                     onChange={e => handleClienteChange(e.target.value)}
                     required
-                    className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm text-slate-700 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 bg-white">
+                    variant="emerald"
+                  >
                     <option value="" disabled>— Selecciona un cliente —</option>
                     {clientes.map((c: any) => (
                       <option key={c.id} value={c.id}>
                         {`${c.first_name || ""} ${c.last_name || ""}`.trim() || c.commercial_name || c.nif_cif}
                       </option>
                     ))}
-                  </select>
+                  </AppSelect>
                 </div>
               </div>
             </div>
@@ -640,15 +720,6 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
         </div>
       )}
     </div>
-
-    {/* ── Modal Adjuntos ── */}
-    {showAdj && editId && (
-      <AdjuntosModal
-        entityId={editId}
-        entityName={form.descripcion || `Expediente ${form.anio}`}
-        onClose={() => setShowAdj(false)}
-      />
-    )}
     </>
   );
 }

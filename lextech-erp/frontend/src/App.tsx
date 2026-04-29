@@ -2,6 +2,7 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { SignedIn, SignedOut } from "@clerk/clerk-react";
 import { ChatUnreadProvider } from './contexts/ChatUnreadContext';
+import { EmailUnreadProvider } from './contexts/EmailUnreadContext';
 
 // Layouts
 import DashboardLayout from './layouts/DashboardLayout';
@@ -19,12 +20,17 @@ import Agenda from './pages/Agenda';
 import Tareas from './pages/Tareas';
 import Chat   from './pages/Chat';
 import Email  from './pages/Email';
+import Documental from './pages/Documental';
+import WhatsApp from './pages/WhatsApp';
+import AltaConEnlace from './pages/AltaConEnlace';
+import FormularioCliente from './pages/FormularioCliente';
 
 export default function App() {
   return (
     <>
       <SignedIn>
         <ChatUnreadProvider>
+        <EmailUnreadProvider>
         <Routes>
           {/* Redirigir raíz al dashboard */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -33,6 +39,7 @@ export default function App() {
           <Route path="/dashboard" element={<DashboardLayout />}>
             <Route index element={<DashboardHome />} />
             <Route path="clientes" element={<ClientList />} />
+            <Route path="clientes/invitar" element={<AltaConEnlace />} />
             <Route path="clientes/new" element={<ClientForm />} />
             <Route path="clientes/:id/edit" element={<ClientForm />} />
             <Route path="clientes/:id" element={<ClientDetail />} />
@@ -42,18 +49,30 @@ export default function App() {
             <Route path="agenda" element={<Agenda />} />
             <Route path="tareas" element={<Tareas />} />
             <Route path="chat"   element={<Chat />} />
+            <Route path="whatsapp" element={<WhatsApp />} />
             <Route path="correo" element={<Email />} />
+            <Route path="documental" element={<Documental />} />
+            <Route path="facturacion" element={<ModuloEnCarga nombre="Contabilidad / Facturación" />} />
+            <Route path="plaud-ia" element={<ModuloEnCarga nombre="Plaud IA" />} />
+            <Route path="chat-ia" element={<ModuloEnCarga nombre="Chat IA" />} />
             <Route path="config" element={<ModuloEnCarga nombre="Configuración" />} />
           </Route>
+
+          {/* Formulario público de alta (accesible también si el usuario está logueado) */}
+          <Route path="/formulario-cliente/:token" element={<FormularioCliente />} />
 
           {/* Capturar rutas desconocidas */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
+        </EmailUnreadProvider>
         </ChatUnreadProvider>
       </SignedIn>
 
       <SignedOut>
-        <PublicLanding />
+        <Routes>
+          <Route path="/formulario-cliente/:token" element={<FormularioCliente />} />
+          <Route path="*" element={<PublicLanding />} />
+        </Routes>
       </SignedOut>
     </>
   );
@@ -64,12 +83,10 @@ function ModuloEnCarga({ nombre }: { nombre: string }) {
   return (
     <div className="h-[60vh] flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-200 rounded-3xl">
       <div className="h-16 w-16 bg-slate-100 rounded-2xl flex items-center justify-center mb-4">
-        <svg className="w-8 h-8 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-        </svg>
+        <span className="text-3xl">🚧</span>
       </div>
-      <p className="text-lg font-bold text-slate-500">{nombre}</p>
-      <p className="text-sm text-slate-400 mt-1">Módulo en desarrollo</p>
+      <p className="text-lg font-semibold text-slate-500">{nombre}</p>
+      <p className="text-sm text-slate-400 mt-1">Módulo en construcción</p>
     </div>
   );
 }

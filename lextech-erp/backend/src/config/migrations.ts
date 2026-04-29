@@ -23,6 +23,7 @@ export async function runMigrations(): Promise<void> {
 
     // Extensión UUID
     await client.query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp";`);
+    await client.query(`CREATE EXTENSION IF NOT EXISTS unaccent;`);
 
     // ── Crear tabla principal si no existe ─────────────────────────
     await client.query(`
@@ -260,6 +261,47 @@ export async function runMigrations(): Promise<void> {
           FOR EACH ROW EXECUTE FUNCTION update_updated_at();
       `);
     } catch (_e: any) {}
+    try {
+      await client.query(`
+        ALTER TABLE notes
+        ADD COLUMN IF NOT EXISTS expediente_id UUID REFERENCES expedientes(id) ON DELETE CASCADE
+      `);
+    } catch (_e: any) {}
+    try {
+      await client.query(`ALTER TABLE notes ALTER COLUMN client_id DROP NOT NULL`);
+    } catch (_e: any) {}
+    try {
+      await client.query(`ALTER TABLE notes DROP CONSTRAINT IF EXISTS chk_notes_owner`);
+    } catch (_e: any) {}
+    try {
+      await client.query(`
+        ALTER TABLE notes
+        ADD CONSTRAINT chk_notes_owner
+        CHECK (client_id IS NOT NULL OR expediente_id IS NOT NULL)
+      `);
+    } catch (_e: any) {}
+    try {
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_notes_expediente_id ON notes (expediente_id)`);
+    } catch (_e: any) {}
+
+    try {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS expediente_relations (
+          expediente_id UUID NOT NULL REFERENCES expedientes(id) ON DELETE CASCADE,
+          related_expediente_id UUID NOT NULL REFERENCES expedientes(id) ON DELETE CASCADE,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          created_by VARCHAR(200),
+          CONSTRAINT expediente_relations_not_same CHECK (expediente_id <> related_expediente_id),
+          CONSTRAINT expediente_relations_unique UNIQUE (expediente_id, related_expediente_id)
+        )
+      `);
+    } catch (_e: any) {}
+    try {
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_expediente_relations_exp ON expediente_relations (expediente_id)`);
+    } catch (_e: any) {}
+    try {
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_expediente_relations_related ON expediente_relations (related_expediente_id)`);
+    } catch (_e: any) {}
 
     // ── OPTIMIZACIONES DE BASE DE DATOS ─────────────────────────
 
@@ -404,6 +446,9 @@ export async function runMigrations(): Promise<void> {
       ['centro',             `VARCHAR(150)`],
       ['color',              `VARCHAR(50) DEFAULT 'ninguno'`],
       ['ref_expediente',     `VARCHAR(100)`],
+      ['demandantes',        `TEXT`],
+      ['demandados',         `TEXT`],
+      ['fecha_notificacion', `DATE`],
     ];
     for (const [col, def] of expedientesCols) {
       try {
@@ -518,9 +563,11 @@ export async function runMigrations(): Promise<void> {
       `ALTER TABLE client_tasks ADD COLUMN IF NOT EXISTS importe     NUMERIC(12,2)`,
       `ALTER TABLE client_tasks ADD COLUMN IF NOT EXISTS notas       TEXT`,
       `ALTER TABLE client_tasks ADD COLUMN IF NOT EXISTS etapa       VARCHAR(200)`,
+      `ALTER TABLE client_tasks ADD COLUMN IF NOT EXISTS agenda_event_id UUID`,
     ]) {
       try { await client.query(col); } catch (_e: any) {}
     }
+    try { await client.query(`CREATE INDEX IF NOT EXISTS idx_client_tasks_agenda_event_id ON client_tasks (agenda_event_id)`); } catch (_e: any) {}
 
     // ── Tabla task_etapas (etapas configurables por el despacho) ─────────────
     await client.query(`
@@ -566,16 +613,41 @@ export async function runMigrations(): Promise<void> {
         status         VARCHAR(50)  NOT NULL DEFAULT 'pendiente',
         expediente_id  UUID,
         cliente_id     UUID,
+        related_user_id VARCHAR(150),
+        related_user_name VARCHAR(200),
+        organization_context TEXT,
         location       VARCHAR(300),
         color          VARCHAR(20),
+        source         VARCHAR(40)  NOT NULL DEFAULT 'manual',
+        external_provider VARCHAR(40),
+        external_id    VARCHAR(255),
+        external_url   TEXT,
         created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
         updated_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW()
       );
     `);
+    for (const col of [
+      `ALTER TABLE agenda_events ADD COLUMN IF NOT EXISTS source VARCHAR(40) NOT NULL DEFAULT 'manual'`,
+      `ALTER TABLE agenda_events ADD COLUMN IF NOT EXISTS external_provider VARCHAR(40)`,
+      `ALTER TABLE agenda_events ADD COLUMN IF NOT EXISTS external_id VARCHAR(255)`,
+      `ALTER TABLE agenda_events ADD COLUMN IF NOT EXISTS external_url TEXT`,
+      `ALTER TABLE agenda_events ADD COLUMN IF NOT EXISTS related_user_id VARCHAR(150)`,
+      `ALTER TABLE agenda_events ADD COLUMN IF NOT EXISTS related_user_name VARCHAR(200)`,
+      `ALTER TABLE agenda_events ADD COLUMN IF NOT EXISTS organization_context TEXT`,
+      `ALTER TABLE agenda_events ADD COLUMN IF NOT EXISTS task_id UUID`,
+    ]) {
+      try { await client.query(col); } catch (_e: any) {}
+    }
     for (const idx of [
       `CREATE INDEX IF NOT EXISTS idx_agenda_events_start_at   ON agenda_events (start_at DESC)`,
       `CREATE INDEX IF NOT EXISTS idx_agenda_events_user_id    ON agenda_events (user_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_agenda_events_related_user_id ON agenda_events (related_user_id)`,
       `CREATE INDEX IF NOT EXISTS idx_agenda_events_status     ON agenda_events (status)`,
+      `CREATE INDEX IF NOT EXISTS idx_agenda_events_task_id    ON agenda_events (task_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_agenda_events_external   ON agenda_events (external_provider, external_id)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS ux_agenda_events_google_unique
+         ON agenda_events (external_provider, external_id)
+         WHERE external_provider IS NOT NULL AND external_id IS NOT NULL`,
     ]) {
       try { await client.query(idx); } catch (_e: any) {}
     }
@@ -751,6 +823,11 @@ export async function runMigrations(): Promise<void> {
         updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
       );
     `);
+    // Añadir columna protocol si no existe (IMAP / POP3)
+    try {
+      await client.query(`ALTER TABLE email_accounts
+        ADD COLUMN IF NOT EXISTS protocol VARCHAR(10) NOT NULL DEFAULT 'imap'`);
+    } catch (_e: any) {}
     for (const idx of [
       `CREATE INDEX IF NOT EXISTS idx_email_accounts_user_id ON email_accounts (user_id)`,
     ]) { try { await client.query(idx); } catch (_e: any) {} }
@@ -792,6 +869,152 @@ export async function runMigrations(): Promise<void> {
       `CREATE INDEX IF NOT EXISTS idx_emails_from_email      ON emails (from_email)`,
     ]) { try { await client.query(idx); } catch (_e: any) {} }
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS email_contacts (
+        id            UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id       VARCHAR(150) NOT NULL,
+        email         VARCHAR(300) NOT NULL,
+        name          VARCHAR(300),
+        source        VARCHAR(50)  NOT NULL DEFAULT 'manual',
+        usage_count   INTEGER      NOT NULL DEFAULT 1,
+        last_used_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        UNIQUE(user_id, email)
+      );
+    `);
+    for (const idx of [
+      `CREATE INDEX IF NOT EXISTS idx_email_contacts_user_id      ON email_contacts (user_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_email_contacts_last_used_at ON email_contacts (user_id, last_used_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_email_contacts_email        ON email_contacts (email)`,
+    ]) { try { await client.query(idx); } catch (_e: any) {} }
+
+    // ── Módulo de WhatsApp Business ───────────────────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS whatsapp_messages (
+        id                UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        wa_message_id     VARCHAR(255) UNIQUE,
+        client_id         UUID         REFERENCES entities(id) ON DELETE SET NULL,
+        direction         VARCHAR(20)  NOT NULL DEFAULT 'outbound',
+        message_type      VARCHAR(40)  NOT NULL DEFAULT 'text',
+        from_phone        VARCHAR(30),
+        to_phone          VARCHAR(30),
+        contact_name      VARCHAR(255),
+        body              TEXT,
+        status            VARCHAR(40)  NOT NULL DEFAULT 'queued',
+        sent_by_user_id   VARCHAR(150),
+        sent_by_user_name VARCHAR(200),
+        raw_payload       JSONB,
+        created_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      );
+    `);
+    for (const col of [
+      `ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS wa_message_id VARCHAR(255)`,
+      `ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS client_id UUID`,
+      `ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS direction VARCHAR(20) NOT NULL DEFAULT 'outbound'`,
+      `ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS message_type VARCHAR(40) NOT NULL DEFAULT 'text'`,
+      `ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS from_phone VARCHAR(30)`,
+      `ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS to_phone VARCHAR(30)`,
+      `ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS contact_name VARCHAR(255)`,
+      `ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS body TEXT`,
+      `ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS status VARCHAR(40) NOT NULL DEFAULT 'queued'`,
+      `ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS sent_by_user_id VARCHAR(150)`,
+      `ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS sent_by_user_name VARCHAR(200)`,
+      `ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS raw_payload JSONB`,
+      `ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`,
+    ]) {
+      try { await client.query(col); } catch (_e: any) {}
+    }
+    try {
+      await client.query(`
+        ALTER TABLE whatsapp_messages
+        ADD CONSTRAINT whatsapp_messages_client_id_fkey
+        FOREIGN KEY (client_id) REFERENCES entities(id) ON DELETE SET NULL
+      `);
+    } catch (_e: any) {}
+    for (const idx of [
+      `CREATE INDEX IF NOT EXISTS idx_whatsapp_messages_client_created ON whatsapp_messages (client_id, created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_whatsapp_messages_from_phone ON whatsapp_messages (from_phone)`,
+      `CREATE INDEX IF NOT EXISTS idx_whatsapp_messages_to_phone ON whatsapp_messages (to_phone)`,
+      `CREATE INDEX IF NOT EXISTS idx_whatsapp_messages_status ON whatsapp_messages (status)`,
+    ]) { try { await client.query(idx); } catch (_e: any) {} }
+    try {
+      await client.query(`
+        CREATE OR REPLACE TRIGGER trg_whatsapp_messages_updated_at
+          BEFORE UPDATE ON whatsapp_messages
+          FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+      `);
+    } catch (_e: any) {}
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS whatsapp_schedules (
+        id                UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        client_id         UUID         REFERENCES entities(id) ON DELETE SET NULL,
+        phone             VARCHAR(30)  NOT NULL,
+        body              TEXT         NOT NULL,
+        scheduled_for     TIMESTAMPTZ  NOT NULL,
+        status            VARCHAR(30)  NOT NULL DEFAULT 'pending',
+        created_by_user_id VARCHAR(150),
+        created_by_user_name VARCHAR(200),
+        created_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      );
+    `);
+    for (const idx of [
+      `CREATE INDEX IF NOT EXISTS idx_whatsapp_schedules_client ON whatsapp_schedules (client_id, scheduled_for DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_whatsapp_schedules_status ON whatsapp_schedules (status, scheduled_for ASC)`,
+    ]) { try { await client.query(idx); } catch (_e: any) {} }
+    try {
+      await client.query(`
+        CREATE OR REPLACE TRIGGER trg_whatsapp_schedules_updated_at
+          BEFORE UPDATE ON whatsapp_schedules
+          FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+      `);
+    } catch (_e: any) {}
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS whatsapp_settings (
+        id                   INTEGER      PRIMARY KEY DEFAULT 1,
+        access_token         TEXT,
+        phone_number_id      VARCHAR(255),
+        verify_token         VARCHAR(255),
+        graph_version        VARCHAR(20)  NOT NULL DEFAULT 'v23.0',
+        webhook_base_url     TEXT,
+        business_account_id  VARCHAR(255),
+        updated_by_user_id   VARCHAR(150),
+        updated_by_user_name VARCHAR(200),
+        created_at           TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at           TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        CONSTRAINT whatsapp_settings_singleton CHECK (id = 1)
+      );
+    `);
+    for (const col of [
+      `ALTER TABLE whatsapp_settings ADD COLUMN IF NOT EXISTS access_token TEXT`,
+      `ALTER TABLE whatsapp_settings ADD COLUMN IF NOT EXISTS phone_number_id VARCHAR(255)`,
+      `ALTER TABLE whatsapp_settings ADD COLUMN IF NOT EXISTS verify_token VARCHAR(255)`,
+      `ALTER TABLE whatsapp_settings ADD COLUMN IF NOT EXISTS graph_version VARCHAR(20) NOT NULL DEFAULT 'v23.0'`,
+      `ALTER TABLE whatsapp_settings ADD COLUMN IF NOT EXISTS webhook_base_url TEXT`,
+      `ALTER TABLE whatsapp_settings ADD COLUMN IF NOT EXISTS business_account_id VARCHAR(255)`,
+      `ALTER TABLE whatsapp_settings ADD COLUMN IF NOT EXISTS updated_by_user_id VARCHAR(150)`,
+      `ALTER TABLE whatsapp_settings ADD COLUMN IF NOT EXISTS updated_by_user_name VARCHAR(200)`,
+      `ALTER TABLE whatsapp_settings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`,
+    ]) { try { await client.query(col); } catch (_e: any) {} }
+    try {
+      await client.query(`
+        INSERT INTO whatsapp_settings (id)
+        VALUES (1)
+        ON CONFLICT (id) DO NOTHING
+      `);
+    } catch (_e: any) {}
+    try {
+      await client.query(`
+        CREATE OR REPLACE TRIGGER trg_whatsapp_settings_updated_at
+          BEFORE UPDATE ON whatsapp_settings
+          FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+      `);
+    } catch (_e: any) {}
+
     // VACUUM ANALYZE para mantener las estadísticas de consulta frescas
     try {
       await client.query(`ANALYZE entities;`);
@@ -812,7 +1035,7 @@ export async function runMigrations(): Promise<void> {
 
     console.log('✅ Migraciones completadas correctamente.');
   } catch (error: any) {
-    console.error('❌ Error durante las migraciones:', error?.message || String(error));
+       console.error('❌ Error durante las migraciones:', error?.message || String(error));
   } finally {
     if (client) client.release();
   }

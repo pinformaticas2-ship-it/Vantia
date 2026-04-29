@@ -1,8 +1,8 @@
 import React, {
-  useEffect, useState, useCallback, useMemo,
+  useEffect, useState, useCallback, useMemo, useRef,
 } from "react";
 import { useAuth } from "@clerk/clerk-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   CheckCircle2, Circle, AlertTriangle, Clock, Plus, X,
   Loader2, Search, Filter, Trash2, Edit3, Flag,
@@ -90,18 +90,23 @@ const emptyForm = (): TaskFormData => ({
 });
 
 function TaskModal({
-  task, clients, onClose, onSave, onDelete, saving, errorMsg, getToken,
+  task, clients, clientsLoading, clientsError, onClose, onSave, onDelete, saving, errorMsg, getToken, initialClientId = "", initialForm = null,
 }: {
   task: Task | null;
   clients: { id: string; name: string }[];
+  clientsLoading: boolean;
+  clientsError: string | null;
   onClose: () => void;
   onSave: (clientId: string, data: TaskFormData) => void;
   onDelete: (id: string) => void;
   saving: boolean;
   errorMsg: string | null;
   getToken: (opts?: { skipCache?: boolean }) => Promise<string | null>;
+  initialClientId?: string;
+  initialForm?: TaskFormData | null;
 }) {
-  const [form, setForm] = useState<TaskFormData>(task ? {
+  const buildFormFromProps = useCallback((): TaskFormData => (
+    task ? {
     titulo: task.titulo, descripcion: task.descripcion || "",
     plazo: task.plazo ? task.plazo.slice(0,10) : "",
     fecha_aviso: (task as any).fecha_aviso ? (task as any).fecha_aviso.slice(0,10) : "",
@@ -110,9 +115,15 @@ function TaskModal({
     importe: (task as any).importe != null ? String((task as any).importe) : "",
     notas: (task as any).notas || "",
     etapa: (task as any).etapa || "",
-  } : emptyForm());
-  const [clientId, setClientId] = useState(task?.client_id || "");
+  } : (initialForm || emptyForm())), [task, initialForm]);
+  const [form, setForm] = useState<TaskFormData>(buildFormFromProps);
+  const [clientId, setClientId] = useState(task?.client_id || initialClientId);
   const set = (k: keyof TaskFormData, v: string) => setForm(f => ({ ...f, [k]: v }));
+
+  useEffect(() => {
+    setForm(buildFormFromProps());
+    setClientId(task?.client_id || initialClientId);
+  }, [buildFormFromProps, task, initialClientId]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -141,12 +152,17 @@ function TaskModal({
               value={clientId}
               onChange={e => setClientId(e.target.value)}
               required
-              disabled={!!task}
+              disabled={!!task || clientsLoading}
               className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-red-400 bg-white disabled:opacity-60"
             >
               <option value="">— Selecciona un cliente —</option>
+              {clientsLoading && <option value="">— Cargando clientes… —</option>}
+              {clientsError && !clientsLoading && <option value="">— No se pudieron cargar los clientes —</option>}
               {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
+            {clientsError && !clientsLoading && (
+              <p className="mt-1 text-[11px] font-medium text-amber-600">{clientsError}</p>
+            )}
           </div>
 
           {/* Título */}
@@ -429,9 +445,12 @@ function TaskCard({
 // ── Página principal ──────────────────────────────────────────────────────────
 export default function Tareas() {
   const { getToken } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [tasks,   setTasks]   = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
+  const [clientsLoading, setClientsLoading] = useState(false);
+  const [clientsError, setClientsError] = useState<string | null>(null);
 
   // Filtros
   const [tab,         setTab]         = useState<"todas" | "plazos">("todas");
@@ -444,31 +463,90 @@ export default function Tareas() {
   // Modal
   const [showModal, setShowModal] = useState(false);
   const [editTask,  setEditTask]  = useState<Task | null>(null);
+  const [modalInitialClientId, setModalInitialClientId] = useState("");
+  const [modalInitialForm, setModalInitialForm] = useState<TaskFormData | null>(null);
   const [saving,    setSaving]    = useState(false);
   const [errorMsg,  setErrorMsg]  = useState<string | null>(null);
+  const prefillHandledRef = useRef("");
+
+  const fetchClients = useCallback(async () => {
+    setClientsLoading(true);
+    setClientsError(null);
+    try {
+      const token = await getToken({ skipCache: true });
+      const clientsRes = await fetch("/api/entities?limit=500", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const clientsData = await safeJson(clientsRes);
+      if (!clientsRes.ok) {
+        setClientsError(clientsData?.error || "No se pudieron cargar los clientes");
+        return;
+      }
+      const mapped = (clientsData.data || []).map((c: any) => ({
+        id: c.id,
+        name:
+          c.commercial_name ||
+          `${c.first_name || ""} ${c.last_name || ""}`.trim() ||
+          c.nif_cif ||
+          c.internal_number ||
+          c.id,
+      }));
+      setClients(mapped);
+      if (mapped.length === 0) {
+        setClientsError("No hay clientes disponibles para asignar a la tarea");
+      }
+    } catch (_e) {
+      setClientsError("Error de conexión al cargar clientes");
+    } finally {
+      setClientsLoading(false);
+    }
+  }, [getToken]);
 
   const fetchTasks = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
       const token = await getToken({ skipCache: true });
-      const [tasksRes, clientsRes] = await Promise.all([
-        fetch("/api/tasks/me", { headers: { Authorization: `Bearer ${token}` } }),
-        fetch("/api/entities?limit=500", { headers: { Authorization: `Bearer ${token}` } }),
-      ]);
-      const [tasksData, clientsData] = await Promise.all([safeJson(tasksRes), safeJson(clientsRes)]);
+      const tasksRes = await fetch("/api/tasks/me", { headers: { Authorization: `Bearer ${token}` } });
+      const tasksData = await safeJson(tasksRes);
       if (tasksRes.ok)   setTasks(tasksData.data || []);
-      if (clientsRes.ok) {
-        setClients((clientsData.data || []).map((c: any) => ({
-          id: c.id,
-          name: c.commercial_name || `${c.first_name || ""} ${c.last_name || ""}`.trim() || c.id,
-        })));
-      }
     } catch (_e) {}
     finally { if (!silent) setLoading(false); }
   }, [getToken]);
 
-  useEffect(() => { fetchTasks(); }, [fetchTasks]);
+  useEffect(() => {
+    fetchTasks();
+    fetchClients();
+  }, [fetchTasks, fetchClients]);
   useAutoRefresh(() => fetchTasks(true), { intervalMs: 30_000 });
+
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam === "plazos" || tabParam === "todas") {
+      setTab(tabParam);
+    }
+
+    if (searchParams.get("open") !== "new") return;
+
+    const signature = searchParams.toString();
+    if (prefillHandledRef.current === signature) return;
+    prefillHandledRef.current = signature;
+
+    setEditTask(null);
+    setErrorMsg(null);
+    setModalInitialClientId(searchParams.get("clientId") || "");
+    setModalInitialForm({
+      ...emptyForm(),
+      tipo: searchParams.get("tipo") || "otro",
+    });
+    setShowModal(true);
+    if (clients.length === 0) fetchClients();
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("open");
+    nextParams.delete("clientId");
+    nextParams.delete("tipo");
+    setSearchParams(nextParams, { replace: true });
+  }, [searchParams, setSearchParams, clients.length, fetchClients]);
 
   // Filtrado
   const filtered = useMemo(() => {
@@ -540,8 +618,21 @@ export default function Tareas() {
     finally { setSaving(false); }
   };
 
-  const openNew  = () => { setEditTask(null); setErrorMsg(null); setShowModal(true); };
-  const openEdit = (t: Task) => { setEditTask(t); setErrorMsg(null); setShowModal(true); };
+  const openNew  = () => {
+    setEditTask(null);
+    setErrorMsg(null);
+    setModalInitialClientId("");
+    setModalInitialForm(null);
+    setShowModal(true);
+    if (clients.length === 0) fetchClients();
+  };
+  const openEdit = (t: Task) => {
+    setEditTask(t);
+    setErrorMsg(null);
+    setModalInitialClientId("");
+    setModalInitialForm(null);
+    setShowModal(true);
+  };
 
   return (
     <div className="space-y-4 animate-in fade-in duration-500">
@@ -703,12 +794,16 @@ export default function Tareas() {
         <TaskModal
           task={editTask}
           clients={clients}
+          clientsLoading={clientsLoading}
+          clientsError={clientsError}
           onClose={() => { setShowModal(false); setEditTask(null); setErrorMsg(null); }}
           onSave={handleSave}
           onDelete={handleDelete}
           saving={saving}
           errorMsg={errorMsg}
           getToken={getToken}
+          initialClientId={modalInitialClientId}
+          initialForm={modalInitialForm}
         />
       )}
     </div>

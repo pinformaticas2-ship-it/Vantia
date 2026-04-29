@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+	<xs:include schemaLocation="tipos.xsd"/>
+	<xs:redefine schemaLocation="tipos.xsd">
+		<xs:complexType name="ct-data">
+			<xs:complexContent>
+				<xs:extension base="ct-data">
+					<xs:sequence minOccurs="1" maxOccurs="1">
+						<xs:element name="sumario" type="ct-sumario"/>
+					</xs:sequence>
+				</xs:extension>
+			</xs:complexContent>
+		</xs:complexType>
+	</xs:redefine>
+	<xs:complexType name="ct-sumario">
+		<xs:sequence>
+			<xs:element name="metadatos" type="ct-meta-diario" minOccurs="1" maxOccurs="1"/>
+			<xs:element name="diario" type="ct-diario" minOccurs="1" maxOccurs="unbounded"/>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:complexType name="ct-meta-diario">
+		<xs:sequence>
+			<xs:element name="publicacion" type="xs:string"/>
+			<xs:element name="fecha_publicacion" type="xs:string"/>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:complexType name="ct-diario">
+		<xs:sequence>
+			<xs:element name="sumario_diario" type="ct-sumario-diario" minOccurs="1" maxOccurs="1"/>
+			<xs:element name="seccion" type="ct-seccion-diario" minOccurs="1" maxOccurs="unbounded"/>
+		</xs:sequence>
+		<xs:attribute name="numero" type="xs:integer"/>
+	</xs:complexType>
+	<xs:complexType name="ct-sumario-diario">
+		<xs:sequence minOccurs="1" maxOccurs="1">
+			<xs:element name="identificador" type="xs:string"/>
+			<xs:element name="url_pdf" type="ct-url-pdf"/>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:complexType name="ct-seccion-diario">
+		<xs:sequence>
+			<xs:element name="departamento" type="ct-departamento" minOccurs="1" maxOccurs="unbounded"/>
+		</xs:sequence>
+		<xs:attribute name="codigo" type="xs:string"/>
+		<xs:attribute name="nombre" type="xs:string"/>
+	</xs:complexType>
+	<xs:complexType name="ct-url-pdf">
+		<xs:simpleContent>
+			<xs:extension base="xs:string">
+				<xs:attribute name="szBytes" type="xs:integer" use="required"/>
+				<xs:attribute name="szKBytes" type="xs:integer" use="required"/>
+				<xs:attribute name="pagina_inicial" type="xs:integer" use="optional"/>
+				<xs:attribute name="pagina_final" type="xs:integer" use="optional"/>
+			</xs:extension>
+		</xs:simpleContent>
+	</xs:complexType>
+	<xs:complexType name="ct-departamento">
+		<xs:choice>
+			<xs:sequence>
+				<xs:element name="epigrafe" type="ct-epigrafe" minOccurs="1" maxOccurs="unbounded"/>
+			</xs:sequence>
+			<xs:sequence>
+				<xs:element name="item" type="ct-item-sumario" minOccurs="1" maxOccurs="unbounded"/>
+			</xs:sequence>
+		</xs:choice>
+		<xs:attribute name="nombre" type="xs:string"/>
+		<xs:attribute name="codigo" type="xs:integer"/>
+	</xs:complexType>
+	<xs:complexType name="ct-epigrafe">
+		<xs:sequence>
+			<xs:element name="item" type="ct-item-sumario" minOccurs="1" maxOccurs="unbounded"/>
+		</xs:sequence>
+		<xs:attribute name="nombre" type="xs:string"/>
+	</xs:complexType>
+	<xs:complexType name="ct-item-sumario">
+		<xs:sequence>
+			<xs:element name="identificador" type="xs:string" minOccurs="1" maxOccurs="1"/>
+			<xs:element name="control" type="xs:string" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="titulo" type="xs:string" minOccurs="1" maxOccurs="1"/>
+			<xs:element name="url_pdf" type="ct-url-pdf" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="url_html" type="xs:string" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="url_xml" type="xs:string" minOccurs="0" maxOccurs="1"/>
+		</xs:sequence>
+	</xs:complexType>
+</xs:schema>

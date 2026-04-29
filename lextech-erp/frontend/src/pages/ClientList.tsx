@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useAuth } from "@clerk/clerk-react";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -12,12 +13,14 @@ import {
   Paperclip, BarChart2, MoreHorizontal, AlertTriangle,
   Star, Palette, Copy, GitMerge, CreditCard, MessageSquare,
   RotateCcw, Bell, ArrowRight, Settings, Trash2,
-  ChevronRight, Bug, History, TrendingUp, Pencil, Smartphone,
+  ChevronRight, Bug, History, TrendingUp, Pencil, Smartphone, ScanLine,
+  FileCode2, FileText, Download, ArrowLeft, ChevronsLeft, ChevronsRight, CheckCircle2,
 } from "lucide-react";
 import { safeJson } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
 import { AtajosButton } from "../components/AtajosSystem";
 import AdjuntosModal from "../components/AdjuntosModal";
+import { EtapaSelect } from "../components/EtapaSelect";
 
 // ── Helpers ───────────────────────────────────────────────────
 const statusColor: Record<string, string> = {
@@ -43,9 +46,85 @@ function fmtDate(d: string | null) {
   return new Date(d).toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
-type SortKey = "internal_number" | "first_name" | "nif_cif" | "phone_mobile" | "phone_1" | "email" | "type" | "lopd" | "date_alta" | "client_status";
+function fmtGender(g: string | null | undefined) {
+  if (!g) return "—";
+  if (g === "M") return "Masculino";
+  if (g === "F") return "Femenino";
+  return g;
+}
+
+function calcAge(birthDate: string | null | undefined) {
+  if (!birthDate) return null;
+  const date = new Date(birthDate);
+  if (Number.isNaN(date.getTime())) return null;
+  return Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24 * 365.25));
+}
+
+type SortKey =
+  | "internal_number"
+  | "first_name"
+  | "document_type"
+  | "last_name"
+  | "nif_cif"
+  | "commercial_name"
+  | "legal_nature"
+  | "gender"
+  | "birth_date"
+  | "nationality"
+  | "expedition_country"
+  | "address"
+  | "address_town"
+  | "address_cp"
+  | "address_province"
+  | "address_country"
+  | "phone_mobile"
+  | "phone_1"
+  | "phone_2"
+  | "phone_3"
+  | "phone_fax"
+  | "email"
+  | "website"
+  | "type"
+  | "lopd"
+  | "date_alta"
+  | "date_baja"
+  | "center"
+  | "commercial_communications"
+  | "client_status";
 type SortDir = "asc" | "desc";
 type ViewMode = "list" | "detail" | "multiselect";
+
+interface QuickTaskFormData {
+  titulo: string;
+  descripcion: string;
+  plazo: string;
+  fecha_aviso: string;
+  estado: string;
+  prioridad: string;
+  tipo: string;
+  expediente: string;
+  juzgado: string;
+  num_proc: string;
+  importe: string;
+  notas: string;
+  etapa: string;
+}
+
+const QUICK_TASK_EMPTY = (): QuickTaskFormData => ({
+  titulo: "",
+  descripcion: "",
+  plazo: "",
+  fecha_aviso: "",
+  estado: "pendiente",
+  prioridad: "media",
+  tipo: "plazo_procesal",
+  expediente: "",
+  juzgado: "",
+  num_proc: "",
+  importe: "",
+  notas: "",
+  etapa: "",
+});
 
 // ── Campos de filtro disponibles ──────────────────────────────
 const FILTER_FIELDS = [
@@ -60,6 +139,252 @@ const FILTER_FIELDS = [
   { value: "client_status",label: "Estado" },
   { value: "address_town", label: "Población" },
 ];
+
+const CLIENT_LIST_COLUMNS = [
+  { key: "internal_number", label: "Nº", defaultVisible: true },
+  { key: "name", label: "Nombre y apellidos", defaultVisible: true },
+  { key: "document_type", label: "Tipo documento", defaultVisible: false },
+  { key: "nif_cif", label: "NIF / CIF", defaultVisible: true },
+  { key: "last_name", label: "Apellidos", defaultVisible: false },
+  { key: "commercial_name", label: "Nombre comercial", defaultVisible: false },
+  { key: "legal_nature", label: "Naturaleza jurídica", defaultVisible: false },
+  { key: "gender", label: "Sexo", defaultVisible: false },
+  { key: "birth_date", label: "Fecha nacimiento", defaultVisible: false },
+  { key: "age", label: "Edad", defaultVisible: false },
+  { key: "nationality", label: "Nacionalidad", defaultVisible: false },
+  { key: "expedition_country", label: "País expedición", defaultVisible: false },
+  { key: "address", label: "Dirección", defaultVisible: false },
+  { key: "address_town", label: "Población", defaultVisible: false },
+  { key: "address_cp", label: "Código postal", defaultVisible: false },
+  { key: "address_province", label: "Provincia", defaultVisible: false },
+  { key: "address_country", label: "País", defaultVisible: false },
+  { key: "phone_mobile", label: "Móvil", defaultVisible: true },
+  { key: "phone_1", label: "Teléfono", defaultVisible: true },
+  { key: "email", label: "Correo electrónico", defaultVisible: true },
+  { key: "phone_2", label: "Teléfono 2", defaultVisible: false },
+  { key: "phone_3", label: "Teléfono 3", defaultVisible: false },
+  { key: "phone_fax", label: "Fax", defaultVisible: false },
+  { key: "website", label: "Página web", defaultVisible: false },
+  { key: "type", label: "Tipo", defaultVisible: true },
+  { key: "lopd", label: "LOPD", defaultVisible: true },
+  { key: "date_alta", label: "Fecha alta", defaultVisible: true },
+  { key: "date_baja", label: "Fecha baja", defaultVisible: false },
+  { key: "center", label: "Centro", defaultVisible: false },
+  { key: "commercial_communications", label: "Com. comerciales", defaultVisible: false },
+  { key: "client_status", label: "Estado", defaultVisible: true },
+  { key: "total_actuaciones", label: "Actuac.", defaultVisible: true },
+  { key: "total_expedientes", label: "Exp.", defaultVisible: true },
+] as const;
+
+type ClientListColumnKey = typeof CLIENT_LIST_COLUMNS[number]["key"];
+type ExportFormat = "excel" | "xml" | "word";
+type ExportTemplate = {
+  id: string;
+  name: string;
+  format: ExportFormat;
+  fields: string[];
+  builtIn?: boolean;
+};
+type ClientExportFieldDef = {
+  id: string;
+  label: string;
+  getValue: (row: any) => string;
+};
+
+const DEFAULT_VISIBLE_CLIENT_COLUMNS: Record<ClientListColumnKey, boolean> = CLIENT_LIST_COLUMNS.reduce((acc, column) => {
+  acc[column.key] = column.defaultVisible;
+  return acc;
+}, {} as Record<ClientListColumnKey, boolean>);
+
+const CLIENT_EXPORT_STORAGE_KEY = "client-export-templates-v1";
+
+const CLIENT_EXPORT_FIELDS: ClientExportFieldDef[] = [
+  { id: "internal_number", label: "Nº", getValue: (row) => row.internal_number != null ? String(row.internal_number) : "" },
+  { id: "name", label: "Nombre y apellidos", getValue: (row) => `${row.first_name || ""} ${row.last_name || ""}`.trim() },
+  { id: "document_type", label: "Tipo documento", getValue: (row) => row.document_type || "" },
+  { id: "nif_cif", label: "NIF / CIF", getValue: (row) => row.nif_cif || "" },
+  { id: "last_name", label: "Apellidos", getValue: (row) => row.last_name || "" },
+  { id: "commercial_name", label: "Nombre comercial", getValue: (row) => row.commercial_name || "" },
+  { id: "legal_nature", label: "Naturaleza jurídica", getValue: (row) => row.legal_nature || "" },
+  { id: "gender", label: "Sexo", getValue: (row) => fmtGender(row.gender).replace("—", "") },
+  { id: "birth_date", label: "Fecha nacimiento", getValue: (row) => row.birth_date ? fmtDate(row.birth_date) : "" },
+  { id: "age", label: "Edad", getValue: (row) => calcAge(row.birth_date) != null ? `${calcAge(row.birth_date)} años` : "" },
+  { id: "nationality", label: "Nacionalidad", getValue: (row) => row.nationality || "" },
+  { id: "expedition_country", label: "País expedición", getValue: (row) => row.expedition_country || "" },
+  { id: "address", label: "Dirección", getValue: (row) => row.address || "" },
+  { id: "address_town", label: "Población", getValue: (row) => row.address_town || "" },
+  { id: "address_cp", label: "Código postal", getValue: (row) => row.address_cp || "" },
+  { id: "address_province", label: "Provincia", getValue: (row) => row.address_province || "" },
+  { id: "address_country", label: "País", getValue: (row) => row.address_country || "" },
+  { id: "phone_mobile", label: "Móvil", getValue: (row) => row.phone_mobile || "" },
+  { id: "phone_1", label: "Teléfono", getValue: (row) => row.phone_1 || "" },
+  { id: "email", label: "Correo electrónico", getValue: (row) => row.email || "" },
+  { id: "phone_2", label: "Teléfono 2", getValue: (row) => row.phone_2 || "" },
+  { id: "phone_3", label: "Teléfono 3", getValue: (row) => row.phone_3 || "" },
+  { id: "phone_fax", label: "Fax", getValue: (row) => row.phone_fax || "" },
+  { id: "website", label: "Página web", getValue: (row) => row.website || "" },
+  { id: "type", label: "Tipo", getValue: (row) => row.type || "" },
+  { id: "lopd", label: "LOPD", getValue: (row) => row.lopd || "" },
+  { id: "date_alta", label: "Fecha alta", getValue: (row) => fmtDate(row.date_alta ?? row.created_at).replace("—", "") },
+  { id: "date_baja", label: "Fecha baja", getValue: (row) => row.date_baja ? fmtDate(row.date_baja) : "" },
+  { id: "center", label: "Centro", getValue: (row) => row.center || "" },
+  { id: "commercial_communications", label: "Com. comerciales", getValue: (row) => row.commercial_communications || "" },
+  { id: "client_status", label: "Estado", getValue: (row) => row.client_status || "" },
+  { id: "total_actuaciones", label: "Actuac.", getValue: (row) => row.total_actuaciones != null ? String(row.total_actuaciones) : "" },
+  { id: "total_expedientes", label: "Exp.", getValue: (row) => row.total_expedientes != null ? String(row.total_expedientes) : "" },
+];
+
+const CLIENT_LIST_EXPORT_FIELD_BY_COLUMN: Record<ClientListColumnKey, string> = {
+  internal_number: "internal_number",
+  name: "name",
+  document_type: "document_type",
+  nif_cif: "nif_cif",
+  last_name: "last_name",
+  commercial_name: "commercial_name",
+  legal_nature: "legal_nature",
+  gender: "gender",
+  birth_date: "birth_date",
+  age: "age",
+  nationality: "nationality",
+  expedition_country: "expedition_country",
+  address: "address",
+  address_town: "address_town",
+  address_cp: "address_cp",
+  address_province: "address_province",
+  address_country: "address_country",
+  phone_mobile: "phone_mobile",
+  phone_1: "phone_1",
+  email: "email",
+  phone_2: "phone_2",
+  phone_3: "phone_3",
+  phone_fax: "phone_fax",
+  website: "website",
+  type: "type",
+  lopd: "lopd",
+  date_alta: "date_alta",
+  date_baja: "date_baja",
+  center: "center",
+  commercial_communications: "commercial_communications",
+  client_status: "client_status",
+  total_actuaciones: "total_actuaciones",
+  total_expedientes: "total_expedientes",
+};
+
+function getClientExportFieldLabel(fieldId: string) {
+  return CLIENT_EXPORT_FIELDS.find((field) => field.id === fieldId)?.label || fieldId;
+}
+
+function loadStoredClientExportTemplates(): ExportTemplate[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(CLIENT_EXPORT_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item) => item && item.id && item.name && Array.isArray(item.fields));
+  } catch {
+    return [];
+  }
+}
+
+function saveStoredClientExportTemplates(templates: ExportTemplate[]) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(CLIENT_EXPORT_STORAGE_KEY, JSON.stringify(templates));
+}
+
+function escapeXml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+function toExcelColumnLabel(index: number) {
+  let n = index + 1;
+  let label = "";
+  while (n > 0) {
+    const rem = (n - 1) % 26;
+    label = String.fromCharCode(65 + rem) + label;
+    n = Math.floor((n - 1) / 26);
+  }
+  return label;
+}
+
+function buildExcelLikeHtml(headers: string[], rows: string[][], title: string) {
+  const columnLetters = headers.map((_, index) => `<th class="col-letter">${toExcelColumnLabel(index)}</th>`).join("");
+  const headerCells = headers.map((header) => `<th>${escapeXml(header)}</th>`).join("");
+  const bodyRows = rows.map((row, rowIndex) => `<tr><th class="row-number">${rowIndex + 2}</th>${row.map((cell) => `<td>${escapeXml(cell)}</td>`).join("")}</tr>`).join("");
+  return `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>${escapeXml(title)}</title>
+    <style>
+      body { font-family: Calibri, Arial, sans-serif; background: #f3f6fb; margin: 0; padding: 18px; }
+      .sheet { background: #ffffff; border: 1px solid #cfd8e3; box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08); overflow: hidden; }
+      table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+      th, td { border: 1px solid #d9e1ea; padding: 6px 8px; font-size: 11px; color: #111827; vertical-align: top; word-wrap: break-word; line-height: 1.35; }
+      .corner, .col-letter, .row-number { background: #eef2f6; color: #5b6878; font-weight: 700; text-align: center; }
+      .corner, .row-number { width: 44px; }
+      .col-letter { padding: 5px 0; }
+      thead .header-title { background: #dbe5f1; font-weight: 700; text-align: center; color: #233247; }
+      tbody tr:nth-child(even) td { background: #fbfcfe; }
+    </style>
+  </head>
+  <body>
+    <div class="sheet">
+      <table>
+        <thead>
+          <tr><th class="corner"></th>${columnLetters}</tr>
+          <tr><th class="row-number">1</th>${headerCells.replace(/<th>/g, '<th class="header-title">')}</tr>
+        </thead>
+        <tbody>${bodyRows}</tbody>
+      </table>
+    </div>
+  </body>
+</html>`;
+}
+
+function downloadTextFile(content: string, filename: string, mimeType: string) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportFormatMeta(format: ExportFormat) {
+  switch (format) {
+    case "xml":
+      return {
+        label: "XML",
+        icon: FileCode2,
+        className: "from-amber-50 to-orange-50 border-amber-200 text-amber-700",
+        badgeClassName: "bg-amber-100 text-amber-700",
+        description: "Estructurado para integraciones y otros sistemas.",
+      };
+    case "word":
+      return {
+        label: "Word",
+        icon: FileText,
+        className: "from-blue-50 to-sky-50 border-blue-200 text-blue-700",
+        badgeClassName: "bg-blue-100 text-blue-700",
+        description: "Documento editable con apariencia de tabla.",
+      };
+    default:
+      return {
+        label: "Excel",
+        icon: FileSpreadsheet,
+        className: "from-emerald-50 to-lime-50 border-emerald-200 text-emerald-700",
+        badgeClassName: "bg-emerald-100 text-emerald-700",
+        description: "Listado tipo hoja de cálculo con la plantilla por defecto.",
+      };
+  }
+}
 
 interface ActiveFilter { id: number; field: string; value: string; }
 let nextId = 1;
@@ -115,14 +440,14 @@ function ToolBtn({
       disabled={disabled}
       title={label}
       className={`
-        flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95
+        flex items-center gap-1.5 whitespace-nowrap px-3.5 py-2 rounded-xl text-xs font-semibold transition-all active:scale-[0.98] shadow-sm
         ${disabled
-          ? "text-slate-300 cursor-not-allowed"
+          ? "text-slate-300 cursor-not-allowed bg-white border border-slate-100"
           : primary
-            ? "bg-red-600 text-white hover:bg-red-700 shadow-sm shadow-red-200"
+            ? "bg-red-600 text-white hover:bg-red-700 border border-red-600 shadow-red-100"
             : danger
-              ? "text-red-600 hover:bg-red-50 border border-red-200"
-              : "text-slate-600 hover:bg-slate-100 border border-slate-200"
+              ? "text-red-600 bg-white hover:bg-red-50 border border-red-200"
+              : "text-slate-600 bg-white hover:bg-slate-50 border border-slate-200"
         }
       `}
     >
@@ -140,7 +465,6 @@ function DropdownBtn({
   items: { label: string; icon?: any; onClick: () => void; divider?: boolean }[];
 }) {
   const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
   const btnRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -156,40 +480,28 @@ function DropdownBtn({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Cierra al hacer scroll
-  useEffect(() => {
-    if (!open) return;
-    const handler = () => setOpen(false);
-    window.addEventListener("scroll", handler, true);
-    return () => window.removeEventListener("scroll", handler, true);
-  }, [open]);
-
   const handleOpen = () => {
     if (disabled) return;
-    if (!open && btnRef.current) {
-      const r = btnRef.current.getBoundingClientRect();
-      setPos({ top: r.bottom + 4, left: r.left, width: r.width });
-    }
     setOpen(o => !o);
   };
 
   return (
-    <>
+    <div className="relative shrink-0">
       <button
         ref={btnRef}
         onClick={handleOpen}
         disabled={disabled}
         title={label}
         className={`
-          flex items-center gap-0 rounded-lg text-xs font-semibold transition-all active:scale-95 border overflow-hidden
-          ${disabled ? "text-slate-300 cursor-not-allowed border-slate-100" : "text-slate-600 hover:bg-slate-100 border-slate-200"}
+          flex items-center gap-0 rounded-xl text-xs font-semibold transition-all active:scale-[0.98] border overflow-hidden shadow-sm
+          ${disabled ? "text-slate-300 cursor-not-allowed border-slate-100 bg-white" : "text-slate-600 bg-white hover:bg-slate-50 border-slate-200"}
         `}
       >
-        <span className="flex items-center gap-1.5 px-2.5 py-1.5">
+        <span className="flex items-center gap-1.5 px-3 py-2">
           <Icon size={13} />
-          <span className="hidden sm:inline">{label}</span>
+          <span className="hidden sm:inline whitespace-nowrap">{label}</span>
         </span>
-        <span className={`px-1 py-1.5 border-l ${disabled ? "border-slate-100" : "border-slate-200 hover:bg-slate-200"}`}>
+        <span className={`px-1.5 py-2 border-l ${disabled ? "border-slate-100" : "border-slate-200 hover:bg-slate-100"}`}>
           <ChevronDownSmall size={10} />
         </span>
       </button>
@@ -197,8 +509,7 @@ function DropdownBtn({
       {open && (
         <div
           ref={menuRef}
-          style={{ position: "fixed", top: pos.top, left: pos.left, minWidth: Math.max(pos.width, 220) }}
-          className="z-[9999] bg-white border border-slate-200 rounded-xl shadow-2xl shadow-slate-300/40 py-1 max-h-[70vh] overflow-y-auto"
+          className="absolute left-0 top-full z-[9999] mt-2 min-w-[220px] max-w-[280px] bg-white border border-slate-200 rounded-2xl shadow-2xl shadow-slate-300/40 py-1.5 max-h-[72vh] overflow-y-auto"
         >
           {items.map((item, i) =>
             item.divider ? (
@@ -216,7 +527,103 @@ function DropdownBtn({
           )}
         </div>
       )}
-    </>
+    </div>
+  );
+}
+
+function AltaOptionsBtn({
+  onManual,
+  onDni,
+  onLink,
+}: {
+  onManual: () => void;
+  onDni: () => void;
+  onLink: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (
+        wrapRef.current && !wrapRef.current.contains(e.target as Node) &&
+        menuRef.current && !menuRef.current.contains(e.target as Node)
+      ) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const options = [
+    {
+      title: "Crear manualmente",
+      description: "Crea un cliente desde cero introduciendo sus datos manualmente.",
+      icon: Plus,
+      iconWrap: "bg-green-100 text-green-600",
+      onClick: onManual,
+    },
+    {
+      title: "Con DNI",
+      description: "Sube anverso y reverso del DNI para rellenar la ficha inicial automáticamente.",
+      icon: ScanLine,
+      iconWrap: "bg-blue-100 text-blue-600",
+      onClick: onDni,
+    },
+    {
+      title: "Con enlace",
+      description: "Genera un enlace para que el cliente rellene sus datos directamente.",
+      icon: ExternalLink,
+      iconWrap: "bg-amber-100 text-amber-700",
+      onClick: onLink,
+    },
+  ];
+
+  return (
+    <div ref={wrapRef} className="relative shrink-0">
+      <button
+        ref={btnRef}
+        onClick={() => setOpen((prev) => !prev)}
+        className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all select-none whitespace-nowrap shadow-sm ${
+          open
+            ? "bg-red-800 text-white shadow-sm"
+            : "bg-red-700 text-white hover:bg-red-800 active:scale-[0.98]"
+        }`}
+      >
+        <Plus size={13} />
+        <span className="hidden sm:inline">Alta</span>
+        <ChevronDownSmall size={10} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div
+          ref={menuRef}
+          className="absolute left-0 top-full z-50 mt-2 w-[330px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.18)]"
+        >
+          <div className="border-b border-slate-100 bg-slate-50/80 px-4 py-3">
+            <p className="text-sm font-semibold text-slate-600">Elige cómo quieres agregar clientes</p>
+          </div>
+          <div className="p-2">
+            {options.map((option) => (
+              <button
+                key={option.title}
+                onClick={() => { option.onClick(); setOpen(false); }}
+                className="flex w-full items-start gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-slate-50"
+              >
+                <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${option.iconWrap}`}>
+                  <option.icon size={15} />
+                </div>
+                <div>
+                  <p className="text-[15px] font-semibold text-slate-800">{option.title}</p>
+                  <p className="mt-0.5 text-sm leading-6 text-slate-500">{option.description}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -252,6 +659,177 @@ function ConfirmModal({
             className={`px-4 py-2 text-xs font-bold rounded-lg transition-all active:scale-95 ${danger ? "bg-red-600 text-white hover:bg-red-700" : "bg-amber-500 text-white hover:bg-amber-600"}`}
           >
             {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function QuickTaskModal({
+  client,
+  form,
+  setForm,
+  saving,
+  errorMsg,
+  onClose,
+  onSave,
+  getToken,
+}: {
+  client: any;
+  form: QuickTaskFormData;
+  setForm: React.Dispatch<React.SetStateAction<QuickTaskFormData>>;
+  saving: boolean;
+  errorMsg: string | null;
+  onClose: () => void;
+  onSave: () => void;
+  getToken: (opts?: { skipCache?: boolean }) => Promise<string | null>;
+}) {
+  const set = (k: keyof QuickTaskFormData, v: string) => setForm(prev => ({ ...prev, [k]: v }));
+
+  return (
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/30 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-3xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">Tareas del cliente</p>
+            <h3 className="text-sm font-bold text-slate-800 mt-1">Crear obligación / plazo</h3>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+          >
+            <X size={15} />
+          </button>
+        </div>
+
+        {errorMsg && (
+          <div className="px-5 py-2 bg-red-50 border-b border-red-100 text-xs text-red-700 font-medium">{errorMsg}</div>
+        )}
+
+        <div className="p-5 space-y-4 max-h-[78vh] overflow-y-auto">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Cliente seleccionado</p>
+            <p className="mt-1 text-sm font-semibold text-slate-800">
+              {(client?.first_name || "").trim()} {(client?.last_name || "").trim()}
+            </p>
+            <p className="mt-0.5 text-xs text-slate-500">{client?.nif_cif || client?.email || "Sin dato principal"}</p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Título <span className="text-red-500">*</span></label>
+            <input
+              value={form.titulo}
+              onChange={e => set("titulo", e.target.value)}
+              placeholder="Descripción breve de la tarea..."
+              className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-red-400"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Descripción</label>
+            <textarea
+              value={form.descripcion}
+              onChange={e => set("descripcion", e.target.value)}
+              rows={2}
+              placeholder="Instrucciones o contexto adicional..."
+              className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm resize-none focus:outline-none focus:border-red-400"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Tipo</label>
+              <select value={form.tipo} onChange={e => set("tipo", e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400 bg-white">
+                <option value="plazo_procesal">Plazo procesal</option>
+                <option value="vista_juicio">Vista / Juicio</option>
+                <option value="notificacion">Notificación</option>
+                <option value="reunion">Reunión</option>
+                <option value="escrito">Escrito</option>
+                <option value="gestion">Gestión</option>
+                <option value="pago">Pago</option>
+                <option value="llamada">Llamada</option>
+                <option value="diligencia">Diligencia</option>
+                <option value="otro">Otro</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Fecha límite</label>
+              <input type="date" value={form.plazo} onChange={e => set("plazo", e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Estado</label>
+              <select value={form.estado} onChange={e => set("estado", e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400 bg-white">
+                <option value="pendiente">Pendiente</option>
+                <option value="urgente">Urgente</option>
+                <option value="completada">Completada</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Prioridad</label>
+              <select value={form.prioridad} onChange={e => set("prioridad", e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400 bg-white">
+                <option value="alta">Alta</option>
+                <option value="media">Media</option>
+                <option value="baja">Baja</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Expediente</label>
+              <input value={form.expediente} onChange={e => set("expediente", e.target.value)} placeholder="EXP-2024-001" className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-red-400" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Juzgado / Tribunal</label>
+              <input value={form.juzgado} onChange={e => set("juzgado", e.target.value)} placeholder="Juzgado nº..." className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-red-400" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Nº procedimiento</label>
+              <input value={form.num_proc} onChange={e => set("num_proc", e.target.value)} placeholder="123/2024" className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-red-400" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Fecha de aviso</label>
+              <input type="date" value={form.fecha_aviso} onChange={e => set("fecha_aviso", e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Importe (€)</label>
+              <input type="number" step="0.01" min="0" value={form.importe} onChange={e => set("importe", e.target.value)} placeholder="0,00" className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Etapa</label>
+              <EtapaSelect value={form.etapa} onChange={v => set("etapa", v)} getToken={getToken} />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Notas internas</label>
+              <textarea
+                value={form.notas}
+                onChange={e => set("notas", e.target.value)}
+                rows={2}
+                placeholder="Observaciones internas..."
+                className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm resize-none focus:outline-none focus:border-red-400"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="px-5 py-4 border-t border-slate-100 flex items-center justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
+            Cancelar
+          </button>
+          <button
+            onClick={onSave}
+            disabled={saving || !form.titulo.trim()}
+            className="flex items-center gap-2 px-5 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-lg active:scale-95 transition-all"
+          >
+            {saving ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
+            Guardar tarea
           </button>
         </div>
       </div>
@@ -355,25 +933,111 @@ export default function ClientList() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());    // vista multiselect
   const [showSelectionDropdown, setShowSelectionDropdown] = useState(false); // dropdown lista seleccionados
   const [showOpciones, setShowOpciones] = useState(false);
+  const [showColumnSelector, setShowColumnSelector] = useState(false);
   const opcionesRef = useRef<HTMLDivElement>(null);
   const [showAdjuntos, setShowAdjuntos] = useState(false);
+  const [visibleColumns, setVisibleColumns] = useState<Record<ClientListColumnKey, boolean>>(() => {
+    try {
+      const raw = localStorage.getItem("client-list-visible-columns");
+      if (!raw) return DEFAULT_VISIBLE_CLIENT_COLUMNS;
+      const parsed = JSON.parse(raw) as Partial<Record<ClientListColumnKey, boolean>>;
+      return { ...DEFAULT_VISIBLE_CLIENT_COLUMNS, ...parsed };
+    } catch {
+      return DEFAULT_VISIBLE_CLIENT_COLUMNS;
+    }
+  });
 
   // Cerrar Opciones al clicar fuera
   React.useEffect(() => {
     function outside(e: MouseEvent) {
-      if (opcionesRef.current && !opcionesRef.current.contains(e.target as Node)) setShowOpciones(false);
+      if (opcionesRef.current && !opcionesRef.current.contains(e.target as Node)) {
+        setShowOpciones(false);
+        setShowColumnSelector(false);
+      }
     }
     document.addEventListener("mousedown", outside);
     return () => document.removeEventListener("mousedown", outside);
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem("client-list-visible-columns", JSON.stringify(visibleColumns));
+  }, [visibleColumns]);
+
+  const toggleColumnVisibility = useCallback((key: ClientListColumnKey) => {
+    setVisibleColumns(prev => {
+      const nextVisible = !prev[key];
+      const visibleCount = Object.values(prev).filter(Boolean).length;
+      if (!nextVisible && visibleCount <= 1) return prev;
+      return { ...prev, [key]: nextVisible };
+    });
+  }, []);
+
+  const visibleColumnCount = useMemo(() => {
+    const base = CLIENT_LIST_COLUMNS.filter(column => visibleColumns[column.key]).length;
+    return base + 1; // columna de acción final
+  }, [visibleColumns]);
   const [refreshSpin, setRefreshSpin] = useState(false);                     // animación refresco
   const [bajaConfirm, setBajaConfirm] = useState(false);                     // modal confirmar baja
   const [bajaLoading, setBajaLoading] = useState(false);                     // spinner baja
+  const [showQuickTaskModal, setShowQuickTaskModal] = useState(false);
+  const [quickTaskSaving, setQuickTaskSaving] = useState(false);
+  const [quickTaskError, setQuickTaskError] = useState<string | null>(null);
+  const [quickTaskForm, setQuickTaskForm] = useState<QuickTaskFormData>(QUICK_TASK_EMPTY);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [showExportTemplateEditor, setShowExportTemplateEditor] = useState(false);
+  const [exportEditorMode, setExportEditorMode] = useState<"create" | "edit">("create");
+  const [customExportTemplates, setCustomExportTemplates] = useState<ExportTemplate[]>(() => loadStoredClientExportTemplates());
+  const [selectedExportTemplateId, setSelectedExportTemplateId] = useState<string>("default-client-excel");
+  const [selectedExportFormat, setSelectedExportFormat] = useState<ExportFormat>("excel");
+  const [exportTemplateName, setExportTemplateName] = useState("");
+  const [exportVisibleFields, setExportVisibleFields] = useState<string[]>([]);
+  const [exportAvailableSelected, setExportAvailableSelected] = useState<string[]>([]);
+  const [exportVisibleSelected, setExportVisibleSelected] = useState<string[]>([]);
+  const [exportError, setExportError] = useState("");
+  const currentClientListExportFields = useMemo(
+    () =>
+      CLIENT_LIST_COLUMNS
+        .filter((column) => visibleColumns[column.key])
+        .map((column) => CLIENT_LIST_EXPORT_FIELD_BY_COLUMN[column.key]),
+    [visibleColumns]
+  );
+  const defaultClientExportTemplate = useMemo<ExportTemplate>(
+    () => ({
+      id: "default-client-excel",
+      name: "Listado actual",
+      format: "excel",
+      builtIn: true,
+      fields: currentClientListExportFields,
+    }),
+    [currentClientListExportFields]
+  );
+  const exportTemplates = useMemo(
+    () => [defaultClientExportTemplate, ...customExportTemplates],
+    [defaultClientExportTemplate, customExportTemplates]
+  );
+  const selectedExportTemplate = useMemo(
+    () => exportTemplates.find((template) => template.id === selectedExportTemplateId) || defaultClientExportTemplate,
+    [exportTemplates, selectedExportTemplateId, defaultClientExportTemplate]
+  );
+  const availableExportFields = useMemo(
+    () => CLIENT_EXPORT_FIELDS.filter((field) => !exportVisibleFields.includes(field.id)),
+    [exportVisibleFields]
+  );
 
   // Sistema de filtros multicriteria
   const [filters, setFilters] = useState<ActiveFilter[]>([
     { id: nextId++, field: "any", value: "" },
   ]);
+
+  useEffect(() => {
+    saveStoredClientExportTemplates(customExportTemplates);
+  }, [customExportTemplates]);
+
+  useEffect(() => {
+    if (!exportTemplates.some((template) => template.id === selectedExportTemplateId)) {
+      setSelectedExportTemplateId(defaultClientExportTemplate.id);
+    }
+  }, [exportTemplates, selectedExportTemplateId, defaultClientExportTemplate.id]);
 
   // Ordenación
   const [sortKey, setSortKey] = useState<SortKey>("internal_number");
@@ -435,6 +1099,8 @@ export default function ClientList() {
     return rows;
   }, [clients, filters, sortKey, sortDir]);
 
+  const exportPreviewRows = useMemo(() => filtered.slice(0, 12), [filtered]);
+
   // ── Estadísticas barra inferior ────────────────────────────
   const stats = useMemo(() => {
     const total   = clients.length;
@@ -443,6 +1109,16 @@ export default function ClientList() {
     const pctBaja = total > 0 ? ((bajas / total) * 100).toFixed(2) : "0,00";
     return { total, activos, bajas, pctBaja };
   }, [clients]);
+
+  useEffect(() => {
+    saveStoredClientExportTemplates(customExportTemplates);
+  }, [customExportTemplates]);
+
+  useEffect(() => {
+    if (!exportTemplates.some((template) => template.id === selectedExportTemplateId)) {
+      setSelectedExportTemplateId(defaultClientExportTemplate.id);
+    }
+  }, [exportTemplates, selectedExportTemplateId, defaultClientExportTemplate.id]);
 
   // ── Ordenación ─────────────────────────────────────────────
   const handleSort = (k: SortKey) => {
@@ -515,6 +1191,38 @@ export default function ClientList() {
     }
   };
 
+  const openQuickTaskModal = () => {
+    setQuickTaskForm(QUICK_TASK_EMPTY());
+    setQuickTaskError(null);
+    setShowQuickTaskModal(true);
+  };
+
+  const handleQuickTaskSave = async () => {
+    if (!selected || !quickTaskForm.titulo.trim()) return;
+    setQuickTaskSaving(true);
+    setQuickTaskError(null);
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/tasks/client/${selected}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(quickTaskForm),
+      });
+      const result = await safeJson(res);
+      if (!res.ok) {
+        setQuickTaskError(result?.error || "No se pudo crear la tarea");
+        return;
+      }
+      setShowQuickTaskModal(false);
+      setQuickTaskForm(QUICK_TASK_EMPTY());
+      window.dispatchEvent(new CustomEvent("historial-changed"));
+    } catch (err: any) {
+      setQuickTaskError(err.message || "Error de conexión");
+    } finally {
+      setQuickTaskSaving(false);
+    }
+  };
+
   // ── Helpers multiselect ────────────────────────────────────
   const toggleId = (id: string) =>
     setSelectedIds(prev => {
@@ -563,6 +1271,120 @@ export default function ClientList() {
     a.href = "data:text/csv;charset=utf-8,%EF%BB%BF" + encodeURIComponent(csv);
     a.download = `clientes_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
+  };
+
+  const openExportModal = () => {
+    setSelectedExportTemplateId(defaultClientExportTemplate.id);
+    setSelectedExportFormat(defaultClientExportTemplate.format);
+    setExportError("");
+    setShowExportModal(true);
+  };
+
+  const openCreateExportTemplate = () => {
+    setExportEditorMode("create");
+    setExportTemplateName("");
+    setSelectedExportFormat("excel");
+    setExportVisibleFields([...defaultClientExportTemplate.fields]);
+    setExportAvailableSelected([]);
+    setExportVisibleSelected([]);
+    setExportError("");
+    setShowExportTemplateEditor(true);
+  };
+
+  const openEditExportTemplate = () => {
+    setExportEditorMode("edit");
+    setExportTemplateName(selectedExportTemplate.builtIn ? "" : selectedExportTemplate.name);
+    setSelectedExportFormat(selectedExportTemplate.format);
+    setExportVisibleFields([...selectedExportTemplate.fields]);
+    setExportAvailableSelected([]);
+    setExportVisibleSelected([]);
+    setExportError("");
+    setShowExportTemplateEditor(true);
+  };
+
+  const moveFieldsToVisible = (fieldIds: string[]) => {
+    setExportVisibleFields((prev) => [...prev, ...fieldIds.filter((fieldId) => !prev.includes(fieldId))]);
+    setExportAvailableSelected([]);
+  };
+
+  const moveFieldsToAvailable = (fieldIds: string[]) => {
+    setExportVisibleFields((prev) => prev.filter((fieldId) => !fieldIds.includes(fieldId)));
+    setExportVisibleSelected([]);
+  };
+
+  const saveExportTemplate = () => {
+    if (!exportVisibleFields.length) {
+      setExportError("Selecciona al menos una columna para la plantilla.");
+      return;
+    }
+    const trimmedName = exportTemplateName.trim();
+    if (exportEditorMode === "create" && !trimmedName) {
+      setExportError("Escribe un nombre para la plantilla.");
+      return;
+    }
+    if (exportEditorMode === "edit" && selectedExportTemplate.builtIn) {
+      setExportError("Listado actual no se modifica desde aquí; refleja siempre las columnas visibles del listado.");
+      return;
+    }
+
+    if (exportEditorMode === "edit") {
+      setCustomExportTemplates((prev) =>
+        prev.map((template) =>
+          template.id === selectedExportTemplate.id
+            ? { ...template, name: trimmedName, format: selectedExportFormat, fields: exportVisibleFields }
+            : template
+        )
+      );
+      setSelectedExportTemplateId(selectedExportTemplate.id);
+    } else {
+      const template: ExportTemplate = {
+        id: crypto.randomUUID(),
+        name: trimmedName,
+        format: selectedExportFormat,
+        fields: exportVisibleFields,
+      };
+      setCustomExportTemplates((prev) => [...prev, template]);
+      setSelectedExportTemplateId(template.id);
+    }
+
+    setShowExportTemplateEditor(false);
+    setExportError("");
+  };
+
+  const deleteSelectedTemplate = () => {
+    if (selectedExportTemplate.builtIn) return;
+    setCustomExportTemplates((prev) => prev.filter((template) => template.id !== selectedExportTemplate.id));
+    setSelectedExportTemplateId(defaultClientExportTemplate.id);
+  };
+
+  const runExport = () => {
+    const template = selectedExportTemplate;
+    const fields = template.fields;
+    if (!fields.length) {
+      setExportError("La plantilla no tiene columnas para exportar.");
+      return;
+    }
+
+    const headers = fields.map((fieldId) => getClientExportFieldLabel(fieldId));
+    const rows = filtered.map((client) =>
+      fields.map((fieldId) => CLIENT_EXPORT_FIELDS.find((field) => field.id === fieldId)?.getValue(client) || "")
+    );
+    const dateStamp = new Date().toISOString().slice(0, 10);
+    const safeName = (template.name || "clientes").replace(/[^\w\d-_]+/g, "_");
+
+    if (selectedExportFormat === "xml") {
+      const xmlRows = filtered.map((client) => `  <cliente>\n${fields.map((fieldId) => `    <${fieldId}>${escapeXml(CLIENT_EXPORT_FIELDS.find((field) => field.id === fieldId)?.getValue(client) || "")}</${fieldId}>`).join("\n")}\n  </cliente>`).join("\n");
+      downloadTextFile(`<?xml version="1.0" encoding="UTF-8"?>\n<clientes>\n${xmlRows}\n</clientes>\n`, `${safeName}_${dateStamp}.xml`, "application/xml;charset=utf-8");
+    } else if (selectedExportFormat === "word") {
+      const html = buildExcelLikeHtml(headers, rows, template.name);
+      downloadTextFile(html, `${safeName}_${dateStamp}.doc`, "application/msword;charset=utf-8");
+    } else {
+      const html = buildExcelLikeHtml(headers, rows, template.name);
+      downloadTextFile(html, `${safeName}_${dateStamp}.xls`, "application/vnd.ms-excel;charset=utf-8");
+    }
+
+    setShowExportModal(false);
+    setExportError("");
   };
 
   // ── Duplicar cliente ───────────────────────────────────────
@@ -659,6 +1481,289 @@ export default function ClientList() {
         onCancel={() => setBajaConfirm(false)}
       />
     )}
+    {showQuickTaskModal && selectedClient && (
+      <QuickTaskModal
+        client={selectedClient}
+        form={quickTaskForm}
+        setForm={setQuickTaskForm}
+        saving={quickTaskSaving}
+        errorMsg={quickTaskError}
+        onClose={() => {
+          setShowQuickTaskModal(false);
+          setQuickTaskError(null);
+          setQuickTaskForm(QUICK_TASK_EMPTY());
+        }}
+        onSave={handleQuickTaskSave}
+        getToken={getToken}
+      />
+    )}
+    {showExportModal && typeof document !== "undefined" && createPortal(
+      <div className="fixed inset-0 z-[125] flex items-center justify-center bg-slate-950/40 backdrop-blur-sm p-3 sm:p-4 animate-in fade-in duration-200" onClick={() => setShowExportModal(false)}>
+        <div className="flex h-[min(860px,calc(100vh-24px))] w-full max-w-[min(1380px,calc(100vw-24px))] flex-col rounded-3xl border border-slate-200 bg-white shadow-2xl overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-2 duration-200" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-5 py-3">
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-[0.25em] text-slate-400">Exportar clientes</p>
+              <h3 className="text-[17px] font-bold text-slate-900">Plantillas de exportación</h3>
+            </div>
+            <button type="button" onClick={() => setShowExportModal(false)} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-400 hover:border-slate-300 hover:text-slate-700">
+              <X size={16} />
+            </button>
+          </div>
+
+          <div className="border-b border-slate-100 px-4 py-3 sm:px-5">
+            <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
+              <div className="grid gap-2 md:grid-cols-3">
+                {(["excel", "xml", "word"] as ExportFormat[]).map((format) => {
+                  const meta = exportFormatMeta(format);
+                  const Icon = meta.icon;
+                  const active = selectedExportFormat === format;
+                  return (
+                    <button
+                      key={format}
+                      type="button"
+                      onClick={() => setSelectedExportFormat(format)}
+                      className={`group rounded-2xl border bg-gradient-to-br px-3 py-2.5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${meta.className} ${active ? "ring-2 ring-red-500/70 shadow-md scale-[1.01]" : "opacity-90 hover:opacity-100"}`}
+                    >
+                      <div className="flex items-start justify-between gap-2.5">
+                        <div className="flex items-center gap-2.5">
+                          <div className={`flex h-8 w-8 items-center justify-center rounded-xl ${meta.badgeClassName}`}>
+                            <Icon size={16} />
+                          </div>
+                          <div>
+                            <p className="text-[13px] font-bold leading-none">{meta.label}</p>
+                            <p className="mt-1 text-[10px] leading-4 text-slate-500">{meta.description}</p>
+                          </div>
+                        </div>
+                        {active && <CheckCircle2 size={16} className="text-red-500 shrink-0" />}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex flex-wrap items-center gap-2 justify-end">
+                <button type="button" onClick={openCreateExportTemplate} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-medium text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm">Alta</button>
+                <button type="button" onClick={deleteSelectedTemplate} disabled={selectedExportTemplate.builtIn} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-medium text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-40">Baja</button>
+                <button type="button" onClick={openEditExportTemplate} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-medium text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm">Modificar</button>
+                <button type="button" onClick={() => setShowExportModal(false)} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-medium text-slate-600 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm">Cancelar</button>
+                <button type="button" onClick={runExport} className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-all hover:-translate-y-0.5 hover:bg-red-700 hover:shadow-lg">
+                  <Download size={13} />
+                  Exportar
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid min-h-0 flex-1 grid-cols-[250px_minmax(0,1fr)] gap-0">
+            <div className="border-r border-slate-200 p-3">
+              <p className="mb-3 text-[13px] leading-5 text-slate-500">Selecciona una plantilla de exportación o configura una nueva con los campos que quieras exportar.</p>
+              <div className="overflow-hidden rounded-2xl border border-slate-200">
+                <div className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold uppercase tracking-wider text-slate-500">Plantilla</div>
+                <div className="max-h-[calc(100vh-360px)] overflow-y-auto">
+                  {exportTemplates.map((template) => (
+                    <button
+                      key={template.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedExportTemplateId(template.id);
+                        setSelectedExportFormat(template.format);
+                      }}
+                      className={`w-full border-b border-slate-100 px-4 py-2.5 text-left last:border-b-0 transition-all duration-150 ${selectedExportTemplateId === template.id ? "bg-gradient-to-r from-lime-300 via-lime-200 to-white text-slate-900 shadow-inner" : "hover:bg-slate-50 text-slate-700 hover:translate-x-1"}`}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-[13px] font-semibold leading-5">{template.name}</p>
+                          <p className="mt-1 text-xs uppercase tracking-wide opacity-70">{template.format}</p>
+                        </div>
+                        {selectedExportTemplateId === template.id && <CheckCircle2 size={16} className="text-red-500" />}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="min-h-0 p-3">
+              <div className="grid min-h-0 gap-3 xl:grid-cols-[250px_minmax(0,1fr)]">
+                <div className="overflow-hidden rounded-2xl border border-slate-200">
+                  <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold uppercase tracking-wider text-slate-500">
+                    <span>Campos a exportar</span>
+                    <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] text-slate-600 normal-case">{selectedExportTemplate.fields.length} columnas</span>
+                  </div>
+                  <div className="max-h-[calc(100vh-360px)] overflow-y-auto px-4 py-3 text-[13px] text-slate-700">
+                    {selectedExportTemplate.fields.map((fieldId) => (
+                      <div key={fieldId} className="py-0.5">{getClientExportFieldLabel(fieldId)}</div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="overflow-hidden rounded-2xl border border-slate-200">
+                  <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold uppercase tracking-wider text-slate-500">
+                    <span>Vista previa</span>
+                    <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] text-slate-600 normal-case">{exportPreviewRows.length} filas</span>
+                  </div>
+                  <div className="h-[calc(100vh-360px)] overflow-auto bg-[#f3f6fb] p-3">
+                    <div className="inline-block min-w-full overflow-hidden border border-[#cfd8e3] bg-white shadow-[0_12px_28px_rgba(15,23,42,0.08)]">
+                      <table className="min-w-max border-collapse text-[10px] text-slate-800">
+                        <thead>
+                          <tr>
+                            <th className="w-10 border border-[#d9e1ea] bg-[#eef2f6] px-2 py-1 text-center font-bold text-slate-500" />
+                            {selectedExportTemplate.fields.map((fieldId, index) => (
+                              <th key={`${fieldId}-letter`} className="whitespace-nowrap border border-[#d9e1ea] bg-[#eef2f6] px-2 py-1 text-center font-bold text-slate-500">
+                                {toExcelColumnLabel(index)}
+                              </th>
+                            ))}
+                          </tr>
+                          <tr>
+                            <th className="w-10 border border-[#d9e1ea] bg-[#eef2f6] px-2 py-1 text-center font-bold text-slate-500">1</th>
+                            {selectedExportTemplate.fields.map((fieldId) => (
+                              <th key={fieldId} className="whitespace-nowrap border border-[#d9e1ea] bg-[#dbe5f1] px-2.5 py-2 text-center font-semibold tracking-wide text-slate-700">
+                                {getClientExportFieldLabel(fieldId)}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {exportPreviewRows.map((row, rowIndex) => (
+                            <tr key={row.id} className={rowIndex % 2 === 0 ? "bg-white" : "bg-[#fbfcfe]"}>
+                              <td className="border border-[#d9e1ea] bg-[#eef2f6] px-2 py-2 text-center font-semibold text-slate-500">{rowIndex + 2}</td>
+                              {selectedExportTemplate.fields.map((fieldId) => {
+                                const field = CLIENT_EXPORT_FIELDS.find((item) => item.id === fieldId);
+                                return (
+                                  <td key={`${row.id}-${fieldId}`} className="border border-[#d9e1ea] px-2.5 py-2 align-top leading-5">
+                                    {field ? field.getValue(row) : ""}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {exportError && (
+                <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {exportError}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>,
+      document.body
+    )}
+    {showExportTemplateEditor && typeof document !== "undefined" && createPortal(
+      <div className="fixed inset-0 z-[126] flex items-center justify-center bg-slate-950/40 backdrop-blur-sm px-4 animate-in fade-in duration-200" onClick={() => setShowExportTemplateEditor(false)}>
+        <div className="w-full max-w-5xl rounded-3xl border border-slate-200 bg-white shadow-2xl overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-2 duration-200" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+            <h3 className="text-lg font-bold text-slate-900">{exportEditorMode === "create" ? "Nueva plantilla de exportación" : "Modificar plantilla de exportación"}</h3>
+            <button type="button" onClick={() => setShowExportTemplateEditor(false)} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-400 hover:text-slate-700">
+              <X size={16} />
+            </button>
+          </div>
+          <div className="p-6">
+            <div className="grid gap-6 lg:grid-cols-[1fr_84px_1fr]">
+              <div>
+                <div className="mb-3 flex items-center justify-between">
+                  <h4 className="font-semibold text-slate-800">Campos disponibles</h4>
+                  <div className="relative">
+                    <select value="clientes" disabled className="appearance-none rounded-xl border border-slate-200 bg-white px-4 py-2 pr-9 text-sm text-slate-700 outline-none disabled:opacity-100">
+                      <option>Clientes</option>
+                    </select>
+                    <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  </div>
+                </div>
+                <div className="h-[340px] overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50/40 p-3">
+                  {availableExportFields.map((field) => (
+                    <label key={field.id} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 transition-all hover:bg-white hover:shadow-sm">
+                      <input
+                        type="checkbox"
+                        checked={exportAvailableSelected.includes(field.id)}
+                        onChange={(e) => setExportAvailableSelected((prev) => e.target.checked ? [...prev, field.id] : prev.filter((id) => id !== field.id))}
+                      />
+                      <span className="text-sm text-slate-700">{field.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex flex-col items-center justify-center gap-3">
+                <button type="button" onClick={() => moveFieldsToVisible(exportAvailableSelected)} className="rounded-xl border border-slate-200 bg-white p-2 text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm"><ArrowRight size={18} /></button>
+                <button type="button" onClick={() => moveFieldsToAvailable(exportVisibleSelected)} className="rounded-xl border border-slate-200 bg-white p-2 text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm"><ArrowLeft size={18} /></button>
+                <button type="button" onClick={() => moveFieldsToVisible(availableExportFields.map((field) => field.id))} className="rounded-xl border border-slate-200 bg-white p-2 text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm"><ChevronsRight size={18} /></button>
+                <button type="button" onClick={() => moveFieldsToAvailable([...exportVisibleFields])} className="rounded-xl border border-slate-200 bg-white p-2 text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm"><ChevronsLeft size={18} /></button>
+              </div>
+
+              <div>
+                <div className="mb-3 flex items-center justify-between">
+                  <h4 className="font-semibold text-slate-800">Campos visibles</h4>
+                  <div className="relative">
+                    <select value={selectedExportFormat} onChange={(e) => setSelectedExportFormat(e.target.value as ExportFormat)} className="appearance-none rounded-xl border border-slate-200 bg-white px-4 py-2 pr-9 text-sm text-slate-700 outline-none">
+                      <option value="excel">Excel</option>
+                      <option value="xml">XML</option>
+                      <option value="word">Word</option>
+                    </select>
+                    <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  </div>
+                </div>
+                <div className="h-[340px] overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50/40 p-3">
+                  {exportVisibleFields.map((fieldId) => (
+                    <label key={fieldId} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 transition-all hover:bg-white hover:shadow-sm">
+                      <input
+                        type="checkbox"
+                        checked={exportVisibleSelected.includes(fieldId)}
+                        onChange={(e) => setExportVisibleSelected((prev) => e.target.checked ? [...prev, fieldId] : prev.filter((id) => id !== fieldId))}
+                      />
+                      <span className="text-sm text-slate-700">{getClientExportFieldLabel(fieldId)}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6">
+              <label className="mb-2 block text-sm font-semibold text-slate-700">Nombre de la plantilla</label>
+              <input
+                type="text"
+                value={exportTemplateName}
+                onChange={(e) => setExportTemplateName(e.target.value)}
+                placeholder="Ej. Clientes para seguimiento"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none focus:border-red-300"
+              />
+            </div>
+
+            {exportError && (
+              <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {exportError}
+              </div>
+            )}
+
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <button type="button" onClick={() => setShowExportTemplateEditor(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</button>
+              <button type="button" onClick={saveExportTemplate} className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700">Guardar plantilla</button>
+            </div>
+          </div>
+        </div>
+      </div>,
+      document.body
+    )}
+    {showQuickTaskModal && selectedClient && (
+      <QuickTaskModal
+        client={selectedClient}
+        form={quickTaskForm}
+        setForm={setQuickTaskForm}
+        saving={quickTaskSaving}
+        errorMsg={quickTaskError}
+        onClose={() => {
+          setShowQuickTaskModal(false);
+          setQuickTaskError(null);
+          setQuickTaskForm(QUICK_TASK_EMPTY());
+        }}
+        onSave={handleQuickTaskSave}
+        getToken={getToken}
+      />
+    )}
     <div className="flex flex-col gap-0 animate-in fade-in duration-300" style={{ height: "calc(100vh - 96px)" }}>
 
       {/* ── CABECERA ─────────────────────────────────────────── */}
@@ -678,12 +1783,14 @@ export default function ClientList() {
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm flex flex-col overflow-hidden flex-1 min-h-0">
 
         {/* ── BARRA DE ACCIONES ────────────────────────────────── */}
-        <div className="flex items-center gap-1 px-3 py-2 border-b border-slate-100 bg-slate-50/80 flex-wrap">
+        <div className="flex items-center gap-1.5 px-3 py-3 border-b border-slate-100 bg-slate-50/80 flex-wrap">
 
           {/* ─ Alta ─ */}
-          <Link to="/dashboard/clientes/new">
-            <ToolBtn icon={Plus} label="Alta" primary />
-          </Link>
+          <AltaOptionsBtn
+            onManual={() => navigate("/dashboard/clientes/new?mode=manual")}
+            onDni={() => navigate("/dashboard/clientes/new?mode=dni")}
+            onLink={() => navigate("/dashboard/clientes/new?mode=link")}
+          />
 
           {/* ─ Baja (eliminar) ─ */}
           <ToolBtn
@@ -734,7 +1841,7 @@ export default function ClientList() {
                 onClick: () => selected && navigate(`/dashboard/clientes/${selected}#notas`),
               },
               {
-                label: "MN Sign",
+                label: "Sign",
                 icon: PenLine,
                 onClick: () => selected && navigate(`/dashboard/clientes/${selected}#firma`),
               },
@@ -750,25 +1857,28 @@ export default function ClientList() {
                 label: "Nuevo",
                 icon: MessageCircle,
                 onClick: () => {
-                  const tel = (selectedClient?.phone_mobile || selectedClient?.phone_1 || "").replace(/\D/g, "");
-                  window.open(`https://wa.me/34${tel}`);
+                  if (!selected) return;
+                  navigate(`/dashboard/whatsapp?clientId=${selected}&mode=new`);
                 },
               },
               {
                 label: "Con Plantilla",
                 icon: FileSpreadsheet,
                 onClick: () => {
-                  const tel = (selectedClient?.phone_mobile || selectedClient?.phone_1 || "").replace(/\D/g, "");
-                  window.open(`https://wa.me/34${tel}`);
+                  if (!selected) return;
+                  navigate(`/dashboard/whatsapp?clientId=${selected}&mode=template`);
                 },
               },
               {
                 label: "Programar WhatsApp",
                 icon: Bell,
-                onClick: () => {},
+                onClick: () => {
+                  if (!selected) return;
+                  navigate(`/dashboard/whatsapp?clientId=${selected}&mode=schedule`);
+                },
               },
               {
-                label: "MN Sign",
+                label: "Sign",
                 icon: PenLine,
                 onClick: () => selected && navigate(`/dashboard/clientes/${selected}#firma`),
               },
@@ -776,8 +1886,8 @@ export default function ClientList() {
                 label: "Ver Conversación",
                 icon: ExternalLink,
                 onClick: () => {
-                  const tel = (selectedClient?.phone_mobile || selectedClient?.phone_1 || "").replace(/\D/g, "");
-                  window.open(`https://web.whatsapp.com/send?phone=34${tel}`);
+                  if (!selected) return;
+                  navigate(`/dashboard/whatsapp?clientId=${selected}&mode=thread`);
                 },
               },
             ]}
@@ -785,59 +1895,24 @@ export default function ClientList() {
 
           <div className="w-px h-5 bg-slate-200 mx-0.5" />
 
-          {/* ─ MN Sign ─ */}
+          {/* ─ Sign ─ */}
           <ToolBtn
-            icon={PenLine} label="MN Sign"
+            icon={PenLine} label="Sign"
             disabled={!selected}
             onClick={() => selected && navigate(`/dashboard/clientes/${selected}#firma`)}
           />
 
-          {/* ─ Atajos ─ */}
+          {/* ─ Tareas ─ */}
           <DropdownBtn
-            icon={Zap} label="Atajos"
-            items={[
-              { label: "Propuesta Colaboración Asociaciones", icon: ArrowRight,    onClick: () => {} },
-              { label: "LOPD",                               icon: ArrowRight,    onClick: () => {} },
-              { label: "Domiciliación Bancaria",             icon: ArrowRight,    onClick: () => {} },
-              { label: "Informes",                           icon: ArrowRight,    onClick: () => {} },
-              { label: "Consentimientos",                    icon: ArrowRight,    onClick: () => {} },
-              { divider: true, label: "", onClick: () => {} },
-              { label: "Correo microcréditos Javier",        icon: Mail,          onClick: () => selectedClient?.email && window.open(`mailto:${selectedClient.email}`) },
-              { label: "Formulario COVID",                   icon: FileSpreadsheet, onClick: () => {} },
-              { label: "Firma LOPD Correo",                  icon: Mail,          onClick: () => selectedClient?.email && window.open(`mailto:${selectedClient.email}`) },
-              { label: "Valoración",                         icon: Mail,          onClick: () => {} },
-              { label: "Formulario Registro Cliente + LOPD", icon: Mail,          onClick: () => {} },
-              { label: "Formulario Actualización Datos cliente", icon: Mail,      onClick: () => {} },
-              { label: "Firma LOPD",                         icon: Mail,          onClick: () => {} },
-              { label: "Imprimir LOPD",                      icon: Printer,       onClick: () => {} },
-              { label: "Firma Consentimiento Grabación de Imágenes", icon: Mail,  onClick: () => {} },
-              { label: "Firma Domiciliación Bancaria",       icon: Mail,          onClick: () => {} },
-              { label: "Solicitar Valoración",               icon: Mail,          onClick: () => {} },
-              { label: "Registro en Acceso Clientes",        icon: Mail,          onClick: () => {} },
-              { label: "Imprimir Presupuesto",               icon: Printer,       onClick: () => {} },
-              { divider: true, label: "", onClick: () => {} },
-              { label: "<Añadir nuevo>",                     icon: Plus,          onClick: () => {} },
-              { label: "<Configurar Atajos>",                icon: Settings,      onClick: () => {} },
-            ]}
-          />
-
-          {/* ─ Actuación ─ */}
-          <DropdownBtn
-            icon={Activity} label="Actuación"
+            icon={ClipboardList} label="Tareas"
             disabled={!selected}
             items={[
-              { label: "Nueva actuación",       icon: Activity,  onClick: () => selected && navigate(`/dashboard/clientes/${selected}#notas`) },
-              { label: "Ver historial",          icon: ClipboardList, onClick: () => selected && navigate(`/dashboard/clientes/${selected}`) },
+              { label: "Nueva actuación", icon: Activity, onClick: () => selected && navigate(`/dashboard/clientes/${selected}#notas`) },
+              { label: "Crear obligaciones", icon: ClipboardList, onClick: openQuickTaskModal },
+              { label: "Ver historial", icon: History, onClick: () => selected && navigate(`/dashboard/clientes/${selected}`) },
               { divider: true, label: "", onClick: () => {} },
-              { label: "Reactivar cliente (Alta)", icon: Plus,   onClick: handleAlta },
+              { label: "Reactivar cliente (Alta)", icon: Plus, onClick: handleAlta },
             ]}
-          />
-
-          {/* ─ Crear Obligaciones ─ */}
-          <ToolBtn
-            icon={ClipboardList} label="Crear Obligaciones"
-            disabled={!selected}
-            onClick={() => selected && navigate(`/dashboard/clientes/${selected}#obligaciones`)}
           />
 
           <div className="w-px h-5 bg-slate-200 mx-0.5" />
@@ -860,7 +1935,7 @@ export default function ClientList() {
           />
 
           {/* ─ Excel ─ */}
-          <ToolBtn icon={FileSpreadsheet} label="Excel" onClick={exportCSV} />
+          <ToolBtn icon={FileSpreadsheet} label="Excel" onClick={openExportModal} />
 
           {/* ─ Informes/Dashboard ─ */}
           <ToolBtn
@@ -877,14 +1952,14 @@ export default function ClientList() {
           <div className="relative" ref={opcionesRef}>
             <button
               onClick={() => setShowOpciones(v => !v)}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors border ${showOpciones ? "bg-red-50 border-red-300 text-red-700" : "text-slate-600 hover:bg-slate-100 border-slate-200"}`}>
+              className={`flex items-center gap-1.5 whitespace-nowrap px-3 py-2 rounded-xl text-xs font-semibold transition-all shadow-sm border ${showOpciones ? "bg-red-50 border-red-300 text-red-700" : "text-slate-600 hover:bg-slate-50 border-slate-200 bg-white"}`}>
               <MoreHorizontal size={13} /> Opciones <ChevronDown size={10} />
             </button>
             {showOpciones && (
-              <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[230px] py-1.5">
+              <div className="absolute right-0 top-full mt-2 z-50 w-[290px] max-h-[78vh] overflow-y-auto overscroll-contain bg-white border border-slate-200 rounded-2xl shadow-[0_24px_60px_rgba(15,23,42,0.18)] py-1.5">
 
                 {/* Grupo 1 */}
-                <button onClick={() => { exportCSV(); setShowOpciones(false); }}
+                <button onClick={() => { openExportModal(); setShowOpciones(false); }}
                   className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
                   <FileSpreadsheet size={12} className="text-slate-400" /> Excel
                 </button>
@@ -900,6 +1975,44 @@ export default function ClientList() {
                   className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
                   <Star size={12} className="text-slate-400" /> Seleccionar Opciones Favoritas
                 </button>
+                <div className="relative">
+                  <button
+                    onClick={() => setShowColumnSelector(v => !v)}
+                    className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors"
+                  >
+                    <span className="flex items-center gap-2.5">
+                      <LayoutList size={12} className="text-slate-400" /> Elegir columnas
+                    </span>
+                    <ChevronRight size={12} className={`text-slate-400 transition-transform ${showColumnSelector ? "rotate-90" : ""}`} />
+                  </button>
+                  {showColumnSelector && (
+                    <div className="mx-2 mb-2 rounded-xl border border-slate-200 bg-slate-50 p-2">
+                      <p className="sticky top-0 z-[1] px-1 pb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400 bg-slate-50">Columnas visibles</p>
+                      <div className="max-h-[52vh] space-y-1 overflow-y-auto pr-1">
+                        {CLIENT_LIST_COLUMNS.map((column) => {
+                          const checked = visibleColumns[column.key];
+                          const disabled = checked && Object.values(visibleColumns).filter(Boolean).length <= 1;
+                          return (
+                            <button
+                              key={column.key}
+                              type="button"
+                              onClick={() => toggleColumnVisibility(column.key)}
+                              disabled={disabled}
+                              className={`flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-xs transition-colors ${
+                                disabled
+                                  ? "cursor-not-allowed text-slate-300"
+                                  : "text-slate-700 hover:bg-white hover:text-red-700"
+                              }`}
+                            >
+                              <span>{column.label}</span>
+                              {checked ? <CheckSquare size={13} className="text-red-600" /> : <Square size={13} className="text-slate-400" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 <div className="h-px bg-slate-100 my-1.5" />
 
@@ -1015,17 +2128,6 @@ export default function ClientList() {
           </div>
 
           {/* ─ Indicador cliente seleccionado ─ */}
-          {selectedClient && (
-            <div className="ml-auto flex items-center gap-1.5 px-2 py-1 bg-red-50 border border-red-100 rounded-lg shrink-0">
-              <div className="w-2 h-2 bg-red-500 rounded-full" />
-              <span className="text-xs text-red-700 font-medium max-w-[140px] truncate">
-                {selectedClient.first_name} {selectedClient.last_name}
-              </span>
-              <button onClick={() => setSelected(null)} className="text-red-300 hover:text-red-600 transition-colors ml-0.5">
-                <X size={11} />
-              </button>
-            </div>
-          )}
         </div>
 
         {/* ── BARRA DE FILTROS MULTICRITERIA ───────────────────── */}
@@ -1184,25 +2286,46 @@ export default function ClientList() {
             <table className="w-full text-left text-sm min-w-[900px]">
               <thead className="bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
                 <tr>
-                  <Th label="Nº"                 sortKey="internal_number" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="w-14 pl-4" />
-                  <Th label="Nombre y Apellidos" sortKey="first_name"      currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
-                  <Th label="NIF / CIF"          sortKey="nif_cif"         currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
-                  <Th label="Móvil"              sortKey="phone_mobile"    currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden lg:table-cell" />
-                  <Th label="Teléfono"           sortKey="phone_1"         currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden xl:table-cell" />
-                  <Th label="Correo Electrónico" sortKey="email"           currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden lg:table-cell" />
-                  <Th label="Tipo"               sortKey="type"            currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden md:table-cell" />
-                  <Th label="LOPD"               sortKey="lopd"            currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden xl:table-cell" />
-                  <Th label="Fecha Alta"         sortKey="date_alta"       currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden md:table-cell" />
-                  <Th label="Estado"             sortKey="client_status"   currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
-                  <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden xl:table-cell">Actuac.</th>
-                  <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden xl:table-cell">Exp.</th>
+                  {visibleColumns.internal_number && <Th label="Nº"                 sortKey="internal_number" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="w-14 pl-4" />}
+                  {visibleColumns.name && <Th label="Nombre y Apellidos" sortKey="first_name"      currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />}
+                  {visibleColumns.document_type && <Th label="Tipo documento" sortKey="document_type" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden xl:table-cell" />}
+                  {visibleColumns.nif_cif && <Th label="NIF / CIF"          sortKey="nif_cif"         currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />}
+                  {visibleColumns.last_name && <Th label="Apellidos" sortKey="last_name" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden xl:table-cell" />}
+                  {visibleColumns.commercial_name && <Th label="Nombre comercial" sortKey="commercial_name" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden xl:table-cell" />}
+                  {visibleColumns.legal_nature && <Th label="Naturaleza jurídica" sortKey="legal_nature" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden 2xl:table-cell" />}
+                  {visibleColumns.gender && <Th label="Sexo" sortKey="gender" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden xl:table-cell" />}
+                  {visibleColumns.birth_date && <Th label="Fecha nacimiento" sortKey="birth_date" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden 2xl:table-cell" />}
+                  {visibleColumns.age && <Th label="Edad" sortKey="birth_date" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden 2xl:table-cell" />}
+                  {visibleColumns.nationality && <Th label="Nacionalidad" sortKey="nationality" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden 2xl:table-cell" />}
+                  {visibleColumns.expedition_country && <Th label="País expedición" sortKey="expedition_country" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden 2xl:table-cell" />}
+                  {visibleColumns.address && <Th label="Dirección" sortKey="address" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden 2xl:table-cell" />}
+                  {visibleColumns.address_town && <Th label="Población" sortKey="address_town" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden xl:table-cell" />}
+                  {visibleColumns.address_cp && <Th label="Código postal" sortKey="address_cp" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden xl:table-cell" />}
+                  {visibleColumns.address_province && <Th label="Provincia" sortKey="address_province" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden 2xl:table-cell" />}
+                  {visibleColumns.address_country && <Th label="País" sortKey="address_country" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden 2xl:table-cell" />}
+                  {visibleColumns.phone_mobile && <Th label="Móvil"              sortKey="phone_mobile"    currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden lg:table-cell" />}
+                  {visibleColumns.phone_1 && <Th label="Teléfono"           sortKey="phone_1"         currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden xl:table-cell" />}
+                  {visibleColumns.email && <Th label="Correo Electrónico" sortKey="email"           currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden lg:table-cell" />}
+                  {visibleColumns.phone_2 && <Th label="Teléfono 2" sortKey="phone_2" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden 2xl:table-cell" />}
+                  {visibleColumns.phone_3 && <Th label="Teléfono 3" sortKey="phone_3" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden 2xl:table-cell" />}
+                  {visibleColumns.phone_fax && <Th label="Fax" sortKey="phone_fax" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden 2xl:table-cell" />}
+                  {visibleColumns.website && <Th label="Página web" sortKey="website" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden 2xl:table-cell" />}
+                  {visibleColumns.type && <Th label="Tipo"               sortKey="type"            currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden md:table-cell" />}
+                  {visibleColumns.lopd && <Th label="LOPD"               sortKey="lopd"            currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden xl:table-cell" />}
+                  {visibleColumns.date_alta && <Th label="Fecha Alta"         sortKey="date_alta"       currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden md:table-cell" />}
+                  {visibleColumns.date_baja && <Th label="Fecha baja" sortKey="date_baja" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden xl:table-cell" />}
+                  {visibleColumns.center && <Th label="Centro" sortKey="center" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden xl:table-cell" />}
+                  {visibleColumns.commercial_communications && <Th label="Com. comerciales" sortKey="commercial_communications" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="hidden 2xl:table-cell" />}
+                  {visibleColumns.client_status && <Th label="Estado"             sortKey="client_status"   currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />}
+                  {visibleColumns.total_actuaciones && <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden xl:table-cell">Actuac.</th>}
+                  {visibleColumns.total_expedientes && <th className="px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden xl:table-cell">Exp.</th>}
                   <th className="px-3 py-2.5 w-10" />
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="py-20 text-center">
+                    <td colSpan={visibleColumnCount} className="py-20 text-center">
                       <div className="flex flex-col items-center gap-3 text-slate-400">
                         <Users size={36} className="opacity-15" />
                         <p className="font-medium text-sm">
@@ -1228,8 +2351,8 @@ export default function ClientList() {
                       onDoubleClick={() => navigate(`/dashboard/clientes/${client.id}`)}
                       className={`border-b border-slate-50 cursor-pointer transition-colors group ${isSelected ? "bg-red-50 border-l-2 border-l-red-500" : "hover:bg-slate-50/80"}`}
                     >
-                      <td className={`pl-4 pr-3 py-3 font-mono text-slate-400 ${isSelected ? "text-red-400" : ""}`}>{client.internal_number || "—"}</td>
-                      <td className="px-3 py-3">
+                      {visibleColumns.internal_number && <td className={`pl-4 pr-3 py-3 font-mono text-slate-400 ${isSelected ? "text-red-400" : ""}`}>{client.internal_number || "—"}</td>}
+                      {visibleColumns.name && <td className="px-3 py-3">
                         <div className="flex items-center gap-2.5">
                           {client.photo_url
                             ? <img src={client.photo_url} alt="" className="h-9 w-9 rounded-lg object-cover shrink-0 border border-slate-100" />
@@ -1240,29 +2363,50 @@ export default function ClientList() {
                             {client.commercial_name && <p className="text-xs text-slate-400 truncate leading-tight">{client.commercial_name}</p>}
                           </div>
                         </div>
-                      </td>
-                      <td className="px-3 py-3 font-mono text-slate-500">{client.nif_cif || <span className="text-slate-300">—</span>}</td>
-                      <td className="px-3 py-3 text-slate-500 hidden lg:table-cell">{client.phone_mobile || <span className="text-slate-300">—</span>}</td>
-                      <td className="px-3 py-3 text-slate-500 hidden xl:table-cell">{client.phone_1 || <span className="text-slate-300">—</span>}</td>
-                      <td className="px-3 py-3 text-slate-500 hidden lg:table-cell truncate max-w-[160px]">{client.email || <span className="text-slate-300">—</span>}</td>
-                      <td className="px-3 py-3 hidden md:table-cell"><span className={`font-semibold ${tipoColor[client.type] || "text-slate-600"}`}>{client.type || "—"}</span></td>
-                      <td className="px-3 py-3 hidden xl:table-cell">
+                      </td>}
+                      {visibleColumns.document_type && <td className="px-3 py-3 hidden xl:table-cell text-slate-500">{client.document_type || <span className="text-slate-300">—</span>}</td>}
+                      {visibleColumns.nif_cif && <td className="px-3 py-3 font-mono text-slate-500">{client.nif_cif || <span className="text-slate-300">—</span>}</td>}
+                      {visibleColumns.last_name && <td className="px-3 py-3 hidden xl:table-cell text-slate-500">{client.last_name || <span className="text-slate-300">—</span>}</td>}
+                      {visibleColumns.commercial_name && <td className="px-3 py-3 hidden xl:table-cell text-slate-500 truncate max-w-[160px]">{client.commercial_name || <span className="text-slate-300">—</span>}</td>}
+                      {visibleColumns.legal_nature && <td className="px-3 py-3 hidden 2xl:table-cell text-slate-500">{client.legal_nature || <span className="text-slate-300">—</span>}</td>}
+                      {visibleColumns.gender && <td className="px-3 py-3 hidden xl:table-cell text-slate-500">{fmtGender(client.gender)}</td>}
+                      {visibleColumns.birth_date && <td className="px-3 py-3 hidden 2xl:table-cell text-slate-500 whitespace-nowrap">{client.birth_date ? fmtDate(client.birth_date) : <span className="text-slate-300">—</span>}</td>}
+                      {visibleColumns.age && <td className="px-3 py-3 hidden 2xl:table-cell text-slate-500 whitespace-nowrap">{calcAge(client.birth_date) !== null ? `${calcAge(client.birth_date)} años` : <span className="text-slate-300">—</span>}</td>}
+                      {visibleColumns.nationality && <td className="px-3 py-3 hidden 2xl:table-cell text-slate-500">{client.nationality || <span className="text-slate-300">—</span>}</td>}
+                      {visibleColumns.expedition_country && <td className="px-3 py-3 hidden 2xl:table-cell text-slate-500">{client.expedition_country || <span className="text-slate-300">—</span>}</td>}
+                      {visibleColumns.address && <td className="px-3 py-3 hidden 2xl:table-cell text-slate-500 truncate max-w-[220px]">{client.address || <span className="text-slate-300">—</span>}</td>}
+                      {visibleColumns.address_town && <td className="px-3 py-3 hidden xl:table-cell text-slate-500">{client.address_town || <span className="text-slate-300">—</span>}</td>}
+                      {visibleColumns.address_cp && <td className="px-3 py-3 hidden xl:table-cell text-slate-500 whitespace-nowrap">{client.address_cp || <span className="text-slate-300">—</span>}</td>}
+                      {visibleColumns.address_province && <td className="px-3 py-3 hidden 2xl:table-cell text-slate-500">{client.address_province || <span className="text-slate-300">—</span>}</td>}
+                      {visibleColumns.address_country && <td className="px-3 py-3 hidden 2xl:table-cell text-slate-500">{client.address_country || <span className="text-slate-300">—</span>}</td>}
+                      {visibleColumns.phone_mobile && <td className="px-3 py-3 text-slate-500 hidden lg:table-cell">{client.phone_mobile || <span className="text-slate-300">—</span>}</td>}
+                      {visibleColumns.phone_1 && <td className="px-3 py-3 text-slate-500 hidden xl:table-cell">{client.phone_1 || <span className="text-slate-300">—</span>}</td>}
+                      {visibleColumns.phone_2 && <td className="px-3 py-3 text-slate-500 hidden 2xl:table-cell">{client.phone_2 || <span className="text-slate-300">—</span>}</td>}
+                      {visibleColumns.phone_3 && <td className="px-3 py-3 text-slate-500 hidden 2xl:table-cell">{client.phone_3 || <span className="text-slate-300">—</span>}</td>}
+                      {visibleColumns.phone_fax && <td className="px-3 py-3 text-slate-500 hidden 2xl:table-cell">{client.phone_fax || <span className="text-slate-300">—</span>}</td>}
+                      {visibleColumns.email && <td className="px-3 py-3 text-slate-500 hidden lg:table-cell truncate max-w-[160px]">{client.email || <span className="text-slate-300">—</span>}</td>}
+                      {visibleColumns.website && <td className="px-3 py-3 text-slate-500 hidden 2xl:table-cell truncate max-w-[180px]">{client.website || <span className="text-slate-300">—</span>}</td>}
+                      {visibleColumns.type && <td className="px-3 py-3 hidden md:table-cell"><span className={`font-semibold ${tipoColor[client.type] || "text-slate-600"}`}>{client.type || "—"}</span></td>}
+                      {visibleColumns.lopd && <td className="px-3 py-3 hidden xl:table-cell">
                         {client.lopd ? <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${lopdColor[client.lopd] || "bg-slate-50 text-slate-500"}`}>{client.lopd}</span> : <span className="text-slate-300">—</span>}
-                      </td>
-                      <td className="px-3 py-3 text-slate-500 hidden md:table-cell whitespace-nowrap">{fmtDate(client.date_alta ?? client.created_at)}</td>
-                      <td className="px-3 py-3">
+                      </td>}
+                      {visibleColumns.date_alta && <td className="px-3 py-3 text-slate-500 hidden md:table-cell whitespace-nowrap">{fmtDate(client.date_alta ?? client.created_at)}</td>}
+                      {visibleColumns.date_baja && <td className="px-3 py-3 text-slate-500 hidden xl:table-cell whitespace-nowrap">{client.date_baja ? fmtDate(client.date_baja) : <span className="text-slate-300">—</span>}</td>}
+                      {visibleColumns.center && <td className="px-3 py-3 text-slate-500 hidden xl:table-cell">{client.center || <span className="text-slate-300">—</span>}</td>}
+                      {visibleColumns.commercial_communications && <td className="px-3 py-3 text-slate-500 hidden 2xl:table-cell">{client.commercial_communications || <span className="text-slate-300">—</span>}</td>}
+                      {visibleColumns.client_status && <td className="px-3 py-3">
                         {client.client_status ? <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${statusColor[client.client_status] || "bg-slate-100 text-slate-600"}`}>{client.client_status}</span> : <span className="text-slate-300">—</span>}
-                      </td>
-                      <td className="px-3 py-3 hidden xl:table-cell text-center">
+                      </td>}
+                      {visibleColumns.total_actuaciones && <td className="px-3 py-3 hidden xl:table-cell text-center">
                         {(client.total_actuaciones ?? 0) > 0
                           ? <span className="inline-flex items-center justify-center min-w-[22px] h-5 px-1.5 rounded-full text-xs font-bold bg-blue-100 text-blue-700">{client.total_actuaciones}</span>
                           : <span className="text-slate-300 text-xs">—</span>}
-                      </td>
-                      <td className="px-3 py-3 hidden xl:table-cell text-center">
+                      </td>}
+                      {visibleColumns.total_expedientes && <td className="px-3 py-3 hidden xl:table-cell text-center">
                         {(client.total_expedientes ?? 0) > 0
                           ? <span className="inline-flex items-center justify-center min-w-[22px] h-5 px-1.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-700">{client.total_expedientes}</span>
                           : <span className="text-slate-300 text-xs">—</span>}
-                      </td>
+                      </td>}
                       <td className="px-3 py-3 text-right">
                         <Link to={`/dashboard/clientes/${client.id}`} onClick={e => e.stopPropagation()} className="p-1 rounded-lg text-slate-200 hover:text-red-500 hover:bg-red-50 transition-colors inline-flex opacity-0 group-hover:opacity-100" title="Abrir ficha">
                           <ExternalLink size={14} />

@@ -1,8 +1,10 @@
 import { Request, Response } from 'express';
 import * as crypto from 'crypto';
 import pool from '../config/database';
-import { ImapClient, ImapConfig, syncInbox } from '../utils/imap';
-import { sendEmail, SmtpConfig, MailMessage } from '../utils/smtp';
+import { ImapClient, ImapConfig, syncInbox, testImapConnection } from '../utils/imap';
+import { Pop3Config, syncPop3Inbox, testPop3Connection } from '../utils/pop3';
+import { sendEmail, SmtpConfig, MailMessage, testSmtpConnection } from '../utils/smtp';
+import { logActivityForReq } from './activityController';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -30,6 +32,85 @@ function userId(req: Request): string {
   return (req as any).auth?.userId || '';
 }
 
+function explainMailConnectionError(error: any, proto: 'imap' | 'pop3' | 'smtp'): string {
+  const message = String(error?.message || error || '').trim();
+  const lower = message.toLowerCase();
+  const label = proto === 'smtp' ? 'SMTP' : proto.toUpperCase();
+
+  if (lower.includes('auth') || lower.includes('login') || lower.includes('invalid credentials')) {
+    return `No se pudo iniciar sesión en ${label}. Revisa el usuario, la contraseña o la contraseña de aplicación.`;
+  }
+  if (lower.includes('econnrefused') || lower.includes('connection refused')) {
+    return `El servidor ${label} rechazó la conexión. Revisa host, puerto y si ese servicio está habilitado.`;
+  }
+  if (lower.includes('enotfound') || lower.includes('getaddrinfo')) {
+    return `No se pudo resolver el servidor ${label}. Comprueba que el host esté bien escrito.`;
+  }
+  if (lower.includes('certificate') || lower.includes('tls') || lower.includes('ssl')) {
+    return `La conexión segura con ${label} falló. Revisa SSL/TLS y el puerto configurado.`;
+  }
+  if (lower.includes('timeout') || lower.includes('timed out')) {
+    return `El servidor ${label} tardó demasiado en responder. Comprueba host, puerto y conectividad.`;
+  }
+
+  return `No se pudo validar la conexión ${label}: ${message || 'error desconocido'}`;
+}
+
+function parseAddressToken(raw: string): { email: string; name: string | null } | null {
+  const value = String(raw || '').trim();
+  if (!value) return null;
+
+  const angled = value.match(/^(.*?)<([^>]+)>$/);
+  const email = (angled ? angled[2] : value).trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return null;
+
+  const name = angled?.[1]?.trim().replace(/^"|"$/g, '') || null;
+  return { email, name };
+}
+
+function extractContacts(input: unknown): Array<{ email: string; name: string | null }> {
+  const parts = Array.isArray(input)
+    ? input.flatMap((item) => String(item || '').split(/[;,]/))
+    : String(input || '').split(/[;,]/);
+
+  return parts
+    .map(parseAddressToken)
+    .filter((item): item is { email: string; name: string | null } => Boolean(item));
+}
+
+async function upsertEmailContacts(
+  uid: string,
+  contacts: Array<{ email: string; name?: string | null }>,
+  source = 'gmail',
+) {
+  for (const contact of contacts) {
+    await pool.query(
+      `INSERT INTO email_contacts (user_id, email, name, source, usage_count, last_used_at)
+       VALUES ($1,$2,$3,$4,1,NOW())
+       ON CONFLICT (user_id, email)
+       DO UPDATE SET
+         name = COALESCE(EXCLUDED.name, email_contacts.name),
+         source = EXCLUDED.source,
+         usage_count = email_contacts.usage_count + 1,
+         last_used_at = NOW(),
+         updated_at = NOW()`,
+      [uid, contact.email, contact.name || null, source],
+    );
+  }
+}
+
+async function getAccountForMessage(messageId: string, uid: string) {
+  const { rows } = await pool.query(
+    `SELECT e.id, e.uid, e.folder, e.user_id,
+            a.id AS account_id, a.imap_host, a.imap_port, a.imap_secure, a.username, a.password_enc
+       FROM emails e
+       JOIN email_accounts a ON a.id=e.account_id
+      WHERE e.id=$1 AND e.user_id=$2`,
+    [messageId, uid],
+  );
+  return rows[0] || null;
+}
+
 // ── Cuentas ───────────────────────────────────────────────────────────────────
 
 export async function getAccounts(req: Request, res: Response) {
@@ -38,7 +119,9 @@ export async function getAccounts(req: Request, res: Response) {
   try {
     const { rows } = await pool.query(
       `SELECT id, label, email, imap_host, imap_port, imap_secure,
-              smtp_host, smtp_port, smtp_secure, username, active, last_sync_at, created_at
+              smtp_host, smtp_port, smtp_secure, username, active,
+              COALESCE(protocol, 'imap') AS protocol,
+              last_sync_at, created_at
        FROM email_accounts WHERE user_id=$1 ORDER BY created_at`,
       [uid],
     );
@@ -51,39 +134,67 @@ export async function createAccount(req: Request, res: Response) {
   if (!uid) return err(res, 'No autenticado', 401);
   const {
     label = 'Mi cuenta', email,
-    imap_host, imap_port = 993, imap_secure = true,
+    imap_host, imap_port, imap_secure = true,
     smtp_host, smtp_port = 587, smtp_secure = false,
     username, password,
+    protocol = 'imap',   // 'imap' | 'pop3'
   } = req.body;
 
+  const proto      = String(protocol).toLowerCase() === 'pop3' ? 'pop3' : 'imap';
+  const defaultPort = proto === 'pop3' ? 995 : 993;
+  const inPort     = Number(imap_port ?? defaultPort);
+
   if (!email || !imap_host || !smtp_host || !username || !password) {
-    return err(res, 'Faltan campos obligatorios', 400);
-  }
-
-  // Test IMAP connection before saving
-  const imapCfg: ImapConfig = {
-    host: imap_host, port: Number(imap_port), secure: Boolean(imap_secure),
-    user: username, password,
-  };
-  try {
-    const client = new ImapClient(imapCfg);
-    await client.connect();
-    await client.login();
-    await client.logout();
-  } catch (e: any) {
-    return err(res, `No se pudo conectar a IMAP: ${e.message}`, 400);
+    return err(res, 'Faltan campos obligatorios (email, servidor, usuario, contraseña)', 400);
   }
 
   try {
+    if (proto === 'pop3') {
+      const pop3Cfg: Pop3Config = {
+        host: String(imap_host),
+        port: inPort,
+        secure: Boolean(imap_secure),
+        user: String(username),
+        password: String(password),
+      };
+      await testPop3Connection(pop3Cfg).catch((e) => {
+        throw new Error(explainMailConnectionError(e, 'pop3'));
+      });
+    } else {
+      const imapCfg: ImapConfig = {
+        host: String(imap_host),
+        port: inPort,
+        secure: Boolean(imap_secure),
+        user: String(username),
+        password: String(password),
+      };
+      await testImapConnection(imapCfg).catch((e) => {
+        throw new Error(explainMailConnectionError(e, 'imap'));
+      });
+    }
+
+    const smtpCfg: SmtpConfig = {
+      host: String(smtp_host),
+      port: Number(smtp_port),
+      secure: Boolean(smtp_secure),
+      user: String(username),
+      password: String(password),
+    };
+    await testSmtpConnection(smtpCfg).catch((e) => {
+      throw new Error(explainMailConnectionError(e, 'smtp'));
+    });
+
     const enc = encryptPassword(password);
     const { rows } = await pool.query(
-      `INSERT INTO email_accounts (user_id, label, email, imap_host, imap_port, imap_secure,
-        smtp_host, smtp_port, smtp_secure, username, password_enc)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+      `INSERT INTO email_accounts
+         (user_id, label, email, imap_host, imap_port, imap_secure,
+          smtp_host, smtp_port, smtp_secure, username, password_enc, protocol)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
        RETURNING id, label, email, imap_host, imap_port, imap_secure,
-                 smtp_host, smtp_port, smtp_secure, username, active, last_sync_at, created_at`,
-      [uid, label, email, imap_host, Number(imap_port), Boolean(imap_secure),
-       smtp_host, Number(smtp_port), Boolean(smtp_secure), username, enc],
+                 smtp_host, smtp_port, smtp_secure, username, active,
+                 protocol, last_sync_at, created_at`,
+      [uid, label, email, imap_host, inPort, Boolean(imap_secure),
+       smtp_host, Number(smtp_port), Boolean(smtp_secure), username, enc, proto],
     );
     return ok(res, rows[0]);
   } catch (e: any) { return err(res, e.message); }
@@ -103,7 +214,7 @@ export async function deleteAccount(req: Request, res: Response) {
   } catch (e: any) { return err(res, e.message); }
 }
 
-// ── Sincronización IMAP ───────────────────────────────────────────────────────
+// ── Sincronización IMAP / POP3 ────────────────────────────────────────────────
 
 export async function syncAccount(req: Request, res: Response) {
   const uid = userId(req);
@@ -118,53 +229,83 @@ export async function syncAccount(req: Request, res: Response) {
       [id, uid],
     );
     if (!accs.length) return err(res, 'Cuenta no encontrada', 404);
-    const acc = accs[0];
+    const acc      = accs[0];
     const password = decryptPassword(acc.password_enc);
+    const proto    = (acc.protocol || 'imap').toLowerCase();
 
-    const imapCfg: ImapConfig = {
-      host: acc.imap_host, port: acc.imap_port, secure: acc.imap_secure,
-      user: acc.username, password,
-    };
-
-    const messages = await syncInbox(imapCfg, folder, limit);
-
-    // Upsert into DB
     let inserted = 0;
-    for (const msg of messages) {
-      const sentAt = msg.date ? new Date(msg.date) : null;
-      const { rowCount } = await pool.query(
-        `INSERT INTO emails
-          (account_id, user_id, uid, message_id, folder, from_email, from_name,
-           to_emails, subject, snippet, is_read, size_bytes, sent_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
-         ON CONFLICT (account_id, uid, folder) DO UPDATE SET
-           is_read    = EXCLUDED.is_read,
-           is_starred = emails.is_starred,
-           snippet    = COALESCE(EXCLUDED.snippet, emails.snippet)`,
-        [
-          acc.id, uid,
-          msg.uid > 0 ? msg.uid : null,
-          msg.messageId || null,
-          folder,
-          msg.from || null,
-          msg.fromName || null,
-          msg.to || null,
-          msg.subject || '(Sin asunto)',
-          msg.snippet || null,
-          msg.flags.includes('\\Seen'),
-          msg.size || 0,
-          sentAt,
-        ],
+    let synced   = 0;
+
+    if (proto === 'pop3') {
+      // ── POP3: descargar solo mensajes nuevos por UIDL ──────────────────────
+      const { rows: known } = await pool.query(
+        `SELECT message_id FROM emails WHERE account_id=$1 AND message_id IS NOT NULL`,
+        [acc.id],
       );
-      if (rowCount) inserted++;
+      const knownUidls = new Set(known.map((r: any) => String(r.message_id)));
+
+      const pop3Cfg: Pop3Config = {
+        host: acc.imap_host, port: acc.imap_port, secure: acc.imap_secure,
+        user: acc.username, password,
+      };
+      const messages = await syncPop3Inbox(pop3Cfg, knownUidls, limit);
+      synced = messages.length;
+
+      for (const msg of messages) {
+        const sentAt = msg.date ? new Date(msg.date) : null;
+        const { rowCount } = await pool.query(
+          `INSERT INTO emails
+             (account_id, user_id, message_id, folder, from_email, from_name,
+              to_emails, subject, snippet, body_text, body_html, is_read,
+              is_starred, size_bytes, sent_at)
+           VALUES ($1,$2,$3,'INBOX',$4,$5,$6,$7,$8,$9,$10,false,false,$11,$12)
+           ON CONFLICT DO NOTHING`,
+          [
+            acc.id, uid, msg.uidl,
+            msg.from || null, msg.fromName || null, msg.to || null,
+            msg.subject || '(Sin asunto)', msg.snippet || null,
+            msg.bodyText || null, msg.bodyHtml || null,
+            msg.size || 0, sentAt,
+          ],
+        );
+        if (rowCount) inserted++;
+      }
+    } else {
+      // ── IMAP ──────────────────────────────────────────────────────────────
+      const imapCfg: ImapConfig = {
+        host: acc.imap_host, port: acc.imap_port, secure: acc.imap_secure,
+        user: acc.username, password,
+      };
+      const messages = await syncInbox(imapCfg, folder, limit);
+      synced = messages.length;
+
+      for (const msg of messages) {
+        const sentAt = msg.date ? new Date(msg.date) : null;
+        const { rowCount } = await pool.query(
+          `INSERT INTO emails
+             (account_id, user_id, uid, message_id, folder, from_email, from_name,
+              to_emails, subject, snippet, is_read, is_starred, size_bytes, sent_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+           ON CONFLICT (account_id, uid, folder) DO UPDATE SET
+             is_read    = EXCLUDED.is_read,
+             is_starred = EXCLUDED.is_starred,
+             snippet    = COALESCE(EXCLUDED.snippet, emails.snippet)`,
+          [
+            acc.id, uid,
+            msg.uid > 0 ? msg.uid : null, msg.messageId || null,
+            folder, msg.from || null, msg.fromName || null, msg.to || null,
+            msg.subject || '(Sin asunto)', msg.snippet || null,
+            msg.flags.includes('\\Seen'), msg.flags.includes('\\Flagged'),
+            msg.size || 0, sentAt,
+          ],
+        );
+        if (rowCount) inserted++;
+      }
     }
 
-    await pool.query(
-      `UPDATE email_accounts SET last_sync_at=NOW() WHERE id=$1`,
-      [acc.id],
-    );
+    await pool.query(`UPDATE email_accounts SET last_sync_at=NOW() WHERE id=$1`, [acc.id]);
 
-    return ok(res, { synced: messages.length, inserted, folder });
+    return ok(res, { synced, inserted, folder, protocol: proto });
   } catch (e: any) { return err(res, `Error de sincronización: ${e.message}`); }
 }
 
@@ -312,10 +453,30 @@ export async function markRead(req: Request, res: Response) {
   const { id } = req.params;
   const { read = true } = req.body;
   try {
+    const message = await getAccountForMessage(id, uid);
+    if (!message) return err(res, 'Email no encontrado', 404);
+
     await pool.query(
       `UPDATE emails SET is_read=$1 WHERE id=$2 AND user_id=$3`,
       [Boolean(read), id, uid],
     );
+
+    if (message.uid) {
+      try {
+        const password = decryptPassword(message.password_enc);
+        const cfg: ImapConfig = {
+          host: message.imap_host, port: message.imap_port, secure: message.imap_secure,
+          user: message.username, password,
+        };
+        const client = new ImapClient(cfg);
+        await client.connect();
+        await client.login();
+        await client.selectFolder(message.folder);
+        await client.markRead(Number(message.uid), Boolean(read));
+        await client.logout();
+      } catch (_e) { /* best effort */ }
+    }
+
     return ok(res, { id, is_read: Boolean(read) });
   } catch (e: any) { return err(res, e.message); }
 }
@@ -325,12 +486,32 @@ export async function toggleStar(req: Request, res: Response) {
   if (!uid) return err(res, 'No autenticado', 401);
   const { id } = req.params;
   try {
+    const message = await getAccountForMessage(id, uid);
+    if (!message) return err(res, 'Email no encontrado', 404);
+
     const { rows } = await pool.query(
       `UPDATE emails SET is_starred = NOT is_starred WHERE id=$1 AND user_id=$2
        RETURNING is_starred`,
       [id, uid],
     );
     if (!rows.length) return err(res, 'Email no encontrado', 404);
+
+    if (message.uid) {
+      try {
+        const password = decryptPassword(message.password_enc);
+        const cfg: ImapConfig = {
+          host: message.imap_host, port: message.imap_port, secure: message.imap_secure,
+          user: message.username, password,
+        };
+        const client = new ImapClient(cfg);
+        await client.connect();
+        await client.login();
+        await client.selectFolder(message.folder);
+        await client.markFlagged(Number(message.uid), Boolean(rows[0].is_starred));
+        await client.logout();
+      } catch (_e) { /* best effort */ }
+    }
+
     return ok(res, { id, is_starred: rows[0].is_starred });
   } catch (e: any) { return err(res, e.message); }
 }
@@ -392,15 +573,25 @@ export async function sendMail(req: Request, res: Response) {
   const uid = userId(req);
   if (!uid) return err(res, 'No autenticado', 401);
   const { account_id, to, cc, bcc, subject, html, text, draft_id } = req.body;
+  let accountId = account_id as string | undefined;
 
-  if (!account_id || !to || !subject || !html) {
-    return err(res, 'Faltan campos obligatorios (account_id, to, subject, html)', 400);
+  if (!to || !subject || !html) {
+    return err(res, 'Faltan campos obligatorios (to, subject, html)', 400);
   }
 
   try {
+    if (!accountId) {
+      const { rows: firstAccountRows } = await pool.query(
+        `SELECT id FROM email_accounts WHERE user_id=$1 AND active=true ORDER BY created_at ASC LIMIT 1`,
+        [uid],
+      );
+      accountId = firstAccountRows[0]?.id;
+    }
+    if (!accountId) return err(res, 'No hay ninguna cuenta IMAP/SMTP activa para enviar', 400);
+
     const { rows } = await pool.query(
       `SELECT * FROM email_accounts WHERE id=$1 AND user_id=$2 AND active=true`,
-      [account_id, uid],
+      [accountId, uid],
     );
     if (!rows.length) return err(res, 'Cuenta no encontrada', 404);
     const acc = rows[0];
@@ -441,8 +632,112 @@ export async function sendMail(req: Request, res: Response) {
       await pool.query(`DELETE FROM emails WHERE id=$1 AND user_id=$2 AND is_draft=true`, [draft_id, uid]);
     }
 
+    await upsertEmailContacts(uid, [
+      ...extractContacts(to),
+      ...extractContacts(cc),
+      ...extractContacts(bcc),
+    ], 'smtp');
+
+    await logActivityForReq(
+      req,
+      `Correo enviado: ${subject}`,
+      'EMAIL',
+      accountId,
+      (Array.isArray(toList) ? toList : [toList]).join(', '),
+      'CREATE',
+    );
+
     return ok(res, { sent: true });
   } catch (e: any) { return err(res, `Error al enviar: ${e.message}`); }
+}
+
+export async function getRecipientSuggestions(req: Request, res: Response) {
+  const uid = userId(req);
+  if (!uid) return err(res, 'No autenticado', 401);
+
+  const q = String(req.query.q || '').trim();
+  const limit = Math.min(Math.max(Number(req.query.limit || 8), 1), 20);
+  const like = `%${q}%`;
+
+  try {
+    const { rows } = await pool.query(
+      `
+      SELECT *
+      FROM (
+        SELECT
+          ec.email,
+          COALESCE(NULLIF(ec.name, ''), ec.email) AS name,
+          ec.source,
+          ec.usage_count,
+          ec.last_used_at
+        FROM email_contacts ec
+        WHERE ec.user_id = $1
+          AND ($2 = '' OR ec.email ILIKE $3 OR COALESCE(ec.name, '') ILIKE $3)
+
+        UNION
+
+        SELECT
+          e.email,
+          COALESCE(NULLIF(TRIM(CONCAT(COALESCE(e.first_name, ''), ' ', COALESCE(e.last_name, ''))), ''), e.commercial_name, e.email) AS name,
+          'cliente' AS source,
+          0 AS usage_count,
+          NULL::timestamptz AS last_used_at
+        FROM entities e
+        WHERE e.email IS NOT NULL
+          AND e.email <> ''
+          AND ($2 = '' OR e.email ILIKE $3 OR COALESCE(e.first_name, '') ILIKE $3 OR COALESCE(e.last_name, '') ILIKE $3 OR COALESCE(e.commercial_name, '') ILIKE $3)
+      ) candidates
+      ORDER BY usage_count DESC, last_used_at DESC NULLS LAST, name ASC
+      LIMIT $4
+      `,
+      [uid, q, like, limit],
+    );
+
+    return ok(res, rows);
+  } catch (e: any) {
+    return err(res, e.message);
+  }
+}
+
+export async function logGmailSent(req: Request, res: Response) {
+  const uid = userId(req);
+  if (!uid) return err(res, 'No autenticado', 401);
+
+  const { to, cc, bcc, subject, snippet, has_attachments } = req.body || {};
+  if (!to || !subject) return err(res, 'Faltan campos obligatorios (to, subject)', 400);
+
+  try {
+    const contacts = [
+      ...extractContacts(to),
+      ...extractContacts(cc),
+      ...extractContacts(bcc),
+    ];
+
+    if (contacts.length) {
+      await upsertEmailContacts(uid, contacts, 'gmail');
+    }
+
+    const recipientsText = contacts.map((contact) => contact.email).join(', ');
+    const attachmentSuffix = has_attachments ? ' con adjuntos' : '';
+    const summary = String(snippet || '').slice(0, 220);
+
+    await logActivityForReq(
+      req,
+      `Correo Gmail enviado${attachmentSuffix}: ${subject}`,
+      'EMAIL',
+      undefined,
+      recipientsText || subject,
+      'CREATE',
+    );
+
+    return ok(res, {
+      logged: true,
+      contacts_saved: contacts.length,
+      summary,
+    });
+  } catch (e: any) {
+    return err(res, e.message);
+  }
 }
 
 // ── Borradores ────────────────────────────────────────────────────────────────

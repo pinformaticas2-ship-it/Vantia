@@ -8,10 +8,7 @@ const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const database_1 = __importDefault(require("../config/database"));
 const activityController_1 = require("./activityController");
-const UPLOADS_ROOT = path_1.default.join(__dirname, '../../uploads/clients');
-const CLIENT_FILES_ROOT = process.env.CLIENT_FILES_PATH
-    ? path_1.default.resolve(process.env.CLIENT_FILES_PATH)
-    : path_1.default.join(process.env.USERPROFILE || process.env.HOME || '', 'lextech-client-files');
+const paths_1 = require("../config/paths");
 const nullIfEmpty = (v) => (v === '' || v === undefined ? null : v);
 function reqUserName(req) {
     const c = req.auth?.sessionClaims;
@@ -171,8 +168,8 @@ const createEntity = async (req, res) => {
         ]);
         try {
             const clientId = result.rows[0].id;
-            const serverFolder = path_1.default.join(UPLOADS_ROOT, clientId);
-            const localFolder = path_1.default.join(CLIENT_FILES_ROOT, clientId);
+            const serverFolder = path_1.default.join(paths_1.UPLOADS_CLIENTS_ROOT, clientId);
+            const localFolder = path_1.default.join(paths_1.CLIENT_FILES_ROOT, clientId);
             if (!fs_1.default.existsSync(serverFolder))
                 fs_1.default.mkdirSync(serverFolder, { recursive: true });
             if (!fs_1.default.existsSync(localFolder))

@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const pg_1 = require("pg");
 const dotenv_1 = __importDefault(require("dotenv"));
+const dns_1 = __importDefault(require("dns"));
 dotenv_1.default.config();
 const rawUrl = process.env.DATABASE_URL?.trim().replace(/['"]/g, '');
 if (!rawUrl) {
@@ -20,9 +21,22 @@ catch (err) {
     console.error("👉 Asegúrate de no usar caracteres como # o / sin codificar en la contraseña.");
     process.exit(-1);
 }
+const parsedUrl = new URL(rawUrl);
+const shouldUseSsl = process.env.PGSSL === 'true' || rawUrl.includes('supabase.co');
+const connectionFamily = Number(process.env.PG_FAMILY || (rawUrl.includes('supabase.co') ? 4 : 0)) || undefined;
+const lookup = connectionFamily
+    ? ((hostname, _options, callback) => dns_1.default.lookup(hostname, { family: connectionFamily }, callback))
+    : undefined;
 const pool = new pg_1.Pool({
     connectionString: rawUrl,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    host: parsedUrl.hostname,
+    port: parsedUrl.port ? Number(parsedUrl.port) : undefined,
+    database: parsedUrl.pathname.replace(/^\//, '') || undefined,
+    user: decodeURIComponent(parsedUrl.username || ''),
+    password: decodeURIComponent(parsedUrl.password || ''),
+    ...(connectionFamily ? { family: connectionFamily } : {}),
+    ...(lookup ? { lookup } : {}),
+    ssl: shouldUseSsl ? { rejectUnauthorized: false } : false,
     max: 20,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 5000,

@@ -1,0 +1,295 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+	<xs:element name="response" type="ct-response"/>
+	<xs:complexType name="ct-response">
+		<xs:sequence minOccurs="1" maxOccurs="1">
+			<xs:element name="status" type="ct-status"/>
+			<xs:element name="data" type="ct-data"/>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:complexType name="ct-status">
+		<xs:sequence minOccurs="1" maxOccurs="1">
+			<xs:element name="code" type="xs:integer"/>
+			<xs:element name="text" type="xs:string"/>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:complexType name="ct-data"/>
+	<xs:simpleType name="st-fecha">
+		<xs:restriction base="xs:string">
+			<xs:pattern value="[0-9]{8}"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:simpleType name="st-fecha-hora">
+		<xs:restriction base="xs:string">
+			<xs:pattern value="[0-9]{8}T[0-9]{6}Z"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:simpleType name="st-url">
+		<xs:restriction base="xs:anyURI">
+			<xs:pattern value="https://.+" />
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:simpleType name="st-id-estado-consolidacion">
+		<xs:restriction base="xs:integer">
+			<xs:enumeration value="0"/>
+			<xs:enumeration value="3"/>
+			<xs:enumeration value="4"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:simpleType name="st-descripcion-estado-consolidacion">
+		<xs:restriction base="xs:string">
+			<xs:enumeration value="Sin consolidar"/>
+			<xs:enumeration value="Finalizado"/>
+			<xs:enumeration value="Desactualizado"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:simpleType name="st-id-ambitos">
+		<xs:restriction base="xs:integer">
+			<xs:enumeration value="1"/>
+			<xs:enumeration value="2"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:simpleType name="st-descripcion-ambitos">
+		<xs:restriction base="xs:string">
+			<xs:enumeration value="Estatal"/>
+			<xs:enumeration value="Autonómico"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:simpleType name="st-id-relaciones">
+		<xs:restriction base="xs:integer">
+			<xs:enumeration value="201"/>
+			<xs:enumeration value="202"/>
+			<xs:enumeration value="203"/>
+			<xs:enumeration value="204"/>
+			<xs:enumeration value="210"/>
+			<xs:enumeration value="211"/>
+			<xs:enumeration value="212"/>
+			<xs:enumeration value="213"/>
+			<xs:enumeration value="214"/>
+			<xs:enumeration value="215"/>
+			<xs:enumeration value="216"/>
+			<xs:enumeration value="217"/>
+			<xs:enumeration value="220"/>
+			<xs:enumeration value="221"/>
+			<xs:enumeration value="230"/>
+			<xs:enumeration value="231"/>
+			<xs:enumeration value="235"/>
+			<xs:enumeration value="245"/>
+			<xs:enumeration value="247"/>
+			<xs:enumeration value="270"/>
+			<xs:enumeration value="271"/>
+			<xs:enumeration value="272"/>
+			<xs:enumeration value="300"/>
+			<xs:enumeration value="301"/>
+			<xs:enumeration value="303"/>
+			<xs:enumeration value="330"/>
+			<xs:enumeration value="331"/>
+			<xs:enumeration value="400"/>
+			<xs:enumeration value="401"/>
+			<xs:enumeration value="402"/>
+			<xs:enumeration value="404"/>
+			<xs:enumeration value="406"/>
+			<xs:enumeration value="407"/>
+			<xs:enumeration value="408"/>
+			<xs:enumeration value="420"/>
+			<xs:enumeration value="421"/>
+			<xs:enumeration value="422"/>
+			<xs:enumeration value="426"/>
+			<xs:enumeration value="427"/>
+			<xs:enumeration value="430"/>
+			<xs:enumeration value="440"/>
+			<xs:enumeration value="470"/>
+			<xs:enumeration value="480"/>
+			<xs:enumeration value="490"/>
+			<xs:enumeration value="520"/>
+			<xs:enumeration value="530"/>
+			<xs:enumeration value="540"/>
+			<xs:enumeration value="552"/>
+			<xs:enumeration value="693"/>
+			<xs:enumeration value="694"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:complexType name="ct-metadatos">
+		<xs:sequence minOccurs="1" maxOccurs="1">
+			<xs:element name="fecha_actualizacion" type="st-fecha-hora"/>
+			<xs:element name="identificador" type="xs:string"/>
+			<xs:element name="ambito" minOccurs="0">
+				<xs:complexType>
+					<xs:simpleContent>
+						<xs:extension base="st-descripcion-ambitos">
+							<xs:attribute name="codigo" use="required">
+								<xs:simpleType>
+									<xs:restriction base="st-id-ambitos"/>
+								</xs:simpleType>
+							</xs:attribute>
+						</xs:extension>
+					</xs:simpleContent>
+				</xs:complexType>
+			</xs:element>
+			<xs:element name="departamento" minOccurs="0">
+				<xs:complexType>
+					<xs:simpleContent>
+						<xs:extension base="xs:string">
+							<xs:attribute name="codigo" use="required">
+								<xs:simpleType>
+									<xs:restriction base="xs:integer"/>
+								</xs:simpleType>
+							</xs:attribute>
+						</xs:extension>
+					</xs:simpleContent>
+				</xs:complexType>
+			</xs:element>
+			<xs:element name="rango">
+				<xs:complexType>
+					<xs:simpleContent>
+						<xs:extension base="xs:string">
+							<xs:attribute name="codigo" use="required">
+								<xs:simpleType>
+									<xs:restriction base="xs:integer"/>
+								</xs:simpleType>
+							</xs:attribute>
+						</xs:extension>
+					</xs:simpleContent>
+				</xs:complexType>
+			</xs:element>
+			<xs:element name="fecha_disposicion" type="st-fecha"/>
+			<xs:element name="numero_oficial" type="xs:string" minOccurs="0"/>
+			<xs:element name="titulo" type="xs:string"/>
+			<xs:element name="diario" type="xs:string"/>
+			<xs:element name="fecha_publicacion" type="st-fecha"/>
+			<xs:element name="diario_numero" type="xs:int"/>
+			<xs:element name="fecha_vigencia" type="st-fecha"/>
+			<xs:element name="estatus_derogacion" type="xs:string" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="estatus_anulacion" type="xs:string" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="vigencia_agotada" type="xs:string"/>
+			<xs:element name="estado_consolidacion">
+				<xs:complexType>
+					<xs:simpleContent>
+						<xs:extension base="st-descripcion-estado-consolidacion">
+							<xs:attribute name="codigo" use="required">
+								<xs:simpleType>
+									<xs:restriction base="st-id-estado-consolidacion"/>
+								</xs:simpleType>
+							</xs:attribute>
+						</xs:extension>
+					</xs:simpleContent>
+				</xs:complexType>
+			</xs:element>
+			<xs:element name="url_eli" type="st-url" minOccurs="0" maxOccurs="1"/>
+			<xs:element name="url_html_consolidada" type="st-url"/>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:complexType name="ct-analisis">
+		<xs:sequence minOccurs="1" maxOccurs="1">
+			<xs:element name="materias" type="ct-materias"/>
+			<xs:element name="notas" type="ct-notas"/>
+			<xs:element name="referencias" type="ct-referencias"/>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:complexType name="ct-materias">
+		<xs:sequence minOccurs="0" maxOccurs="unbounded">
+			<xs:element name="materia">
+				<xs:complexType>
+					<xs:simpleContent>
+						<xs:extension base="st-materia">
+							<xs:attribute name="codigo" use="required">
+								<xs:simpleType>
+									<xs:restriction base="xs:integer"/>
+								</xs:simpleType>
+							</xs:attribute>
+						</xs:extension>
+					</xs:simpleContent>
+				</xs:complexType>
+			</xs:element>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:simpleType name="st-materia">
+		<xs:restriction base="xs:string"/>
+	</xs:simpleType>
+	<xs:complexType name="ct-notas">
+		<xs:sequence minOccurs="0" maxOccurs="unbounded">
+			<xs:element name="nota" type="xs:string"/>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:complexType name="ct-referencias">
+		<xs:sequence minOccurs="1" maxOccurs="1">
+			<xs:element name="anteriores" type="ct-referencias-anteriores"/>
+			<xs:element name="posteriores" type="ct-referencias-posteriores"/>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:complexType name="ct-referencias-anteriores">
+		<xs:sequence minOccurs="0" maxOccurs="unbounded">
+			<xs:element name="anterior" type="ct-referencia"/>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:complexType name="ct-referencia">
+		<xs:sequence>
+			<xs:element name="id_norma" type="xs:string"/>
+			<xs:element name="relacion" type="st-relacion"/>
+			<xs:element name="texto" type="xs:string"/>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:complexType name="ct-referencias-posteriores">
+		<xs:sequence minOccurs="0" maxOccurs="unbounded">
+			<xs:element name="posterior" type="ct-referencia"/>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:complexType name="st-relacion">
+		<xs:simpleContent>
+			<xs:extension base="xs:string">
+				<xs:attribute name="codigo" use="required">
+					<xs:simpleType>
+						<xs:restriction base="st-id-relaciones"/>
+					</xs:simpleType>
+				</xs:attribute>
+			</xs:extension>
+		</xs:simpleContent>
+	</xs:complexType>
+	<xs:complexType name="ct-texto-consolidado">
+		<xs:sequence>
+			<xs:element name="bloque" minOccurs="0" maxOccurs="unbounded"/>
+		</xs:sequence>
+	</xs:complexType>
+	<xs:element name="blockquote">
+		<xs:complexType>
+			<xs:sequence>
+				<xs:element name="p" minOccurs="1" maxOccurs="unbounded"/>
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+	<xs:element name="bloque">
+		<xs:complexType>
+			<xs:sequence>
+				<xs:element name="version" minOccurs="0" maxOccurs="unbounded">
+					<xs:complexType>
+						<xs:sequence>
+							<xs:element name="p" minOccurs="0" maxOccurs="unbounded"/>
+							<xs:element name="blockquote" minOccurs="0" maxOccurs="unbounded"/>
+						</xs:sequence>
+						<xs:attribute name="id_norma" type ="xs:string" use="required"/>
+						<xs:attribute name="fecha_publicacion" type ="st-fecha" use="required"/>
+						<xs:attribute name="fecha_vigencia" type ="st-fecha" use="optional"/>
+					</xs:complexType>
+				 </xs:element>
+			</xs:sequence>
+			<xs:attribute name="id" type ="xs:string" use="required"/>
+			<xs:attribute name="tipo" use="required">
+				<xs:simpleType>
+					<xs:restriction base="xs:string">
+						<xs:enumeration value="nota_inicial"/>
+						<xs:enumeration value="precepto"/>
+						<xs:enumeration value="encabezado"/>
+						<xs:enumeration value="indice"/>
+						<xs:enumeration value="firma"/>
+						<xs:enumeration value="parte_dispositiva"/>
+						<xs:enumeration value="parte_final"/>
+						<xs:enumeration value="preambulo"/>
+						<xs:enumeration value="ratificacion"/>
+						<xs:enumeration value="instrumento"/>
+					</xs:restriction>
+				</xs:simpleType>
+			</xs:attribute>
+			<xs:attribute name="titulo" type ="xs:string" use="optional"/>
+		</xs:complexType>
+	</xs:element>
+</xs:schema>

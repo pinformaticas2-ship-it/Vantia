@@ -77,10 +77,18 @@ interface AdjuntosModalProps {
   entityId: string;
   entityName: string;
   onClose: () => void;
+  inline?: boolean;
+  autoOpenAfterAttach?: boolean;
 }
 
 // ── Component ─────────────────────────────────────────────────
-export default function AdjuntosModal({ entityId, entityName, onClose }: AdjuntosModalProps) {
+export default function AdjuntosModal({
+  entityId,
+  entityName,
+  onClose,
+  inline = false,
+  autoOpenAfterAttach = false,
+}: AdjuntosModalProps) {
   const { getToken } = useAuth();
 
   const [files, setFiles]               = useState<any[]>([]);
@@ -261,7 +269,7 @@ export default function AdjuntosModal({ entityId, entityName, onClose }: Adjunto
         window.dispatchEvent(new CustomEvent("historial-changed"));
         const isWord  = file.type.includes("wordprocessingml") || file.name.match(/\.docx?$/i);
         const isExcel = file.type.includes("spreadsheet") || file.type.includes("excel") || file.name.match(/\.xlsx?$|\.xlsm$|\.xlsb$/i);
-        if (fileId && (isWord || isExcel)) {
+        if (autoOpenAfterAttach && fileId && (isWord || isExcel)) {
           const ext = file.name.match(/\.[^/.]+$/)?.[0] ?? (isExcel ? ".xlsx" : ".docx");
           const displayName = editDocName.trim() ? `${editDocName}${ext}` : file.name;
           await openInWord({ id: fileId, original_name: displayName });
@@ -416,7 +424,9 @@ export default function AdjuntosModal({ entityId, entityName, onClose }: Adjunto
       if (data.success && data.data) {
         setEditingFile(null);
         await loadFiles();
-        await downloadWithAuth(data.data.id, data.data.original_name);
+        if (autoOpenAfterAttach) {
+          await downloadWithAuth(data.data.id, data.data.original_name);
+        }
       }
     } catch (_e) {}
     finally { setSavingMetadata(false); }
@@ -508,7 +518,9 @@ export default function AdjuntosModal({ entityId, entityName, onClose }: Adjunto
             });
           }
           await loadFiles();
-          await downloadWithAuth(fileId, finalFileName);
+          if (autoOpenAfterAttach) {
+            await downloadWithAuth(fileId, finalFileName);
+          }
         }
         setShowTemplates(false);
         setEditingFile(null);
@@ -562,31 +574,51 @@ export default function AdjuntosModal({ entityId, entityName, onClose }: Adjunto
 
   const selectedFile = files.find(f => f.id === selectedFileId) ?? null;
 
-  return createPortal(
+  const innerContent = (
     <>
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div
-        className="bg-slate-50 w-full max-w-[1400px] mx-4 my-4 rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-200"
-        onClick={e => e.stopPropagation()}
-        style={{ maxHeight: "calc(100vh - 32px)" }}
-      >
+    <div
+      className={inline
+        ? "bg-slate-50 w-full h-full rounded-xl flex flex-col overflow-hidden border border-slate-200"
+        : "bg-slate-50 w-full max-w-[1540px] mx-4 my-4 rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-200"
+      }
+      onClick={(e) => e.stopPropagation()}
+      style={inline ? undefined : { maxHeight: "calc(100vh - 32px)" }}
+    >
         {/* ── Title bar ── */}
-        <div className="flex items-center justify-between px-5 py-3 bg-white border-b border-slate-200 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-red-100 shrink-0">
-              <Paperclip size={15} className="text-red-600" />
+        <div className="flex items-start justify-between px-5 py-4 bg-white border-b border-slate-200 shrink-0">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-red-100 bg-gradient-to-br from-red-50 to-rose-100 shadow-sm">
+              <Paperclip size={16} className="text-red-600" />
             </div>
-            <div>
-              <h2 className="text-sm font-bold text-slate-900 leading-tight">Adjuntos</h2>
-              <p className="text-[11px] text-slate-500 truncate max-w-xs">{entityName}</p>
+            {/*
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-base font-bold text-slate-900">Adjuntos</h2>
+                <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                  {loadingFiles ? "Cargando…" : `${files.length} ${files.length === 1 ? "archivo" : "archivos"}`}
+                </span>
+                <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-600">
+                  {sidebarSection}
+                </span>
+              </div>
+              <p className="mt-1 max-w-[440px] truncate text-xs text-slate-500">
+                Organiza, previsualiza y clasifica los documentos vinculados a {entityName}.
+              </p>
             </div>
-            <span className="text-[11px] text-slate-400 ml-1 font-medium">
+            {/*
               {loadingFiles ? "Cargando…" : `${files.length} ${files.length === 1 ? "archivo" : "archivos"}`}
-            </span>
+            
+            */}
           </div>
-          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors">
-            <X size={15} />
+          {!inline && (
+          <button
+            onClick={onClose}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+          >
+            <X size={14} />
+            Cerrar
           </button>
+          )}
         </div>
 
         {/* ── Error banner ── */}
@@ -599,7 +631,129 @@ export default function AdjuntosModal({ entityId, entityName, onClose }: Adjunto
           </div>
         )}
 
+        <div className="flex items-center justify-between gap-3 px-4 py-3 bg-white border-b border-slate-100 shrink-0 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-700 transition-colors"
+            >
+              <Upload size={15} />
+              Subir archivo
+            </button>
+            <button
+              onClick={showCreateBlankModal}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+            >
+              <FilePlus2 size={15} className="text-indigo-500" />
+              Nuevo documento
+            </button>
+            <button
+              onClick={() => openTemplatesModal()}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+            >
+              <Sparkles size={15} className="text-amber-500" />
+              Plantillas
+            </button>
+            <button
+              onClick={() => folderInputRef.current?.click()}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+            >
+              <FolderOpen size={15} className="text-emerald-600" />
+              Importar carpeta
+            </button>
+          </div>
+          <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 p-1">
+            <button
+              onClick={() => setViewMode("list")}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors ${viewMode === "list" ? "bg-white text-red-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+            >
+              <LayoutList size={13} />
+              Lista
+            </button>
+            <button
+              onClick={() => setViewMode("grid")}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors ${viewMode === "grid" ? "bg-white text-red-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+            >
+              <Grid3X3 size={13} />
+              Cuadrícula
+            </button>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 px-4 py-3 bg-slate-50 border-b border-slate-200 shrink-0 flex-wrap">
+          <div className="relative flex-1 min-w-[240px]">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              value={searchText}
+              onChange={e => setSearchText(e.target.value)}
+              placeholder="Buscar por archivo o nombre de documento…"
+              className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 bg-white rounded-xl focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100"
+            />
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Tipo</span>
+            <select
+              value={filterTipo}
+              onChange={e => setFilterTipo(e.target.value)}
+              className="min-w-[180px] text-sm border border-slate-200 bg-white rounded-xl px-3 py-2 focus:outline-none focus:border-red-400 text-slate-600"
+            >
+              {tipoOptions.map(t => <option key={t}>{t}</option>)}
+            </select>
+          </div>
+          {selectedFile && (
+            <div className="flex items-center gap-2 ml-auto flex-wrap">
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Seleccionado</span>
+              {(isPreviewable(selectedFile.mimetype) || isWordFile(selectedFile.mimetype, selectedFile.original_name) || isExcelFile(selectedFile.mimetype, selectedFile.original_name)) && (
+                <button
+                  onClick={() => openPreview(selectedFile)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  <Eye size={14} />
+                  Vista previa
+                </button>
+              )}
+              {(isWordFile(selectedFile.mimetype, selectedFile.original_name) || isExcelFile(selectedFile.mimetype, selectedFile.original_name)) ? (
+                <button
+                  onClick={() => openInWord(selectedFile)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  <ExternalLink size={14} />
+                  Abrir
+                </button>
+              ) : (
+                <button
+                  onClick={() => downloadWithAuth(selectedFile.id, selectedFile.original_name)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  <Download size={14} />
+                  Descargar
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  setEditingFile({ id: selectedFile.id, document_name: selectedFile.document_name || "", attachment_type: selectedFile.attachment_type || "Sin clasificar" });
+                  setEditDocName(selectedFile.document_name || "");
+                  setEditAttachmentType(selectedFile.attachment_type || "Sin clasificar");
+                }}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                <Edit3 size={14} />
+                Editar
+              </button>
+              <button
+                onClick={() => handleDelete(selectedFile.id)}
+                className="inline-flex items-center gap-2 rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-100 transition-colors"
+              >
+                <Trash2 size={14} />
+                Eliminar
+              </button>
+            </div>
+          )}
+        </div>
+
         {/* ── Toolbar ── */}
+        {false && (
+        <>
         <div className="flex items-center gap-0.5 px-3 py-2 bg-white border-b border-slate-100 shrink-0 flex-wrap">
           {/* Alta */}
           <button
@@ -737,6 +891,8 @@ export default function AdjuntosModal({ entityId, entityName, onClose }: Adjunto
         </div>
 
         {/* ── Hidden inputs ── */}
+        </>
+        )}
         <input ref={fileInputRef} type="file" multiple className="hidden"
           onChange={e => { if (e.target.files) { enqueueFiles(e.target.files); e.target.value = ""; } }}
         />
@@ -749,15 +905,18 @@ export default function AdjuntosModal({ entityId, entityName, onClose }: Adjunto
         <div className="flex flex-1 overflow-hidden">
 
           {/* Sidebar */}
-          <div className="w-48 shrink-0 bg-white border-r border-slate-200 overflow-y-auto">
+          <div className="w-52 shrink-0 bg-white border-r border-slate-200 overflow-y-auto">
             {/* Storage folder */}
-            <div className="px-2 pt-3 pb-1">
+            <div className="px-3 pt-4 pb-2">
               <div className="flex items-center gap-1.5 px-2 py-1.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                 <Folder size={13} className="text-amber-500 shrink-0" />
                 <span className="truncate">Almacenamiento</span>
               </div>
+              <p className="px-2 text-[11px] leading-5 text-slate-400">
+                Organiza los documentos por tipo para encontrarlos más rápido.
+              </p>
             </div>
-            <div className="px-2 pb-3 space-y-0.5">
+            <div className="px-3 pb-4 space-y-1">
               {[
                 { label: "Todos", count: files.length, indent: false },
                 { label: "Sin archivar", count: files.filter(f => !f.attachment_type || f.attachment_type === "Sin clasificar").length, indent: true },
@@ -771,15 +930,15 @@ export default function AdjuntosModal({ entityId, entityName, onClose }: Adjunto
                 <button
                   key={item.label}
                   onClick={() => setSidebarSection(item.label)}
-                  className={`w-full flex items-center justify-between px-2 py-1.5 text-xs rounded-lg transition-colors text-left ${
+                  className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-xl transition-colors text-left ${
                     sidebarSection === item.label
-                      ? "bg-red-600 text-white font-semibold"
+                      ? "bg-red-600 text-white font-semibold shadow-sm"
                       : "text-slate-600 hover:bg-slate-100 font-medium"
                   } ${item.indent ? "ml-2 w-[calc(100%-8px)]" : ""}`}
                 >
                   <span className="truncate">{item.label}</span>
                   {item.count > 0 && (
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 ml-1 ${
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 ml-2 ${
                       sidebarSection === item.label ? "bg-red-500 text-white" : "bg-slate-100 text-slate-500"
                     }`}>
                       {item.count}
@@ -1022,7 +1181,7 @@ export default function AdjuntosModal({ entityId, entityName, onClose }: Adjunto
 
           {/* Preview panel */}
           {preview && (
-            <div className="w-[380px] shrink-0 border-l border-slate-200 bg-white flex flex-col overflow-hidden">
+            <div className="w-[520px] shrink-0 border-l border-slate-200 bg-white flex flex-col overflow-hidden">
               <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 border-b border-slate-100 shrink-0">
                 <span className="text-xs font-bold text-slate-700 truncate flex-1">{preview.name}</span>
                 <div className="flex items-center gap-1 shrink-0 ml-2">
@@ -1063,7 +1222,6 @@ export default function AdjuntosModal({ entityId, entityName, onClose }: Adjunto
         </div>
 
       </div>
-    </div>
 
       {/* ── Templates modal ── */}
       {showTemplates && (
@@ -1311,6 +1469,15 @@ export default function AdjuntosModal({ entityId, entityName, onClose }: Adjunto
           </div>
         </div>
       )}
+    </>
+  );
+
+  if (inline) return innerContent;
+  return createPortal(
+    <>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      {innerContent}
+    </div>
     </>,
     document.body
   );

@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteExpediente = exports.updateExpediente = exports.createExpediente = exports.getExpediente = exports.getStats = exports.getExpedientes = void 0;
+exports.deleteExpediente = exports.updateExpediente = exports.createExpediente = exports.getExpediente = exports.updateImportBatch = exports.createImportBatch = exports.getImportBatchDetail = exports.getImportHistory = exports.getStats = exports.getExpedientes = void 0;
 const database_1 = __importDefault(require("../config/database"));
 const activityController_1 = require("./activityController");
 function reqUserName(req) {
@@ -14,15 +14,24 @@ function reqUserName(req) {
         || [c.first_name, c.last_name].filter(Boolean).join(' ')
         || c.email || req.auth?.userId || 'Sistema';
 }
+function clampImportStatus(status) {
+    const value = String(status || '').toLowerCase();
+    const allowed = new Set(['uploaded', 'configuring', 'reviewing', 'processing', 'completed', 'failed']);
+    return allowed.has(value) ? value : 'uploaded';
+}
+function normalizeCount(value) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 0;
+}
 const getExpedientes = async (req, res) => {
     try {
         const q = (req.query.q || '').trim();
-        const estado = (req.query.estado || '');
-        const tipo = (req.query.tipo || '');
-        const anio = parseInt(req.query.anio) || 0;
+        const estado = req.query.estado || '';
+        const tipo = req.query.tipo || '';
+        const anio = parseInt(req.query.anio, 10) || 0;
         const clienteId = (req.query.clienteId || '').trim();
-        const limit = Math.min(parseInt(req.query.limit) || 300, 500);
-        const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+        const limit = Math.min(parseInt(req.query.limit, 10) || 300, 500);
+        const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
         const conds = [];
         const vals = [];
         let p = 1;
@@ -38,17 +47,17 @@ const getExpedientes = async (req, res) => {
             p++;
         }
         if (estado) {
-            conds.push(`e.estado     = $${p}`);
+            conds.push(`e.estado = $${p}`);
             vals.push(estado);
             p++;
         }
         if (tipo) {
-            conds.push(`e.tipo       = $${p}`);
+            conds.push(`e.tipo = $${p}`);
             vals.push(tipo);
             p++;
         }
         if (anio) {
-            conds.push(`e.anio       = $${p}`);
+            conds.push(`e.anio = $${p}`);
             vals.push(anio);
             p++;
         }
@@ -73,7 +82,7 @@ const getExpedientes = async (req, res) => {
             database_1.default.query(sql, vals),
             database_1.default.query(countSql, vals.slice(0, -2)),
         ]);
-        res.json({ data: rows.rows, total: parseInt(countRow.rows[0].count) });
+        res.json({ data: rows.rows, total: parseInt(countRow.rows[0].count, 10) });
     }
     catch (e) {
         res.status(500).json({ error: e.message });
@@ -84,12 +93,12 @@ const getStats = async (_req, res) => {
     try {
         const r = await database_1.default.query(`
       SELECT
-        COUNT(*)                                         AS total,
-        COUNT(*) FILTER (WHERE estado = 'abierto')       AS abiertos,
-        COUNT(*) FILTER (WHERE estado = 'cerrado')       AS cerrados,
-        COUNT(*) FILTER (WHERE estado = 'suspendido')    AS suspendidos,
-        COUNT(*) FILTER (WHERE estado = 'archivado')     AS archivados,
-        EXTRACT(YEAR FROM NOW())::int                    AS anio_actual,
+        COUNT(*) AS total,
+        COUNT(*) FILTER (WHERE estado = 'abierto') AS abiertos,
+        COUNT(*) FILTER (WHERE estado = 'cerrado') AS cerrados,
+        COUNT(*) FILTER (WHERE estado = 'suspendido') AS suspendidos,
+        COUNT(*) FILTER (WHERE estado = 'archivado') AS archivados,
+        EXTRACT(YEAR FROM NOW())::int AS anio_actual,
         COUNT(*) FILTER (WHERE anio = EXTRACT(YEAR FROM NOW())::int) AS este_anio
       FROM expedientes
     `);
@@ -100,6 +109,139 @@ const getStats = async (_req, res) => {
     }
 };
 exports.getStats = getStats;
+const getImportHistory = async (req, res) => {
+    try {
+        const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
+        const r = await database_1.default.query(`SELECT id, file_name, status, total_count, completed_count, error_count, pending_count,
+              notes, created_at, updated_at, user_id, user_name
+       FROM expediente_import_batches
+       ORDER BY created_at DESC
+       LIMIT $1`, [limit]);
+        res.json({ data: r.rows });
+    }
+    catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+};
+exports.getImportHistory = getImportHistory;
+const getImportBatchDetail = async (req, res) => {
+    try {
+        const [batchResult, itemsResult] = await Promise.all([
+            database_1.default.query(`SELECT id, file_name, status, total_count, completed_count, error_count, pending_count,
+                notes, created_at, updated_at, user_id, user_name
+         FROM expediente_import_batches
+         WHERE id = $1`, [req.params.id]),
+            database_1.default.query(`SELECT id, row_number, reference, status, error_message, payload, created_expediente_id,
+                created_at, updated_at
+         FROM expediente_import_items
+         WHERE batch_id = $1
+         ORDER BY row_number ASC NULLS LAST, created_at ASC`, [req.params.id]),
+        ]);
+        if (!batchResult.rows.length) {
+            return res.status(404).json({ error: 'Lote de importacion no encontrado' });
+        }
+        res.json({ data: { ...batchResult.rows[0], items: itemsResult.rows } });
+    }
+    catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+};
+exports.getImportBatchDetail = getImportBatchDetail;
+const createImportBatch = async (req, res) => {
+    const client = await database_1.default.connect();
+    try {
+        const fileName = String(req.body?.file_name || '').trim();
+        if (!fileName) {
+            return res.status(400).json({ error: 'file_name es obligatorio' });
+        }
+        const status = clampImportStatus(req.body?.status);
+        const totalCount = normalizeCount(req.body?.total_count);
+        const completedCount = normalizeCount(req.body?.completed_count);
+        const errorCount = normalizeCount(req.body?.error_count);
+        const pendingCount = req.body?.pending_count != null
+            ? normalizeCount(req.body?.pending_count)
+            : Math.max(totalCount - completedCount - errorCount, 0);
+        const notes = typeof req.body?.notes === 'string' ? req.body.notes.trim() || null : null;
+        const items = Array.isArray(req.body?.items) ? req.body.items : [];
+        const userId = req.auth?.userId || 'SYSTEM';
+        const userName = reqUserName(req);
+        await client.query('BEGIN');
+        const batchInsert = await client.query(`INSERT INTO expediente_import_batches
+         (user_id, user_name, file_name, status, total_count, completed_count, error_count, pending_count, notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+       RETURNING id, file_name, status, total_count, completed_count, error_count, pending_count,
+                 notes, created_at, updated_at, user_id, user_name`, [userId, userName, fileName, status, totalCount, completedCount, errorCount, pendingCount, notes]);
+        const batch = batchInsert.rows[0];
+        for (const rawItem of items) {
+            const rowNumber = rawItem?.row_number != null ? normalizeCount(rawItem.row_number) : null;
+            const reference = typeof rawItem?.reference === 'string' ? rawItem.reference.trim() || null : null;
+            const rawStatus = String(rawItem?.status || '').toLowerCase();
+            const itemStatus = rawStatus === 'completed' || rawStatus === 'failed' || rawStatus === 'processing'
+                ? rawStatus
+                : 'uploaded';
+            const errorMessage = typeof rawItem?.error_message === 'string' ? rawItem.error_message.trim() || null : null;
+            const payload = rawItem?.payload ?? null;
+            const createdExpedienteId = typeof rawItem?.created_expediente_id === 'string'
+                ? rawItem.created_expediente_id
+                : null;
+            await client.query(`INSERT INTO expediente_import_items
+           (batch_id, row_number, reference, status, error_message, payload, created_expediente_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)`, [batch.id, rowNumber, reference, itemStatus, errorMessage, payload, createdExpedienteId]);
+        }
+        await client.query('COMMIT');
+        await (0, activityController_1.logActivityForReq)(req, `Importacion CSV registrada: ${fileName}`, 'EXPEDIENTE_IMPORT', batch.id, fileName, 'UPLOAD');
+        res.status(201).json({ data: batch });
+    }
+    catch (e) {
+        await client.query('ROLLBACK');
+        res.status(500).json({ error: e.message });
+    }
+    finally {
+        client.release();
+    }
+};
+exports.createImportBatch = createImportBatch;
+const updateImportBatch = async (req, res) => {
+    try {
+        const status = req.body?.status != null ? clampImportStatus(req.body.status) : null;
+        const notes = req.body?.notes != null
+            ? (typeof req.body.notes === 'string' ? req.body.notes.trim() || null : null)
+            : undefined;
+        const totalCount = req.body?.total_count != null ? normalizeCount(req.body.total_count) : undefined;
+        const completedCount = req.body?.completed_count != null ? normalizeCount(req.body.completed_count) : undefined;
+        const errorCount = req.body?.error_count != null ? normalizeCount(req.body.error_count) : undefined;
+        const pendingCount = req.body?.pending_count != null ? normalizeCount(req.body.pending_count) : undefined;
+        const current = await database_1.default.query(`SELECT id, file_name, status, total_count, completed_count, error_count, pending_count, notes
+       FROM expediente_import_batches
+       WHERE id = $1`, [req.params.id]);
+        if (!current.rows.length) {
+            return res.status(404).json({ error: 'Lote de importacion no encontrado' });
+        }
+        const prev = current.rows[0];
+        const nextTotal = totalCount ?? prev.total_count ?? 0;
+        const nextCompleted = completedCount ?? prev.completed_count ?? 0;
+        const nextErrors = errorCount ?? prev.error_count ?? 0;
+        const nextPending = pendingCount ?? Math.max(nextTotal - nextCompleted - nextErrors, 0);
+        const r = await database_1.default.query(`UPDATE expediente_import_batches
+       SET status = $1,
+           total_count = $2,
+           completed_count = $3,
+           error_count = $4,
+           pending_count = $5,
+           notes = $6,
+           updated_at = NOW()
+       WHERE id = $7
+       RETURNING id, file_name, status, total_count, completed_count, error_count, pending_count,
+                 notes, created_at, updated_at, user_id, user_name`, [status ?? prev.status, nextTotal, nextCompleted, nextErrors, nextPending, notes === undefined ? prev.notes : notes, req.params.id]);
+        const batch = r.rows[0];
+        await (0, activityController_1.logActivityForReq)(req, `Importacion CSV actualizada: ${batch.file_name} (${batch.status})`, 'EXPEDIENTE_IMPORT', batch.id, batch.file_name, batch.status === 'failed' ? 'ACTION' : 'UPLOAD');
+        res.json({ data: batch });
+    }
+    catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+};
+exports.updateImportBatch = updateImportBatch;
 const getExpediente = async (req, res) => {
     try {
         const r = await database_1.default.query(`SELECT e.*, ent.first_name || COALESCE(' ' || ent.last_name, '') AS cliente_nombre_linked,
@@ -121,7 +263,7 @@ const createExpediente = async (req, res) => {
     try {
         const yr = anio || new Date().getFullYear();
         const maxR = await database_1.default.query(`SELECT COALESCE(MAX(num_exp), 0) + 1 AS next FROM expedientes WHERE anio = $1`, [yr]);
-        const num_exp = maxR.rows[0].next;
+        const numExp = maxR.rows[0].next;
         let nombre = cliente_nombre || null;
         if (cliente_id && !nombre) {
             const cr = await database_1.default.query(`SELECT first_name || COALESCE(' ' || last_name, '') AS n FROM entities WHERE id = $1`, [cliente_id]);
@@ -137,7 +279,7 @@ const createExpediente = async (req, res) => {
           created_by)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31)
        RETURNING *`, [
-            yr, num_exp,
+            yr, numExp,
             ref_propia?.trim() || null, ref_expediente?.trim() || null,
             descripcion?.trim() || null, tipo || 'judicial',
             cliente_id || null, nombre,
@@ -161,7 +303,7 @@ const createExpediente = async (req, res) => {
             color?.trim() || 'ninguno',
             reqUserName(req),
         ]);
-        (0, activityController_1.logActivityForReq)(req, `Expediente creado: ${yr}/${num_exp} — ${descripcion || ''}`, 'EXPEDIENTE', r.rows[0].id);
+        (0, activityController_1.logActivityForReq)(req, `Expediente creado: ${yr}/${numExp} - ${descripcion || ''}`, 'EXPEDIENTE', r.rows[0].id);
         res.status(201).json({ data: r.rows[0] });
     }
     catch (e) {

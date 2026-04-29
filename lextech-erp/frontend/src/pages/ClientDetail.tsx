@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { createPortal } from "react-dom";
+import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
 import {
   Edit3, Loader2, AlertCircle,
@@ -850,7 +851,7 @@ const TIPO_CONFIG: Record<string, { label: string; color: string }> = {
   otro:           { label: "Otro",            color: "bg-slate-100 text-slate-500" },
 };
 
-function TabTareas({ clientId }: { clientId: string }) {
+function TabTareas({ clientId, autoOpen = false, initialTaskType = "" }: { clientId: string; autoOpen?: boolean; initialTaskType?: string }) {
   const { getToken } = useAuth();
   const [tareas, setTareas]       = useState<any[]>([]);
   const [loading, setLoading]     = useState(true);
@@ -866,6 +867,16 @@ function TabTareas({ clientId }: { clientId: string }) {
   const [filterVencidas, setFilterVencidas] = useState(false);
   const [search, setSearch]             = useState("");
   const [confirmDeleteTareaId, setConfirmDeleteTareaId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!autoOpen) return;
+    setShowForm(true);
+    setEditId(null);
+    setForm(prev => ({
+      ...TAREA_EMPTY,
+      tipo: initialTaskType || prev.tipo || "otro",
+    }));
+  }, [autoOpen, initialTaskType]);
 
   const estadoStyle: Record<string, string> = {
     pendiente:  "bg-amber-100 text-amber-700",
@@ -1829,11 +1840,14 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
   // Preview panel de plantillas
   const [selectedTpl, setSelectedTpl] = useState<{ path: string; name: string; ext: string } | null>(null);
   const [tplPreviewHtml, setTplPreviewHtml] = useState<string | null>(null);
+  const [tplPreviewUrl, setTplPreviewUrl] = useState<string | null>(null);
+  const [tplPreviewMime, setTplPreviewMime] = useState<string | null>(null);
   const [tplPreviewLoading, setTplPreviewLoading] = useState(false);
   // Thumbnails de imágenes (blobURL por fileId)
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
   const loadingThumbIds = useRef<Set<string>>(new Set());
   const previewBlobUrl  = useRef<string | null>(null);
+  const tplPreviewBlobUrl = useRef<string | null>(null);
   // Cache de vistas previas: evita re-fetch del mismo archivo
   const previewCache = useRef<Map<string, { url: string; name: string; mime: string; appType?: 'word' | 'excel' }>>(new Map());
   const fileInputRef   = useRef<HTMLInputElement>(null);
@@ -1851,6 +1865,32 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
   const pendingUploadFile = useRef<File | null>(null);
   // Vista previa de Word
   const [wordPreview, setWordPreview] = useState<{ id: string; name: string; mime: string } | null>(null);
+
+  const revokePreviewEntry = useCallback((fileId: string) => {
+    const cached = previewCache.current.get(fileId);
+    if (cached?.url?.startsWith('blob:')) {
+      try { URL.revokeObjectURL(cached.url); } catch (_) {}
+    }
+    previewCache.current.delete(fileId);
+    if (previewBlobUrl.current === cached?.url) {
+      previewBlobUrl.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      for (const entry of previewCache.current.values()) {
+        if (entry.url?.startsWith('blob:')) {
+          try { URL.revokeObjectURL(entry.url); } catch (_) {}
+        }
+      }
+      previewCache.current.clear();
+      if (previewBlobUrl.current) {
+        try { URL.revokeObjectURL(previewBlobUrl.current); } catch (_) {}
+        previewBlobUrl.current = null;
+      }
+    };
+  }, []);
 
   // ── Cargar thumbnails de imágenes ─────────────────────────────
   const loadThumb = useCallback(async (fileId: string) => {
@@ -2012,7 +2052,7 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
       headers: { Authorization: `Bearer ${token}` },
     });
     setFiles(prev => prev.filter(f => f.id !== fileId));
-    previewCache.current.delete(fileId);
+    revokePreviewEntry(fileId);
     if (preview?.fileId === fileId) setPreview(null);
     window.dispatchEvent(new CustomEvent('historial-changed'));
   };
@@ -2064,11 +2104,53 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
     const isWord  = f.mimetype?.includes('wordprocessingml') || f.original_name?.match(/\.docx?$/i);
     const isExcel = isExcelFile(f.mimetype || '', f.original_name || '');
 
-    const endpoint = isWord
-      ? `/api/files/${clientId}/${f.id}/preview-html`
-      : isExcel
+    const fallbackHtmlPreview = async () => {
+      const fallbackEndpoint = isExcel
         ? `/api/files/${clientId}/${f.id}/preview-excel`
-        : `/api/files/${clientId}/${f.id}/download`;
+        : `/api/files/${clientId}/${f.id}/preview-html`;
+      const fallbackRes = await fetch(fallbackEndpoint, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!fallbackRes.ok) {
+        const errorData = await fallbackRes.json().catch(() => ({}));
+        const errorMsg = errorData.error || `Error ${fallbackRes.status}`;
+        const errorHtml = `<html><body style="font-family: Arial; margin: 20px; color: #d32f2f;"><h2>Error al cargar vista previa</h2><p>${errorMsg}</p></body></html>`;
+        const blob = new Blob([errorHtml], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        previewBlobUrl.current = url;
+        setPreview({ url, name: f.original_name, mime: 'text/html', fileId: f.id });
+        return;
+      }
+      const html = await fallbackRes.text();
+      const blob = new Blob([html], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      previewBlobUrl.current = url;
+      const entry = { url, name: f.original_name, mime: 'text/html', fileId: f.id, appType: (isExcel ? 'excel' : 'word') as 'word' | 'excel' };
+      previewCache.current.set(f.id, entry);
+      setPreview(entry);
+    };
+
+    if (isWord) {
+      const pdfRes = await fetch(`/api/files/${clientId}/${f.id}/preview-pdf`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const contentType = pdfRes.headers.get('content-type') || '';
+      if (pdfRes.ok && contentType.includes('application/pdf')) {
+        const blob = await pdfRes.blob();
+        const url = URL.createObjectURL(blob);
+        previewBlobUrl.current = url;
+        const entry = { url, name: f.original_name, mime: 'application/pdf', fileId: f.id, appType: 'word' as const };
+        previewCache.current.set(f.id, entry);
+        setPreview(entry);
+        return;
+      }
+      await fallbackHtmlPreview();
+      return;
+    }
+
+    const endpoint = isExcel
+      ? `/api/files/${clientId}/${f.id}/preview-excel`
+      : `/api/files/${clientId}/${f.id}/download`;
 
     const res = await fetch(endpoint, {
       headers: { Authorization: `Bearer ${token}` },
@@ -2085,12 +2167,12 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
       return;
     }
 
-    if (isWord || isExcel) {
+    if (isExcel) {
       const html = await res.text();
       const blob = new Blob([html], { type: 'text/html' });
       const url = URL.createObjectURL(blob);
       previewBlobUrl.current = url;
-      const entry = { url, name: f.original_name, mime: 'text/html', fileId: f.id, appType: (isExcel ? 'excel' : 'word') as 'word' | 'excel' };
+      const entry = { url, name: f.original_name, mime: 'text/html', fileId: f.id, appType: 'excel' as const };
       previewCache.current.set(f.id, entry);
       setPreview(entry);
     } else {
@@ -2147,17 +2229,41 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
   const loadTplPreview = async (file: { path: string; name: string; ext: string }) => {
     setSelectedTpl(file);
     setTplPreviewHtml(null);
+    if (tplPreviewBlobUrl.current) {
+      URL.revokeObjectURL(tplPreviewBlobUrl.current);
+      tplPreviewBlobUrl.current = null;
+    }
+    setTplPreviewUrl(null);
+    setTplPreviewMime(null);
     setTplPreviewLoading(true);
     try {
       const token = await getToken({ skipCache: true });
+      const isWordTemplate = file.ext === '.doc' || file.ext === '.docx';
+
+      if (isWordTemplate) {
+        const pdfRes = await fetch(`/api/files/templates/preview-pdf?path=${encodeURIComponent(file.path)}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const contentType = pdfRes.headers.get('content-type') || '';
+        if (pdfRes.ok && contentType.includes('application/pdf')) {
+          const blob = await pdfRes.blob();
+          const url = URL.createObjectURL(blob);
+          tplPreviewBlobUrl.current = url;
+          setTplPreviewUrl(url);
+          setTplPreviewMime('application/pdf');
+          return;
+        }
+      }
+
       const res = await fetch(`/api/files/templates/preview?path=${encodeURIComponent(file.path)}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      // El backend devuelve 200 con HTML tanto para .docx como para .doc (mensaje amigable)
       const html = await res.text();
       setTplPreviewHtml(html);
+      setTplPreviewMime('text/html');
     } catch (e: any) {
       setTplPreviewHtml(`<html><body style="padding:20px;font-family:sans-serif;color:#dc2626"><p>Error al cargar vista previa</p><p style="font-size:11px;color:#999">${e.message}</p></body></html>`);
+      setTplPreviewMime('text/html');
     } finally {
       setTplPreviewLoading(false);
     }
@@ -2170,6 +2276,12 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
     setTemplateSearch('');
     setSelectedTpl(null);
     setTplPreviewHtml(null);
+    if (tplPreviewBlobUrl.current) {
+      URL.revokeObjectURL(tplPreviewBlobUrl.current);
+      tplPreviewBlobUrl.current = null;
+    }
+    setTplPreviewUrl(null);
+    setTplPreviewMime(null);
     if (docPlantFolders.length > 0 && !forceReload) return; // ya cargado
     setDocPlantLoading(true);
     setDocPlantError(null);
@@ -2567,7 +2679,7 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 {/* Abrir en Word / Excel (para previsualización HTML) */}
-                {preview.mime === "text/html" && preview.fileId && preview.appType === 'word' && (
+                {preview.fileId && preview.appType === 'word' && (
                   <button
                     onClick={() => openInWord({ id: preview.fileId!, original_name: preview.name })}
                     className="flex items-center gap-1 text-[11px] font-semibold text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 px-2 py-1 rounded-lg transition-colors border border-neutral-200"
@@ -2596,10 +2708,6 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
                 {/* Cerrar */}
                 <button
                   onClick={() => {
-                    if (previewBlobUrl.current) {
-                      URL.revokeObjectURL(previewBlobUrl.current);
-                      previewBlobUrl.current = null;
-                    }
                     setPreview(null);
                   }}
                   className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
@@ -2676,8 +2784,16 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
       </div>
 
       {/* Modal plantillas */}
-      {showTemplates && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowTemplates(false)}>
+      {showTemplates && createPortal(
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => {
+          if (tplPreviewBlobUrl.current) {
+            URL.revokeObjectURL(tplPreviewBlobUrl.current);
+            tplPreviewBlobUrl.current = null;
+          }
+          setTplPreviewUrl(null);
+          setTplPreviewMime(null);
+          setShowTemplates(false);
+        }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl mx-4 overflow-hidden flex flex-col" style={{ height: '88vh' }} onClick={e => e.stopPropagation()}>
 
             {/* Header */}
@@ -2704,7 +2820,15 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
                   ✨ Generar
                 </button>
                 <div className="w-px h-5 bg-slate-200 mx-1" />
-                <button onClick={() => setShowTemplates(false)} className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg transition-colors">
+                <button onClick={() => {
+                  if (tplPreviewBlobUrl.current) {
+                    URL.revokeObjectURL(tplPreviewBlobUrl.current);
+                    tplPreviewBlobUrl.current = null;
+                  }
+                  setTplPreviewUrl(null);
+                  setTplPreviewMime(null);
+                  setShowTemplates(false);
+                }} className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg transition-colors">
                   <X size={16} />
                 </button>
               </div>
@@ -2838,6 +2962,12 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
                             <Loader2 size={28} className="animate-spin text-red-500" />
                             <p className="text-sm">Cargando vista previa…</p>
                           </div>
+                        ) : tplPreviewMime === 'application/pdf' && tplPreviewUrl ? (
+                          <iframe
+                            src={`${tplPreviewUrl}#toolbar=1&navpanes=1&scrollbar=1&view=FitH`}
+                            className="w-full h-full border-0"
+                            title="Vista previa de plantilla"
+                          />
                         ) : tplPreviewHtml ? (
                           <iframe
                             srcDoc={tplPreviewHtml}
@@ -2885,12 +3015,13 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
             )}
 
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Modal vista previa de Word */}
-      {wordPreview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setWordPreview(null)}>
+      {wordPreview && createPortal(
+        <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setWordPreview(null)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
               <div className="flex items-center gap-3">
@@ -2928,12 +3059,13 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Modal editar metadatos del archivo */}
-      {editingFile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setEditingFile(null)}>
+      {editingFile && createPortal(
+        <div className="fixed inset-0 z-[10002] flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setEditingFile(null)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
 
             {/* Header */}
@@ -3040,7 +3172,8 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -3150,17 +3283,34 @@ export default function ClientDetail() {
   const { id } = useParams<{ id: string }>();
   const { getToken } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [client, setClient] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]   = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState("perfil");
+  const initialTab = searchParams.get("tab") || "perfil";
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [photoZoom, setPhotoZoom] = useState(false);
   // Lazy-mount: tabs mount the first time they're visited and stay mounted (hidden via CSS)
-  const [mountedTabs, setMountedTabs] = useState<Set<string>>(new Set(["perfil"]));
+  const [mountedTabs, setMountedTabs] = useState<Set<string>>(new Set(["perfil", initialTab]));
   const handleTabChange = (tabId: string) => {
     setActiveTab(tabId);
     setMountedTabs(prev => { const s = new Set(prev); s.add(tabId); return s; });
   };
+
+  useEffect(() => {
+    const requestedTab = searchParams.get("tab");
+    if (requestedTab && requestedTab !== activeTab) {
+      setActiveTab(requestedTab);
+      setMountedTabs(prev => { const s = new Set(prev); s.add(requestedTab); return s; });
+    }
+  }, [searchParams, activeTab]);
+
+  useEffect(() => {
+    if (searchParams.get("openTask") !== "new") return;
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("openTask");
+    setSearchParams(nextParams, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const fetchClient = useCallback(async (silent = false) => {
     if (!id) return;
@@ -3356,7 +3506,11 @@ export default function ClientDetail() {
             )}
             {mountedTabs.has("tareas") && (
               <div style={{ display: activeTab === "tareas" ? "block" : "none" }}>
-                <TabTareas clientId={id!} />
+                <TabTareas
+                  clientId={id!}
+                  autoOpen={searchParams.get("openTask") === "new"}
+                  initialTaskType={searchParams.get("taskType") || ""}
+                />
               </div>
             )}
             {mountedTabs.has("adjuntos") && (

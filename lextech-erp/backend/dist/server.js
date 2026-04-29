@@ -8,7 +8,6 @@ const helmet_1 = __importDefault(require("helmet"));
 const cors_1 = __importDefault(require("cors"));
 const compression_1 = __importDefault(require("compression"));
 const dotenv_1 = __importDefault(require("dotenv"));
-const path_1 = __importDefault(require("path"));
 const entities_1 = __importDefault(require("./routes/entities"));
 const ocr_1 = __importDefault(require("./routes/ocr"));
 const activity_1 = __importDefault(require("./routes/activity"));
@@ -18,14 +17,20 @@ const tasks_1 = __importDefault(require("./routes/tasks"));
 const expedientes_1 = __importDefault(require("./routes/expedientes"));
 const agenda_1 = __importDefault(require("./routes/agenda"));
 const chat_1 = __importDefault(require("./routes/chat"));
+const email_1 = __importDefault(require("./routes/email"));
 const migrations_1 = require("./config/migrations");
 const localFilesWatcher_1 = require("./watchers/localFilesWatcher");
 const filesController_1 = require("./controllers/filesController");
 const activityController_1 = require("./controllers/activityController");
 const database_1 = __importDefault(require("./config/database"));
+const paths_1 = require("./config/paths");
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 4000;
+const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
 process.on('unhandledRejection', (reason) => {
     console.error('❌ Unhandled promise rejection:', reason);
 });
@@ -33,7 +38,16 @@ process.on('uncaughtException', (error) => {
     console.error('❌ Uncaught exception:', error);
 });
 app.use((0, helmet_1.default)({ crossOriginResourcePolicy: false }));
-app.use((0, cors_1.default)({ origin: true, credentials: true }));
+app.use((0, cors_1.default)({
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+            callback(null, true);
+            return;
+        }
+        callback(new Error('Origen no permitido por CORS'));
+    },
+    credentials: true,
+}));
 app.use(express_1.default.json({ limit: '10mb' }));
 app.use(express_1.default.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/api', (_req, res, next) => {
@@ -45,7 +59,7 @@ app.use('/api', (_req, res, next) => {
     next();
 });
 app.use((0, compression_1.default)());
-app.use('/uploads', express_1.default.static(path_1.default.join(__dirname, '../uploads')));
+app.use('/uploads', express_1.default.static(paths_1.UPLOADS_ROOT));
 app.use('/api/entities', entities_1.default);
 app.use('/api/ocr', ocr_1.default);
 app.use('/api/activity', activity_1.default);
@@ -55,6 +69,7 @@ app.use('/api/tasks', tasks_1.default);
 app.use('/api/expedientes', expedientes_1.default);
 app.use('/api/agenda', agenda_1.default);
 app.use('/api/chat', chat_1.default);
+app.use('/api/email', email_1.default);
 app.get('/health', (_req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
@@ -86,8 +101,10 @@ app.use((err, _req, res, _next) => {
 (0, migrations_1.runMigrations)().then(() => {
     app.listen(PORT, async () => {
         console.log(`🛡️  VANTIA Backend corriendo en http://localhost:${PORT}`);
-        (0, localFilesWatcher_1.startLocalFilesWatcher)();
-        (0, filesController_1.migrateLocalFoldersStructure)();
+        if (paths_1.SHOULD_START_LOCAL_WATCHER) {
+            (0, localFilesWatcher_1.startLocalFilesWatcher)();
+            (0, filesController_1.migrateLocalFoldersStructure)();
+        }
         try {
             await (0, activityController_1.logServerStart)();
         }

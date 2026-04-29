@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { requireAuth } from '../middleware/auth';
 import {
   getAccounts,
   createAccount,
@@ -13,9 +14,12 @@ import {
   saveDraft,
   getDrafts,
   getStats,
+  getRecipientSuggestions,
+  logGmailSent,
 } from '../controllers/emailController';
 
 const router = Router();
+router.use(requireAuth);
 
 // ── Cuentas ──────────────────────────────────────────────────────────────────
 router.get('/accounts',           getAccounts);
@@ -29,9 +33,11 @@ router.get('/messages/:id',       getMessage);
 router.patch('/messages/:id/read',   markRead);
 router.patch('/messages/:id/star',   toggleStar);
 router.delete('/messages/:id',    deleteMessage);
+router.get('/contacts/suggestions', getRecipientSuggestions);
 
 // ── Envío y borradores ───────────────────────────────────────────────────────
 router.post('/send',              sendMail);
+router.post('/gmail/log-sent',    logGmailSent);
 router.post('/drafts',            saveDraft);
 router.get('/drafts',             getDrafts);
 

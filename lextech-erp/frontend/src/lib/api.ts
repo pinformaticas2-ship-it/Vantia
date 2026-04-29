@@ -157,9 +157,13 @@ export function getClientIp(): string | null {
   return _clientIp;
 }
 
-export async function safeJson(response: Response) {
+export async function safeJson(response: Response, options?: { authRetried?: boolean }) {
   if (response.status === 401) {
-    throw new Error('Sesion no valida o expirada; el token se ha renovado, reintentando...');
+    throw new Error(
+      options?.authRetried
+        ? 'Sesion no valida o expirada. El backend no ha aceptado la autenticacion.'
+        : 'Sesion no valida o expirada; reintentando con un token renovado...',
+    );
   }
 
   const contentType = response.headers.get('content-type') || '';
@@ -225,7 +229,7 @@ export async function apiFetch(
 
       if (res.status === 401 && attempt === 0) continue;
 
-      return safeJson(res);
+      return safeJson(res, { authRetried: attempt > 0 });
     }
   };
 

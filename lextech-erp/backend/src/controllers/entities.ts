@@ -5,8 +5,16 @@ import pool from '../config/database';
 import { logActivity, logActivityForReq } from './activityController';
 import { CLIENT_FILES_ROOT, UPLOADS_CLIENTS_ROOT as UPLOADS_ROOT } from '../config/paths';
 
-/** Convierte string vacío a null (evita cast ::date fallido en PostgreSQL) */
-const nullIfEmpty = (v: any) => (v === '' || v === undefined ? null : v);
+/** Convierte strings vacíos/guiones a null (evita casts fallidos en PostgreSQL) */
+const nullIfEmpty = (v: any) => {
+  if (v === undefined || v === null) return null;
+  if (typeof v === 'string') {
+    const normalized = v.trim();
+    if (!normalized || normalized === '—' || normalized === '-') return null;
+    return normalized;
+  }
+  return v;
+};
 
 /** Extrae el nombre legible del usuario desde las sessionClaims de Clerk */
 function reqUserName(req: any): string {
@@ -24,6 +32,17 @@ function reqUserName(req: any): string {
 /** Formatea un error de PG de forma legible */
 const pgErr = (e: any) =>
   `${e?.message || String(e)}${e?.detail ? ' | detail: ' + e.detail : ''}${e?.code ? ' | code: ' + e.code : ''}`;
+
+const friendlyEntityError = (e: any) => {
+  const raw = String(e?.message || '');
+  if (e?.code === '22P02' && /type numeric/i.test(raw)) {
+    return 'No se pudo guardar el cliente porque algún campo numérico tiene un formato inválido. Revisa código postal, teléfonos y otros campos opcionales.';
+  }
+  if (e?.code === '22P02' && /date/i.test(raw)) {
+    return 'No se pudo guardar el cliente porque alguna fecha no tiene un formato válido.';
+  }
+  return pgErr(e);
+};
 
 // ─────────────────────────────────────────────────────────────
 // GET /api/entities  — con búsqueda, filtro y paginación
@@ -228,7 +247,8 @@ export const createEntity = async (req: any, res: Response) => {
     if (error.code === '23505') {
       return res.status(409).json({ success: false, error: 'Este NIF/CIF ya está registrado.' });
     }
-    res.status(500).json({ success: false, error: pgErr(error) });
+    const status = error?.code === '22P02' ? 400 : 500;
+    res.status(status).json({ success: false, error: friendlyEntityError(error) });
   }
 };
 
@@ -338,7 +358,8 @@ export const updateEntity = async (req: any, res: Response) => {
     if (error.code === '23505') {
       return res.status(409).json({ success: false, error: 'Este NIF/CIF ya está registrado.' });
     }
-    res.status(500).json({ success: false, error: pgErr(error) });
+    const status = error?.code === '22P02' ? 400 : 500;
+    res.status(status).json({ success: false, error: friendlyEntityError(error) });
   }
 };
 

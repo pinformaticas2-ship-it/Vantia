@@ -451,7 +451,7 @@ export default function Trazabilidad() {
                             </div>
                             {item.ip_address && (
                               <div>
-                                <span className="text-slate-400 uppercase tracking-wide text-[9px] font-bold">IP</span>
+                                <span className="text-slate-400 upperc  ase tracking-wide text-[9px] font-bold">IP</span>
                                 <p className="mt-0.5"><IpBadge ip={item.ip_address}/></p>
                               </div>
                             )}
