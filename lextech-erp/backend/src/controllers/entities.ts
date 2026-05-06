@@ -92,7 +92,7 @@ export const getEntities = async (req: any, res: Response) => {
         e.first_name, e.last_name, e.commercial_name, e.nif_cif,
         e.email, e.phone_1, e.phone_mobile,
         e.address_town, e.address_province,
-        e.photo_url, e.created_at, e.date_alta, e.lopd,
+        e.photo_url, e.created_at, e.date_alta, e.lopd, e.color,
         (SELECT COUNT(*) FROM activity_log al
          WHERE al.entity_id = e.id AND al.entity_type = 'CLIENT'
            AND al.action_type NOT LIKE 'Nota%'
@@ -371,7 +371,7 @@ export const patchEntity = async (req: any, res: Response) => {
   const ALLOWED = [
     'client_status', 'date_baja', 'date_alta',
     'lopd', 'center', 'commercial_communications',
-    'type', 'commercial_name', 'website',
+    'type', 'commercial_name', 'website', 'color',
   ];
   const entries = Object.entries(req.body).filter(([k]) => ALLOWED.includes(k));
   if (entries.length === 0) {

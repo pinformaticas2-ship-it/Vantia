@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import * as crypto from 'crypto';
 import pool from '../config/database';
-import { ImapClient, ImapConfig, syncInbox, testImapConnection } from '../utils/imap';
+import { ImapClient, ImapConfig, ImapFolderInfo, syncInbox, testImapConnection } from '../utils/imap';
 import { Pop3Config, syncPop3Inbox, testPop3Connection } from '../utils/pop3';
 import { sendEmail, SmtpConfig, MailMessage, testSmtpConnection } from '../utils/smtp';
 import { logActivityForReq } from './activityController';
@@ -33,7 +33,20 @@ function userId(req: Request): string {
 }
 
 function explainMailConnectionError(error: any, proto: 'imap' | 'pop3' | 'smtp'): string {
-  const message = String(error?.message || error || '').trim();
+  const message = [
+    error?.responseText,
+    error?.response,
+    error?.serverResponseText,
+    error?.serverResponse,
+    error?.command && error?.responseStatus ? `${error.command} ${error.responseStatus}` : null,
+    error?.code,
+    error?.message,
+  ]
+    .filter(Boolean)
+    .map((item) => String(item).trim())
+    .filter(Boolean)
+    .join(' | ')
+    .trim() || String(error?.message || error || '').trim();
   const lower = message.toLowerCase();
   const label = proto === 'smtp' ? 'SMTP' : proto.toUpperCase();
 
@@ -51,6 +64,10 @@ function explainMailConnectionError(error: any, proto: 'imap' | 'pop3' | 'smtp')
   }
   if (lower.includes('timeout') || lower.includes('timed out')) {
     return `El servidor ${label} tardó demasiado en responder. Comprueba host, puerto y conectividad.`;
+  }
+
+  if (lower.includes('command failed') || lower.includes('bad command') || lower.includes('no [')) {
+    return `El servidor ${label} rechazó la operación. Suele deberse a usuario o contraseña incorrectos, SSL/TLS mal configurado o un host/puerto que no corresponde con ese proveedor.`;
   }
 
   return `No se pudo validar la conexión ${label}: ${message || 'error desconocido'}`;
@@ -129,6 +146,74 @@ export async function getAccounts(req: Request, res: Response) {
   } catch (e: any) { return err(res, e.message); }
 }
 
+export async function getOAuthProfiles(req: Request, res: Response) {
+  const uid = userId(req);
+  if (!uid) return err(res, 'No autenticado', 401);
+  const provider = String(req.query.provider || 'google').toLowerCase();
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, provider, email, display_name, avatar_url, external_id, last_used_at, created_at
+         FROM email_oauth_profiles
+        WHERE user_id=$1 AND provider=$2
+        ORDER BY last_used_at DESC, created_at DESC`,
+      [uid, provider],
+    );
+    return ok(res, rows);
+  } catch (e: any) {
+    return err(res, e.message);
+  }
+}
+
+export async function upsertOAuthProfile(req: Request, res: Response) {
+  const uid = userId(req);
+  if (!uid) return err(res, 'No autenticado', 401);
+
+  const provider = String(req.body?.provider || 'google').toLowerCase();
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  const displayName = String(req.body?.display_name || req.body?.displayName || '').trim() || null;
+  const avatarUrl = String(req.body?.avatar_url || req.body?.avatarUrl || '').trim() || null;
+  const externalId = String(req.body?.external_id || req.body?.externalId || '').trim() || null;
+
+  if (!email) return err(res, 'Falta el email del perfil', 400);
+
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO email_oauth_profiles (user_id, provider, email, display_name, avatar_url, external_id, last_used_at)
+       VALUES ($1,$2,$3,$4,$5,$6,NOW())
+       ON CONFLICT (user_id, provider, email)
+       DO UPDATE SET
+         display_name = COALESCE(EXCLUDED.display_name, email_oauth_profiles.display_name),
+         avatar_url   = COALESCE(EXCLUDED.avatar_url, email_oauth_profiles.avatar_url),
+         external_id  = COALESCE(EXCLUDED.external_id, email_oauth_profiles.external_id),
+         last_used_at = NOW(),
+         updated_at   = NOW()
+       RETURNING id, provider, email, display_name, avatar_url, external_id, last_used_at, created_at`,
+      [uid, provider, email, displayName, avatarUrl, externalId],
+    );
+    return ok(res, rows[0]);
+  } catch (e: any) {
+    return err(res, e.message);
+  }
+}
+
+export async function deleteOAuthProfile(req: Request, res: Response) {
+  const uid = userId(req);
+  if (!uid) return err(res, 'No autenticado', 401);
+  const { id } = req.params;
+
+  try {
+    const { rowCount } = await pool.query(
+      `DELETE FROM email_oauth_profiles WHERE id=$1 AND user_id=$2`,
+      [id, uid],
+    );
+    if (!rowCount) return err(res, 'Perfil no encontrado', 404);
+    return ok(res, true);
+  } catch (e: any) {
+    return err(res, e.message);
+  }
+}
+
 export async function createAccount(req: Request, res: Response) {
   const uid = userId(req);
   if (!uid) return err(res, 'No autenticado', 401);
@@ -149,6 +234,25 @@ export async function createAccount(req: Request, res: Response) {
   }
 
   try {
+    const { rows: existingAccounts } = await pool.query(
+      `SELECT id, label
+         FROM email_accounts
+        WHERE user_id=$1
+          AND LOWER(email)=LOWER($2)
+          AND LOWER(username)=LOWER($3)
+          AND LOWER(imap_host)=LOWER($4)
+          AND COALESCE(protocol, 'imap')=$5
+          AND active=true
+        LIMIT 1`,
+      [uid, email, username, imap_host, proto],
+    );
+    if (existingAccounts.length) {
+      return err(res, 'Esa cuenta ya existe en el módulo de correo. Usa la cuenta ya creada o bórrala antes de crear otra igual.', 409);
+    }
+
+    const withTimeout = <T>(p: Promise<T>, ms: number, label: string): Promise<T> =>
+      Promise.race([p, new Promise<T>((_, rej) => setTimeout(() => rej(new Error(`Timeout (${label}): el servidor tardó demasiado en responder`)), ms))]);
+
     if (proto === 'pop3') {
       const pop3Cfg: Pop3Config = {
         host: String(imap_host),
@@ -156,8 +260,9 @@ export async function createAccount(req: Request, res: Response) {
         secure: Boolean(imap_secure),
         user: String(username),
         password: String(password),
+        timeout: 12000,
       };
-      await testPop3Connection(pop3Cfg).catch((e) => {
+      await withTimeout(testPop3Connection(pop3Cfg), 20000, 'POP3').catch((e) => {
         throw new Error(explainMailConnectionError(e, 'pop3'));
       });
     } else {
@@ -168,7 +273,7 @@ export async function createAccount(req: Request, res: Response) {
         user: String(username),
         password: String(password),
       };
-      await testImapConnection(imapCfg).catch((e) => {
+      await withTimeout(testImapConnection(imapCfg), 20000, 'IMAP').catch((e) => {
         throw new Error(explainMailConnectionError(e, 'imap'));
       });
     }
@@ -180,7 +285,7 @@ export async function createAccount(req: Request, res: Response) {
       user: String(username),
       password: String(password),
     };
-    await testSmtpConnection(smtpCfg).catch((e) => {
+    await withTimeout(testSmtpConnection(smtpCfg), 20000, 'SMTP').catch((e) => {
       throw new Error(explainMailConnectionError(e, 'smtp'));
     });
 
@@ -212,6 +317,92 @@ export async function deleteAccount(req: Request, res: Response) {
     if (!rowCount) return err(res, 'Cuenta no encontrada', 404);
     return ok(res, { id });
   } catch (e: any) { return err(res, e.message); }
+}
+
+export async function getAccountFolders(req: Request, res: Response) {
+  const uid = userId(req);
+  if (!uid) return err(res, 'No autenticado', 401);
+  const { id } = req.params;
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT * FROM email_accounts WHERE id=$1 AND user_id=$2 AND active=true`,
+      [id, uid],
+    );
+    if (!rows.length) return err(res, 'Cuenta no encontrada', 404);
+
+    const acc = rows[0];
+    const proto = String(acc.protocol || 'imap').toLowerCase();
+    if (proto === 'pop3') return ok(res, []);
+
+    const password = decryptPassword(acc.password_enc);
+    const cfg: ImapConfig = {
+      host: acc.imap_host,
+      port: acc.imap_port,
+      secure: acc.imap_secure,
+      user: acc.username,
+      password,
+    };
+
+    const client = new ImapClient(cfg);
+    try {
+      await client.connect();
+      await client.login();
+      const folders = await client.listFolders();
+      return ok(res, folders);
+    } finally {
+      await client.logout().catch(() => undefined);
+    }
+  } catch (e: any) {
+    return err(res, e.message);
+  }
+}
+
+export async function createAccountFolder(req: Request, res: Response) {
+  const uid = userId(req);
+  if (!uid) return err(res, 'No autenticado', 401);
+  const { id } = req.params;
+  const name = String(req.body?.name || '').trim();
+
+  if (!name) return err(res, 'Indica un nombre de carpeta', 400);
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT * FROM email_accounts WHERE id=$1 AND user_id=$2 AND active=true`,
+      [id, uid],
+    );
+    if (!rows.length) return err(res, 'Cuenta no encontrada', 404);
+
+    const acc = rows[0];
+    const proto = String(acc.protocol || 'imap').toLowerCase();
+    if (proto === 'pop3') return err(res, 'Las cuentas POP3 no permiten crear carpetas', 400);
+
+    const password = decryptPassword(acc.password_enc);
+    const cfg: ImapConfig = {
+      host: acc.imap_host,
+      port: acc.imap_port,
+      secure: acc.imap_secure,
+      user: acc.username,
+      password,
+    };
+
+    const client = new ImapClient(cfg);
+    try {
+      await client.connect();
+      await client.login();
+      const existingFolders = await client.listFolders();
+      if (existingFolders.some((folder) => folder.path.toLowerCase() === name.toLowerCase())) {
+        return err(res, 'Ya existe una carpeta con ese nombre', 409);
+      }
+      await client.createFolder(name);
+      const folders = await client.listFolders();
+      return ok(res, { created: name, folders });
+    } finally {
+      await client.logout().catch(() => undefined);
+    }
+  } catch (e: any) {
+    return err(res, e.message);
+  }
 }
 
 // ── Sincronización IMAP / POP3 ────────────────────────────────────────────────

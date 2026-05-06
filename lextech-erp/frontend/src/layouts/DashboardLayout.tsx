@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Briefcase, Users, Settings,
@@ -113,10 +113,12 @@ function timeAgo(dateStr: string): string {
   return `hace ${Math.floor(h / 24)}d`;
 }
 function actionIcon(t: string) {
-  if (t.toLowerCase().includes("cliente")) return "👤";
-  if (t.toLowerCase().includes("expediente")) return "📁";
-  if (t.toLowerCase().includes("documento")) return "📄";
-  return "⚡";
+  const value = String(t || "").toLowerCase();
+  if (value.includes("correo") || value.includes("email")) return "??";
+  if (value.includes("cliente")) return "??";
+  if (value.includes("expediente")) return "??";
+  if (value.includes("documento")) return "??";
+  return "?";
 }
 
 // ── VantIA flotante (siempre visible, contextual) ───────────────────────────
@@ -359,7 +361,24 @@ function WhatsAppWidget() {
 }
 
 // ── Notifications Panel ──────────────────────────────────────────────────────
-function NotificationsPanel({ notifs, loading, onClose }: { notifs: any[]; loading: boolean; onClose: () => void }) {
+type UnifiedNotification = {
+  id: string;
+  kind: "chat" | "email" | "whatsapp";
+  title: string;
+  subtitle?: string;
+  meta?: string;
+  count?: number;
+  created_at: string;
+  onClick?: () => void;
+};
+
+function notificationIcon(kind: UnifiedNotification["kind"]) {
+  if (kind === "chat") return "💬";
+  if (kind === "email") return "✉️";
+  return "🟢";
+}
+
+function NotificationsPanel({ notifs, loading, onClose }: { notifs: UnifiedNotification[]; loading: boolean; onClose: () => void }) {
   return (
     <div className="absolute right-0 top-14 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden">
       <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
@@ -370,16 +389,26 @@ function NotificationsPanel({ notifs, loading, onClose }: { notifs: any[]; loadi
         {loading ? (
           <div className="flex justify-center py-8"><Loader2 size={18} className="animate-spin text-slate-300" /></div>
         ) : notifs.length === 0 ? (
-          <div className="py-8 text-center text-slate-400 text-xs">Sin actividad reciente</div>
-        ) : notifs.map((n: any) => (
-          <div key={n.id} className="flex items-start gap-3 px-4 py-3 hover:bg-slate-50">
-            <span className="text-base mt-0.5">{actionIcon(n.action_type)}</span>
+          <div className="py-8 text-center text-slate-400 text-xs">Sin mensajes pendientes</div>
+        ) : notifs.map((n) => (
+          <button
+            key={n.id}
+            type="button"
+            onClick={() => { n.onClick?.(); onClose(); }}
+            className="w-full flex items-start gap-3 px-4 py-3 hover:bg-slate-50 text-left">
+            <span className="text-base mt-0.5">{notificationIcon(n.kind)}</span>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-slate-700 truncate">{n.action_type}</p>
-              {n.entity_name && <p className="text-[11px] text-slate-500 truncate">{n.entity_name}</p>}
+              <p className="text-xs font-semibold text-slate-700 truncate">{n.title}</p>
+              {n.subtitle && <p className="text-[11px] text-slate-500 truncate">{n.subtitle}</p>}
+              {n.meta && <p className="text-[11px] text-slate-400 truncate mt-0.5">{n.meta}</p>}
               <p className="text-[10px] text-slate-400 mt-0.5">{timeAgo(n.created_at)}</p>
             </div>
-          </div>
+            {!!n.count && n.count > 1 && (
+              <span className="ml-2 min-w-[20px] h-5 bg-slate-100 text-slate-600 text-[10px] font-black rounded-full flex items-center justify-center px-1.5">
+                {n.count > 99 ? "99+" : n.count}
+              </span>
+            )}
+          </button>
         ))}
       </div>
     </div>
@@ -537,12 +566,13 @@ export default function DashboardLayout() {
   const [isNotifOpen,   setIsNotifOpen]   = useState(false);
   const [searchQuery,   setSearchQuery]   = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
-  const [notifications, setNotifications] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<UnifiedNotification[]>([]);
   const [notifLoading,  setNotifLoading]  = useState(false);
 
   const searchRef      = useRef<HTMLDivElement>(null);
   const notifRef       = useRef<HTMLDivElement>(null);
   const loginFiredRef  = useRef<string | null>(null); // tracks which userId we've already logged-in
+  const notifBusyRef   = useRef(false);
 
   // ── Registrar LOGIN en trazabilidad cuando el usuario se autentica ──────
   useEffect(() => {
@@ -609,22 +639,170 @@ export default function DashboardLayout() {
     return () => document.removeEventListener("mousedown", h);
   }, []);
 
-  const openNotifications = useCallback(async () => {
-    setIsNotifOpen(true);
-    setNotifLoading(true);
+  const hiddenKinds = useMemo(() => {
+    const hidden = new Set<UnifiedNotification["kind"]>();
+    if (location.pathname.startsWith("/dashboard/correo")) hidden.add("email");
+    if (location.pathname.startsWith("/dashboard/chat")) hidden.add("chat");
+    if (location.pathname.startsWith("/dashboard/whatsapp")) hidden.add("whatsapp");
+    return hidden;
+  }, [location.pathname]);
+
+  const fetchNotifications = useCallback(async (showLoader = false) => {
+    if (notifBusyRef.current) return;
+    notifBusyRef.current = true;
+    if (showLoader) setNotifLoading(true);
     try {
       const token = await getToken({ skipCache: true });
-      const res   = await fetch("/api/activity", { headers: { Authorization: `Bearer ${token}` } });
-      const data  = await safeJson(res);
-      if (res.ok) setNotifications(data.data || []);
+      if (!token) return;
+      const headers = { Authorization: `Bearer ${token}` };
+      const [chatRes, emailRes, waRes] = await Promise.all([
+        fetch("/api/chat/canales", { headers }),
+        fetch("/api/email/messages?folder=INBOX&unread=1&page=1&pageSize=50", { headers }),
+        fetch("/api/whatsapp/contacts", { headers }),
+      ]);
+
+      const [chatData, emailData, waData] = await Promise.all([
+        safeJson(chatRes),
+        safeJson(emailRes),
+        safeJson(waRes),
+      ]);
+
+      const next: UnifiedNotification[] = [];
+
+      if (chatRes.ok) {
+        const chatItems = Array.isArray(chatData?.data) ? chatData.data : [];
+        for (const item of chatItems) {
+          const unread = Number(item?.no_leidos || 0);
+          if (item?.tipo !== "directo" || unread <= 0) continue;
+          const dmName = item?.dm_target_user_name || "Chat interno";
+          next.push({
+            id: `chat-${item.id}`,
+            kind: "chat",
+            title: dmName,
+            subtitle: unread > 1 ? `${unread} mensajes internos sin leer` : "1 mensaje interno sin leer",
+            meta: item?.ultimo_mensaje || undefined,
+            count: unread,
+            created_at: item?.ultimo_mensaje_at || item?.created_at || new Date().toISOString(),
+            onClick: () => navigate(`/dashboard/chat?canal=${encodeURIComponent(item.id)}`),
+          });
+        }
+      }
+
+      if (emailRes.ok) {
+        const emailItems = Array.isArray(emailData?.data?.emails) ? emailData.data.emails : [];
+        const groupedEmails = new Map<string, { from: string; subject: string; snippet: string; count: number; created_at: string; id: string }>();
+        for (const item of emailItems) {
+          const key = String(item?.from_email || item?.from_name || item?.id || "");
+          if (!key) continue;
+          const existing = groupedEmails.get(key);
+          const createdAt = item?.sent_at || new Date().toISOString();
+          if (!existing) {
+            groupedEmails.set(key, {
+              from: item?.from_name || item?.from_email || "Nuevo correo",
+              subject: item?.subject || "(Sin asunto)",
+              snippet: item?.snippet || "",
+              count: 1,
+              created_at: createdAt,
+              id: item?.id,
+            });
+          } else {
+            existing.count += 1;
+            if (new Date(createdAt).getTime() > new Date(existing.created_at).getTime()) {
+              existing.created_at = createdAt;
+              existing.subject = item?.subject || existing.subject;
+              existing.snippet = item?.snippet || existing.snippet;
+              existing.id = item?.id || existing.id;
+              existing.from = item?.from_name || item?.from_email || existing.from;
+            }
+          }
+        }
+
+        for (const grouped of groupedEmails.values()) {
+          next.push({
+            id: `email-${grouped.id}`,
+            kind: "email",
+            title: grouped.from,
+            subtitle: grouped.count > 1 ? `${grouped.count} correos sin leer` : grouped.subject,
+            meta: grouped.count > 1 ? grouped.subject : grouped.snippet,
+            count: grouped.count,
+            created_at: grouped.created_at,
+            onClick: () => navigate(`/dashboard/correo?openEmail=${encodeURIComponent(grouped.id)}`),
+          });
+        }
+      }
+
+      if (waRes.ok) {
+        const waItems = Array.isArray(waData?.data) ? waData.data : [];
+        for (const item of waItems) {
+          if (String(item?.last_message_direction || "") !== "inbound") continue;
+          if (!item?.last_message_at) continue;
+          next.push({
+            id: `wa-${item.id}`,
+            kind: "whatsapp",
+            title: item?.commercial_name || `${item?.first_name || ""} ${item?.last_name || ""}`.trim() || item?.email || "WhatsApp",
+            subtitle: "Mensaje recibido por WhatsApp",
+            meta: item?.last_message_body || undefined,
+            count: 1,
+            created_at: item?.last_message_at,
+            onClick: () => navigate(`/dashboard/whatsapp?clientId=${encodeURIComponent(item.id)}&mode=thread`),
+          });
+        }
+      }
+
+      next.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      setNotifications(next.slice(0, 20));
     } catch (_e) {
-    } finally { setNotifLoading(false); }
-  }, [getToken]);
+    } finally {
+      notifBusyRef.current = false;
+      if (showLoader) setNotifLoading(false);
+    }
+  }, [getToken, navigate]);
+
+  const openNotifications = useCallback(async () => {
+    setIsNotifOpen(true);
+    await fetchNotifications(true);
+  }, [fetchNotifications]);
+
+  useEffect(() => {
+    let interval: number | null = null;
+
+    const handleRefresh = () => {
+      void fetchNotifications(false);
+    };
+    const handleVisibilityChange = () => {
+      handleRefresh();
+      startPolling();
+    };
+
+    const startPolling = () => {
+      if (interval) window.clearInterval(interval);
+      interval = window.setInterval(
+        handleRefresh,
+        document.visibilityState === "visible" ? 3000 : 9000,
+      );
+    };
+
+    handleRefresh();
+    startPolling();
+    window.addEventListener("focus", handleRefresh);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      if (interval) window.clearInterval(interval);
+      window.removeEventListener("focus", handleRefresh);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [fetchNotifications]);
+
+  const visibleNotifications = useMemo(
+    () => notifications.filter((item) => !hiddenKinds.has(item.kind)),
+    [hiddenKinds, notifications],
+  );
 
   return (
     <div className="erp-shell min-h-screen flex font-sans antialiased text-neutral-900">
 
-      {latestUnread && (
+      {latestUnread && !location.pathname.startsWith("/dashboard/correo") && (
         <EmailToast
           email={latestUnread}
           onClose={clearLatestUnread}
@@ -699,13 +877,13 @@ export default function DashboardLayout() {
                 className="relative p-2.5 rounded-xl hover:bg-slate-50 text-slate-500 border border-slate-100 transition-colors"
               >
                 <Bell className="h-5 w-5" />
-                {(notifications.length > 0 || emailUnreadCount > 0) && (
+                {(visibleNotifications.length > 0 || (!hiddenKinds.has("email") && emailUnreadCount > 0)) && (
                   <span className="absolute top-2 right-2 h-2 w-2 bg-red-500 rounded-full border-2 border-white" />
                 )}
               </button>
               {isNotifOpen && (
                 <NotificationsPanel
-                  notifs={notifications.slice(0, 10)}
+                  notifs={visibleNotifications.slice(0, 10)}
                   loading={notifLoading}
                   onClose={() => setIsNotifOpen(false)}
                 />

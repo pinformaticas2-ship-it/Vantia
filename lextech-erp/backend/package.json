@@ -10,6 +10,7 @@
     "start": "node dist/server.js"
   },
   "dependencies": {
+    "@clerk/backend": "^2.6.1",
     "@clerk/clerk-sdk-node": "^5.0.0",
     "@google/generative-ai": "^0.24.1",
     "bcryptjs": "^2.4.3",
@@ -21,6 +22,7 @@
     "express-rate-limit": "^7.5.0",
     "helmet": "^8.0.0",
     "hpp": "^0.2.3",
+    "imapflow": "^1.0.181",
     "multer": "^2.0.2",
     "openai": "^6.34.0",
     "pg": "^8.13.1",

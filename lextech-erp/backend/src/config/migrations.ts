@@ -68,6 +68,7 @@ export async function runMigrations(): Promise<void> {
       ['center',                    `VARCHAR(150)`],
       ['photo_url',                 `TEXT`],
       ['dni_image_url',             `TEXT`],
+      ['color',                     `VARCHAR(20) NOT NULL DEFAULT 'ninguno'`],
     ];
 
     for (const [col, def] of alterColumns) {
@@ -661,6 +662,36 @@ export async function runMigrations(): Promise<void> {
     } catch (_e: any) {}
 
     // ── Chat de equipo ─────────────────────────────────────────────────────────
+    // ── Adjuntos propios por actuación/tarea ──────────────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS task_files (
+        id              UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        task_id         UUID         NOT NULL,
+        original_name   VARCHAR(500) NOT NULL,
+        stored_name     VARCHAR(500) NOT NULL,
+        mimetype        VARCHAR(255),
+        size_bytes      BIGINT,
+        document_name   VARCHAR(500),
+        attachment_type VARCHAR(120) NOT NULL DEFAULT 'Sin clasificar',
+        created_by      VARCHAR(150),
+        created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      );
+    `);
+    for (const idx of [
+      `CREATE INDEX IF NOT EXISTS idx_task_files_task_id ON task_files (task_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_task_files_created_at ON task_files (created_at DESC)`,
+    ]) {
+      try { await client.query(idx); } catch (_e: any) {}
+    }
+    try {
+      await client.query(`
+        CREATE OR REPLACE TRIGGER trg_task_files_updated_at
+          BEFORE UPDATE ON task_files
+          FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+      `);
+    } catch (_e: any) {}
+
     // Canales
     await client.query(`
       CREATE TABLE IF NOT EXISTS chat_canales (
@@ -831,6 +862,33 @@ export async function runMigrations(): Promise<void> {
     for (const idx of [
       `CREATE INDEX IF NOT EXISTS idx_email_accounts_user_id ON email_accounts (user_id)`,
     ]) { try { await client.query(idx); } catch (_e: any) {} }
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS email_oauth_profiles (
+        id             UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id        VARCHAR(150) NOT NULL,
+        provider       VARCHAR(30)  NOT NULL DEFAULT 'google',
+        email          VARCHAR(200) NOT NULL,
+        display_name   VARCHAR(200),
+        avatar_url     TEXT,
+        external_id    VARCHAR(200),
+        last_used_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        UNIQUE(user_id, provider, email)
+      );
+    `);
+    for (const idx of [
+      `CREATE INDEX IF NOT EXISTS idx_email_oauth_profiles_user_id ON email_oauth_profiles (user_id, provider)`,
+      `CREATE INDEX IF NOT EXISTS idx_email_oauth_profiles_last_used_at ON email_oauth_profiles (user_id, last_used_at DESC)`,
+    ]) { try { await client.query(idx); } catch (_e: any) {} }
+    try {
+      await client.query(`
+        CREATE TRIGGER trg_email_oauth_profiles_updated_at
+          BEFORE UPDATE ON email_oauth_profiles
+          FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+      `);
+    } catch (_e: any) {}
 
     // Emails cacheados desde IMAP
     await client.query(`

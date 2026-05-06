@@ -71,6 +71,11 @@ function isExcelFile(mime: string, name: string) {
     n.endsWith(".csv")
   );
 }
+function openMailDraft(subject: string, body?: string) {
+  const params = new URLSearchParams({ subject });
+  if (body?.trim()) params.set("body", body);
+  window.open(`mailto:?${params.toString()}`);
+}
 
 // ── Props ────────────────────────────────────────────────────
 interface AdjuntosModalProps {
@@ -336,11 +341,14 @@ export default function AdjuntosModal({
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) await downloadWithAuth(f.id, f.original_name || "documento.docx");
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setErrorMsg(err?.error || "No se pudo abrir el documento en local");
+      }
     } catch (_err) {
-      await downloadWithAuth(f.id, f.original_name || "documento.docx");
+      setErrorMsg("No se pudo abrir el documento en local");
     }
-  }, [entityId, getToken, downloadWithAuth]);
+  }, [entityId, getToken]);
 
   // ── Open PDF in browser ────────────────────────────────────
   const openInBrowser = useCallback(async (f: any) => {
@@ -365,13 +373,25 @@ export default function AdjuntosModal({
     const token = await getToken({ skipCache: true });
     const isWord  = f.mimetype?.includes("wordprocessingml") || f.original_name?.match(/\.docx?$/i);
     const isExcel = isExcelFile(f.mimetype || "", f.original_name || "");
-    const endpoint = isWord
-      ? `/api/files/${entityId}/${f.id}/preview-html`
-      : isExcel
-        ? `/api/files/${entityId}/${f.id}/preview-excel`
-        : `/api/files/${entityId}/${f.id}/download`;
+    let res: Response | null = null;
+    let mode: "pdf" | "html" | "file" = "file";
 
-    const res = await fetch(endpoint, { headers: { Authorization: `Bearer ${token}` } });
+    if (isWord) {
+      res = await fetch(`/api/files/${entityId}/${f.id}/preview-pdf`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) {
+        mode = "pdf";
+      } else {
+        res = await fetch(`/api/files/${entityId}/${f.id}/preview-html`, { headers: { Authorization: `Bearer ${token}` } });
+        mode = "html";
+      }
+    } else if (isExcel) {
+      res = await fetch(`/api/files/${entityId}/${f.id}/preview-excel`, { headers: { Authorization: `Bearer ${token}` } });
+      mode = "html";
+    } else {
+      res = await fetch(`/api/files/${entityId}/${f.id}/download`, { headers: { Authorization: `Bearer ${token}` } });
+      mode = "file";
+    }
+
     if (!res.ok) {
       const errorData = await res.json().catch(() => ({}));
       const errorMsg = errorData.error || `Error ${res.status}`;
@@ -383,12 +403,19 @@ export default function AdjuntosModal({
       return;
     }
 
-    if (isWord || isExcel) {
+    if (mode === "html") {
       const html = await res.text();
       const blob = new Blob([html], { type: "text/html" });
       const url = URL.createObjectURL(blob);
       previewBlobUrl.current = url;
       const entry = { url, name: f.original_name, mime: "text/html", fileId: f.id, appType: (isExcel ? "excel" : "word") as "word" | "excel" };
+      previewCache.current.set(f.id, entry);
+      setPreview(entry);
+    } else if (mode === "pdf") {
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      previewBlobUrl.current = url;
+      const entry = { url, name: f.original_name, mime: "application/pdf", fileId: f.id, appType: "word" as const };
       previewCache.current.set(f.id, entry);
       setPreview(entry);
     } else {
@@ -424,9 +451,6 @@ export default function AdjuntosModal({
       if (data.success && data.data) {
         setEditingFile(null);
         await loadFiles();
-        if (autoOpenAfterAttach) {
-          await downloadWithAuth(data.data.id, data.data.original_name);
-        }
       }
     } catch (_e) {}
     finally { setSavingMetadata(false); }
@@ -518,9 +542,6 @@ export default function AdjuntosModal({
             });
           }
           await loadFiles();
-          if (autoOpenAfterAttach) {
-            await downloadWithAuth(fileId, finalFileName);
-          }
         }
         setShowTemplates(false);
         setEditingFile(null);
@@ -573,6 +594,28 @@ export default function AdjuntosModal({
   });
 
   const selectedFile = files.find(f => f.id === selectedFileId) ?? null;
+  const mailTargetName = selectedFile?.document_name || selectedFile?.original_name || entityName;
+  const mailSubject = selectedFile
+    ? `Adjunto: ${mailTargetName}`
+    : `Adjuntos de ${entityName}`;
+  const mailBody = selectedFile
+    ? [
+        "Hola,",
+        "",
+        `Te escribo en relación con el adjunto "${mailTargetName}".`,
+        `Tipo: ${selectedFile.attachment_type || "Sin clasificar"}`,
+        `Formato: ${selectedFile.original_name || "Archivo"}`,
+        selectedFile.created_at ? `Fecha: ${new Date(selectedFile.created_at).toLocaleDateString("es-ES")}` : "",
+        "",
+        `Puedes revisarlo dentro del apartado de adjuntos de ${entityName} en el ERP.`,
+      ].filter(Boolean).join("\n")
+    : [
+        "Hola,",
+        "",
+        `Te escribo en relación con los adjuntos vinculados a ${entityName}.`,
+        "",
+        "Puedes revisarlos directamente desde el ERP.",
+      ].join("\n");
 
   const innerContent = (
     <>
@@ -661,6 +704,13 @@ export default function AdjuntosModal({
               <FolderOpen size={15} className="text-emerald-600" />
               Importar carpeta
             </button>
+            <button
+              onClick={() => openMailDraft(mailSubject, mailBody)}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+            >
+              <Mail size={15} className="text-blue-500" />
+              Enviar correo
+            </button>
           </div>
           <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 p-1">
             <button
@@ -739,6 +789,13 @@ export default function AdjuntosModal({
               >
                 <Edit3 size={14} />
                 Editar
+              </button>
+              <button
+                onClick={() => openMailDraft(mailSubject, mailBody)}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                <Mail size={14} />
+                Enviar correo
               </button>
               <button
                 onClick={() => handleDelete(selectedFile.id)}

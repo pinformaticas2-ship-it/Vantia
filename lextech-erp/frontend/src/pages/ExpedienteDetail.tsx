@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useParams, useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
@@ -12,6 +12,11 @@ import {
   MoreHorizontal,
   Activity,
   Paperclip,
+  Upload,
+  Download,
+  FilePlus2,
+  Sparkles,
+  Eye,
   RefreshCw,
   Calendar,
   Hash,
@@ -29,6 +34,7 @@ import {
   Gavel,
   CheckCircle2,
   Link2,
+  Mail,
 } from "lucide-react";
 import { safeJson } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
@@ -126,7 +132,7 @@ const Indicador = ({
   </div>
 );
 
-type DetailTabKey = "perfil" | TabKey | "relacionados";
+type DetailTabKey = "perfil" | TabKey | "relacionados" | "actuacion";
 
 const DETAIL_TABS: { key: DetailTabKey; label: string; icon: any }[] = [
   { key: "perfil", label: "Datos", icon: User },
@@ -135,6 +141,7 @@ const DETAIL_TABS: { key: DetailTabKey; label: string; icon: any }[] = [
   { key: "contrarios", label: "Contrarios", icon: Users },
   { key: "relacionados", label: "Expedientes relacionados", icon: Link2 },
   { key: "tareas", label: "Tareas / Plazos", icon: AlertTriangle },
+  { key: "actuacion", label: "Actuaciones", icon: ClipboardList },
   { key: "adjuntos", label: "Adjuntos", icon: Paperclip },
   { key: "historial", label: "Historial expediente", icon: Activity },
 ];
@@ -536,6 +543,7 @@ const TAREA_EMPTY: TareaForm = {
 };
 
 const TIPO_CONFIG: Record<string, { label: string; color: string }> = {
+  actuacion: { label: "Actuación", color: "bg-fuchsia-100 text-fuchsia-700" },
   plazo_procesal: { label: "Plazo Procesal", color: "bg-red-100 text-red-700" },
   vista_juicio: { label: "Vista / Juicio", color: "bg-purple-100 text-purple-700" },
   notificacion: { label: "Notificación", color: "bg-blue-100 text-blue-700" },
@@ -554,12 +562,16 @@ function TabTareas({
   expedienteRef,
   juzgado,
   numProc,
+  initialCreate = false,
+  initialType = "",
 }: {
   expedienteId: string;
   clienteId?: string | null;
   expedienteRef?: string | null;
   juzgado?: string | null;
   numProc?: string | null;
+  initialCreate?: boolean;
+  initialType?: string;
 }) {
   const { getToken } = useAuth();
   const [tareas, setTareas] = useState<any[]>([]);
@@ -592,6 +604,21 @@ function TabTareas({
       num_proc: numProc || "",
     }));
   }, [expedienteRef, expedienteId, juzgado, numProc]);
+
+  const autoOpenedRef = useRef(false);
+  useEffect(() => {
+    if (!initialCreate || autoOpenedRef.current || !clienteId) return;
+    autoOpenedRef.current = true;
+    setShowForm(true);
+    setForm({
+      ...TAREA_EMPTY,
+      expediente: expedienteRef || "",
+      expediente_id: expedienteId,
+      juzgado: juzgado || "",
+      num_proc: numProc || "",
+      tipo: initialType || TAREA_EMPTY.tipo,
+    });
+  }, [clienteId, expedienteId, expedienteRef, initialCreate, initialType, juzgado, numProc]);
 
   const estadoStyle: Record<string, string> = {
     pendiente: "bg-amber-100 text-amber-700",
@@ -1042,6 +1069,1229 @@ function TabAdjuntosExpediente({
   );
 }
 
+// ── Helpers locales para ActuacionAdjuntosPanel ─────────────────────────────
+function fileIconAct(mime: string, name: string) {
+  const n = (name || "").toLowerCase();
+  if (mime?.startsWith("image/"))   return { icon: "🖼️", color: "bg-emerald-100 text-emerald-600", label: "Imagen" };
+  if (mime === "application/pdf")   return { icon: "📄", color: "bg-red-100 text-red-600",     label: "PDF" };
+  if (mime?.includes("word") || n.endsWith(".doc") || n.endsWith(".docx")) return { icon: "📝", color: "bg-blue-100 text-blue-600", label: "Word" };
+  if (mime?.includes("excel") || mime?.includes("spreadsheet") || n.endsWith(".xlsx") || n.endsWith(".xls") || n.endsWith(".csv")) return { icon: "📊", color: "bg-green-100 text-green-600", label: "Excel" };
+  if (mime?.includes("presentation") || n.endsWith(".pptx")) return { icon: "📑", color: "bg-orange-100 text-orange-600", label: "PPT" };
+  if (mime?.startsWith("text/"))    return { icon: "📃", color: "bg-slate-100 text-slate-600", label: "Texto" };
+  return { icon: "📎", color: "bg-slate-100 text-slate-500", label: "Archivo" };
+}
+function fmtSizeAct(bytes: number) {
+  if (!bytes) return "—";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+function isPrevAct(mime: string) { return mime === "application/pdf" || mime?.startsWith("image/") || mime?.startsWith("text/"); }
+function isWordAct(mime: string, name: string) { const n = (name || "").toLowerCase(); return mime?.includes("word") || mime?.includes("officedocument.wordprocessingml") || n.endsWith(".doc") || n.endsWith(".docx"); }
+function isExcelAct(mime: string, name: string) { const n = (name || "").toLowerCase(); return mime?.includes("excel") || mime?.includes("spreadsheetml") || n.endsWith(".xlsx") || n.endsWith(".xls") || n.endsWith(".csv"); }
+function openMailDraft(subject: string, body?: string) {
+  const params = new URLSearchParams({ subject });
+  if (body?.trim()) params.set("body", body);
+  window.open(`mailto:?${params.toString()}`);
+}
+
+function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
+  const { getToken } = useAuth();
+  const [files, setFiles] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [editingFile, setEditingFile] = useState<any | null>(null);
+  const [editDocName, setEditDocName] = useState("");
+  const [editAttachmentType, setEditAttachmentType] = useState("Sin clasificar");
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [templateSearch, setTemplateSearch] = useState("");
+  const [docPlantFolders, setDocPlantFolders] = useState<{ name: string; files: { name: string; path: string; ext: string }[] }[]>([]);
+  const [docPlantLoading, setDocPlantLoading] = useState(false);
+  const [selectedTpl, setSelectedTpl] = useState<{ path: string; name: string; ext: string } | null>(null);
+  const [query, setQuery] = useState("");
+  // Preview
+  const [preview, setPreview] = useState<{ url: string; name: string; mime: string; fileId: string } | null>(null);
+  const [thumbs, setThumbs] = useState<Record<string, string>>({});
+  const loadingThumbIds = useRef<Set<string>>(new Set());
+  const previewCache = useRef<Map<string, { url: string; name: string; mime: string; fileId: string }>>(new Map());
+  const pendingUploadFile = useRef<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    return () => {
+      for (const entry of previewCache.current.values()) {
+        if (entry.url?.startsWith("blob:")) try { URL.revokeObjectURL(entry.url); } catch (_) {}
+      }
+      previewCache.current.clear();
+    };
+  }, []);
+
+  const loadFiles = useCallback(async () => {
+    try {
+      setLoading(true); setError(null);
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/tasks/${taskId}/files`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await safeJson(res);
+      if (res.ok) setFiles(data.data || []);
+      else setError(data?.error || "No se pudieron cargar los adjuntos.");
+    } finally { setLoading(false); }
+  }, [getToken, taskId]);
+
+  useEffect(() => { loadFiles(); }, [loadFiles]);
+
+  const uploadFiles = useCallback(async (fileList: File[] | FileList | null, metadata?: { document_name?: string | null; attachment_type?: string }) => {
+    if (!fileList || !Array.from(fileList).length) return;
+    setUploading(true); setError(null);
+    try {
+      const token = await getToken({ skipCache: true });
+      const fd = new FormData();
+      Array.from(fileList).forEach((file) => fd.append("files", file));
+      const res = await fetch(`/api/tasks/${taskId}/files`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd });
+      const data = await safeJson(res);
+      if (!res.ok) { setError(data?.error || "No se pudieron subir los adjuntos."); return; }
+      if (metadata && Array.isArray(data?.data)) {
+        await Promise.all(data.data.map((item: any) =>
+          fetch(`/api/tasks/${taskId}/files/${item.id}`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(metadata) })
+        ));
+      }
+      await loadFiles();
+    } finally { setUploading(false); }
+  }, [getToken, loadFiles, taskId]);
+
+  const loadThumb = useCallback(async (fileId: string) => {
+    if (loadingThumbIds.current.has(fileId)) return;
+    loadingThumbIds.current.add(fileId);
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/tasks/${taskId}/files/${fileId}/download`, { headers: { Authorization: `Bearer ${token}` } });
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      setThumbs((prev) => ({ ...prev, [fileId]: url }));
+    } catch (_) { loadingThumbIds.current.delete(fileId); }
+  }, [getToken, taskId]);
+
+  const openPreview = useCallback(async (file: any) => {
+    const cached = previewCache.current.get(file.id);
+    if (cached) { setPreview(cached); return; }
+    try {
+      const token = await getToken({ skipCache: true });
+      const isWord = isWordAct(file.mimetype || "", file.original_name || "");
+      const isExcel = isExcelAct(file.mimetype || "", file.original_name || "");
+      const isDirectPreview = isPrevAct(file.mimetype || "");
+      const previewEndpoint = isWord
+        ? `/api/tasks/${taskId}/files/${file.id}/preview-pdf`
+        : isExcel
+          ? `/api/tasks/${taskId}/files/${file.id}/preview-excel`
+          : isDirectPreview
+            ? `/api/tasks/${taskId}/files/${file.id}/download`
+            : null;
+      if (!previewEndpoint) {
+        setError("Este tipo de archivo no tiene vista previa en la actuación. Usa el botón de descarga si lo necesitas.");
+        return;
+      }
+      let res = await fetch(previewEndpoint, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok && isWord) {
+        res = await fetch(`/api/tasks/${taskId}/files/${file.id}/preview-html`, { headers: { Authorization: `Bearer ${token}` } });
+      }
+      if (!res.ok) {
+        setError("No se pudo generar la vista previa de este adjunto.");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const mime = isWord
+        ? (res.headers.get("content-type")?.includes("pdf") ? "application/pdf" : "text/html")
+        : isExcel
+          ? "text/html"
+          : (file.mimetype || res.headers.get("content-type") || "");
+      const entry = { url, name: file.original_name, mime, fileId: file.id };
+      previewCache.current.set(file.id, entry);
+      setPreview(entry);
+    } catch (_) {}
+  }, [getToken, taskId]);
+
+  const openMetadataForUpload = (file: File) => {
+    pendingUploadFile.current = file;
+    setEditDocName(file.name.replace(/\.[^/.]+$/, ""));
+    setEditAttachmentType("Sin clasificar");
+    setEditingFile({ id: "PENDING_UPLOAD", original_name: file.name });
+  };
+
+  const handleSingleUpload = (fileList: FileList | null) => {
+    const file = fileList?.[0];
+    if (file) openMetadataForUpload(file);
+  };
+
+  const handleFolderImport = (fileList: FileList | null) => {
+    if (fileList?.length) uploadFiles(fileList);
+  };
+
+  const handleSaveMetadata = async () => {
+    if (!editingFile) return;
+    if (editingFile.id === "PENDING_UPLOAD") {
+      const file = pendingUploadFile.current;
+      if (!file) return;
+      await uploadFiles([file], { document_name: editDocName.trim() || null, attachment_type: editAttachmentType });
+      pendingUploadFile.current = null;
+      setEditingFile(null);
+      return;
+    }
+    const token = await getToken({ skipCache: true });
+    const res = await fetch(`/api/tasks/${taskId}/files/${editingFile.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ document_name: editDocName.trim() || null, attachment_type: editAttachmentType }),
+    });
+    const data = await safeJson(res);
+    if (res.ok) {
+      setFiles((prev) => prev.map((item) => item.id === editingFile.id ? data.data : item));
+      setEditingFile(null);
+    } else { setError(data?.error || "No se pudo actualizar el adjunto."); }
+  };
+
+  const handleDownload = async (fileId: string, fileName: string) => {
+    const token = await getToken({ skipCache: true });
+    const res = await fetch(`/api/tasks/${taskId}/files/${fileId}/download`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = fileName;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  };
+
+  const handleDelete = async (fileId: string) => {
+    const token = await getToken({ skipCache: true });
+    const res = await fetch(`/api/tasks/${taskId}/files/${fileId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    if (res.ok) {
+      setFiles((prev) => prev.filter((item) => item.id !== fileId));
+      if (preview?.fileId === fileId) setPreview(null);
+    }
+  };
+
+  const loadTemplates = useCallback(async () => {
+    setDocPlantLoading(true);
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch("/api/files/templates", { headers: { Authorization: `Bearer ${token}` } });
+      const data = await safeJson(res);
+      if (res.ok) setDocPlantFolders(data.data || []);
+      else setError(data?.error || "No se pudieron cargar las plantillas.");
+    } finally { setDocPlantLoading(false); }
+  }, [getToken]);
+
+  const attachTemplate = async () => {
+    if (!selectedTpl) return;
+    setUploading(true);
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/files/templates/download?path=${encodeURIComponent(selectedTpl.path)}`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const file = new File([blob], selectedTpl.name, { type: blob.type || "application/octet-stream" });
+      await uploadFiles([file], { document_name: selectedTpl.name.replace(/\.[^/.]+$/, ""), attachment_type: "Sin clasificar" });
+      setShowTemplates(false); setSelectedTpl(null);
+    } finally { setUploading(false); }
+  };
+
+  const createBlankDocument = async () => {
+    setUploading(true);
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch("/api/files/templates/blank.docx", { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const file = new File([blob], `Nueva actuacion ${new Date().toLocaleDateString("es-ES").replace(/\//g, "-")}.docx`, {
+        type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      });
+      openMetadataForUpload(file);
+    } finally { setUploading(false); }
+  };
+
+  const filteredFolders = useMemo(() => {
+    const q = templateSearch.trim().toLowerCase();
+    if (!q) return docPlantFolders;
+    return docPlantFolders.map((folder) => ({ ...folder, files: folder.files.filter((f) => f.name.toLowerCase().includes(q)) })).filter((folder) => folder.files.length > 0);
+  }, [docPlantFolders, templateSearch]);
+
+  const filteredFiles = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return files;
+    return files.filter((file) =>
+      [file.original_name, file.document_name, file.attachment_type]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(q)
+    );
+  }, [files, query]);
+
+  return (
+    <div className="space-y-4">
+      {/* Toolbar */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="text-xs text-slate-400">{uploading ? "Subiendo..." : `${files.length} archivo${files.length !== 1 ? "s" : ""}`}</span>
+          <div className="relative min-w-[250px]">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Buscar adjuntos..."
+              className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-2 text-sm text-slate-700 focus:outline-none focus:border-red-400"
+            />
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <button
+            type="button"
+            onClick={() => {
+              const activeFile = preview ? files.find((item) => item.id === preview.fileId) : null;
+              const subject = activeFile
+                ? `Adjunto de actuación: ${activeFile.document_name || activeFile.original_name}`
+                : "Adjuntos de la actuación";
+              const body = activeFile
+                ? `Hola,\n\nTe escribo en relación con el adjunto "${activeFile.document_name || activeFile.original_name}" asociado a esta actuación.\n\nTipo: ${activeFile.attachment_type || "Sin clasificar"}\nFecha: ${activeFile.created_at ? new Date(activeFile.created_at).toLocaleDateString("es-ES") : "Sin fecha"}\n\nRevisa el expediente para consultar o compartir el archivo correspondiente.`
+                : "Hola,\n\nTe escribo en relación con los adjuntos asociados a esta actuación.\n\nPuedes revisar los documentos directamente desde el expediente en el ERP.";
+              openMailDraft(subject, body);
+            }}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:border-slate-300 rounded-lg transition-colors"
+          >
+            <Mail size={12} /> Enviar correo
+          </button>
+          <button type="button" onClick={() => folderInputRef.current?.click()}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:border-slate-300 rounded-lg transition-colors">
+            <FolderOpen size={12} /> Importar carpeta
+          </button>
+          <button type="button" onClick={() => fileInputRef.current?.click()}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:border-slate-300 rounded-lg transition-colors">
+            <Upload size={12} /> Subir archivo
+          </button>
+          <button type="button" onClick={createBlankDocument} disabled={uploading}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:border-slate-300 rounded-lg transition-colors disabled:opacity-50">
+            <FilePlus2 size={12} /> Nuevo documento
+          </button>
+          <button type="button"
+            onClick={() => { setShowTemplates(true); if (!docPlantFolders.length) void loadTemplates(); }}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors">
+            <Sparkles size={12} /> Usar plantilla
+          </button>
+        </div>
+        <input ref={fileInputRef} type="file" className="hidden" onChange={(e) => { handleSingleUpload(e.target.files); e.currentTarget.value = ""; }} />
+        <input ref={folderInputRef} type="file" multiple {...({ webkitdirectory: "", directory: "" } as any)} className="hidden" onChange={(e) => { handleFolderImport(e.target.files); e.currentTarget.value = ""; }} />
+      </div>
+
+      {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</div>}
+
+      {/* Lista + Preview */}
+      <div className="hidden">
+        {/* File list */}
+        <div
+          className={`${preview ? "w-[48%] shrink-0" : "w-full"} overflow-y-auto transition-all duration-300`}
+          onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+          onDragLeave={() => setIsDragOver(false)}
+          onDrop={(e) => { e.preventDefault(); setIsDragOver(false); handleFolderImport(e.dataTransfer.files); }}
+        >
+          {loading ? (
+            <div className="flex items-center justify-center gap-2 py-16 text-sm text-slate-400">
+              <Loader2 size={16} className="animate-spin" />
+              Cargando adjuntos...
+            </div>
+          ) : files.length === 0 ? (
+            <div className={`m-4 rounded-2xl border-2 border-dashed px-6 py-12 text-center transition-colors ${isDragOver ? "border-red-300 bg-red-50" : "border-slate-200 bg-slate-50/60"}`}>
+              <Upload size={22} className="mx-auto mb-3 text-slate-300" />
+              <p className="text-sm font-semibold text-slate-700">Arrastra archivos aqui</p>
+              <p className="mt-1 text-xs text-slate-400">PDF, Word, Excel, imagenes — max. 50 MB</p>
+            </div>
+          ) : (
+            <table className={`w-full text-left transition-colors ${isDragOver ? "ring-2 ring-inset ring-red-300" : ""}`}>
+              <thead className="bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
+                <tr>
+                  <th className="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Archivo</th>
+                  <th className="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Documento</th>
+                  <th className="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tipo</th>
+                  <th className="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tam.</th>
+                  <th className="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Fecha</th>
+                  <th className="px-4 py-2.5" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {filteredFiles.map((file) => {
+                  const fi = fileIconAct(file.mimetype, file.original_name);
+                  const canPrev = isPrevAct(file.mimetype);
+                  const canWord = isWordAct(file.mimetype, file.original_name);
+                  const canExcel = isExcelAct(file.mimetype, file.original_name);
+                  const isActive = preview?.fileId === file.id;
+                  return (
+                    <tr key={file.id} className={`hover:bg-slate-50/70 transition-colors group ${isActive ? "bg-red-50/40" : ""}`}>
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center gap-2">
+                          {file.mimetype?.startsWith("image/") && thumbs[file.id] ? (
+                            <img src={thumbs[file.id]} alt="" className="h-8 w-8 rounded object-cover shrink-0 cursor-pointer hover:scale-105 transition-transform" onClick={() => openPreview(file)} />
+                          ) : (
+                            <span
+                              className={`h-8 w-8 rounded flex items-center justify-center text-sm shrink-0 ${fi.color} cursor-pointer`}
+                              onClick={() => { if (file.mimetype?.startsWith("image/")) loadThumb(file.id); else if (canPrev || canWord || canExcel) openPreview(file); }}
+                            >
+                              {fi.icon}
+                            </span>
+                          )}
+                          <div className="min-w-0">
+                            <button
+                              type="button"
+                              onClick={() => { if (canPrev || canWord || canExcel) openPreview(file); }}
+                              className={`text-xs font-medium text-slate-700 text-left truncate block max-w-[140px] ${(canPrev || canWord || canExcel) ? "hover:text-red-600 cursor-pointer" : "cursor-default"}`}
+                              title={file.original_name}
+                            >
+                              {file.original_name}
+                            </button>
+                            <span className={`text-[9px] font-bold px-1 py-0.5 rounded ${fi.color}`}>{fi.label}</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <span className="text-xs text-slate-500 truncate block max-w-[180px]" title={file.document_name || file.original_name}>
+                          {file.document_name || file.original_name}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <span className={`inline-flex px-1.5 py-0.5 rounded text-[9px] font-bold ${file.attachment_type === "Sin clasificar" ? "bg-blue-50 text-blue-600" : "bg-slate-100 text-slate-600"}`}>
+                          {file.attachment_type || "Sin clasificar"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 text-xs text-slate-400">{fmtSizeAct(Number(file.size_bytes))}</td>
+                      <td className="px-4 py-2.5 text-xs text-slate-400">{file.created_at ? new Date(file.created_at).toLocaleDateString("es-ES") : "—"}</td>
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {(canPrev || canWord || canExcel) && (
+                            <button type="button" onClick={() => openPreview(file)} title="Vista previa"
+                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                              <Eye size={13} />
+                            </button>
+                          )}
+                          <button type="button" onClick={() => handleDownload(file.id, file.original_name)} title="Descargar"
+                            className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
+                            <Download size={13} />
+                          </button>
+                          <button type="button"
+                            onClick={() => { setEditDocName(file.document_name || file.original_name); setEditAttachmentType(file.attachment_type || "Sin clasificar"); setEditingFile(file); }}
+                            title="Editar"
+                            className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors">
+                            <Edit3 size={13} />
+                          </button>
+                          <button type="button" onClick={() => handleDelete(file.id)} title="Eliminar"
+                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Preview panel */}
+        {preview && (
+          <div className="flex-1 border-l border-slate-100 flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between gap-2 px-3 py-2 bg-slate-50 border-b border-slate-100 shrink-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-base shrink-0">
+                  {preview.mime === "application/pdf" ? "📄" : preview.mime.startsWith("image/") ? "🖼️" : "📝"}
+                </span>
+                <p className="text-xs font-semibold text-slate-700 truncate" title={preview.name}>{preview.name}</p>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <button type="button" onClick={() => handleDownload(preview.fileId, preview.name)} title="Descargar"
+                  className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-lg transition-colors">
+                  <Download size={13} />
+                </button>
+                <button type="button" onClick={() => setPreview(null)} title="Cerrar"
+                  className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-lg transition-colors">
+                  <X size={13} />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-hidden bg-slate-100">
+              {preview.mime === "application/pdf" ? (
+                <iframe src={preview.url} className="w-full h-full border-0" title={preview.name} />
+              ) : preview.mime.startsWith("image/") ? (
+                <div className="w-full h-full flex items-center justify-center p-4">
+                  <img src={preview.url} alt={preview.name} className="max-w-full max-h-full object-contain rounded-xl shadow-md" />
+                </div>
+              ) : preview.mime.startsWith("text/") ? (
+                <iframe src={preview.url} className="w-full h-full border-0 bg-white" title={preview.name} />
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-center px-6">
+                  <span className="text-5xl mb-4">📎</span>
+                  <p className="text-sm font-semibold text-slate-700">{preview.name}</p>
+                  <p className="mt-1 text-xs text-slate-400">Vista previa no disponible para este tipo de archivo</p>
+                  <button type="button" onClick={() => handleDownload(preview.fileId, preview.name)}
+                    className="mt-4 inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl">
+                    <Download size={12} /> Descargar
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div
+        className={`rounded-2xl border-2 border-dashed px-6 py-10 text-center transition-colors ${isDragOver ? "border-red-300 bg-red-50" : "border-slate-200 bg-slate-50/60"}`}
+        onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+        onDragLeave={() => setIsDragOver(false)}
+        onDrop={(e) => { e.preventDefault(); setIsDragOver(false); handleFolderImport(e.dataTransfer.files); }}
+      >
+        <Upload size={24} className="mx-auto mb-3 text-slate-300" />
+        <p className="text-sm font-semibold text-slate-700">Arrastra archivos o carpetas aquí</p>
+        <p className="mt-1 text-xs text-slate-400">PDF, Word, Excel, imágenes. Máx. 50 MB por archivo.</p>
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
+        {loading ? (
+          <div className="flex items-center justify-center gap-2 py-16 text-sm text-slate-400">
+            <Loader2 size={16} className="animate-spin" />
+            Cargando adjuntos...
+          </div>
+        ) : files.length === 0 ? (
+          <div className="px-6 py-14 text-center">
+            <Paperclip size={26} className="mx-auto mb-3 text-slate-300" />
+            <p className="text-sm font-semibold text-slate-700">No hay adjuntos en esta actuación</p>
+            <p className="mt-1 text-xs text-slate-400">Sube archivos, importa una carpeta o usa una plantilla para completar la actuación.</p>
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[960px] text-left">
+                <thead className="bg-slate-50 border-b border-slate-100">
+                  <tr>
+                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Archivo</th>
+                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Documento</th>
+                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tipo</th>
+                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tam.</th>
+                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Fecha</th>
+                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {filteredFiles.map((file) => {
+                    const fi = fileIconAct(file.mimetype, file.original_name);
+                    const canPrev = isPrevAct(file.mimetype);
+                    const canWord = isWordAct(file.mimetype, file.original_name);
+                    const canExcel = isExcelAct(file.mimetype, file.original_name);
+                    const isActive = preview?.fileId === file.id;
+                    return (
+                      <tr key={file.id} className={`group transition-colors ${isActive ? "bg-red-50/50" : "hover:bg-slate-50/70"}`}>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            {file.mimetype?.startsWith("image/") && thumbs[file.id] ? (
+                              <img src={thumbs[file.id]} alt="" className="h-10 w-10 rounded-lg object-cover shrink-0 cursor-pointer hover:scale-105 transition-transform" onClick={() => openPreview(file)} />
+                            ) : (
+                              <button type="button" className={`h-10 w-10 rounded-xl flex items-center justify-center text-sm shrink-0 ${fi.color}`} onClick={() => { if (file.mimetype?.startsWith("image/")) loadThumb(file.id); else if (canPrev || canWord || canExcel) openPreview(file); }}>
+                                {fi.icon}
+                              </button>
+                            )}
+                            <div className="min-w-0">
+                              <button
+                                type="button"
+                                onClick={() => { if (canPrev || canWord || canExcel) openPreview(file); }}
+                                className={`text-sm font-semibold text-slate-800 text-left truncate block max-w-[260px] ${(canPrev || canWord || canExcel) ? "hover:text-red-600" : ""}`}
+                                title={file.original_name}
+                              >
+                                {file.original_name}
+                              </button>
+                              <span className={`mt-1 inline-flex text-[10px] font-bold px-1.5 py-0.5 rounded ${fi.color}`}>{fi.label}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-sm text-slate-600 truncate block max-w-[240px]" title={file.document_name || file.original_name}>
+                            {file.document_name || file.original_name}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex px-2 py-1 rounded-full text-[10px] font-bold ${file.attachment_type === "Sin clasificar" ? "bg-blue-50 text-blue-600" : "bg-slate-100 text-slate-600"}`}>
+                            {file.attachment_type || "Sin clasificar"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-slate-500">{fmtSizeAct(Number(file.size_bytes))}</td>
+                        <td className="px-4 py-3 text-sm text-slate-500">{file.created_at ? new Date(file.created_at).toLocaleDateString("es-ES") : "—"}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1">
+                            {(canPrev || canWord || canExcel) && (
+                              <button type="button" onClick={() => openPreview(file)} title="Vista previa" className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                                <Eye size={14} />
+                              </button>
+                            )}
+                            <button type="button" onClick={() => handleDownload(file.id, file.original_name)} title="Descargar" className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+                              <Download size={14} />
+                            </button>
+                            <button type="button" onClick={() => { setEditDocName(file.document_name || file.original_name); setEditAttachmentType(file.attachment_type || "Sin clasificar"); setEditingFile(file); }} title="Editar" className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors">
+                              <Edit3 size={14} />
+                            </button>
+                            <button type="button" onClick={() => handleDelete(file.id)} title="Eliminar" className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {preview && (
+              <div className="border-t border-slate-100 bg-slate-50/60">
+                <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-slate-100">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Vista previa</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-800 truncate" title={preview.name}>{preview.name}</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button type="button" onClick={() => handleDownload(preview.fileId, preview.name)} className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-600 rounded-xl border border-slate-200 hover:bg-white">
+                      <Download size={12} /> Descargar
+                    </button>
+                    <button type="button" onClick={() => setPreview(null)} className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-600 rounded-xl border border-slate-200 hover:bg-white">
+                      <X size={12} /> Cerrar
+                    </button>
+                  </div>
+                </div>
+                <div className="h-[560px] overflow-hidden bg-slate-100">
+                  {preview.mime === "application/pdf" ? (
+                    <iframe src={preview.url} className="w-full h-full border-0" title={preview.name} />
+                  ) : preview.mime.startsWith("image/") ? (
+                    <div className="w-full h-full flex items-center justify-center p-5">
+                      <img src={preview.url} alt={preview.name} className="max-w-full max-h-full object-contain rounded-xl shadow-md" />
+                    </div>
+                  ) : preview.mime.startsWith("text/") ? (
+                    <iframe src={preview.url} className="w-full h-full border-0 bg-white" title={preview.name} />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-full text-center px-6">
+                      <span className="text-5xl mb-4">📎</span>
+                      <p className="text-sm font-semibold text-slate-700">{preview.name}</p>
+                      <p className="mt-1 text-xs text-slate-400">Vista previa no disponible para este tipo de archivo</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Modal editar metadatos */}
+      {editingFile && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-[160] flex items-center justify-center bg-slate-950/40 backdrop-blur-sm p-4" onClick={() => setEditingFile(null)}>
+          <div className="w-full max-w-lg rounded-2xl bg-white border border-slate-200 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-slate-100">
+              <h4 className="text-base font-bold text-slate-900">{editingFile.id === "PENDING_UPLOAD" ? "Preparar adjunto" : "Editar adjunto"}</h4>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Nombre del documento</label>
+                <input value={editDocName} onChange={(e) => setEditDocName(e.target.value)} className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400" />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tipo de adjunto</label>
+                <select value={editAttachmentType} onChange={(e) => setEditAttachmentType(e.target.value)} className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400 bg-white">
+                  <option value="Sin clasificar">Sin clasificar</option>
+                  <option value="AUTO">AUTO</option>
+                  <option value="ESCRITO PROCESAL">ESCRITO PROCESAL</option>
+                  <option value="FACTURAS">FACTURAS</option>
+                  <option value="PODER">PODER</option>
+                  <option value="EVIDENCIA">EVIDENCIA</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 px-5 pb-5">
+              <button type="button" onClick={() => setEditingFile(null)} className="px-4 py-2 text-sm font-semibold text-slate-600 rounded-xl border border-slate-200 hover:bg-slate-50">Cancelar</button>
+              <button type="button" onClick={handleSaveMetadata} className="px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl">Guardar</button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Modal plantillas */}
+      {showTemplates && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-[155] flex items-center justify-center bg-slate-950/40 backdrop-blur-sm p-4" onClick={() => setShowTemplates(false)}>
+          <div className="w-full max-w-5xl rounded-3xl bg-white border border-slate-200 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <div>
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.22em]">Plantillas del despacho</p>
+                <h4 className="mt-1 text-lg font-bold text-slate-900">Usar plantilla en esta actuacion</h4>
+              </div>
+              <button type="button" onClick={() => setShowTemplates(false)} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-400 hover:text-slate-700">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="grid grid-cols-[320px_1fr] min-h-[480px]">
+              <div className="border-r border-slate-100 p-4 space-y-3">
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input value={templateSearch} onChange={(e) => setTemplateSearch(e.target.value)} placeholder="Buscar plantilla..." className="w-full rounded-xl border border-slate-200 pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:border-red-400" />
+                </div>
+                <div className="max-h-[380px] overflow-y-auto rounded-2xl border border-slate-200">
+                  {docPlantLoading ? (
+                    <div className="p-6 text-sm text-slate-400">Cargando plantillas...</div>
+                  ) : filteredFolders.length === 0 ? (
+                    <div className="p-6 text-sm text-slate-400">No se encontraron plantillas.</div>
+                  ) : filteredFolders.map((folder) => (
+                    <div key={folder.name} className="border-b border-slate-100 last:border-b-0">
+                      <div className="px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-slate-400 bg-slate-50">{folder.name}</div>
+                      <div className="divide-y divide-slate-100">
+                        {folder.files.map((file) => (
+                          <button key={file.path} type="button" onClick={() => setSelectedTpl(file)}
+                            className={`w-full px-4 py-3 text-left text-sm transition-colors ${selectedTpl?.path === file.path ? "bg-red-50 text-red-700" : "hover:bg-slate-50 text-slate-700"}`}>
+                            {file.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="p-6 flex flex-col">
+                <div className="flex-1 rounded-2xl border border-dashed border-slate-200 bg-slate-50 flex items-center justify-center text-center px-8">
+                  {selectedTpl ? (
+                    <div>
+                      <Sparkles size={22} className="mx-auto mb-3 text-red-300" />
+                      <p className="text-sm font-semibold text-slate-700">{selectedTpl.name}</p>
+                      <p className="mt-1 text-xs text-slate-400">Se anadira como adjunto propio de esta actuacion.</p>
+                    </div>
+                  ) : (
+                    <div>
+                      <Sparkles size={22} className="mx-auto mb-3 text-slate-300" />
+                      <p className="text-sm font-semibold text-slate-700">Selecciona una plantilla</p>
+                      <p className="mt-1 text-xs text-slate-400">Eligela en el panel izquierdo para adjuntarla a la actuacion.</p>
+                    </div>
+                  )}
+                </div>
+                <div className="flex justify-end gap-2 pt-4">
+                  <button type="button" onClick={() => setShowTemplates(false)} className="px-4 py-2 text-sm font-semibold text-slate-600 rounded-xl border border-slate-200 hover:bg-slate-50">Cancelar</button>
+                  <button type="button" onClick={attachTemplate} disabled={!selectedTpl || uploading} className="px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-xl">Usar plantilla</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+}
+
+function ActuacionModal({
+  open,
+  onClose,
+  onSave,
+  saving,
+  clienteId,
+  form,
+  setForm,
+  selectedActuacion,
+  getToken,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSave: () => void;
+  saving: boolean;
+  clienteId?: string | null;
+  form: TareaForm;
+  setForm: React.Dispatch<React.SetStateAction<TareaForm>>;
+  selectedActuacion: any | null;
+  getToken: any;
+}) {
+  if (!open || typeof document === "undefined") return null;
+
+  const mailSubject = form.titulo?.trim()
+    ? `${form.titulo.trim()} - ${form.expediente || "Expediente"}`
+    : `Actuación - ${form.expediente || "Expediente"}`;
+  const mailBody = [
+    "Hola,",
+    "",
+    `Te escribo en relación con la actuación "${form.titulo || "Sin título"}".`,
+    form.descripcion ? `Descripción: ${form.descripcion}` : "",
+    form.plazo ? `Fecha de actuación: ${form.plazo}` : "",
+    form.fecha_aviso ? `Fecha de aviso: ${form.fecha_aviso}` : "",
+    form.juzgado ? `Juzgado / Tribunal: ${form.juzgado}` : "",
+    form.num_proc ? `N.º procedimiento: ${form.num_proc}` : "",
+    form.estado ? `Estado: ${form.estado}` : "",
+    form.prioridad ? `Prioridad: ${form.prioridad}` : "",
+    "",
+    "Puedes revisar la actuación completa dentro del expediente en el ERP.",
+  ].filter(Boolean).join("\n");
+
+  return createPortal(
+    <div className="fixed inset-0 z-[140] flex items-center justify-center bg-slate-950/45 backdrop-blur-sm p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-[1500px] flex flex-col overflow-hidden rounded-3xl bg-white border border-slate-200 shadow-2xl"
+        style={{ height: "92vh" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between gap-4 px-6 py-4 border-b border-slate-100 shrink-0">
+          <div>
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.22em]">Actuacion del expediente</p>
+            <h3 className="mt-0.5 text-xl font-bold text-slate-900">
+              {selectedActuacion ? "Editar actuacion" : "Nueva actuacion"}
+            </h3>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => openMailDraft(mailSubject, mailBody)}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-slate-600 rounded-xl border border-slate-200 hover:bg-slate-50"
+            >
+              <Mail size={14} />
+              Enviar correo
+            </button>
+            <button type="button" onClick={onClose}
+              className="px-4 py-2 text-sm font-semibold text-slate-600 rounded-xl border border-slate-200 hover:bg-slate-50">
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={saving || !clienteId || !form.titulo.trim()}
+              className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-bold text-white bg-red-700 hover:bg-red-800 disabled:opacity-50 rounded-xl shadow-sm"
+            >
+              {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+              {selectedActuacion ? "Guardar cambios" : "Guardar actuacion"}
+            </button>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 space-y-5">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Expediente</p>
+              <p className="mt-1 text-sm font-semibold text-slate-800">{form.expediente || "Sin referencia"}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Usuario</p>
+              <p className="mt-1 text-sm font-semibold text-slate-800">{selectedActuacion?.created_by || "Usuario actual"}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Referencia</p>
+              <p className="mt-1 text-sm font-semibold text-slate-800">{selectedActuacion?.id ? `ACT-${String(selectedActuacion.id).slice(0, 8)}` : "Se generará al guardar"}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Estado actual</p>
+              <p className="mt-1 text-sm font-semibold text-slate-800">{form.estado === "completada" ? "Realizada" : form.estado || "Pendiente"}</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 2xl:grid-cols-[1.15fr_0.85fr] gap-5">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-5">
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Título de la actuación</label>
+                <input
+                  value={form.titulo}
+                  onChange={(e) => setForm((prev) => ({ ...prev, titulo: e.target.value }))}
+                  placeholder="Ej: Preparación de contestación, llamada con cliente..."
+                  className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100"
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Descripción</label>
+                <textarea
+                  value={form.descripcion}
+                  onChange={(e) => setForm((prev) => ({ ...prev, descripcion: e.target.value }))}
+                  rows={3}
+                  placeholder="Resume qué se ha hecho, qué se ha recibido o qué toca preparar..."
+                  className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm resize-none focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Fecha de actuación</label>
+                  <input type="date" value={form.plazo} onChange={(e) => setForm((prev) => ({ ...prev, plazo: e.target.value }))} className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Fecha de aviso</label>
+                  <input type="date" value={form.fecha_aviso} onChange={(e) => setForm((prev) => ({ ...prev, fecha_aviso: e.target.value }))} className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Estado</label>
+                  <select value={form.estado} onChange={(e) => setForm((prev) => ({ ...prev, estado: e.target.value }))} className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400 bg-white">
+                    <option value="pendiente">Pendiente</option>
+                    <option value="urgente">Urgente</option>
+                    <option value="completada">Realizada</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Prioridad</label>
+                  <select value={form.prioridad} onChange={(e) => setForm((prev) => ({ ...prev, prioridad: e.target.value }))} className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400 bg-white">
+                    <option value="alta">Alta</option>
+                    <option value="media">Media</option>
+                    <option value="baja">Baja</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-5">
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tipo de actuación</label>
+                <select value={form.tipo} onChange={(e) => setForm((prev) => ({ ...prev, tipo: e.target.value }))} className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400 bg-white">
+                  <option value="actuacion">Actuación general</option>
+                  <option value="diligencia">Diligencia</option>
+                  <option value="escrito">Escrito</option>
+                  <option value="reunion">Reunión</option>
+                  <option value="llamada">Llamada</option>
+                  <option value="gestion">Gestión</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Juzgado / Tribunal</label>
+                  <input value={form.juzgado} onChange={(e) => setForm((prev) => ({ ...prev, juzgado: e.target.value }))} className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">N.º procedimiento</label>
+                  <input value={form.num_proc} onChange={(e) => setForm((prev) => ({ ...prev, num_proc: e.target.value }))} className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400" />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Etapa</label>
+                <div className="mt-1">
+                  <EtapaSelect value={form.etapa} onChange={(v) => setForm((prev) => ({ ...prev, etapa: v }))} getToken={getToken} />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Importe vinculado</label>
+                <input type="number" step="0.01" min="0" value={form.importe} onChange={(e) => setForm((prev) => ({ ...prev, importe: e.target.value }))} className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400" />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Notas internas</label>
+                <textarea value={form.notas} onChange={(e) => setForm((prev) => ({ ...prev, notas: e.target.value }))} rows={4} className="mt-1 w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm resize-none focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100" />
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
+            <div className="px-5 py-3 border-b border-slate-100">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Adjuntos de la actuación</p>
+              <p className="text-xs text-slate-400 mt-0.5">Archivos asociados únicamente a esta actuación.</p>
+            </div>
+            {selectedActuacion ? (
+              <div className="p-5">
+                <ActuacionAdjuntosPanel taskId={selectedActuacion.id} />
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center text-center px-8 py-14">
+                <Paperclip size={32} className="mb-3 text-slate-200" />
+                <p className="text-sm font-semibold text-slate-700">Sin adjuntos todavía</p>
+                <p className="mt-1 text-xs text-slate-400">Guarda primero la actuación para poder añadirle sus propios archivos.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+function TabActuacion({
+  expedienteId,
+  clienteId,
+  expedienteRef,
+  juzgado,
+  numProc,
+  initialCreate = false,
+}: {
+  expedienteId: string;
+  clienteId?: string | null;
+  expedienteRef?: string | null;
+  juzgado?: string | null;
+  numProc?: string | null;
+  initialCreate?: boolean;
+}) {
+  const { getToken } = useAuth();
+  const mapActuacionToForm = useCallback((item?: any | null): TareaForm => ({
+    titulo: item?.titulo || "",
+    descripcion: item?.descripcion || "",
+    plazo: item?.plazo ? String(item.plazo).slice(0, 10) : "",
+    fecha_aviso: item?.fecha_aviso ? String(item.fecha_aviso).slice(0, 10) : "",
+    estado: item?.estado || "pendiente",
+    prioridad: item?.prioridad || "media",
+    expediente: item?.expediente || expedienteRef || "",
+    expediente_id: item?.expediente_id || expedienteId,
+    tipo: item?.tipo || "actuacion",
+    juzgado: item?.juzgado || juzgado || "",
+    num_proc: item?.num_proc || numProc || "",
+    importe: item?.importe != null ? String(item.importe) : "",
+    notas: item?.notas || "",
+    etapa: item?.etapa || "",
+  }), [expedienteId, expedienteRef, juzgado, numProc]);
+  const [actuaciones, setActuaciones] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [form, setForm] = useState<TareaForm>(mapActuacionToForm());
+
+  useEffect(() => {
+    setForm((prev) => ({
+      ...prev,
+      expediente: expedienteRef || "",
+      expediente_id: expedienteId,
+      juzgado: juzgado || "",
+      num_proc: numProc || "",
+      tipo: prev.tipo || "actuacion",
+    }));
+  }, [expedienteId, expedienteRef, juzgado, numProc]);
+
+  const autoOpenedRef = useRef(false);
+  useEffect(() => {
+    if (!initialCreate || autoOpenedRef.current || !clienteId) return;
+    autoOpenedRef.current = true;
+    setSelectedId(null);
+    setForm(mapActuacionToForm());
+    setShowModal(true);
+  }, [clienteId, initialCreate, mapActuacionToForm]);
+
+  const loadActuaciones = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/tasks/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await safeJson(res);
+      if (!res.ok) throw new Error(data.error || "No se pudieron cargar las actuaciones");
+      const rows = (data.data || []).filter((item: any) => item.expediente_id === expedienteId && item.tipo === "actuacion");
+      setActuaciones(rows);
+      setSelectedId((prev) => prev && rows.some((item: any) => item.id === prev) ? prev : rows[0]?.id || null);
+    } catch (e: any) {
+      setError(e?.message || "No se pudieron cargar las actuaciones");
+    } finally {
+      setLoading(false);
+    }
+  }, [expedienteId, getToken]);
+
+  useEffect(() => {
+    loadActuaciones();
+  }, [loadActuaciones]);
+
+  const handleCreate = async () => {
+    if (!clienteId || !form.titulo.trim()) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/tasks/client/${clienteId}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          ...form,
+          tipo: form.tipo || "actuacion",
+          expediente_id: expedienteId,
+          expediente: expedienteRef || "",
+        }),
+      });
+      const data = await safeJson(res);
+      if (!res.ok) throw new Error(data.error || "No se pudo crear la actuación");
+      const created = data.data;
+      setActuaciones((prev) => [created, ...prev]);
+      setSelectedId(created.id);
+      setShowModal(true);
+      setForm({
+        ...TAREA_EMPTY,
+        expediente: expedienteRef || "",
+        expediente_id: expedienteId,
+        juzgado: juzgado || "",
+        num_proc: numProc || "",
+        tipo: "actuacion",
+        estado: "pendiente",
+      });
+      window.dispatchEvent(new CustomEvent("historial-changed"));
+    } catch (e: any) {
+      setError(e?.message || "No se pudo crear la actuación");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleOpenNew = () => {
+    setSelectedId(null);
+    setForm(mapActuacionToForm());
+    setShowModal(true);
+  };
+
+  const handleOpenExisting = (item: any) => {
+    setSelectedId(item.id);
+    setForm(mapActuacionToForm(item));
+    setShowModal(true);
+  };
+
+  const handleSaveActuacion = async () => {
+    if (!clienteId || !form.titulo.trim()) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const token = await getToken({ skipCache: true });
+      const editingId = selectedId;
+      const url = editingId ? `/api/tasks/${editingId}` : `/api/tasks/client/${clienteId}`;
+      const method = editingId ? "PUT" : "POST";
+      const res = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          ...form,
+          tipo: form.tipo || "actuacion",
+          expediente_id: expedienteId,
+          expediente: expedienteRef || "",
+        }),
+      });
+      const data = await safeJson(res);
+      if (!res.ok) throw new Error(data.error || "No se pudo guardar la actuación");
+      const saved = data.data;
+      setActuaciones((prev) => {
+        if (editingId) return prev.map((item) => (item.id === editingId ? saved : item));
+        return [saved, ...prev];
+      });
+      setSelectedId(saved.id);
+      setForm(mapActuacionToForm(saved));
+      window.dispatchEvent(new CustomEvent("historial-changed"));
+    } catch (e: any) {
+      setError(e?.message || "No se pudo guardar la actuación");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const selectedActuacion = actuaciones.find((item) => item.id === selectedId) || null;
+
+  return (
+    <div className="space-y-4">
+      {!clienteId && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Para crear actuaciones desde este expediente, primero debe haber un cliente vinculado.
+        </div>
+      )}
+
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div className="px-5 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Clock size={14} className="text-slate-400" />
+            <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Actuaciones registradas</h3>
+          </div>
+          <button
+            type="button"
+            onClick={handleOpenNew}
+            disabled={!clienteId}
+            className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-sm disabled:opacity-50"
+          >
+            <Plus size={12} />
+            Crear actuación
+          </button>
+        </div>
+        <div className="p-5">
+          {loading ? (
+            <div className="flex items-center gap-2 text-sm text-slate-400">
+              <Loader2 size={15} className="animate-spin" />
+              Cargando actuaciones...
+            </div>
+          ) : actuaciones.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center">
+              <ClipboardList size={20} className="mx-auto mb-3 text-slate-300" />
+              <p className="text-sm font-semibold text-slate-700">Todavía no hay actuaciones</p>
+              <p className="mt-1 text-xs text-slate-400">Crea una actuación arriba y después podrás añadirle adjuntos propios.</p>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-slate-200 overflow-hidden">
+              <div className="grid grid-cols-[140px_1.8fr_1.1fr_140px_140px] gap-0 bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                <div className="px-4 py-3">Fecha</div>
+                <div className="px-4 py-3">Descripción</div>
+                <div className="px-4 py-3">Usuario</div>
+                <div className="px-4 py-3">Estado</div>
+                <div className="px-4 py-3">Tipo</div>
+              </div>
+              <div className="divide-y divide-slate-200">
+              {actuaciones.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => handleOpenExisting(item)}
+                  className={`grid w-full grid-cols-[140px_1.8fr_1.1fr_140px_140px] gap-0 text-left transition-colors ${
+                    selectedId === item.id
+                      ? "bg-red-50/60"
+                      : "bg-white hover:bg-slate-50"
+                  }`}
+                >
+                  <div className="px-4 py-3 text-sm text-slate-700">{item.plazo ? fmtDate(item.plazo) : "—"}</div>
+                  <div className="px-4 py-3">
+                    <p className="text-sm font-semibold text-slate-800 truncate">{item.titulo}</p>
+                    <p className="mt-0.5 text-xs text-slate-500 truncate">{item.descripcion || "Sin descripción"}</p>
+                  </div>
+                  <div className="px-4 py-3 text-sm text-slate-600 truncate">{item.created_by || "Usuario"}</div>
+                  <div className="px-4 py-3">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600">
+                      {item.estado === "completada" ? "Realizada" : item.estado}
+                    </span>
+                  </div>
+                  <div className="px-4 py-3">
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${TIPO_CONFIG[item.tipo]?.color || "bg-slate-100 text-slate-500"}`}>
+                      {TIPO_CONFIG[item.tipo]?.label || "Actuación"}
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <ActuacionModal
+        open={showModal}
+        onClose={() => {
+          setShowModal(false);
+          if (!selectedActuacion) setForm(mapActuacionToForm());
+        }}
+        onSave={handleSaveActuacion}
+        saving={saving}
+        clienteId={clienteId}
+        form={form}
+        setForm={setForm}
+        selectedActuacion={selectedActuacion}
+        getToken={getToken}
+      />
+    </div>
+  );
+}
+
 function TabExpedientesRelacionados({
   expedienteId,
   currentRef,
@@ -1394,6 +2644,9 @@ export default function ExpedienteDetail() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [clientes, setClientes] = useState<any[]>([]);
+  const shouldOpenNuevaActuacion = searchParams.get("newActuacion") === "1";
+  const shouldOpenNuevaTarea = searchParams.get("newTarea") === "1";
+  const initialTareaType = searchParams.get("type") || "";
 
   useEffect(() => {
     const requestedTab = searchParams.get("tab");
@@ -1795,6 +3048,18 @@ export default function ExpedienteDetail() {
                 expedienteRef={exp.ref_expediente || `${exp.anio}/${exp.num_exp}`}
                 juzgado={exp.juzgado}
                 numProc={exp.num_autos}
+                initialCreate={shouldOpenNuevaTarea}
+                initialType={initialTareaType}
+              />
+            )}
+            {tab === "actuacion" && (
+              <TabActuacion
+                expedienteId={id!}
+                clienteId={exp.cliente_id}
+                expedienteRef={exp.ref_expediente || `${exp.anio}/${exp.num_exp}`}
+                juzgado={exp.juzgado}
+                numProc={exp.num_autos}
+                initialCreate={shouldOpenNuevaActuacion}
               />
             )}
             {tab === "adjuntos" && (

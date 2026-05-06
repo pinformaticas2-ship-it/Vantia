@@ -13,7 +13,7 @@ import {
   Search, ChevronDown, X, Mail, MailOpen,
   Reply, ReplyAll, Forward, Paperclip, Loader2, CheckCircle2,
   MoreVertical, AlertCircle, Eye, EyeOff,
-  ChevronLeft, Edit3, Tag, Wifi, Zap, Pin, FolderPlus, RotateCcw, Folder,
+  ChevronLeft, Edit3, Tag, Wifi, Zap, Pin, FolderPlus, RotateCcw, Folder, Archive,
   AtSign, Shield, Filter, LogIn, type LucideIcon,
 } from 'lucide-react';
 
@@ -39,6 +39,7 @@ interface GmailGIS {
       initTokenClient: (cfg: {
         client_id: string;
         scope: string;
+        login_hint?: string;
         callback: (resp: { access_token?: string; error?: string; expires_in?: number }) => void;
       }) => { requestAccessToken: () => void };
     };
@@ -81,6 +82,21 @@ interface PendingDeleteLabel {
   name: string;
 }
 
+interface PendingDeleteAccount {
+  id: string;
+  name: string;
+  email: string;
+}
+
+type ImapSystemFolderKey = 'INBOX' | 'SENT' | 'DRAFTS' | 'TRASH' | 'SPAM' | 'ARCHIVE';
+
+interface ImapFolderInfo {
+  path: string;
+  name: string;
+  specialUse?: string;
+  flags: string[];
+}
+
 interface ImapAccount {
   id: string;
   label: string;
@@ -117,6 +133,16 @@ interface ComposeAttachment {
 interface GmailProfile {
   emailAddress: string;
   messagesTotal?: number;
+}
+
+interface SavedOAuthProfile {
+  id: string;
+  provider: 'google' | string;
+  email: string;
+  display_name?: string | null;
+  avatar_url?: string | null;
+  external_id?: string | null;
+  last_used_at?: string | null;
 }
 
 interface LocalDraft {
@@ -270,17 +296,38 @@ function removeLocalDraft(id?: string | null) {
   return next;
 }
 
+const GMAIL_LABEL_NAMES: Record<string, string> = {
+  INBOX:                'Bandeja de entrada',
+  STARRED:              'Destacados',
+  IMPORTANT:            'Importantes',
+  SENT:                 'Enviados',
+  DRAFT:                'Borradores',
+  SPAM:                 'Spam',
+  TRASH:                'Papelera',
+  UNREAD:               'No leídos',
+  CHAT:                 'Chats',
+  SNOOZED:              'En espera',
+  CATEGORY_PERSONAL:    'Personal',
+  CATEGORY_SOCIAL:      'Redes sociales',
+  CATEGORY_PROMOTIONS:  'Promociones',
+  CATEGORY_UPDATES:     'Actualizaciones',
+  CATEGORY_FORUMS:      'Foros',
+};
+
 function normalizeLabelName(value: unknown, fallback = 'Carpeta sin nombre') {
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    return trimmed || fallback;
-  }
-  if (value && typeof value === 'object') {
-    const record = value as Record<string, unknown>;
-    const nested = record.name ?? record.label ?? record.value ?? record.id;
-    if (typeof nested === 'string' && nested.trim()) return nested.trim();
-  }
-  return fallback;
+  const raw = (() => {
+    if (typeof value === 'string') return value.trim();
+    if (value && typeof value === 'object') {
+      const record = value as Record<string, unknown>;
+      const nested = record.name ?? record.label ?? record.value ?? record.id;
+      if (typeof nested === 'string') return nested.trim();
+    }
+    return '';
+  })();
+  if (!raw) return fallback;
+  if (GMAIL_LABEL_NAMES[raw]) return GMAIL_LABEL_NAMES[raw];
+  // Quitar prefijo "Label_XXXXXXXX/" o "CATEGORY_" si no está en el mapa
+  return raw.replace(/^Label_[^/]+\//, '').replace(/^CATEGORY_/, '');
 }
 
 function readPinnedEmailIds(accountKey = 'default'): string[] {
@@ -345,15 +392,19 @@ function parseGmailMessage(msg: any): ParsedEmail {
   };
 }
 
-function mapFolderToImapApi(folder: FolderKey): string {
-  const map: Record<string, string> = {
+function mapFolderToImapApi(
+  folder: FolderKey,
+  imapFolderMap?: Partial<Record<ImapSystemFolderKey, string>>,
+): string {
+  const fallback: Record<string, string> = {
     INBOX: 'INBOX',
     SENT: 'Sent',
     DRAFTS: 'Drafts',
     TRASH: 'Trash',
     SPAM: 'Spam',
+    ARCHIVE: 'Archive',
   };
-  return map[folder] || folder;
+  return imapFolderMap?.[folder as ImapSystemFolderKey] || fallback[folder] || folder;
 }
 
 function parseImapEmail(row: ImapApiEmail): ParsedEmail {
@@ -845,44 +896,175 @@ function ComposeWindow({
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 
-type FolderKey = 'INBOX' | 'STARRED' | 'PINNED' | 'SENT' | 'DRAFTS' | 'SPAM' | 'TRASH' | string;
+type FolderKey =
+  | 'INBOX'
+  | 'STARRED'
+  | 'PINNED'
+  | 'ALL'
+  | 'SNOOZED'
+  | 'IMPORTANT'
+  | 'SENT'
+  | 'DRAFTS'
+  | 'SCHEDULED'
+  | 'SPAM'
+  | 'TRASH'
+  | string;
 
 const SYSTEM_FOLDERS: {
   key: FolderKey; label: string; icon: LucideIcon;
 }[] = [
-  { key: 'INBOX',   label: 'Bandeja entrada', icon: Inbox    },
+  { key: 'INBOX',   label: 'Recibidos',        icon: Inbox    },
   { key: 'STARRED', label: 'Destacados',       icon: Star     },
+  { key: 'SNOOZED', label: 'Pospuestos',       icon: RotateCcw },
   { key: 'PINNED',  label: 'Pineados',         icon: Pin      },
+  { key: 'IMPORTANT', label: 'Importantes',    icon: AlertCircle },
   { key: 'SENT',    label: 'Enviados',         icon: Send     },
   { key: 'DRAFTS',  label: 'Borradores',       icon: FileText },
+  { key: 'SCHEDULED', label: 'Programados',    icon: Send     },
+  { key: 'ALL',     label: 'Todos',            icon: Mail     },
+  { key: 'SPAM',    label: 'Spam',             icon: Shield   },
   { key: 'TRASH',   label: 'Papelera',         icon: Trash2   },
+  { key: 'ARCHIVE', label: 'Archivo',          icon: Archive  },
 ];
 
+// ─── Connect Account Modal ────────────────────────────────────────────────────
+
+function ConnectAccountModal({
+  savedGmailProfiles, onConnectNewGmail, onReconnectProfile, onAddImap, onClose,
+}: {
+  savedGmailProfiles: SavedOAuthProfile[];
+  onConnectNewGmail: () => void;
+  onReconnectProfile: (profile: SavedOAuthProfile) => void;
+  onAddImap: () => void;
+  onClose: () => void;
+}) {
+  const GoogleIcon = () => (
+    <svg width={18} height={18} viewBox="0 0 24 24" className="flex-shrink-0">
+      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+    </svg>
+  );
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h2 className="text-base font-bold text-gray-900">Conectar cuenta de correo</h2>
+          <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="p-4 space-y-3">
+          {savedGmailProfiles.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Cuentas guardadas</p>
+              <div className="space-y-1">
+                {savedGmailProfiles.map(profile => (
+                  <button
+                    key={profile.id}
+                    type="button"
+                    onClick={() => { onReconnectProfile(profile); onClose(); }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-red-50 transition-colors text-left">
+                    <GoogleIcon />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-gray-800 truncate">{profile.display_name || profile.email}</p>
+                      <p className="text-xs text-gray-400 truncate">{profile.email}</p>
+                    </div>
+                    <RotateCcw size={14} className="text-gray-300 flex-shrink-0" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className={savedGmailProfiles.length > 0 ? 'border-t border-gray-100 pt-3' : ''}>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Nueva cuenta</p>
+            {GMAIL_CLIENT_ID && (
+              <button
+                type="button"
+                onClick={() => { onConnectNewGmail(); onClose(); }}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border-2 border-gray-100 hover:border-red-200 hover:bg-red-50 transition-all text-left">
+                <GoogleIcon />
+                <div className="text-left flex-1">
+                  <p className="text-sm font-semibold text-gray-800">Google / Gmail</p>
+                  <p className="text-xs text-gray-400">OAuth seguro — sin contraseñas</p>
+                </div>
+                <Zap size={14} className="text-yellow-500 flex-shrink-0" />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => { onAddImap(); onClose(); }}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border-2 border-gray-100 hover:border-indigo-200 hover:bg-indigo-50 transition-all text-left mt-2">
+              <AtSign size={18} className="text-gray-400 flex-shrink-0" />
+              <div className="text-left flex-1">
+                <p className="text-sm font-semibold text-gray-800">IMAP / POP3</p>
+                <p className="text-xs text-gray-400">Outlook, corporativo, dominio propio...</p>
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Sidebar ──────────────────────────────────────────────────────────────────
+
 function Sidebar({
-  userEmail, userName, userAvatar, gmailProfile, gmailConnected, labels,
-  selectedFolder, onSelectFolder, onCompose, onConnectGmail, onDisconnectGmail,
-  onConnectOutlook,
+  userEmail, userName, userAvatar, gmailProfile, gmailConnected, savedGmailProfiles, labels,
+  selectedFolder, onSelectFolder, onCompose, onDisconnectGmail,
+  onReconnectGoogleProfile, onDeleteGoogleProfile, onConnectAccount,
   onSync, syncing, unreadCount, draftCount, pinnedCount, imapAccounts, selectedImapAccountId,
-  onSelectGmail, onSelectImapAccount, onAddImap,
+  imapFolders, imapSystemFolderMap, onSelectGmail, onSelectImapAccount,
   onCreateLabel, onDeleteLabel,
+  onCreateImapFolder, onDeleteImapAccount, canUseMailbox,
 }: {
   userEmail: string; userName: string; userAvatar?: string;
   gmailProfile: GmailProfile | null; gmailConnected: boolean;
+  savedGmailProfiles: SavedOAuthProfile[];
   labels: GmailLabel[]; selectedFolder: FolderKey;
   onSelectFolder: (f: FolderKey) => void; onCompose: () => void;
-  onConnectGmail: () => void; onDisconnectGmail: () => void;
-  onConnectOutlook: () => void;
+  onDisconnectGmail: () => void;
+  onReconnectGoogleProfile: (profile: SavedOAuthProfile) => void;
+  onDeleteGoogleProfile: (profileId: string) => void;
+  onConnectAccount: () => void;
   onSync: () => void; syncing: boolean;
   unreadCount: number; draftCount: number; pinnedCount: number;
   imapAccounts: ImapAccount[];
   selectedImapAccountId: string | null;
+  imapFolders: ImapFolderInfo[];
+  imapSystemFolderMap: Partial<Record<ImapSystemFolderKey, string>>;
   onSelectGmail: () => void;
   onSelectImapAccount: (accountId: string) => void;
-  onAddImap: () => void;
   onCreateLabel: () => void;
   onDeleteLabel: (labelId: string) => void;
+  onCreateImapFolder: () => void;
+  onDeleteImapAccount: (accountId: string) => void;
+  canUseMailbox: boolean;
 }) {
   const userLabels = labels.filter(l => l.type === 'user');
+  const categoryLabels = labels.filter((label) =>
+    label.type === 'system' &&
+    ['CATEGORY_SOCIAL', 'CATEGORY_UPDATES', 'CATEGORY_FORUMS', 'CATEGORY_PROMOTIONS', 'CATEGORY_PERSONAL'].includes(label.id),
+  );
+  const extraGmailSystemLabels = labels.filter((label) =>
+    label.type === 'system' &&
+    !['INBOX', 'STARRED', 'IMPORTANT', 'SENT', 'DRAFT', 'SPAM', 'TRASH', 'UNREAD', 'CHAT', 'SNOOZED', 'CATEGORY_SOCIAL', 'CATEGORY_UPDATES', 'CATEGORY_FORUMS', 'CATEGORY_PROMOTIONS', 'CATEGORY_PERSONAL'].includes(label.id),
+  );
+  const isImapActive = Boolean(selectedImapAccountId);
+  const isGmailActive = gmailConnected && !isImapActive;
+  const visibleSystemFolders = SYSTEM_FOLDERS.filter((folder) => {
+    if (!isGmailActive && folder.key === 'PINNED') return false;
+    if (!isImapActive) return true;
+    if (folder.key === 'STARRED') return true;
+    if (folder.key === 'ALL' || folder.key === 'SNOOZED' || folder.key === 'IMPORTANT' || folder.key === 'PINNED') return false;
+    if (folder.key === 'INBOX') return true;
+    return Boolean(imapSystemFolderMap[folder.key as ImapSystemFolderKey]);
+  });
+  const gmailBadgeByFolder = new Map(
+    labels.map((label) => [label.id, Number(label.messagesUnread ?? label.messagesTotal ?? 0)]),
+  );
 
   return (
     <div className="flex flex-col h-full min-h-0 bg-white border-r border-gray-200">
@@ -893,62 +1075,25 @@ function Sidebar({
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-gray-800 truncate">{userName}</p>
             <p className="text-xs text-gray-400 truncate">
-              {gmailProfile?.emailAddress || userEmail}
+              {isImapActive
+                ? (imapAccounts.find(a => a.id === selectedImapAccountId)?.email || userEmail)
+                : (gmailProfile?.emailAddress || userEmail)}
             </p>
           </div>
         </div>
         {/* Compose */}
         <button
           onClick={onCompose}
-          className="mt-3 w-full flex items-center gap-2 bg-[#ab0433] hover:bg-[#8f022a] text-white text-sm font-medium px-4 py-2.5 rounded-full transition-colors shadow-sm">
+          disabled={!canUseMailbox}
+          className="mt-3 w-full flex items-center gap-2 bg-[#ab0433] hover:bg-[#8f022a] text-white text-sm font-medium px-4 py-2.5 rounded-full transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50">
           <Edit3 size={15} /> Redactar
         </button>
       </div>
 
-      {/* Cuentas conectadas */}
-      <div className="px-3 py-2 border-b border-gray-100 flex-shrink-0 space-y-1.5">
-        {/* Gmail */}
-        {gmailConnected ? (
-          <div className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-red-50 ring-1 ring-red-200">
-            <button onClick={onSelectGmail} className="flex flex-1 items-center gap-2 min-w-0 text-left">
-              <Wifi size={13} className="text-[#ab0433] flex-shrink-0" />
-              <span className="text-xs text-[#ab0433] font-medium truncate">
-                {gmailProfile?.emailAddress || 'Gmail conectado'}
-              </span>
-            </button>
-            <button onClick={onSync} disabled={syncing} title="Sincronizar"
-              className="p-1 text-[#ab0433] hover:bg-red-100 rounded-md transition-colors flex-shrink-0">
-              <RefreshCw size={12} className={syncing ? 'animate-spin' : ''} />
-            </button>
-            <button onClick={onDisconnectGmail} title="Desconectar Gmail"
-              className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-100 rounded-md transition-colors flex-shrink-0">
-              <LogIn size={12} className="rotate-180" />
-            </button>
-          </div>
-        ) : (
-          <button onClick={onConnectGmail}
-            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg bg-gray-50 hover:bg-red-50 text-gray-500 hover:text-[#ab0433] transition-colors text-xs font-medium">
-            <svg width={13} height={13} viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
-              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-            </svg>
-            Conectar Gmail
-          </button>
-        )}
-
-        {/* IMAP / POP3 genérico */}
-        <button onClick={onConnectOutlook}
-          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg bg-gray-50 hover:bg-indigo-50 text-gray-500 hover:text-indigo-700 transition-colors text-xs font-medium">
-          <AtSign size={13} className="flex-shrink-0" />
-          Añadir cuenta IMAP / POP3
-        </button>
-      </div>
 
       {/* Folder list — PINNED solo si hay Gmail activo */}
       <nav className="flex-1 overflow-y-auto py-2">
-        {SYSTEM_FOLDERS.filter(f => f.key !== 'PINNED' || gmailConnected).map(({ key, label, icon: Icon }) => {
+        {visibleSystemFolders.map(({ key, label, icon: Icon }) => {
           const active = selectedFolder === key;
           const badge = key === 'INBOX'
             ? unreadCount
@@ -956,16 +1101,19 @@ function Sidebar({
               ? draftCount
               : key === 'PINNED'
                 ? pinnedCount
-                : 0;
+                : gmailConnected && !isImapActive
+                  ? Number(gmailBadgeByFolder.get(key === 'DRAFTS' ? 'DRAFT' : key) || 0)
+                  : 0;
           return (
             <button
               key={key}
+              disabled={!canUseMailbox}
               onClick={() => onSelectFolder(key)}
               className={`w-full flex items-center gap-3 px-4 py-2 text-sm transition-colors ${
                 active
                   ? 'bg-red-50 text-[#ab0433] font-semibold'
                   : 'text-gray-600 hover:bg-gray-50'
-              }`}>
+              } disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent`}>
               <Icon size={16} className={active ? 'text-[#ab0433]' : 'text-gray-400'} />
               <span className="flex-1 text-left">{label}</span>
               {badge > 0 && (
@@ -980,7 +1128,7 @@ function Sidebar({
         })}
 
         {/* User labels */}
-        {userLabels.length > 0 && (
+        {isGmailActive && userLabels.length > 0 && (
           <div className="mt-2 pt-2 border-t border-gray-100">
             <div className="px-4 pb-1 flex items-center justify-between">
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
@@ -988,8 +1136,9 @@ function Sidebar({
               </p>
               <button
                 type="button"
+                disabled={!canUseMailbox}
                 onClick={() => onCreateLabel()}
-                className="p-1 rounded-full text-gray-400 hover:text-[#ab0433] hover:bg-red-50 transition-colors"
+                className="p-1 rounded-full text-gray-400 hover:text-[#ab0433] hover:bg-red-50 transition-colors disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
                 title="Crear carpeta">
                 <FolderPlus size={14} />
               </button>
@@ -1002,8 +1151,9 @@ function Sidebar({
                 }`}>
                 <button
                   type="button"
+                  disabled={!canUseMailbox}
                   onClick={() => onSelectFolder(l.id)}
-                  className="flex flex-1 min-w-0 items-center gap-3 text-left">
+                  className="flex flex-1 min-w-0 items-center gap-3 text-left disabled:cursor-not-allowed">
                   <Folder size={14} className={selectedFolder === l.id ? 'text-[#ab0433]' : 'text-gray-400'} />
                   <span className="flex-1 truncate">{normalizeLabelName(l.name, l.id)}</span>
                   {l.messagesUnread ? (
@@ -1012,8 +1162,9 @@ function Sidebar({
                 </button>
                 <button
                   type="button"
+                  disabled={!canUseMailbox}
                   onClick={() => onDeleteLabel(l.id)}
-                  className="opacity-0 group-hover:opacity-100 p-1 rounded-md text-gray-400 hover:text-[#ab0433] hover:bg-red-50 transition-all"
+                  className="opacity-0 group-hover:opacity-100 p-1 rounded-md text-gray-400 hover:text-[#ab0433] hover:bg-red-50 transition-all disabled:opacity-30 disabled:hover:bg-transparent"
                   title="Borrar carpeta">
                   <Trash2 size={14} />
                 </button>
@@ -1021,50 +1172,248 @@ function Sidebar({
             ))}
           </div>
         )}
-        {userLabels.length === 0 && gmailConnected && (
+        {userLabels.length === 0 && isGmailActive && (
           <div className="mt-2 pt-2 border-t border-gray-100 px-4">
             <button
               type="button"
+              disabled={!canUseMailbox}
               onClick={() => onCreateLabel()}
-              className="w-full flex items-center gap-2 rounded-xl border border-dashed border-red-200 px-3 py-2 text-xs text-[#ab0433] hover:bg-red-50 transition-colors">
+              className="w-full flex items-center gap-2 rounded-xl border border-dashed border-red-200 px-3 py-2 text-xs text-[#ab0433] hover:bg-red-50 transition-colors disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent">
               <FolderPlus size={14} />
               Crear primera carpeta
             </button>
           </div>
         )}
 
-        {/* IMAP accounts */}
-        {imapAccounts.length > 0 && (
+        {isGmailActive && extraGmailSystemLabels.length > 0 && (
           <div className="mt-2 pt-2 border-t border-gray-100">
-            <p className="px-4 pb-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-              Otras cuentas
-            </p>
-            {imapAccounts.map(acc => (
+            <div className="px-4 pb-1">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                Gmail
+              </p>
+            </div>
+            {extraGmailSystemLabels.map((label) => (
               <button
-                key={acc.id}
-                onClick={() => onSelectImapAccount(acc.id)}
-                className={`w-full px-4 py-2 flex items-center gap-2 text-left transition-colors ${
-                  selectedImapAccountId === acc.id
-                    ? 'bg-red-50 text-[#ab0433]'
-                    : 'hover:bg-gray-50 text-gray-600'
-                }`}>
-                <div className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-medium truncate">{acc.label || acc.email}</p>
-                  <p className="text-[11px] text-gray-400 truncate">{acc.email}</p>
-                </div>
+                key={label.id}
+                type="button"
+                disabled={!canUseMailbox}
+                onClick={() => onSelectFolder(label.id)}
+                className={`w-full flex items-center gap-3 px-4 py-1.5 text-sm transition-colors ${
+                  selectedFolder === label.id ? 'bg-red-50 text-[#ab0433] font-medium' : 'text-gray-600 hover:bg-gray-50'
+                } disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent`}>
+                <Tag size={14} className={selectedFolder === label.id ? 'text-[#ab0433]' : 'text-gray-400'} />
+                <span className="flex-1 truncate text-left">{normalizeLabelName(label.name, label.id)}</span>
+                {Number(label.messagesUnread ?? label.messagesTotal ?? 0) > 0 && (
+                  <span className="text-xs text-gray-400">
+                    {Number(label.messagesUnread ?? label.messagesTotal ?? 0)}
+                  </span>
+                )}
               </button>
             ))}
           </div>
         )}
+
+        {isGmailActive && categoryLabels.length > 0 && (
+          <div className="mt-2 pt-2 border-t border-gray-100">
+            <div className="px-4 pb-1">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                Categorías
+              </p>
+            </div>
+            {categoryLabels.map((label) => (
+              <button
+                key={label.id}
+                type="button"
+                disabled={!canUseMailbox}
+                onClick={() => onSelectFolder(label.id)}
+                className={`w-full flex items-center gap-3 px-4 py-1.5 text-sm transition-colors ${
+                  selectedFolder === label.id ? 'bg-red-50 text-[#ab0433] font-medium' : 'text-gray-600 hover:bg-gray-50'
+                } disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent`}>
+                <Tag size={14} className={selectedFolder === label.id ? 'text-[#ab0433]' : 'text-gray-400'} />
+                <span className="flex-1 truncate text-left">{normalizeLabelName(label.name, label.id)}</span>
+                {Number(label.messagesUnread ?? label.messagesTotal ?? 0) > 0 && (
+                  <span className="text-xs text-gray-400">
+                    {Number(label.messagesUnread ?? label.messagesTotal ?? 0)}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {isGmailActive && (
+            <div className="mt-2 pt-2 border-t border-gray-100 px-4 space-y-1">
+              <button
+                type="button"
+                disabled={!canUseMailbox}
+                onClick={() => onSelectFolder('SCHEDULED')}
+                className="w-full flex items-center gap-2 rounded-lg px-2 py-2 text-xs text-gray-500 hover:bg-gray-50 hover:text-[#ab0433] transition-colors disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent">
+                <Send size={14} />
+                Gestionar suscripciones
+              </button>
+              <button
+                type="button"
+                disabled={!canUseMailbox}
+                onClick={() => onCreateLabel()}
+                className="w-full flex items-center gap-2 rounded-lg px-2 py-2 text-xs text-gray-500 hover:bg-gray-50 hover:text-[#ab0433] transition-colors disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent">
+                <Tag size={14} />
+              Gestionar etiquetas
+            </button>
+            <button
+              type="button"
+              onClick={() => onCreateLabel()}
+              className="w-full flex items-center gap-2 rounded-lg px-2 py-2 text-xs text-gray-500 hover:bg-gray-50 hover:text-[#ab0433] transition-colors">
+              <Plus size={14} />
+              Nueva etiqueta
+            </button>
+          </div>
+        )}
+
+        {/* Otras cuentas — Gmail + IMAP unificados */}
+        {(savedGmailProfiles.length > 0 || imapAccounts.length > 0) && (
+          <div className="mt-2 pt-2 border-t border-gray-100">
+            <div className="px-4 pb-1 flex items-center justify-between">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Otras cuentas</p>
+            </div>
+
+            {/* Cuentas Gmail guardadas */}
+            {savedGmailProfiles.map(profile => {
+              const isActive = gmailConnected && gmailProfile?.emailAddress === profile.email && !selectedImapAccountId;
+              // Token válido pero viendo otra cuenta (IMAP activo) → cambio silencioso
+              const tokenOk = gmailConnected && gmailProfile?.emailAddress === profile.email;
+              // Token expirado o es otra cuenta → necesita re-auth
+              const needsReauth = !isActive && !tokenOk;
+              return (
+                <div
+                  key={profile.id}
+                  className={`group flex items-center gap-1 px-2 py-1 rounded-xl mx-2 transition-colors ${
+                    isActive ? 'bg-red-50' : 'hover:bg-gray-50'
+                  }`}>
+                  <button
+                    type="button"
+                    onClick={() => isActive ? onSelectGmail() : onReconnectGoogleProfile(profile)}
+                    title={needsReauth ? 'Sesión expirada — haz clic para volver a conectar' : undefined}
+                    className="flex flex-1 items-center gap-2 min-w-0 px-2 py-1 text-left">
+                    <svg width={13} height={13} viewBox="0 0 24 24" className="flex-shrink-0">
+                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                    </svg>
+                    <div className="min-w-0 flex-1">
+                      <p className={`text-xs font-medium truncate ${isActive ? 'text-[#ab0433]' : 'text-gray-700'}`}>
+                        {profile.display_name || profile.email}
+                      </p>
+                      <p className="text-[11px] text-gray-400 truncate">{profile.email}</p>
+                    </div>
+                    {isActive && <div className="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" />}
+                    {needsReauth && (
+                      <AlertCircle size={12} className="text-orange-400 flex-shrink-0" title="Sesión expirada" />
+                    )}
+                  </button>
+                  {isActive && (
+                    <>
+                      <button onClick={onSync} disabled={syncing} title="Sincronizar"
+                        className="opacity-0 group-hover:opacity-100 p-1 text-[#ab0433] hover:bg-red-100 rounded-md transition-all flex-shrink-0">
+                        <RefreshCw size={12} className={syncing ? 'animate-spin' : ''} />
+                      </button>
+                      <button onClick={onDisconnectGmail} title="Desconectar"
+                        className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-600 hover:bg-red-100 rounded-md transition-all flex-shrink-0">
+                        <LogIn size={12} className="rotate-180" />
+                      </button>
+                    </>
+                  )}
+                  {!isActive && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); onDeleteGoogleProfile(profile.id); }}
+                      title="Borrar cuenta guardada"
+                      className="opacity-0 group-hover:opacity-100 p-1 rounded-md text-gray-400 hover:text-[#ab0433] hover:bg-red-50 transition-all flex-shrink-0">
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                  {!isActive && !needsReauth && (
+                    <RotateCcw size={12} className="opacity-0 group-hover:opacity-100 text-gray-400 flex-shrink-0 mr-1" />
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Cuentas IMAP */}
+            {imapAccounts.map(acc => (
+              <div
+                key={acc.id}
+                className={`group flex items-center gap-1 px-2 py-1 rounded-xl mx-2 transition-colors ${
+                  selectedImapAccountId === acc.id ? 'bg-red-50 text-[#ab0433]' : 'text-gray-600 hover:bg-gray-50'
+                }`}>
+                <button
+                  type="button"
+                  onClick={() => onSelectImapAccount(acc.id)}
+                  className="flex flex-1 items-center gap-2 min-w-0 px-2 py-1 text-left">
+                  <div className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium truncate">{acc.label || acc.email}</p>
+                    <p className="text-[11px] text-gray-400 truncate">{acc.email}</p>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onDeleteImapAccount(acc.id); }}
+                  title="Borrar cuenta"
+                  className="opacity-0 group-hover:opacity-100 p-1 rounded-md text-gray-400 hover:text-[#ab0433] hover:bg-red-50 transition-all flex-shrink-0">
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {selectedImapAccountId && (
+          <div className="mt-2 pt-2 border-t border-gray-100">
+            <div className="px-4 pb-1 flex items-center justify-between">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                Carpetas IMAP
+              </p>
+              <button
+                type="button"
+                disabled={!canUseMailbox}
+                onClick={onCreateImapFolder}
+                className="p-1 rounded-full text-gray-400 hover:text-[#ab0433] hover:bg-red-50 transition-colors disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+                title="Crear carpeta IMAP">
+                <FolderPlus size={14} />
+              </button>
+            </div>
+            {imapFolders.length > 0 ? (
+              imapFolders.map((folder) => (
+                <button
+                  key={folder.path}
+                  type="button"
+                  disabled={!canUseMailbox}
+                  onClick={() => onSelectFolder(folder.path)}
+                  className={`w-full flex items-center gap-3 px-4 py-1.5 text-sm transition-colors ${
+                    selectedFolder === folder.path
+                      ? 'bg-red-50 text-[#ab0433]'
+                      : 'text-gray-600 hover:bg-gray-50'
+                  } disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent`}>
+                  <Folder size={14} className={selectedFolder === folder.path ? 'text-[#ab0433]' : 'text-gray-400'} />
+                  <span className="truncate">{folder.name}</span>
+                </button>
+              ))
+            ) : (
+              <div className="px-4 py-2 text-xs text-gray-400">
+                No hay carpetas personalizadas en esta cuenta.
+              </div>
+            )}
+          </div>
+        )}
       </nav>
 
-      {/* Añadir más cuentas */}
+      {/* Conectar cuenta */}
       <div className="px-3 py-3 border-t border-gray-100 flex-shrink-0">
         <button
-          onClick={onAddImap}
+          onClick={onConnectAccount}
           className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-500 hover:text-[#ab0433] hover:bg-red-50 rounded-lg transition-colors">
-          <Plus size={14} /> Añadir cuenta IMAP/POP3
+          <Plus size={14} /> Conectar cuenta
         </button>
       </div>
     </div>
@@ -1765,6 +2114,35 @@ function EmptyState({ folder }: { folder: string }) {
   );
 }
 
+function MailboxLockedState({
+  hasConfiguredAccounts,
+  onConnectAccount,
+}: {
+  hasConfiguredAccounts: boolean;
+  onConnectAccount: () => void;
+}) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center px-6 text-center">
+      <Shield size={42} className="mb-4 text-gray-200" />
+      <h3 className="text-lg font-semibold text-gray-800">
+        {hasConfiguredAccounts ? 'Selecciona una cuenta de correo' : 'Conecta una cuenta de correo'}
+      </h3>
+      <p className="mt-2 max-w-md text-sm text-gray-500">
+        {hasConfiguredAccounts
+          ? 'Hay cuentas guardadas, pero no hay ninguna activa. Hasta seleccionarla o reconectarla no se podrá usar ninguna función del correo.'
+          : 'No hay ninguna cuenta configurada. Conecta Gmail o una cuenta IMAP/POP3 para empezar a usar el módulo de correo.'}
+      </p>
+      <button
+        type="button"
+        onClick={onConnectAccount}
+        className="mt-5 inline-flex items-center gap-2 rounded-full bg-[#ab0433] px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#8f022a]">
+        <Plus size={16} />
+        {hasConfiguredAccounts ? 'Seleccionar o conectar cuenta' : 'Conectar cuenta'}
+      </button>
+    </div>
+  );
+}
+
 // ─── Main Email Component ─────────────────────────────────────────────────────
 
 export default function Email() {
@@ -1781,6 +2159,22 @@ export default function Email() {
     return t || '';
   }, [getToken]);
 
+  // Fetch autenticado con reintento automático si el JWT de Clerk ha expirado
+  const authFetch = useCallback(async (url: string, opts?: RequestInit): Promise<Response> => {
+    const token = await getToken();
+    const res = await fetch(url, {
+      ...opts,
+      headers: { Authorization: `Bearer ${token || ''}`, ...opts?.headers },
+    });
+    if (res.status !== 401) return res;
+    // 401 → forzar renovación del token y reintentar una vez
+    const fresh = await getToken({ skipCache: true });
+    return fetch(url, {
+      ...opts,
+      headers: { Authorization: `Bearer ${fresh || ''}`, ...opts?.headers },
+    });
+  }, [getToken]);
+
   // ── Google Identity Services ──────────────────────────────────────────────
   const [gisLoaded, setGisLoaded]   = useState(false);
   const [gmailToken, setGmailToken] = useState<string>(() => {
@@ -1791,6 +2185,7 @@ export default function Email() {
     } catch { return ''; }
   });
   const [gmailProfile, setGmailProfile] = useState<GmailProfile | null>(null);
+  const [savedGmailProfiles, setSavedGmailProfiles] = useState<SavedOAuthProfile[]>([]);
   const [gmailLabels, setGmailLabels]   = useState<GmailLabel[]>([]);
   const tokenClientRef = useRef<{ requestAccessToken: () => void } | null>(null);
 
@@ -1808,6 +2203,7 @@ export default function Email() {
   }> | null>(null);
   const [imapAccounts, setImapAccounts] = useState<ImapAccount[]>([]);
   const [selectedImapAccountId, setSelectedImapAccountId] = useState<string | null>(null);
+  const [imapFolders, setImapFolders] = useState<ImapFolderInfo[]>([]);
   const [loading, setLoading]           = useState(false);
   const [syncing, setSyncing]           = useState(false);
   const [searchQ, setSearchQ]           = useState('');
@@ -1822,7 +2218,12 @@ export default function Email() {
   const [creatingLabel, setCreatingLabel] = useState(false);
   const [pendingDeleteLabel, setPendingDeleteLabel] = useState<PendingDeleteLabel | null>(null);
   const [deletingLabel, setDeletingLabel] = useState(false);
+  const [pendingDeleteAccount, setPendingDeleteAccount] = useState<PendingDeleteAccount | null>(null);
+  const [showConnectModal, setShowConnectModal] = useState(false);
   const pendingOpenEmailId = searchParams.get('openEmail');
+  const selectedEmailRef = useRef<ParsedEmail | null>(null);
+  const emailRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const refreshInFlightRef = useRef(false);
 
   const currentImapAccount = useMemo(
     () => imapAccounts.find((account) => account.id === selectedImapAccountId) || null,
@@ -1843,11 +2244,49 @@ export default function Email() {
       ? (currentImapAccount?.id || 'imap')
       : 'default';
 
+  const imapSystemFolderMap = useMemo(() => {
+    const findBySpecialUse = (specialUse: string) =>
+      imapFolders.find((f) => f.specialUse === specialUse)?.path;
+
+    const findByRegex = (patterns: RegExp[]) =>
+      imapFolders.find(({ path }) => {
+        const norm = path.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+        return patterns.some((p) => p.test(norm));
+      })?.path;
+
+    const map: Partial<Record<ImapSystemFolderKey, string>> = {
+      INBOX: imapFolders.find((f) => f.path.toUpperCase() === 'INBOX')?.path || 'INBOX',
+      SENT:    findBySpecialUse('\\Sent')    || findByRegex([/^sent$/, /^sent items$/, /^enviados?$/, /sent/, /enviad/]),
+      DRAFTS:  findBySpecialUse('\\Drafts')  || findByRegex([/^drafts?$/, /^borradores?$/, /draft/, /borrad/]),
+      TRASH:   findBySpecialUse('\\Trash')   || findByRegex([/^trash$/, /^papelera$/, /^deleted(?: items)?$/, /trash/, /papelera/, /deleted/, /eliminad/]),
+      SPAM:    findBySpecialUse('\\Junk')    || findByRegex([/^spam$/, /^junk$/, /^correo no deseado$/, /spam/, /junk/, /no deseado/]),
+      ARCHIVE: findBySpecialUse('\\Archive') || findByRegex([/^archive$/, /^archivo$/, /^all mail$/, /archiv/]),
+    };
+
+    return map;
+  }, [imapFolders]);
+
+  const imapCustomFolders = useMemo(() => {
+    const reserved = new Set(
+      Object.values(imapSystemFolderMap)
+        .filter(Boolean)
+        .map((value) => String(value).toLowerCase()),
+    );
+
+    return imapFolders
+      .filter((folder) => !reserved.has(folder.path.toLowerCase()))
+      .sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
+  }, [imapFolders, imapSystemFolderMap]);
+
   const normalizedLabelName = newLabelName.trim().replace(/\s+/g, ' ');
   const applyPinnedState = useCallback((items: ParsedEmail[]) => {
     const pinned = new Set(readPinnedEmailIds(activePinnedKey));
     return items.map((item) => ({ ...item, isPinned: pinned.has(item.id) }));
   }, [activePinnedKey]);
+
+  useEffect(() => {
+    selectedEmailRef.current = selectedEmail;
+  }, [selectedEmail]);
 
   // ── Cargar Google Identity Services ──────────────────────────────────────
   useEffect(() => {
@@ -1882,14 +2321,26 @@ export default function Email() {
         access_token: resp.access_token,
         expires_at: expiresAt,
       }));
-              throw new Error('Tu sesión ha caducado antes de sincronizar la cuenta. Recarga la página e inténtalo de nuevo.');
+      return;
     } else {
       setError('Error al conectar con Google: ' + (resp.error || 'Desconocido'));
     }
   }, []);
 
-  const connectGoogle = useCallback(() => {
+  const connectGoogle = useCallback((loginHint?: string) => {
     const goog = (window as any).google as GmailGIS | undefined;
+    const currentOrigin = window.location.origin;
+    const shouldNormalizeLocalOrigin =
+      /^(http:\/\/127\.0\.0\.1:\d+|http:\/\/localhost:\d+)$/.test(currentOrigin) &&
+      currentOrigin !== 'http://localhost:5173';
+
+    if (shouldNormalizeLocalOrigin) {
+      window.location.replace(
+        `http://localhost:5173${window.location.pathname}${window.location.search}${window.location.hash}`,
+      );
+      return;
+    }
+
     if (!GMAIL_CLIENT_ID) {
       setError('VITE_GOOGLE_CLIENT_ID no está configurado en .env');
       return;
@@ -1898,15 +2349,38 @@ export default function Email() {
       setError('Google Identity Services aún se está cargando. Espera un momento y vuelve a intentarlo.');
       return;
     }
-    // Inicializar (o reinicializar) el cliente en el momento del clic
-    tokenClientRef.current = goog.accounts.oauth2.initTokenClient({
+    const clientConfig: any = {
       client_id: GMAIL_CLIENT_ID,
       scope: GMAIL_SCOPES,
       callback: gmailCallback,
-    });
+    };
+    if (loginHint) clientConfig.login_hint = loginHint;
+    tokenClientRef.current = goog.accounts.oauth2.initTokenClient(clientConfig);
     setSelectedImapAccountId(null);
     tokenClientRef.current.requestAccessToken();
   }, [gmailCallback]);
+
+  const reconnectGoogleProfile = useCallback((profile: SavedOAuthProfile) => {
+    setSelectedImapAccountId(null);
+    setSelectedFolder('INBOX');
+    setSelectedEmail(null);
+    setError('');
+
+    // Si el token en memoria sigue activo para esta cuenta, volver sin OAuth
+    if (gmailToken && gmailProfile?.emailAddress === profile.email) return;
+
+    // Intentar restaurar desde localStorage sin OAuth
+    try {
+      const stored = JSON.parse(localStorage.getItem(GMAIL_TOKEN_KEY) || '{}');
+      if (stored.access_token && stored.expires_at && Date.now() < stored.expires_at - 60_000) {
+        setGmailToken(stored.access_token);
+        return;
+      }
+    } catch { /* noop */ }
+
+    // Token expirado o no encontrado → OAuth
+    connectGoogle(profile.email);
+  }, [connectGoogle, gmailToken, gmailProfile]);
 
   // ── Desconectar Gmail ─────────────────────────────────────────────────────
   const disconnectGmail = useCallback(() => {
@@ -1938,11 +2412,79 @@ export default function Email() {
     }
   }, []);
 
+  const refreshImapAccounts = useCallback(async () => {
+    const response = await authFetch(`${API}/email/accounts`).catch(() => null);
+    if (!response) return;
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload?.success) return;
+
+    const accounts: ImapAccount[] = payload.data || [];
+    setImapAccounts(accounts);
+    if (!gmailToken && accounts.length > 0 && !selectedImapAccountId) {
+      setSelectedImapAccountId(accounts[0].id);
+    }
+  }, [authFetch, gmailToken, selectedImapAccountId]);
+
+  const refreshImapFolders = useCallback(async (accountId: string) => {
+    if (!accountId) return;
+    const response = await authFetch(`${API}/email/accounts/${accountId}/folders`).catch(() => null);
+    if (!response) return;
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload?.success) {
+      setImapFolders([]);
+      return;
+    }
+
+    const folders: ImapFolderInfo[] = (payload.data || []).filter(
+      (f: unknown): f is ImapFolderInfo =>
+        f !== null && typeof f === 'object' && typeof (f as ImapFolderInfo).path === 'string',
+    );
+
+    setImapFolders(folders);
+  }, [authFetch]);
+
+  const refreshSavedGmailProfiles = useCallback(async () => {
+    const response = await authFetch(`${API}/email/profiles?provider=google`).catch(() => null);
+    if (!response) return;
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload?.success) return;
+    setSavedGmailProfiles(Array.isArray(payload.data) ? payload.data : []);
+  }, [authFetch]);
+
+  const deleteSavedGmailProfile = useCallback(async (profileId: string) => {
+    const response = await authFetch(`${API}/email/profiles/${profileId}`, { method: 'DELETE' }).catch(() => null);
+    if (!response) return;
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload?.success) {
+      setError(payload?.error || 'No se pudo borrar la cuenta guardada');
+      return;
+    }
+    setSavedGmailProfiles((prev) => prev.filter((profile) => profile.id !== profileId));
+  }, [authFetch]);
+
+  const persistGoogleProfile = useCallback(async (profile: GmailProfile) => {
+    if (!profile?.emailAddress) return;
+    await authFetch(`${API}/email/profiles`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        provider: 'google',
+        email: profile.emailAddress,
+        display_name: userName,
+        avatar_url: userAvatar || null,
+      }),
+    }).catch(() => null);
+    await refreshSavedGmailProfiles().catch(() => undefined);
+  }, [authFetch, refreshSavedGmailProfiles, userAvatar, userName]);
+
   // ── Load Gmail profile & labels ───────────────────────────────────────────
   useEffect(() => {
     if (!gmail) return;
     gmail.getProfile()
-      .then(p => setGmailProfile(p))
+      .then(async (p) => {
+        setGmailProfile(p);
+        await persistGoogleProfile(p);
+      })
       .catch(handleGmailError);
     gmail.listLabels()
       .then(({ labels }) => {
@@ -1958,60 +2500,74 @@ export default function Email() {
         else setDraftCount(localDraftCount);
       })
       .catch(handleGmailError);
-  }, [gmail, handleGmailError]);
+  }, [gmail, handleGmailError, persistGoogleProfile]);
 
   // ── Load IMAP accounts desde backend ─────────────────────────────────────
   useEffect(() => {
-    tokenGetter().then(token => {
-      if (!token) return;
-      fetch(`${API}/email/accounts`, { headers: { Authorization: `Bearer ${token}` } })
-        .then(r => r.json())
-        .then(d => {
-          if (!d.success || !d.data?.length) return;
-          const accounts: ImapAccount[] = d.data;
-          setImapAccounts(accounts);
-          // Auto-seleccionar la primera cuenta IMAP si no hay Gmail activo
-          if (!gmailToken && accounts.length > 0) {
-            setSelectedImapAccountId(accounts[0].id);
-          }
-        })
-        .catch(() => { /* sin cuentas guardadas */ });
-    });
-  }, [tokenGetter]); // eslint-disable-line react-hooks/exhaustive-deps
+    void refreshImapAccounts().catch(() => undefined);
+  }, [refreshImapAccounts]);
+
+  useEffect(() => {
+    void refreshSavedGmailProfiles().catch(() => undefined);
+  }, [refreshSavedGmailProfiles]);
+
+  useEffect(() => {
+    if (!selectedImapAccountId) {
+      setImapFolders([]);
+      return;
+    }
+    void refreshImapFolders(selectedImapAccountId).catch(() => setImapFolders([]));
+  }, [refreshImapFolders, selectedImapAccountId]);
 
   // ── Map folder key to Gmail label IDs ────────────────────────────────────
   const folderToGmailIds = useCallback((folder: FolderKey): string[] => {
     const MAP: Record<string, string[]> = {
-      INBOX: ['INBOX'], STARRED: ['STARRED'], SENT: ['SENT'],
-      DRAFTS: ['DRAFT'], SPAM: ['SPAM'], TRASH: ['TRASH'],
+      INBOX: ['INBOX'],
+      STARRED: ['STARRED'],
+      ALL: [],
+      SNOOZED: ['SNOOZED'],
+      SENT: ['SENT'],
+      IMPORTANT: ['IMPORTANT'],
+      DRAFTS: ['DRAFT'],
+      SCHEDULED: ['SCHEDULED'],
+      SPAM: ['SPAM'],
+      TRASH: ['TRASH'],
     };
     return MAP[folder] || [folder];
   }, []);
 
   // ── Load emails from Gmail ────────────────────────────────────────────────
-  const loadEmails = useCallback(async (reset = true, token?: string) => {
-    setLoading(true); setError('');
-    if (reset) { setEmails([]); setSelectedEmail(null); }
+  const loadEmails = useCallback(async (
+    reset = true,
+    token?: string,
+    options?: { silent?: boolean; preserveSelection?: boolean },
+  ) => {
+    const silent = Boolean(options?.silent);
+    const preserveSelection = Boolean(options?.preserveSelection);
+    const previousSelectedId = preserveSelection ? selectedEmailRef.current?.id || null : null;
+    if (!silent) setLoading(true);
+    setError('');
+    if (reset && !silent && !preserveSelection) { setEmails([]); setSelectedEmail(null); }
     try {
       if (currentImapAccount) {
-        const authToken = await tokenGetter();
-        if (!authToken) throw new Error('No se pudo autenticar la sesión');
-
-        const folder = mapFolderToImapApi(selectedFolder);
+        const folder = mapFolderToImapApi(selectedFolder, imapSystemFolderMap);
         if (reset) setNextPageToken(undefined);
 
-        const res = await fetch(
+        const res = await authFetch(
           `${API}/email/messages?account_id=${encodeURIComponent(currentImapAccount.id)}&folder=${encodeURIComponent(folder)}&q=${encodeURIComponent(searchQ.trim())}&limit=100`,
-          { headers: { Authorization: `Bearer ${authToken}` } },
         );
         const payload = await res.json();
         if (!res.ok || !payload?.success) throw new Error(payload?.error || 'Error al cargar correos IMAP');
 
-        setEmails((payload.data?.emails || []).map((row: ImapApiEmail) => parseImapEmail(row)));
+        const nextEmails: ParsedEmail[] = (payload.data?.emails || []).map((row: ImapApiEmail) => parseImapEmail(row));
+        setEmails(nextEmails);
+        if (previousSelectedId) {
+          const nextSelected = nextEmails.find((item) => item.id === previousSelectedId) || null;
+          if (nextSelected) setSelectedEmail(nextSelected);
+        }
 
-        const statsRes = await fetch(
+        const statsRes = await authFetch(
           `${API}/email/stats?account_id=${encodeURIComponent(currentImapAccount.id)}`,
-          { headers: { Authorization: `Bearer ${authToken}` } },
         );
         const statsPayload = await statsRes.json().catch(() => null);
         if (statsRes.ok && statsPayload?.success) {
@@ -2065,6 +2621,10 @@ export default function Email() {
             }),
         );
         setEmails(parsedPinned);
+        if (previousSelectedId) {
+          const nextSelected = parsedPinned.find((item) => item.id === previousSelectedId) || null;
+          if (nextSelected) setSelectedEmail(nextSelected);
+        }
         setNextPageToken(undefined);
         return;
       }
@@ -2132,15 +2692,22 @@ export default function Email() {
         });
 
       const nextEmails = applyPinnedState(parsed);
-      if (reset) setEmails([...localDraftEmails, ...nextEmails]);
+      if (reset) {
+        const mergedEmails = [...localDraftEmails, ...nextEmails];
+        setEmails(mergedEmails);
+        if (previousSelectedId) {
+          const nextSelected = mergedEmails.find((item) => item.id === previousSelectedId) || null;
+          if (nextSelected) setSelectedEmail(nextSelected);
+        }
+      }
       else setEmails(prev => [...prev, ...nextEmails]);
     } catch (e: any) {
       handleGmailError(e);
       setError(e.message || 'Error al cargar correos');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  }, [applyPinnedState, currentImapAccount, folderToGmailIds, gmail, handleGmailError, searchQ, selectedFolder, tokenGetter, userEmail, userName]);
+  }, [applyPinnedState, currentImapAccount, folderToGmailIds, gmail, handleGmailError, imapSystemFolderMap, searchQ, selectedFolder, tokenGetter, userEmail, userName]);
 
   // ── Recargar pinnedIds cuando cambia el provider activo ──────────────────
   useEffect(() => {
@@ -2151,6 +2718,62 @@ export default function Email() {
   useEffect(() => {
     if (gmail || currentImapAccount) loadEmails(true);
   }, [gmail, currentImapAccount, selectedFolder]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!gmail && !currentImapAccount) return;
+
+    const silentRefresh = async (refreshStructure = false) => {
+      if (refreshInFlightRef.current) return;
+      refreshInFlightRef.current = true;
+      try {
+        if (currentImapAccount) {
+          if (refreshStructure) {
+            await refreshImapFolders(currentImapAccount.id).catch(() => undefined);
+          }
+          const folder = mapFolderToImapApi(selectedFolder, imapSystemFolderMap);
+          await authFetch(
+            `${API}/email/accounts/${currentImapAccount.id}/sync?folder=${encodeURIComponent(folder)}&limit=40`,
+            { method: 'POST' },
+          ).catch(() => null);
+        } else if (gmail && refreshStructure) {
+          gmail.listLabels().then(({ labels }) => {
+            setGmailLabels((labels || []).map((label: any) => ({
+              ...label,
+              name: normalizeLabelName(label?.name, label?.id || 'Carpeta sin nombre'),
+            })));
+          }).catch(() => undefined);
+        }
+
+        await loadEmails(true, undefined, { silent: true, preserveSelection: true });
+      } finally {
+        refreshInFlightRef.current = false;
+      }
+    };
+
+    const startPolling = () => {
+      if (emailRefreshRef.current) clearInterval(emailRefreshRef.current);
+      const intervalMs = document.visibilityState === 'visible'
+        ? (currentImapAccount ? 12000 : 18000)
+        : (currentImapAccount ? 30000 : 45000);
+      emailRefreshRef.current = setInterval(() => { void silentRefresh(false); }, intervalMs);
+    };
+
+    startPolling();
+
+    const onFocus = () => {
+      void silentRefresh(true);
+      startPolling();
+    };
+
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onFocus);
+
+    return () => {
+      if (emailRefreshRef.current) clearInterval(emailRefreshRef.current);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onFocus);
+    };
+  }, [currentImapAccount, gmail, imapSystemFolderMap, loadEmails, mapFolderToImapApi, selectedFolder, tokenGetter]);
 
   // ── Open email (full body fetch) ──────────────────────────────────────────
   const openEmail = useCallback(async (email: ParsedEmail) => {
@@ -2174,10 +2797,7 @@ export default function Email() {
     }
     if (email.source === 'imap') {
       try {
-        const token = await tokenGetter();
-        const res = await fetch(`${API}/email/messages/${email.id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await authFetch(`${API}/email/messages/${email.id}`);
         const payload = await res.json();
         if (!res.ok || !payload?.success) throw new Error(payload?.error || 'No se pudo abrir el correo');
         const parsed = parseImapEmail(payload.data as ImapApiEmail);
@@ -2244,16 +2864,11 @@ export default function Email() {
     setEmails(prev => prev.map(em => em.id === id ? { ...em, isStarred: !starred } : em));
     setSelectedEmail(se => se?.id === id ? { ...se, isStarred: !starred } : se);
     if (selectedEmail?.source === 'imap' || emails.find((email) => email.id === id)?.source === 'imap') {
-      tokenGetter().then((token) => {
-        fetch(`${API}/email/messages/${id}/star`, {
-          method: 'PATCH',
-          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        }).catch(() => {});
-      });
+      authFetch(`${API}/email/messages/${id}/star`, { method: 'PATCH' }).catch(() => {});
       return;
     }
     if (gmail) gmail.toggleStar(id, !starred).catch(() => {});
-  }, [emails, gmail, selectedEmail?.source, tokenGetter]);
+  }, [authFetch, emails, gmail, selectedEmail?.source]);
 
   // ── Delete ────────────────────────────────────────────────────────────────
   const deleteEmail = useCallback((id: string) => {
@@ -2266,16 +2881,11 @@ export default function Email() {
       return;
     }
     if (selectedEmail?.source === 'imap' || emails.find((email) => email.id === id)?.source === 'imap') {
-      tokenGetter().then((token) => {
-        fetch(`${API}/email/messages/${id}`, {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` },
-        }).catch(() => {});
-      });
+      authFetch(`${API}/email/messages/${id}`, { method: 'DELETE' }).catch(() => {});
       return;
     }
     if (gmail) gmail.trash(id).catch(() => {});
-  }, [emails, gmail, gmailLabels, selectedEmail?.source, tokenGetter]);
+  }, [authFetch, emails, gmail, gmailLabels, selectedEmail?.source]);
 
   const togglePinned = useCallback((email: ParsedEmail) => {
     if (email.source === 'draft') return;
@@ -2324,6 +2934,40 @@ export default function Email() {
     }
   }, [gmail]);
 
+  const createFolderForCurrentProvider = useCallback(async (rawName?: string) => {
+    const name = String(rawName || newLabelName).trim().replace(/\s+/g, ' ');
+    if (!name) {
+      setLabelModalOpen(true);
+      return;
+    }
+
+    if (currentImapAccount) {
+      setCreatingLabel(true);
+      try {
+        const response = await authFetch(`${API}/email/accounts/${currentImapAccount.id}/folders`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name }),
+        });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.success) {
+          throw new Error(payload?.error || 'No se pudo crear la carpeta IMAP');
+        }
+        await refreshImapFolders(currentImapAccount.id);
+        setSelectedFolder(name);
+        setNewLabelName('');
+        setLabelModalOpen(false);
+      } catch (e: any) {
+        setError(e.message || 'No se pudo crear la carpeta IMAP');
+      } finally {
+        setCreatingLabel(false);
+      }
+      return;
+    }
+
+    await createUserLabel(name);
+  }, [authFetch, createUserLabel, currentImapAccount, newLabelName]);
+
   const requestDeleteUserLabel = useCallback((labelId: string) => {
     const label = gmailLabels.find((item) => item.id === labelId);
     setPendingDeleteLabel({
@@ -2353,6 +2997,41 @@ export default function Email() {
     }
   }, [gmail, pendingDeleteLabel, selectedFolder]);
 
+  const requestDeleteImapAccount = useCallback((accountId: string) => {
+    const account = imapAccounts.find((item) => item.id === accountId);
+    if (!account) return;
+    setPendingDeleteAccount({
+      id: account.id,
+      name: account.label || account.email,
+      email: account.email,
+    });
+  }, [imapAccounts]);
+
+  const deleteImapAccount = useCallback(async () => {
+    if (!pendingDeleteAccount) return;
+    try {
+      const response = await authFetch(`${API}/email/accounts/${pendingDeleteAccount.id}`, {
+        method: 'DELETE',
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.success) {
+        throw new Error(payload?.error || 'No se pudo borrar la cuenta');
+      }
+
+      const remainingAccounts = imapAccounts.filter((account) => account.id !== pendingDeleteAccount.id);
+      setImapAccounts(remainingAccounts);
+      if (selectedImapAccountId === pendingDeleteAccount.id) {
+        setSelectedImapAccountId(remainingAccounts[0]?.id || null);
+        setSelectedFolder('INBOX');
+        setSelectedEmail(null);
+        setImapFolders([]);
+      }
+      setPendingDeleteAccount(null);
+    } catch (e: any) {
+      setError(e.message || 'No se pudo borrar la cuenta');
+    }
+  }, [authFetch, imapAccounts, pendingDeleteAccount, selectedImapAccountId]);
+
   const assignEmailToLabel = useCallback(async (email: ParsedEmail, labelId: string) => {
     if (!gmail || email.source !== 'gmail') return;
     try {
@@ -2367,6 +3046,11 @@ export default function Email() {
 
   // ── Compose ───────────────────────────────────────────────────────────────
   const startCompose = (data: Partial<ComposeData> = {}) => {
+    if (activeProvider === 'none') {
+      setError('Selecciona o conecta una cuenta de correo para poder redactar mensajes.');
+      setShowConnectModal(true);
+      return;
+    }
     setCompose({ to: '', cc: '', bcc: '', subject: '', body: '', ...data });
   };
 
@@ -2423,21 +3107,29 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
   };
 
   // ── Sync ──────────────────────────────────────────────────────────────────
+  const syncImapAccountFolders = useCallback(async (account: ImapAccount, preferredFolder?: string) => {
+    const foldersToSync = new Set<string>();
+    foldersToSync.add(imapSystemFolderMap.INBOX || 'INBOX');
+    if (imapSystemFolderMap.SENT) foldersToSync.add(imapSystemFolderMap.SENT);
+    if (imapSystemFolderMap.DRAFTS) foldersToSync.add(imapSystemFolderMap.DRAFTS);
+    if (preferredFolder && preferredFolder !== 'PINNED' && preferredFolder !== 'STARRED') {
+      foldersToSync.add(mapFolderToImapApi(preferredFolder, imapSystemFolderMap));
+    }
+
+    for (const folder of foldersToSync) {
+      await authFetch(
+        `${API}/email/accounts/${account.id}/sync?folder=${encodeURIComponent(folder)}&limit=${folder === 'INBOX' ? 100 : 40}`,
+        { method: 'POST' },
+      ).catch(() => null);
+    }
+  }, [authFetch, imapSystemFolderMap]);
+
   const handleSync = async () => {
     setSyncing(true);
     try {
       if (currentImapAccount) {
-        const token = await tokenGetter();
-        const folder = mapFolderToImapApi(selectedFolder);
-        const res = await fetch(
-          `${API}/email/accounts/${currentImapAccount.id}/sync?folder=${encodeURIComponent(folder)}&limit=100`,
-          {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${token}` },
-          },
-        );
-        const payload = await res.json();
-        if (!res.ok || !payload?.success) throw new Error(payload?.error || 'Error al sincronizar la cuenta');
+        await refreshImapFolders(currentImapAccount.id);
+        await syncImapAccountFolders(currentImapAccount, selectedFolder);
         await loadEmails(true);
       } else if (gmail) {
         const { labels } = await gmail.listLabels();
@@ -2456,7 +3148,8 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
     finally { setSyncing(false); }
   };
 
-  const isConnected = !!gmail || imapAccounts.length > 0;
+  const hasConfiguredAccounts = !!gmail || savedGmailProfiles.length > 0 || imapAccounts.length > 0;
+  const hasActiveMailbox = activeProvider !== 'none';
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -2474,6 +3167,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
             userAvatar={userAvatar}
             gmailProfile={gmailProfile}
             gmailConnected={!!gmail}
+            savedGmailProfiles={savedGmailProfiles}
             labels={gmailLabels}
             selectedFolder={selectedFolder}
             onSelectFolder={(f) => {
@@ -2482,9 +3176,10 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
               setSearchQ('');
             }}
             onCompose={() => startCompose()}
-            onConnectGmail={connectGoogle}
             onDisconnectGmail={disconnectGmail}
-            onConnectOutlook={connectOutlook}
+            onReconnectGoogleProfile={reconnectGoogleProfile}
+            onDeleteGoogleProfile={deleteSavedGmailProfile}
+            onConnectAccount={() => setShowConnectModal(true)}
             onSync={handleSync}
             syncing={syncing}
             unreadCount={unreadCount}
@@ -2492,14 +3187,19 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
             pinnedCount={pinnedIds.length}
             imapAccounts={imapAccounts}
             selectedImapAccountId={selectedImapAccountId}
+            imapFolders={imapCustomFolders}
+            imapSystemFolderMap={imapSystemFolderMap}
             onSelectGmail={() => setSelectedImapAccountId(null)}
             onSelectImapAccount={(accountId) => {
               setSelectedImapAccountId(accountId);
+              setSelectedFolder('INBOX');
               setSelectedEmail(null);
             }}
-            onAddImap={() => { setImapPreset(null); setShowImapForm(true); }}
-            onCreateLabel={createUserLabel}
+            onCreateLabel={() => { setNewLabelName(''); setLabelModalOpen(true); }}
             onDeleteLabel={requestDeleteUserLabel}
+            onCreateImapFolder={() => { setNewLabelName(''); setLabelModalOpen(true); }}
+            onDeleteImapAccount={requestDeleteImapAccount}
+            canUseMailbox={hasActiveMailbox}
           />
         </div>
       </div>
@@ -2520,6 +3220,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
             </span>
             <button
               onClick={() => startCompose()}
+              disabled={!hasActiveMailbox}
               className="p-2 bg-[#ab0433] text-white rounded-full">
               <Edit3 size={15} />
             </button>
@@ -2535,6 +3236,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
                 <input
                   value={searchQ}
                   onChange={e => setSearchQ(e.target.value)}
+                  disabled={!hasActiveMailbox}
                   placeholder="Buscar en correos..."
                   className="flex-1 bg-transparent text-sm outline-none text-gray-700 placeholder-gray-400 min-w-0" />
                 {searchQ && (
@@ -2561,7 +3263,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
                 <span className="text-xs text-gray-400">{unreadCount} no leídos</span>
               )}
               <button
-                onClick={() => loadEmails(true)} disabled={loading}
+                onClick={() => loadEmails(true)} disabled={loading || !hasActiveMailbox}
                 className="p-1.5 hover:bg-gray-100 rounded-full text-gray-400 transition-colors">
                 <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
               </button>
@@ -2570,11 +3272,16 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
 
           {/* List */}
           <div className="flex-1 overflow-y-auto bg-white">
-            {!isConnected ? (
+            {!hasConfiguredAccounts ? (
               <ConnectWizard
                 onConnectGoogle={connectGoogle}
                 onConnectOutlook={connectOutlook}
                 googleClientId={GMAIL_CLIENT_ID}
+              />
+            ) : !hasActiveMailbox ? (
+              <MailboxLockedState
+                hasConfiguredAccounts={hasConfiguredAccounts}
+                onConnectAccount={() => setShowConnectModal(true)}
               />
             ) : loading && emails.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20">
@@ -2610,7 +3317,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
                   <div className="py-4 flex justify-center border-t border-gray-100">
                     <button
                       onClick={() => loadEmails(false, nextPageToken)}
-                      disabled={loading}
+                      disabled={loading || !hasActiveMailbox}
                       className="text-sm text-[#ab0433] hover:text-[#8f022a] font-medium flex items-center gap-1.5 px-4 py-2 rounded-full hover:bg-red-50 transition-colors">
                       {loading
                         ? <Loader2 size={14} className="animate-spin" />
@@ -2628,7 +3335,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
         <div className={`flex-1 min-w-0 h-full flex-col bg-white ${
           selectedEmail ? 'flex' : 'hidden lg:flex'
         }`}>
-          {selectedEmail ? (
+          {selectedEmail && hasActiveMailbox ? (
             <EmailReader
               email={selectedEmail}
               onReply={() => replyTo(selectedEmail)}
@@ -2643,11 +3350,16 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
               onCreateLabel={createUserLabel}
               userLabels={gmailLabels.filter((label) => label.type === 'user')}
             />
-          ) : (
+          ) : hasActiveMailbox ? (
             <div className="flex flex-col items-center justify-center h-full select-none">
               <MailOpen size={56} className="text-gray-200 mb-4" />
               <p className="text-gray-400 text-sm">Selecciona un mensaje para leerlo</p>
             </div>
+          ) : (
+            <MailboxLockedState
+              hasConfiguredAccounts={hasConfiguredAccounts}
+              onConnectAccount={() => setShowConnectModal(true)}
+            />
           )}
         </div>
       </div>
@@ -2676,7 +3388,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
             onSubmit={(e) => {
               e.preventDefault();
               if (!normalizedLabelName || creatingLabel) return;
-              void createUserLabel(normalizedLabelName);
+              void createFolderForCurrentProvider(normalizedLabelName);
             }}
             className="w-full max-w-md rounded-[30px] border border-slate-200 bg-white shadow-[0_40px_80px_rgba(15,23,42,0.22)] overflow-hidden">
             <div className="px-6 pt-6 pb-5 bg-gradient-to-br from-white via-white to-red-50/50 border-b border-slate-100">
@@ -2685,9 +3397,13 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
                   <FolderPlus size={24} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h3 className="text-xl font-semibold text-slate-900">Crear carpeta personalizada</h3>
+                  <h3 className="text-xl font-semibold text-slate-900">
+                    {currentImapAccount ? 'Crear carpeta IMAP' : 'Crear carpeta personalizada'}
+                  </h3>
                   <p className="text-sm text-slate-500 mt-1">
-                    Organiza tus correos con una carpeta propia dentro de Gmail y del ERP.
+                    {currentImapAccount
+                      ? `Organiza mejor la cuenta ${currentImapAccount.email} con una carpeta propia.`
+                      : 'Organiza tus correos con una carpeta propia dentro de Gmail y del ERP.'}
                   </p>
                 </div>
                 <button
@@ -2787,17 +3503,66 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
         </div>
       )}
 
+      {pendingDeleteAccount && (
+        <div className="fixed inset-0 z-[71] flex items-center justify-center bg-slate-950/35 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-[28px] border border-slate-200 bg-white shadow-[0_40px_80px_rgba(15,23,42,0.22)] overflow-hidden">
+            <div className="px-6 pt-6 pb-4 bg-gradient-to-br from-white via-white to-red-50/40 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="h-12 w-12 rounded-2xl bg-red-50 text-[#ab0433] flex items-center justify-center">
+                  <Trash2 size={20} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900">Borrar cuenta de correo</h3>
+                  <p className="text-sm text-slate-500">Confirma si quieres quitar esta cuenta del módulo.</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-6 py-5">
+              <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3">
+                <p className="text-sm text-slate-700">
+                  ¿Quieres borrar la cuenta <span className="font-semibold text-[#ab0433]">{pendingDeleteAccount.name}</span>?
+                </p>
+                <p className="mt-1 text-xs text-slate-500">{pendingDeleteAccount.email}</p>
+              </div>
+            </div>
+
+            <div className="px-6 pb-6 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setPendingDeleteAccount(null)}
+                className="px-5 py-2.5 rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors">
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => void deleteImapAccount()}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#ab0433] text-white hover:bg-[#8f022a] transition-colors">
+                <Trash2 size={16} />
+                Borrar cuenta
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Connect Account Modal ── */}
+      {showConnectModal && (
+        <ConnectAccountModal
+          savedGmailProfiles={savedGmailProfiles}
+          onConnectNewGmail={() => { setShowConnectModal(false); connectGoogle(); }}
+          onReconnectProfile={(profile) => { setShowConnectModal(false); reconnectGoogleProfile(profile); }}
+          onAddImap={() => { setShowConnectModal(false); setImapPreset(null); setShowImapForm(true); }}
+          onClose={() => setShowConnectModal(false)}
+        />
+      )}
+
       {/* ── IMAP form ── */}
       {showImapForm && (
         <ImapForm
           onClose={() => { setShowImapForm(false); setImapPreset(null); }}
           onSaved={async (savedAccount) => {
             setError('');
-            const token = await tokenGetter();
-            if (!token) {
-              setError('La cuenta se guardó, pero tu sesión ha caducado antes de sincronizar. Recarga la página y vuelve a intentarlo.');
-              throw new Error('Tu sesión ha caducado antes de sincronizar la cuenta. Recarga la página e inténtalo de nuevo.');
-            }
 
             // 1. Recargar lista de cuentas
             setImapAccounts((prev) => {
@@ -2805,24 +3570,16 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
               return [...withoutCurrent, savedAccount];
             });
 
-            // 2. Seleccionar la cuenta recién añadida (la última)
+            // 2. Seleccionar la cuenta recién añadida
             setSelectedImapAccountId(savedAccount.id);
             setSelectedFolder('INBOX');
 
-            // 3. Hacer sync inmediato para descargar correos
+            // 3. Cargar carpetas y hacer sync inmediato
             setSyncing(true);
             try {
-              const syncResponse = await fetch(
-                `${API}/email/accounts/${savedAccount.id}/sync?folder=INBOX&limit=50`,
-                { method: 'POST', headers: { Authorization: `Bearer ${token}` } },
-              );
-              const syncPayload = await syncResponse.json().catch(() => null);
-              if (!syncResponse.ok || !syncPayload?.success) {
-                throw new Error(syncPayload?.error || 'No se pudo sincronizar la bandeja de entrada inicial.');
-              }
-              const accountsResponse = await fetch(`${API}/email/accounts`, {
-                headers: { Authorization: `Bearer ${token}` },
-              });
+              await refreshImapFolders(savedAccount.id);
+              await syncImapAccountFolders(savedAccount, 'INBOX');
+              const accountsResponse = await authFetch(`${API}/email/accounts`);
               const accountsPayload = await accountsResponse.json().catch(() => null);
               if (accountsResponse.ok && accountsPayload?.success) {
                 setImapAccounts(accountsPayload.data || []);

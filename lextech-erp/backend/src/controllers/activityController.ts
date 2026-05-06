@@ -330,3 +330,39 @@ export const getUserActivity = async (req: Request, res: Response) => {
     res.status(500).json({ success: false, error: pgErr(e) });
   }
 };
+
+export const getMyActivity = async (req: Request, res: Response) => {
+  const userId = (req as any).auth?.userId;
+  if (!userId) {
+    return res.status(401).json({ success: false, error: 'No autenticado' });
+  }
+
+  const limit = Math.min(parseInt((req.query.limit as string) || '100'), 500);
+  const offset = parseInt((req.query.offset as string) || '0');
+  const eventType = (req.query.event_type as string) || '';
+
+  try {
+    const params: any[] = [userId, limit, offset];
+    const filter = eventType ? `AND event_type=$4` : '';
+    if (eventType) params.push(eventType);
+
+    const [rows, total] = await Promise.all([
+      pool.query(
+        `
+        SELECT id, user_id, user_name, action_type,
+               entity_type, entity_id, entity_name,
+               event_type, ip_address, session_id, user_agent, device_id, created_at
+        FROM activity_log
+        WHERE user_id=$1 ${filter}
+        ORDER BY created_at DESC LIMIT $2 OFFSET $3
+      `,
+        params
+      ),
+      pool.query(`SELECT COUNT(*)::int AS total FROM activity_log WHERE user_id=$1`, [userId]),
+    ]);
+
+    return res.json({ success: true, data: rows.rows, total: total.rows[0]?.total ?? 0 });
+  } catch (e: any) {
+    return res.status(500).json({ success: false, error: pgErr(e) });
+  }
+};

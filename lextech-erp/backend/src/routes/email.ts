@@ -2,8 +2,13 @@ import { Router } from 'express';
 import { requireAuth } from '../middleware/auth';
 import {
   getAccounts,
+  getOAuthProfiles,
+  upsertOAuthProfile,
+  deleteOAuthProfile,
   createAccount,
   deleteAccount,
+  getAccountFolders,
+  createAccountFolder,
   syncAccount,
   getMessages,
   getMessage,
@@ -23,8 +28,13 @@ router.use(requireAuth);
 
 // ── Cuentas ──────────────────────────────────────────────────────────────────
 router.get('/accounts',           getAccounts);
+router.get('/profiles',           getOAuthProfiles);
+router.post('/profiles',          upsertOAuthProfile);
+router.delete('/profiles/:id',    deleteOAuthProfile);
 router.post('/accounts',          createAccount);
 router.delete('/accounts/:id',    deleteAccount);
+router.get('/accounts/:id/folders', getAccountFolders);
+router.post('/accounts/:id/folders', createAccountFolder);
 router.post('/accounts/:id/sync', syncAccount);
 
 // ── Mensajes ─────────────────────────────────────────────────────────────────

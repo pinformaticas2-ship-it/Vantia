@@ -232,9 +232,14 @@ export class Pop3Client {
       // Acumular en buffer binario
       this.socket.on('data', (d: Buffer) => { this.buf += d.toString('binary'); });
 
-      const waitGreeting = () => {
+      const waitGreeting = (deadline: number) => {
+        if (Date.now() > deadline) {
+          this.socket?.destroy();
+          reject(new Error('Timeout esperando saludo del servidor'));
+          return;
+        }
         const idx = this.buf.indexOf('\r\n');
-        if (idx < 0) { setTimeout(waitGreeting, 50); return; }
+        if (idx < 0) { setTimeout(() => waitGreeting(deadline), 50); return; }
         const line = this.buf.slice(0, idx);
         this.buf   = this.buf.slice(idx + 2);
         if (line.startsWith('+OK')) resolve();
@@ -242,8 +247,11 @@ export class Pop3Client {
       };
 
       const onConnect = () => {
-        this.socket!.setTimeout(0);
-        setTimeout(waitGreeting, 100);
+        this.socket!.setTimeout(this.timeout, () => {
+          this.socket?.destroy();
+          reject(new Error('Timeout al comunicar con el servidor'));
+        });
+        setTimeout(() => waitGreeting(Date.now() + this.timeout), 100);
       };
 
       this.cfg.secure

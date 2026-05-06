@@ -91,7 +91,7 @@ export default function DashboardHome() {
     try {
       const token = await getToken({ skipCache: true });
       const [actRes, agendaRes, tasksRes] = await Promise.all([
-        fetch("/api/activity",               { headers: { Authorization: `Bearer ${token}` } }),
+        fetch("/api/activity/me?limit=10",    { headers: { Authorization: `Bearer ${token}` } }),
         fetch("/api/agenda/upcoming?limit=5", { headers: { Authorization: `Bearer ${token}` } }),
         fetch("/api/tasks/me",               { headers: { Authorization: `Bearer ${token}` } }),
       ]);

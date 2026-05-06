@@ -6,6 +6,7 @@ import {
   addClientActivity,
   getActivityByUsers,
   getUserActivity,
+  getMyActivity,
   registerLogin,
   registerLogout,
 } from '../controllers/activityController';
@@ -18,6 +19,7 @@ router.post('/logout',             requireAuth, registerLogout);
 
 // Consultas
 router.get('/',                    requireAuth, getActivity);
+router.get('/me',                  requireAuth, getMyActivity);
 router.get('/users',               requireAuth, getActivityByUsers);
 router.get('/user/:userId',        requireAuth, getUserActivity);
 router.get('/client/:clientId',    requireAuth, getClientActivity);

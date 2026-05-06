@@ -1,6 +1,27 @@
 import { Request, Response } from 'express';
+import fs from 'fs';
+import path from 'path';
 import pool from '../config/database';
+import { TEMP_ROOT, UPLOADS_CLIENTS_ROOT as CLIENT_UPLOADS_ROOT } from '../config/paths';
 import { logActivityForReq, resolveUserName } from './activityController';
+
+export const TASK_FILES_ROOT = path.join(CLIENT_UPLOADS_ROOT, '..', 'task-files');
+
+const ensureTaskFilesDir = (taskId: string) => {
+  const dir = path.join(TASK_FILES_ROOT, taskId);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  return dir;
+};
+
+const getTaskFileRecord = async (taskId: string, fileId: string) => {
+  const result = await pool.query(
+    `SELECT stored_name, original_name, mimetype
+     FROM task_files
+     WHERE id = $1 AND task_id = $2`,
+    [fileId, taskId]
+  );
+  return result.rows[0] || null;
+};
 
 const explainTaskError = (error: any) => {
   const raw = String(error?.message || "");
@@ -193,6 +214,396 @@ export const createTask = async (req: any, res: Response) => {
 };
 
 // ── PUT /api/tasks/:id ─────────────────────────────────────────
+export const listTaskFiles = async (req: any, res: Response) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      `SELECT id, task_id, original_name, stored_name, mimetype, size_bytes,
+              document_name, attachment_type, created_by, created_at, updated_at
+       FROM task_files
+       WHERE task_id = $1
+       ORDER BY created_at DESC`,
+      [id]
+    );
+    ensureTaskFilesDir(id);
+    res.json({ success: true, data: result.rows });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: explainTaskError(e) });
+  }
+};
+
+export const uploadTaskFiles = async (req: any, res: Response) => {
+  const { id } = req.params;
+  const userId = req.auth?.userId || 'SYSTEM';
+  const files: Express.Multer.File[] = req.files as Express.Multer.File[];
+
+  if (!files?.length) {
+    return res.status(400).json({ success: false, error: 'No se recibieron archivos.' });
+  }
+
+  try {
+    const inserted: any[] = [];
+    for (const file of files) {
+      const baseFileName = path.basename(file.originalname);
+      const result = await pool.query(
+        `INSERT INTO task_files
+           (task_id, original_name, stored_name, mimetype, size_bytes, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING *`,
+        [id, baseFileName, file.filename, file.mimetype, file.size, userId]
+      );
+      inserted.push(result.rows[0]);
+    }
+
+    await logActivityForReq(req, `Adjuntos añadidos a actuación`, 'TASK', id);
+    res.status(201).json({ success: true, data: inserted });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: explainTaskError(e) });
+  }
+};
+
+export const updateTaskFileMetadata = async (req: any, res: Response) => {
+  const { id, fileId } = req.params;
+  const { document_name, attachment_type } = req.body || {};
+  try {
+    const result = await pool.query(
+      `UPDATE task_files
+       SET document_name = $1,
+           attachment_type = $2,
+           updated_at = NOW()
+       WHERE id = $3 AND task_id = $4
+       RETURNING *`,
+      [
+        document_name?.trim() || null,
+        attachment_type?.trim() || 'Sin clasificar',
+        fileId,
+        id,
+      ]
+    );
+    if (!result.rows.length) {
+      return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
+    }
+    res.json({ success: true, data: result.rows[0] });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: explainTaskError(e) });
+  }
+};
+
+export const downloadTaskFile = async (req: any, res: Response) => {
+  const { id, fileId } = req.params;
+  try {
+    const fileRow = await getTaskFileRecord(id, fileId);
+    if (!fileRow) {
+      return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
+    }
+
+    const { stored_name, original_name, mimetype } = fileRow;
+    const filePath = path.join(TASK_FILES_ROOT, id, stored_name);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, error: 'Archivo no encontrado en disco.' });
+    }
+
+    res.setHeader('Content-Type', mimetype || 'application/octet-stream');
+    const asciiName = original_name.replace(/[^\x20-\x7E]/g, '_').replace(/"/g, '\\"');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(original_name)}`
+    );
+    res.sendFile(filePath);
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: explainTaskError(e) });
+  }
+};
+
+export const previewTaskWordAsPdf = async (req: any, res: Response) => {
+  const { id, fileId } = req.params;
+  try {
+    const fileRow = await getTaskFileRecord(id, fileId);
+    if (!fileRow) {
+      return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
+    }
+
+    const { stored_name, original_name, mimetype } = fileRow;
+    const ext = path.extname(original_name || stored_name || '').toLowerCase();
+    const isWord =
+      mimetype?.includes('word') ||
+      mimetype?.includes('wordprocessingml') ||
+      ext === '.doc' ||
+      ext === '.docx';
+
+    if (!isWord) {
+      return res.status(400).json({ success: false, error: 'Este archivo no es Word.' });
+    }
+
+    const sourcePath = path.join(TASK_FILES_ROOT, id, stored_name);
+    if (!fs.existsSync(sourcePath)) {
+      return res.status(404).json({ success: false, error: 'Archivo no encontrado en disco.' });
+    }
+
+    const srcStat = fs.statSync(sourcePath);
+    const cacheKey = Buffer.from(`task:${id}:${fileId}:${sourcePath}`).toString('hex').slice(0, 32);
+    const tempDir = path.join(TEMP_ROOT, `task_word_preview_${cacheKey}`);
+    if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+    const outputPdf = path.join(tempDir, `preview.pdf`);
+
+    if (fs.existsSync(outputPdf)) {
+      const pdfStat = fs.statSync(outputPdf);
+      if (pdfStat.mtimeMs >= srcStat.mtimeMs) {
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent((original_name || 'preview').replace(/\.(docx?|DOCX?)$/, '.pdf'))}"`);
+        return res.sendFile(outputPdf);
+      }
+    }
+
+    try { if (fs.existsSync(outputPdf)) fs.unlinkSync(outputPdf); } catch (_) {}
+
+    const converterScript = path.join(tempDir, `task_word_to_pdf_${cacheKey}.py`);
+    const converterCode = `import sys, os, subprocess, shutil
+
+source_path = sys.argv[1]
+output_pdf = sys.argv[2]
+converted = False
+
+def convert_with_word_com(src, out_pdf):
+    import win32com.client
+    word = win32com.client.Dispatch("Word.Application")
+    word.Visible = False
+    word.DisplayAlerts = 0
+    doc = None
+    try:
+        doc = word.Documents.Open(src, False, True)
+        doc.SaveAs(out_pdf, FileFormat=17)
+    finally:
+        if doc is not None:
+            try: doc.Close(False)
+            except Exception: pass
+        try: word.Quit()
+        except Exception: pass
+
+try:
+    convert_with_word_com(source_path, output_pdf)
+    if os.path.exists(output_pdf):
+        converted = True
+except Exception:
+    pass
+
+if not converted:
+    try:
+        src_esc = source_path.replace("'", "''")
+        out_esc = output_pdf.replace("'", "''")
+        ps_cmd = (
+            "$ErrorActionPreference='Stop';"
+            "$w=New-Object -ComObject Word.Application;"
+            "$w.Visible=$false;$w.DisplayAlerts=0;"
+            "$d=$w.Documents.Open('" + src_esc + "',$false,$true);"
+            "$d.SaveAs('" + out_esc + "',17);"
+            "$d.Close($false);$w.Quit()"
+        )
+        r = subprocess.run(
+            ['powershell', '-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', ps_cmd],
+            timeout=90, capture_output=True
+        )
+        if r.returncode == 0 and os.path.exists(output_pdf):
+            converted = True
+    except Exception:
+        pass
+
+if not converted:
+    soffice_paths = [
+        r'C:\\Program Files\\LibreOffice\\program\\soffice.exe',
+        r'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe',
+        'soffice',
+    ]
+    out_dir = os.path.dirname(output_pdf)
+    for soffice in soffice_paths:
+        try:
+            try:
+                candidate = os.path.join(out_dir, os.path.splitext(os.path.basename(source_path))[0] + '.pdf')
+                if os.path.exists(candidate):
+                    os.remove(candidate)
+            except Exception:
+                pass
+            r = subprocess.run(
+                [soffice, '--headless', '--convert-to', 'pdf', '--outdir', out_dir, source_path],
+                timeout=90, capture_output=True
+            )
+            candidate = os.path.join(out_dir, os.path.splitext(os.path.basename(source_path))[0] + '.pdf')
+            if os.path.exists(candidate):
+                if candidate != output_pdf:
+                    shutil.move(candidate, output_pdf)
+                if os.path.exists(output_pdf):
+                    converted = True
+                    break
+        except Exception:
+            continue
+
+if converted and os.path.exists(output_pdf):
+    print('OK')
+    sys.exit(0)
+print('FAILED')
+sys.exit(1)
+`;
+
+    fs.writeFileSync(converterScript, converterCode, 'utf-8');
+    const { execFile } = require('child_process');
+    const pythonCmds = process.platform === 'win32' ? ['python', 'py', 'python3'] : ['python3', 'python'];
+
+    const tryPython = (index: number) => {
+      if (index >= pythonCmds.length) {
+        try { fs.unlinkSync(converterScript); } catch (_) {}
+        return res.status(503).json({
+          success: false,
+          error: 'No se pudo convertir el documento Word a PDF para la vista previa.',
+        });
+      }
+      execFile(pythonCmds[index], [converterScript, sourcePath, outputPdf], { timeout: 120000 }, (err: any) => {
+        const success = !err && fs.existsSync(outputPdf);
+        if (!success) return tryPython(index + 1);
+        try { fs.unlinkSync(converterScript); } catch (_) {}
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent((original_name || 'preview').replace(/\.(docx?|DOCX?)$/, '.pdf'))}"`);
+        return res.sendFile(outputPdf);
+      });
+    };
+
+    return tryPython(0);
+  } catch (e: any) {
+    return res.status(500).json({ success: false, error: explainTaskError(e) });
+  }
+};
+
+export const previewTaskWordAsHtml = async (req: any, res: Response) => {
+  const { id, fileId } = req.params;
+  try {
+    const fileRow = await getTaskFileRecord(id, fileId);
+    if (!fileRow) {
+      return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
+    }
+
+    const { stored_name, original_name, mimetype } = fileRow;
+    const ext = path.extname(original_name || stored_name || '').toLowerCase();
+    const isWord =
+      mimetype?.includes('word') ||
+      mimetype?.includes('wordprocessingml') ||
+      ext === '.doc' ||
+      ext === '.docx';
+
+    if (!isWord) {
+      return res.status(400).json({ success: false, error: 'Este archivo no es Word.' });
+    }
+
+    const filePath = path.join(TASK_FILES_ROOT, id, stored_name);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, error: 'Archivo no encontrado en disco.' });
+    }
+
+    const tempDir = TEMP_ROOT;
+    if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+    const scriptPath = path.join(tempDir, `task_preview_${fileId}.py`);
+    const normalizedPath = filePath.replace(/\\/g, '/');
+
+    const pythonScript = `#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+import sys, io
+from zipfile import ZipFile
+from xml.etree import ElementTree as ET
+
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
+
+def esc(s):
+    return str(s).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+
+try:
+    file_path = sys.argv[1] if len(sys.argv) > 1 else '${normalizedPath}'
+    with ZipFile(file_path, 'r') as docx:
+        xml_content = docx.read('word/document.xml').decode('utf-8')
+        root = ET.fromstring(xml_content.encode('utf-8'))
+        ns = {'w': W_NS}
+        paragraphs = []
+        for para in root.findall('.//w:p', ns):
+            parts = []
+            for t in para.findall('.//w:t', ns):
+                if t.text:
+                    parts.append(t.text)
+            text = ''.join(parts).strip()
+            if text:
+                paragraphs.append('<p style="margin:0 0 14px;line-height:1.65;color:#334155;font-size:15px;">' + esc(text) + '</p>')
+
+        html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{font-family:Calibri,Arial,sans-serif;background:#f8fafc;margin:0;padding:24px;color:#0f172a}.sheet{background:white;border:1px solid #e2e8f0;border-radius:18px;box-shadow:0 10px 35px rgba(15,23,42,.08);padding:28px;max-width:980px;margin:0 auto}.tag{display:inline-block;margin-bottom:18px;padding:6px 10px;border-radius:999px;background:#eff6ff;color:#2563eb;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}h1{font-size:20px;margin:0 0 18px}</style></head><body><div class="sheet"><span class="tag">Vista previa Word</span><h1>' + esc('${stored_name}') + '</h1>' + ''.join(paragraphs if paragraphs else ['<p style="color:#94a3b8">No se ha podido extraer texto legible de este documento.</p>']) + '</div></body></html>'
+        print(html)
+except Exception as e:
+    print('<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;padding:24px;color:#b91c1c"><h3>Error al generar la vista previa</h3><p>' + esc(str(e)) + '</p></body></html>')
+`;
+
+    fs.writeFileSync(scriptPath, pythonScript);
+    const { execFile } = require('child_process');
+    const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+    execFile(pythonCmd, [scriptPath, filePath], { timeout: 15000, maxBuffer: 10 * 1024 * 1024 }, (error: any, stdout: any) => {
+      try { fs.unlinkSync(scriptPath); } catch (_) {}
+      if (error) {
+        return res.status(500).json({ success: false, error: 'No se pudo generar la vista previa HTML del documento Word.' });
+      }
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.send(String(stdout || ''));
+    });
+  } catch (e: any) {
+    return res.status(500).json({ success: false, error: explainTaskError(e) });
+  }
+};
+
+export const previewTaskExcelAsHtml = async (req: any, res: Response) => {
+  const { id, fileId } = req.params;
+  try {
+    const fileRow = await getTaskFileRecord(id, fileId);
+    if (!fileRow) {
+      return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
+    }
+    const { original_name } = fileRow;
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(`<!DOCTYPE html><html><head><meta charset="utf-8" /><style>
+      body{margin:0;background:#f8fafc;font-family:Inter,Segoe UI,Arial,sans-serif;color:#0f172a}
+      .box{max-width:520px;margin:48px auto;background:white;border:1px solid #e2e8f0;border-radius:20px;padding:28px 30px;box-shadow:0 12px 40px rgba(15,23,42,.08)}
+      .tag{display:inline-block;padding:4px 10px;border-radius:999px;background:#dcfce7;color:#166534;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+      h1{font-size:20px;margin:16px 0 8px}
+      p{font-size:14px;line-height:1.6;color:#475569;margin:0 0 10px}
+      code{display:block;margin-top:14px;padding:12px 14px;border-radius:12px;background:#f8fafc;border:1px solid #e2e8f0;color:#0f172a;font-size:13px}
+    </style></head><body><div class="box">
+      <span class="tag">Vista previa limitada</span>
+      <h1>Archivo de hoja de cálculo</h1>
+      <p>La actuación contiene un archivo Excel, pero esta previsualización todavía no está disponible en este panel.</p>
+      <p>Puedes seguir gestionando el adjunto desde la actuación y descargarlo solo si de verdad lo necesitas.</p>
+      <code>${String(original_name || 'Archivo Excel').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code>
+    </div></body></html>`);
+  } catch (e: any) {
+    return res.status(500).json({ success: false, error: explainTaskError(e) });
+  }
+};
+
+export const deleteTaskFile = async (req: any, res: Response) => {
+  const { id, fileId } = req.params;
+  try {
+    const result = await pool.query(
+      `DELETE FROM task_files
+       WHERE id = $1 AND task_id = $2
+       RETURNING stored_name, original_name`,
+      [fileId, id]
+    );
+    if (!result.rows.length) {
+      return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
+    }
+
+    const { stored_name, original_name } = result.rows[0];
+    const filePath = path.join(TASK_FILES_ROOT, id, stored_name);
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+
+    await logActivityForReq(req, `Adjunto eliminado de actuación: ${original_name || stored_name}`, 'TASK', id);
+    res.json({ success: true });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: explainTaskError(e) });
+  }
+};
+
 export const updateTask = async (req: any, res: Response) => {
   const { id } = req.params;
   const { titulo, descripcion, plazo, fecha_aviso, estado, prioridad, expediente, tipo, juzgado, num_proc, importe, notas, etapa } = req.body;

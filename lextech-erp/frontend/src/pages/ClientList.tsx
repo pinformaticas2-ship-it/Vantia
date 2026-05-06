@@ -14,13 +14,14 @@ import {
   Star, Palette, Copy, GitMerge, CreditCard, MessageSquare,
   RotateCcw, Bell, ArrowRight, Settings, Trash2,
   ChevronRight, Bug, History, TrendingUp, Pencil, Smartphone, ScanLine,
-  FileCode2, FileText, Download, ArrowLeft, ChevronsLeft, ChevronsRight, CheckCircle2,
+  FileCode2, FileText, Download, ArrowLeft, ChevronsLeft, ChevronsRight, CheckCircle2, Check,
 } from "lucide-react";
 import { safeJson } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
 import { AtajosButton } from "../components/AtajosSystem";
 import AdjuntosModal from "../components/AdjuntosModal";
 import { EtapaSelect } from "../components/EtapaSelect";
+import ColumnVisibilityModal from "../components/ColumnVisibilityModal";
 
 // ── Helpers ───────────────────────────────────────────────────
 const statusColor: Record<string, string> = {
@@ -195,6 +196,120 @@ const DEFAULT_VISIBLE_CLIENT_COLUMNS: Record<ClientListColumnKey, boolean> = CLI
   acc[column.key] = column.defaultVisible;
   return acc;
 }, {} as Record<ClientListColumnKey, boolean>);
+
+const CLIENT_ROW_COLOR_STYLES: Record<string, {
+  row: string;
+  rowSelected: string;
+  nameSelected: string;
+  number: string;
+  numberSelected: string;
+  avatar: string;
+  avatarSelected: string;
+  card: string;
+  cardSelected: string;
+  cardNameSelected: string;
+  multi: string;
+  multiSelected: string;
+}> = {
+  ninguno: {
+    row: "hover:bg-slate-50/80",
+    rowSelected: "bg-red-50 border-l-2 border-l-red-500",
+    nameSelected: "text-red-700",
+    number: "text-slate-400",
+    numberSelected: "text-red-400",
+    avatar: "bg-slate-100 text-slate-500",
+    avatarSelected: "bg-red-200 text-red-700",
+    card: "border-slate-150 bg-white hover:border-slate-300 hover:shadow-sm",
+    cardSelected: "border-red-300 bg-red-50 shadow-md shadow-red-100",
+    cardNameSelected: "text-red-700",
+    multi: "border-slate-200 bg-white hover:border-red-200 hover:shadow-sm hover:bg-slate-50/60",
+    multiSelected: "border-red-400 bg-red-50 shadow-md shadow-red-100 scale-[0.98]",
+  },
+  azul: {
+    row: "bg-sky-50/45 hover:bg-sky-100/70",
+    rowSelected: "bg-sky-100 border-l-2 border-l-sky-500",
+    nameSelected: "text-sky-900",
+    number: "text-sky-500",
+    numberSelected: "text-sky-700",
+    avatar: "bg-sky-100 text-sky-600",
+    avatarSelected: "bg-sky-200 text-sky-800",
+    card: "border-sky-200 bg-sky-50/60 hover:border-sky-300 hover:shadow-sm",
+    cardSelected: "border-sky-400 bg-sky-100 shadow-md shadow-sky-100",
+    cardNameSelected: "text-sky-900",
+    multi: "border-sky-200 bg-sky-50/50 hover:border-sky-300 hover:shadow-sm",
+    multiSelected: "border-sky-400 bg-sky-100 shadow-md shadow-sky-100 scale-[0.98]",
+  },
+  verde: {
+    row: "bg-emerald-50/45 hover:bg-emerald-100/70",
+    rowSelected: "bg-emerald-100 border-l-2 border-l-emerald-500",
+    nameSelected: "text-emerald-900",
+    number: "text-emerald-500",
+    numberSelected: "text-emerald-700",
+    avatar: "bg-emerald-100 text-emerald-600",
+    avatarSelected: "bg-emerald-200 text-emerald-800",
+    card: "border-emerald-200 bg-emerald-50/60 hover:border-emerald-300 hover:shadow-sm",
+    cardSelected: "border-emerald-400 bg-emerald-100 shadow-md shadow-emerald-100",
+    cardNameSelected: "text-emerald-900",
+    multi: "border-emerald-200 bg-emerald-50/50 hover:border-emerald-300 hover:shadow-sm",
+    multiSelected: "border-emerald-400 bg-emerald-100 shadow-md shadow-emerald-100 scale-[0.98]",
+  },
+  amarillo: {
+    row: "bg-amber-50/55 hover:bg-amber-100/70",
+    rowSelected: "bg-amber-100 border-l-2 border-l-amber-500",
+    nameSelected: "text-amber-900",
+    number: "text-amber-500",
+    numberSelected: "text-amber-700",
+    avatar: "bg-amber-100 text-amber-700",
+    avatarSelected: "bg-amber-200 text-amber-900",
+    card: "border-amber-200 bg-amber-50/60 hover:border-amber-300 hover:shadow-sm",
+    cardSelected: "border-amber-400 bg-amber-100 shadow-md shadow-amber-100",
+    cardNameSelected: "text-amber-900",
+    multi: "border-amber-200 bg-amber-50/50 hover:border-amber-300 hover:shadow-sm",
+    multiSelected: "border-amber-400 bg-amber-100 shadow-md shadow-amber-100 scale-[0.98]",
+  },
+  naranja: {
+    row: "bg-orange-50/55 hover:bg-orange-100/70",
+    rowSelected: "bg-orange-100 border-l-2 border-l-orange-500",
+    nameSelected: "text-orange-900",
+    number: "text-orange-500",
+    numberSelected: "text-orange-700",
+    avatar: "bg-orange-100 text-orange-700",
+    avatarSelected: "bg-orange-200 text-orange-900",
+    card: "border-orange-200 bg-orange-50/60 hover:border-orange-300 hover:shadow-sm",
+    cardSelected: "border-orange-400 bg-orange-100 shadow-md shadow-orange-100",
+    cardNameSelected: "text-orange-900",
+    multi: "border-orange-200 bg-orange-50/50 hover:border-orange-300 hover:shadow-sm",
+    multiSelected: "border-orange-400 bg-orange-100 shadow-md shadow-orange-100 scale-[0.98]",
+  },
+  rojo: {
+    row: "bg-rose-50/55 hover:bg-rose-100/70",
+    rowSelected: "bg-rose-100 border-l-2 border-l-rose-500",
+    nameSelected: "text-rose-900",
+    number: "text-rose-500",
+    numberSelected: "text-rose-700",
+    avatar: "bg-rose-100 text-rose-700",
+    avatarSelected: "bg-rose-200 text-rose-900",
+    card: "border-rose-200 bg-rose-50/60 hover:border-rose-300 hover:shadow-sm",
+    cardSelected: "border-rose-400 bg-rose-100 shadow-md shadow-rose-100",
+    cardNameSelected: "text-rose-900",
+    multi: "border-rose-200 bg-rose-50/50 hover:border-rose-300 hover:shadow-sm",
+    multiSelected: "border-rose-400 bg-rose-100 shadow-md shadow-rose-100 scale-[0.98]",
+  },
+  morado: {
+    row: "bg-violet-50/55 hover:bg-violet-100/70",
+    rowSelected: "bg-violet-100 border-l-2 border-l-violet-500",
+    nameSelected: "text-violet-900",
+    number: "text-violet-500",
+    numberSelected: "text-violet-700",
+    avatar: "bg-violet-100 text-violet-700",
+    avatarSelected: "bg-violet-200 text-violet-900",
+    card: "border-violet-200 bg-violet-50/60 hover:border-violet-300 hover:shadow-sm",
+    cardSelected: "border-violet-400 bg-violet-100 shadow-md shadow-violet-100",
+    cardNameSelected: "text-violet-900",
+    multi: "border-violet-200 bg-violet-50/50 hover:border-violet-300 hover:shadow-sm",
+    multiSelected: "border-violet-400 bg-violet-100 shadow-md shadow-violet-100 scale-[0.98]",
+  },
+};
 
 const CLIENT_EXPORT_STORAGE_KEY = "client-export-templates-v1";
 
@@ -440,7 +555,7 @@ function ToolBtn({
       disabled={disabled}
       title={label}
       className={`
-        flex items-center gap-1.5 whitespace-nowrap px-3.5 py-2 rounded-xl text-xs font-semibold transition-all active:scale-[0.98] shadow-sm
+        flex items-center gap-1.5 whitespace-nowrap px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all active:scale-[0.98] shadow-sm
         ${disabled
           ? "text-slate-300 cursor-not-allowed bg-white border border-slate-100"
           : primary
@@ -493,15 +608,15 @@ function DropdownBtn({
         disabled={disabled}
         title={label}
         className={`
-          flex items-center gap-0 rounded-xl text-xs font-semibold transition-all active:scale-[0.98] border overflow-hidden shadow-sm
+          flex items-center gap-0 rounded-lg text-[11px] font-semibold transition-all active:scale-[0.98] border overflow-hidden shadow-sm
           ${disabled ? "text-slate-300 cursor-not-allowed border-slate-100 bg-white" : "text-slate-600 bg-white hover:bg-slate-50 border-slate-200"}
         `}
       >
-        <span className="flex items-center gap-1.5 px-3 py-2">
+        <span className="flex items-center gap-1.5 px-2.5 py-1.5">
           <Icon size={13} />
           <span className="hidden sm:inline whitespace-nowrap">{label}</span>
         </span>
-        <span className={`px-1.5 py-2 border-l ${disabled ? "border-slate-100" : "border-slate-200 hover:bg-slate-100"}`}>
+        <span className={`px-1.5 py-1.5 border-l ${disabled ? "border-slate-100" : "border-slate-200 hover:bg-slate-100"}`}>
           <ChevronDownSmall size={10} />
         </span>
       </button>
@@ -933,7 +1048,7 @@ export default function ClientList() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());    // vista multiselect
   const [showSelectionDropdown, setShowSelectionDropdown] = useState(false); // dropdown lista seleccionados
   const [showOpciones, setShowOpciones] = useState(false);
-  const [showColumnSelector, setShowColumnSelector] = useState(false);
+  const [showColumnModal, setShowColumnModal] = useState(false);
   const opcionesRef = useRef<HTMLDivElement>(null);
   const [showAdjuntos, setShowAdjuntos] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<Record<ClientListColumnKey, boolean>>(() => {
@@ -952,7 +1067,6 @@ export default function ClientList() {
     function outside(e: MouseEvent) {
       if (opcionesRef.current && !opcionesRef.current.contains(e.target as Node)) {
         setShowOpciones(false);
-        setShowColumnSelector(false);
       }
     }
     document.addEventListener("mousedown", outside);
@@ -963,19 +1077,48 @@ export default function ClientList() {
     localStorage.setItem("client-list-visible-columns", JSON.stringify(visibleColumns));
   }, [visibleColumns]);
 
-  const toggleColumnVisibility = useCallback((key: ClientListColumnKey) => {
-    setVisibleColumns(prev => {
-      const nextVisible = !prev[key];
-      const visibleCount = Object.values(prev).filter(Boolean).length;
-      if (!nextVisible && visibleCount <= 1) return prev;
-      return { ...prev, [key]: nextVisible };
-    });
-  }, []);
-
   const visibleColumnCount = useMemo(() => {
     const base = CLIENT_LIST_COLUMNS.filter(column => visibleColumns[column.key]).length;
     return base + 1; // columna de acción final
   }, [visibleColumns]);
+  const clientAvailableColumnItems = useMemo(
+    () => CLIENT_LIST_COLUMNS.filter((column) => !visibleColumns[column.key]).map((column) => ({ key: column.key, label: column.label })),
+    [visibleColumns]
+  );
+  const clientVisibleColumnItems = useMemo(
+    () => CLIENT_LIST_COLUMNS.filter((column) => visibleColumns[column.key]).map((column) => ({ key: column.key, label: column.label })),
+    [visibleColumns]
+  );
+  const moveClientColumnsToVisible = useCallback((keys: string[]) => {
+    setVisibleColumns((prev) => {
+      const next = { ...prev };
+      keys.forEach((key) => {
+        next[key as ClientListColumnKey] = true;
+      });
+      return next;
+    });
+  }, []);
+  const moveClientColumnsToAvailable = useCallback((keys: string[]) => {
+    setVisibleColumns((prev) => {
+      const next = { ...prev };
+      keys.forEach((key) => {
+        next[key as ClientListColumnKey] = false;
+      });
+      return next;
+    });
+  }, []);
+  const showAllClientColumns = useCallback(() => {
+    setVisibleColumns(CLIENT_LIST_COLUMNS.reduce((acc, column) => {
+      acc[column.key] = true;
+      return acc;
+    }, {} as Record<ClientListColumnKey, boolean>));
+  }, []);
+  const moveAllClientColumnsToAvailable = useCallback(() => {
+    setVisibleColumns(CLIENT_LIST_COLUMNS.reduce((acc, column) => {
+      acc[column.key] = false;
+      return acc;
+    }, {} as Record<ClientListColumnKey, boolean>));
+  }, []);
   const [refreshSpin, setRefreshSpin] = useState(false);                     // animación refresco
   const [bajaConfirm, setBajaConfirm] = useState(false);                     // modal confirmar baja
   const [bajaLoading, setBajaLoading] = useState(false);                     // spinner baja
@@ -1128,6 +1271,29 @@ export default function ClientList() {
 
   // ── Acciones toolbar ───────────────────────────────────────
   const selectedClient = useMemo(() => clients.find(c => c.id === selected), [clients, selected]);
+  const assignClientColor = useCallback(async (color: string) => {
+    if (!selected || !selectedClient) return;
+    try {
+      const token = await getToken({ skipCache: true });
+      const r = await fetch(`/api/entities/${selected}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ color }),
+      });
+      const j = await safeJson(r);
+      if (!r.ok || j?.success === false) {
+        throw new Error(j?.error || "No se pudo asignar el color al cliente.");
+      }
+      const updatedColor = j?.data?.color || color;
+      setClients((prev) => prev.map((client) => client.id === selected ? { ...client, color: updatedColor } : client));
+      setShowOpciones(false);
+    } catch (e: any) {
+      alert(e?.message || "No se pudo asignar el color al cliente.");
+    }
+  }, [getToken, selected, selectedClient]);
 
   // ── Cambio de vista ────────────────────────────────────────
   const switchView = (mode: ViewMode) => {
@@ -1764,6 +1930,19 @@ export default function ClientList() {
         getToken={getToken}
       />
     )}
+    <ColumnVisibilityModal
+      open={showColumnModal}
+      title="Modificar columnas del listado"
+      sourceLabel="Clientes"
+      targetLabel="Columnas visibles"
+      availableItems={clientAvailableColumnItems}
+      visibleItems={clientVisibleColumnItems}
+      onMoveToVisible={moveClientColumnsToVisible}
+      onMoveToAvailable={moveClientColumnsToAvailable}
+      onMoveAllToVisible={showAllClientColumns}
+      onMoveAllToAvailable={moveAllClientColumnsToAvailable}
+      onClose={() => setShowColumnModal(false)}
+    />
     <div className="flex flex-col gap-0 animate-in fade-in duration-300" style={{ height: "calc(100vh - 96px)" }}>
 
       {/* ── CABECERA ─────────────────────────────────────────── */}
@@ -1783,7 +1962,7 @@ export default function ClientList() {
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm flex flex-col overflow-hidden flex-1 min-h-0">
 
         {/* ── BARRA DE ACCIONES ────────────────────────────────── */}
-        <div className="flex items-center gap-1.5 px-3 py-3 border-b border-slate-100 bg-slate-50/80 flex-wrap">
+        <div className="flex items-center gap-1 px-2.5 py-2 border-b border-slate-100 bg-slate-50/80 flex-wrap">
 
           {/* ─ Alta ─ */}
           <AltaOptionsBtn
@@ -1952,66 +2131,29 @@ export default function ClientList() {
           <div className="relative" ref={opcionesRef}>
             <button
               onClick={() => setShowOpciones(v => !v)}
-              className={`flex items-center gap-1.5 whitespace-nowrap px-3 py-2 rounded-xl text-xs font-semibold transition-all shadow-sm border ${showOpciones ? "bg-red-50 border-red-300 text-red-700" : "text-slate-600 hover:bg-slate-50 border-slate-200 bg-white"}`}>
+              className={`flex items-center gap-1.5 whitespace-nowrap px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all shadow-sm border ${showOpciones ? "bg-red-50 border-red-300 text-red-700" : "text-slate-600 hover:bg-slate-50 border-slate-200 bg-white"}`}>
               <MoreHorizontal size={13} /> Opciones <ChevronDown size={10} />
             </button>
             {showOpciones && (
-              <div className="absolute right-0 top-full mt-2 z-50 w-[290px] max-h-[78vh] overflow-y-auto overscroll-contain bg-white border border-slate-200 rounded-2xl shadow-[0_24px_60px_rgba(15,23,42,0.18)] py-1.5">
+              <div className="absolute right-0 top-full mt-2 z-50 w-[290px] bg-white border border-slate-200 rounded-2xl shadow-[0_24px_60px_rgba(15,23,42,0.18)] py-1.5 overflow-visible">
 
                 {/* Grupo 1 */}
-                <button onClick={() => { openExportModal(); setShowOpciones(false); }}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                  <FileSpreadsheet size={12} className="text-slate-400" /> Excel
-                </button>
-                <button onClick={() => { selected && setBajaConfirm(true); setShowOpciones(false); }}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                  <UserMinus size={12} className="text-slate-400" /> Baja
-                </button>
-                <button onClick={() => { selected && selectedClient && navigate(`/dashboard/clientes/${selected}/edit`); setShowOpciones(false); }}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                  <Pencil size={12} className="text-slate-400" /> Modificar
-                </button>
                 <button onClick={() => { alert("Seleccionar opciones favoritas"); setShowOpciones(false); }}
                   className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
                   <Star size={12} className="text-slate-400" /> Seleccionar Opciones Favoritas
                 </button>
                 <div className="relative">
                   <button
-                    onClick={() => setShowColumnSelector(v => !v)}
-                    className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors"
+                    onClick={() => {
+                      setShowColumnModal(true);
+                      setShowOpciones(false);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors"
                   >
                     <span className="flex items-center gap-2.5">
                       <LayoutList size={12} className="text-slate-400" /> Elegir columnas
                     </span>
-                    <ChevronRight size={12} className={`text-slate-400 transition-transform ${showColumnSelector ? "rotate-90" : ""}`} />
                   </button>
-                  {showColumnSelector && (
-                    <div className="mx-2 mb-2 rounded-xl border border-slate-200 bg-slate-50 p-2">
-                      <p className="sticky top-0 z-[1] px-1 pb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400 bg-slate-50">Columnas visibles</p>
-                      <div className="max-h-[52vh] space-y-1 overflow-y-auto pr-1">
-                        {CLIENT_LIST_COLUMNS.map((column) => {
-                          const checked = visibleColumns[column.key];
-                          const disabled = checked && Object.values(visibleColumns).filter(Boolean).length <= 1;
-                          return (
-                            <button
-                              key={column.key}
-                              type="button"
-                              onClick={() => toggleColumnVisibility(column.key)}
-                              disabled={disabled}
-                              className={`flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-xs transition-colors ${
-                                disabled
-                                  ? "cursor-not-allowed text-slate-300"
-                                  : "text-slate-700 hover:bg-white hover:text-red-700"
-                              }`}
-                            >
-                              <span>{column.label}</span>
-                              {checked ? <CheckSquare size={13} className="text-red-600" /> : <Square size={13} className="text-slate-400" />}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 <div className="h-px bg-slate-100 my-1.5" />
@@ -2022,7 +2164,7 @@ export default function ClientList() {
                     <span className="flex items-center gap-2.5"><ExternalLink size={12} className="text-slate-400" /> Ir a</span>
                     <ChevronRight size={11} className="text-slate-300" />
                   </button>
-                  <div className="absolute left-full top-0 ml-1 z-50 bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[180px] py-1.5 hidden group-hover/ira:block">
+                  <div className="absolute left-full -ml-px top-[-1px] z-50 bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[180px] py-1.5 hidden group-hover/ira:block">
                     <button onClick={() => { selected && navigate(`/dashboard/clientes/${selected}`); setShowOpciones(false); }}
                       className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
                       <Users size={12} className="text-slate-400" /> Ir a Ficha Cliente
@@ -2038,10 +2180,38 @@ export default function ClientList() {
                   </div>
                 </div>
 
-                <button onClick={() => { alert("Asignar color al cliente"); setShowOpciones(false); }}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                  <Palette size={12} className="text-slate-400" /> Asignar Color
-                </button>
+                <div className="relative group/color">
+                  <button className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
+                    <span className="flex items-center gap-2.5">
+                      <Palette size={12} className="text-slate-400" /> Asignar Color
+                    </span>
+                    <ChevronRight size={11} className="text-slate-300" />
+                  </button>
+                  <div className="absolute right-full -mr-px top-[-1px] z-50 hidden min-w-[190px] rounded-xl border border-slate-200 bg-white py-1.5 shadow-2xl group-hover/color:block">
+                    {[
+                      { value: "ninguno", label: "Sin color", dot: "bg-slate-300" },
+                      { value: "azul", label: "Azul suave", dot: "bg-sky-400" },
+                      { value: "verde", label: "Verde suave", dot: "bg-emerald-400" },
+                      { value: "amarillo", label: "Amarillo suave", dot: "bg-amber-400" },
+                      { value: "naranja", label: "Naranja suave", dot: "bg-orange-400" },
+                      { value: "rojo", label: "Rojo suave", dot: "bg-rose-400" },
+                      { value: "morado", label: "Morado suave", dot: "bg-violet-400" },
+                    ].map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => assignClientColor(option.value)}
+                        className="flex w-full items-center justify-between gap-2.5 px-3.5 py-2 text-left text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-700"
+                      >
+                        <span className="flex items-center gap-2.5">
+                          <span className={`h-2.5 w-2.5 rounded-full ${option.dot}`} />
+                          {option.label}
+                        </span>
+                        {(selectedClient?.color || "ninguno") === option.value && <Check size={11} className="text-red-500" />}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
                 <div className="h-px bg-slate-100 my-1.5" />
 
@@ -2075,31 +2245,13 @@ export default function ClientList() {
                   <Smartphone size={12} className="text-slate-400" /> Enviar SMS
                 </button>
 
-                {/* Depurar → submenú */}
-                <div className="relative group/dep">
-                  <button className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                    <span className="flex items-center gap-2.5"><Bug size={12} className="text-slate-400" /> Depurar</span>
-                    <ChevronRight size={11} className="text-slate-300" />
-                  </button>
-                  <div className="absolute left-full top-0 ml-1 z-50 bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[180px] py-1.5 hidden group-hover/dep:block">
-                    <button onClick={() => console.log("Cliente:", selectedClient)}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                      <Bug size={12} className="text-slate-400" /> Ver en consola
-                    </button>
-                    <button onClick={() => alert(JSON.stringify(selectedClient, null, 2))}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                      <ClipboardList size={12} className="text-slate-400" /> Mostrar datos crudos
-                    </button>
-                  </div>
-                </div>
-
                 {/* Versión Antigua → submenú */}
                 <div className="relative group/ver">
                   <button className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
                     <span className="flex items-center gap-2.5"><History size={12} className="text-slate-400" /> Versión Antigua</span>
                     <ChevronRight size={11} className="text-slate-300" />
                   </button>
-                  <div className="absolute left-full top-0 ml-1 z-50 bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[180px] py-1.5 hidden group-hover/ver:block">
+                  <div className="absolute left-full -ml-px top-[-1px] z-50 bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[180px] py-1.5 hidden group-hover/ver:block">
                     <button onClick={() => alert("Ver historial de versiones")}
                       className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
                       <History size={12} className="text-slate-400" /> Ver historial versiones
@@ -2110,18 +2262,6 @@ export default function ClientList() {
                     </button>
                   </div>
                 </div>
-
-                <div className="h-px bg-slate-100 my-1.5" />
-
-                {/* Grupo 6 */}
-                <button onClick={() => { alert("Recalcular intereses"); setShowOpciones(false); }}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                  <TrendingUp size={12} className="text-slate-400" /> Recalcular Intereses
-                </button>
-                <button onClick={() => { fetchClients(false); setShowOpciones(false); }}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                  <Activity size={12} className="text-slate-400" /> Recalcular Indicadores
-                </button>
 
               </div>
             )}
@@ -2344,22 +2484,23 @@ export default function ClientList() {
                   </tr>
                 ) : filtered.map((client) => {
                   const isSelected = selected === client.id;
+                  const colorStyle = CLIENT_ROW_COLOR_STYLES[client.color || "ninguno"] || CLIENT_ROW_COLOR_STYLES.ninguno;
                   return (
                     <tr
                       key={client.id}
                       onClick={() => setSelected(isSelected ? null : client.id)}
                       onDoubleClick={() => navigate(`/dashboard/clientes/${client.id}`)}
-                      className={`border-b border-slate-50 cursor-pointer transition-colors group ${isSelected ? "bg-red-50 border-l-2 border-l-red-500" : "hover:bg-slate-50/80"}`}
+                      className={`border-b border-slate-50 cursor-pointer transition-colors group ${isSelected ? colorStyle.rowSelected : colorStyle.row}`}
                     >
-                      {visibleColumns.internal_number && <td className={`pl-4 pr-3 py-3 font-mono text-slate-400 ${isSelected ? "text-red-400" : ""}`}>{client.internal_number || "—"}</td>}
+                      {visibleColumns.internal_number && <td className={`pl-4 pr-3 py-3 font-mono ${isSelected ? colorStyle.numberSelected : colorStyle.number}`}>{client.internal_number || "—"}</td>}
                       {visibleColumns.name && <td className="px-3 py-3">
                         <div className="flex items-center gap-2.5">
                           {client.photo_url
                             ? <img src={client.photo_url} alt="" className="h-9 w-9 rounded-lg object-cover shrink-0 border border-slate-100" />
-                            : <div className={`h-9 w-9 rounded-lg flex items-center justify-center text-sm font-bold shrink-0 ${isSelected ? "bg-red-200 text-red-700" : "bg-slate-100 text-slate-500"}`}>{((client.first_name || "?")[0] || "?").toUpperCase()}</div>
+                            : <div className={`h-9 w-9 rounded-lg flex items-center justify-center text-sm font-bold shrink-0 ${isSelected ? colorStyle.avatarSelected : colorStyle.avatar}`}>{((client.first_name || "?")[0] || "?").toUpperCase()}</div>
                           }
                           <div className="min-w-0">
-                            <p className={`font-semibold leading-tight truncate ${isSelected ? "text-red-700" : "text-slate-800"}`}>{client.first_name} {client.last_name}</p>
+                            <p className={`font-semibold leading-tight truncate ${isSelected ? colorStyle.nameSelected : "text-slate-800"}`}>{client.first_name} {client.last_name}</p>
                             {client.commercial_name && <p className="text-xs text-slate-400 truncate leading-tight">{client.commercial_name}</p>}
                           </div>
                         </div>
@@ -2434,6 +2575,7 @@ export default function ClientList() {
               <div className="space-y-2">
                 {filtered.map((client) => {
                   const isSelected = selected === client.id;
+                  const colorStyle = CLIENT_ROW_COLOR_STYLES[client.color || "ninguno"] || CLIENT_ROW_COLOR_STYLES.ninguno;
                   return (
                     <div
                       key={client.id}
@@ -2441,10 +2583,7 @@ export default function ClientList() {
                       onDoubleClick={() => navigate(`/dashboard/clientes/${client.id}`)}
                       className={`
                         flex items-center gap-4 px-4 py-3 rounded-xl border cursor-pointer transition-all group
-                        ${isSelected
-                          ? "border-red-300 bg-red-50 shadow-md shadow-red-100"
-                          : "border-slate-150 bg-white hover:border-slate-300 hover:shadow-sm"
-                        }
+                        ${isSelected ? colorStyle.cardSelected : colorStyle.card}
                       `}
                     >
                       {/* Avatar grande */}
@@ -2452,8 +2591,7 @@ export default function ClientList() {
                         {client.photo_url
                           ? <img src={client.photo_url} alt="" className="h-11 w-11 rounded-xl object-cover border border-slate-100 shadow-sm" />
                           : (
-                            <div className={`h-11 w-11 rounded-xl flex items-center justify-center text-base font-bold shadow-sm
-                              ${isSelected ? "bg-gradient-to-br from-red-400 to-red-600 text-white" : "bg-gradient-to-br from-slate-200 to-slate-300 text-slate-600"}`}>
+                            <div className={`h-11 w-11 rounded-xl flex items-center justify-center text-base font-bold shadow-sm ${isSelected ? colorStyle.avatarSelected : colorStyle.avatar}`}>
                               {((client.first_name || "?")[0] || "?").toUpperCase()}
                             </div>
                           )
@@ -2462,7 +2600,7 @@ export default function ClientList() {
 
                       {/* Nombre + número */}
                       <div className="w-52 shrink-0">
-                        <p className={`font-bold text-sm leading-tight truncate ${isSelected ? "text-red-700" : "text-slate-800"}`}>
+                        <p className={`font-bold text-sm leading-tight truncate ${isSelected ? colorStyle.cardNameSelected : "text-slate-800"}`}>
                           {client.first_name} {client.last_name}
                         </p>
                         {client.commercial_name && <p className="text-[11px] text-slate-400 truncate">{client.commercial_name}</p>}
@@ -2577,6 +2715,7 @@ export default function ClientList() {
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                 {filtered.map((client) => {
                   const isChecked = selectedIds.has(client.id);
+                  const colorStyle = CLIENT_ROW_COLOR_STYLES[client.color || "ninguno"] || CLIENT_ROW_COLOR_STYLES.ninguno;
                   return (
                     <div
                       key={client.id}
@@ -2584,10 +2723,7 @@ export default function ClientList() {
                       className={`
                         relative flex flex-col items-center gap-2 px-3 pt-4 pb-3 rounded-xl border cursor-pointer
                         transition-all select-none group
-                        ${isChecked
-                          ? "border-red-400 bg-red-50 shadow-md shadow-red-100 scale-[0.98]"
-                          : "border-slate-200 bg-white hover:border-red-200 hover:shadow-sm hover:bg-slate-50/60"
-                        }
+                        ${isChecked ? colorStyle.multiSelected : colorStyle.multi}
                       `}
                     >
                       {/* Checkbox esquina superior derecha */}
@@ -2602,11 +2738,7 @@ export default function ClientList() {
                       {client.photo_url
                         ? <img src={client.photo_url} alt="" className={`h-12 w-12 rounded-2xl object-cover border-2 transition-all ${isChecked ? "border-red-400 shadow-md shadow-red-200" : "border-slate-100"}`} />
                         : (
-                          <div className={`h-12 w-12 rounded-2xl flex items-center justify-center text-lg font-bold transition-all
-                            ${isChecked
-                              ? "bg-gradient-to-br from-red-400 to-red-600 text-white shadow-md shadow-red-200"
-                              : "bg-gradient-to-br from-slate-100 to-slate-200 text-slate-500"
-                            }`}>
+                          <div className={`h-12 w-12 rounded-2xl flex items-center justify-center text-lg font-bold transition-all ${isChecked ? `${colorStyle.avatarSelected} shadow-md` : colorStyle.avatar}`}>
                             {((client.first_name || "?")[0] || "?").toUpperCase()}
                           </div>
                         )
@@ -2614,7 +2746,7 @@ export default function ClientList() {
 
                       {/* Nombre */}
                       <div className="text-center min-w-0 w-full">
-                        <p className={`text-[11px] font-bold leading-tight truncate ${isChecked ? "text-red-700" : "text-slate-800"}`}>
+                        <p className={`text-[11px] font-bold leading-tight truncate ${isChecked ? colorStyle.cardNameSelected : "text-slate-800"}`}>
                           {client.first_name}
                         </p>
                         <p className={`text-[10px] leading-tight truncate ${isChecked ? "text-red-500" : "text-slate-500"}`}>

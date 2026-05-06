@@ -11,12 +11,13 @@ import OpenAI from 'openai';
 import {
   extractZip,
   extractTextFromFile,
+  extractImageOcr,
   cleanupDir,
   renderPdfPagesToImages,
   cleanupRenderedPageImages,
   type DocFile,
 } from '../utils/docExtract';
-import { UPLOADS_ROOT } from '../config/paths';
+import { UPLOADS_ROOT, UPLOADS_CLIENTS_ROOT } from '../config/paths';
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
 const genAI = GEMINI_API_KEY ? new GoogleGenerativeAI(GEMINI_API_KEY) : null;
@@ -91,6 +92,147 @@ function extractNotificadoDate(text?: string | null) {
       if (normalized) return normalized;
     }
   }
+
+  const lines = source
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (!/noti[f1l][i1l]?(?:ca|ci)?[dcl]?[oa]?/i.test(line)) continue;
+
+    const windowText = [line, lines[index + 1] || '', lines[index + 2] || '']
+      .filter(Boolean)
+      .join(' ');
+    const dateMatch = windowText.match(/(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})/);
+    if (dateMatch) {
+      const normalized = normalizeLooseSpanishDate(dateMatch[1]);
+      if (normalized) return normalized;
+    }
+  }
+
+  const broadMatch = source.match(/noti[f1l][i1l]?(?:ca|ci)?[dcl]?[oa]?[\s\S]{0,80}?(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})/i);
+  if (broadMatch) {
+    const normalized = normalizeLooseSpanishDate(broadMatch[1]);
+    if (normalized) return normalized;
+  }
+  return null;
+}
+
+function extractStandaloneHandwrittenLikeDate(text?: string | null) {
+  const source = String(text || '');
+  if (!source.trim()) return null;
+
+  const lines = source
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, 24);
+
+  const blockedKeywords = [
+    'nacimiento',
+    'emision',
+    'validez',
+    'fecha alta',
+    'fecha cierre',
+    'vencimiento',
+    'caducidad',
+    'sentencia',
+    'demanda',
+    'procedimiento',
+  ];
+
+  for (const line of lines) {
+    const normalizedLine = line
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+
+    if (blockedKeywords.some((keyword) => normalizedLine.includes(keyword))) continue;
+
+    const isolatedMatch = line.match(/^\D{0,6}(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})\D{0,6}$/);
+    if (!isolatedMatch) continue;
+
+    const normalized = normalizeLooseSpanishDate(isolatedMatch[1]);
+    if (normalized) return normalized;
+  }
+
+  return null;
+}
+
+function extractDocumentLevelNotificationDate(text?: string | null) {
+  const source = String(text || '');
+  if (!source.trim()) return null;
+
+  const normalizedSource = source
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+  const contextualPatterns = [
+    /recibid[oa][^\d]{0,24}(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})/i,
+    /entregad[oa][^\d]{0,24}(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})/i,
+    /cedula[^\d]{0,32}(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})/i,
+    /diligencia[^\d]{0,32}(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})/i,
+  ];
+
+  for (const pattern of contextualPatterns) {
+    const match = normalizedSource.match(pattern);
+    if (!match) continue;
+    const normalized = normalizeLooseSpanishDate(match[1]);
+    if (normalized) return normalized;
+  }
+
+  return null;
+}
+
+function runNotificationDateChecks(text?: string | null) {
+  return (
+    extractNotificadoDate(text)
+    || extractStandaloneHandwrittenLikeDate(text)
+    || extractDocumentLevelNotificationDate(text)
+    || null
+  );
+}
+
+async function extractFocusedNotificationDate(file: DocFile) {
+  try {
+    if (file.ext === '.pdf') {
+      let firstPageImages: { path: string }[] = [];
+      try {
+        firstPageImages = renderPdfPagesToImages(file.fullPath, 1);
+        const firstPageText = firstPageImages
+          .map((page) => extractImageOcr(page.path))
+          .filter((chunk) => chunk.trim())
+          .join('\n\n');
+        const firstPageDate = runNotificationDateChecks(firstPageText);
+        if (firstPageDate) return firstPageDate;
+      } finally {
+        if (firstPageImages.length) cleanupRenderedPageImages(firstPageImages as any);
+      }
+
+      let allPageImages: { path: string; pageNumber?: number }[] = [];
+      try {
+        allPageImages = renderPdfPagesToImages(file.fullPath, 8);
+        const remainingPagesText = allPageImages
+          .filter((page) => Number(page.pageNumber || 0) > 1)
+          .map((page) => extractImageOcr(page.path))
+          .filter((chunk) => chunk.trim())
+          .join('\n\n');
+        return runNotificationDateChecks(remainingPagesText);
+      } finally {
+        if (allPageImages.length) cleanupRenderedPageImages(allPageImages as any);
+      }
+    }
+
+    if (['.jpg', '.jpeg', '.png', '.tiff', '.tif', '.bmp', '.webp'].includes(file.ext)) {
+      const imageText = extractImageOcr(file.fullPath);
+      return runNotificationDateChecks(imageText);
+    }
+  } catch (error) {
+    console.warn(`[documentImport] Capa extra de fecha de notificación falló en ${file.name}:`, String((error as any)?.message || error || 'Error desconocido'));
+  }
+
   return null;
 }
 
@@ -103,6 +245,16 @@ function normalizePartyName(value: string) {
 
 function splitPartyNames(value: unknown): string[] | null {
   if (value == null) return null;
+
+  const extractRawName = (input: unknown): string => {
+    if (typeof input === 'string' || typeof input === 'number') return String(input).trim();
+    if (input && typeof input === 'object') {
+      const obj = input as Record<string, unknown>;
+      const candidate = obj.nombre ?? obj.name ?? obj.label ?? obj.razon_social ?? obj.value;
+      if (typeof candidate === 'string' || typeof candidate === 'number') return String(candidate).trim();
+    }
+    return '';
+  };
 
   const collectFromString = (raw: string) => {
     const cleaned = raw
@@ -120,7 +272,7 @@ function splitPartyNames(value: unknown): string[] | null {
 
   const values = Array.isArray(value) ? value : [value];
   const flattened = values
-    .flatMap((item) => collectFromString(String(item || '')))
+    .flatMap((item) => collectFromString(extractRawName(item)))
     .filter(Boolean);
 
   const unique = flattened.filter((item, index) => flattened.findIndex((other) => other.toLowerCase() === item.toLowerCase()) === index);
@@ -182,6 +334,152 @@ function isRetryableGeminiError(error: any) {
 
 function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isWeekend(date: Date) {
+  const day = date.getDay();
+  return day === 0 || day === 6;
+}
+
+function addWorkingDaysFromIso(value?: string | null, days = 0) {
+  const base = String(value || '').slice(0, 10);
+  if (!base) return null;
+  const current = new Date(`${base}T00:00:00Z`);
+  if (Number.isNaN(current.getTime())) return null;
+
+  let remaining = Math.max(days, 0);
+  while (remaining > 0) {
+    current.setUTCDate(current.getUTCDate() + 1);
+    if (!isWeekend(current)) remaining -= 1;
+  }
+  return current.toISOString().slice(0, 10);
+}
+
+function subtractDaysFromIso(value?: string | null, days = 0) {
+  const base = String(value || '').slice(0, 10);
+  if (!base) return null;
+  const current = new Date(`${base}T00:00:00Z`);
+  if (Number.isNaN(current.getTime())) return null;
+  current.setUTCDate(current.getUTCDate() - Math.max(days, 0));
+  return current.toISOString().slice(0, 10);
+}
+
+function isoDateToAgendaStart(value?: string | null) {
+  if (!value) return null;
+  return `${String(value).slice(0, 10)}T08:00:00.000Z`;
+}
+
+function isoDateToAgendaEnd(value?: string | null) {
+  if (!value) return null;
+  return `${String(value).slice(0, 10)}T18:00:00.000Z`;
+}
+
+async function createImportedDeadlineFollowUps(
+  expediente: any,
+  draft: Record<string, any>,
+  userId_: string,
+  userName_: string,
+) {
+  const baseDate = String(draft.fecha_inicio || draft.fecha_notificacion || '').slice(0, 10);
+  if (!baseDate) return;
+
+  const deadlineDate = addWorkingDaysFromIso(baseDate, 20);
+  if (!deadlineDate) return;
+
+  const reminderDate = subtractDaysFromIso(deadlineDate, 3) || deadlineDate;
+  const expedienteLabel = draft.ref_expediente || draft.ref_propia || `${expediente.anio}/${expediente.num_exp}`;
+  const descripcionBase = draft.descripcion || 'Expediente importado desde documento';
+  const clienteId = draft.cliente_id || expediente.cliente_id || null;
+  const clienteNombre = draft.cliente_nombre || expediente.cliente_nombre || null;
+  const reminderTitle = `AVISO DE REVISIÓN · FECHA LÍMITE · ${expedienteLabel}`;
+  const deadlineTitle = `FECHA LÍMITE · ${expedienteLabel}`;
+  const reminderDescription = [
+    'Seguimiento automático creado tras verificar el escaneo del expediente.',
+    `Fecha límite del expediente: ${deadlineDate}`,
+    `Fecha de revisión / aviso: ${reminderDate}`,
+    descripcionBase,
+  ].filter(Boolean).join('\n\n');
+
+  if (clienteId) {
+    const taskResult = await pool.query(
+      `INSERT INTO client_tasks
+         (client_id, client_name, titulo, descripcion, plazo, fecha_aviso, estado, prioridad,
+          expediente, expediente_id, tipo, juzgado, num_proc, notas, etapa, created_by, user_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+       RETURNING *`,
+      [
+        clienteId,
+        clienteNombre,
+        reminderTitle,
+        reminderDescription,
+        reminderDate,
+        reminderDate,
+        'pendiente',
+        'alta',
+        expedienteLabel,
+        expediente.id,
+        'plazo_procesal',
+        draft.juzgado?.trim() || null,
+        draft.num_autos?.trim() || null,
+        draft.observaciones?.trim() || null,
+        'Revisión documental',
+        userName_,
+        userId_,
+      ],
+    );
+
+    const task = taskResult.rows[0];
+    const reminderAgenda = await pool.query(
+      `INSERT INTO agenda_events
+         (user_id, user_name, title, description, start_at, end_at, all_day, type, status,
+          expediente_id, cliente_id, organization_context, source, task_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+       RETURNING id`,
+      [
+        userId_,
+        userName_,
+        reminderTitle,
+        reminderDescription,
+        isoDateToAgendaStart(reminderDate),
+        isoDateToAgendaEnd(reminderDate),
+        true,
+        'plazo',
+        'pendiente',
+        expediente.id,
+        clienteId,
+        expedienteLabel,
+        'document-import-review',
+        task.id,
+      ],
+    );
+
+    await pool.query(
+      `UPDATE client_tasks SET agenda_event_id = $1, updated_at = NOW() WHERE id = $2`,
+      [reminderAgenda.rows[0]?.id || null, task.id],
+    );
+  }
+
+  await pool.query(
+    `INSERT INTO agenda_events
+       (user_id, user_name, title, description, start_at, end_at, all_day, type, status,
+        expediente_id, cliente_id, organization_context, source)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+      [
+        userId_,
+        userName_,
+        deadlineTitle,
+        `Vencimiento calculado automáticamente tras verificar el expediente.\n\n${descripcionBase}`,
+        isoDateToAgendaStart(deadlineDate),
+        isoDateToAgendaEnd(deadlineDate),
+      true,
+      'plazo',
+      'pendiente',
+      expediente.id,
+      clienteId,
+      expedienteLabel,
+      'document-import-deadline',
+    ],
+  );
 }
 
 function ensureDir(dirPath: string) {
@@ -446,9 +744,10 @@ ${text.slice(0, 12000)}
 }
 
 function sanitizeParsedExpediente(parsed: ParsedExpedienteData): ParsedExpedienteData {
-  const prioritizedNotificadoDate = extractNotificadoDate(
-    [parsed.observaciones, parsed.transcription].filter(Boolean).join('\n')
-  );
+  const dateSource = [parsed.observaciones, parsed.transcription].filter(Boolean).join('\n');
+  const prioritizedNotificadoDate = extractNotificadoDate(dateSource);
+  const standaloneHandwrittenDate = extractStandaloneHandwrittenLikeDate(dateSource);
+  const documentLevelFallbackDate = extractDocumentLevelNotificationDate(dateSource);
   const inferredTipoAsunto = inferTipoAsuntoFromContent(parsed.transcription, parsed.tipo_proc);
   const inferredDescripcion = inferDescripcionFromContent(parsed.transcription, parsed.tipo_proc, parsed.juzgado);
 
@@ -470,6 +769,10 @@ function sanitizeParsedExpediente(parsed: ParsedExpedienteData): ParsedExpedient
   // Normalizar fecha_notificacion
   if (prioritizedNotificadoDate) {
     parsed.fecha_notificacion = prioritizedNotificadoDate;
+  } else if (standaloneHandwrittenDate) {
+    parsed.fecha_notificacion = standaloneHandwrittenDate;
+  } else if (!parsed.fecha_notificacion && documentLevelFallbackDate) {
+    parsed.fecha_notificacion = documentLevelFallbackDate;
   }
   if (parsed.fecha_notificacion) {
     parsed.fecha_notificacion = normalizeLooseSpanishDate(parsed.fecha_notificacion) || (() => {
@@ -822,6 +1125,43 @@ function persistDocumentForReview(batchId: string, rowNumber: number, file: DocF
   };
 }
 
+async function attachImportedDocumentToExpediente(
+  expedienteId: string,
+  payload: Record<string, any>,
+  userId_: string,
+) {
+  const previewStoredName = String(payload?.storedName || '').trim();
+  const originalName = String(payload?.fileName || payload?.reference || '').trim();
+  const mimeType = String(payload?.mimeType || 'application/octet-stream').trim();
+  const documentName = path.parse(originalName || previewStoredName || 'Documento importado').name;
+  if (!previewStoredName || !originalName) return;
+
+  const sourcePath = path.join(UPLOADS_ROOT, 'document-imports', String(payload?.batchId || ''), previewStoredName);
+  if (!fs.existsSync(sourcePath)) return;
+
+  const expedienteDir = ensureDir(path.join(UPLOADS_CLIENTS_ROOT, expedienteId));
+  const storedName = `${Date.now()}_${sanitizeFileName(originalName)}`;
+  const destinationPath = path.join(expedienteDir, storedName);
+  fs.copyFileSync(sourcePath, destinationPath);
+  const stat = fs.statSync(destinationPath);
+
+  await pool.query(
+    `INSERT INTO client_files
+       (client_id, original_name, stored_name, mimetype, size_bytes, document_name, attachment_type, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+    [
+      expedienteId,
+      originalName,
+      storedName,
+      mimeType,
+      stat.size,
+      documentName || null,
+      'Sin clasificar',
+      userId_,
+    ],
+  );
+}
+
 async function refreshBatchCounters(batchId: string) {
   const { rows } = await pool.query(
     `SELECT
@@ -935,6 +1275,14 @@ export async function uploadDocumentImport(req: Request, res: Response) {
         extractedData = visionFirst
           ? mergeExtractedData(extractedFromText.data, extractedFromVision.data)
           : mergeExtractedData(extractedFromVision.data, extractedFromText.data);
+
+        if (!extractedData.fecha_notificacion) {
+          const focusedNotificationDate = await extractFocusedNotificationDate(file);
+          if (focusedNotificationDate) {
+            extractedData.fecha_notificacion = focusedNotificationDate;
+          }
+        }
+
         const combinedText = [textPreview, extractedFromVision.data.transcription || '']
           .filter((value) => String(value || '').trim())
           .join('\n\n');
@@ -980,6 +1328,7 @@ export async function uploadDocumentImport(req: Request, res: Response) {
           status,
           userError,
           JSON.stringify({
+            batchId,
             fileName: file.name,
             mimeType: preview.mimeType,
             previewUrl: preview.previewUrl,
@@ -1058,7 +1407,19 @@ export async function acceptDocumentImportItem(req: Request, res: Response) {
       return err(res, 'Indica un cliente escribiendo el nombre o seleccionando uno existente antes de aceptar el expediente', 400);
     }
 
-    const expediente = await createExpediente(draft, unam);
+    const representacion = String(req.body?.representa_a || draft.representa_a || 'demandantes');
+    const demandantes = Array.isArray(draft.demandantes) ? draft.demandantes : [];
+    const demandados = Array.isArray(draft.demandados) ? draft.demandados : [];
+    const finalDraft = {
+      ...draft,
+      cliente_nombre: draft.cliente_nombre || demandantes[0] || '',
+      contrario: draft.contrario || demandados.join(' | '),
+      representa_a: representacion,
+    };
+
+    const expediente = await createExpediente(finalDraft, unam);
+    await attachImportedDocumentToExpediente(expediente.id, payload, uid);
+    await createImportedDeadlineFollowUps(expediente, finalDraft, uid, unam);
 
     await pool.query(
       `UPDATE expediente_import_items
@@ -1071,7 +1432,7 @@ export async function acceptDocumentImportItem(req: Request, res: Response) {
         expediente.id,
         JSON.stringify({
           ...payload,
-          draft,
+          draft: finalDraft,
           userError: null,
           developerError: null,
           acceptedAt: new Date().toISOString(),

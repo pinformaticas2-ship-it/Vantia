@@ -1,62 +1,68 @@
-/**
- * IMAP Client - implementado con modulos nativos de Node.js
- * Soporta TLS/SSL (puerto 993) y IMAP plano (puerto 143).
- *
- * Esta version evita la logica anterior basada en "broadcast" de lineas a
- * todas las peticiones pendientes, que hacia el flujo muy fragil. Aqui las
- * ordenes se ejecutan en serie y cada comando espera su respuesta etiquetada.
- */
-import * as net from 'net';
-import * as tls from 'tls';
+const { ImapFlow } = require('imapflow');
 
 export interface ImapConfig {
-  host:     string;
-  port:     number;
-  secure:   boolean;
-  user:     string;
+  host: string;
+  port: number;
+  secure: boolean;
+  user: string;
   password: string;
 }
 
+export interface ImapFolderInfo {
+  path: string;
+  name: string;
+  specialUse?: string;
+  flags: string[];
+}
+
 export interface ImapEnvelope {
-  uid:       number;
-  flags:     string[];
-  date:      string;
-  subject:   string;
-  from:      string;
-  fromName:  string;
-  to:        string;
+  uid: number;
+  flags: string[];
+  date: string;
+  subject: string;
+  from: string;
+  fromName: string;
+  to: string;
   messageId: string;
-  size:      number;
+  size: number;
 }
 
 export interface ImapMessage extends ImapEnvelope {
   bodyText: string;
   bodyHtml: string;
-  snippet:  string;
+  snippet: string;
 }
 
 function decodeBase64(s: string): string {
-  try { return Buffer.from(s, 'base64').toString('utf-8'); } catch { return s; }
+  try {
+    return Buffer.from(s, 'base64').toString('utf-8');
+  } catch {
+    return s;
+  }
 }
 
 function decodeQuotedPrintable(s: string): string {
   return s
     .replace(/=\r?\n/g, '')
-    .replace(/=([0-9A-Fa-f]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+    .replace(/=([0-9A-Fa-f]{2})/g, (_match, hex) => String.fromCharCode(parseInt(hex, 16)));
 }
 
 function decodeHeader(raw: string): string {
   if (!raw) return '';
   return raw.replace(/=\?([^?]+)\?([BbQq])\?([^?]*)\?=/g, (_match, charset, enc, text) => {
     try {
-      const data = enc.toUpperCase() === 'B'
-        ? Buffer.from(text, 'base64').toString(charset.toLowerCase() as BufferEncoding)
-        : Buffer.from(decodeQuotedPrintable(text), 'binary').toString();
-      return data;
+      if (String(enc).toUpperCase() === 'B') {
+        return Buffer.from(String(text), 'base64').toString(String(charset).toLowerCase() as BufferEncoding);
+      }
+      return Buffer.from(decodeQuotedPrintable(String(text)), 'binary').toString();
     } catch {
-      return text;
+      return String(text);
     }
   });
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function parseMimeParts(raw: string): { text: string; html: string } {
@@ -75,38 +81,40 @@ function parseMimeParts(raw: string): { text: string; html: string } {
       : cte === 'quoted-printable'
         ? decodeQuotedPrintable(body)
         : body;
+
     if (mainCT.includes('text/html')) html = decoded;
     else text = decoded;
+
     return { text, html };
   }
 
-  const boundaryM = raw.match(/boundary="?([^"\r\n;]+)"?/i);
-  if (!boundaryM) return { text, html };
-  const boundary = boundaryM[1];
+  const boundaryMatch = raw.match(/boundary="?([^"\r\n;]+)"?/i);
+  if (!boundaryMatch) return { text, html };
+  const boundary = boundaryMatch[1];
 
   const parts = raw.split(new RegExp(`--${escapeRegExp(boundary)}(?:--)?`));
   for (const part of parts) {
     if (!part.trim() || part.trim() === '--') continue;
-    const partHeaderEnd = part.indexOf('\r\n\r\n');
-    if (partHeaderEnd === -1) continue;
-    const partHeaders = part.slice(0, partHeaderEnd);
-    const partBody = part.slice(partHeaderEnd + 4);
+    const headerEnd = part.indexOf('\r\n\r\n');
+    if (headerEnd === -1) continue;
 
-    const partCT = (partHeaders.match(/Content-Type:\s*([^\r\n;]+)/i)?.[1] || '').trim().toLowerCase();
-    const partCTE = (partHeaders.match(/Content-Transfer-Encoding:\s*(\S+)/i)?.[1] || '').toLowerCase();
+    const headers = part.slice(0, headerEnd);
+    const body = part.slice(headerEnd + 4);
+    const partCT = (headers.match(/Content-Type:\s*([^\r\n;]+)/i)?.[1] || '').trim().toLowerCase();
+    const partCTE = (headers.match(/Content-Transfer-Encoding:\s*(\S+)/i)?.[1] || '').toLowerCase();
 
     if (partCT.includes('multipart')) {
-      const sub = parseMimeParts(part);
-      if (!text && sub.text) text = sub.text;
-      if (!html && sub.html) html = sub.html;
+      const nested = parseMimeParts(part);
+      if (!text && nested.text) text = nested.text;
+      if (!html && nested.html) html = nested.html;
       continue;
     }
 
     const decoded = partCTE === 'base64'
-      ? decodeBase64(partBody.replace(/\r?\n/g, ''))
+      ? decodeBase64(body.replace(/\r?\n/g, ''))
       : partCTE === 'quoted-printable'
-        ? decodeQuotedPrintable(partBody)
-        : partBody;
+        ? decodeQuotedPrintable(body)
+        : body;
 
     if (partCT.includes('text/html') && !html) html = decoded;
     else if (partCT.includes('text/plain') && !text) text = decoded;
@@ -115,401 +123,260 @@ function parseMimeParts(raw: string): { text: string; html: string } {
   return { text, html };
 }
 
-function escapeRegExp(s: string) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function snippet(text: string, html: string): string {
-  const plain = text || html.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+function buildSnippet(text: string, html: string): string {
+  const plain = text || html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
   return plain.slice(0, 200);
 }
 
-function tokenizeImap(s: string): string[] {
-  const tokens: string[] = [];
-  let i = 0;
-  while (i < s.length) {
-    if (s[i] === ' ') { i++; continue; }
-    if (s[i] === '"') {
-      let j = i + 1;
-      while (j < s.length && !(s[j] === '"' && s[j - 1] !== '\\')) j++;
-      tokens.push(s.slice(i + 1, j));
-      i = j + 1;
-    } else if (s[i] === '(') {
-      let depth = 0;
-      let j = i;
-      while (j < s.length) {
-        if (s[j] === '(') depth++;
-        if (s[j] === ')') {
-          depth--;
-          if (depth === 0) break;
-        }
-        j++;
-      }
-      tokens.push(s.slice(i, j + 1));
-      i = j + 1;
-    } else if (s.slice(i, i + 3).toUpperCase() === 'NIL') {
-      tokens.push('');
-      i += 3;
-    } else {
-      let j = i;
-      while (j < s.length && s[j] !== ' ' && s[j] !== ')') j++;
-      tokens.push(s.slice(i, j));
-      i = j;
-    }
-  }
-  return tokens;
+function normalizeFlags(flags: any): string[] {
+  if (!flags) return [];
+  if (Array.isArray(flags)) return flags.map((flag) => String(flag));
+  if (flags instanceof Set) return Array.from(flags).map((flag) => String(flag));
+  return [];
 }
 
-function parseAddressList(s: string): { name: string; email: string } {
-  if (!s || s === 'NIL' || !s.startsWith('(')) return { name: '', email: '' };
-  const inner = s.slice(1, -1).trim();
-  const parts = tokenizeImap(inner);
-  if (!parts.length) return { name: '', email: '' };
-  const addrStr = parts[0] || '';
-  if (!addrStr.startsWith('(')) return { name: '', email: '' };
-  const addrParts = tokenizeImap(addrStr.slice(1, -1));
-  const name = decodeHeader(addrParts[0] || '');
-  const mailbox = addrParts[2] || '';
-  const host = addrParts[3] || '';
-  const email = mailbox && host ? `${mailbox}@${host}` : mailbox;
-  return { name, email };
+function normalizeAddress(addresses: any): { email: string; name: string } {
+  const first = Array.isArray(addresses) ? addresses[0] : null;
+  if (!first) return { email: '', name: '' };
+
+  const email = String(first.address || first.email || '').trim();
+  const name = decodeHeader(String(first.name || first.displayName || '').trim());
+  return { email, name };
 }
 
-function parseEnvelopeBlock(block: string): ImapEnvelope | null {
-  const uidM = block.match(/UID\s+(\d+)/i);
-  const sizeM = block.match(/RFC822\.SIZE\s+(\d+)/i);
-  const flagsM = block.match(/FLAGS\s+\(([^)]*)\)/i);
-  const envMatch = block.match(/ENVELOPE\s+\(([\s\S]+?)\)(?=\s+(?:RFC822|BODY|BODY\[|UID|FLAGS|RFC822\.SIZE|\)))/i)
-    || block.match(/ENVELOPE\s+\(([\s\S]+)\)\s*$/i);
+function mapEnvelope(message: any): ImapEnvelope {
+  const envelope = message?.envelope || {};
+  const from = normalizeAddress(envelope.from);
+  const to = normalizeAddress(envelope.to);
 
-  const uid = uidM ? parseInt(uidM[1], 10) : 0;
-  const size = sizeM ? parseInt(sizeM[1], 10) : 0;
-  const flags = flagsM ? flagsM[1].split(/\s+/).filter(Boolean) : [];
-
-  if (!envMatch) {
-    return {
-      uid,
-      flags,
-      date: '',
-      subject: '',
-      from: '',
-      fromName: '',
-      to: '',
-      messageId: '',
-      size,
-    };
-  }
-
-  const env = envMatch[1];
-  const tokens = tokenizeImap(env);
-  const date = decodeHeader(tokens[0] || '');
-  const subject = decodeHeader(tokens[1] || '');
-  const fromAddr = parseAddressList(tokens[2] || '');
-  const toAddr = parseAddressList(tokens[5] || '');
-  const msgId = (tokens[9] || '').replace(/[<>]/g, '');
+  let date = '';
+  if (envelope.date instanceof Date) date = envelope.date.toISOString();
+  else if (message?.internalDate instanceof Date) date = message.internalDate.toISOString();
+  else if (envelope.date) date = String(envelope.date);
 
   return {
-    uid,
-    flags,
-    size,
+    uid: Number(message?.uid || 0),
+    flags: normalizeFlags(message?.flags),
     date,
-    subject,
-    from: fromAddr.email,
-    fromName: fromAddr.name,
-    to: toAddr.email,
-    messageId: msgId,
+    subject: decodeHeader(String(envelope.subject || '')),
+    from: from.email,
+    fromName: from.name,
+    to: to.email,
+    messageId: String(envelope.messageId || '').replace(/[<>]/g, ''),
+    size: Number(message?.size || message?.source?.length || 0),
   };
 }
 
-function splitFetchBlocks(raw: string): string[] {
-  const normalized = raw.replace(/\r\n/g, '\n');
-  const lines = normalized.split('\n');
-  const blocks: string[] = [];
-  let current: string[] = [];
-
-  for (const line of lines) {
-    if (/^\* \d+ FETCH/i.test(line)) {
-      if (current.length) blocks.push(current.join('\r\n'));
-      current = [line];
-      continue;
-    }
-    if (current.length) {
-      current.push(line);
-    }
-  }
-
-  if (current.length) blocks.push(current.join('\r\n'));
-  return blocks;
-}
-
 export class ImapClient {
-  private socket: net.Socket | tls.TLSSocket | null = null;
-  private buffer = '';
-  private tagCtr = 0;
+  private client: any = null;
+  private mailboxLock: any = null;
+  private currentMailbox = '';
 
   constructor(private cfg: ImapConfig) {}
 
-  private nextTag() {
-    return `A${String(++this.tagCtr).padStart(4, '0')}`;
+  private ensureClient() {
+    if (!this.client) throw new Error('No hay conexion IMAP activa');
+    return this.client;
   }
 
-  private ensureSocket() {
-    if (!this.socket) throw new Error('No hay conexion IMAP activa');
-    return this.socket;
-  }
-
-  private waitForLine(timeoutMs = 15_000): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const socket = this.ensureSocket();
-      let settled = false;
-
-      const cleanup = () => {
-        socket.off('data', onData);
-        socket.off('error', onError);
-        clearTimeout(timer);
-      };
-
-      const finish = (cb: () => void) => {
-        if (settled) return;
-        settled = true;
-        cleanup();
-        cb();
-      };
-
-      const tryResolve = () => {
-        const idx = this.buffer.indexOf('\r\n');
-        if (idx === -1) return;
-        const line = this.buffer.slice(0, idx);
-        this.buffer = this.buffer.slice(idx + 2);
-        finish(() => resolve(line));
-      };
-
-      const onData = (chunk: Buffer) => {
-        this.buffer += chunk.toString('binary');
-        tryResolve();
-      };
-
-      const onError = (error: Error) => finish(() => reject(error));
-      const timer = setTimeout(() => finish(() => reject(new Error('IMAP timeout esperando linea'))), timeoutMs);
-
-      socket.on('data', onData);
-      socket.once('error', onError);
-      tryResolve();
-    });
-  }
-
-  private waitForTaggedResponse(tag: string, timeoutMs = 30_000): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const socket = this.ensureSocket();
-      let settled = false;
-
-      const cleanup = () => {
-        socket.off('data', onData);
-        socket.off('error', onError);
-        clearTimeout(timer);
-      };
-
-      const finish = (cb: () => void) => {
-        if (settled) return;
-        settled = true;
-        cleanup();
-        cb();
-      };
-
-      const taggedRegex = new RegExp(`(?:^|\\r\\n)${tag}\\s+(OK|NO|BAD)\\s*([^\\r\\n]*)`, 'i');
-
-      const tryResolve = () => {
-        const match = this.buffer.match(taggedRegex);
-        if (!match) return;
-
-        const status = (match[1] || '').toUpperCase();
-        const info = match[2] || '';
-        const endIndex = (match.index || 0) + match[0].length;
-        const payload = this.buffer.slice(0, endIndex);
-        this.buffer = this.buffer.slice(endIndex).replace(/^\r\n/, '');
-
-        if (status === 'OK') {
-          finish(() => resolve(payload));
-        } else {
-          finish(() => reject(new Error(`IMAP ${status}: ${info || 'error desconocido'} (tag ${tag})`)));
-        }
-      };
-
-      const onData = (chunk: Buffer) => {
-        this.buffer += chunk.toString('binary');
-        tryResolve();
-      };
-
-      const onError = (error: Error) => finish(() => reject(error));
-      const timer = setTimeout(() => finish(() => reject(new Error(`IMAP timeout on tag ${tag}`))), timeoutMs);
-
-      socket.on('data', onData);
-      socket.once('error', onError);
-      tryResolve();
-    });
-  }
-
-  private async cmd(command: string, timeoutMs = 30_000): Promise<string> {
-    const socket = this.ensureSocket();
-    const tag = this.nextTag();
-    socket.write(`${tag} ${command}\r\n`);
-    return this.waitForTaggedResponse(tag, timeoutMs);
+  private async releaseMailboxLock() {
+    if (this.mailboxLock) {
+      try {
+        this.mailboxLock.release();
+      } catch {
+        // noop
+      }
+      this.mailboxLock = null;
+    }
   }
 
   async connect(): Promise<void> {
-    await new Promise<void>((resolve, reject) => {
-      let settled = false;
-      const finish = (cb: () => void) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        cb();
-      };
+    if (this.client) return;
 
-      const attach = (sock: net.Socket | tls.TLSSocket) => {
-        this.socket = sock;
-        sock.setEncoding('binary');
-        sock.once('error', (error) => finish(() => reject(error)));
-      };
-
-      const timer = setTimeout(() => finish(() => reject(new Error('IMAP connect timeout'))), 15_000);
-
-      if (this.cfg.secure) {
-        const sock = tls.connect(
-          {
-            host: this.cfg.host,
-            port: this.cfg.port,
-            rejectUnauthorized: false,
-          },
-          () => finish(() => resolve()),
-        );
-        attach(sock);
-      } else {
-        const sock = net.connect({ host: this.cfg.host, port: this.cfg.port }, () => finish(() => resolve()));
-        attach(sock);
-      }
+    this.client = new ImapFlow({
+      host: this.cfg.host,
+      port: this.cfg.port,
+      secure: this.cfg.secure,
+      auth: {
+        user: this.cfg.user,
+        pass: this.cfg.password,
+      },
+      logger: false,
     });
 
-    const greeting = await this.waitForLine(15_000);
-    if (!/^\*\s+OK/i.test(greeting)) {
-      throw new Error(`Saludo IMAP inesperado: ${greeting}`);
-    }
+    await this.client.connect();
   }
 
   async login(): Promise<void> {
-    await this.cmd(`LOGIN "${this.cfg.user.replace(/"/g, '\\"')}" "${this.cfg.password.replace(/"/g, '\\"')}"`);
+    // ImapFlow autentica durante connect(); mantenemos el metodo por compatibilidad.
   }
 
   async logout(): Promise<void> {
+    await this.releaseMailboxLock();
+
+    if (!this.client) return;
+
     try {
-      await this.cmd('LOGOUT', 5_000);
+      await this.client.logout();
     } catch {
-      // best effort
+      try {
+        this.client.close();
+      } catch {
+        // noop
+      }
+    } finally {
+      this.client = null;
+      this.currentMailbox = '';
     }
-    this.socket?.destroy();
-    this.socket = null;
   }
 
-  async listFolders(): Promise<string[]> {
-    const raw = await this.cmd('LIST "" "*"');
-    return raw
-      .split('\r\n')
-      .filter((line) => /^\* LIST/i.test(line))
-      .map((line) => {
-        const m = line.match(/"([^"]+)"\s*$/) || line.match(/\s(\S+)\s*$/);
-        return m ? m[1] : '';
-      })
-      .filter(Boolean);
+  async listFolders(): Promise<ImapFolderInfo[]> {
+    const client = this.ensureClient();
+    const boxes = await client.list();
+
+    const folders: ImapFolderInfo[] = [];
+    const walk = (items: any[]) => {
+      for (const item of items || []) {
+        const flags: string[] = item.flags instanceof Set
+          ? Array.from(item.flags).map(String)
+          : (Array.isArray(item.flags) ? item.flags.map(String) : []);
+
+        const noSelect = flags.some(f => f.toLowerCase() === '\\noselect');
+        const path = String(item.path || item.name || '');
+
+        if (!noSelect && path) {
+          folders.push({
+            path,
+            name: String(item.name || path.split(String(item.delimiter || '/')).pop() || path),
+            specialUse: item.specialUse ? String(item.specialUse) : undefined,
+            flags,
+          });
+        }
+        if (item.children?.length) walk(item.children);
+      }
+    };
+
+    walk(boxes);
+    return folders;
+  }
+
+  async createFolder(folder: string): Promise<void> {
+    const client = this.ensureClient();
+    await client.mailboxCreate(folder);
   }
 
   async selectFolder(folder: string): Promise<{ exists: number; unseen: number }> {
-    const raw = await this.cmd(`SELECT "${folder.replace(/"/g, '\\"')}"`);
-    let exists = 0;
-    let unseen = 0;
-    for (const line of raw.split('\r\n')) {
-      const em = line.match(/^\*\s+(\d+)\s+EXISTS/i);
-      if (em) exists = parseInt(em[1], 10);
-      const um = line.match(/\[UNSEEN\s+(\d+)\]/i);
-      if (um) unseen = parseInt(um[1], 10);
-    }
-    return { exists, unseen };
+    const client = this.ensureClient();
+
+    await this.releaseMailboxLock();
+    this.mailboxLock = await client.getMailboxLock(folder);
+    this.currentMailbox = folder;
+
+    return {
+      exists: Number(client.mailbox?.exists || 0),
+      unseen: Number(client.mailbox?.unseen || 0),
+    };
   }
 
   async searchUids(criteria = 'ALL'): Promise<number[]> {
-    const raw = await this.cmd(`UID SEARCH ${criteria}`);
-    for (const line of raw.split('\r\n')) {
-      const m = line.match(/^\*\s+SEARCH\s+([\d\s]+)/i);
-      if (m) return m[1].trim().split(/\s+/).map(Number).filter(Boolean);
+    const client = this.ensureClient();
+    const exists = Number(client.mailbox?.exists || 0);
+    if (!exists) return [];
+
+    const start = 1;
+    const end = exists;
+    const uids: number[] = [];
+
+    const fetchCriteria = criteria.toUpperCase() === 'ALL' ? `${start}:${end}` : `${start}:${end}`;
+    for await (const message of client.fetch(fetchCriteria, { uid: true }, { uid: false })) {
+      if (message?.uid) uids.push(Number(message.uid));
     }
-    return [];
+
+    return uids;
   }
 
   async fetchEnvelopes(uids: number[]): Promise<ImapEnvelope[]> {
     if (!uids.length) return [];
-    const uidList = uids.join(',');
-    const raw = await this.cmd(`UID FETCH ${uidList} (UID FLAGS RFC822.SIZE ENVELOPE)`, 60_000);
-    return splitFetchBlocks(raw)
-      .map((block) => parseEnvelopeBlock(block))
-      .filter((item): item is ImapEnvelope => Boolean(item));
+    const client = this.ensureClient();
+    const result: ImapEnvelope[] = [];
+    const range = uids.join(',');
+
+    for await (const message of client.fetch(range, {
+      uid: true,
+      envelope: true,
+      flags: true,
+      size: true,
+      internalDate: true,
+    }, { uid: true })) {
+      result.push(mapEnvelope(message));
+    }
+
+    return result;
   }
 
   async fetchFullMessage(uid: number): Promise<ImapMessage | null> {
-    const raw = await this.cmd(`UID FETCH ${uid} (UID FLAGS RFC822.SIZE ENVELOPE RFC822)`, 60_000);
-    const block = splitFetchBlocks(raw)[0];
-    if (!block) return null;
+    const client = this.ensureClient();
+    const message = await client.fetchOne(uid, {
+      uid: true,
+      envelope: true,
+      flags: true,
+      size: true,
+      internalDate: true,
+      source: true,
+    }, { uid: true });
 
-    const envelope = parseEnvelopeBlock(block);
-    if (!envelope) return null;
+    if (!message) return null;
 
-    const literalMatch = block.match(/RFC822\s+\{(\d+)\}\r\n/i);
-    if (!literalMatch) {
-      return {
-        ...envelope,
-        bodyText: '',
-        bodyHtml: '',
-        snippet: '',
-      };
-    }
-
-    const literalSize = parseInt(literalMatch[1], 10);
-    const bodyStart = block.indexOf(literalMatch[0]) + literalMatch[0].length;
-    const rawBody = block.slice(bodyStart, bodyStart + literalSize);
-    const { text, html } = parseMimeParts(rawBody);
+    const source = Buffer.isBuffer(message.source)
+      ? message.source.toString('utf8')
+      : String(message.source || '');
+    const parts = parseMimeParts(source);
+    const envelope = mapEnvelope(message);
 
     return {
       ...envelope,
-      bodyText: text,
-      bodyHtml: html,
-      snippet: snippet(text, html),
+      bodyText: parts.text,
+      bodyHtml: parts.html,
+      snippet: buildSnippet(parts.text, parts.html),
     };
   }
 
   async markRead(uid: number, read: boolean): Promise<void> {
-    const flag = read ? '+FLAGS' : '-FLAGS';
-    await this.cmd(`UID STORE ${uid} ${flag} (\\Seen)`);
+    const client = this.ensureClient();
+    if (read) {
+      await client.messageFlagsAdd(uid, ['\\Seen'], { uid: true });
+    } else {
+      await client.messageFlagsRemove(uid, ['\\Seen'], { uid: true });
+    }
   }
 
   async markFlagged(uid: number, flagged: boolean): Promise<void> {
-    const flag = flagged ? '+FLAGS' : '-FLAGS';
-    await this.cmd(`UID STORE ${uid} ${flag} (\\Flagged)`);
+    const client = this.ensureClient();
+    if (flagged) {
+      await client.messageFlagsAdd(uid, ['\\Flagged'], { uid: true });
+    } else {
+      await client.messageFlagsRemove(uid, ['\\Flagged'], { uid: true });
+    }
   }
 
   async copyToFolder(uid: number, folder: string): Promise<void> {
-    await this.cmd(`UID COPY ${uid} "${folder.replace(/"/g, '\\"')}"`);
+    const client = this.ensureClient();
+    await client.messageCopy(uid, folder, { uid: true });
   }
 
   async addFlag(uid: number, flag: string): Promise<void> {
-    await this.cmd(`UID STORE ${uid} +FLAGS (${flag})`);
+    const client = this.ensureClient();
+    await client.messageFlagsAdd(uid, [flag], { uid: true });
   }
 
   async expunge(): Promise<void> {
-    await this.cmd('EXPUNGE');
+    const client = this.ensureClient();
+    await client.mailboxExpunge();
   }
 
   async moveToTrash(uid: number, trashFolder = 'Trash'): Promise<void> {
-    await this.cmd(`UID COPY ${uid} "${trashFolder.replace(/"/g, '\\"')}"`);
-    await this.cmd(`UID STORE ${uid} +FLAGS (\\Deleted)`);
-    await this.expunge();
+    const client = this.ensureClient();
+    await client.messageMove(uid, trashFolder, { uid: true });
   }
 }
 
@@ -529,18 +396,21 @@ export async function syncInbox(
   maxMessages = 50,
 ): Promise<ImapMessage[]> {
   const client = new ImapClient(cfg);
+
   try {
     await client.connect();
     await client.login();
-    await client.selectFolder(folder);
+    const selected = await client.selectFolder(folder);
+
+    if (!selected.exists) return [];
 
     const uids = await client.searchUids('ALL');
     const recent = uids.slice(-maxMessages).reverse();
     if (!recent.length) return [];
 
     const envelopes = await client.fetchEnvelopes(recent);
-    return envelopes.map((e) => ({
-      ...e,
+    return envelopes.map((message) => ({
+      ...message,
       bodyText: '',
       bodyHtml: '',
       snippet: '',

@@ -8,15 +8,16 @@ import {
   FolderOpen, Plus, Loader2, AlertCircle, RefreshCw,
   X, ChevronUp, ChevronDown, ListFilter, ExternalLink,
   Edit3, Trash2, FileSpreadsheet, Printer, MoreHorizontal,
-  Users, Activity, Mail, MessageSquare, Paperclip,
+  Users, Activity, Mail, MessageSquare, MessageCircle, Paperclip,
   AlertTriangle, ClipboardList, ChevronRight, Star,
   Palette, Zap, Bell, Copy, GitMerge, Smartphone,
-  Bug, History, TrendingUp, UserMinus, Pencil, Bookmark,
+  Bug, History, TrendingUp, UserMinus, Pencil, PenLine, Bookmark, BarChart2,
   AlignJustify, LayoutList, ListChecks, Upload, Eye, Settings2, SlidersHorizontal, Check, Search, CheckCircle2,
   Download, FileCode2, FileText, ArrowRight, ArrowLeft, ChevronsRight, ChevronsLeft,
 } from "lucide-react";
 import { AtajosButton } from "../components/AtajosSystem";
 import AdjuntosModal from "../components/AdjuntosModal";
+import ColumnVisibilityModal from "../components/ColumnVisibilityModal";
 import BackButton from "../components/BackButton";
 
 type ViewMode = "list" | "detail" | "multiselect" | "csvImport" | "csvImportConfigure" | "csvImportReview" | "csvImportComplete" | "csvImportHistory" | "csvImportErrorDetail" | "documentImport" | "documentImportVerify";
@@ -562,6 +563,45 @@ const DEFAULT_EXPEDIENTE_EXPORT_TEMPLATE: ExportTemplate = {
   fields: [...CURRENT_EXPEDIENTE_LIST_EXPORT_FIELDS],
 };
 
+const EXPEDIENTE_LIST_COLUMNS = [
+  { key: "anio", label: "Año", defaultVisible: true },
+  { key: "num_exp", label: "Núm. Exp", defaultVisible: true },
+  { key: "ref_propia", label: "Ref. Propia", defaultVisible: true },
+  { key: "ref_expediente", label: "Ref. expediente", defaultVisible: false },
+  { key: "descripcion", label: "Descripción Expediente", defaultVisible: true },
+  { key: "tipo", label: "Tipo de Expediente", defaultVisible: true },
+  { key: "cliente_nombre", label: "Cliente", defaultVisible: true },
+  { key: "contrario", label: "Contrario", defaultVisible: true },
+  { key: "procurador", label: "Procurador Propio", defaultVisible: true },
+  { key: "juzgado", label: "Juzgado Principal", defaultVisible: true },
+  { key: "tipo_proc", label: "Tipo Procedimiento", defaultVisible: true },
+  { key: "num_autos", label: "Núm. Autos", defaultVisible: true },
+  { key: "nig", label: "NIG", defaultVisible: true },
+  { key: "estado", label: "Estado", defaultVisible: true },
+  { key: "observaciones", label: "Observaciones", defaultVisible: false },
+  { key: "fecha_inicio", label: "Fecha alta", defaultVisible: false },
+  { key: "fecha_cierre", label: "Fecha cierre", defaultVisible: false },
+  { key: "fecha_notificacion", label: "Fecha notificación", defaultVisible: false },
+  { key: "importe", label: "Importe", defaultVisible: false },
+  { key: "tipos_asunto", label: "Tipo de asunto", defaultVisible: false },
+  { key: "cuantia_principal", label: "Cuantía principal", defaultVisible: false },
+  { key: "intereses", label: "Intereses", defaultVisible: false },
+  { key: "costas", label: "Costas", defaultVisible: false },
+  { key: "cuantia_total", label: "Cuantía total", defaultVisible: false },
+  { key: "indeterminado", label: "Indeterminado", defaultVisible: false },
+  { key: "etapa", label: "Etapa", defaultVisible: false },
+  { key: "persona_contacto", label: "Persona contacto", defaultVisible: false },
+  { key: "contacto", label: "Contacto", defaultVisible: false },
+  { key: "centro", label: "Centro", defaultVisible: false },
+] as const;
+
+type ExpedienteListColumnKey = typeof EXPEDIENTE_LIST_COLUMNS[number]["key"];
+
+const DEFAULT_VISIBLE_EXPEDIENTE_COLUMNS: Record<ExpedienteListColumnKey, boolean> = EXPEDIENTE_LIST_COLUMNS.reduce((acc, column) => {
+  acc[column.key] = column.defaultVisible;
+  return acc;
+}, {} as Record<ExpedienteListColumnKey, boolean>);
+
 const EXPEDIENTE_ROW_COLOR_STYLES: Record<string, {
   row: string;
   rowSelected: string;
@@ -804,20 +844,20 @@ function ToolBtn({
       onClick={onClick}
       disabled={disabled}
       className={`
-        flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold
-        transition-all select-none whitespace-nowrap
+        flex items-center gap-1.5 whitespace-nowrap px-2.5 py-1.5 rounded-lg text-[11px] font-semibold
+        transition-all active:scale-[0.98] shadow-sm
         ${disabled
-          ? "text-slate-300 cursor-not-allowed"
+          ? "text-slate-300 cursor-not-allowed bg-white border border-slate-100"
           : primary
-            ? "bg-red-700 text-white hover:bg-red-800 shadow-sm active:scale-95"
+            ? "bg-red-600 text-white hover:bg-red-700 border border-red-600 shadow-red-100"
             : danger
-              ? "text-red-500 hover:bg-red-50 hover:text-red-700"
-              : "text-slate-600 hover:bg-slate-100 hover:text-slate-800"
+              ? "text-red-600 bg-white hover:bg-red-50 border border-red-200"
+              : "text-slate-600 bg-white hover:bg-slate-50 border border-slate-200"
         }
       `}
     >
       <Icon size={13} />
-      {label}
+      <span className="hidden sm:inline">{label}</span>
     </button>
   );
 }
@@ -864,15 +904,15 @@ function DropdownToolBtn({
         onClick={() => !disabled && setOpen((prev) => !prev)}
         disabled={disabled}
         className={`
-          flex items-center gap-0 rounded-xl text-xs font-semibold transition-all active:scale-[0.98] border overflow-hidden shadow-sm
+          flex items-center gap-0 rounded-lg text-[11px] font-semibold transition-all active:scale-[0.98] border overflow-hidden shadow-sm
           ${disabled ? "text-slate-300 cursor-not-allowed border-slate-100 bg-white" : "text-slate-600 bg-white hover:bg-slate-50 border-slate-200"}
         `}
       >
-        <span className="flex items-center gap-1.5 px-3 py-2">
+        <span className="flex items-center gap-1.5 px-2.5 py-1.5">
           <Icon size={13} />
           <span className="hidden sm:inline whitespace-nowrap">{label}</span>
         </span>
-        <span className={`px-1.5 py-2 border-l ${disabled ? "border-slate-100" : "border-slate-200 hover:bg-slate-100"}`}>
+        <span className={`px-1.5 py-1.5 border-l ${disabled ? "border-slate-100" : "border-slate-200 hover:bg-slate-100"}`}>
           <ChevronDown size={10} />
         </span>
       </button>
@@ -2945,21 +2985,43 @@ function DocumentImportVerifyView({
   item,
   clients,
   form,
+  representaA,
   saving,
   error,
   onBack,
   onChange,
+  onChangeRepresentaA,
   onAccept,
 }: {
   item: DocumentImportItem;
   clients: any[];
   form: typeof EXP_EMPTY;
+  representaA: "demandantes" | "demandados";
   saving: boolean;
   error: string | null;
   onBack: () => void;
   onChange: (key: keyof typeof EXP_EMPTY, value: any) => void;
+  onChangeRepresentaA: (value: "demandantes" | "demandados") => void;
   onAccept: () => void;
 }) {
+  const normalizeImportedName = (value: unknown): string => {
+    if (typeof value === "string" || typeof value === "number") {
+      const normalized = String(value).trim();
+      return normalized === "[object Object]" ? "" : normalized;
+    }
+    if (value && typeof value === "object") {
+      const obj = value as Record<string, unknown>;
+      const candidate = obj.nombre ?? obj.name ?? obj.label ?? obj.razon_social ?? obj.value;
+      if (typeof candidate === "string" || typeof candidate === "number") {
+        const normalized = String(candidate).trim();
+        return normalized === "[object Object]" ? "" : normalized;
+      }
+    }
+    return "";
+  };
+  const normalizeImportedList = (value: unknown): string[] =>
+    Array.isArray(value) ? value.map((entry) => normalizeImportedName(entry)).filter(Boolean) : [];
+
   const previewUrl    = item.payload?.previewUrl || "";
   const mimeType      = item.payload?.mimeType || "";
   const textPreview   = String(item.payload?.textPreview || "").trim();
@@ -2968,10 +3030,10 @@ function DocumentImportVerifyView({
   const fileName      = item.payload?.fileName || item.reference || `Documento ${item.row_number}`;
 
   const safeClienteId        = String(form.cliente_id ?? "");
-  const safeClienteNombre    = String(form.cliente_nombre ?? "");
+  const safeClienteNombre    = normalizeImportedName(form.cliente_nombre);
   const safeDescripcion      = String(form.descripcion ?? "");
-  const safeContrario        = String(form.contrario ?? "");
-  const safeProcurador       = String(form.procurador ?? "");
+  const safeContrario        = normalizeImportedName(form.contrario);
+  const safeProcurador       = normalizeImportedName(form.procurador);
   const safeJuzgado          = String(form.juzgado ?? "");
   const safeTipoProc         = String(form.tipo_proc ?? "");
   const safeTipoAsunto       = String(form.tipos_asunto ?? "");
@@ -2982,6 +3044,8 @@ function DocumentImportVerifyView({
   const safeCentro           = String(form.centro ?? "");
   const safeObservaciones    = String(form.observaciones ?? "");
   const safeCuantiaPrincipal = form.cuantia_principal == null ? "" : String(form.cuantia_principal);
+  const extractedDemandantes = normalizeImportedList((item.payload?.extractedData as any)?.demandantes);
+  const extractedDemandados = normalizeImportedList((item.payload?.extractedData as any)?.demandados);
 
   const clientOptions = clients.map(c => ({
     value: c.id,
@@ -3143,6 +3207,39 @@ function DocumentImportVerifyView({
             <div className="mt-1">
               <input value={safeDescripcion} onChange={e => onChange("descripcion", e.target.value)} className={inp}
                 placeholder="Resumen del expediente…" />
+            </div>
+          </PanelSection>
+
+          <PanelSection title="Representación del despacho">
+            <div className="grid grid-cols-2 gap-3 mt-1">
+              <button
+                type="button"
+                onClick={() => onChangeRepresentaA("demandantes")}
+                className={`rounded-xl border px-3 py-3 text-left transition-colors ${
+                  representaA === "demandantes"
+                    ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                }`}
+              >
+                <p className="text-sm font-semibold">Representamos a demandantes</p>
+                <p className="mt-1 text-xs opacity-80">
+                  {extractedDemandantes.length ? extractedDemandantes.join(" | ") : "Sin demandantes detectados"}
+                </p>
+              </button>
+              <button
+                type="button"
+                onClick={() => onChangeRepresentaA("demandados")}
+                className={`rounded-xl border px-3 py-3 text-left transition-colors ${
+                  representaA === "demandados"
+                    ? "border-red-300 bg-red-50 text-red-800"
+                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                }`}
+              >
+                <p className="text-sm font-semibold">Representamos a demandados</p>
+                <p className="mt-1 text-xs opacity-80">
+                  {extractedDemandados.length ? extractedDemandados.join(" | ") : "Sin demandados detectados"}
+                </p>
+              </button>
             </div>
           </PanelSection>
 
@@ -3427,6 +3524,7 @@ export default function ExpedienteList() {
   const [documentImportSuccessNotice, setDocumentImportSuccessNotice] = useState<string | null>(null);
   const [documentImportVerifyItem, setDocumentImportVerifyItem] = useState<DocumentImportItem | null>(null);
   const [documentImportVerifyForm, setDocumentImportVerifyForm] = useState<typeof EXP_EMPTY>(EXP_EMPTY);
+  const [documentImportRepresentaA, setDocumentImportRepresentaA] = useState<"demandantes" | "demandados">("demandantes");
   const [documentImportVerifySaving, setDocumentImportVerifySaving] = useState(false);
   const [documentImportVerifyError, setDocumentImportVerifyError] = useState<string | null>(null);
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
@@ -3471,8 +3569,19 @@ export default function ExpedienteList() {
   // Dropdowns click-based
   const [showOpciones, setShowOpciones] = useState(false);
   const opcionesRef = useRef<HTMLDivElement>(null);
+  const [showColumnModal, setShowColumnModal] = useState(false);
   const [showAltaMenu, setShowAltaMenu] = useState(false);
   const altaMenuRef = useRef<HTMLDivElement>(null);
+  const [visibleColumns, setVisibleColumns] = useState<Record<ExpedienteListColumnKey, boolean>>(() => {
+    try {
+      const raw = localStorage.getItem("expediente-list-visible-columns");
+      if (!raw) return DEFAULT_VISIBLE_EXPEDIENTE_COLUMNS;
+      const parsed = JSON.parse(raw) as Partial<Record<ExpedienteListColumnKey, boolean>>;
+      return { ...DEFAULT_VISIBLE_EXPEDIENTE_COLUMNS, ...parsed };
+    } catch {
+      return DEFAULT_VISIBLE_EXPEDIENTE_COLUMNS;
+    }
+  });
 
   // Cerrar dropdown Opciones al clicar fuera
   useEffect(() => {
@@ -3483,6 +3592,9 @@ export default function ExpedienteList() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+  useEffect(() => {
+    localStorage.setItem("expediente-list-visible-columns", JSON.stringify(visibleColumns));
+  }, [visibleColumns]);
 
   const openManualCreate = () => {
     setShowAltaMenu(false);
@@ -3550,11 +3662,39 @@ export default function ExpedienteList() {
 
   const openDocumentImportVerify = useCallback((item: DocumentImportItem) => {
     const draft = (item.payload?.draft || {}) as Partial<typeof EXP_EMPTY>;
+    const normalizeImportedName = (value: unknown): string => {
+      if (typeof value === "string" || typeof value === "number") {
+        const normalized = String(value).trim();
+        return normalized === "[object Object]" ? "" : normalized;
+      }
+      if (value && typeof value === "object") {
+        const obj = value as Record<string, unknown>;
+        const candidate = obj.nombre ?? obj.name ?? obj.label ?? obj.razon_social ?? obj.value;
+        if (typeof candidate === "string" || typeof candidate === "number") {
+          const normalized = String(candidate).trim();
+          return normalized === "[object Object]" ? "" : normalized;
+        }
+      }
+      return "";
+    };
+    const normalizeImportedList = (value: unknown): string[] =>
+      Array.isArray(value) ? value.map((entry) => normalizeImportedName(entry)).filter(Boolean) : [];
+    const extractedDemandantes = normalizeImportedList((item.payload?.extractedData as any)?.demandantes);
+    const extractedDemandados = normalizeImportedList((item.payload?.extractedData as any)?.demandados);
+    const inferredRepresentaA = String((item.payload?.draft as any)?.representa_a || "").trim() === "demandados"
+      ? "demandados"
+      : extractedDemandados.length && !extractedDemandantes.length
+        ? "demandados"
+        : "demandantes";
     setDocumentImportVerifyItem(item);
     setDocumentImportVerifyError(null);
+    setDocumentImportRepresentaA(inferredRepresentaA);
     setDocumentImportVerifyForm({
       ...EXP_EMPTY,
       ...draft,
+      cliente_nombre: normalizeImportedName(draft.cliente_nombre),
+      contrario: normalizeImportedName(draft.contrario),
+      procurador: normalizeImportedName(draft.procurador),
       cuantia_principal: draft.cuantia_principal != null ? String(draft.cuantia_principal) : "",
     });
     setViewMode("documentImportVerify");
@@ -3581,7 +3721,7 @@ export default function ExpedienteList() {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ draft: documentImportVerifyForm }),
+        body: JSON.stringify({ draft: documentImportVerifyForm, representa_a: documentImportRepresentaA }),
       });
       const data = await safeJson(res);
       if (!res.ok) throw new Error(data.error || "No se pudo crear el expediente desde el documento verificado");
@@ -3603,6 +3743,7 @@ export default function ExpedienteList() {
     documentImportActiveBatch,
     documentImportVerifyForm,
     documentImportVerifyItem,
+    documentImportRepresentaA,
     fetchDocumentImportBatch,
     fetchDocumentImportHistory,
     getToken,
@@ -3988,6 +4129,48 @@ export default function ExpedienteList() {
 
   // ── Acciones toolbar ──────────────────────────────────────────
   const selectedExp = useMemo(() => expedientes.find(e => e.id === selected), [expedientes, selected]);
+  const expedienteAvailableColumnItems = useMemo(
+    () => EXPEDIENTE_LIST_COLUMNS.filter((column) => !visibleColumns[column.key]).map((column) => ({ key: column.key, label: column.label })),
+    [visibleColumns]
+  );
+  const expedienteVisibleColumnItems = useMemo(
+    () => EXPEDIENTE_LIST_COLUMNS.filter((column) => visibleColumns[column.key]).map((column) => ({ key: column.key, label: column.label })),
+    [visibleColumns]
+  );
+  const moveExpedienteColumnsToVisible = useCallback((keys: string[]) => {
+    setVisibleColumns((prev) => {
+      const next = { ...prev };
+      keys.forEach((key) => {
+        next[key as ExpedienteListColumnKey] = true;
+      });
+      return next;
+    });
+  }, []);
+  const moveExpedienteColumnsToAvailable = useCallback((keys: string[]) => {
+    setVisibleColumns((prev) => {
+      const next = { ...prev };
+      keys.forEach((key) => {
+        next[key as ExpedienteListColumnKey] = false;
+      });
+      return next;
+    });
+  }, []);
+  const showAllExpedienteColumns = useCallback(() => {
+    setVisibleColumns(EXPEDIENTE_LIST_COLUMNS.reduce((acc, column) => {
+      acc[column.key] = true;
+      return acc;
+    }, {} as Record<ExpedienteListColumnKey, boolean>));
+  }, []);
+  const moveAllExpedienteColumnsToAvailable = useCallback(() => {
+    setVisibleColumns(EXPEDIENTE_LIST_COLUMNS.reduce((acc, column) => {
+      acc[column.key] = false;
+      return acc;
+    }, {} as Record<ExpedienteListColumnKey, boolean>));
+  }, []);
+  const visibleExpedienteColumnCount = useMemo(
+    () => EXPEDIENTE_LIST_COLUMNS.filter((column) => visibleColumns[column.key]).length + 1,
+    [visibleColumns]
+  );
   const assignExpedienteColor = useCallback(async (color: string) => {
     if (!selectedExp) return;
     try {
@@ -4429,6 +4612,7 @@ export default function ExpedienteList() {
         item={documentImportVerifyItem}
         clients={clientes}
         form={documentImportVerifyForm}
+        representaA={documentImportRepresentaA}
         saving={documentImportVerifySaving}
         error={documentImportVerifyError}
         onBack={() => {
@@ -4436,6 +4620,9 @@ export default function ExpedienteList() {
           setViewMode("documentImport");
         }}
         onChange={(key, value) => setDocumentImportVerifyForm((prev) => ({ ...prev, [key]: value }))}
+        onChangeRepresentaA={(value) => {
+          setDocumentImportRepresentaA(value);
+        }}
         onAccept={handleAcceptDocumentImportItem}
       />
     );
@@ -4453,6 +4640,20 @@ export default function ExpedienteList() {
           onClose={() => setShowAdjuntos(false)}
         />
       )}
+
+      <ColumnVisibilityModal
+        open={showColumnModal}
+        title="Modificar columnas del listado"
+        sourceLabel="Expedientes"
+        targetLabel="Columnas visibles"
+        availableItems={expedienteAvailableColumnItems}
+        visibleItems={expedienteVisibleColumnItems}
+        onMoveToVisible={moveExpedienteColumnsToVisible}
+        onMoveToAvailable={moveExpedienteColumnsToAvailable}
+        onMoveAllToVisible={showAllExpedienteColumns}
+        onMoveAllToAvailable={moveAllExpedienteColumnsToAvailable}
+        onClose={() => setShowColumnModal(false)}
+      />
 
       {showRelacionarModal && selectedExp && typeof document !== "undefined" && createPortal(
         <div
@@ -4919,13 +5120,13 @@ export default function ExpedienteList() {
         <div className="bg-white border border-slate-200 rounded-2xl shadow-sm flex flex-col overflow-hidden flex-1 min-h-0">
 
           {/* ── Toolbar de acciones ─────────────────────────── */}
-          <div className="flex items-center gap-1 px-3 py-2 border-b border-slate-100 bg-slate-50/80 flex-wrap">
+          <div className="flex items-center gap-1 px-2.5 py-2 border-b border-slate-100 bg-slate-50/80 flex-wrap">
 
-            {/* — Alta / Baja / Modificar / Abrir ficha — misma posición que ClientList */}
+            {/* — Alta / Baja / Modificar — */}
             <div className="relative" ref={altaMenuRef}>
               <button
                 onClick={() => setShowAltaMenu(v => !v)}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all select-none whitespace-nowrap ${
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all select-none whitespace-nowrap ${
                   showAltaMenu
                     ? "bg-red-800 text-white shadow-sm"
                     : "bg-red-700 text-white hover:bg-red-800 shadow-sm active:scale-95"
@@ -4970,7 +5171,6 @@ export default function ExpedienteList() {
             </div>
             <ToolBtn icon={Trash2}       label="Baja"       danger   disabled={!selected} onClick={() => selected && setDeleteId(selected)} />
             <ToolBtn icon={Edit3}        label="Modificar"           disabled={!selected} onClick={() => { setEditItem(selectedExp); setShowModal(true); }} />
-            <ToolBtn icon={ExternalLink} label="Abrir ficha"         disabled={!selected} onClick={() => selected && navigate(`/dashboard/expedientes/${selected}`)} />
 
             <div className="w-px h-5 bg-slate-200 mx-0.5" />
 
@@ -5039,19 +5239,91 @@ export default function ExpedienteList() {
                 },
               ]}
             />
-            <ToolBtn icon={MessageSquare}label="WhatsApp"       disabled={!selected} onClick={() => {}} />
+            <DropdownToolBtn
+              icon={MessageCircle}
+              label="Enviar WhatsApp"
+              disabled={!selectedExp?.cliente_id}
+              items={[
+                {
+                  label: "Nuevo",
+                  icon: MessageCircle,
+                  onClick: () => {
+                    if (!selectedExp?.cliente_id) return;
+                    navigate(`/dashboard/whatsapp?clientId=${selectedExp.cliente_id}&mode=new`);
+                  },
+                },
+                {
+                  label: "Con Plantilla",
+                  icon: FileSpreadsheet,
+                  onClick: () => {
+                    if (!selectedExp?.cliente_id) return;
+                    navigate(`/dashboard/whatsapp?clientId=${selectedExp.cliente_id}&mode=template`);
+                  },
+                },
+                {
+                  label: "Programar WhatsApp",
+                  icon: Bell,
+                  onClick: () => {
+                    if (!selectedExp?.cliente_id) return;
+                    navigate(`/dashboard/whatsapp?clientId=${selectedExp.cliente_id}&mode=schedule`);
+                  },
+                },
+                {
+                  label: "Sign",
+                  icon: Pencil,
+                  onClick: () => selected && navigate(`/dashboard/expedientes/${selected}#firma`),
+                },
+                {
+                  label: "Ver Conversación",
+                  icon: ExternalLink,
+                  onClick: () => {
+                    if (!selectedExp?.cliente_id) return;
+                    navigate(`/dashboard/whatsapp?clientId=${selectedExp.cliente_id}&mode=thread`);
+                  },
+                },
+              ]}
+            />
 
             <div className="w-px h-5 bg-slate-200 mx-0.5" />
 
-            <ToolBtn icon={ClipboardList}label="Actuación"     disabled={!selected} onClick={() => selected && navigate(`/dashboard/expedientes/${selected}`)} />
+            <ToolBtn
+              icon={PenLine}
+              label="Sign"
+              disabled={!selected}
+              onClick={() => selected && navigate(`/dashboard/expedientes/${selected}#firma`)}
+            />
+            <DropdownToolBtn
+              icon={ClipboardList}
+              label="Tareas"
+              disabled={!selected}
+              items={[
+                {
+                  label: "Nueva actuación",
+                  icon: Activity,
+                  onClick: () => selected && navigate(`/dashboard/expedientes/${selected}?tab=actuacion&newActuacion=1`),
+                },
+                {
+                  label: "Crear obligaciones",
+                  icon: ClipboardList,
+                  onClick: () => selected && navigate(`/dashboard/expedientes/${selected}?tab=tareas&newTarea=1&type=plazo_procesal`),
+                },
+                {
+                  label: "Ver historial",
+                  icon: History,
+                  onClick: () => selected && navigate(`/dashboard/expedientes/${selected}`),
+                },
+              ]}
+            />
+
+            <div className="w-px h-5 bg-slate-200 mx-0.5" />
+
             <ToolBtn icon={GitMerge}     label="Asociar"       disabled={!selectedExp} onClick={openRelacionarModal} />
             <ToolBtn icon={Paperclip}    label="Adjuntos"      disabled={!selected} onClick={() => selected && setShowAdjuntos(true)} />
-            <ToolBtn icon={Users}        label="Ir a cliente"  disabled={!selectedExp?.cliente_id} onClick={() => selectedExp?.cliente_id && navigate(`/dashboard/clientes/${selectedExp.cliente_id}`)} />
-
             <div className="w-px h-5 bg-slate-200 mx-0.5" />
 
             <ToolBtn icon={FileSpreadsheet} label="Excel"    onClick={openExportModal} />
             <ToolBtn icon={Printer}         label="Imprimir" onClick={() => window.print()} />
+            <ToolBtn icon={BarChart2}       label="Informes" onClick={() => navigate("/dashboard")} />
 
             <div className="w-px h-5 bg-slate-200 mx-0.5" />
 
@@ -5062,20 +5334,28 @@ export default function ExpedienteList() {
             <div className="relative" ref={opcionesRef}>
               <button
                 onClick={() => setShowOpciones(v => !v)}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors border ${showOpciones ? "bg-red-50 border-red-300 text-red-700" : "text-slate-600 hover:bg-slate-100 border-slate-200"}`}>
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-colors border ${showOpciones ? "bg-red-50 border-red-300 text-red-700" : "text-slate-600 hover:bg-slate-100 border-slate-200"}`}>
                 <MoreHorizontal size={13} /> Opciones <ChevronDown size={10} />
               </button>
               {showOpciones && (
-              <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[230px] py-1.5">
+              <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[230px] py-1.5 overflow-visible">
 
                 {/* Grupo 1: acciones principales */}
-                <button onClick={openExportModal}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                  <FileSpreadsheet size={12} className="text-slate-400" /> Excel
-                </button>
                 <button onClick={() => alert("Seleccionar opciones favoritas")}
                   className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
                   <Star size={12} className="text-slate-400" /> Seleccionar Opciones Favoritas
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowColumnModal(true);
+                    setShowOpciones(false);
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-700"
+                >
+                  <span className="flex items-center gap-2.5">
+                    <LayoutList size={12} className="text-slate-400" /> Elegir columnas
+                  </span>
                 </button>
 
                 <div className="h-px bg-slate-100 my-1.5" />
@@ -5089,7 +5369,7 @@ export default function ExpedienteList() {
                     </span>
                     <ChevronRight size={11} className="text-slate-300" />
                   </button>
-                  <div className="absolute right-full top-0 mr-1 z-50 bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[180px] py-1.5 hidden group-hover/sub:block">
+                  <div className="absolute right-full -mr-px top-[-1px] z-50 bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[180px] py-1.5 hidden group-hover/sub:block">
                     <button onClick={() => selectedExp?.cliente_id && navigate(`/dashboard/clientes/${selectedExp.cliente_id}`)}
                       className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
                       <Users size={12} className="text-slate-400" /> Ir a Cliente
@@ -5112,7 +5392,7 @@ export default function ExpedienteList() {
                     </span>
                     <ChevronRight size={11} className="text-slate-300" />
                   </button>
-                  <div className="absolute right-full top-0 mr-1 z-50 hidden min-w-[190px] rounded-xl border border-slate-200 bg-white py-1.5 shadow-2xl group-hover/color:block">
+                  <div className="absolute right-full -mr-px top-[-1px] z-50 hidden min-w-[190px] rounded-xl border border-slate-200 bg-white py-1.5 shadow-2xl group-hover/color:block">
                     {[
                       { value: "ninguno", label: "Sin color", dot: "bg-slate-300" },
                       { value: "azul", label: "Azul suave", dot: "bg-sky-400" },
@@ -5170,26 +5450,6 @@ export default function ExpedienteList() {
                   <Smartphone size={12} className="text-slate-400" /> Enviar SMS
                 </button>
 
-                {/* Depurar → submenú */}
-                <div className="relative group/dep">
-                  <button className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                    <span className="flex items-center gap-2.5">
-                      <Bug size={12} className="text-slate-400" /> Depurar
-                    </span>
-                    <ChevronRight size={11} className="text-slate-300" />
-                  </button>
-                  <div className="absolute right-full top-0 mr-1 z-50 bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[180px] py-1.5 hidden group-hover/dep:block">
-                    <button onClick={() => console.log("Expediente:", selectedExp)}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                      <Bug size={12} className="text-slate-400" /> Ver en consola
-                    </button>
-                    <button onClick={() => alert(JSON.stringify(selectedExp, null, 2))}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                      <ClipboardList size={12} className="text-slate-400" /> Mostrar datos crudos
-                    </button>
-                  </div>
-                </div>
-
                 {/* Versión Antigua → submenú */}
                 <div className="relative group/ver">
                   <button className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
@@ -5198,7 +5458,7 @@ export default function ExpedienteList() {
                     </span>
                     <ChevronRight size={11} className="text-slate-300" />
                   </button>
-                  <div className="absolute right-full top-0 mr-1 z-50 bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[180px] py-1.5 hidden group-hover/ver:block">
+                  <div className="absolute right-full -mr-px top-[-1px] z-50 bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[180px] py-1.5 hidden group-hover/ver:block">
                     <button onClick={() => alert("Restaurar versión anterior")}
                       className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
                       <History size={12} className="text-slate-400" /> Ver historial versiones
@@ -5209,18 +5469,6 @@ export default function ExpedienteList() {
                     </button>
                   </div>
                 </div>
-
-                <div className="h-px bg-slate-100 my-1.5" />
-
-                {/* Grupo 6: recalcular */}
-                <button onClick={() => alert("Recalcular intereses")}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                  <TrendingUp size={12} className="text-slate-400" /> Recalcular Intereses
-                </button>
-                <button onClick={() => fetchExpedientes(false)}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                  <Activity size={12} className="text-slate-400" /> Recalcular Indicadores
-                </button>
 
               </div>
               )}
@@ -5330,26 +5578,26 @@ export default function ExpedienteList() {
             <table className="w-full text-left text-sm min-w-[1100px]">
               <thead className="bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
                 <tr>
-                  <Th label="Año"                    sk="anio"          sort={sort} dir={dir} onSort={handleSort} className="w-14 pl-4" />
-                  <Th label="Núm. Exp"               sk="num_exp"        sort={sort} dir={dir} onSort={handleSort} className="w-16" />
-                  <Th label="Ref. Propia"                                 sort={sort} dir={dir} onSort={handleSort} className="w-24" />
-                  <Th label="Descripción Expediente" sk="descripcion"    sort={sort} dir={dir} onSort={handleSort} className="min-w-[180px]" />
-                  <Th label="Tipo de Expediente"     sk="tipo"           sort={sort} dir={dir} onSort={handleSort} className="w-40" />
-                  <Th label="Cliente"                sk="cliente_nombre" sort={sort} dir={dir} onSort={handleSort} className="w-36" />
-                  <Th label="Contrario"              sk="contrario"      sort={sort} dir={dir} onSort={handleSort} className="w-36" />
-                  <Th label="Procurador Propio"                          sort={sort} dir={dir} onSort={handleSort} className="w-32 hidden xl:table-cell" />
-                  <Th label="Juzgado Principal"      sk="juzgado"        sort={sort} dir={dir} onSort={handleSort} className="w-44 hidden lg:table-cell" />
-                  <Th label="Tipo Procedimiento"                         sort={sort} dir={dir} onSort={handleSort} className="w-28 hidden xl:table-cell" />
-                  <Th label="Núm. Autos"                                 sort={sort} dir={dir} onSort={handleSort} className="w-24 hidden lg:table-cell" />
-                  <Th label="NIG"                                        sort={sort} dir={dir} onSort={handleSort} className="w-28 hidden xl:table-cell" />
-                  <Th label="Estado"                 sk="estado"         sort={sort} dir={dir} onSort={handleSort} className="w-24" />
+                  {visibleColumns.anio && <Th label="Año"                    sk="anio"          sort={sort} dir={dir} onSort={handleSort} className="w-14 pl-4" />}
+                  {visibleColumns.num_exp && <Th label="Núm. Exp"               sk="num_exp"        sort={sort} dir={dir} onSort={handleSort} className="w-16" />}
+                  {visibleColumns.ref_propia && <Th label="Ref. Propia"                                 sort={sort} dir={dir} onSort={handleSort} className="w-24" />}
+                  {visibleColumns.descripcion && <Th label="Descripción Expediente" sk="descripcion"    sort={sort} dir={dir} onSort={handleSort} className="min-w-[180px]" />}
+                  {visibleColumns.tipo && <Th label="Tipo de Expediente"     sk="tipo"           sort={sort} dir={dir} onSort={handleSort} className="w-40" />}
+                  {visibleColumns.cliente_nombre && <Th label="Cliente"                sk="cliente_nombre" sort={sort} dir={dir} onSort={handleSort} className="w-36" />}
+                  {visibleColumns.contrario && <Th label="Contrario"              sk="contrario"      sort={sort} dir={dir} onSort={handleSort} className="w-36" />}
+                  {visibleColumns.procurador && <Th label="Procurador Propio"                          sort={sort} dir={dir} onSort={handleSort} className="w-32 hidden xl:table-cell" />}
+                  {visibleColumns.juzgado && <Th label="Juzgado Principal"      sk="juzgado"        sort={sort} dir={dir} onSort={handleSort} className="w-44 hidden lg:table-cell" />}
+                  {visibleColumns.tipo_proc && <Th label="Tipo Procedimiento"                         sort={sort} dir={dir} onSort={handleSort} className="w-28 hidden xl:table-cell" />}
+                  {visibleColumns.num_autos && <Th label="Núm. Autos"                                 sort={sort} dir={dir} onSort={handleSort} className="w-24 hidden lg:table-cell" />}
+                  {visibleColumns.nig && <Th label="NIG"                                        sort={sort} dir={dir} onSort={handleSort} className="w-28 hidden xl:table-cell" />}
+                  {visibleColumns.estado && <Th label="Estado"                 sk="estado"         sort={sort} dir={dir} onSort={handleSort} className="w-24" />}
                   <th className="px-3 py-2.5 w-10" />
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={14} className="py-20 text-center">
+                    <td colSpan={visibleExpedienteColumnCount} className="py-20 text-center">
                       <div className="flex flex-col items-center gap-3 text-slate-400">
                         <FolderOpen size={36} className="opacity-15" />
                         <p className="font-medium text-sm">
@@ -5380,32 +5628,32 @@ export default function ExpedienteList() {
                         ${isSel ? colorStyle.rowSelected : colorStyle.row}`}
                     >
                       {/* Año */}
-                      <td className={`pl-4 pr-3 py-3 font-mono ${isSel ? colorStyle.yearSelected : colorStyle.year}`}>{exp.anio}</td>
+                      {visibleColumns.anio && <td className={`pl-4 pr-3 py-3 font-mono ${isSel ? colorStyle.yearSelected : colorStyle.year}`}>{exp.anio}</td>}
 
                       {/* Núm */}
-                      <td className="px-3 py-3">
+                      {visibleColumns.num_exp && <td className="px-3 py-3">
                         <span className={`font-extrabold text-base ${isSel ? colorStyle.numberSelected : colorStyle.number}`}>{exp.num_exp}</span>
-                      </td>
+                      </td>}
 
                       {/* Ref */}
-                      <td className="px-3 py-3 font-mono text-slate-400">
+                      {visibleColumns.ref_propia && <td className="px-3 py-3 font-mono text-slate-400">
                         {exp.ref_propia || <span className="text-slate-200">—</span>}
-                      </td>
+                      </td>}
 
                       {/* Descripción */}
-                      <td className="px-3 py-3">
+                      {visibleColumns.descripcion && <td className="px-3 py-3">
                         <span className={`font-semibold truncate block max-w-[220px] ${isSel ? colorStyle.descriptionSelected : "text-slate-800"}`}>
                           {exp.descripcion || <span className="text-slate-300 font-normal">Sin descripción</span>}
                         </span>
-                      </td>
+                      </td>}
 
                       {/* Tipo */}
-                      <td className="px-3 py-3 text-xs text-slate-600 uppercase whitespace-nowrap font-medium">
+                      {visibleColumns.tipo && <td className="px-3 py-3 text-xs text-slate-600 uppercase whitespace-nowrap font-medium">
                         {tipoConf.label}
-                      </td>
+                      </td>}
 
                       {/* Cliente */}
-                      <td className="px-3 py-3">
+                      {visibleColumns.cliente_nombre && <td className="px-3 py-3">
                         {exp.cliente_id ? (
                           <button
                             onClick={e => { e.stopPropagation(); navigate(`/dashboard/clientes/${exp.cliente_id}`); }}
@@ -5417,42 +5665,42 @@ export default function ExpedienteList() {
                             {exp.cliente_nombre || <span className="text-slate-200">—</span>}
                           </span>
                         )}
-                      </td>
+                      </td>}
 
                       {/* Contrario */}
-                      <td className="px-3 py-3 text-slate-500 truncate max-w-[130px]">
+                      {visibleColumns.contrario && <td className="px-3 py-3 text-slate-500 truncate max-w-[130px]">
                         {exp.contrario || <span className="text-slate-200">—</span>}
-                      </td>
+                      </td>}
 
                       {/* Procurador */}
-                      <td className="px-3 py-3 text-slate-400 hidden xl:table-cell truncate max-w-[120px]">
+                      {visibleColumns.procurador && <td className="px-3 py-3 text-slate-400 hidden xl:table-cell truncate max-w-[120px]">
                         {exp.procurador || <span className="text-slate-200">—</span>}
-                      </td>
+                      </td>}
 
                       {/* Juzgado */}
-                      <td className="px-3 py-3 text-slate-400 hidden lg:table-cell truncate max-w-[150px]">
+                      {visibleColumns.juzgado && <td className="px-3 py-3 text-slate-400 hidden lg:table-cell truncate max-w-[150px]">
                         {exp.juzgado || <span className="text-slate-200">—</span>}
-                      </td>
+                      </td>}
 
                       {/* Tipo proc */}
-                      <td className="px-3 py-3 text-slate-400 uppercase hidden xl:table-cell whitespace-nowrap">
+                      {visibleColumns.tipo_proc && <td className="px-3 py-3 text-slate-400 uppercase hidden xl:table-cell whitespace-nowrap">
                         {exp.tipo_proc || <span className="text-slate-200">—</span>}
-                      </td>
+                      </td>}
 
                       {/* Núm. Autos */}
-                      <td className="px-3 py-3 font-mono text-slate-400 hidden lg:table-cell">
+                      {visibleColumns.num_autos && <td className="px-3 py-3 font-mono text-slate-400 hidden lg:table-cell">
                         {exp.num_autos || <span className="text-slate-200">—</span>}
-                      </td>
+                      </td>}
 
                       {/* NIG */}
-                      <td className="px-3 py-3 font-mono text-slate-300 hidden xl:table-cell">
+                      {visibleColumns.nig && <td className="px-3 py-3 font-mono text-slate-300 hidden xl:table-cell">
                         {exp.nig ? <span title={exp.nig}>{exp.nig.slice(0,12)}{exp.nig.length > 12 ? "…" : ""}</span> : <span className="text-slate-200">—</span>}
-                      </td>
+                      </td>}
 
                       {/* Estado */}
-                      <td className="px-3 py-3 text-xs text-slate-600 whitespace-nowrap">
+                      {visibleColumns.estado && <td className="px-3 py-3 text-xs text-slate-600 whitespace-nowrap">
                         {estadoConf.label}
-                      </td>
+                      </td>}
 
                       {/* Abrir */}
                       <td className="px-3 py-3 text-right">

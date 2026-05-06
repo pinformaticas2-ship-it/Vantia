@@ -297,7 +297,7 @@ function xmlToText(xml: string): string {
 
 // ── OCR via Tesseract ─────────────────────────────────────────────────────────
 
-function extractImageOcr(filePath: string): string {
+export function extractImageOcr(filePath: string): string {
   // Intentar con tesseract CLI si está disponible
   const tesseractCmd = resolveCommand('tesseract');
   if (tesseractCmd) {
