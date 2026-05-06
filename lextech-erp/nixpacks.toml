@@ -1,0 +1,8 @@
+[phases.setup]
+aptPkgs = [
+  "unzip",
+  "poppler-utils",
+  "tesseract-ocr",
+  "tesseract-ocr-spa",
+  "tesseract-ocr-eng"
+]
