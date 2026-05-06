@@ -6,6 +6,7 @@ import { spawnSync } from 'child_process';
 import * as fs   from 'fs';
 import * as path from 'path';
 import * as os   from 'os';
+import AdmZip = require('adm-zip');
 
 // ── Tipos soportados ──────────────────────────────────────────────────────────
 
@@ -66,6 +67,14 @@ const SUPPORTED_EXTS = ['.pdf', '.docx', '.doc', '.txt', '.text', '.rtf',
   '.jpg', '.jpeg', '.png', '.tiff', '.tif', '.bmp', '.webp'];
 
 function extractArchive(archivePath: string, destinationDir: string) {
+  try {
+    const zip = new AdmZip(archivePath);
+    zip.extractAllTo(destinationDir, true);
+    return;
+  } catch (zipError: any) {
+    console.warn(`[docExtract] Fallback a utilidades del sistema para ZIP: ${zipError?.message || zipError}`);
+  }
+
   if (process.platform === 'win32') {
     const needsZipAlias = path.extname(archivePath).toLowerCase() !== '.zip';
     const zipPath = needsZipAlias ? `${archivePath}.zip` : archivePath;
