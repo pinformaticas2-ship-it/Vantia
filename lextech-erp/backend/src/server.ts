@@ -94,6 +94,22 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Diagnóstico de rutas de almacenamiento
+app.get('/api/health/storage', (_req, res) => {
+  const fs = require('fs');
+  const { UPLOADS_ROOT, CLIENT_FILES_ROOT, DATA_ROOT } = require('./config/paths');
+  const check = (p: string) => ({ path: p, exists: fs.existsSync(p) });
+  res.json({
+    cwd: process.cwd(),
+    DATA_ROOT_env: process.env.DATA_ROOT || '(no configurado)',
+    paths: {
+      DATA_ROOT: check(DATA_ROOT),
+      UPLOADS_ROOT: check(UPLOADS_ROOT),
+      CLIENT_FILES_ROOT: check(CLIENT_FILES_ROOT),
+    }
+  });
+});
+
 // Health check de base de datos — visita http://localhost:4000/api/health/db para diagnosticar
 app.get('/api/health/db', async (_req, res) => {
   try {
