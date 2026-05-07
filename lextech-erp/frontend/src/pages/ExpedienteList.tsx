@@ -21,7 +21,7 @@ import ColumnVisibilityModal from "../components/ColumnVisibilityModal";
 import BackButton from "../components/BackButton";
 
 type ViewMode = "list" | "detail" | "multiselect" | "csvImport" | "csvImportConfigure" | "csvImportReview" | "csvImportComplete" | "csvImportHistory" | "csvImportErrorDetail" | "documentImport" | "documentImportVerify";
-import { safeJson, resolveApiUrl } from "../lib/api";
+import { safeJson, resolveApiUrl, resolveUploadUrl } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
 import { TIPOS, ESTADOS, EXP_EMPTY, ExpedienteModal, lbl, inp } from "../components/ExpedienteModal";
 import AppSelect from "../components/AppSelect";
@@ -3022,7 +3022,7 @@ function DocumentImportVerifyView({
   const normalizeImportedList = (value: unknown): string[] =>
     Array.isArray(value) ? value.map((entry) => normalizeImportedName(entry)).filter(Boolean) : [];
 
-  const previewUrl    = item.payload?.previewUrl || "";
+  const previewUrl    = resolveUploadUrl(item.payload?.previewUrl) || "";
   const mimeType      = item.payload?.mimeType || "";
   const textPreview   = String(item.payload?.textPreview || "").trim();
   const userError     = item.payload?.userError || item.error_message;
