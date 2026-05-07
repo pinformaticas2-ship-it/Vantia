@@ -30,7 +30,13 @@ const GMAIL_TOKEN_KEY = 'lextech-gmail-token-v1';
 const LOCAL_DRAFTS_KEY = 'lextech-email-drafts-v1';
 // Key de pineados es por cuenta (evita que se mezclen Gmail e IMAP)
 const pinnedKey = (accountKey: string) => `lextech-email-pinned-${accountKey}`;
-const API = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000') + '/api';
+const API = (() => {
+  const env = import.meta.env.VITE_API_BASE_URL?.trim();
+  if (env) return env + '/api';
+  if (typeof window !== 'undefined' && window.location.hostname.endsWith('.vercel.app'))
+    return 'https://gallant-curiosity-production-0aad.up.railway.app/api';
+  return 'http://localhost:4000/api';
+})();
 
 // Extend Window for Gmail GIS (avoid conflict with Agenda's declaration)
 interface GmailGIS {
