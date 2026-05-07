@@ -7,6 +7,7 @@ const router = (0, express_1.Router)();
 router.post('/login', auth_1.requireAuth, activityController_1.registerLogin);
 router.post('/logout', auth_1.requireAuth, activityController_1.registerLogout);
 router.get('/', auth_1.requireAuth, activityController_1.getActivity);
+router.get('/me', auth_1.requireAuth, activityController_1.getMyActivity);
 router.get('/users', auth_1.requireAuth, activityController_1.getActivityByUsers);
 router.get('/user/:userId', auth_1.requireAuth, activityController_1.getUserActivity);
 router.get('/client/:clientId', auth_1.requireAuth, activityController_1.getClientActivity);

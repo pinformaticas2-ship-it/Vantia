@@ -1,0 +1,14 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const auth_1 = require("../middleware/auth");
+const documentalController_1 = require("../controllers/documentalController");
+const router = (0, express_1.Router)();
+router.get('/providers', auth_1.requireAuth, documentalController_1.getDocumentalProviders);
+router.get('/boe/schemas', auth_1.requireAuth, documentalController_1.getBoeSchemas);
+router.get('/boe/search', auth_1.requireAuth, documentalController_1.searchBoeDocuments);
+router.get('/boe/document/:id/block/:blockId', auth_1.requireAuth, documentalController_1.getBoeBlockById);
+router.get('/boe/document/:id', auth_1.requireAuth, documentalController_1.getBoeDocumentById);
+router.get('/cendoj/highlights', auth_1.requireAuth, documentalController_1.getCendojHighlights);
+router.get('/cendoj/search', auth_1.requireAuth, documentalController_1.searchCendoj);
+exports.default = router;

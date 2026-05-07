@@ -42,7 +42,7 @@ const chatVantia = async (req, res) => {
     if (!userId || !moduleId) {
         return res.status(400).json({ success: false, error: 'Falta userId o moduleId.' });
     }
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
     if (!apiKey) {
         return res.status(503).json({
             success: false,

@@ -18,6 +18,10 @@ const expedientes_1 = __importDefault(require("./routes/expedientes"));
 const agenda_1 = __importDefault(require("./routes/agenda"));
 const chat_1 = __importDefault(require("./routes/chat"));
 const email_1 = __importDefault(require("./routes/email"));
+const whatsapp_1 = __importDefault(require("./routes/whatsapp"));
+const documentImport_1 = __importDefault(require("./routes/documentImport"));
+const documental_1 = __importDefault(require("./routes/documental"));
+const clientInvite_1 = __importDefault(require("./routes/clientInvite"));
 const migrations_1 = require("./config/migrations");
 const localFilesWatcher_1 = require("./watchers/localFilesWatcher");
 const filesController_1 = require("./controllers/filesController");
@@ -66,10 +70,14 @@ app.use('/api/activity', activity_1.default);
 app.use('/api/vantia', vantia_1.default);
 app.use('/api/files', files_1.default);
 app.use('/api/tasks', tasks_1.default);
+app.use('/api/expedientes/documents', documentImport_1.default);
 app.use('/api/expedientes', expedientes_1.default);
 app.use('/api/agenda', agenda_1.default);
 app.use('/api/chat', chat_1.default);
 app.use('/api/email', email_1.default);
+app.use('/api/whatsapp', whatsapp_1.default);
+app.use('/api/documental', documental_1.default);
+app.use('/api/clientes/invites', clientInvite_1.default);
 app.get('/health', (_req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
@@ -108,8 +116,6 @@ app.use((err, _req, res, _next) => {
         try {
             await (0, activityController_1.logServerStart)();
         }
-        catch (_e) { }
+        catch { }
     });
-}).catch((error) => {
-    console.error('❌ Error arrancando backend:', error);
 });

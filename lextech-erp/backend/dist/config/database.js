@@ -9,21 +9,22 @@ const dns_1 = __importDefault(require("dns"));
 dotenv_1.default.config();
 const rawUrl = process.env.DATABASE_URL?.trim().replace(/['"]/g, '');
 if (!rawUrl) {
-    console.error("❌ FATAL: DATABASE_URL no definida.");
+    console.error('FATAL: DATABASE_URL no definida.');
     process.exit(-1);
 }
 try {
     new URL(rawUrl);
-    console.log("📡 URL de base de datos validada correctamente.");
+    console.log('URL de base de datos validada correctamente.');
 }
-catch (err) {
-    console.error("❌ ERROR: La URL en el .env sigue siendo inválida.");
-    console.error("👉 Asegúrate de no usar caracteres como # o / sin codificar en la contraseña.");
+catch {
+    console.error('ERROR: La URL en el .env es inválida.');
     process.exit(-1);
 }
 const parsedUrl = new URL(rawUrl);
-const shouldUseSsl = process.env.PGSSL === 'true' || rawUrl.includes('supabase.co');
-const connectionFamily = Number(process.env.PG_FAMILY || (rawUrl.includes('supabase.co') ? 4 : 0)) || undefined;
+const isSupabase = rawUrl.includes('supabase.com') || rawUrl.includes('supabase.co');
+const isSupabasePooler = parsedUrl.hostname.includes('pooler.supabase.com');
+const shouldUseSsl = process.env.PGSSL === 'true' || isSupabase;
+const connectionFamily = Number(process.env.PG_FAMILY || (isSupabase ? 4 : 0)) || undefined;
 const lookup = connectionFamily
     ? ((hostname, _options, callback) => dns_1.default.lookup(hostname, { family: connectionFamily }, callback))
     : undefined;
@@ -37,22 +38,43 @@ const pool = new pg_1.Pool({
     ...(connectionFamily ? { family: connectionFamily } : {}),
     ...(lookup ? { lookup } : {}),
     ssl: shouldUseSsl ? { rejectUnauthorized: false } : false,
-    max: 20,
-    idleTimeoutMillis: 30000,
+    max: isSupabasePooler ? 5 : 20,
+    idleTimeoutMillis: isSupabasePooler ? 10000 : 30000,
     connectionTimeoutMillis: 5000,
     allowExitOnIdle: false,
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 10000,
     statement_timeout: 30000,
 });
+function isTransientPoolerError(error) {
+    const message = String(error?.message || '');
+    return error?.code === 'XX000' && /DbHandler exited/i.test(message);
+}
+const originalQuery = pool.query.bind(pool);
+pool.query = async (...args) => {
+    try {
+        return await originalQuery(...args);
+    }
+    catch (error) {
+        if (isSupabasePooler && isTransientPoolerError(error)) {
+            console.warn('Reintentando query tras fallo transitorio del pooler de Supabase...');
+            return originalQuery(...args);
+        }
+        throw error;
+    }
+};
 pool.on('error', (err) => {
-    console.error('🔥 Error en el Pool de PG:', err);
+    console.error('Error en el Pool de PG:', err);
 });
 (async () => {
+    if (isSupabasePooler)
+        return;
     try {
         const warmup = await pool.connect();
         warmup.release();
-        console.log('🔥 Pool de conexiones precalentado correctamente.');
+        console.log('Pool de conexiones precalentado correctamente.');
     }
-    catch (_e) {
+    catch {
     }
 })();
 exports.default = pool;

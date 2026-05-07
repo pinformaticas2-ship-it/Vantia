@@ -1,0 +1,13 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const clerk_sdk_node_1 = require("@clerk/clerk-sdk-node");
+const clientInviteController_1 = require("../controllers/clientInviteController");
+const router = (0, express_1.Router)();
+const auth = (0, clerk_sdk_node_1.ClerkExpressRequireAuth)();
+router.post('/', auth, clientInviteController_1.createInvite);
+router.get('/', auth, clientInviteController_1.listInvites);
+router.delete('/:id', auth, clientInviteController_1.deleteInvite);
+router.get('/public/:token', clientInviteController_1.getPublicForm);
+router.post('/public/:token', clientInviteController_1.submitPublicForm);
+exports.default = router;

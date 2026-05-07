@@ -31,6 +31,7 @@ const upload = (0, multer_1.default)({
     limits: { fileSize: 50 * 1024 * 1024 },
 });
 router.get('/templates', requireAuth, filesController_1.listTemplates);
+router.get('/templates/preview-pdf', requireAuth, filesController_1.previewTemplateAsPdf);
 router.get('/templates/preview', requireAuth, filesController_1.previewTemplateAsHtml);
 router.get('/templates/download', requireAuth, filesController_1.downloadTemplate);
 router.get('/templates/blank.docx', requireAuth, filesController_1.downloadBlank);
@@ -40,6 +41,7 @@ router.get('/:clientId', requireAuth, filesController_1.listFiles);
 router.post('/:clientId', requireAuth, upload.array('files', 50), filesController_1.uploadFiles);
 router.put('/:clientId/:fileId', requireAuth, filesController_1.updateFileMetadata);
 router.post('/:clientId/:fileId/open-local', requireAuth, filesController_1.openFileLocally);
+router.get('/:clientId/:fileId/preview-pdf', requireAuth, filesController_1.previewWordAsPdf);
 router.get('/:clientId/:fileId/preview-html', requireAuth, filesController_1.previewDocxAsHtml);
 router.get('/:clientId/:fileId/preview-excel', requireAuth, filesController_1.previewExcelAsHtml);
 router.get('/:clientId/:fileId/download', requireAuth, filesController_1.downloadFile);

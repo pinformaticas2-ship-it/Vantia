@@ -1,12 +1,20 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const auth_1 = require("../middleware/auth");
 const expedientesController_1 = require("../controllers/expedientesController");
+const noteRoutes_1 = __importDefault(require("./noteRoutes"));
 const router = (0, express_1.Router)();
 router.get('/stats', auth_1.requireAuth, expedientesController_1.getStats);
 router.get('/imports', auth_1.requireAuth, expedientesController_1.getImportHistory);
 router.get('/imports/:id', auth_1.requireAuth, expedientesController_1.getImportBatchDetail);
+router.use('/:id/notes', noteRoutes_1.default);
+router.get('/:id/related', auth_1.requireAuth, expedientesController_1.getRelatedExpedientes);
+router.post('/:id/related', auth_1.requireAuth, expedientesController_1.addRelatedExpediente);
+router.delete('/:id/related/:relatedId', auth_1.requireAuth, expedientesController_1.removeRelatedExpediente);
 router.get('/', auth_1.requireAuth, expedientesController_1.getExpedientes);
 router.post('/imports', auth_1.requireAuth, expedientesController_1.createImportBatch);
 router.patch('/imports/:id', auth_1.requireAuth, expedientesController_1.updateImportBatch);

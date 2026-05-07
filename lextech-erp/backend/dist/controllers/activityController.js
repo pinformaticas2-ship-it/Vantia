@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getUserActivity = exports.getActivityByUsers = exports.addClientActivity = exports.getClientActivity = exports.getActivity = exports.registerLogout = exports.registerLogin = void 0;
+exports.getMyActivity = exports.getUserActivity = exports.getActivityByUsers = exports.addClientActivity = exports.getClientActivity = exports.getActivity = exports.registerLogout = exports.registerLogin = void 0;
 exports.resolveUserName = resolveUserName;
 exports.logActivity = logActivity;
 exports.logActivityForReq = logActivityForReq;
@@ -262,3 +262,34 @@ const getUserActivity = async (req, res) => {
     }
 };
 exports.getUserActivity = getUserActivity;
+const getMyActivity = async (req, res) => {
+    const userId = req.auth?.userId;
+    if (!userId) {
+        return res.status(401).json({ success: false, error: 'No autenticado' });
+    }
+    const limit = Math.min(parseInt(req.query.limit || '100'), 500);
+    const offset = parseInt(req.query.offset || '0');
+    const eventType = req.query.event_type || '';
+    try {
+        const params = [userId, limit, offset];
+        const filter = eventType ? `AND event_type=$4` : '';
+        if (eventType)
+            params.push(eventType);
+        const [rows, total] = await Promise.all([
+            database_1.default.query(`
+        SELECT id, user_id, user_name, action_type,
+               entity_type, entity_id, entity_name,
+               event_type, ip_address, session_id, user_agent, device_id, created_at
+        FROM activity_log
+        WHERE user_id=$1 ${filter}
+        ORDER BY created_at DESC LIMIT $2 OFFSET $3
+      `, params),
+            database_1.default.query(`SELECT COUNT(*)::int AS total FROM activity_log WHERE user_id=$1`, [userId]),
+        ]);
+        return res.json({ success: true, data: rows.rows, total: total.rows[0]?.total ?? 0 });
+    }
+    catch (e) {
+        return res.status(500).json({ success: false, error: pgErr(e) });
+    }
+};
+exports.getMyActivity = getMyActivity;

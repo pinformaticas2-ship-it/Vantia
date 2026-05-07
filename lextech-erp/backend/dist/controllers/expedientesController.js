@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteExpediente = exports.updateExpediente = exports.createExpediente = exports.getExpediente = exports.updateImportBatch = exports.createImportBatch = exports.getImportBatchDetail = exports.getImportHistory = exports.getStats = exports.getExpedientes = void 0;
+exports.deleteExpediente = exports.updateExpediente = exports.createExpediente = exports.removeRelatedExpediente = exports.addRelatedExpediente = exports.getRelatedExpedientes = exports.getExpediente = exports.updateImportBatch = exports.createImportBatch = exports.getImportBatchDetail = exports.getImportHistory = exports.getStats = exports.getExpedientes = void 0;
 const database_1 = __importDefault(require("../config/database"));
 const activityController_1 = require("./activityController");
 function reqUserName(req) {
@@ -23,6 +23,33 @@ function normalizeCount(value) {
     const parsed = Number(value);
     return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 0;
 }
+function nullableText(value) {
+    const normalized = String(value ?? '').trim();
+    return normalized ? normalized : null;
+}
+function nullableNumeric(value) {
+    if (value === undefined || value === null)
+        return null;
+    if (typeof value === 'number')
+        return Number.isFinite(value) ? value : null;
+    const normalized = String(value).trim();
+    if (!normalized || normalized === '-' || normalized === '—')
+        return null;
+    return value;
+}
+function friendlyExpedienteError(e) {
+    const raw = String(e?.message || '');
+    if (e?.code === '22P02' && /type numeric/i.test(raw)) {
+        return 'No se pudo actualizar el expediente porque algún importe o número relacionado venía vacío o con formato inválido.';
+    }
+    if (e?.code === '22P02' && /date/i.test(raw)) {
+        return 'No se pudo actualizar el expediente porque alguna fecha no tiene un formato válido.';
+    }
+    return raw || 'Error al guardar el expediente';
+}
+function normalizeExpedienteRelationPair(a, b) {
+    return a < b ? [a, b] : [b, a];
+}
 const getExpedientes = async (req, res) => {
     try {
         const q = (req.query.q || '').trim();
@@ -37,10 +64,14 @@ const getExpedientes = async (req, res) => {
         let p = 1;
         if (q) {
             conds.push(`(
-        e.descripcion ILIKE $${p} OR e.ref_propia ILIKE $${p}
-        OR e.cliente_nombre ILIKE $${p} OR e.contrario ILIKE $${p}
-        OR e.juzgado ILIKE $${p} OR e.nig ILIKE $${p}
-        OR e.num_autos ILIKE $${p}
+        unaccent(COALESCE(e.descripcion, '')) ILIKE unaccent($${p})
+        OR unaccent(COALESCE(e.ref_propia, '')) ILIKE unaccent($${p})
+        OR unaccent(COALESCE(e.ref_expediente, '')) ILIKE unaccent($${p})
+        OR unaccent(COALESCE(e.cliente_nombre, '')) ILIKE unaccent($${p})
+        OR unaccent(COALESCE(e.contrario, '')) ILIKE unaccent($${p})
+        OR unaccent(COALESCE(e.juzgado, '')) ILIKE unaccent($${p})
+        OR unaccent(COALESCE(e.nig, '')) ILIKE unaccent($${p})
+        OR unaccent(COALESCE(e.num_autos, '')) ILIKE unaccent($${p})
         OR CAST(e.num_exp AS TEXT) ILIKE $${p}
       )`);
             vals.push(`%${q}%`);
@@ -258,6 +289,79 @@ const getExpediente = async (req, res) => {
     }
 };
 exports.getExpediente = getExpediente;
+const getRelatedExpedientes = async (req, res) => {
+    try {
+        const expedienteId = req.params.id;
+        const r = await database_1.default.query(`SELECT e.*
+       FROM expediente_relations rel
+       JOIN expedientes e
+         ON e.id = CASE
+           WHEN rel.expediente_id = $1 THEN rel.related_expediente_id
+           ELSE rel.expediente_id
+         END
+       WHERE rel.expediente_id = $1 OR rel.related_expediente_id = $1
+       ORDER BY e.anio DESC, e.num_exp DESC`, [expedienteId]);
+        res.json({ data: r.rows });
+    }
+    catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+};
+exports.getRelatedExpedientes = getRelatedExpedientes;
+const addRelatedExpediente = async (req, res) => {
+    try {
+        const expedienteId = String(req.params.id || "").trim();
+        const relatedExpedienteId = String(req.body?.related_expediente_id || "").trim();
+        if (!expedienteId || !relatedExpedienteId) {
+            return res.status(400).json({ error: 'Falta el expediente a relacionar' });
+        }
+        if (expedienteId === relatedExpedienteId) {
+            return res.status(400).json({ error: 'No puedes relacionar un expediente consigo mismo' });
+        }
+        const [leftId, rightId] = normalizeExpedienteRelationPair(expedienteId, relatedExpedienteId);
+        const existing = await database_1.default.query(`SELECT 1
+         FROM expediente_relations
+        WHERE expediente_id = $1 AND related_expediente_id = $2
+        LIMIT 1`, [leftId, rightId]);
+        if (existing.rowCount) {
+            return res.status(409).json({ error: 'Estos expedientes ya están relacionados' });
+        }
+        await database_1.default.query(`INSERT INTO expediente_relations (expediente_id, related_expediente_id, created_by)
+       VALUES ($1,$2,$3)
+       ON CONFLICT (expediente_id, related_expediente_id) DO NOTHING`, [leftId, rightId, reqUserName(req)]);
+        const related = await database_1.default.query(`SELECT e.*
+       FROM expediente_relations rel
+       JOIN expedientes e
+         ON e.id = CASE
+           WHEN rel.expediente_id = $1 THEN rel.related_expediente_id
+           ELSE rel.expediente_id
+         END
+       WHERE rel.expediente_id = $1 OR rel.related_expediente_id = $1
+       ORDER BY e.anio DESC, e.num_exp DESC`, [expedienteId]);
+        res.status(201).json({ data: related.rows });
+    }
+    catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+};
+exports.addRelatedExpediente = addRelatedExpediente;
+const removeRelatedExpediente = async (req, res) => {
+    try {
+        const expedienteId = String(req.params.id || "").trim();
+        const relatedId = String(req.params.relatedId || "").trim();
+        if (!expedienteId || !relatedId) {
+            return res.status(400).json({ error: 'Falta el expediente relacionado' });
+        }
+        const [leftId, rightId] = normalizeExpedienteRelationPair(expedienteId, relatedId);
+        await database_1.default.query(`DELETE FROM expediente_relations
+       WHERE expediente_id = $1 AND related_expediente_id = $2`, [leftId, rightId]);
+        res.json({ ok: true });
+    }
+    catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+};
+exports.removeRelatedExpediente = removeRelatedExpediente;
 const createExpediente = async (req, res) => {
     const { anio, ref_propia, ref_expediente, descripcion, tipo, cliente_id, cliente_nombre, contrario, procurador, juzgado, tipo_proc, num_autos, nig, estado, observaciones, fecha_inicio, fecha_cierre, importe, tipos_asunto, cuantia_principal, intereses, costas, cuantia_total, indeterminado, etapa, persona_contacto, contacto, centro, color, } = req.body;
     try {
@@ -280,34 +384,34 @@ const createExpediente = async (req, res) => {
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31)
        RETURNING *`, [
             yr, numExp,
-            ref_propia?.trim() || null, ref_expediente?.trim() || null,
-            descripcion?.trim() || null, tipo || 'judicial',
+            nullableText(ref_propia), nullableText(ref_expediente),
+            nullableText(descripcion), tipo || 'judicial',
             cliente_id || null, nombre,
-            contrario?.trim() || null, procurador?.trim() || null,
-            juzgado?.trim() || null, tipo_proc?.trim() || null,
-            num_autos?.trim() || null, nig?.trim() || null,
+            nullableText(contrario), nullableText(procurador),
+            nullableText(juzgado), nullableText(tipo_proc),
+            nullableText(num_autos), nullableText(nig),
             estado || 'abierto',
-            observaciones?.trim() || null,
+            nullableText(observaciones),
             fecha_inicio || null, fecha_cierre || null,
-            importe || null,
-            tipos_asunto?.trim() || null,
-            cuantia_principal != null ? cuantia_principal : null,
-            intereses != null ? intereses : null,
-            costas != null ? costas : null,
-            cuantia_total != null ? cuantia_total : null,
+            nullableNumeric(importe),
+            nullableText(tipos_asunto),
+            nullableNumeric(cuantia_principal),
+            nullableNumeric(intereses),
+            nullableNumeric(costas),
+            nullableNumeric(cuantia_total),
             indeterminado === true || indeterminado === 'true',
-            etapa?.trim() || null,
-            persona_contacto?.trim() || null,
-            contacto?.trim() || null,
-            centro?.trim() || null,
-            color?.trim() || 'ninguno',
+            nullableText(etapa),
+            nullableText(persona_contacto),
+            nullableText(contacto),
+            nullableText(centro),
+            nullableText(color) || 'ninguno',
             reqUserName(req),
         ]);
         (0, activityController_1.logActivityForReq)(req, `Expediente creado: ${yr}/${numExp} - ${descripcion || ''}`, 'EXPEDIENTE', r.rows[0].id);
         res.status(201).json({ data: r.rows[0] });
     }
     catch (e) {
-        res.status(500).json({ error: e.message });
+        res.status(e?.code === '22P02' ? 400 : 500).json({ error: friendlyExpedienteError(e) });
     }
 };
 exports.createExpediente = createExpediente;
@@ -330,27 +434,27 @@ const updateExpediente = async (req, res) => {
          persona_contacto=$25, contacto=$26, centro=$27, color=$28,
          updated_at=NOW()
        WHERE id=$29 RETURNING *`, [
-            ref_propia?.trim() || null, ref_expediente?.trim() || null,
-            descripcion?.trim() || null, tipo || 'judicial',
+            nullableText(ref_propia), nullableText(ref_expediente),
+            nullableText(descripcion), tipo || 'judicial',
             cliente_id || null, nombre,
-            contrario?.trim() || null, procurador?.trim() || null,
-            juzgado?.trim() || null, tipo_proc?.trim() || null,
-            num_autos?.trim() || null, nig?.trim() || null,
+            nullableText(contrario), nullableText(procurador),
+            nullableText(juzgado), nullableText(tipo_proc),
+            nullableText(num_autos), nullableText(nig),
             estado || 'abierto',
-            observaciones?.trim() || null,
+            nullableText(observaciones),
             fecha_inicio || null, fecha_cierre || null,
-            importe || null,
-            tipos_asunto?.trim() || null,
-            cuantia_principal != null ? cuantia_principal : null,
-            intereses != null ? intereses : null,
-            costas != null ? costas : null,
-            cuantia_total != null ? cuantia_total : null,
+            nullableNumeric(importe),
+            nullableText(tipos_asunto),
+            nullableNumeric(cuantia_principal),
+            nullableNumeric(intereses),
+            nullableNumeric(costas),
+            nullableNumeric(cuantia_total),
             indeterminado === true || indeterminado === 'true',
-            etapa?.trim() || null,
-            persona_contacto?.trim() || null,
-            contacto?.trim() || null,
-            centro?.trim() || null,
-            color?.trim() || 'ninguno',
+            nullableText(etapa),
+            nullableText(persona_contacto),
+            nullableText(contacto),
+            nullableText(centro),
+            nullableText(color) || 'ninguno',
             req.params.id,
         ]);
         if (!r.rows.length)
@@ -358,7 +462,7 @@ const updateExpediente = async (req, res) => {
         res.json({ data: r.rows[0] });
     }
     catch (e) {
-        res.status(500).json({ error: e.message });
+        res.status(e?.code === '22P02' ? 400 : 500).json({ error: friendlyExpedienteError(e) });
     }
 };
 exports.updateExpediente = updateExpediente;

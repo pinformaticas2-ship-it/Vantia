@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.downloadBlank = exports.downloadTemplate = exports.listTemplates = exports.previewTemplateAsHtml = exports.UPLOADS_ROOT = exports.testPreviewImages = exports.previewExcelAsHtml = exports.previewDocxAsHtml = exports.openFileLocally = exports.createBlankDocument = exports.updateFileMetadata = exports.deleteFile = exports.downloadFile = exports.uploadFiles = exports.listFiles = void 0;
+exports.downloadBlank = exports.downloadTemplate = exports.previewTemplateAsPdf = exports.listTemplates = exports.previewTemplateAsHtml = exports.UPLOADS_ROOT = exports.testPreviewImages = exports.previewWordAsPdf = exports.previewExcelAsHtml = exports.previewDocxAsHtml = exports.openFileLocally = exports.createBlankDocument = exports.updateFileMetadata = exports.deleteFile = exports.downloadFile = exports.uploadFiles = exports.listFiles = void 0;
 exports.ensureClientDir = ensureClientDir;
 exports.migrateLocalFoldersStructure = migrateLocalFoldersStructure;
 const path_1 = __importDefault(require("path"));
@@ -12,6 +12,7 @@ const database_1 = __importDefault(require("../config/database"));
 const activityController_1 = require("./activityController");
 const paths_1 = require("../config/paths");
 Object.defineProperty(exports, "UPLOADS_ROOT", { enumerable: true, get: function () { return paths_1.UPLOADS_CLIENTS_ROOT; } });
+const localEditWatchers = new Map();
 const ATTACHMENT_TYPE_FOLDERS = [
     'Sin clasificar',
     'AUTO',
@@ -35,6 +36,62 @@ function ensureLocalClientDir(clientId, attachmentType) {
     if (!fs_1.default.existsSync(dir))
         fs_1.default.mkdirSync(dir, { recursive: true });
     return dir;
+}
+function ensureLocalEditableDir(clientId, attachmentType, fileId) {
+    const baseDir = ensureLocalClientDir(clientId, attachmentType);
+    if (!fileId)
+        return baseDir;
+    const dir = path_1.default.join(baseDir, fileId);
+    if (!fs_1.default.existsSync(dir))
+        fs_1.default.mkdirSync(dir, { recursive: true });
+    return dir;
+}
+function closeLocalEditWatcher(localPath) {
+    const existing = localEditWatchers.get(localPath);
+    if (!existing)
+        return;
+    if (existing.timer)
+        clearTimeout(existing.timer);
+    try {
+        existing.watcher.close();
+    }
+    catch (_) { }
+    localEditWatchers.delete(localPath);
+}
+function watchLocalEditableFile(localPath, serverPath, fileId, clientId) {
+    closeLocalEditWatcher(localPath);
+    let lastSyncedMtimeMs = fs_1.default.existsSync(localPath) ? fs_1.default.statSync(localPath).mtimeMs : 0;
+    const syncBackToServer = async () => {
+        try {
+            if (!fs_1.default.existsSync(localPath) || !fs_1.default.existsSync(serverPath))
+                return;
+            const localStat = fs_1.default.statSync(localPath);
+            if (localStat.mtimeMs <= lastSyncedMtimeMs)
+                return;
+            fs_1.default.copyFileSync(localPath, serverPath);
+            lastSyncedMtimeMs = fs_1.default.statSync(localPath).mtimeMs;
+            await database_1.default.query(`UPDATE client_files
+         SET size_bytes = $1
+         WHERE id = $2 AND client_id = $3`, [localStat.size, fileId, clientId]);
+        }
+        catch (_) {
+        }
+    };
+    const watcher = fs_1.default.watch(localPath, () => {
+        const current = localEditWatchers.get(localPath);
+        if (!current)
+            return;
+        if (current.timer)
+            clearTimeout(current.timer);
+        current.timer = setTimeout(() => {
+            syncBackToServer().catch(() => { });
+        }, 1200);
+    });
+    localEditWatchers.set(localPath, {
+        watcher,
+        timer: null,
+        lastSyncedMtimeMs,
+    });
 }
 async function initClientFolders(clientId) {
     try {
@@ -273,20 +330,24 @@ exports.createBlankDocument = createBlankDocument;
 const openFileLocally = async (req, res) => {
     const { clientId, fileId } = req.params;
     try {
-        const result = await database_1.default.query(`SELECT stored_name, original_name FROM client_files WHERE id = $1 AND client_id = $2`, [fileId, clientId]);
+        const result = await database_1.default.query(`SELECT stored_name, original_name, attachment_type FROM client_files WHERE id = $1 AND client_id = $2`, [fileId, clientId]);
         if (result.rows.length === 0) {
             return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
         }
-        const { stored_name, original_name } = result.rows[0];
+        const { stored_name, original_name, attachment_type } = result.rows[0];
         const serverPath = path_1.default.join(paths_1.UPLOADS_CLIENTS_ROOT, clientId, stored_name);
         if (!fs_1.default.existsSync(serverPath)) {
             return res.status(404).json({ success: false, error: 'Archivo no encontrado en disco.' });
         }
-        const typeResult = await database_1.default.query(`SELECT attachment_type FROM client_files WHERE id = $1 AND client_id = $2`, [fileId, clientId]);
-        const attachType = typeResult.rows[0]?.attachment_type || 'Sin clasificar';
-        const localDir = ensureLocalClientDir(clientId, attachType);
+        const localDir = ensureLocalEditableDir(clientId, attachment_type, fileId);
         const localPath = path_1.default.join(localDir, original_name);
-        fs_1.default.copyFileSync(serverPath, localPath);
+        const serverStat = fs_1.default.statSync(serverPath);
+        const shouldRefreshLocal = !fs_1.default.existsSync(localPath) ||
+            fs_1.default.statSync(localPath).mtimeMs < serverStat.mtimeMs;
+        if (shouldRefreshLocal) {
+            fs_1.default.copyFileSync(serverPath, localPath);
+        }
+        watchLocalEditableFile(localPath, serverPath, fileId, clientId);
         const { spawn } = require('child_process');
         if (process.platform === 'win32') {
             spawn('cmd', ['/c', 'start', '', localPath], { detached: true, stdio: 'ignore' }).unref();
@@ -1051,6 +1112,168 @@ except Exception:
     }
 };
 exports.previewExcelAsHtml = previewExcelAsHtml;
+const previewWordAsPdf = async (req, res) => {
+    const { clientId, fileId } = req.params;
+    try {
+        const result = await database_1.default.query(`SELECT stored_name, original_name, mimetype FROM client_files WHERE id = $1 AND client_id = $2`, [fileId, clientId]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
+        }
+        const { stored_name, original_name, mimetype } = result.rows[0];
+        const ext = path_1.default.extname(original_name || stored_name || '').toLowerCase();
+        const isWord = mimetype?.includes('word') ||
+            mimetype?.includes('wordprocessingml') ||
+            ext === '.doc' ||
+            ext === '.docx';
+        if (!isWord) {
+            return res.status(400).json({ success: false, error: 'Este archivo no es Word.' });
+        }
+        const sourcePath = path_1.default.join(paths_1.UPLOADS_CLIENTS_ROOT, clientId, stored_name);
+        if (!fs_1.default.existsSync(sourcePath)) {
+            return res.status(404).json({ success: false, error: 'Archivo no encontrado en disco.' });
+        }
+        const srcStat = fs_1.default.statSync(sourcePath);
+        const cacheKey = Buffer.from(`${clientId}:${fileId}:${sourcePath}`).toString('hex').slice(0, 32);
+        const tempDir = path_1.default.join(paths_1.TEMP_ROOT, `word_preview_${cacheKey}`);
+        if (!fs_1.default.existsSync(tempDir))
+            fs_1.default.mkdirSync(tempDir, { recursive: true });
+        const outputPdf = path_1.default.join(tempDir, `preview.pdf`);
+        if (fs_1.default.existsSync(outputPdf)) {
+            const pdfStat = fs_1.default.statSync(outputPdf);
+            if (pdfStat.mtimeMs >= srcStat.mtimeMs) {
+                res.setHeader('Content-Type', 'application/pdf');
+                res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent((original_name || 'preview').replace(/\.(docx?|DOCX?)$/, '.pdf'))}"`);
+                return res.sendFile(outputPdf);
+            }
+        }
+        try {
+            if (fs_1.default.existsSync(outputPdf))
+                fs_1.default.unlinkSync(outputPdf);
+        }
+        catch (_) { }
+        const converterScript = path_1.default.join(tempDir, `word_to_pdf_${cacheKey}.py`);
+        const converterCode = `import sys, os, subprocess, shutil
+
+source_path = sys.argv[1]
+output_pdf = sys.argv[2]
+converted = False
+
+def convert_with_word_com(src, out_pdf):
+    import win32com.client
+    word = win32com.client.Dispatch("Word.Application")
+    word.Visible = False
+    word.DisplayAlerts = 0
+    doc = None
+    try:
+        doc = word.Documents.Open(src, False, True)
+        doc.SaveAs(out_pdf, FileFormat=17)
+    finally:
+        if doc is not None:
+            try: doc.Close(False)
+            except Exception: pass
+        try: word.Quit()
+        except Exception: pass
+
+try:
+    convert_with_word_com(source_path, output_pdf)
+    if os.path.exists(output_pdf):
+        converted = True
+except Exception:
+    pass
+
+if not converted:
+    try:
+        src_esc = source_path.replace("'", "''")
+        out_esc = output_pdf.replace("'", "''")
+        ps_cmd = (
+            "$ErrorActionPreference='Stop';"
+            "$w=New-Object -ComObject Word.Application;"
+            "$w.Visible=$false;$w.DisplayAlerts=0;"
+            "$d=$w.Documents.Open('" + src_esc + "',$false,$true);"
+            "$d.SaveAs('" + out_esc + "',17);"
+            "$d.Close($false);$w.Quit()"
+        )
+        r = subprocess.run(
+            ['powershell', '-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', ps_cmd],
+            timeout=90, capture_output=True
+        )
+        if r.returncode == 0 and os.path.exists(output_pdf):
+            converted = True
+    except Exception:
+        pass
+
+if not converted:
+    if sys.platform == 'win32':
+        soffice_paths = [
+            r'C:\\Program Files\\LibreOffice\\program\\soffice.exe',
+            r'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe',
+            'soffice',
+        ]
+    else:
+        soffice_paths = ['soffice', '/usr/bin/soffice', '/usr/lib/libreoffice/program/soffice']
+    out_dir = os.path.dirname(output_pdf)
+    for soffice in soffice_paths:
+        try:
+            try:
+                candidate = os.path.join(out_dir, os.path.splitext(os.path.basename(source_path))[0] + '.pdf')
+                if os.path.exists(candidate):
+                    os.remove(candidate)
+            except Exception:
+                pass
+            r = subprocess.run(
+                [soffice, '--headless', '--convert-to', 'pdf', '--outdir', out_dir, source_path],
+                timeout=90, capture_output=True
+            )
+            candidate = os.path.join(out_dir, os.path.splitext(os.path.basename(source_path))[0] + '.pdf')
+            if os.path.exists(candidate):
+                if candidate != output_pdf:
+                    shutil.move(candidate, output_pdf)
+                if os.path.exists(output_pdf):
+                    converted = True
+                    break
+        except Exception:
+            continue
+
+if converted and os.path.exists(output_pdf):
+    print('OK')
+    sys.exit(0)
+print('FAILED')
+sys.exit(1)
+`;
+        fs_1.default.writeFileSync(converterScript, converterCode, 'utf-8');
+        const { execFile } = require('child_process');
+        const pythonCmds = process.platform === 'win32' ? ['python', 'py', 'python3'] : ['python3', 'python'];
+        const tryPython = (index) => {
+            if (index >= pythonCmds.length) {
+                try {
+                    fs_1.default.unlinkSync(converterScript);
+                }
+                catch (_) { }
+                return res.status(503).json({
+                    success: false,
+                    error: 'No se pudo convertir el documento Word a PDF para la vista previa.',
+                });
+            }
+            execFile(pythonCmds[index], [converterScript, sourcePath, outputPdf], { timeout: 120000 }, (err) => {
+                const success = !err && fs_1.default.existsSync(outputPdf);
+                if (!success)
+                    return tryPython(index + 1);
+                try {
+                    fs_1.default.unlinkSync(converterScript);
+                }
+                catch (_) { }
+                res.setHeader('Content-Type', 'application/pdf');
+                res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent((original_name || 'preview').replace(/\.(docx?|DOCX?)$/, '.pdf'))}"`);
+                return res.sendFile(outputPdf);
+            });
+        };
+        return tryPython(0);
+    }
+    catch (err) {
+        return res.status(500).json({ success: false, error: err.message });
+    }
+};
+exports.previewWordAsPdf = previewWordAsPdf;
 const testPreviewImages = async (req, res) => {
     const testHtml = `<?xml version="1.0" encoding="UTF-8"?><html><head><meta charset="UTF-8"><style>body { font-family: Calibri, Arial, sans-serif; margin: 20px; } h1 { color: #333; } p { margin: 12px 0; } img { max-width: 100%; height: auto; border-radius: 4px; margin: 10px 0; border: 2px solid #ddd; }</style></head><body><h1>Test Preview with Base64 Images</h1><p>This is a test document to verify images display correctly in previews.</p><p>Simple red pixel below:</p><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==" alt="test image"/><p>If you see a red square above, images work correctly!</p></body></html>`;
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -1810,6 +2033,162 @@ const listTemplates = (_req, res) => {
     }
 };
 exports.listTemplates = listTemplates;
+const previewTemplateAsPdf = async (req, res) => {
+    const relPath = req.query.path;
+    if (!relPath)
+        return res.status(400).json({ success: false, error: 'Parámetro path requerido.' });
+    const resolved = path_1.default.resolve(DOCPLANT_ROOT, relPath);
+    const docplantRoot = path_1.default.resolve(DOCPLANT_ROOT);
+    if (!resolved.startsWith(docplantRoot + path_1.default.sep) && resolved !== docplantRoot) {
+        return res.status(403).json({ success: false, error: 'Acceso denegado.' });
+    }
+    if (!fs_1.default.existsSync(resolved)) {
+        return res.status(404).json({ success: false, error: 'Plantilla no encontrada.' });
+    }
+    const ext = path_1.default.extname(resolved).toLowerCase();
+    if (ext !== '.doc' && ext !== '.docx') {
+        return res.status(400).json({ success: false, error: 'Solo se puede generar PDF para plantillas Word.' });
+    }
+    try {
+        const srcStat = fs_1.default.statSync(resolved);
+        const cacheKey = Buffer.from(`tpl:${relPath}:${resolved}`).toString('hex').slice(0, 32);
+        const tempDir = path_1.default.join(paths_1.TEMP_ROOT, `tpl_preview_${cacheKey}`);
+        if (!fs_1.default.existsSync(tempDir))
+            fs_1.default.mkdirSync(tempDir, { recursive: true });
+        const outputPdf = path_1.default.join(tempDir, `preview.pdf`);
+        if (fs_1.default.existsSync(outputPdf)) {
+            const pdfStat = fs_1.default.statSync(outputPdf);
+            if (pdfStat.mtimeMs >= srcStat.mtimeMs) {
+                res.setHeader('Content-Type', 'application/pdf');
+                res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(path_1.default.basename(resolved).replace(/\.(docx?|DOCX?)$/, '.pdf'))}"`);
+                return res.sendFile(outputPdf);
+            }
+        }
+        try {
+            if (fs_1.default.existsSync(outputPdf))
+                fs_1.default.unlinkSync(outputPdf);
+        }
+        catch (_) { }
+        const converterScript = path_1.default.join(tempDir, `tpl_word_to_pdf_${cacheKey}.py`);
+        const converterCode = `import sys, os, subprocess, shutil
+
+source_path = sys.argv[1]
+output_pdf = sys.argv[2]
+converted = False
+
+def convert_with_word_com(src, out_pdf):
+    import win32com.client
+    word = win32com.client.Dispatch("Word.Application")
+    word.Visible = False
+    word.DisplayAlerts = 0
+    doc = None
+    try:
+        doc = word.Documents.Open(src, False, True)
+        doc.SaveAs(out_pdf, FileFormat=17)
+    finally:
+        if doc is not None:
+            try: doc.Close(False)
+            except Exception: pass
+        try: word.Quit()
+        except Exception: pass
+
+try:
+    convert_with_word_com(source_path, output_pdf)
+    if os.path.exists(output_pdf):
+        converted = True
+except Exception:
+    pass
+
+if not converted:
+    try:
+        src_esc = source_path.replace("'", "''")
+        out_esc = output_pdf.replace("'", "''")
+        ps_cmd = (
+            "$ErrorActionPreference='Stop';"
+            "$w=New-Object -ComObject Word.Application;"
+            "$w.Visible=$false;$w.DisplayAlerts=0;"
+            "$d=$w.Documents.Open('" + src_esc + "',$false,$true);"
+            "$d.SaveAs('" + out_esc + "',17);"
+            "$d.Close($false);$w.Quit()"
+        )
+        r = subprocess.run(
+            ['powershell', '-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', ps_cmd],
+            timeout=90, capture_output=True
+        )
+        if r.returncode == 0 and os.path.exists(output_pdf):
+            converted = True
+    except Exception:
+        pass
+
+if not converted:
+    if sys.platform == 'win32':
+        soffice_paths = [
+            r'C:\\Program Files\\LibreOffice\\program\\soffice.exe',
+            r'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe',
+            'soffice',
+        ]
+    else:
+        soffice_paths = ['soffice', '/usr/bin/soffice', '/usr/lib/libreoffice/program/soffice']
+    out_dir = os.path.dirname(output_pdf)
+    for soffice in soffice_paths:
+        try:
+            try:
+                candidate = os.path.join(out_dir, os.path.splitext(os.path.basename(source_path))[0] + '.pdf')
+                if os.path.exists(candidate):
+                    os.remove(candidate)
+            except Exception:
+                pass
+            r = subprocess.run(
+                [soffice, '--headless', '--convert-to', 'pdf', '--outdir', out_dir, source_path],
+                timeout=90, capture_output=True
+            )
+            candidate = os.path.join(out_dir, os.path.splitext(os.path.basename(source_path))[0] + '.pdf')
+            if os.path.exists(candidate):
+                if candidate != output_pdf:
+                    shutil.move(candidate, output_pdf)
+                if os.path.exists(output_pdf):
+                    converted = True
+                    break
+        except Exception:
+            continue
+
+if converted and os.path.exists(output_pdf):
+    print('OK')
+    sys.exit(0)
+print('FAILED')
+sys.exit(1)
+`;
+        fs_1.default.writeFileSync(converterScript, converterCode, 'utf-8');
+        const { execFile } = require('child_process');
+        const pythonCmds = process.platform === 'win32' ? ['python', 'py', 'python3'] : ['python3', 'python'];
+        const tryPython = (index) => {
+            if (index >= pythonCmds.length) {
+                try {
+                    fs_1.default.unlinkSync(converterScript);
+                }
+                catch (_) { }
+                return res.status(503).json({ success: false, error: 'No se pudo convertir la plantilla Word a PDF para la vista previa.' });
+            }
+            execFile(pythonCmds[index], [converterScript, resolved, outputPdf], { timeout: 120000 }, (err) => {
+                const success = !err && fs_1.default.existsSync(outputPdf);
+                if (!success)
+                    return tryPython(index + 1);
+                try {
+                    fs_1.default.unlinkSync(converterScript);
+                }
+                catch (_) { }
+                res.setHeader('Content-Type', 'application/pdf');
+                res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(path_1.default.basename(resolved).replace(/\.(docx?|DOCX?)$/, '.pdf'))}"`);
+                return res.sendFile(outputPdf);
+            });
+        };
+        return tryPython(0);
+    }
+    catch (err) {
+        return res.status(500).json({ success: false, error: err.message });
+    }
+};
+exports.previewTemplateAsPdf = previewTemplateAsPdf;
 const downloadTemplate = (req, res) => {
     const filePath = req.query.path;
     if (!filePath)

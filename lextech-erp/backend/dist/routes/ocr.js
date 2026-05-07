@@ -21,5 +21,9 @@ const upload = (0, multer_1.default)({
         }
     },
 });
-router.post('/dni', auth_1.requireAuth, upload.single('dni_image'), ocrController_1.scanDNI);
+router.post('/dni', auth_1.requireAuth, upload.fields([
+    { name: 'dni_front_image', maxCount: 1 },
+    { name: 'dni_back_image', maxCount: 1 },
+    { name: 'dni_image', maxCount: 1 },
+]), ocrController_1.scanDNI);
 exports.default = router;

@@ -9,7 +9,17 @@ const fs_1 = __importDefault(require("fs"));
 const database_1 = __importDefault(require("../config/database"));
 const activityController_1 = require("./activityController");
 const paths_1 = require("../config/paths");
-const nullIfEmpty = (v) => (v === '' || v === undefined ? null : v);
+const nullIfEmpty = (v) => {
+    if (v === undefined || v === null)
+        return null;
+    if (typeof v === 'string') {
+        const normalized = v.trim();
+        if (!normalized || normalized === '—' || normalized === '-')
+            return null;
+        return normalized;
+    }
+    return v;
+};
 function reqUserName(req) {
     const c = req.auth?.sessionClaims;
     if (!c)
@@ -23,6 +33,16 @@ function reqUserName(req) {
         || 'Sistema';
 }
 const pgErr = (e) => `${e?.message || String(e)}${e?.detail ? ' | detail: ' + e.detail : ''}${e?.code ? ' | code: ' + e.code : ''}`;
+const friendlyEntityError = (e) => {
+    const raw = String(e?.message || '');
+    if (e?.code === '22P02' && /type numeric/i.test(raw)) {
+        return 'No se pudo guardar el cliente porque algún campo numérico tiene un formato inválido. Revisa código postal, teléfonos y otros campos opcionales.';
+    }
+    if (e?.code === '22P02' && /date/i.test(raw)) {
+        return 'No se pudo guardar el cliente porque alguna fecha no tiene un formato válido.';
+    }
+    return pgErr(e);
+};
 const getEntities = async (req, res) => {
     try {
         const search = (req.query.search || '').trim();
@@ -59,7 +79,7 @@ const getEntities = async (req, res) => {
         e.first_name, e.last_name, e.commercial_name, e.nif_cif,
         e.email, e.phone_1, e.phone_mobile,
         e.address_town, e.address_province,
-        e.photo_url, e.created_at, e.date_alta, e.lopd,
+        e.photo_url, e.created_at, e.date_alta, e.lopd, e.color,
         (SELECT COUNT(*) FROM activity_log al
          WHERE al.entity_id = e.id AND al.entity_type = 'CLIENT'
            AND al.action_type NOT LIKE 'Nota%'
@@ -187,7 +207,8 @@ const createEntity = async (req, res) => {
         if (error.code === '23505') {
             return res.status(409).json({ success: false, error: 'Este NIF/CIF ya está registrado.' });
         }
-        res.status(500).json({ success: false, error: pgErr(error) });
+        const status = error?.code === '22P02' ? 400 : 500;
+        res.status(status).json({ success: false, error: friendlyEntityError(error) });
     }
 };
 exports.createEntity = createEntity;
@@ -279,7 +300,8 @@ const updateEntity = async (req, res) => {
         if (error.code === '23505') {
             return res.status(409).json({ success: false, error: 'Este NIF/CIF ya está registrado.' });
         }
-        res.status(500).json({ success: false, error: pgErr(error) });
+        const status = error?.code === '22P02' ? 400 : 500;
+        res.status(status).json({ success: false, error: friendlyEntityError(error) });
     }
 };
 exports.updateEntity = updateEntity;
@@ -288,7 +310,7 @@ const patchEntity = async (req, res) => {
     const ALLOWED = [
         'client_status', 'date_baja', 'date_alta',
         'lopd', 'center', 'commercial_communications',
-        'type', 'commercial_name', 'website',
+        'type', 'commercial_name', 'website', 'color',
     ];
     const entries = Object.entries(req.body).filter(([k]) => ALLOWED.includes(k));
     if (entries.length === 0) {
