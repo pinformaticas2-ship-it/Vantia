@@ -1282,7 +1282,7 @@ const testPreviewImages = async (req, res) => {
 exports.testPreviewImages = testPreviewImages;
 const DOCPLANT_ROOT = process.env.DOCPLANT_PATH
     ? path_1.default.resolve(process.env.DOCPLANT_PATH)
-    : path_1.default.join(__dirname, '../../../DocPlant');
+    : path_1.default.join(process.cwd(), 'DocPlant');
 const BLANK_DOCX_B64 = 'UEsDBBQAAAAIALxZa1zdyKT7KwEAAJ4DAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbLWTTU8CMRCG' +
     '7/6Kpley29WDMYaFgx9H5YA/oGlnobFf6QzI/ntnATkYhBjx2M687/NOMx1PN8GLNRR0Kbbyum6k' +
     'gGiSdXHRyrf5c3UnBZKOVvsUoZU9oJxOrsbzPgMKFkds5ZIo3yuFZglBY50yRK50qQRNfCwLlbV5' +

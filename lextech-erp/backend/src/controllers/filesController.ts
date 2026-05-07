@@ -1446,10 +1446,10 @@ export { ensureClientDir, UPLOADS_ROOT };
 // PLANTILLAS — DocPlant
 // ─────────────────────────────────────────────────────────────
 
-// DocPlant vive 3 niveles arriba de backend/src/controllers/
+// DocPlant está en la raíz del backend (junto a package.json)
 const DOCPLANT_ROOT = process.env.DOCPLANT_PATH
   ? path.resolve(process.env.DOCPLANT_PATH)
-  : path.join(__dirname, '../../../DocPlant');
+  : path.join(process.cwd(), 'DocPlant');
 
 // Blank .docx completo — generado y verificado con Python/zipfile
 const BLANK_DOCX_B64 =
