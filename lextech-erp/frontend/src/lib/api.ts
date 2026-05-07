@@ -12,10 +12,8 @@ function stripTrailingSlash(value: string): string {
 function getHostedBackendFallback(): string {
   if (typeof window === 'undefined') return '';
   const host = window.location.hostname.toLowerCase();
-  if (host.endsWith('.vercel.app')) {
-    return DEFAULT_PRODUCTION_BACKEND_BASE_URL;
-  }
-  return '';
+  const isLocal = host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0';
+  return isLocal ? '' : DEFAULT_PRODUCTION_BACKEND_BASE_URL;
 }
 
 export function getApiBaseUrl(): string {
