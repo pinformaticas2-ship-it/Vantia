@@ -80,12 +80,12 @@ app.use('/api/activity', activityRoutes);
 app.use('/api/vantia', vantiaRoutes);
 app.use('/api/files',  filesRoutes);
 app.use('/api/tasks',       tasksRoutes);
+app.use('/api/expedientes/documents', documentImportRoutes);
 app.use('/api/expedientes', expedientesRoutes);
 app.use('/api/agenda',      agendaRoutes);
 app.use('/api/chat',              chatRoutes);
 app.use('/api/email',             emailRoutes);
 app.use('/api/whatsapp',          whatsappRoutes);
-app.use('/api/expedientes/documents', documentImportRoutes);
 app.use('/api/documental',        documentalRoutes);
 app.use('/api/clientes/invites',  clientInviteRoutes);
 

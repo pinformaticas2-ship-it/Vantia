@@ -31,8 +31,11 @@ const LOCAL_DRAFTS_KEY = 'lextech-email-drafts-v1';
 // Key de pineados es por cuenta (evita que se mezclen Gmail e IMAP)
 const pinnedKey = (accountKey: string) => `lextech-email-pinned-${accountKey}`;
 const API = (() => {
-  const env = import.meta.env.VITE_API_BASE_URL?.trim();
-  if (env) return env + '/api';
+  const raw = import.meta.env.VITE_API_BASE_URL?.trim();
+  if (raw) {
+    const base = /^https?:\/\//i.test(raw) ? raw : 'https://' + raw;
+    return base.replace(/\/+$/, '') + '/api';
+  }
   if (typeof window !== 'undefined') {
     const host = window.location.hostname.toLowerCase();
     const isLocal = host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0';

@@ -1,8 +1,13 @@
 let _clientIp: string | null = null;
 let _ipPromise: Promise<string | null> | null = null;
 const DEVICE_ID_KEY = 'lextech_device_id';
-const RAW_API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.trim() || '';
-const RAW_UPLOADS_BASE_URL = import.meta.env.VITE_UPLOADS_BASE_URL?.trim() || '';
+function ensureProtocol(url: string): string {
+  if (!url || /^https?:\/\//i.test(url)) return url;
+  return 'https://' + url;
+}
+
+const RAW_API_BASE_URL = ensureProtocol(import.meta.env.VITE_API_BASE_URL?.trim() || '');
+const RAW_UPLOADS_BASE_URL = ensureProtocol(import.meta.env.VITE_UPLOADS_BASE_URL?.trim() || '');
 const DEFAULT_PRODUCTION_BACKEND_BASE_URL = 'https://gallant-curiosity-production-0aad.up.railway.app';
 
 function stripTrailingSlash(value: string): string {

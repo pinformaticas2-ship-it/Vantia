@@ -21,7 +21,7 @@ import ColumnVisibilityModal from "../components/ColumnVisibilityModal";
 import BackButton from "../components/BackButton";
 
 type ViewMode = "list" | "detail" | "multiselect" | "csvImport" | "csvImportConfigure" | "csvImportReview" | "csvImportComplete" | "csvImportHistory" | "csvImportErrorDetail" | "documentImport" | "documentImportVerify";
-import { safeJson } from "../lib/api";
+import { safeJson, resolveApiUrl } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
 import { TIPOS, ESTADOS, EXP_EMPTY, ExpedienteModal, lbl, inp } from "../components/ExpedienteModal";
 import AppSelect from "../components/AppSelect";
@@ -3774,7 +3774,7 @@ export default function ExpedienteList() {
 
       const data = await new Promise<any>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-        xhr.open("POST", "/api/expedientes/documents/upload");
+        xhr.open("POST", resolveApiUrl("/api/expedientes/documents/upload"));
         xhr.setRequestHeader("Authorization", `Bearer ${token}`);
         xhr.upload.onprogress = (event) => {
           if (event.lengthComputable) {
