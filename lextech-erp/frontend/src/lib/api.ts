@@ -3,17 +3,29 @@ let _ipPromise: Promise<string | null> | null = null;
 const DEVICE_ID_KEY = 'lextech_device_id';
 const RAW_API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.trim() || '';
 const RAW_UPLOADS_BASE_URL = import.meta.env.VITE_UPLOADS_BASE_URL?.trim() || '';
+const DEFAULT_PRODUCTION_BACKEND_BASE_URL = 'https://gallant-curiosity-production-0aad.up.railway.app';
 
 function stripTrailingSlash(value: string): string {
   return value.replace(/\/+$/, '');
 }
 
+function getHostedBackendFallback(): string {
+  if (typeof window === 'undefined') return '';
+  const host = window.location.hostname.toLowerCase();
+  if (host.endsWith('.vercel.app')) {
+    return DEFAULT_PRODUCTION_BACKEND_BASE_URL;
+  }
+  return '';
+}
+
 export function getApiBaseUrl(): string {
-  return stripTrailingSlash(RAW_API_BASE_URL);
+  const base = RAW_API_BASE_URL || getHostedBackendFallback();
+  return stripTrailingSlash(base);
 }
 
 export function getUploadsBaseUrl(): string {
-  return stripTrailingSlash(RAW_UPLOADS_BASE_URL || RAW_API_BASE_URL);
+  const base = RAW_UPLOADS_BASE_URL || RAW_API_BASE_URL || getHostedBackendFallback();
+  return stripTrailingSlash(base);
 }
 
 export function resolveApiUrl(input: string): string {
@@ -169,12 +181,15 @@ export async function safeJson(response: Response, options?: { authRetried?: boo
   const contentType = response.headers.get('content-type') || '';
 
   if (!contentType.includes('application/json')) {
+    const simplifiedUrl = response.url || 'ruta desconocida';
     const statusMsg =
       response.status === 404
-        ? 'Ruta no encontrada (404)'
+        ? `Ruta no encontrada (404): ${simplifiedUrl}`
+        : response.status === 405
+          ? `Metodo no permitido (405): ${simplifiedUrl}`
         : response.status === 502 || response.status === 503 || response.status === 0
-          ? 'Backend no disponible; verifica que el servidor este corriendo en el puerto 4000'
-          : `Error del servidor (${response.status})`;
+          ? `Backend no disponible: ${simplifiedUrl}`
+          : `Error del servidor (${response.status}) en ${simplifiedUrl} [content-type=${contentType || 'desconocido'}]`;
 
     throw new Error(statusMsg);
   }
