@@ -1,4 +1,6 @@
 {
+  "buildCommand": "npm run vercel-build",
+  "outputDirectory": "frontend/dist",
   "rewrites": [
     {
       "source": "/api/:path*",
@@ -9,7 +11,7 @@
       "destination": "https://gallant-curiosity-production-0aad.up.railway.app/uploads/:path*"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!api/|uploads/|assets/|favicon\\.svg|vite\\.svg).*)",
       "destination": "/index.html"
     }
   ]
