@@ -3,7 +3,15 @@
   "outputDirectory": "frontend/dist",
   "rewrites": [
     {
-      "source": "/((?!api/|assets/|favicon\\.svg|vite\\.svg).*)",
+      "source": "/api/:path*",
+      "destination": "https://gallant-curiosity-production-0aad.up.railway.app/api/:path*"
+    },
+    {
+      "source": "/uploads/:path*",
+      "destination": "https://gallant-curiosity-production-0aad.up.railway.app/uploads/:path*"
+    },
+    {
+      "source": "/((?!api/|uploads/|assets/|favicon\\.svg|vite\\.svg).*)",
       "destination": "/index.html"
     }
   ]
