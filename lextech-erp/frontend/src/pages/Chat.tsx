@@ -13,7 +13,7 @@ import {
   Share2, ExternalLink, Copy, Minus, RotateCcw, Sparkles, Clock3, Eye,
   PawPrint, UtensilsCrossed, Trophy, Flag, User, type LucideIcon,
 } from "lucide-react";
-import { safeJson } from "../lib/api";
+import { safeJson, resolveUploadUrl } from "../lib/api";
 import { createPortal } from "react-dom";
 import { useChatUnread } from "../contexts/ChatUnreadContext";
 import BackButton from "../components/BackButton";
@@ -254,11 +254,7 @@ const EmojiImg = React.memo(function EmojiImg({
 const fmtTime = (iso: string) =>
   new Date(iso).toLocaleTimeString("es-ES", { hour:"2-digit", minute:"2-digit" });
 
-const mediaUrl = (url?: string | null) => {
-  if (!url) return null;
-  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) return url;
-  return `${API_ORIGIN}${url}`;
-};
+const mediaUrl = (url?: string | null) => resolveUploadUrl(url);
 
 function fmtDateLabel(iso: string) {
   const d = new Date(iso);
