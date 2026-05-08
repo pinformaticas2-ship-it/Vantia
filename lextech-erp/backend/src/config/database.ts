@@ -40,7 +40,7 @@ const pool = new Pool({
   ssl: shouldUseSsl ? { rejectUnauthorized: false } : false,
   max: isSupabasePooler ? 5 : 20,
   idleTimeoutMillis: isSupabasePooler ? 10_000 : 30_000,
-  connectionTimeoutMillis: 5_000,
+  connectionTimeoutMillis: 15_000,
   allowExitOnIdle: false,
   keepAlive: true,
   keepAliveInitialDelayMillis: 10_000,
@@ -49,7 +49,9 @@ const pool = new Pool({
 
 function isTransientPoolerError(error: any) {
   const message = String(error?.message || '');
-  return error?.code === 'XX000' && /DbHandler exited/i.test(message);
+  if (error?.code === 'XX000' && /DbHandler exited/i.test(message)) return true;
+  if (/connection terminated due to connection timeout/i.test(message)) return true;
+  return false;
 }
 
 const originalQuery = pool.query.bind(pool);

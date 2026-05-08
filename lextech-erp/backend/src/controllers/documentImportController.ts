@@ -21,7 +21,7 @@ import { UPLOADS_ROOT, UPLOADS_CLIENTS_ROOT } from '../config/paths';
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
 const genAI = GEMINI_API_KEY ? new GoogleGenerativeAI(GEMINI_API_KEY) : null;
-const GEMINI_MODELS = ['gemini-2.5-flash'];
+const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const openaiClient = OPENAI_API_KEY ? new OpenAI({ apiKey: OPENAI_API_KEY }) : null;
 

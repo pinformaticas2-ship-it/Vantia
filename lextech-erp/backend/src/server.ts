@@ -153,6 +153,17 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 runMigrations().then(() => {
   app.listen(PORT, async () => {
     console.log(`🛡️  VANTIA Backend corriendo en http://localhost:${PORT}`);
+
+    // Validar formato de GEMINI_API_KEY en arranque
+    const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
+    if (!geminiKey) {
+      console.warn('⚠️  GEMINI_API_KEY no configurada — importación de documentos y VantIA desactivados.');
+    } else if (!geminiKey.startsWith('AIzaSy')) {
+      console.error('❌ GEMINI_API_KEY inválida (debe empezar por AIzaSy...). La clave actual parece un token OAuth, no una API key de Google AI Studio. Obtén una en https://aistudio.google.com/apikey');
+    } else {
+      console.log('✅ GEMINI_API_KEY configurada correctamente.');
+    }
+
     if (SHOULD_START_LOCAL_WATCHER) {
       startLocalFilesWatcher();
       migrateLocalFoldersStructure();
