@@ -41,7 +41,11 @@ process.on('unhandledRejection', (reason) => {
 process.on('uncaughtException', (error) => {
     console.error('❌ Uncaught exception:', error);
 });
-app.use((0, helmet_1.default)({ crossOriginResourcePolicy: false }));
+app.use((0, helmet_1.default)({
+    crossOriginResourcePolicy: false,
+    frameguard: false,
+    contentSecurityPolicy: false,
+}));
 app.use((0, cors_1.default)({
     origin: (origin, callback) => {
         if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
