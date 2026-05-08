@@ -2100,8 +2100,8 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
 
     const token = await getToken({ skipCache: true });
 
-    // Detectar tipo de archivo
-    const isWord  = f.mimetype?.includes('wordprocessingml') || f.original_name?.match(/\.docx?$/i);
+    // Detectar tipo de archivo (.doc no soportado en preview, solo .docx)
+    const isWord  = f.mimetype?.includes('wordprocessingml') || /\.docx$/i.test(f.original_name || '');
     const isExcel = isExcelFile(f.mimetype || '', f.original_name || '');
 
     const fallbackHtmlPreview = async () => {
@@ -2157,13 +2157,7 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
     });
 
     if (!res.ok) {
-      const errorData = await res.json().catch(() => ({}));
-      const errorMsg = errorData.error || `Error ${res.status}`;
-      const errorHtml = `<html><body style="font-family: Arial; margin: 20px; color: #d32f2f;"><h2>Error al cargar vista previa</h2><p>${errorMsg}</p></body></html>`;
-      const blob = new Blob([errorHtml], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      previewBlobUrl.current = url;
-      setPreview({ url, name: f.original_name, mime: 'text/html', fileId: f.id });
+      setPreview({ url: '', name: f.original_name, mime: 'error', fileId: f.id });
       return;
     }
 
@@ -2176,10 +2170,16 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
       previewCache.current.set(f.id, entry);
       setPreview(entry);
     } else {
+      const mime = f.mimetype || 'application/octet-stream';
+      const previewable = mime === 'application/pdf' || mime.startsWith('image/') || mime.startsWith('text/');
+      if (!previewable) {
+        setPreview({ url: '', name: f.original_name, mime: 'unsupported', fileId: f.id });
+        return;
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       previewBlobUrl.current = url;
-      const entry = { url, name: f.original_name, mime: f.mimetype, fileId: f.id };
+      const entry = { url, name: f.original_name, mime, fileId: f.id };
       previewCache.current.set(f.id, entry);
       setPreview(entry);
     }
@@ -2723,19 +2723,12 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
 
               {/* ── PDF: visor nativo completo con zoom y páginas ── */}
               {preview.mime === "application/pdf" && (
-                <object
-                  data={preview.url}
-                  type="application/pdf"
-                  className="w-full h-full"
+                <iframe
+                  src={preview.url}
+                  className="w-full h-full border-0"
+                  title={preview.name}
                   style={{ minHeight: 0 }}
-                >
-                  {/* Fallback si el navegador no soporta object para PDF */}
-                  <iframe
-                    src={`${preview.url}#toolbar=1&navpanes=1&scrollbar=1&view=FitH`}
-                    className="w-full h-full border-0"
-                    title={preview.name}
-                  />
-                </object>
+                />
               )}
 
               {/* ── Imágenes: visor con fondo oscuro y tamaño completo ── */}
@@ -2771,11 +2764,23 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
                 />
               )}
 
-              {/* ── Error ── */}
-              {preview.mime === "error" && (
-                <div className="flex flex-col items-center justify-center h-full gap-3 text-slate-400 p-8">
-                  <span className="text-4xl">⚠️</span>
-                  <p className="text-sm font-medium text-slate-600">No se pudo cargar la vista previa</p>
+              {/* ── Error / Sin preview ── */}
+              {(preview.mime === "error" || preview.mime === "unsupported") && (
+                <div className="flex flex-col items-center justify-center h-full gap-4 text-slate-400 p-8">
+                  <span className="text-5xl">📎</span>
+                  <div className="text-center">
+                    <p className="text-sm font-semibold text-slate-600 mb-1">Vista previa no disponible</p>
+                    <p className="text-xs text-slate-400">Este formato no se puede mostrar directamente.</p>
+                  </div>
+                  {preview.fileId && (
+                    <button
+                      onClick={() => downloadWithAuth(preview.fileId!, preview.name)}
+                      className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 transition-colors"
+                    >
+                      <Download size={14} />
+                      Descargar archivo
+                    </button>
+                  )}
                 </div>
               )}
             </div>

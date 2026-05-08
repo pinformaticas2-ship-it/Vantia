@@ -29,7 +29,7 @@ function fmtSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 function isPreviewable(mime: string) { return mime === "application/pdf" || mime.startsWith("image/") || mime.startsWith("text/"); }
-function isWordFile(mime: string, name: string) { const n = name.toLowerCase(); return mime.includes("word") || mime.includes("officedocument.wordprocessingml") || n.endsWith(".doc") || n.endsWith(".docx"); }
+function isWordFile(mime: string, name: string) { const n = name.toLowerCase(); return mime.includes("wordprocessingml") || n.endsWith(".docx"); }
 function isExcelFile(mime: string, name: string) { const n = name.toLowerCase(); return mime.includes("excel") || mime.includes("spreadsheetml") || mime.includes("spreadsheet") || n.endsWith(".xlsx") || n.endsWith(".xls") || n.endsWith(".xlsm") || n.endsWith(".csv"); }
 const PLANTILLAS: any[] = [];
 
@@ -362,13 +362,7 @@ export function FilesTabPanel({ entityId, entity }: { entityId: string; entity?:
     });
 
     if (!res.ok) {
-      const errorData = await res.json().catch(() => ({}));
-      const errorMsg = errorData.error || `Error ${res.status}`;
-      const errorHtml = `<html><body style="font-family: Arial; margin: 20px; color: #d32f2f;"><h2>Error al cargar vista previa</h2><p>${errorMsg}</p></body></html>`;
-      const blob = new Blob([errorHtml], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      previewBlobUrl.current = url;
-      setPreview({ url, name: f.original_name, mime: 'text/html', fileId: f.id });
+      setPreview({ url: '', name: f.original_name, mime: 'error', fileId: f.id });
       return;
     }
 
@@ -381,10 +375,15 @@ export function FilesTabPanel({ entityId, entity }: { entityId: string; entity?:
       previewCache.current.set(f.id, entry);
       setPreview(entry);
     } else {
+      const mime = f.mimetype || 'application/octet-stream';
+      if (!isPreviewable(mime)) {
+        setPreview({ url: '', name: f.original_name, mime: 'unsupported', fileId: f.id });
+        return;
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       previewBlobUrl.current = url;
-      const entry = { url, name: f.original_name, mime: f.mimetype, fileId: f.id };
+      const entry = { url, name: f.original_name, mime, fileId: f.id };
       previewCache.current.set(f.id, entry);
       setPreview(entry);
     }
@@ -922,21 +921,14 @@ export function FilesTabPanel({ entityId, entity }: { entityId: string; entity?:
             {/* Contenido de la preview */}
             <div className="flex-1 overflow-hidden relative">
 
-              {/* ── PDF: visor nativo completo con zoom y páginas ── */}
+              {/* ── PDF: visor iframe ── */}
               {preview.mime === "application/pdf" && (
-                <object
-                  data={preview.url}
-                  type="application/pdf"
-                  className="w-full h-full"
+                <iframe
+                  src={preview.url}
+                  className="w-full h-full border-0"
+                  title={preview.name}
                   style={{ minHeight: 0 }}
-                >
-                  {/* Fallback si el navegador no soporta object para PDF */}
-                  <iframe
-                    src={`${preview.url}#toolbar=1&navpanes=1&scrollbar=1&view=FitH`}
-                    className="w-full h-full border-0"
-                    title={preview.name}
-                  />
-                </object>
+                />
               )}
 
               {/* ── Imágenes: visor con fondo oscuro y tamaño completo ── */}
@@ -972,11 +964,23 @@ export function FilesTabPanel({ entityId, entity }: { entityId: string; entity?:
                 />
               )}
 
-              {/* ── Error ── */}
-              {preview.mime === "error" && (
-                <div className="flex flex-col items-center justify-center h-full gap-3 text-slate-400 p-8">
-                  <span className="text-4xl">⚠️</span>
-                  <p className="text-sm font-medium text-slate-600">No se pudo cargar la vista previa</p>
+              {/* ── Error / Sin preview ── */}
+              {(preview.mime === "error" || preview.mime === "unsupported") && (
+                <div className="flex flex-col items-center justify-center h-full gap-4 text-slate-400 p-8">
+                  <span className="text-5xl">📎</span>
+                  <div className="text-center">
+                    <p className="text-sm font-semibold text-slate-600 mb-1">Vista previa no disponible</p>
+                    <p className="text-xs text-slate-400">Este formato no se puede mostrar directamente.</p>
+                  </div>
+                  {preview.fileId && (
+                    <button
+                      onClick={() => downloadWithAuth(preview.fileId!, preview.name)}
+                      className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 transition-colors"
+                    >
+                      <Download size={14} />
+                      Descargar archivo
+                    </button>
+                  )}
                 </div>
               )}
             </div>
