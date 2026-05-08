@@ -111,13 +111,19 @@ app.get('/api/health/db', async (_req, res) => {
     }
 });
 app.use((err, _req, res, _next) => {
-    if (err.status === 401 || err.message === 'Unauthenticated') {
+    const isAuthError = err.status === 401 ||
+        err.statusCode === 401 ||
+        err.message === 'Unauthenticated' ||
+        err.clerkError === true ||
+        /unauthenticated|unauthorized|invalid.*token|token.*invalid|jwt|clerk/i.test(err.message || '');
+    if (isAuthError) {
+        console.warn('⚠️ Auth error (→401):', err.message);
         return res.status(401).json({ success: false, error: 'Sesión no válida o expirada' });
     }
     if (err.code === '23505') {
         return res.status(409).json({ success: false, error: 'Este NIF/CIF ya está registrado.' });
     }
-    console.error('❌ Error:', err.stack || err.message);
+    console.error('❌ Error [status=%s code=%s]:', err.status ?? err.statusCode ?? '?', err.code ?? '?', err.stack || err.message);
     res.status(500).json({ success: false, error: 'Error interno del servidor' });
 });
 (0, migrations_1.runMigrations)().then(() => {
