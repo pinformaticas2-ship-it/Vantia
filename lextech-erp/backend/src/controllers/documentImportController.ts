@@ -208,51 +208,105 @@ function runNotificationDateChecks(text?: string | null) {
   );
 }
 
+async function geminiDateOnlyFromImages(
+  images: Array<{ path: string; mimeType: string }>,
+): Promise<string | null> {
+  if (!GEMINI_API_KEY || !genAI || !images.length) return null;
+
+  const prompt = `Analiza esta imagen de un documento judicial espanol.
+TAREA UNICA: Encuentra la fecha de notificacion escrita a mano.
+
+La fecha de notificacion puede aparecer como:
+- Una anotacion manuscrita "Notificado", "Notif.", "Ntfdo.", "Emplazado" seguida de una fecha
+- Una fecha sola escrita a mano en un margen, esquina o cuadro (sin texto impreso alrededor)
+- Un sello o cajetin con fecha de entrega/recepcion o recibido
+- "Recibido el", "Entregado el", "Firmado el", "Recibí el" + fecha manuscrita
+
+Devuelve SOLO este JSON (sin explicaciones, sin markdown):
+{"fecha": "DD/MM/YYYY"}
+Si no ves ninguna fecha manuscrita devuelve:
+{"fecha": null}`;
+
+  const parts: any[] = [{ text: prompt }];
+  for (const img of images) {
+    parts.push({
+      inlineData: {
+        mimeType: img.mimeType,
+        data: fs.readFileSync(img.path, { encoding: 'base64' }),
+      },
+    });
+  }
+
+  for (const modelName of GEMINI_MODELS) {
+    try {
+      const model = genAI.getGenerativeModel({ model: modelName });
+      const result = await model.generateContent({
+        contents: [{ role: 'user', parts }],
+        generationConfig: { temperature: 0.0, topP: 0.5, responseMimeType: 'application/json' },
+      } as any);
+      const raw = result.response.text().trim()
+        .replace(/^```json?\s*/i, '').replace(/```\s*$/i, '').trim();
+      const parsed = JSON.parse(raw);
+      const fechaRaw = parsed?.fecha;
+      if (!fechaRaw || fechaRaw === 'null') return null;
+      return normalizeLooseSpanishDate(String(fechaRaw));
+    } catch { /* try next model */ }
+  }
+  return null;
+}
+
 async function extractFocusedNotificationDate(file: DocFile) {
+  const IMAGE_EXTS = ['.jpg', '.jpeg', '.png', '.tiff', '.tif', '.bmp', '.webp'];
   try {
     if (file.ext === '.pdf') {
-      // Render all pages at once (max 8), then check last pages first (cédula is usually last)
-      let allPageImages: { path: string; pageNumber?: number }[] = [];
+      // Render all pages at once (max 8), check last pages first (cédula is usually last)
+      let allPageImages: { path: string; pageNumber?: number; mimeType: string }[] = [];
       try {
         allPageImages = renderPdfPagesToImages(file.fullPath, 8);
         const ocrByPage = allPageImages.map((page) => ({
           pageNumber: Number(page.pageNumber || 0),
+          path: page.path,
+          mimeType: page.mimeType,
           text: extractImageOcr(page.path),
         }));
 
-        // 1st pass: last 2 pages (cédula de notificación suele estar al final)
-        const lastPagesText = ocrByPage
-          .slice(-2)
-          .map((p) => p.text)
-          .filter((t) => t.trim())
-          .join('\n\n');
+        // 1st pass OCR: last 2 pages
+        const lastPagesText = ocrByPage.slice(-2).map((p) => p.text).filter((t) => t.trim()).join('\n\n');
         const lastPageDate = runNotificationDateChecks(lastPagesText);
         if (lastPageDate) return lastPageDate;
 
-        // 2nd pass: first page
-        const firstPageText = ocrByPage
-          .filter((p) => p.pageNumber === 1)
-          .map((p) => p.text)
-          .filter((t) => t.trim())
-          .join('\n\n');
+        // 2nd pass OCR: first page
+        const firstPageText = ocrByPage.filter((p) => p.pageNumber === 1).map((p) => p.text).filter((t) => t.trim()).join('\n\n');
         const firstPageDate = runNotificationDateChecks(firstPageText);
         if (firstPageDate) return firstPageDate;
 
-        // 3rd pass: remaining middle pages
+        // 3rd pass OCR: middle pages
         const middlePagesText = ocrByPage
-          .filter((p) => p.pageNumber > 1 && p.pageNumber < (ocrByPage.length - 1))
-          .map((p) => p.text)
-          .filter((t) => t.trim())
-          .join('\n\n');
-        return runNotificationDateChecks(middlePagesText);
+          .filter((p) => p.pageNumber > 1 && p.pageNumber < ocrByPage.length)
+          .map((p) => p.text).filter((t) => t.trim()).join('\n\n');
+        const middleDate = runNotificationDateChecks(middlePagesText);
+        if (middleDate) return middleDate;
+
+        // 4th pass: OCR couldn't find it — ask Gemini with a focused single-task prompt
+        // Try last 2 pages first (cédula), then all pages if needed
+        console.log(`[documentImport] OCR no encontró fecha de notificación, usando Gemini focused para ${file.name}`);
+        const lastImages = ocrByPage.slice(-2);
+        const dateFromLastPages = await geminiDateOnlyFromImages(lastImages);
+        if (dateFromLastPages) return dateFromLastPages;
+
+        const dateFromAllPages = await geminiDateOnlyFromImages(ocrByPage);
+        return dateFromAllPages;
       } finally {
         if (allPageImages.length) cleanupRenderedPageImages(allPageImages as any);
       }
     }
 
-    if (['.jpg', '.jpeg', '.png', '.tiff', '.tif', '.bmp', '.webp'].includes(file.ext)) {
+    if (IMAGE_EXTS.includes(file.ext)) {
       const imageText = extractImageOcr(file.fullPath);
-      return runNotificationDateChecks(imageText);
+      const ocrDate = runNotificationDateChecks(imageText);
+      if (ocrDate) return ocrDate;
+      // Fallback: ask Gemini focused
+      return geminiDateOnlyFromImages([{ path: file.fullPath, mimeType: getMimeType(file.ext) }]);
     }
   } catch (error) {
     console.warn(`[documentImport] Capa extra de fecha de notificación falló en ${file.name}:`, String((error as any)?.message || error || 'Error desconocido'));
