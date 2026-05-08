@@ -1283,14 +1283,26 @@ export const previewWordAsPdf = async (req: any, res: Response) => {
 
     const { stored_name, original_name, mimetype } = result.rows[0];
     const ext = path.extname(original_name || stored_name || '').toLowerCase();
-    const isWord =
-      mimetype?.includes('word') ||
-      mimetype?.includes('wordprocessingml') ||
-      ext === '.doc' ||
-      ext === '.docx';
 
-    if (!isWord) {
-      return res.status(400).json({ success: false, error: 'Este archivo no es Word.' });
+    // Tipos que LibreOffice puede convertir a PDF
+    const LIBREOFFICE_EXTS = new Set([
+      '.doc','.docx','.odt','.rtf','.txt',
+      '.xls','.xlsx','.ods','.csv',
+      '.ppt','.pptx','.odp',
+      '.html','.htm','.xml',
+    ]);
+    const canConvert =
+      LIBREOFFICE_EXTS.has(ext) ||
+      mimetype?.includes('word') ||
+      mimetype?.includes('spreadsheet') ||
+      mimetype?.includes('presentation') ||
+      mimetype?.includes('opendocument') ||
+      mimetype === 'text/plain' ||
+      mimetype === 'text/html' ||
+      mimetype === 'text/csv';
+
+    if (!canConvert) {
+      return res.status(400).json({ success: false, error: 'Formato no convertible a PDF.' });
     }
 
     const sourcePath = path.join(UPLOADS_ROOT, clientId, stored_name);

@@ -2100,37 +2100,10 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
 
     const token = await getToken({ skipCache: true });
 
-    // Detectar tipo de archivo (.doc no soportado en preview, solo .docx)
-    const isWord  = f.mimetype?.includes('wordprocessingml') || /\.docx$/i.test(f.original_name || '');
-    const isExcel = isExcelFile(f.mimetype || '', f.original_name || '');
-
-    const fallbackHtmlPreview = async () => {
-      const fallbackEndpoint = isExcel
-        ? `/api/files/${clientId}/${f.id}/preview-excel`
-        : `/api/files/${clientId}/${f.id}/preview-html`;
-      const fallbackRes = await fetch(fallbackEndpoint, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!fallbackRes.ok) {
-        const errorData = await fallbackRes.json().catch(() => ({}));
-        const errorMsg = errorData.error || `Error ${fallbackRes.status}`;
-        const errorHtml = `<html><body style="font-family: Arial; margin: 20px; color: #d32f2f;"><h2>Error al cargar vista previa</h2><p>${errorMsg}</p></body></html>`;
-        const blob = new Blob([errorHtml], { type: 'text/html' });
-        const url = URL.createObjectURL(blob);
-        previewBlobUrl.current = url;
-        setPreview({ url, name: f.original_name, mime: 'text/html', fileId: f.id });
-        return;
-      }
-      const html = await fallbackRes.text();
-      const blob = new Blob([html], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      previewBlobUrl.current = url;
-      const entry = { url, name: f.original_name, mime: 'text/html', fileId: f.id, appType: (isExcel ? 'excel' : 'word') as 'word' | 'excel' };
-      previewCache.current.set(f.id, entry);
-      setPreview(entry);
-    };
-
-    if (isWord) {
+    // Para cualquier tipo no PDF/imagen: intentar conversión a PDF via LibreOffice
+    const isPdf = f.mimetype === 'application/pdf';
+    const isImage = f.mimetype?.startsWith('image/');
+    if (!isPdf && !isImage) {
       const pdfRes = await fetch(`/api/files/${clientId}/${f.id}/preview-pdf`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -2139,18 +2112,16 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
         const blob = await pdfRes.blob();
         const url = URL.createObjectURL(blob);
         previewBlobUrl.current = url;
-        const entry = { url, name: f.original_name, mime: 'application/pdf', fileId: f.id, appType: 'word' as const };
+        const entry = { url, name: f.original_name, mime: 'application/pdf', fileId: f.id };
         previewCache.current.set(f.id, entry);
         setPreview(entry);
         return;
       }
-      await fallbackHtmlPreview();
+      setPreview({ url: '', name: f.original_name, mime: 'unsupported', fileId: f.id });
       return;
     }
 
-    const endpoint = isExcel
-      ? `/api/files/${clientId}/${f.id}/preview-excel`
-      : `/api/files/${clientId}/${f.id}/download`;
+    const endpoint = `/api/files/${clientId}/${f.id}/download`;
 
     const res = await fetch(endpoint, {
       headers: { Authorization: `Bearer ${token}` },

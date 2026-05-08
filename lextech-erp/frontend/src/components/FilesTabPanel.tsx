@@ -305,37 +305,10 @@ export function FilesTabPanel({ entityId, entity }: { entityId: string; entity?:
 
     const token = await getToken({ skipCache: true });
 
-    // Detectar tipo de archivo
-    const isWord  = f.mimetype?.includes('wordprocessingml') || f.original_name?.match(/\.docx?$/i);
-    const isExcel = isExcelFile(f.mimetype || '', f.original_name || '');
-
-    const fallbackHtmlPreview = async () => {
-      const fallbackEndpoint = isExcel
-        ? `/api/files/${entityId}/${f.id}/preview-excel`
-        : `/api/files/${entityId}/${f.id}/preview-html`;
-      const fallbackRes = await fetch(fallbackEndpoint, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!fallbackRes.ok) {
-        const errorData = await fallbackRes.json().catch(() => ({}));
-        const errorMsg = errorData.error || `Error ${fallbackRes.status}`;
-        const errorHtml = `<html><body style="font-family: Arial; margin: 20px; color: #d32f2f;"><h2>Error al cargar vista previa</h2><p>${errorMsg}</p></body></html>`;
-        const blob = new Blob([errorHtml], { type: 'text/html' });
-        const url = URL.createObjectURL(blob);
-        previewBlobUrl.current = url;
-        setPreview({ url, name: f.original_name, mime: 'text/html', fileId: f.id });
-        return;
-      }
-      const html = await fallbackRes.text();
-      const blob = new Blob([html], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      previewBlobUrl.current = url;
-      const entry = { url, name: f.original_name, mime: 'text/html', fileId: f.id, appType: (isExcel ? 'excel' : 'word') as 'word' | 'excel' };
-      previewCache.current.set(f.id, entry);
-      setPreview(entry);
-    };
-
-    if (isWord) {
+    // Para cualquier tipo no PDF/imagen: intentar conversión a PDF via LibreOffice
+    const isPdf = f.mimetype === 'application/pdf';
+    const isImage = f.mimetype?.startsWith('image/');
+    if (!isPdf && !isImage) {
       const pdfRes = await fetch(`/api/files/${entityId}/${f.id}/preview-pdf`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -344,18 +317,17 @@ export function FilesTabPanel({ entityId, entity }: { entityId: string; entity?:
         const blob = await pdfRes.blob();
         const url = URL.createObjectURL(blob);
         previewBlobUrl.current = url;
-        const entry = { url, name: f.original_name, mime: 'application/pdf', fileId: f.id, appType: 'word' as const };
+        const entry = { url, name: f.original_name, mime: 'application/pdf', fileId: f.id };
         previewCache.current.set(f.id, entry);
         setPreview(entry);
         return;
       }
-      await fallbackHtmlPreview();
+      // LibreOffice no puede convertirlo → mostrar botón de descarga
+      setPreview({ url: '', name: f.original_name, mime: 'unsupported', fileId: f.id });
       return;
     }
 
-    const endpoint = isExcel
-      ? `/api/files/${entityId}/${f.id}/preview-excel`
-      : `/api/files/${entityId}/${f.id}/download`;
+    const endpoint = `/api/files/${entityId}/${f.id}/download`;
 
     const res = await fetch(endpoint, {
       headers: { Authorization: `Bearer ${token}` },

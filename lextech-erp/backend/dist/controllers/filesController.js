@@ -1121,12 +1121,22 @@ const previewWordAsPdf = async (req, res) => {
         }
         const { stored_name, original_name, mimetype } = result.rows[0];
         const ext = path_1.default.extname(original_name || stored_name || '').toLowerCase();
-        const isWord = mimetype?.includes('word') ||
-            mimetype?.includes('wordprocessingml') ||
-            ext === '.doc' ||
-            ext === '.docx';
-        if (!isWord) {
-            return res.status(400).json({ success: false, error: 'Este archivo no es Word.' });
+        const LIBREOFFICE_EXTS = new Set([
+            '.doc', '.docx', '.odt', '.rtf', '.txt',
+            '.xls', '.xlsx', '.ods', '.csv',
+            '.ppt', '.pptx', '.odp',
+            '.html', '.htm', '.xml',
+        ]);
+        const canConvert = LIBREOFFICE_EXTS.has(ext) ||
+            mimetype?.includes('word') ||
+            mimetype?.includes('spreadsheet') ||
+            mimetype?.includes('presentation') ||
+            mimetype?.includes('opendocument') ||
+            mimetype === 'text/plain' ||
+            mimetype === 'text/html' ||
+            mimetype === 'text/csv';
+        if (!canConvert) {
+            return res.status(400).json({ success: false, error: 'Formato no convertible a PDF.' });
         }
         const sourcePath = path_1.default.join(paths_1.UPLOADS_CLIENTS_ROOT, clientId, stored_name);
         if (!fs_1.default.existsSync(sourcePath)) {

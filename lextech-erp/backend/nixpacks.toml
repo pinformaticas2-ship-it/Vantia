@@ -4,5 +4,9 @@ aptPkgs = [
   "poppler-utils",
   "tesseract-ocr",
   "tesseract-ocr-spa",
-  "tesseract-ocr-eng"
+  "tesseract-ocr-eng",
+  "libreoffice",
+  "fonts-liberation",
+  "fonts-dejavu-core",
+  "fontconfig"
 ]
