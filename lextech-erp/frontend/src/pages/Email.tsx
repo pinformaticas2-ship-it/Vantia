@@ -1067,10 +1067,11 @@ function Sidebar({
   const isImapActive = Boolean(selectedImapAccountId);
   const isGmailActive = gmailConnected && !isImapActive;
   const visibleSystemFolders = SYSTEM_FOLDERS.filter((folder) => {
-    if (!isGmailActive && folder.key === 'PINNED') return false;
+    // PINNED y SNOOZED son exclusivos de Gmail OAuth — no están disponibles via IMAP
+    if (!isGmailActive && (folder.key === 'PINNED' || folder.key === 'SNOOZED')) return false;
     if (!isImapActive) return true;
     if (folder.key === 'STARRED') return true;
-    if (folder.key === 'ALL' || folder.key === 'SNOOZED' || folder.key === 'IMPORTANT' || folder.key === 'PINNED') return false;
+    if (folder.key === 'ALL' || folder.key === 'IMPORTANT') return false;
     if (folder.key === 'INBOX') return true;
     return Boolean(imapSystemFolderMap[folder.key as ImapSystemFolderKey]);
   });
