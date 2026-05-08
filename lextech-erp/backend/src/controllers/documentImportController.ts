@@ -482,6 +482,59 @@ async function createImportedDeadlineFollowUps(
   );
 }
 
+function normalizeForMatch(s: string) {
+  return s
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+async function matchClientInDb(candidateNames: string[]): Promise<{ id: string; nombre: string } | null> {
+  const candidates = candidateNames
+    .map((n) => normalizeForMatch(String(n || '')))
+    .filter((n) => n.length >= 3);
+  if (!candidates.length) return null;
+
+  const { rows } = await pool.query<{ id: string; nombre: string; comercial: string }>(
+    `SELECT id,
+            TRIM(COALESCE(NULLIF(TRIM(first_name || ' ' || COALESCE(last_name, '')), ''), commercial_name, '')) AS nombre,
+            COALESCE(commercial_name, '') AS comercial
+     FROM entities
+     WHERE first_name IS NOT NULL OR commercial_name IS NOT NULL`,
+  );
+
+  // Exact match first
+  for (const candidate of candidates) {
+    for (const entity of rows) {
+      const eName = normalizeForMatch(entity.nombre);
+      const eComercial = normalizeForMatch(entity.comercial);
+      if (eName === candidate || eComercial === candidate) {
+        return { id: entity.id, nombre: entity.nombre };
+      }
+    }
+  }
+
+  // Substring match (min 6 chars to avoid false positives)
+  for (const candidate of candidates) {
+    for (const entity of rows) {
+      const eName = normalizeForMatch(entity.nombre);
+      const eComercial = normalizeForMatch(entity.comercial);
+      if (
+        (eName.length >= 6 && candidate.includes(eName)) ||
+        (eComercial.length >= 6 && candidate.includes(eComercial)) ||
+        (candidate.length >= 6 && eName.includes(candidate)) ||
+        (candidate.length >= 6 && eComercial.includes(candidate))
+      ) {
+        return { id: entity.id, nombre: entity.nombre };
+      }
+    }
+  }
+
+  return null;
+}
+
 function ensureDir(dirPath: string) {
   if (!fs.existsSync(dirPath)) fs.mkdirSync(dirPath, { recursive: true });
   return dirPath;
@@ -1305,6 +1358,25 @@ export async function uploadDocumentImport(req: Request, res: Response) {
           autoAssign ? clienteId : null,
           autoAssign ? procuradorForzado : null,
         );
+
+        // Auto-match cliente con entidades ya registradas en el ERP
+        if (!draft.cliente_id) {
+          const nameCandidates = [
+            ...(Array.isArray(extractedData.demandantes) ? extractedData.demandantes : []),
+            extractedData.cliente_nombre,
+          ].filter((n): n is string => Boolean(n && String(n).trim()));
+          try {
+            const matched = await matchClientInDb(nameCandidates);
+            if (matched) {
+              draft.cliente_id = matched.id;
+              draft.cliente_nombre = matched.nombre;
+              console.log(`[documentImport] Cliente auto-matched: "${matched.nombre}" (${matched.id})`);
+            }
+          } catch (matchErr) {
+            console.warn('[documentImport] Error en auto-match de cliente:', String((matchErr as any)?.message || matchErr));
+          }
+        }
+
         reviewCount++;
       } catch (error: any) {
         status = 'failed';
