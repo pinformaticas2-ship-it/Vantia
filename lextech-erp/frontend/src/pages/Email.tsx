@@ -2558,6 +2558,12 @@ export default function Email() {
     const silent = Boolean(options?.silent);
     const preserveSelection = Boolean(options?.preserveSelection);
     const previousSelectedId = preserveSelection ? selectedEmailRef.current?.id || null : null;
+    // Guardar el body del email abierto para no perderlo al refrescar la lista
+    const previousSelectedBody = preserveSelection ? {
+      bodyHtml: selectedEmailRef.current?.bodyHtml || '',
+      bodyText: selectedEmailRef.current?.bodyText || '',
+      snippet:  selectedEmailRef.current?.snippet  || '',
+    } : null;
     if (!silent) setLoading(true);
     setError('');
     if (reset && !silent && !preserveSelection) { setEmails([]); setSelectedEmail(null); }
@@ -2576,7 +2582,9 @@ export default function Email() {
         setEmails(nextEmails);
         if (previousSelectedId) {
           const nextSelected = nextEmails.find((item) => item.id === previousSelectedId) || null;
-          if (nextSelected) setSelectedEmail(nextSelected);
+          if (nextSelected) setSelectedEmail(previousSelectedBody
+            ? { ...nextSelected, bodyHtml: nextSelected.bodyHtml || previousSelectedBody.bodyHtml, bodyText: nextSelected.bodyText || previousSelectedBody.bodyText, snippet: nextSelected.snippet || previousSelectedBody.snippet }
+            : nextSelected);
         }
 
         const statsRes = await authFetch(
@@ -2636,7 +2644,9 @@ export default function Email() {
         setEmails(parsedPinned);
         if (previousSelectedId) {
           const nextSelected = parsedPinned.find((item) => item.id === previousSelectedId) || null;
-          if (nextSelected) setSelectedEmail(nextSelected);
+          if (nextSelected) setSelectedEmail(previousSelectedBody
+            ? { ...nextSelected, bodyHtml: nextSelected.bodyHtml || previousSelectedBody.bodyHtml, bodyText: nextSelected.bodyText || previousSelectedBody.bodyText, snippet: nextSelected.snippet || previousSelectedBody.snippet }
+            : nextSelected);
         }
         setNextPageToken(undefined);
         return;
@@ -2710,7 +2720,9 @@ export default function Email() {
         setEmails(mergedEmails);
         if (previousSelectedId) {
           const nextSelected = mergedEmails.find((item) => item.id === previousSelectedId) || null;
-          if (nextSelected) setSelectedEmail(nextSelected);
+          if (nextSelected) setSelectedEmail(previousSelectedBody
+            ? { ...nextSelected, bodyHtml: nextSelected.bodyHtml || previousSelectedBody.bodyHtml, bodyText: nextSelected.bodyText || previousSelectedBody.bodyText, snippet: nextSelected.snippet || previousSelectedBody.snippet }
+            : nextSelected);
         }
       }
       else setEmails(prev => [...prev, ...nextEmails]);
