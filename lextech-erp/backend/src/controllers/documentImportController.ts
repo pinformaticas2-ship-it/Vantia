@@ -76,47 +76,59 @@ function extractNotificadoDate(text?: string | null) {
   const source = String(text || '');
   if (!source.trim()) return null;
 
+  // Strip accents for OCR-resilient matching
+  const ns = source.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const DATE_RE = /(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})/;
+
   const patterns = [
+    // Canonical: notificado/a immediately followed by date
     /notificad[oa]\s*[:\-]?\s*(\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{2,4})/i,
-    /notificad[oa][^\d]{0,20}(\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{2,4})/i,
-    /notif[il1]cad[oa][^\d]{0,20}(\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{2,4})/i,
-    /notificad[oa]\s*\n\s*(\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{2,4})/i,
-    /noti[f1l][i1l]?ca[dcl][oa]\s*[:\-]?\s*(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})/i,
-    /noti[f1l][i1l]?ca[dcl][oa][^\d]{0,30}(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})/i,
+    /notificad[oa][^\d]{0,30}(\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{2,4})/i,
+    /notificad[oa]\s*[\r\n]+\s*(\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{2,4})/i,
+    // OCR variants: noti[f/1][i/1/l][c/k][a/e/o][d/c][o/a]
+    /noti[f1][i1l]?[ck]?[aeo][dc][oa]\s*[:\-]?\s*(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})/i,
+    /noti[f1][i1l]?[ck]?[aeo][dc][oa][^\d]{0,30}(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})/i,
+    // Abbreviations: "Notif." / "Ntf." / "Ntfdo." / "N/:" / "Nf."
+    /\bnotif\.?\s*[:\-]?\s*(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})/i,
+    /\bntf\.?\s*[:\-]?\s*(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})/i,
+    /\bntfdo\.?\s*[:\-]?\s*(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})/i,
+    /\bnf\.?\s*[:\-]\s*(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})/i,
+    // "Fecha (de) notificacion"
+    /fecha\s+(?:de\s+)?notif[^\d]{0,20}(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})/i,
+    /f\.\s*notif[^\d]{0,20}(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})/i,
+    // "Emplazado/a"
+    /emplazad[oa]\s*[:\-]?\s*(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})/i,
+    /emplazad[oa][^\d]{0,30}(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})/i,
   ];
 
   for (const pattern of patterns) {
-    const match = source.match(pattern);
-    if (match) {
-      const normalized = normalizeLooseSpanishDate(match[1]);
-      if (normalized) return normalized;
+    const m = ns.match(pattern);
+    if (m) {
+      const nd = normalizeLooseSpanishDate(m[1]);
+      if (nd) return nd;
     }
   }
 
-  const lines = source
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index];
-    if (!/noti[f1l][i1l]?(?:ca|ci)?[dcl]?[oa]?/i.test(line)) continue;
-
-    const windowText = [line, lines[index + 1] || '', lines[index + 2] || '']
-      .filter(Boolean)
-      .join(' ');
-    const dateMatch = windowText.match(/(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})/);
-    if (dateMatch) {
-      const normalized = normalizeLooseSpanishDate(dateMatch[1]);
-      if (normalized) return normalized;
+  // Line-window: find any line with a "notif" stem, search next 3 lines for date
+  const lines = source.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const notiStem = /noti[f1][i1l]?|emplaza[d]|ntfdo|notif\b/i;
+  for (let i = 0; i < lines.length; i++) {
+    if (!notiStem.test(lines[i])) continue;
+    const window = lines.slice(i, i + 4).join(' ');
+    const dm = window.match(DATE_RE);
+    if (dm) {
+      const nd = normalizeLooseSpanishDate(dm[1]);
+      if (nd) return nd;
     }
   }
 
-  const broadMatch = source.match(/noti[f1l][i1l]?(?:ca|ci)?[dcl]?[oa]?[\s\S]{0,80}?(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})/i);
-  if (broadMatch) {
-    const normalized = normalizeLooseSpanishDate(broadMatch[1]);
-    if (normalized) return normalized;
+  // Broad: "noti..." anywhere within 100 chars of a date
+  const broadM = ns.match(/noti[f1][i1l]?[\s\S]{0,100}?(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})/i);
+  if (broadM) {
+    const nd = normalizeLooseSpanishDate(broadM[1]);
+    if (nd) return nd;
   }
+
   return null;
 }
 
@@ -124,38 +136,28 @@ function extractStandaloneHandwrittenLikeDate(text?: string | null) {
   const source = String(text || '');
   if (!source.trim()) return null;
 
-  const lines = source
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .slice(0, 24);
+  const allLines = source.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  // Check first 24 AND last 30 lines \u2014 c\u00e9dula de notificaci\u00f3n suele estar al final
+  const linesToCheck = allLines.length > 30
+    ? [...allLines.slice(0, 24), ...allLines.slice(-30)]
+    : allLines;
 
   const blockedKeywords = [
-    'nacimiento',
-    'emision',
-    'validez',
-    'fecha alta',
-    'fecha cierre',
-    'vencimiento',
-    'caducidad',
-    'sentencia',
-    'demanda',
-    'procedimiento',
+    'nacimiento', 'emision', 'validez', 'fecha alta', 'fecha cierre',
+    'vencimiento', 'caducidad', 'sentencia', 'demanda', 'procedimiento',
+    'interposicion', 'presentacion', 'publicacion',
   ];
 
-  for (const line of lines) {
-    const normalizedLine = line
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase();
+  for (const line of linesToCheck) {
+    const normalizedLine = line.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    if (blockedKeywords.some((kw) => normalizedLine.includes(kw))) continue;
 
-    if (blockedKeywords.some((keyword) => normalizedLine.includes(keyword))) continue;
-
-    const isolatedMatch = line.match(/^\D{0,6}(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})\D{0,6}$/);
+    // Slightly relaxed: up to 10 non-digit chars before/after
+    const isolatedMatch = line.match(/^\D{0,10}(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})\D{0,10}$/);
     if (!isolatedMatch) continue;
 
-    const normalized = normalizeLooseSpanishDate(isolatedMatch[1]);
-    if (normalized) return normalized;
+    const nd = normalizeLooseSpanishDate(isolatedMatch[1]);
+    if (nd) return nd;
   }
 
   return null;
@@ -165,22 +167,33 @@ function extractDocumentLevelNotificationDate(text?: string | null) {
   const source = String(text || '');
   if (!source.trim()) return null;
 
-  const normalizedSource = source
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
+  const ns = source.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
   const contextualPatterns = [
-    /recibid[oa][^\d]{0,24}(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})/i,
-    /entregad[oa][^\d]{0,24}(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})/i,
-    /cedula[^\d]{0,32}(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})/i,
-    /diligencia[^\d]{0,32}(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})/i,
+    // Received / delivered / signed
+    /recib[ii1][d]?[oa]?\s*(?:el)?\s*[:\-]?\s*(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})/i,
+    /recib[ii1][d]?[oa]?[^\d]{0,30}(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})/i,
+    /entregad[oa]\s*(?:el)?\s*[:\-]?\s*(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})/i,
+    /entregad[oa][^\d]{0,30}(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})/i,
+    /firmad[oa]\s*(?:el)?\s*[:\-]?\s*(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})/i,
+    // Cedula / diligencia / acuse
+    /cedula[^\d]{0,40}(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})/i,
+    /diligencia[^\d]{0,40}(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})/i,
+    /acuse[^\d]{0,40}(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})/i,
+    // Stamp / reception
+    /sello[^\d]{0,40}(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})/i,
+    /recep[ct]ion[^\d]{0,30}(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})/i,
+    /receptor[^\d]{0,40}(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})/i,
+    // "Citado el" / "Comparecencia"
+    /citad[oa]\s*(?:el)?\s*[:\-]?\s*(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})/i,
+    /comparecen[^\d]{0,40}(\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4})/i,
   ];
 
   for (const pattern of contextualPatterns) {
-    const match = normalizedSource.match(pattern);
-    if (!match) continue;
-    const normalized = normalizeLooseSpanishDate(match[1]);
-    if (normalized) return normalized;
+    const m = ns.match(pattern);
+    if (!m) continue;
+    const nd = normalizeLooseSpanishDate(m[1]);
+    if (nd) return nd;
   }
 
   return null;
@@ -198,28 +211,40 @@ function runNotificationDateChecks(text?: string | null) {
 async function extractFocusedNotificationDate(file: DocFile) {
   try {
     if (file.ext === '.pdf') {
-      let firstPageImages: { path: string }[] = [];
-      try {
-        firstPageImages = renderPdfPagesToImages(file.fullPath, 1);
-        const firstPageText = firstPageImages
-          .map((page) => extractImageOcr(page.path))
-          .filter((chunk) => chunk.trim())
-          .join('\n\n');
-        const firstPageDate = runNotificationDateChecks(firstPageText);
-        if (firstPageDate) return firstPageDate;
-      } finally {
-        if (firstPageImages.length) cleanupRenderedPageImages(firstPageImages as any);
-      }
-
+      // Render all pages at once (max 8), then check last pages first (cédula is usually last)
       let allPageImages: { path: string; pageNumber?: number }[] = [];
       try {
         allPageImages = renderPdfPagesToImages(file.fullPath, 8);
-        const remainingPagesText = allPageImages
-          .filter((page) => Number(page.pageNumber || 0) > 1)
-          .map((page) => extractImageOcr(page.path))
-          .filter((chunk) => chunk.trim())
+        const ocrByPage = allPageImages.map((page) => ({
+          pageNumber: Number(page.pageNumber || 0),
+          text: extractImageOcr(page.path),
+        }));
+
+        // 1st pass: last 2 pages (cédula de notificación suele estar al final)
+        const lastPagesText = ocrByPage
+          .slice(-2)
+          .map((p) => p.text)
+          .filter((t) => t.trim())
           .join('\n\n');
-        return runNotificationDateChecks(remainingPagesText);
+        const lastPageDate = runNotificationDateChecks(lastPagesText);
+        if (lastPageDate) return lastPageDate;
+
+        // 2nd pass: first page
+        const firstPageText = ocrByPage
+          .filter((p) => p.pageNumber === 1)
+          .map((p) => p.text)
+          .filter((t) => t.trim())
+          .join('\n\n');
+        const firstPageDate = runNotificationDateChecks(firstPageText);
+        if (firstPageDate) return firstPageDate;
+
+        // 3rd pass: remaining middle pages
+        const middlePagesText = ocrByPage
+          .filter((p) => p.pageNumber > 1 && p.pageNumber < (ocrByPage.length - 1))
+          .map((p) => p.text)
+          .filter((t) => t.trim())
+          .join('\n\n');
+        return runNotificationDateChecks(middlePagesText);
       } finally {
         if (allPageImages.length) cleanupRenderedPageImages(allPageImages as any);
       }
@@ -664,7 +689,12 @@ IMPORTANTE:
 - cliente_nombre: primer elemento de demandantes
 - contrario: todos los demandados separados por " | "
 - fecha_inicio: fecha de inicio del procedimiento (NO la fecha del documento) en YYYY-MM-DD
-- fecha_notificacion: fecha en que se notifico al demandado en YYYY-MM-DD (cedula, diligencia, sello de recibido). Prioriza cualquier anotacion manuscrita que empiece por "Notificado" seguida de una fecha nn-nn-nn
+- fecha_notificacion: fecha en que se notifico al demandado en YYYY-MM-DD. Busca ACTIVAMENTE:
+  1) "Notificado/a", "Notif.", "Ntfdo." + fecha (ej: "Notificado 15/3/24")
+  2) Cualquier fecha aislada sin contexto impreso (en un doc judicial impreso = fecha de notificacion)
+  3) "Emplazado:", "Recibido el:", "Entregado el:", "Firmado el:" + fecha
+  4) Sellos o diligencias con fecha de entrega/recepcion
+  Si hay una sola fecha manuscrita en el texto, es casi seguro la fecha_notificacion
 
 Devuelve EXCLUSIVAMENTE JSON valido con esta forma:
 {
@@ -893,7 +923,14 @@ async function parseExpedienteFromVision(file: DocFile, ocrText: string): Promis
       ocrSection,
       'Devuelve EXCLUSIVAMENTE JSON valido con esta forma:',
       '{"transcription":null,"tipo":null,"estado":null,"descripcion":null,"demandantes":[],"demandados":[],"cliente_nombre":null,"contrario":null,"procurador":null,"juzgado":null,"tipo_proc":null,"num_autos":null,"nig":null,"fecha_inicio":null,"fecha_notificacion":null,"ref_expediente":null,"tipos_asunto":null,"cuantia_principal":null,"observaciones":null}',
-      'Reglas: transcription=transcribe TODO el texto visible impreso Y manuscrito (campo MAS IMPORTANTE, nunca null si hay texto); demandantes=array JSON con TODOS los demandantes/parte actora/clientes del despacho (puede ser mas de uno y deben ir separados en elementos distintos, nunca en un solo string); demandados=array JSON con TODOS los demandados/parte contraria (puede ser mas de uno y deben ir separados en elementos distintos); cliente_nombre=primer demandante (igual que demandantes[0]); contrario=todos los demandados unidos por " | "; descripcion=1-2 frases de que trata el documento; juzgado=nombre completo del juzgado; num_autos=numero de autos o procedimiento judicial; nig=NIG si aparece; fecha_inicio=fecha de inicio del procedimiento en YYYY-MM-DD (NO la fecha del documento); fecha_notificacion=fecha en que se notifico al demandado en YYYY-MM-DD y debe priorizar cualquier anotacion manuscrita que empiece por "Notificado" seguida de una fecha como nn-nn-nn; cuantia_principal=importe numerico sin simbolos de moneda; tipo en [judicial, extrajudicial, monitorio, obligacion_hacer, prejudicial, diligencias, penal, laboral, contencioso, otro]; observaciones=anotaciones manuscritas importantes u otros datos; usa null/[] si no es visible.',
+      'Reglas generales: transcription=transcribe TODO el texto visible impreso Y manuscrito (campo MAS IMPORTANTE, nunca null si hay texto); demandantes=array JSON con TODOS los demandantes/parte actora (separados en elementos distintos); demandados=array JSON con TODOS los demandados (separados en elementos distintos); cliente_nombre=primer demandante; contrario=todos los demandados unidos por " | "; descripcion=1-2 frases de que trata el documento; juzgado=nombre completo del juzgado; num_autos=numero de autos; nig=NIG si aparece; fecha_inicio=fecha de inicio del procedimiento en YYYY-MM-DD (NO la fecha del documento); cuantia_principal=importe numerico sin simbolos de moneda; tipo en [judicial,extrajudicial,monitorio,obligacion_hacer,prejudicial,diligencias,penal,laboral,contencioso,otro]; observaciones=anotaciones manuscritas importantes; usa null/[] si no es visible.',
+      'REGLA CRITICA para fecha_notificacion: Es la fecha en que se notifico al demandado, en YYYY-MM-DD. BUSCA ACTIVAMENTE en TODAS las paginas, especialmente en la ULTIMA pagina (que suele ser la cedula de notificacion):',
+      '  1) Anotacion manuscrita "Notificado" / "Notif." / "Ntfdo." o similar, seguida o acompanada de una fecha (ej: "Notificado 15/3/24", "Notif. 4-11-23")',
+      '  2) CUALQUIER fecha escrita a mano que aparezca sola o en un margen, sin texto impreso alrededor — en un documento judicial casi siempre es la fecha de notificacion',
+      '  3) Sello, cajetin o diligencia con fecha de entrega o recepcion',
+      '  4) Frases como "Emplazado:", "Recibido el:", "Entregado el:", "Recibí el:", "Firmado el:" seguidas de una fecha',
+      '  5) Una fecha aislada en la esquina superior o inferior de la ultima pagina',
+      '  IMPORTANTE: Si el documento principal esta impreso y ves UNA fecha manuscrita en cualquier pagina, esa fecha es casi con total seguridad la fecha_notificacion. Ponla aunque no este acompanada de la palabra "Notificado".',
     ].filter(Boolean).join('\n');
 
         const parts: any[] = [{ text: prompt }];
@@ -980,7 +1017,14 @@ async function parseExpedienteFromVisionOpenAI(file: DocFile, ocrText: string): 
       ocrSection,
       'Devuelve EXCLUSIVAMENTE JSON valido (sin markdown) con exactamente estos campos:',
       '{"transcription":null,"tipo":null,"estado":null,"descripcion":null,"demandantes":[],"demandados":[],"cliente_nombre":null,"contrario":null,"procurador":null,"juzgado":null,"tipo_proc":null,"num_autos":null,"nig":null,"fecha_inicio":null,"fecha_notificacion":null,"ref_expediente":null,"tipos_asunto":null,"cuantia_principal":null,"observaciones":null}',
-      'Reglas: transcription=transcribe TODO el texto visible impreso Y manuscrito (campo MAS IMPORTANTE, nunca null si hay texto en alguna pagina); demandantes=array JSON con TODOS los nombres de demandantes/parte actora (uno o varios, siempre separados en elementos distintos); demandados=array JSON con TODOS los nombres de demandados/parte contraria (uno o varios, muy comun que haya mas de uno, siempre separados en elementos distintos); cliente_nombre=primer elemento de demandantes; contrario=todos los demandados unidos por " | "; descripcion=1-2 frases que resumen el documento; juzgado=nombre completo del juzgado; num_autos=numero de autos o procedimiento judicial; nig=Numero de Identificacion General si aparece; fecha_inicio=fecha de inicio del procedimiento en YYYY-MM-DD (NO la fecha del documento); fecha_notificacion=fecha en que se notifico/cedulo al demandado en YYYY-MM-DD y debe priorizar cualquier anotacion manuscrita que empiece por "Notificado" seguida de fecha nn-nn-nn; cuantia_principal=importe numerico reclamado sin simbolos de moneda; tipo en [judicial, extrajudicial, monitorio, obligacion_hacer, prejudicial, diligencias, penal, laboral, contencioso, otro]; observaciones=anotaciones manuscritas importantes, datos relevantes no clasificados en otros campos; usa null o [] si no es visible en ninguna pagina.',
+      'Reglas generales: transcription=transcribe TODO el texto visible impreso Y manuscrito; demandantes=array con TODOS los demandantes separados en elementos distintos; demandados=array con TODOS los demandados separados; cliente_nombre=primer demandante; contrario=demandados unidos por " | "; descripcion=1-2 frases resumen; juzgado=nombre completo; num_autos=numero de autos; nig=NIG si aparece; fecha_inicio=fecha inicio procedimiento YYYY-MM-DD (NO fecha del documento); cuantia_principal=importe numerico sin simbolos; tipo en [judicial,extrajudicial,monitorio,obligacion_hacer,prejudicial,diligencias,penal,laboral,contencioso,otro]; observaciones=anotaciones manuscritas relevantes; usa null/[] si no es visible.',
+      'REGLA CRITICA para fecha_notificacion (YYYY-MM-DD): Busca en TODAS las paginas, especialmente en la ULTIMA (cedula de notificacion):',
+      '  1) Anotacion manuscrita "Notificado/a", "Notif.", "Ntfdo." seguida de una fecha (ej: "Notificado 15/3/24")',
+      '  2) Cualquier fecha escrita a mano sola o en un margen — en un documento judicial impreso, una fecha manuscrita aislada ES la fecha de notificacion',
+      '  3) Sello o cajetin con fecha de entrega/recepcion',
+      '  4) "Emplazado:", "Recibido el:", "Entregado el:", "Recibí el:", "Firmado el:" + fecha',
+      '  5) Una fecha aislada en esquina superior/inferior de la ultima pagina',
+      '  Si ves UNA SOLA fecha manuscrita en un documento impreso, es casi seguro la fecha_notificacion aunque no veas la palabra "Notificado".',
     ].filter(Boolean).join('\n');
 
         for (let attempt = 0; attempt < 3; attempt++) {
