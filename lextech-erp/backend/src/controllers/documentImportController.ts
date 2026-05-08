@@ -270,29 +270,29 @@ async function extractFocusedNotificationDate(file: DocFile) {
           text: extractImageOcr(page.path),
         }));
 
-        // 1st pass OCR: last 2 pages
-        const lastPagesText = ocrByPage.slice(-2).map((p) => p.text).filter((t) => t.trim()).join('\n\n');
-        const lastPageDate = runNotificationDateChecks(lastPagesText);
-        if (lastPageDate) return lastPageDate;
+        // 1st pass OCR: primeras 2 páginas (la anotación manuscrita suele estar al inicio)
+        const firstPagesText = ocrByPage.slice(0, 2).map((p) => p.text).filter((t) => t.trim()).join('\n\n');
+        const firstPagesDate = runNotificationDateChecks(firstPagesText);
+        if (firstPagesDate) return firstPagesDate;
 
-        // 2nd pass OCR: first page
-        const firstPageText = ocrByPage.filter((p) => p.pageNumber === 1).map((p) => p.text).filter((t) => t.trim()).join('\n\n');
-        const firstPageDate = runNotificationDateChecks(firstPageText);
-        if (firstPageDate) return firstPageDate;
-
-        // 3rd pass OCR: middle pages
+        // 2nd pass OCR: páginas intermedias
         const middlePagesText = ocrByPage
-          .filter((p) => p.pageNumber > 1 && p.pageNumber < ocrByPage.length)
+          .slice(2, -2)
           .map((p) => p.text).filter((t) => t.trim()).join('\n\n');
         const middleDate = runNotificationDateChecks(middlePagesText);
         if (middleDate) return middleDate;
 
-        // 4th pass: OCR couldn't find it — ask Gemini with a focused single-task prompt
-        // Try last 2 pages first (cédula), then all pages if needed
+        // 3rd pass OCR: últimas 2 páginas
+        const lastPagesText = ocrByPage.slice(-2).map((p) => p.text).filter((t) => t.trim()).join('\n\n');
+        const lastPageDate = runNotificationDateChecks(lastPagesText);
+        if (lastPageDate) return lastPageDate;
+
+        // 4th pass: OCR no encontró nada — Gemini focused con tarea única
+        // Primero las 2 primeras páginas, luego todo el doc si hace falta
         console.log(`[documentImport] OCR no encontró fecha de notificación, usando Gemini focused para ${file.name}`);
-        const lastImages = ocrByPage.slice(-2);
-        const dateFromLastPages = await geminiDateOnlyFromImages(lastImages);
-        if (dateFromLastPages) return dateFromLastPages;
+        const firstImages = ocrByPage.slice(0, 2);
+        const dateFromFirstPages = await geminiDateOnlyFromImages(firstImages);
+        if (dateFromFirstPages) return dateFromFirstPages;
 
         const dateFromAllPages = await geminiDateOnlyFromImages(ocrByPage);
         return dateFromAllPages;
