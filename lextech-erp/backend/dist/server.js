@@ -22,6 +22,8 @@ const whatsapp_1 = __importDefault(require("./routes/whatsapp"));
 const documentImport_1 = __importDefault(require("./routes/documentImport"));
 const documental_1 = __importDefault(require("./routes/documental"));
 const clientInvite_1 = __importDefault(require("./routes/clientInvite"));
+const facturacion_1 = __importDefault(require("./routes/facturacion"));
+const quipu_1 = __importDefault(require("./routes/quipu"));
 const migrations_1 = require("./config/migrations");
 const localFilesWatcher_1 = require("./watchers/localFilesWatcher");
 const filesController_1 = require("./controllers/filesController");
@@ -33,8 +35,21 @@ const app = (0, express_1.default)();
 const PORT = process.env.PORT || 4000;
 const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
     .split(',')
-    .map((origin) => origin.trim())
+    .map((o) => o.trim())
     .filter(Boolean);
+const allowedPatterns = (process.env.CORS_ALLOWED_PATTERNS || '.vercel.app,localhost,127.0.0.1')
+    .split(',')
+    .map((p) => p.trim())
+    .filter(Boolean);
+function isCorsAllowed(origin) {
+    if (!origin)
+        return true;
+    if (allowedOrigins.length === 0)
+        return true;
+    if (allowedOrigins.includes(origin))
+        return true;
+    return allowedPatterns.some((pattern) => origin.includes(pattern));
+}
 process.on('unhandledRejection', (reason) => {
     console.error('❌ Unhandled promise rejection:', reason);
 });
@@ -48,11 +63,13 @@ app.use((0, helmet_1.default)({
 }));
 app.use((0, cors_1.default)({
     origin: (origin, callback) => {
-        if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+        if (isCorsAllowed(origin)) {
             callback(null, true);
-            return;
         }
-        callback(new Error('Origen no permitido por CORS'));
+        else {
+            console.warn(`CORS bloqueado para origen: ${origin}`);
+            callback(new Error(`Origen no permitido por CORS: ${origin}`));
+        }
     },
     credentials: true,
 }));
@@ -82,6 +99,8 @@ app.use('/api/email', email_1.default);
 app.use('/api/whatsapp', whatsapp_1.default);
 app.use('/api/documental', documental_1.default);
 app.use('/api/clientes/invites', clientInvite_1.default);
+app.use('/api/facturacion', facturacion_1.default);
+app.use('/api/quipu', quipu_1.default);
 app.get('/health', (_req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
@@ -133,6 +152,16 @@ app.use((err, _req, res, _next) => {
 (0, migrations_1.runMigrations)().then(() => {
     app.listen(PORT, async () => {
         console.log(`🛡️  VANTIA Backend corriendo en http://localhost:${PORT}`);
+        const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
+        if (!geminiKey) {
+            console.warn('⚠️  GEMINI_API_KEY no configurada — importación de documentos y VantIA desactivados.');
+        }
+        else if (!geminiKey.startsWith('AIzaSy')) {
+            console.error('❌ GEMINI_API_KEY inválida (debe empezar por AIzaSy...). La clave actual parece un token OAuth, no una API key de Google AI Studio. Obtén una en https://aistudio.google.com/apikey');
+        }
+        else {
+            console.log('✅ GEMINI_API_KEY configurada correctamente.');
+        }
         if (paths_1.SHOULD_START_LOCAL_WATCHER) {
             (0, localFilesWatcher_1.startLocalFilesWatcher)();
             (0, filesController_1.migrateLocalFoldersStructure)();

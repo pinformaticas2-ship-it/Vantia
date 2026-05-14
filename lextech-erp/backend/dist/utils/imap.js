@@ -195,6 +195,14 @@ class ImapClient {
     async listFolders() {
         const client = this.ensureClient();
         const boxes = await client.list();
+        const BLOCKED_PATHS = new Set([
+            'snoozed', '[gmail]/snoozed',
+            'category_personal', 'category_social', 'category_promotions',
+            'category_updates', 'category_forums',
+            '[gmail]/category_personal', '[gmail]/category_social',
+            '[gmail]/category_promotions', '[gmail]/category_updates',
+            '[gmail]/category_forums',
+        ]);
         const folders = [];
         const walk = (items) => {
             for (const item of items || []) {
@@ -203,7 +211,7 @@ class ImapClient {
                     : (Array.isArray(item.flags) ? item.flags.map(String) : []);
                 const noSelect = flags.some(f => f.toLowerCase() === '\\noselect');
                 const path = String(item.path || item.name || '');
-                if (!noSelect && path) {
+                if (!noSelect && path && !BLOCKED_PATHS.has(path.toLowerCase())) {
                     folders.push({
                         path,
                         name: String(item.name || path.split(String(item.delimiter || '/')).pop() || path),
@@ -225,7 +233,16 @@ class ImapClient {
     async selectFolder(folder) {
         const client = this.ensureClient();
         await this.releaseMailboxLock();
-        this.mailboxLock = await client.getMailboxLock(folder);
+        try {
+            this.mailboxLock = await client.getMailboxLock(folder);
+        }
+        catch (e) {
+            const msg = String(e?.message || e || '').toLowerCase();
+            if (msg.includes('invalid label') || msg.includes('nonexistent') || msg.includes('no such mailbox')) {
+                throw new Error(`La carpeta "${folder}" no existe o no es accesible en este servidor de correo.`);
+            }
+            throw e;
+        }
         this.currentMailbox = folder;
         return {
             exists: Number(client.mailbox?.exists || 0),

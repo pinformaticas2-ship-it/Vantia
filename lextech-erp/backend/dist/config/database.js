@@ -40,7 +40,7 @@ const pool = new pg_1.Pool({
     ssl: shouldUseSsl ? { rejectUnauthorized: false } : false,
     max: isSupabasePooler ? 5 : 20,
     idleTimeoutMillis: isSupabasePooler ? 10000 : 30000,
-    connectionTimeoutMillis: 5000,
+    connectionTimeoutMillis: 15000,
     allowExitOnIdle: false,
     keepAlive: true,
     keepAliveInitialDelayMillis: 10000,
@@ -48,7 +48,11 @@ const pool = new pg_1.Pool({
 });
 function isTransientPoolerError(error) {
     const message = String(error?.message || '');
-    return error?.code === 'XX000' && /DbHandler exited/i.test(message);
+    if (error?.code === 'XX000' && /DbHandler exited/i.test(message))
+        return true;
+    if (/connection terminated due to connection timeout/i.test(message))
+        return true;
+    return false;
 }
 const originalQuery = pool.query.bind(pool);
 pool.query = async (...args) => {
