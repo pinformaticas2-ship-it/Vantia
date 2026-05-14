@@ -5,6 +5,8 @@ import pool from '../config/database';
 import { TEMP_ROOT, UPLOADS_CLIENTS_ROOT as CLIENT_UPLOADS_ROOT } from '../config/paths';
 import { logActivityForReq, resolveUserName } from './activityController';
 
+const LIBREOFFICE_ENABLED = false;
+
 export const TASK_FILES_ROOT = path.join(CLIENT_UPLOADS_ROOT, '..', 'task-files');
 
 const ensureTaskFilesDir = (taskId: string) => {
@@ -316,6 +318,7 @@ export const downloadTaskFile = async (req: any, res: Response) => {
 };
 
 export const previewTaskWordAsPdf = async (req: any, res: Response) => {
+  if (!LIBREOFFICE_ENABLED) return res.status(503).json({ success: false, error: 'Vista previa PDF temporalmente no disponible.' });
   const { id, fileId } = req.params;
   try {
     const fileRow = await getTaskFileRecord(id, fileId);

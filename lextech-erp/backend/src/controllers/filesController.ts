@@ -5,6 +5,8 @@ import pool from '../config/database';
 import { logActivityForReq } from './activityController';
 import { CLIENT_FILES_ROOT as LOCAL_CLIENT_FILES_ROOT, TEMP_ROOT, UPLOADS_CLIENTS_ROOT as UPLOADS_ROOT } from '../config/paths';
 
+const LIBREOFFICE_ENABLED = false;
+
 type LocalEditWatcher = {
   watcher: fs.FSWatcher;
   timer: NodeJS.Timeout | null;
@@ -1271,6 +1273,7 @@ except Exception:
 // el frontend pueda caer al preview HTML actual.
 // ─────────────────────────────────────────────────────────────────────────────
 export const previewWordAsPdf = async (req: any, res: Response) => {
+  if (!LIBREOFFICE_ENABLED) return res.status(503).json({ success: false, error: 'Vista previa PDF temporalmente no disponible.' });
   const { clientId, fileId } = req.params;
   try {
     const result = await pool.query(
@@ -2233,6 +2236,7 @@ export const listTemplates = (_req: any, res: Response) => {
 };
 
 export const previewTemplateAsPdf = async (req: any, res: Response) => {
+  if (!LIBREOFFICE_ENABLED) return res.status(503).json({ success: false, error: 'Vista previa PDF temporalmente no disponible.' });
   const relPath = req.query.path as string | undefined;
   if (!relPath) return res.status(400).json({ success: false, error: 'Parámetro path requerido.' });
 
