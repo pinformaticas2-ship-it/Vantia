@@ -1,6 +1,3 @@
-import { ClerkExpressRequireAuth } from '@clerk/clerk-sdk-node';
+import { requireAuth as clerkRequireAuth } from '@clerk/express';
 
-// Middleware estricto: Bloquea si no hay token válido
-export const requireAuth = ClerkExpressRequireAuth({
-  // Opciones adicionales si fueran necesarias
-});
+export const requireAuth = clerkRequireAuth();

@@ -4,10 +4,8 @@ import path from 'path';
 import crypto from 'crypto';
 import fs from 'fs';
 const uuidv4 = () => crypto.randomUUID();
-import { ClerkExpressRequireAuth } from '@clerk/clerk-sdk-node';
+import { requireAuth } from '../middleware/auth';
 import { listFiles, uploadFiles, downloadFile, deleteFile, UPLOADS_ROOT, listTemplates, downloadTemplate, downloadBlank, createBlankDocument, updateFileMetadata, openFileLocally, previewDocxAsHtml, previewExcelAsHtml, previewTemplateAsHtml, testPreviewImages, previewWordAsPdf, previewTemplateAsPdf } from '../controllers/filesController';
-
-const requireAuth = ClerkExpressRequireAuth({});
 const router = Router();
 
 // Multer: guarda en uploads/clients/:clientId/ con nombre único

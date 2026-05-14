@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { ClerkExpressRequireAuth } from '@clerk/clerk-sdk-node';
+import { requireAuth as auth } from '../middleware/auth';
 import {
   createInvite,
   listInvites,
@@ -9,7 +9,6 @@ import {
 } from '../controllers/clientInviteController';
 
 const router = Router();
-const auth = ClerkExpressRequireAuth();
 
 // Rutas autenticadas
 router.post('/',       auth, createInvite);

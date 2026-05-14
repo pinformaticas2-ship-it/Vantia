@@ -19,6 +19,7 @@ import documentalRoutes     from './routes/documental';
 import clientInviteRoutes   from './routes/clientInvite';
 import facturacionRoutes    from './routes/facturacion';
 import quipuRoutes          from './routes/quipu';
+import { clerkMiddleware } from '@clerk/express';
 import { runMigrations } from './config/migrations';
 import { startLocalFilesWatcher } from './watchers/localFilesWatcher';
 import { migrateLocalFoldersStructure } from './controllers/filesController';
@@ -66,6 +67,7 @@ process.on('uncaughtException', (error) => {
 });
 
 // --- MIDDLEWARES GLOBALES ---
+app.use(clerkMiddleware());
 app.use(helmet({
   crossOriginResourcePolicy: false,
   frameguard: false,           // elimina X-Frame-Options para permitir framing cross-origin
