@@ -6,7 +6,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   CheckCircle2, Circle, AlertTriangle, Clock, Plus, X,
   Loader2, Search, Filter, Trash2, Edit3, Flag,
-  Briefcase, Users, Calendar, ChevronRight,
+  Briefcase, Users, Calendar, ChevronRight, MoreHorizontal, GripVertical,
 } from "lucide-react";
 import { safeJson } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
@@ -76,6 +76,7 @@ function daysUntil(plazo: string | null): number | null {
 }
 
 const clientName = (t: Task) => t.client_name_resolved || t.client_name || "—";
+type TaskView = "list" | "kanban" | "gantt";
 
 // ── Modal crear/editar tarea ──────────────────────────────────────────────────
 interface TaskFormData {
@@ -443,6 +444,308 @@ function TaskCard({
 }
 
 // ── Página principal ──────────────────────────────────────────────────────────
+function KanbanLane({
+  title,
+  tone,
+  tasks,
+  onToggle,
+  onEdit,
+}: {
+  title: string;
+  tone: string;
+  tasks: Task[];
+  onToggle: (id: string, newEstado: string) => void;
+  onEdit: (t: Task) => void;
+}) {
+  const laneMeta = useMemo(() => {
+    const overdueCount = tasks.filter((task) => isOverdue(task.plazo, task.estado)).length;
+    const urgentCount = tasks.filter((task) => task.estado === "urgente").length;
+    return { overdueCount, urgentCount };
+  }, [tasks]);
+
+  return (
+    <div className="min-w-[340px] max-w-[380px] flex-1 rounded-[24px] border border-slate-200/90 bg-white shadow-[0_12px_36px_rgba(15,23,42,0.06)] overflow-hidden">
+      <div className={`px-4 py-3.5 border-b ${tone}`}>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <GripVertical size={14} className="opacity-50" />
+            <span className="text-sm font-extrabold tracking-tight truncate">{title}</span>
+            <span className="px-2 py-0.5 rounded-full bg-white/90 text-[11px] font-extrabold border border-current/10">{tasks.length}</span>
+          </div>
+          <button className="h-7 w-7 rounded-lg hover:bg-white/70 flex items-center justify-center transition-colors">
+            <MoreHorizontal size={14} />
+          </button>
+        </div>
+        <div className="mt-2 flex items-center gap-2 flex-wrap text-[10px] font-bold uppercase tracking-[0.18em] opacity-75">
+          <span>{laneMeta.overdueCount} vencidas</span>
+          <span className="h-1 w-1 rounded-full bg-current/40" />
+          <span>{laneMeta.urgentCount} urgentes</span>
+        </div>
+      </div>
+      <div className="p-3 min-h-[420px] bg-[linear-gradient(180deg,#fbfcff_0%,#f8fafc_100%)] space-y-3">
+        {tasks.length === 0 ? (
+          <div className="min-h-[220px] rounded-2xl border-2 border-dashed border-slate-200 flex items-center justify-center text-xs font-medium text-slate-400 bg-white/80">
+            Sin tareas
+          </div>
+        ) : tasks.map((task) => {
+          const overdue = isOverdue(task.plazo, task.estado);
+          const days = daysUntil(task.plazo);
+          const tipoConf = TIPO_CONFIG[task.tipo] || TIPO_CONFIG.otro;
+          const prioConf = PRIO_CONFIG[task.prioridad] || PRIO_CONFIG.media;
+          const done = task.estado === "completada";
+
+          return (
+            <div
+              key={task.id}
+              className={`rounded-2xl border bg-white px-4 py-3.5 shadow-[0_6px_18px_rgba(15,23,42,0.05)] transition-all hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(15,23,42,0.08)] ${
+                overdue ? "border-red-200" : "border-slate-200"
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <button
+                  onClick={() => onToggle(task.id, done ? "pendiente" : "completada")}
+                  className="mt-0.5 shrink-0 text-slate-400 hover:text-emerald-500 transition-colors"
+                  title={done ? "Marcar pendiente" : "Marcar completada"}
+                >
+                  {done ? <CheckCircle2 size={18} className="text-emerald-500" /> : <Circle size={18} />}
+                </button>
+                <div className="min-w-0 flex-1">
+                  <button onClick={() => onEdit(task)} className="text-left w-full">
+                    <div className={`text-[15px] leading-5 font-bold ${done ? "line-through text-slate-400" : "text-slate-800"}`}>
+                      {task.titulo}
+                    </div>
+                  </button>
+                  {task.descripcion && (
+                    <p className="mt-1 text-xs text-slate-500 line-clamp-2">{task.descripcion}</p>
+                  )}
+                </div>
+                <button
+                  onClick={() => onEdit(task)}
+                  className="shrink-0 h-8 w-8 rounded-xl border border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  <Edit3 size={13} className="mx-auto" />
+                </button>
+              </div>
+
+              <div className="mt-3 flex items-center gap-2 flex-wrap">
+                <span className={`h-2.5 w-2.5 rounded-full ${prioConf.bar}`} />
+                <span className={`text-[10px] font-extrabold px-2 py-1 rounded-full ${tipoConf.color}`}>{tipoConf.label}</span>
+                <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-slate-100 text-slate-600">{PRIO_CONFIG[task.prioridad]?.label || "Media"}</span>
+                {task.estado === "urgente" && (
+                  <span className="text-[10px] font-extrabold px-2 py-1 rounded-full bg-red-50 text-red-600">Urgente</span>
+                )}
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
+                <div className="rounded-xl border border-slate-100 bg-slate-50 px-2.5 py-2">
+                  <div className="flex items-center gap-1 text-slate-400 font-bold uppercase tracking-[0.16em] text-[9px]">
+                    <Users size={10} /> Cliente
+                  </div>
+                  <div className="mt-1 font-semibold text-slate-700 truncate">{clientName(task)}</div>
+                </div>
+                <div className="rounded-xl border border-slate-100 bg-slate-50 px-2.5 py-2">
+                  <div className="flex items-center gap-1 text-slate-400 font-bold uppercase tracking-[0.16em] text-[9px]">
+                    <Calendar size={10} /> Límite
+                  </div>
+                  <div className={`mt-1 font-semibold truncate ${overdue ? "text-red-600" : "text-slate-700"}`}>
+                    {task.plazo ? fmtDate(task.plazo) : "Sin fecha"}
+                    {days !== null && !overdue && (
+                      <span className="ml-1 text-slate-400">{days === 0 ? "· hoy" : `· ${days}d`}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {(task.expediente || task.juzgado || task.num_proc) && (
+                <div className="mt-3 flex items-center gap-2 flex-wrap text-[11px] text-slate-500">
+                  {task.expediente && (
+                    <span className="inline-flex items-center gap-1">
+                      <Briefcase size={10} /> {task.expediente}
+                    </span>
+                  )}
+                  {task.juzgado && (
+                    <span className="inline-flex items-center gap-1">
+                      <Flag size={10} /> {task.juzgado}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        <button className="w-full rounded-2xl border border-dashed border-slate-200 bg-white/70 py-3 text-sm font-bold text-slate-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50/60 transition-colors">
+          + Añadir tarea
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function GanttBoard({
+  tasks,
+  onEdit,
+}: {
+  tasks: Task[];
+  onEdit: (t: Task) => void;
+}) {
+  const ganttData = useMemo(() => {
+    const list = tasks
+      .filter((task) => !!task.plazo)
+      .map((task) => {
+        const end = new Date(task.plazo as string);
+        const sourceStart = task.created_at || task.updated_at || task.plazo || new Date().toISOString();
+        const parsedStart = new Date(sourceStart);
+        const start = parsedStart.getTime() <= end.getTime()
+          ? parsedStart
+          : new Date(end.getTime() - 86400000 * 3);
+        return { task, start, end };
+      })
+      .sort((a, b) => a.start.getTime() - b.start.getTime());
+
+    if (!list.length) return null;
+
+    const minStart = new Date(Math.min(...list.map((item) => item.start.getTime())));
+    const maxEnd = new Date(Math.max(...list.map((item) => item.end.getTime())));
+    minStart.setHours(0, 0, 0, 0);
+    maxEnd.setHours(0, 0, 0, 0);
+
+    const totalDays = Math.max(1, Math.ceil((maxEnd.getTime() - minStart.getTime()) / 86400000) + 1);
+    const dates = Array.from({ length: totalDays }, (_, index) => {
+      const date = new Date(minStart);
+      date.setDate(minStart.getDate() + index);
+      return date;
+    });
+
+    return { list, minStart, dates, totalDays };
+  }, [tasks]);
+
+  if (!ganttData) {
+    return (
+      <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-white py-20 text-center text-sm font-medium text-slate-400">
+        No hay tareas con fecha límite para mostrar en Gantt.
+      </div>
+    );
+  }
+
+  const { list, minStart, dates, totalDays } = ganttData;
+  const dayWidth = 44;
+  const weekHeaders = dates.reduce<Array<{ label: string; span: number; key: string }>>((acc, date) => {
+    const week = `${date.getFullYear()}-${Math.ceil((((date.getTime() - new Date(date.getFullYear(), 0, 1).getTime()) / 86400000) + new Date(date.getFullYear(), 0, 1).getDay() + 1) / 7)}`;
+    const label = `W${Math.ceil((((date.getTime() - new Date(date.getFullYear(), 0, 1).getTime()) / 86400000) + new Date(date.getFullYear(), 0, 1).getDay() + 1) / 7)} · ${date.toLocaleDateString("es-ES", { month: "short", day: "numeric" })}`;
+    const last = acc[acc.length - 1];
+    if (last?.key === week) {
+      last.span += 1;
+    } else {
+      acc.push({ key: week, label, span: 1 });
+    }
+    return acc;
+  }, []);
+  const todayOffset = Math.floor((new Date(new Date().setHours(0, 0, 0, 0)).getTime() - minStart.getTime()) / 86400000);
+
+  return (
+    <div className="rounded-[24px] border border-slate-200 bg-white overflow-hidden shadow-[0_18px_42px_rgba(15,23,42,0.06)]">
+      <div className="px-4 py-3.5 border-b border-slate-200 bg-slate-50 flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm font-extrabold text-slate-800">Cronograma</span>
+          <span className="px-2.5 py-1 rounded-full bg-white border border-slate-200 text-[11px] font-bold text-slate-500">{list.length} tareas</span>
+          <span className="px-2.5 py-1 rounded-full bg-violet-50 border border-violet-200 text-[11px] font-bold text-violet-600">Vista semanal</span>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 bg-white">Hoy</button>
+          <button className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 bg-white">Semana</button>
+          <button className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 bg-white">Ajuste automático</button>
+        </div>
+      </div>
+      <div className="overflow-auto">
+        <div className="min-w-[1280px]">
+          <div className="grid border-b border-slate-200 bg-slate-50 sticky top-0 z-10" style={{ gridTemplateColumns: `380px repeat(${totalDays}, minmax(${dayWidth}px, 1fr))` }}>
+            <div className="px-5 py-3 text-xs font-bold uppercase tracking-[0.24em] text-slate-500 border-r border-slate-200 row-span-2 flex items-center">Nombre</div>
+            <div className="col-span-full" style={{ gridColumn: `2 / span ${totalDays}` }}>
+              <div className="grid" style={{ gridTemplateColumns: `repeat(${totalDays}, minmax(${dayWidth}px, 1fr))` }}>
+                {weekHeaders.map((week) => (
+                  <div
+                    key={week.key}
+                    className="px-3 py-2 text-[11px] font-bold text-slate-600 border-r border-slate-200 bg-white/70"
+                    style={{ gridColumn: `span ${week.span}` }}
+                  >
+                    {week.label}
+                  </div>
+                ))}
+              </div>
+            </div>
+            {dates.map((date) => (
+              <div key={date.toISOString()} className="px-1 py-2 text-center border-r border-slate-100 bg-slate-50">
+                <div className="text-[11px] font-bold text-slate-700">{date.toLocaleDateString("es-ES", { day: "2-digit" })}</div>
+                <div className="text-[9px] text-slate-400 uppercase">{date.toLocaleDateString("es-ES", { weekday: "short" })}</div>
+              </div>
+            ))}
+          </div>
+
+          {list.map(({ task, start, end }) => {
+            const startOffset = Math.max(0, Math.floor((start.getTime() - minStart.getTime()) / 86400000));
+            const span = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / 86400000) + 1);
+            const tipoConf = TIPO_CONFIG[task.tipo] || TIPO_CONFIG.otro;
+            const overdue = isOverdue(task.plazo, task.estado);
+            const barTone = task.estado === "completada"
+              ? "bg-emerald-500/85"
+              : task.estado === "urgente" || overdue
+                ? "bg-red-500/85"
+                : "bg-indigo-500/85";
+
+            return (
+              <div key={task.id} className="grid border-b border-slate-100 hover:bg-slate-50/70 transition-colors" style={{ gridTemplateColumns: `380px repeat(${totalDays}, minmax(${dayWidth}px, 1fr))` }}>
+                <button onClick={() => onEdit(task)} className="px-5 py-3 text-left border-r border-slate-200 hover:bg-white">
+                  <div className="flex items-start gap-3">
+                    <span className={`mt-1 h-3 w-3 rounded-full ${barTone}`} />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[15px] font-bold text-slate-800 truncate">{task.titulo}</div>
+                      <div className="mt-1 flex items-center gap-2 flex-wrap">
+                        <span className="text-[10px] font-semibold text-blue-600">{clientName(task)}</span>
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${tipoConf.color}`}>{tipoConf.label}</span>
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">{PRIO_CONFIG[task.prioridad]?.label || "Media"}</span>
+                      </div>
+                    </div>
+                  </div>
+                </button>
+                <div className="relative" style={{ gridColumn: `2 / span ${totalDays}` }}>
+                  <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${totalDays}, minmax(${dayWidth}px, 1fr))` }}>
+                    {dates.map((date, index) => (
+                      <div
+                        key={`${task.id}-${date.toISOString()}`}
+                        className={`border-r border-slate-100 ${date.getDay() === 0 || date.getDay() === 6 ? "bg-slate-50/70" : ""} ${index === todayOffset ? "border-l border-l-red-300" : ""}`}
+                      />
+                    ))}
+                  </div>
+                  <div className="relative min-h-[72px]">
+                    {todayOffset >= 0 && todayOffset < totalDays && (
+                      <div
+                        className="absolute top-0 bottom-0 w-px bg-red-400/80 z-[1]"
+                        style={{ left: `${todayOffset * dayWidth + dayWidth / 2}px` }}
+                      />
+                    )}
+                    <button
+                      onClick={() => onEdit(task)}
+                      className={`absolute top-1/2 -translate-y-1/2 h-11 rounded-2xl px-3.5 text-left text-white shadow-[0_8px_22px_rgba(15,23,42,0.18)] ${barTone}`}
+                      style={{
+                        left: `${startOffset * dayWidth + 6}px`,
+                        width: `${Math.max(span * dayWidth - 12, dayWidth - 12)}px`,
+                      }}
+                      title={`${task.titulo} · ${fmtDate(task.plazo)}`}
+                    >
+                      <div className="text-xs font-extrabold truncate">{task.titulo}</div>
+                      <div className="text-[10px] text-white/85 truncate">{fmtDate(task.plazo)}</div>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Tareas() {
   const { getToken } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -459,6 +762,7 @@ export default function Tareas() {
   const [filterPrio,   setFilterPrio]   = useState("");
   const [search,       setSearch]       = useState("");
   const [showFilters,  setShowFilters]  = useState(false);
+  const [view,         setView]         = useState<TaskView>("list");
 
   // Modal
   const [showModal, setShowModal] = useState(false);
@@ -688,6 +992,26 @@ export default function Tareas() {
           </button>
         ))}
 
+        <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl p-1">
+          {([
+            { key: "list", label: "Lista" },
+            { key: "kanban", label: "Kanban" },
+            { key: "gantt", label: "Gantt" },
+          ] as const).map((option) => (
+            <button
+              key={option.key}
+              onClick={() => setView(option.key)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                view === option.key
+                  ? "bg-slate-800 text-white"
+                  : "text-slate-500 hover:bg-slate-50"
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+
         <div className="flex-1" />
 
         {/* Búsqueda */}
@@ -767,7 +1091,7 @@ export default function Tareas() {
             </button>
           )}
         </div>
-      ) : (
+      ) : view === "list" ? (
         <div className="space-y-2">
           {/* Vencidas al top */}
           {filtered.some(t => isOverdue(t.plazo, t.estado)) && (
@@ -787,6 +1111,32 @@ export default function Tareas() {
             <TaskCard key={t.id} task={t} onToggle={handleToggle} onEdit={openEdit} />
           ))}
         </div>
+      ) : view === "kanban" ? (
+        <div className="flex gap-4 overflow-x-auto pb-2">
+          <KanbanLane
+            title="Pendientes"
+            tone="bg-amber-50 text-amber-700"
+            tasks={filtered.filter((task) => task.estado === "pendiente")}
+            onToggle={handleToggle}
+            onEdit={openEdit}
+          />
+          <KanbanLane
+            title="Urgentes"
+            tone="bg-red-50 text-red-700"
+            tasks={filtered.filter((task) => task.estado === "urgente")}
+            onToggle={handleToggle}
+            onEdit={openEdit}
+          />
+          <KanbanLane
+            title="Completadas"
+            tone="bg-emerald-50 text-emerald-700"
+            tasks={filtered.filter((task) => task.estado === "completada")}
+            onToggle={handleToggle}
+            onEdit={openEdit}
+          />
+        </div>
+      ) : (
+        <GanttBoard tasks={filtered} onEdit={openEdit} />
       )}
 
       {/* Modal */}

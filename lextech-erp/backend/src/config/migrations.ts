@@ -947,6 +947,134 @@ export async function runMigrations(): Promise<void> {
       `CREATE INDEX IF NOT EXISTS idx_email_contacts_email        ON email_contacts (email)`,
     ]) { try { await client.query(idx); } catch (_e: any) {} }
 
+    // ── Módulo de Facturación ─────────────────────────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS facturacion_facturas (
+        id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id       VARCHAR(150) NOT NULL,
+        created_by    VARCHAR(200),
+        num           VARCHAR(100) NOT NULL,
+        contacto      VARCHAR(300) NOT NULL,
+        fecha         DATE NOT NULL,
+        vencimiento   DATE,
+        total         NUMERIC(12,2) NOT NULL DEFAULT 0,
+        estado        VARCHAR(30) NOT NULL DEFAULT 'pendiente',
+        area          VARCHAR(30) NOT NULL DEFAULT 'procesal',
+        responsable   VARCHAR(200),
+        forma_pago    VARCHAR(30) NOT NULL DEFAULT 'transferencia',
+        serie         VARCHAR(30) NOT NULL DEFAULT 'HON',
+        tipo_cliente  VARCHAR(30) NOT NULL DEFAULT 'empresa',
+        created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS facturacion_gastos (
+        id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id       VARCHAR(150) NOT NULL,
+        created_by    VARCHAR(200),
+        num           VARCHAR(100) NOT NULL,
+        proveedor     VARCHAR(300) NOT NULL,
+        fecha         DATE NOT NULL,
+        total         NUMERIC(12,2) NOT NULL DEFAULT 0,
+        categoria     VARCHAR(120) NOT NULL DEFAULT 'General',
+        estado        VARCHAR(30) NOT NULL DEFAULT 'pendiente',
+        area          VARCHAR(30) NOT NULL DEFAULT 'procesal',
+        responsable   VARCHAR(200),
+        deducible     BOOLEAN NOT NULL DEFAULT true,
+        created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS facturacion_presupuestos (
+        id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id       VARCHAR(150) NOT NULL,
+        created_by    VARCHAR(200),
+        num           VARCHAR(100) NOT NULL,
+        contacto      VARCHAR(300) NOT NULL,
+        fecha         DATE NOT NULL,
+        total         NUMERIC(12,2) NOT NULL DEFAULT 0,
+        estado        VARCHAR(30) NOT NULL DEFAULT 'pendiente',
+        area          VARCHAR(30) NOT NULL DEFAULT 'procesal',
+        responsable   VARCHAR(200),
+        iguala        BOOLEAN NOT NULL DEFAULT false,
+        created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+    for (const col of [
+      `ALTER TABLE facturacion_facturas ADD COLUMN IF NOT EXISTS client_id UUID REFERENCES entities(id) ON DELETE SET NULL`,
+      `ALTER TABLE facturacion_facturas ADD COLUMN IF NOT EXISTS expediente_id UUID REFERENCES expedientes(id) ON DELETE SET NULL`,
+      `ALTER TABLE facturacion_presupuestos ADD COLUMN IF NOT EXISTS client_id UUID REFERENCES entities(id) ON DELETE SET NULL`,
+      `ALTER TABLE facturacion_presupuestos ADD COLUMN IF NOT EXISTS expediente_id UUID REFERENCES expedientes(id) ON DELETE SET NULL`,
+    ]) { try { await client.query(col); } catch (_e: any) {} }
+    for (const idx of [
+      `CREATE INDEX IF NOT EXISTS idx_facturacion_facturas_user_fecha ON facturacion_facturas (user_id, fecha DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_facturacion_facturas_estado ON facturacion_facturas (estado)`,
+      `CREATE INDEX IF NOT EXISTS idx_facturacion_facturas_client ON facturacion_facturas (client_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_facturacion_facturas_expediente ON facturacion_facturas (expediente_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_facturacion_gastos_user_fecha ON facturacion_gastos (user_id, fecha DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_facturacion_gastos_estado ON facturacion_gastos (estado)`,
+      `CREATE INDEX IF NOT EXISTS idx_facturacion_presupuestos_user_fecha ON facturacion_presupuestos (user_id, fecha DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_facturacion_presupuestos_estado ON facturacion_presupuestos (estado)`,
+      `CREATE INDEX IF NOT EXISTS idx_facturacion_presupuestos_client ON facturacion_presupuestos (client_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_facturacion_presupuestos_expediente ON facturacion_presupuestos (expediente_id)`,
+    ]) { try { await client.query(idx); } catch (_e: any) {} }
+    for (const trg of [
+      `DROP TRIGGER IF EXISTS trg_facturacion_facturas_updated_at ON facturacion_facturas;`,
+      `DROP TRIGGER IF EXISTS trg_facturacion_gastos_updated_at ON facturacion_gastos;`,
+      `DROP TRIGGER IF EXISTS trg_facturacion_presupuestos_updated_at ON facturacion_presupuestos;`,
+    ]) { try { await client.query(trg); } catch (_e: any) {} }
+    try {
+      await client.query(`
+        CREATE TRIGGER trg_facturacion_facturas_updated_at
+          BEFORE UPDATE ON facturacion_facturas
+          FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+      `);
+    } catch (_e: any) {}
+    try {
+      await client.query(`
+        CREATE TRIGGER trg_facturacion_gastos_updated_at
+          BEFORE UPDATE ON facturacion_gastos
+          FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+      `);
+    } catch (_e: any) {}
+    try {
+      await client.query(`
+        CREATE TRIGGER trg_facturacion_presupuestos_updated_at
+          BEFORE UPDATE ON facturacion_presupuestos
+          FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+      `);
+    } catch (_e: any) {}
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS quipu_settings (
+        id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id           VARCHAR(150) NOT NULL UNIQUE,
+        app_id            TEXT NOT NULL,
+        app_secret        TEXT NOT NULL,
+        base_url          TEXT NOT NULL DEFAULT 'https://getquipu.com',
+        access_token      TEXT,
+        token_type        VARCHAR(50),
+        token_expires_at  TIMESTAMPTZ,
+        last_sync_at      TIMESTAMPTZ,
+        sync_summary      JSONB,
+        quipu_company     VARCHAR(255),
+        quipu_email       VARCHAR(255),
+        created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+    try { await client.query(`CREATE INDEX IF NOT EXISTS idx_quipu_settings_user_id ON quipu_settings (user_id);`); } catch (_e: any) {}
+    try { await client.query(`DROP TRIGGER IF EXISTS trg_quipu_settings_updated_at ON quipu_settings;`); } catch (_e: any) {}
+    try {
+      await client.query(`
+        CREATE TRIGGER trg_quipu_settings_updated_at
+          BEFORE UPDATE ON quipu_settings
+          FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+      `);
+    } catch (_e: any) {}
+
     // ── Módulo de WhatsApp Business ───────────────────────────────────────
     await client.query(`
       CREATE TABLE IF NOT EXISTS whatsapp_messages (

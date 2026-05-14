@@ -17,6 +17,8 @@ import whatsappRoutes       from './routes/whatsapp';
 import documentImportRoutes from './routes/documentImport';
 import documentalRoutes     from './routes/documental';
 import clientInviteRoutes   from './routes/clientInvite';
+import facturacionRoutes    from './routes/facturacion';
+import quipuRoutes          from './routes/quipu';
 import { runMigrations } from './config/migrations';
 import { startLocalFilesWatcher } from './watchers/localFilesWatcher';
 import { migrateLocalFoldersStructure } from './controllers/filesController';
@@ -91,6 +93,8 @@ app.use('/api/email',             emailRoutes);
 app.use('/api/whatsapp',          whatsappRoutes);
 app.use('/api/documental',        documentalRoutes);
 app.use('/api/clientes/invites',  clientInviteRoutes);
+app.use('/api/facturacion',       facturacionRoutes);
+app.use('/api/quipu',             quipuRoutes);
 
 // Health check básico
 app.get('/health', (_req, res) => {
