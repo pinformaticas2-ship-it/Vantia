@@ -30,10 +30,32 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 4000;
+
+// ── CORS ──────────────────────────────────────────────────────────────────────
+// CORS_ALLOWED_ORIGINS: lista de orígenes exactos separados por coma.
+//   Si está vacío → permite TODOS (modo permisivo, útil en desarrollo).
+// CORS_ALLOWED_PATTERNS: patrones sufijo separados por coma (p.ej. ".vercel.app").
+//   Por defecto incluye ".vercel.app" y "localhost" para cubrir cualquier
+//   preview/deployment de Vercel sin tener que actualizar la variable cada vez.
 const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
   .split(',')
-  .map((origin) => origin.trim())
+  .map((o) => o.trim())
   .filter(Boolean);
+
+const allowedPatterns = (
+  process.env.CORS_ALLOWED_PATTERNS || '.vercel.app,localhost,127.0.0.1'
+)
+  .split(',')
+  .map((p) => p.trim())
+  .filter(Boolean);
+
+function isCorsAllowed(origin: string | undefined): boolean {
+  if (!origin) return true;                          // mismo origen / curl
+  if (allowedOrigins.length === 0) return true;      // modo permisivo total
+  if (allowedOrigins.includes(origin)) return true;  // coincidencia exacta
+  // Coincidencia por sufijo: ".vercel.app" cubre *cualquier* subdominio
+  return allowedPatterns.some((pattern) => origin.includes(pattern));
+}
 
 process.on('unhandledRejection', (reason) => {
   console.error('❌ Unhandled promise rejection:', reason);
@@ -51,11 +73,12 @@ app.use(helmet({
 }));
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+    if (isCorsAllowed(origin)) {
       callback(null, true);
-      return;
+    } else {
+      console.warn(`CORS bloqueado para origen: ${origin}`);
+      callback(new Error(`Origen no permitido por CORS: ${origin}`));
     }
-    callback(new Error('Origen no permitido por CORS'));
   },
   credentials: true,
 }));
