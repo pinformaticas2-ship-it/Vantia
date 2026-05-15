@@ -96,6 +96,7 @@ type QuipuStatus = {
     invoices?: number;
     numberingSeries?: number;
     syncedAt?: string;
+    importedToFacturacion?: number;
   } | null;
 };
 
@@ -975,6 +976,8 @@ export default function Facturacion() {
         lastSyncAt: response?.data?.summary?.syncedAt || new Date().toISOString(),
         syncSummary: response?.data?.summary || null,
       }));
+      // Reload billing data so imported Quipu invoices appear immediately
+      await loadBilling();
     } catch (error: any) {
       setErrorMsg(error?.message || "No se pudo sincronizar Quipu.");
     } finally {
@@ -1113,7 +1116,7 @@ export default function Facturacion() {
                 </p>
                 {quipuStatus.syncSummary && (
                   <p className="mt-1 text-xs text-emerald-700">
-                    Contactos: {quipuStatus.syncSummary.contacts || 0} · Facturas: {quipuStatus.syncSummary.invoices || 0} · Series: {quipuStatus.syncSummary.numberingSeries || 0}
+                    Contactos: {quipuStatus.syncSummary.contacts || 0} · Facturas Quipu: {quipuStatus.syncSummary.invoices || 0} · Importadas al ERP: {quipuStatus.syncSummary.importedToFacturacion ?? quipuStatus.syncSummary.invoices ?? 0} · Series: {quipuStatus.syncSummary.numberingSeries || 0}
                   </p>
                 )}
               </div>

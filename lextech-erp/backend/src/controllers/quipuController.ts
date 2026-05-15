@@ -17,6 +17,14 @@ async function getStoredQuipuSettings(userId: string) {
   return result.rows[0] || null;
 }
 
+function mapQuipuStatus(status: string): string {
+  const s = String(status || '').toLowerCase();
+  if (s === 'paid') return 'cobrada';
+  if (s === 'overdue') return 'vencida';
+  if (s === 'sent' || s === 'issued') return 'enviada';
+  return 'pendiente';
+}
+
 async function ensureQuipuSyncTables() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS quipu_contacts (
@@ -256,13 +264,46 @@ export const syncQuipuBootstrap = async (req: any, res: Response) => {
     const summary = summarizeQuipuBootstrap(bootstrap);
     await persistQuipuBootstrap(userId, settings.id, bootstrap);
 
+    // Import Quipu invoices into facturacion_facturas so they show in the billing UI
+    let importedCount = 0;
+    for (const item of bootstrap.invoices) {
+      const quipuId = String(item?.id || '').trim();
+      const num = String(item?.attributes?.number || item?.attributes?.serial_number || quipuId).trim();
+      const contacto = String(item?.attributes?.contact_name || item?.attributes?.recipient_name || 'Quipu').trim();
+      const fecha = item?.attributes?.issue_date || item?.attributes?.issued_at || new Date().toISOString().slice(0, 10);
+      const vencimiento = item?.attributes?.due_date || null;
+      const total = Number(item?.attributes?.total_amount || item?.attributes?.total || 0);
+      const estado = mapQuipuStatus(item?.attributes?.status || '');
+
+      if (!quipuId) continue;
+      try {
+        await pool.query(
+          `INSERT INTO facturacion_facturas
+             (user_id, created_by, num, contacto, fecha, vencimiento, total, estado,
+              area, responsable, forma_pago, serie, tipo_cliente, quipu_id)
+           VALUES ($1,'Quipu Sync',$2,$3,$4,$5,$6,$7,'procesal','Quipu','transferencia','QUIPU','empresa',$8)
+           ON CONFLICT (user_id, quipu_id) WHERE quipu_id IS NOT NULL
+           DO UPDATE SET
+             num        = EXCLUDED.num,
+             contacto   = EXCLUDED.contacto,
+             fecha      = EXCLUDED.fecha,
+             vencimiento= EXCLUDED.vencimiento,
+             total      = EXCLUDED.total,
+             estado     = EXCLUDED.estado,
+             updated_at = NOW()`,
+          [userId, num, contacto, fecha, vencimiento, total, estado, quipuId],
+        );
+        importedCount++;
+      } catch (_e: any) { /* skip individual import errors */ }
+    }
+
     await pool.query(
       `UPDATE quipu_settings
        SET last_sync_at = NOW(),
            sync_summary = $2,
            updated_at = NOW()
        WHERE user_id = $1`,
-      [userId, JSON.stringify(summary)],
+      [userId, JSON.stringify({ ...summary, importedToFacturacion: importedCount })],
     );
 
     await logActivityForReq(req, 'Sincronización Quipu ejecutada', 'QUIPU', settings.id, undefined, 'UPDATE');
@@ -270,7 +311,7 @@ export const syncQuipuBootstrap = async (req: any, res: Response) => {
     res.json({
       success: true,
       data: {
-        summary,
+        summary: { ...summary, importedToFacturacion: importedCount },
         contacts: bootstrap.contacts.slice(0, 20),
         invoices: bootstrap.invoices.slice(0, 20),
         numberingSeries: bootstrap.numberingSeries,

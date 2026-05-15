@@ -1006,9 +1006,17 @@ export async function runMigrations(): Promise<void> {
     for (const col of [
       `ALTER TABLE facturacion_facturas ADD COLUMN IF NOT EXISTS client_id UUID REFERENCES entities(id) ON DELETE SET NULL`,
       `ALTER TABLE facturacion_facturas ADD COLUMN IF NOT EXISTS expediente_id UUID REFERENCES expedientes(id) ON DELETE SET NULL`,
+      `ALTER TABLE facturacion_facturas ADD COLUMN IF NOT EXISTS quipu_id VARCHAR(255)`,
       `ALTER TABLE facturacion_presupuestos ADD COLUMN IF NOT EXISTS client_id UUID REFERENCES entities(id) ON DELETE SET NULL`,
       `ALTER TABLE facturacion_presupuestos ADD COLUMN IF NOT EXISTS expediente_id UUID REFERENCES expedientes(id) ON DELETE SET NULL`,
     ]) { try { await client.query(col); } catch (_e: any) {} }
+    try {
+      await client.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_facturacion_facturas_quipu_id
+        ON facturacion_facturas (user_id, quipu_id)
+        WHERE quipu_id IS NOT NULL
+      `);
+    } catch (_e: any) {}
     for (const idx of [
       `CREATE INDEX IF NOT EXISTS idx_facturacion_facturas_user_fecha ON facturacion_facturas (user_id, fecha DESC)`,
       `CREATE INDEX IF NOT EXISTS idx_facturacion_facturas_estado ON facturacion_facturas (estado)`,
