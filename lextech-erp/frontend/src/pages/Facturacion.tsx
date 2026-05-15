@@ -89,6 +89,7 @@ type BillingExpedienteOption = {
 type QuipuStatus = {
   connected: boolean;
   baseUrl?: string;
+  ownerSlug?: string;
   lastSyncAt?: string | null;
   syncSummary?: {
     contacts?: number;
@@ -732,11 +733,12 @@ function QuipuConnectModal({
   onSave,
 }: {
   onClose: () => void;
-  onSave: (payload: { appId: string; appSecret: string; baseUrl: string }) => void;
+  onSave: (payload: { appId: string; appSecret: string; baseUrl: string; ownerSlug: string }) => void;
 }) {
   const [appId, setAppId] = useState("");
   const [appSecret, setAppSecret] = useState("");
   const [baseUrl, setBaseUrl] = useState("https://getquipu.com");
+  const [ownerSlug, setOwnerSlug] = useState("");
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4">
@@ -763,6 +765,10 @@ function QuipuConnectModal({
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Base URL</span>
             <input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
           </label>
+          <label className="space-y-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Owner Slug</span>
+            <input value={ownerSlug} onChange={(e) => setOwnerSlug(e.target.value)} placeholder="ej. mi-despacho" className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+          </label>
           <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
             Quipu usa OAuth2 con <code>app_id</code> y <code>app_secret</code>. El backend ya está preparado para validar la conexión y sincronizar contactos, facturas y series de numeración.
           </div>
@@ -772,7 +778,7 @@ function QuipuConnectModal({
             Cancelar
           </button>
           <button
-            onClick={() => onSave({ appId: appId.trim(), appSecret: appSecret.trim(), baseUrl: baseUrl.trim() })}
+            onClick={() => onSave({ appId: appId.trim(), appSecret: appSecret.trim(), baseUrl: baseUrl.trim(), ownerSlug: ownerSlug.trim() })}
             className="inline-flex items-center gap-2 rounded-xl bg-red-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-800"
           >
             <Save size={14} /> Guardar y validar
@@ -944,7 +950,7 @@ export default function Facturacion() {
     return expedientes.find((item) => item.id === expedienteId)?.label || "";
   }, [expedientes]);
 
-  const saveQuipuCredentials = async (payload: { appId: string; appSecret: string; baseUrl: string }) => {
+  const saveQuipuCredentials = async (payload: { appId: string; appSecret: string; baseUrl: string; ownerSlug: string }) => {
     setSaving(true);
     setErrorMsg(null);
     try {

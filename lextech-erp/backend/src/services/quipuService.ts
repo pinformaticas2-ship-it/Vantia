@@ -4,6 +4,7 @@ export type QuipuStoredSettings = {
   app_id: string;
   app_secret: string;
   base_url?: string | null;
+  owner_slug?: string | null;
   access_token?: string | null;
   token_type?: string | null;
   token_expires_at?: string | Date | null;
@@ -17,6 +18,22 @@ function normalizeBaseUrl(baseUrl?: string | null): string {
 function buildBasicAuth(appId: string, appSecret: string): string {
   return Buffer.from(`${appId}:${appSecret}`).toString('base64');
 }
+
+function normalizeOwnerSlug(ownerSlug?: string | null): string {
+  const slug = String(ownerSlug || '').trim().replace(/^\/+|\/+$/g, '');
+  if (!slug) {
+    throw new Error('El owner_slug de Quipu es obligatorio.');
+  }
+  return slug;
+}
+
+function buildOwnerPath(settings: QuipuStoredSettings, path: string): string {
+  const ownerSlug = normalizeOwnerSlug(settings.owner_slug);
+  const cleanPath = String(path || '').trim();
+  return `/${ownerSlug}${cleanPath.startsWith('/') ? cleanPath : `/${cleanPath}`}`;
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function parseQuipuResponse(response: Response) {
   const contentType = response.headers.get('content-type') || '';
@@ -97,17 +114,52 @@ export async function quipuApiFetch<T = any>(
   return parseQuipuResponse(response);
 }
 
+export async function quipuOwnerFetch<T = any>(
+  settings: QuipuStoredSettings,
+  path: string,
+  init?: RequestInit,
+): Promise<T> {
+  return quipuApiFetch<T>(settings, buildOwnerPath(settings, path), init);
+}
+
+export async function fetchQuipuPaginatedList<T = any>(
+  settings: QuipuStoredSettings,
+  path: string,
+): Promise<T[]> {
+  const results: T[] = [];
+  let page = 1;
+  let totalPages = 1;
+
+  while (page <= totalPages) {
+    const separator = path.includes('?') ? '&' : '?';
+    const response = await quipuOwnerFetch<any>(settings, `${path}${separator}page[number]=${page}`);
+    const rows = Array.isArray(response?.data) ? response.data : [];
+    results.push(...rows);
+
+    const pagination = response?.meta?.pagination_info || {};
+    totalPages = Math.max(Number(pagination.total_pages || 1), 1);
+    page += 1;
+
+    // Quipu limita a 5 peticiones cada 5 segundos.
+    if (page <= totalPages) {
+      await sleep(1100);
+    }
+  }
+
+  return results;
+}
+
 export async function fetchQuipuBootstrap(settings: QuipuStoredSettings) {
   const [contacts, invoices, numberingSeries] = await Promise.all([
-    quipuApiFetch<any>(settings, '/contacts?filter[kind]=client'),
-    quipuApiFetch<any>(settings, '/invoices?sort=-issued_at'),
-    quipuApiFetch<any>(settings, '/numbering_series'),
+    fetchQuipuPaginatedList<any>(settings, '/contactos?filter[kind]=client'),
+    fetchQuipuPaginatedList<any>(settings, '/invoices?sort=-issued_at'),
+    fetchQuipuPaginatedList<any>(settings, '/numbering_series'),
   ]);
 
   return {
-    contacts: Array.isArray(contacts?.data) ? contacts.data : [],
-    invoices: Array.isArray(invoices?.data) ? invoices.data : [],
-    numberingSeries: Array.isArray(numberingSeries?.data) ? numberingSeries.data : [],
+    contacts,
+    invoices,
+    numberingSeries,
   };
 }
 

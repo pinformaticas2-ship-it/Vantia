@@ -1054,6 +1054,7 @@ export async function runMigrations(): Promise<void> {
         app_id            TEXT NOT NULL,
         app_secret        TEXT NOT NULL,
         base_url          TEXT NOT NULL DEFAULT 'https://getquipu.com',
+        owner_slug        VARCHAR(255),
         access_token      TEXT,
         token_type        VARCHAR(50),
         token_expires_at  TIMESTAMPTZ,
@@ -1065,6 +1066,7 @@ export async function runMigrations(): Promise<void> {
         updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
+    try { await client.query(`ALTER TABLE quipu_settings ADD COLUMN IF NOT EXISTS owner_slug VARCHAR(255)`); } catch (_e: any) {}
     try { await client.query(`CREATE INDEX IF NOT EXISTS idx_quipu_settings_user_id ON quipu_settings (user_id);`); } catch (_e: any) {}
     try { await client.query(`DROP TRIGGER IF EXISTS trg_quipu_settings_updated_at ON quipu_settings;`); } catch (_e: any) {}
     try {
