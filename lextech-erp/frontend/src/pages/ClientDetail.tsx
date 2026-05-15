@@ -2099,6 +2099,8 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
     }
 
     const token = await getToken({ skipCache: true });
+    const isWord = isWordFile(f.mimetype || '', f.original_name || '');
+    const isExcel = isExcelFile(f.mimetype || '', f.original_name || '');
 
     // Para cualquier tipo no PDF/imagen: intentar conversión a PDF via LibreOffice
     const isPdf = f.mimetype === 'application/pdf';
@@ -2116,6 +2118,36 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
         previewCache.current.set(f.id, entry);
         setPreview(entry);
         return;
+      }
+      if (isWord) {
+        const htmlRes = await fetch(`/api/files/${clientId}/${f.id}/preview-html`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (htmlRes.ok) {
+          const html = await htmlRes.text();
+          const blob = new Blob([html], { type: 'text/html' });
+          const url = URL.createObjectURL(blob);
+          previewBlobUrl.current = url;
+          const entry = { url, name: f.original_name, mime: 'text/html', fileId: f.id, appType: 'word' as const };
+          previewCache.current.set(f.id, entry);
+          setPreview(entry);
+          return;
+        }
+      }
+      if (isExcel) {
+        const excelRes = await fetch(`/api/files/${clientId}/${f.id}/preview-excel`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (excelRes.ok) {
+          const html = await excelRes.text();
+          const blob = new Blob([html], { type: 'text/html' });
+          const url = URL.createObjectURL(blob);
+          previewBlobUrl.current = url;
+          const entry = { url, name: f.original_name, mime: 'text/html', fileId: f.id, appType: 'excel' as const };
+          previewCache.current.set(f.id, entry);
+          setPreview(entry);
+          return;
+        }
       }
       setPreview({ url: '', name: f.original_name, mime: 'unsupported', fileId: f.id });
       return;
