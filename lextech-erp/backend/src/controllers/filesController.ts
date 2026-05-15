@@ -5,7 +5,8 @@ import pool from '../config/database';
 import { logActivityForReq } from './activityController';
 import { CLIENT_FILES_ROOT as LOCAL_CLIENT_FILES_ROOT, TEMP_ROOT, UPLOADS_CLIENTS_ROOT as UPLOADS_ROOT } from '../config/paths';
 
-const LIBREOFFICE_ENABLED = false;
+const LIBREOFFICE_ENABLED =
+  String(process.env.ENABLE_LIBREOFFICE_PREVIEW || "true").trim().toLowerCase() !== "false";
 
 type LocalEditWatcher = {
   watcher: fs.FSWatcher;

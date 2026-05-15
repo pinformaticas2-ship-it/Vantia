@@ -2,6 +2,7 @@
 aptPkgs = [
   "unzip",
   "poppler-utils",
+  "libreoffice",
   "tesseract-ocr",
   "tesseract-ocr-spa",
   "tesseract-ocr-eng"

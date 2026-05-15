@@ -5,7 +5,8 @@ import pool from '../config/database';
 import { TEMP_ROOT, UPLOADS_CLIENTS_ROOT as CLIENT_UPLOADS_ROOT } from '../config/paths';
 import { logActivityForReq, resolveUserName } from './activityController';
 
-const LIBREOFFICE_ENABLED = false;
+const LIBREOFFICE_ENABLED =
+  String(process.env.ENABLE_LIBREOFFICE_PREVIEW || "true").trim().toLowerCase() !== "false";
 
 export const TASK_FILES_ROOT = path.join(CLIENT_UPLOADS_ROOT, '..', 'task-files');
 
