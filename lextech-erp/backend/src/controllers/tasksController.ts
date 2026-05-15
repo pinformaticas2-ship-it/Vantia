@@ -501,10 +501,122 @@ export const previewTaskWordAsHtml = async (req: any, res: Response) => {
       return res.status(404).json({ success: false, error: 'Archivo no encontrado en disco.' });
     }
 
+    let previewSourcePath = filePath;
+    if (ext === '.doc') {
+      const tempDir = TEMP_ROOT;
+      if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+      const outputDocx = path.join(tempDir, `task_doc_preview_${fileId}.docx`);
+
+      try {
+        if (fs.existsSync(outputDocx)) {
+          const srcMtime = fs.statSync(filePath).mtimeMs;
+          const cacheMtime = fs.statSync(outputDocx).mtimeMs;
+          if (cacheMtime >= srcMtime) {
+            previewSourcePath = outputDocx;
+          }
+        }
+      } catch (_) {}
+
+      if (previewSourcePath === filePath) {
+        const converterScript = path.join(tempDir, `task_doc_to_docx_${fileId}.py`);
+        const converterCode = `import sys, os, subprocess, shutil
+
+doc_path = sys.argv[1]
+out_path = sys.argv[2]
+converted = False
+
+try:
+    import win32com.client
+    word = win32com.client.Dispatch("Word.Application")
+    word.Visible = False
+    word.DisplayAlerts = 0
+    doc = word.Documents.Open(doc_path, False, True)
+    doc.SaveAs(out_path, FileFormat=16)
+    doc.Close(False)
+    word.Quit()
+    if os.path.exists(out_path):
+        converted = True
+except Exception:
+    pass
+
+if not converted:
+    try:
+        doc_esc = doc_path.replace("'", "''")
+        out_esc = out_path.replace("'", "''")
+        ps_cmd = (
+            "$ErrorActionPreference='Stop';"
+            "$w=New-Object -ComObject Word.Application;"
+            "$w.Visible=$false;$w.DisplayAlerts=0;"
+            "$d=$w.Documents.Open('" + doc_esc + "',$false,$true);"
+            "$d.SaveAs('" + out_esc + "',16);"
+            "$d.Close($false);$w.Quit()"
+        )
+        r = subprocess.run(
+            ['powershell', '-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', ps_cmd],
+            timeout=60, capture_output=True
+        )
+        if r.returncode == 0 and os.path.exists(out_path):
+            converted = True
+    except Exception:
+        pass
+
+if not converted:
+    if sys.platform == 'win32':
+        soffice_paths = [
+            r'C:\\Program Files\\LibreOffice\\program\\soffice.exe',
+            r'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe',
+            'soffice',
+        ]
+    else:
+        soffice_paths = ['soffice', '/usr/bin/soffice', '/usr/lib/libreoffice/program/soffice']
+    out_dir = os.path.dirname(out_path)
+    for soffice in soffice_paths:
+        try:
+            r = subprocess.run(
+                [soffice, '--headless', '--convert-to', 'docx', '--outdir', out_dir, doc_path],
+                timeout=60, capture_output=True
+            )
+            candidate = os.path.join(out_dir, os.path.splitext(os.path.basename(doc_path))[0] + '.docx')
+            if os.path.exists(candidate):
+                if candidate != out_path:
+                    shutil.move(candidate, out_path)
+                if os.path.exists(out_path):
+                    converted = True
+                    break
+        except Exception:
+            continue
+
+print('OK' if converted else 'FAILED')
+sys.exit(0 if converted else 1)
+`;
+        fs.writeFileSync(converterScript, converterCode, 'utf-8');
+        const { execFile } = require('child_process');
+        const pythonCmds = process.platform === 'win32' ? ['python', 'py', 'python3'] : ['python3', 'python'];
+
+        let converted = false;
+        for (const pythonCmd of pythonCmds) {
+          const success = await new Promise<boolean>((resolve) => {
+            execFile(pythonCmd, [converterScript, filePath, outputDocx], { timeout: 90000 }, (err: any) => {
+              resolve(!err && fs.existsSync(outputDocx));
+            });
+          });
+          if (success) {
+            converted = true;
+            break;
+          }
+        }
+        try { fs.unlinkSync(converterScript); } catch (_) {}
+        if (!converted) {
+          return res.status(500).json({ success: false, error: 'No se pudo convertir el archivo .doc para generar la vista previa.' });
+        }
+        previewSourcePath = outputDocx;
+      }
+    }
+
     const tempDir = TEMP_ROOT;
     if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
     const scriptPath = path.join(tempDir, `task_preview_${fileId}.py`);
-    const normalizedPath = filePath.replace(/\\/g, '/');
+    const normalizedPath = previewSourcePath.replace(/\\/g, '/');
 
     const pythonScript = `#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
@@ -543,7 +655,7 @@ except Exception as e:
     fs.writeFileSync(scriptPath, pythonScript);
     const { execFile } = require('child_process');
     const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
-    execFile(pythonCmd, [scriptPath, filePath], { timeout: 15000, maxBuffer: 10 * 1024 * 1024 }, (error: any, stdout: any) => {
+    execFile(pythonCmd, [scriptPath, previewSourcePath], { timeout: 15000, maxBuffer: 10 * 1024 * 1024 }, (error: any, stdout: any) => {
       try { fs.unlinkSync(scriptPath); } catch (_) {}
       if (error) {
         return res.status(500).json({ success: false, error: 'No se pudo generar la vista previa HTML del documento Word.' });
