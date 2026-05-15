@@ -12,6 +12,7 @@ const database_1 = __importDefault(require("../config/database"));
 const activityController_1 = require("./activityController");
 const paths_1 = require("../config/paths");
 Object.defineProperty(exports, "UPLOADS_ROOT", { enumerable: true, get: function () { return paths_1.UPLOADS_CLIENTS_ROOT; } });
+const LIBREOFFICE_ENABLED = String(process.env.ENABLE_LIBREOFFICE_PREVIEW || "true").trim().toLowerCase() !== "false";
 const localEditWatchers = new Map();
 const ATTACHMENT_TYPE_FOLDERS = [
     'Sin clasificar',
@@ -1113,6 +1114,8 @@ except Exception:
 };
 exports.previewExcelAsHtml = previewExcelAsHtml;
 const previewWordAsPdf = async (req, res) => {
+    if (!LIBREOFFICE_ENABLED)
+        return res.status(503).json({ success: false, error: 'Vista previa PDF temporalmente no disponible.' });
     const { clientId, fileId } = req.params;
     try {
         const result = await database_1.default.query(`SELECT stored_name, original_name, mimetype FROM client_files WHERE id = $1 AND client_id = $2`, [fileId, clientId]);
@@ -2044,6 +2047,8 @@ const listTemplates = (_req, res) => {
 };
 exports.listTemplates = listTemplates;
 const previewTemplateAsPdf = async (req, res) => {
+    if (!LIBREOFFICE_ENABLED)
+        return res.status(503).json({ success: false, error: 'Vista previa PDF temporalmente no disponible.' });
     const relPath = req.query.path;
     if (!relPath)
         return res.status(400).json({ success: false, error: 'Parámetro path requerido.' });

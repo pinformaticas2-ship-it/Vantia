@@ -24,6 +24,7 @@ const documental_1 = __importDefault(require("./routes/documental"));
 const clientInvite_1 = __importDefault(require("./routes/clientInvite"));
 const facturacion_1 = __importDefault(require("./routes/facturacion"));
 const quipu_1 = __importDefault(require("./routes/quipu"));
+const express_2 = require("@clerk/express");
 const migrations_1 = require("./config/migrations");
 const localFilesWatcher_1 = require("./watchers/localFilesWatcher");
 const filesController_1 = require("./controllers/filesController");
@@ -56,6 +57,7 @@ process.on('unhandledRejection', (reason) => {
 process.on('uncaughtException', (error) => {
     console.error('❌ Uncaught exception:', error);
 });
+app.use((0, express_2.clerkMiddleware)());
 app.use((0, helmet_1.default)({
     crossOriginResourcePolicy: false,
     frameguard: false,

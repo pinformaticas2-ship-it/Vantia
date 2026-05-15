@@ -1,0 +1,11 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const auth_1 = require("../middleware/auth");
+const quipuController_1 = require("../controllers/quipuController");
+const router = (0, express_1.Router)();
+router.get('/status', auth_1.requireAuth, quipuController_1.getQuipuStatus);
+router.post('/connect', auth_1.requireAuth, quipuController_1.saveQuipuCredentials);
+router.post('/sync', auth_1.requireAuth, quipuController_1.syncQuipuBootstrap);
+router.delete('/disconnect', auth_1.requireAuth, quipuController_1.disconnectQuipu);
+exports.default = router;

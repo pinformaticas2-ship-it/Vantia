@@ -9,6 +9,7 @@ const path_1 = __importDefault(require("path"));
 const database_1 = __importDefault(require("../config/database"));
 const paths_1 = require("../config/paths");
 const activityController_1 = require("./activityController");
+const LIBREOFFICE_ENABLED = String(process.env.ENABLE_LIBREOFFICE_PREVIEW || "true").trim().toLowerCase() !== "false";
 exports.TASK_FILES_ROOT = path_1.default.join(paths_1.UPLOADS_CLIENTS_ROOT, '..', 'task-files');
 const ensureTaskFilesDir = (taskId) => {
     const dir = path_1.default.join(exports.TASK_FILES_ROOT, taskId);
@@ -269,6 +270,8 @@ const downloadTaskFile = async (req, res) => {
 };
 exports.downloadTaskFile = downloadTaskFile;
 const previewTaskWordAsPdf = async (req, res) => {
+    if (!LIBREOFFICE_ENABLED)
+        return res.status(503).json({ success: false, error: 'Vista previa PDF temporalmente no disponible.' });
     const { id, fileId } = req.params;
     try {
         const fileRow = await getTaskFileRecord(id, fileId);
