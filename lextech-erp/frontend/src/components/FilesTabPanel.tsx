@@ -33,7 +33,7 @@ function isWordFile(mime: string, name: string) { const n = name.toLowerCase(); 
 function isExcelFile(mime: string, name: string) { const n = name.toLowerCase(); return mime.includes("excel") || mime.includes("spreadsheetml") || mime.includes("spreadsheet") || n.endsWith(".xlsx") || n.endsWith(".xls") || n.endsWith(".xlsm") || n.endsWith(".csv"); }
 const PLANTILLAS: any[] = [];
 
-export function FilesTabPanel({ entityId, entity }: { entityId: string; entity?: any }) {
+export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: { entityId: string; entity?: any; alwaysShowPreview?: boolean }) {
   const { getToken } = useAuth();
 
   const [files, setFiles]           = useState<any[]>([]);
@@ -683,13 +683,10 @@ export function FilesTabPanel({ entityId, entity }: { entityId: string; entity?:
                     const canPreview = isPreviewable(f.mimetype);
                     const canWord    = isWordFile(f.mimetype, f.original_name);
                     const canExcel   = isExcelFile(f.mimetype, f.original_name);
-                    const handleNameClick = canPreview
+                    const canOpenPreview = alwaysShowPreview || canPreview || canWord || canExcel;
+                    const handleNameClick = canOpenPreview
                       ? () => openPreview(f)
-                      : canWord
-                        ? () => openPreview(f)
-                        : canExcel
-                          ? () => openPreview(f)
-                          : undefined;
+                      : undefined;
                     return (
                       <tr key={f.id} className="hover:bg-slate-50/60 transition-colors group">
                         <td className="px-4 py-3">
@@ -706,7 +703,7 @@ export function FilesTabPanel({ entityId, entity }: { entityId: string; entity?:
                               ) : (
                                 <span
                                   className={`h-10 w-10 rounded-lg flex items-center justify-center text-lg shrink-0 ${fi.color} ${f.mimetype?.startsWith('image/') ? 'animate-pulse' : ''} cursor-pointer hover:scale-105 transition-transform`}
-                                  onClick={() => { if (f.mimetype?.startsWith('image/')) loadThumb(f.id); else if (canPreview || canWord || canExcel) handleNameClick?.(); }}
+                                  onClick={() => { if (f.mimetype?.startsWith('image/')) loadThumb(f.id); else if (canOpenPreview) handleNameClick?.(); }}
                                 >
                                   {fi.icon}
                                 </span>
@@ -715,7 +712,7 @@ export function FilesTabPanel({ entityId, entity }: { entityId: string; entity?:
                             <div className="min-w-0">
                               <button
                                 onClick={handleNameClick}
-                                className={`text-sm font-medium text-slate-700 text-left truncate block max-w-[180px] ${(canPreview || canWord || canExcel) ? "hover:text-red-600 hover:underline cursor-pointer" : ""}`}
+                                className={`text-sm font-medium text-slate-700 text-left truncate block max-w-[180px] ${canOpenPreview ? "hover:text-red-600 hover:underline cursor-pointer" : ""}`}
                                 title={canWord ? "Abrir en Word" : canExcel ? "Abrir en Excel" : f.original_name}
                             >
                               {f.original_name}
@@ -741,22 +738,8 @@ export function FilesTabPanel({ entityId, entity }: { entityId: string; entity?:
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
                             {/* Vista previa (PDF, imágenes, texto) */}
-                            {canPreview && (
+                            {canOpenPreview && (
                               <button onClick={() => openPreview(f)} title="Vista previa"
-                                className="p-1.5 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors">
-                                <Eye size={14} />
-                              </button>
-                            )}
-                            {/* Vista previa Word */}
-                            {canWord && !canPreview && (
-                              <button onClick={() => openPreview(f)} title="Vista previa de Word"
-                                className="p-1.5 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors">
-                                <Eye size={14} />
-                              </button>
-                            )}
-                            {/* Vista previa Excel */}
-                            {canExcel && !canPreview && (
-                              <button onClick={() => openPreview(f)} title="Vista previa de Excel"
                                 className="p-1.5 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors">
                                 <Eye size={14} />
                               </button>

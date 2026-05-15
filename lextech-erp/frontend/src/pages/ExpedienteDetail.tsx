@@ -1065,7 +1065,7 @@ function TabAdjuntosExpediente({
   expedienteId: string;
 }) {
   return (
-    <FilesTabPanel entityId={expedienteId} />
+    <FilesTabPanel entityId={expedienteId} alwaysShowPreview />
   );
 }
 
