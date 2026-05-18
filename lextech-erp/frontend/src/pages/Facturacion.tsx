@@ -565,7 +565,7 @@ function StructuredBillingEditorModal({
     const total = Number(form.total);
     if (!form.num.trim() || !Number.isFinite(total) || total <= 0) return;
     if (isGasto && !form.proveedor.trim()) return;
-    if (!isGasto && (!form.contacto.trim() || !form.clientId || !form.expedienteId)) return;
+    if (!isGasto && (!form.contacto.trim() || !form.clientId)) return;
     onSave({
       ...form,
       total,

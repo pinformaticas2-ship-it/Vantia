@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getEntities, getEntityById, createEntity, updateEntity, patchEntity, deleteEntity } from '../controllers/entities';
+import { getEntities, getEntityById, createEntity, updateEntity, patchEntity, deleteEntity, checkNifCif } from '../controllers/entities';
 import noteRoutes from './noteRoutes';
 import { requireAuth } from '../middleware/auth';
 import { uploadDNI } from './../middleware/upload';
@@ -7,6 +7,7 @@ import { uploadDNI } from './../middleware/upload';
 const router = Router();
 
 router.get('/', requireAuth, getEntities);
+router.get('/check-nif', requireAuth, checkNifCif);
 router.get('/:id', requireAuth, getEntityById);
 router.post('/', requireAuth, uploadDNI.single('dni_image'), createEntity);
 router.put('/:id', requireAuth, updateEntity);

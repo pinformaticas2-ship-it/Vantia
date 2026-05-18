@@ -3494,26 +3494,59 @@ export default function ExpedienteDetail() {
               />
             )}
             {tab === "economico" && (() => {
-              const expFacturas = (billing?.facturas || []).filter((f: any) => f.expediente_id === id);
-              const totalFacturado = expFacturas.reduce((s: number, f: any) => s + Number(f.total || 0), 0);
-              const totalCobrado   = expFacturas.filter((f: any) => f.estado === "cobrada").reduce((s: number, f: any) => s + Number(f.total || 0), 0);
-              const totalPendiente = expFacturas.filter((f: any) => f.estado !== "cobrada").reduce((s: number, f: any) => s + Number(f.total || 0), 0);
+              const allBilling = billing?.facturas || [];
+              // Facturas directamente vinculadas a este expediente
+              const expFacturas = allBilling.filter((f: any) => f.expediente_id === id);
+              // Facturas del mismo cliente pero sin expediente específico (o de otro expediente)
+              const clientOnlyFacturas = exp.cliente_id
+                ? allBilling.filter((f: any) => f.client_id === exp.cliente_id && f.expediente_id !== id)
+                : [];
+              const allVisible = [...expFacturas, ...clientOnlyFacturas];
+              const totalFacturado = allVisible.reduce((s: number, f: any) => s + Number(f.total || 0), 0);
+              const totalCobrado   = allVisible.filter((f: any) => f.estado === "cobrada").reduce((s: number, f: any) => s + Number(f.total || 0), 0);
+              const totalPendiente = allVisible.filter((f: any) => f.estado !== "cobrada").reduce((s: number, f: any) => s + Number(f.total || 0), 0);
               const ESTADO_BADGE: Record<string, string> = {
                 cobrada:  "bg-emerald-100 text-emerald-700",
                 pendiente:"bg-amber-100 text-amber-700",
                 vencida:  "bg-red-100 text-red-700",
               };
+              const FacturaRow = ({ f, dim }: { f: any; dim?: boolean }) => (
+                <tr key={f.id} className={`hover:bg-slate-50 transition-colors ${dim ? "opacity-60" : ""}`}>
+                  <td className="px-5 py-3 font-mono text-xs text-slate-700 font-semibold">{f.num}</td>
+                  <td className="px-5 py-3 text-xs text-slate-700 max-w-[180px] truncate">{f.contacto}</td>
+                  <td className="px-5 py-3 text-xs text-slate-500">{fmtDate(f.fecha)}</td>
+                  <td className="px-5 py-3 text-xs text-slate-500">{fmtDate(f.vencimiento)}</td>
+                  <td className="px-5 py-3 text-xs font-bold text-slate-800 text-right">{fmtMoney(f.total)}</td>
+                  <td className="px-5 py-3 text-center">
+                    <span className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold capitalize ${ESTADO_BADGE[f.estado] || "bg-slate-100 text-slate-600"}`}>
+                      {f.estado}
+                    </span>
+                  </td>
+                </tr>
+              );
+              const thead = (
+                <thead>
+                  <tr className="border-b border-slate-100">
+                    <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Núm.</th>
+                    <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Cliente</th>
+                    <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Fecha</th>
+                    <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Vencimiento</th>
+                    <th className="px-5 py-3 text-right text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total</th>
+                    <th className="px-5 py-3 text-center text-[11px] font-bold text-slate-400 uppercase tracking-wider">Estado</th>
+                  </tr>
+                </thead>
+              );
               return (
                 <div className="space-y-5">
-                  {/* Resumen */}
+                  {/* Resumen cliente completo */}
                   <div className="grid grid-cols-3 gap-4">
                     <div className="rounded-2xl border border-slate-200 bg-white p-5">
                       <div className="flex items-center gap-2 mb-3">
                         <BadgeEuro size={15} className="text-slate-400" />
-                        <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Facturado</p>
+                        <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Facturado (cliente)</p>
                       </div>
                       <p className="text-2xl font-black text-slate-800">{fmtMoney(totalFacturado)}</p>
-                      <p className="text-xs text-slate-400 mt-1">{expFacturas.length} factura{expFacturas.length !== 1 ? "s" : ""}</p>
+                      <p className="text-xs text-slate-400 mt-1">{allVisible.length} factura{allVisible.length !== 1 ? "s" : ""}</p>
                     </div>
                     <div className="rounded-2xl border border-slate-200 bg-white p-5">
                       <div className="flex items-center gap-2 mb-3">
@@ -3533,58 +3566,51 @@ export default function ExpedienteDetail() {
                     </div>
                   </div>
 
-                  {/* Tabla facturas */}
+                  {/* Facturas de este expediente */}
                   <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
                     <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Banknote size={14} className="text-slate-400" />
-                        <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Facturas vinculadas</h3>
+                        <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Facturas de este expediente</h3>
                       </div>
                       <Link to="/dashboard/facturacion" className="text-xs font-bold text-red-600 hover:underline flex items-center gap-1">
                         Ir a facturación <ChevronRight size={11} />
                       </Link>
                     </div>
                     {billingLoading ? (
-                      <div className="flex justify-center py-10">
-                        <Loader2 size={18} className="animate-spin text-slate-300" />
-                      </div>
+                      <div className="flex justify-center py-10"><Loader2 size={18} className="animate-spin text-slate-300" /></div>
                     ) : expFacturas.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-12 gap-2 text-slate-300">
-                        <Banknote size={28} className="opacity-30" />
+                      <div className="flex flex-col items-center justify-center py-10 gap-2 text-slate-300">
+                        <Banknote size={24} className="opacity-30" />
                         <p className="text-sm font-medium">Sin facturas vinculadas a este expediente</p>
                         <Link to="/dashboard/facturacion" className="mt-1 text-xs font-bold text-red-500 hover:underline">Crear factura</Link>
                       </div>
                     ) : (
                       <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b border-slate-100">
-                            <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Núm.</th>
-                            <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Cliente</th>
-                            <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Fecha</th>
-                            <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Vencimiento</th>
-                            <th className="px-5 py-3 text-right text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total</th>
-                            <th className="px-5 py-3 text-center text-[11px] font-bold text-slate-400 uppercase tracking-wider">Estado</th>
-                          </tr>
-                        </thead>
+                        {thead}
                         <tbody className="divide-y divide-slate-50">
-                          {expFacturas.map((f: any) => (
-                            <tr key={f.id} className="hover:bg-slate-50 transition-colors">
-                              <td className="px-5 py-3 font-mono text-xs text-slate-700 font-semibold">{f.num}</td>
-                              <td className="px-5 py-3 text-xs text-slate-700 max-w-[180px] truncate">{f.contacto}</td>
-                              <td className="px-5 py-3 text-xs text-slate-500">{fmtDate(f.fecha)}</td>
-                              <td className="px-5 py-3 text-xs text-slate-500">{fmtDate(f.vencimiento)}</td>
-                              <td className="px-5 py-3 text-xs font-bold text-slate-800 text-right">{fmtMoney(f.total)}</td>
-                              <td className="px-5 py-3 text-center">
-                                <span className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold capitalize ${ESTADO_BADGE[f.estado] || "bg-slate-100 text-slate-600"}`}>
-                                  {f.estado}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
+                          {expFacturas.map((f: any) => <FacturaRow key={f.id} f={f} />)}
                         </tbody>
                       </table>
                     )}
                   </div>
+
+                  {/* Otras facturas del cliente */}
+                  {exp.cliente_id && clientOnlyFacturas.length > 0 && (
+                    <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
+                      <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+                        <BadgeEuro size={14} className="text-slate-400" />
+                        <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Otras facturas del cliente</h3>
+                        <span className="ml-1 text-[10px] text-slate-400">(de otros expedientes o sin expediente)</span>
+                      </div>
+                      <table className="w-full text-sm">
+                        {thead}
+                        <tbody className="divide-y divide-slate-50">
+                          {clientOnlyFacturas.map((f: any) => <FacturaRow key={f.id} f={f} dim />)}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               );
             })()}

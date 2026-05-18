@@ -176,8 +176,8 @@ export const createFactura = async (req: any, res: Response) => {
   if (!sanitizeText(num) || !sanitizeText(contacto) || sanitizeAmount(total) === null) {
     return res.status(400).json({ success: false, error: 'Número, cliente e importe son obligatorios.' });
   }
-  if (!sanitizeText(clientId) || !sanitizeText(expedienteId)) {
-    return res.status(400).json({ success: false, error: 'Selecciona un cliente del despacho y su expediente asociado.' });
+  if (!sanitizeText(clientId)) {
+    return res.status(400).json({ success: false, error: 'Selecciona un cliente del despacho.' });
   }
 
   try {
@@ -372,8 +372,8 @@ export const createPresupuesto = async (req: any, res: Response) => {
   if (!sanitizeText(num) || !sanitizeText(contacto) || sanitizeAmount(total) === null) {
     return res.status(400).json({ success: false, error: 'Número, cliente e importe son obligatorios.' });
   }
-  if (!sanitizeText(clientId) || !sanitizeText(expedienteId)) {
-    return res.status(400).json({ success: false, error: 'Selecciona un cliente del despacho y su expediente asociado.' });
+  if (!sanitizeText(clientId)) {
+    return res.status(400).json({ success: false, error: 'Selecciona un cliente del despacho.' });
   }
 
   try {

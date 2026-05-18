@@ -506,6 +506,35 @@ export default function ClientForm() {
     }
   }, [getToken, linkedExpedienteId]);
 
+  // ── NIF/CIF deduplication ────────────────────────────────────
+  const [nifDupEntity, setNifDupEntity] = useState<any>(null);
+  const nifTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const nif = form.nif_cif.trim();
+    // On edit mode skip check for own NIF
+    if (!nif || nif.length < 5) { setNifDupEntity(null); return; }
+    if (nifTimerRef.current) clearTimeout(nifTimerRef.current);
+    nifTimerRef.current = setTimeout(async () => {
+      try {
+        const token = await getToken({ skipCache: true });
+        const res = await fetch(`/api/entities/check-nif?nif=${encodeURIComponent(nif)}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const d = await res.json();
+          // If editing, ignore if it's the same entity
+          if (d.exists && d.entity?.id !== id) {
+            setNifDupEntity(d.entity);
+          } else {
+            setNifDupEntity(null);
+          }
+        }
+      } catch { setNifDupEntity(null); }
+    }, 600);
+    return () => { if (nifTimerRef.current) clearTimeout(nifTimerRef.current); };
+  }, [form.nif_cif, getToken, id]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setForm(p => ({ ...p, [name]: value }));
@@ -1122,6 +1151,12 @@ export default function ClientForm() {
                     </F>
                     <F label="NIF / CIF" required invalid={isInvalid("nif_cif")}>
                       <I name="nif_cif" value={form.nif_cif} onChange={handleChange} placeholder="12345678Z" highlight={h("nif_cif")} invalid={isInvalid("nif_cif")} required />
+                      {nifDupEntity && (
+                        <Link to={`/dashboard/clientes/${nifDupEntity.id}`} className="mt-1.5 flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 hover:bg-amber-100 transition-colors">
+                          <AlertTriangle size={12} className="shrink-0 text-amber-500" />
+                          <span>Ya existe: <span className="underline">{nifDupEntity.first_name} {nifDupEntity.last_name || nifDupEntity.commercial_name || ""}</span> · Ver ficha →</span>
+                        </Link>
+                      )}
                     </F>
                     <F label="Nombre" required invalid={isInvalid("first_name")}>
                       <I name="first_name" value={form.first_name} onChange={handleChange} placeholder="Nombre" highlight={h("first_name")} invalid={isInvalid("first_name")} required />
@@ -1700,6 +1735,12 @@ export default function ClientForm() {
               </F>
               <F label="NIF / CIF" required invalid={isInvalid("nif_cif")}>
                 <I name="nif_cif" value={form.nif_cif} onChange={handleChange} placeholder="12345678Z" highlight={h("nif_cif")} invalid={isInvalid("nif_cif")} required />
+                {nifDupEntity && (
+                  <Link to={`/dashboard/clientes/${nifDupEntity.id}`} className="mt-1.5 flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 hover:bg-amber-100 transition-colors">
+                    <AlertTriangle size={12} className="shrink-0 text-amber-500" />
+                    <span>Ya existe: <span className="underline">{nifDupEntity.first_name} {nifDupEntity.last_name || nifDupEntity.commercial_name || ""}</span> · Ver ficha →</span>
+                  </Link>
+                )}
               </F>
               <F label="Tipo cliente" required invalid={isInvalid("type")}>
                 <S name="type" value={form.type} onChange={handleChange} invalid={isInvalid("type")}>

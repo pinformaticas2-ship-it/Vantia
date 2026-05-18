@@ -114,6 +114,25 @@ export const getEntities = async (req: any, res: Response) => {
 };
 
 // ─────────────────────────────────────────────────────────────
+// GET /api/entities/check-nif?nif=<NIF_CIF>
+// ─────────────────────────────────────────────────────────────
+export const checkNifCif = async (req: any, res: Response) => {
+  const nif = (req.query.nif as string || '').trim().toUpperCase();
+  if (!nif) return res.json({ exists: false, entity: null });
+  try {
+    const result = await pool.query(
+      `SELECT id, type, client_status, first_name, last_name, commercial_name, nif_cif, email, phone_1, phone_mobile, address_town
+       FROM entities WHERE UPPER(nif_cif) = $1 LIMIT 1`,
+      [nif]
+    );
+    if (result.rows.length === 0) return res.json({ exists: false, entity: null });
+    return res.json({ exists: true, entity: result.rows[0] });
+  } catch (e: any) {
+    res.status(500).json({ exists: false, error: e.message });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
 // GET /api/entities/:id
 // ─────────────────────────────────────────────────────────────
 export const getEntityById = async (req: any, res: Response) => {
