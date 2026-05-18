@@ -8,7 +8,7 @@ import {
   Calendar, Hash, FileText, Shield, StickyNote,
   Paperclip, Clock, AlertTriangle, CheckCircle2,
   Upload, Plus, Trash2, ChevronRight, Gavel,
-  FolderOpen, Eye, Download, X, Sparkles, ExternalLink,
+  FolderOpen, Eye, Download, X, Check, Sparkles, ExternalLink,
   ScrollText, Receipt, Scale, UserCheck,
   MessageSquare, FileSignature, ShieldAlert, FilePlus,
   FilePlus2, Search, ChevronDown, ChevronRight as ChevronR,
@@ -52,6 +52,15 @@ const Field = ({ label, value, mono = false }: { label: string; value?: string |
     <p className={`text-sm text-slate-700 font-medium ${mono ? "font-mono" : ""}`}>
       {value || <span className="text-slate-300 font-normal">—</span>}
     </p>
+  </div>
+);
+
+const EI = "w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm text-slate-700 bg-white focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100";
+
+const EF = ({ label, children }: { label: string; mono?: boolean; children: React.ReactNode }) => (
+  <div>
+    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{label}</p>
+    {children}
   </div>
 );
 
@@ -3488,6 +3497,10 @@ export default function ClientDetail() {
   const [client, setClient] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]   = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState<any>(null);
+  const [saving, setSaving] = useState(false);
+  const setEF = (key: string, val: any) => setEditForm((prev: any) => ({ ...prev, [key]: val }));
   const initialTab = searchParams.get("tab") || "perfil";
   const [activeTab, setActiveTab] = useState(initialTab);
   const [photoZoom, setPhotoZoom] = useState(false);
@@ -3565,6 +3578,64 @@ export default function ClientDetail() {
     ? Math.floor((Date.now() - new Date(client.birth_date).getTime()) / (1000 * 60 * 60 * 24 * 365.25))
     : null;
 
+  const startEdit = () => {
+    setEditForm({
+      first_name: client.first_name || "",
+      last_name: client.last_name || "",
+      commercial_name: client.commercial_name || "",
+      type: client.type || "CLIENTE",
+      client_status: client.client_status || "Alta",
+      document_type: client.document_type || "DNI",
+      nif_cif: client.nif_cif || "",
+      legal_nature: client.legal_nature || "",
+      gender: client.gender || "",
+      birth_date: client.birth_date ? client.birth_date.slice(0, 10) : "",
+      nationality: client.nationality || "",
+      expedition_country: client.expedition_country || "",
+      address_street: client.address_street || "",
+      address_town: client.address_town || "",
+      address_cp: client.address_cp || "",
+      address_province: client.address_province || "",
+      address_country: client.address_country || "",
+      email: client.email || "",
+      phone_1: client.phone_1 || "",
+      phone_mobile: client.phone_mobile || "",
+      phone_2: client.phone_2 || "",
+      phone_3: client.phone_3 || "",
+      phone_fax: client.phone_fax || "",
+      website: client.website || "",
+      date_alta: client.date_alta ? client.date_alta.slice(0, 10) : "",
+      date_baja: client.date_baja ? client.date_baja.slice(0, 10) : "",
+      lopd: client.lopd || "",
+      commercial_communications: client.commercial_communications || "",
+      center: client.center || "",
+    });
+    setEditing(true);
+    setActiveTab("perfil");
+  };
+
+  const handleSaveClient = async () => {
+    if (!editForm?.first_name?.trim() && !editForm?.commercial_name?.trim()) return;
+    setSaving(true);
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/entities/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(editForm),
+      });
+      const d = await safeJson(res);
+      if (!res.ok) { alert(d.error || "Error al guardar"); return; }
+      setEditing(false);
+      setEditForm(null);
+      await fetchClient();
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="flex gap-6 animate-in fade-in duration-500">
 
@@ -3580,12 +3651,31 @@ export default function ClientDetail() {
           </div>
           <div className="flex gap-2">
             <BackButton onClick={() => navigate("/dashboard/clientes")} />
-            <button
-              onClick={() => navigate(`/dashboard/clientes/${id}/edit`)}
-              className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm active:scale-95 transition-all"
-            >
-              <Edit3 size={14} /> Editar
-            </button>
+            {editing ? (
+              <>
+                <button
+                  onClick={() => { setEditing(false); setEditForm(null); }}
+                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl shadow-sm active:scale-95 transition-all"
+                >
+                  <X size={14} /> Cancelar
+                </button>
+                <button
+                  onClick={handleSaveClient}
+                  disabled={saving || (!editForm?.first_name?.trim() && !editForm?.commercial_name?.trim())}
+                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-xl shadow-sm active:scale-95 transition-all"
+                >
+                  {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                  Guardar cambios
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={startEdit}
+                className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm active:scale-95 transition-all"
+              >
+                <Edit3 size={14} /> Editar
+              </button>
+            )}
           </div>
         </div>
 
@@ -3687,8 +3777,113 @@ export default function ClientDetail() {
 
           {/* Contenido del tab activo — lazy-mount: monta al primer acceso, oculta con CSS */}
           <div className="p-5">
-            <div style={{ display: activeTab === "perfil"      ? "block" : "none" }}>
-              <TabPerfil client={client} formatDate={formatDate} age={age} />
+            <div style={{ display: activeTab === "perfil" ? "block" : "none" }}>
+              {!editing && <TabPerfil client={client} formatDate={formatDate} age={age} />}
+              {editing && editForm && (
+                <div className="space-y-4">
+                  {/* Datos principales */}
+                  <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                    <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+                      <User size={14} className="text-slate-400" />
+                      <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Datos principales</h3>
+                    </div>
+                    <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+                      <EF label="Nombre"><input value={editForm.first_name} onChange={e => setEF("first_name", e.target.value)} className={EI} placeholder="Nombre" /></EF>
+                      <EF label="Apellidos"><input value={editForm.last_name} onChange={e => setEF("last_name", e.target.value)} className={EI} placeholder="Apellidos" /></EF>
+                      <EF label="Nombre comercial"><input value={editForm.commercial_name} onChange={e => setEF("commercial_name", e.target.value)} className={EI} placeholder="Nombre comercial / empresa" /></EF>
+                      <EF label="Tipo">
+                        <select value={editForm.type} onChange={e => setEF("type", e.target.value)} className={EI}>
+                          {["CLIENTE","CONTRARIO","JUZGADO","PERITO","PROVEEDOR"].map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                      </EF>
+                      <EF label="Estado">
+                        <select value={editForm.client_status} onChange={e => setEF("client_status", e.target.value)} className={EI}>
+                          {["Alta","Baja","Suspendido","Potencial"].map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </EF>
+                    </div>
+                  </div>
+
+                  {/* Identificación */}
+                  <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                    <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+                      <FileText size={14} className="text-slate-400" />
+                      <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Identificación</h3>
+                    </div>
+                    <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+                      <EF label="Tipo documento">
+                        <select value={editForm.document_type} onChange={e => setEF("document_type", e.target.value)} className={EI}>
+                          {["DNI","NIE","NIF","CIF","Pasaporte","Otro"].map(d => <option key={d} value={d}>{d}</option>)}
+                        </select>
+                      </EF>
+                      <EF label="NIF / CIF"><input value={editForm.nif_cif} onChange={e => setEF("nif_cif", e.target.value)} className={EI + " font-mono"} placeholder="00000000A" /></EF>
+                      <EF label="Naturaleza jurídica"><input value={editForm.legal_nature} onChange={e => setEF("legal_nature", e.target.value)} className={EI} /></EF>
+                      <EF label="Sexo">
+                        <select value={editForm.gender} onChange={e => setEF("gender", e.target.value)} className={EI}>
+                          <option value="">—</option>
+                          <option value="M">Masculino</option>
+                          <option value="F">Femenino</option>
+                          <option value="Otro">Otro</option>
+                        </select>
+                      </EF>
+                      <EF label="Fecha nacimiento"><input type="date" value={editForm.birth_date} onChange={e => setEF("birth_date", e.target.value)} className={EI} /></EF>
+                      <EF label="Nacionalidad"><input value={editForm.nationality} onChange={e => setEF("nationality", e.target.value)} className={EI} /></EF>
+                      <EF label="País expedición"><input value={editForm.expedition_country} onChange={e => setEF("expedition_country", e.target.value)} className={EI} /></EF>
+                    </div>
+                  </div>
+
+                  {/* Dirección */}
+                  <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                    <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+                      <MapPin size={14} className="text-slate-400" />
+                      <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Dirección</h3>
+                    </div>
+                    <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+                      <div className="col-span-2 md:col-span-3">
+                        <EF label="Dirección"><input value={editForm.address_street} onChange={e => setEF("address_street", e.target.value)} className={EI} placeholder="Calle, número, piso…" /></EF>
+                      </div>
+                      <EF label="Población"><input value={editForm.address_town} onChange={e => setEF("address_town", e.target.value)} className={EI} /></EF>
+                      <EF label="Código postal"><input value={editForm.address_cp} onChange={e => setEF("address_cp", e.target.value)} className={EI} /></EF>
+                      <EF label="Provincia"><input value={editForm.address_province} onChange={e => setEF("address_province", e.target.value)} className={EI} /></EF>
+                      <EF label="País"><input value={editForm.address_country} onChange={e => setEF("address_country", e.target.value)} className={EI} /></EF>
+                    </div>
+                  </div>
+
+                  {/* Contacto */}
+                  <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                    <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+                      <Phone size={14} className="text-slate-400" />
+                      <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Contacto</h3>
+                    </div>
+                    <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+                      <div className="col-span-2 md:col-span-3">
+                        <EF label="Correo electrónico"><input type="email" value={editForm.email} onChange={e => setEF("email", e.target.value)} className={EI} placeholder="correo@ejemplo.com" /></EF>
+                      </div>
+                      <EF label="Teléfono"><input value={editForm.phone_1} onChange={e => setEF("phone_1", e.target.value)} className={EI} /></EF>
+                      <EF label="Móvil"><input value={editForm.phone_mobile} onChange={e => setEF("phone_mobile", e.target.value)} className={EI} /></EF>
+                      <EF label="Teléfono 2"><input value={editForm.phone_2} onChange={e => setEF("phone_2", e.target.value)} className={EI} /></EF>
+                      <EF label="Teléfono 3"><input value={editForm.phone_3} onChange={e => setEF("phone_3", e.target.value)} className={EI} /></EF>
+                      <EF label="Fax"><input value={editForm.phone_fax} onChange={e => setEF("phone_fax", e.target.value)} className={EI} /></EF>
+                      <EF label="Web"><input value={editForm.website} onChange={e => setEF("website", e.target.value)} className={EI} placeholder="https://…" /></EF>
+                    </div>
+                  </div>
+
+                  {/* Administración */}
+                  <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                    <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+                      <Shield size={14} className="text-slate-400" />
+                      <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Administración</h3>
+                    </div>
+                    <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+                      <EF label="Fecha alta"><input type="date" value={editForm.date_alta} onChange={e => setEF("date_alta", e.target.value)} className={EI} /></EF>
+                      <EF label="Fecha baja"><input type="date" value={editForm.date_baja} onChange={e => setEF("date_baja", e.target.value)} className={EI} /></EF>
+                      <EF label="LOPD"><input value={editForm.lopd} onChange={e => setEF("lopd", e.target.value)} className={EI} /></EF>
+                      <EF label="Comunicaciones comerciales"><input value={editForm.commercial_communications} onChange={e => setEF("commercial_communications", e.target.value)} className={EI} /></EF>
+                      <EF label="Centro"><input value={editForm.center} onChange={e => setEF("center", e.target.value)} className={EI} /></EF>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
             {mountedTabs.has("expedientes") && (
               <div style={{ display: activeTab === "expedientes" ? "block" : "none" }}>
