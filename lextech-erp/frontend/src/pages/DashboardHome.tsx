@@ -10,6 +10,56 @@ import { Link, useNavigate } from "react-router-dom";
 import { safeJson } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
 
+// ── Saludo por hora ──────────────────────────────────────────────────────────
+function getGreeting(): string {
+  const h = new Date().getHours();
+  if (h >= 6 && h < 12) return "Buenos días";
+  if (h >= 12 && h < 20) return "Buenas tardes";
+  return "Buenas noches";
+}
+
+// ── Clima (Open-Meteo, sin API key) ──────────────────────────────────────────
+const WMO_EMOJI: Record<number, string> = {
+  0: "☀️", 1: "🌤️", 2: "⛅", 3: "☁️",
+  45: "🌫️", 48: "🌫️",
+  51: "🌦️", 53: "🌦️", 55: "🌧️",
+  61: "🌧️", 63: "🌧️", 65: "🌧️",
+  71: "🌨️", 73: "🌨️", 75: "❄️", 77: "❄️",
+  80: "🌦️", 81: "🌧️", 82: "⛈️",
+  85: "🌨️", 86: "❄️",
+  95: "⛈️", 96: "⛈️", 99: "⛈️",
+};
+function wmoEmoji(code: number): string {
+  return WMO_EMOJI[code] ?? "🌡️";
+}
+
+type WeatherState = { emoji: string; temp: number; city: string } | null;
+
+function useWeather(): WeatherState {
+  const [weather, setWeather] = useState<WeatherState>(null);
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(async ({ coords }) => {
+      try {
+        const { latitude: lat, longitude: lon } = coords;
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weathercode&timezone=auto`;
+        const res  = await fetch(url);
+        const data = await res.json();
+        const temp = Math.round(data?.current?.temperature_2m ?? 0);
+        const code = data?.current?.weathercode ?? 0;
+        // Reverse geocode city (nominatim, free)
+        const geo  = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`, {
+          headers: { "Accept-Language": "es" },
+        });
+        const geoData = await geo.json();
+        const city = geoData?.address?.city || geoData?.address?.town || geoData?.address?.village || "";
+        setWeather({ emoji: wmoEmoji(code), temp, city });
+      } catch { /* sin clima */ }
+    }, () => { /* permiso denegado */ });
+  }, []);
+  return weather;
+}
+
 // ── helpers ─────────────────────────────────────────────────────────────────
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -57,6 +107,8 @@ export default function DashboardHome() {
   const { user }    = useUser();
   const { getToken } = useAuth();
   const navigate    = useNavigate();
+  const weather     = useWeather();
+  const greeting    = getGreeting();
   const [showAltaMenu,    setShowAltaMenu]    = useState(false);
   const [showClienteMenu, setShowClienteMenu] = useState(false);
   const altaMenuRef    = useRef<HTMLDivElement>(null);
@@ -138,9 +190,18 @@ export default function DashboardHome() {
       {/* CABECERA */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">
-            Buenos días, <span className="text-red-600">{user?.firstName || "usuario"}</span>
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-slate-900">
+              {greeting}, <span className="text-red-600">{user?.firstName || "usuario"}</span>
+            </h1>
+            {weather && (
+              <div className="flex items-center gap-1.5 rounded-xl bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-600">
+                <span className="text-base leading-none">{weather.emoji}</span>
+                <span>{weather.temp}°C</span>
+                {weather.city && <span className="text-slate-400 font-normal hidden sm:inline">· {weather.city}</span>}
+              </div>
+            )}
+          </div>
           <p className="text-slate-400 text-sm mt-0.5">
             {new Date().toLocaleDateString("es-ES", { weekday:"long", day:"numeric", month:"long", year:"numeric" })}
           </p>
