@@ -655,7 +655,7 @@ export default function DashboardHome() {
           <p className="text-sm">Sin elementos visibles. Pulsa <strong>···</strong> para elegir qué mostrar.</p>
         </div>
       ) : (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd} autoScroll={false}>
           <SortableContext items={orderedVisible} strategy={rectSortingStrategy}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {orderedVisible.map(id => (
