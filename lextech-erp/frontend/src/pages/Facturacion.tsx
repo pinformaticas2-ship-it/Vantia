@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import {
   AlertCircle,
@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 
-type Period = "7d" | "30d" | "90d" | "year";
+type FilterPeriod = "year" | "q1" | "q2" | "q3" | "q4" | "jan" | "feb" | "mar" | "apr" | "may" | "jun" | "jul" | "aug" | "sep" | "oct" | "nov" | "dec";
 type TabKey = "dashboard" | "facturas" | "gastos" | "presupuestos";
 type BillingArea = "procesal" | "mercantil" | "laboral" | "familia" | "penal" | "fiscal";
 type PaymentMethod = "transferencia" | "tarjeta" | "domiciliacion" | "bizum" | "efectivo";
@@ -152,12 +152,25 @@ type RawPresupuesto = {
   iguala?: boolean | null;
 };
 
-const PERIOD_LABELS: Record<Period, string> = {
-  "7d": "Últimos 7 días",
-  "30d": "Últimos 30 días",
-  "90d": "Últimos 90 días",
-  year: "Este año",
-};
+const PERIOD_OPTIONS: { value: FilterPeriod; label: string; group?: "quarter" | "month" }[] = [
+  { value: "year",  label: "Todo el año" },
+  { value: "q1",   label: "Trimestre 1", group: "quarter" },
+  { value: "q2",   label: "Trimestre 2", group: "quarter" },
+  { value: "q3",   label: "Trimestre 3", group: "quarter" },
+  { value: "q4",   label: "Trimestre 4", group: "quarter" },
+  { value: "jan",  label: "Enero",       group: "month" },
+  { value: "feb",  label: "Febrero",     group: "month" },
+  { value: "mar",  label: "Marzo",       group: "month" },
+  { value: "apr",  label: "Abril",       group: "month" },
+  { value: "may",  label: "Mayo",        group: "month" },
+  { value: "jun",  label: "Junio",       group: "month" },
+  { value: "jul",  label: "Julio",       group: "month" },
+  { value: "aug",  label: "Agosto",      group: "month" },
+  { value: "sep",  label: "Septiembre",  group: "month" },
+  { value: "oct",  label: "Octubre",     group: "month" },
+  { value: "nov",  label: "Noviembre",   group: "month" },
+  { value: "dec",  label: "Diciembre",   group: "month" },
+];
 
 const AREA_LABELS: Record<BillingArea, string> = {
   procesal: "Procesal",
@@ -793,8 +806,12 @@ function QuipuConnectModal({
 export default function Facturacion() {
   const { getToken } = useAuth();
   const [tab, setTab] = useState<TabKey>("dashboard");
-  const [period, setPeriod] = useState<Period>("30d");
+  const [filterYear,   setFilterYear]   = useState<number>(new Date().getFullYear());
+  const [filterPeriod, setFilterPeriod] = useState<FilterPeriod>("year");
+  const [showYearMenu,   setShowYearMenu]   = useState(false);
   const [showPeriodMenu, setShowPeriodMenu] = useState(false);
+  const yearMenuRef   = useRef<HTMLDivElement>(null);
+  const periodMenuRef = useRef<HTMLDivElement>(null);
   const [facturas, setFacturas] = useState<Factura[]>([]);
   const [gastos, setGastos] = useState<Gasto[]>([]);
   const [presupuestos, setPresupuestos] = useState<Presupuesto[]>([]);
@@ -872,6 +889,45 @@ export default function Facturacion() {
     loadQuipuStatus();
   }, [loadBilling, loadQuipuStatus]);
 
+  // Close year/period menus when clicking outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (yearMenuRef.current && !yearMenuRef.current.contains(e.target as Node)) setShowYearMenu(false);
+      if (periodMenuRef.current && !periodMenuRef.current.contains(e.target as Node)) setShowPeriodMenu(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const availableYears = useMemo(() => {
+    const allYears = new Set<number>();
+    [...facturas.map(f => f.fecha), ...gastos.map(g => g.fecha), ...presupuestos.map(p => p.fecha)]
+      .filter(Boolean)
+      .forEach(d => { const y = new Date(d).getFullYear(); if (!isNaN(y)) allYears.add(y); });
+    const cur = new Date().getFullYear();
+    allYears.add(cur);
+    allYears.add(cur + 1);
+    return Array.from(allYears).sort((a, b) => b - a);
+  }, [facturas, gastos, presupuestos]);
+
+  const matchesDateFilter = useCallback((fecha: string): boolean => {
+    if (!fecha) return true;
+    const d = new Date(fecha);
+    if (isNaN(d.getTime())) return true;
+    if (d.getFullYear() !== filterYear) return false;
+    const m = d.getMonth();
+    if (filterPeriod === "year") return true;
+    if (filterPeriod === "q1") return m <= 2;
+    if (filterPeriod === "q2") return m >= 3 && m <= 5;
+    if (filterPeriod === "q3") return m >= 6 && m <= 8;
+    if (filterPeriod === "q4") return m >= 9;
+    const mMap: Record<string, number> = {
+      jan:0, feb:1, mar:2, apr:3, may:4, jun:5,
+      jul:6, aug:7, sep:8, oct:9, nov:10, dec:11,
+    };
+    return filterPeriod in mMap ? m === mMap[filterPeriod] : true;
+  }, [filterYear, filterPeriod]);
+
   const cobrosPendientes = useMemo(
     () =>
       facturas
@@ -903,13 +959,14 @@ export default function Facturacion() {
       .join(" ")
       .toLowerCase();
     if (q && !searchable.includes(q)) return false;
+    if (!matchesDateFilter(row.fecha)) return false;
     if (filterResponsable !== "todos" && row.responsable !== filterResponsable) return false;
     if (filterArea !== "todas" && row.area !== filterArea) return false;
     if (filterEstado !== "todos" && row.estado !== filterEstado) return false;
     if (filterFormaPago !== "todas" && row.formaPago !== filterFormaPago) return false;
     if (filterSerie !== "todas" && row.serie !== filterSerie) return false;
     return true;
-  }, [search, filterResponsable, filterArea, filterEstado, filterFormaPago, filterSerie]);
+  }, [search, matchesDateFilter, filterResponsable, filterArea, filterEstado, filterFormaPago, filterSerie]);
 
   const filteredFacturas = useMemo(() => facturas.filter(matchesCommonFilters), [facturas, matchesCommonFilters]);
   const filteredCobrosPendientes = useMemo(() => cobrosPendientes.filter(matchesCommonFilters), [cobrosPendientes, matchesCommonFilters]);
@@ -1240,21 +1297,71 @@ export default function Facturacion() {
 
               {tab === "dashboard" && (
                 <>
+                  {/* ── Filtros de periodo ── */}
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="relative w-fit">
-                      <button onClick={() => setShowPeriodMenu((current) => !current)} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-300">
-                        Vista temporal: {PERIOD_LABELS[period]}
-                        <ChevronDown size={14} className={showPeriodMenu ? "rotate-180" : ""} />
-                      </button>
-                      {showPeriodMenu && (
-                        <div className="absolute left-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
-                          {(Object.entries(PERIOD_LABELS) as [Period, string][]).map(([key, label]) => (
-                            <button key={key} onClick={() => { setPeriod(key); setShowPeriodMenu(false); }} className={`w-full px-4 py-2.5 text-left text-sm ${period === key ? "bg-red-50 font-semibold text-red-700" : "text-slate-600 hover:bg-slate-50"}`}>
-                              {label}
-                            </button>
-                          ))}
-                        </div>
-                      )}
+                    <div className="flex items-center gap-2">
+                      {/* Año */}
+                      <div className="relative" ref={yearMenuRef}>
+                        <button
+                          onClick={() => { setShowYearMenu(v => !v); setShowPeriodMenu(false); }}
+                          className={`inline-flex items-center gap-1.5 rounded-xl border px-4 py-2 text-sm font-semibold transition-all ${showYearMenu ? "border-slate-300 bg-slate-100 text-slate-800" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"}`}
+                        >
+                          {filterYear}
+                          <ChevronDown size={13} className={`transition-transform ${showYearMenu ? "rotate-180" : ""}`} />
+                        </button>
+                        {showYearMenu && (
+                          <div className="absolute left-0 top-full z-30 mt-1.5 w-28 overflow-hidden overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-xl" style={{ maxHeight: 220 }}>
+                            {availableYears.map(year => (
+                              <button
+                                key={year}
+                                onClick={() => { setFilterYear(year); setShowYearMenu(false); }}
+                                className={`flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm transition-colors ${filterYear === year ? "font-bold text-teal-700" : "text-slate-600 hover:bg-slate-50"}`}
+                              >
+                                {filterYear === year && <span className="shrink-0 text-teal-600">✓</span>}
+                                {year}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Periodo */}
+                      <div className="relative" ref={periodMenuRef}>
+                        <button
+                          onClick={() => { setShowPeriodMenu(v => !v); setShowYearMenu(false); }}
+                          className={`inline-flex items-center gap-1.5 rounded-xl border px-4 py-2 text-sm font-semibold transition-all ${showPeriodMenu ? "border-slate-300 bg-slate-100 text-slate-800" : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"}`}
+                        >
+                          {PERIOD_OPTIONS.find(o => o.value === filterPeriod)?.label ?? "Todo el año"}
+                          <ChevronDown size={13} className={`transition-transform ${showPeriodMenu ? "rotate-180" : ""}`} />
+                        </button>
+                        {showPeriodMenu && (
+                          <div className="absolute left-0 top-full z-30 mt-1.5 w-44 overflow-y-auto rounded-2xl border border-slate-200 bg-white py-1 shadow-xl" style={{ maxHeight: 280 }}>
+                            {PERIOD_OPTIONS.map((opt, idx) => {
+                              const isSelected = filterPeriod === opt.value;
+                              const prevGroup = idx > 0 ? PERIOD_OPTIONS[idx - 1].group : undefined;
+                              const showDivider = idx > 0 && opt.group !== prevGroup;
+                              return (
+                                <React.Fragment key={opt.value}>
+                                  {showDivider && <div className="my-1 border-t border-slate-100" />}
+                                  <button
+                                    onClick={() => { setFilterPeriod(opt.value); setShowPeriodMenu(false); }}
+                                    className={`flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm transition-colors ${
+                                      isSelected
+                                        ? "font-bold text-teal-700"
+                                        : opt.group === "quarter"
+                                          ? "text-teal-600 hover:bg-teal-50"
+                                          : "text-slate-600 hover:bg-slate-50"
+                                    }`}
+                                  >
+                                    {isSelected ? <span className="shrink-0 text-teal-600">✓</span> : <span className="w-3.5 shrink-0" />}
+                                    {opt.label}
+                                  </button>
+                                </React.Fragment>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-500">
@@ -1265,11 +1372,11 @@ export default function Facturacion() {
                   </div>
 
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    <KpiCard label="Cobros pendientes" value={fmtEur(totalPendiente)} sub={PERIOD_LABELS[period]} color="amber" icon={Banknote} />
-                    <KpiCard label="Facturas vencidas" value={String(facturasVencidas)} sub={PERIOD_LABELS[period]} color="red" icon={AlertCircle} />
-                    <KpiCard label="Presupuestos pendientes de respuesta" value={String(presupuestosPendientes)} sub={PERIOD_LABELS[period]} color="blue" icon={FileSpreadsheet} />
-                    <KpiCard label="Presupuestos aprobados sin facturar" value={String(presupuestosAprobados)} sub={PERIOD_LABELS[period]} color="violet" icon={CheckCircle2} />
-                    <KpiCard label="Pagos pendientes" value={fmtEur(pagosPendientes)} sub={PERIOD_LABELS[period]} color="slate" icon={Clock} />
+                    <KpiCard label="Cobros pendientes" value={fmtEur(totalPendiente)} sub={`${filterYear} · ${PERIOD_OPTIONS.find(o => o.value === filterPeriod)?.label ?? ""}`} color="amber" icon={Banknote} />
+                    <KpiCard label="Facturas vencidas" value={String(facturasVencidas)} sub={`${filterYear} · ${PERIOD_OPTIONS.find(o => o.value === filterPeriod)?.label ?? ""}`} color="red" icon={AlertCircle} />
+                    <KpiCard label="Presupuestos pendientes de respuesta" value={String(presupuestosPendientes)} sub={`${filterYear} · ${PERIOD_OPTIONS.find(o => o.value === filterPeriod)?.label ?? ""}`} color="blue" icon={FileSpreadsheet} />
+                    <KpiCard label="Presupuestos aprobados sin facturar" value={String(presupuestosAprobados)} sub={`${filterYear} · ${PERIOD_OPTIONS.find(o => o.value === filterPeriod)?.label ?? ""}`} color="violet" icon={CheckCircle2} />
+                    <KpiCard label="Pagos pendientes" value={fmtEur(pagosPendientes)} sub={`${filterYear} · ${PERIOD_OPTIONS.find(o => o.value === filterPeriod)?.label ?? ""}`} color="slate" icon={Clock} />
                     <KpiCard label="Gastos del periodo" value={fmtEur(gastosMensuales)} sub="Control de costes" color="green" icon={TrendingDown} />
                   </div>
 
