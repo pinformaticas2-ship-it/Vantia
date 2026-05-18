@@ -1211,6 +1211,35 @@ export async function runMigrations(): Promise<void> {
       `);
     } catch (_e: any) {}
 
+    // ── Tabla exp_notificaciones (cronología de notificaciones judiciales) ───
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS exp_notificaciones (
+        id              UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        expediente_id   UUID         NOT NULL REFERENCES expedientes(id) ON DELETE CASCADE,
+        tipo            VARCHAR(100) NOT NULL DEFAULT 'notificacion',
+        titulo          VARCHAR(300) NOT NULL,
+        descripcion     TEXT,
+        fecha_recepcion DATE         NOT NULL DEFAULT CURRENT_DATE,
+        fecha_limite    DATE,
+        estado          VARCHAR(30)  NOT NULL DEFAULT 'pendiente'
+                        CHECK (estado IN ('pendiente','respondida','archivada')),
+        created_by      VARCHAR(150) NOT NULL DEFAULT 'SYSTEM',
+        created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      );
+    `);
+    for (const idx of [
+      `CREATE INDEX IF NOT EXISTS idx_exp_notificaciones_expediente ON exp_notificaciones (expediente_id, fecha_recepcion DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_exp_notificaciones_estado     ON exp_notificaciones (estado)`,
+    ]) { try { await client.query(idx); } catch (_e: any) {} }
+    try {
+      await client.query(`
+        CREATE OR REPLACE TRIGGER trg_exp_notificaciones_updated_at
+          BEFORE UPDATE ON exp_notificaciones
+          FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+      `);
+    } catch (_e: any) {}
+
     // VACUUM ANALYZE para mantener las estadísticas de consulta frescas
     try {
       await client.query(`ANALYZE entities;`);

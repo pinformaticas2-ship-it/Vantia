@@ -137,7 +137,7 @@ const Indicador = ({
   </div>
 );
 
-type DetailTabKey = "perfil" | TabKey | "relacionados" | "actuacion" | "economico" | "agenda";
+type DetailTabKey = "perfil" | TabKey | "relacionados" | "actuacion" | "economico" | "agenda" | "cronologia";
 
 const DETAIL_TABS: { key: DetailTabKey; label: string; icon: any }[] = [
   { key: "perfil",      label: "Datos",                  icon: User },
@@ -150,8 +150,375 @@ const DETAIL_TABS: { key: DetailTabKey; label: string; icon: any }[] = [
   { key: "actuacion",   label: "Actuaciones",            icon: ClipboardList },
   { key: "adjuntos",    label: "Adjuntos",               icon: Paperclip },
   { key: "historial",   label: "Historial expediente",   icon: Activity },
+  { key: "cronologia",  label: "Cronología",             icon: Clock },
   { key: "agenda",      label: "Agenda",                 icon: Calendar },
 ];
+
+const NOTIF_TIPOS = [
+  { value: "cedula_emplazamiento",    label: "Cédula de emplazamiento" },
+  { value: "providencia",             label: "Providencia" },
+  { value: "auto",                    label: "Auto" },
+  { value: "sentencia",               label: "Sentencia" },
+  { value: "diligencia_ordenacion",   label: "Diligencia de ordenación" },
+  { value: "decreto",                 label: "Decreto" },
+  { value: "citacion",                label: "Citación" },
+  { value: "requerimiento",           label: "Requerimiento" },
+  { value: "notificacion",            label: "Notificación" },
+  { value: "exhorto",                 label: "Exhorto" },
+  { value: "otro",                    label: "Otro" },
+];
+
+const NOTIF_TIPO_COLORS: Record<string, string> = {
+  cedula_emplazamiento:  "bg-orange-100 text-orange-700 border-orange-200",
+  providencia:           "bg-blue-100 text-blue-700 border-blue-200",
+  auto:                  "bg-purple-100 text-purple-700 border-purple-200",
+  sentencia:             "bg-emerald-100 text-emerald-700 border-emerald-200",
+  diligencia_ordenacion: "bg-slate-100 text-slate-600 border-slate-200",
+  decreto:               "bg-slate-100 text-slate-600 border-slate-200",
+  citacion:              "bg-sky-100 text-sky-700 border-sky-200",
+  requerimiento:         "bg-red-100 text-red-700 border-red-200",
+  notificacion:          "bg-amber-100 text-amber-700 border-amber-200",
+  exhorto:               "bg-indigo-100 text-indigo-700 border-indigo-200",
+  otro:                  "bg-slate-100 text-slate-500 border-slate-200",
+};
+
+const NOTIF_DOT_COLORS: Record<string, string> = {
+  cedula_emplazamiento:  "bg-orange-400",
+  providencia:           "bg-blue-400",
+  auto:                  "bg-purple-400",
+  sentencia:             "bg-emerald-400",
+  diligencia_ordenacion: "bg-slate-400",
+  decreto:               "bg-slate-400",
+  citacion:              "bg-sky-400",
+  requerimiento:         "bg-red-400",
+  notificacion:          "bg-amber-400",
+  exhorto:               "bg-indigo-400",
+  otro:                  "bg-slate-300",
+};
+
+const NOTIF_ESTADO_BADGE: Record<string, string> = {
+  pendiente:   "bg-amber-100 text-amber-700",
+  respondida:  "bg-emerald-100 text-emerald-700",
+  archivada:   "bg-slate-100 text-slate-500",
+};
+
+const EMPTY_NOTIF = {
+  tipo: "notificacion",
+  titulo: "",
+  descripcion: "",
+  fecha_recepcion: new Date().toISOString().slice(0, 10),
+  fecha_limite: "",
+  estado: "pendiente",
+};
+
+function CronologiaTab({
+  expedienteId,
+  expediente,
+  notificaciones,
+  loading,
+  getToken,
+  onRefresh,
+}: {
+  expedienteId: string;
+  expediente: any;
+  notificaciones: any[] | null;
+  loading: boolean;
+  getToken: any;
+  onRefresh: () => void;
+}) {
+  const [showForm, setShowForm] = React.useState(false);
+  const [form, setForm] = React.useState({ ...EMPTY_NOTIF });
+  const [saving, setSaving] = React.useState(false);
+  const [editId, setEditId] = React.useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = React.useState<string | null>(null);
+  const [filterEstado, setFilterEstado] = React.useState<string>("todas");
+
+  const tipoLabel = (tipo: string) =>
+    NOTIF_TIPOS.find((t) => t.value === tipo)?.label || tipo;
+
+  const filtered = (notificaciones || []).filter(
+    (n: any) => filterEstado === "todas" || n.estado === filterEstado
+  );
+
+  async function handleSave() {
+    if (!form.titulo || !form.fecha_recepcion) return;
+    setSaving(true);
+    try {
+      const token = await getToken({ skipCache: true });
+      const url = editId
+        ? `/api/expedientes/${expedienteId}/notificaciones/${editId}`
+        : `/api/expedientes/${expedienteId}/notificaciones`;
+      const method = editId ? "PUT" : "POST";
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          ...form,
+          fecha_limite: form.fecha_limite || null,
+        }),
+      });
+      if (res.ok) {
+        setShowForm(false);
+        setEditId(null);
+        setForm({ ...EMPTY_NOTIF });
+        onRefresh();
+      }
+    } catch { /* */ } finally { setSaving(false); }
+  }
+
+  async function handleDelete(nid: string) {
+    try {
+      const token = await getToken({ skipCache: true });
+      await fetch(`/api/expedientes/${expedienteId}/notificaciones/${nid}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setConfirmDelete(null);
+      onRefresh();
+    } catch { /* */ }
+  }
+
+  function startEdit(n: any) {
+    setForm({
+      tipo: n.tipo,
+      titulo: n.titulo,
+      descripcion: n.descripcion || "",
+      fecha_recepcion: n.fecha_recepcion?.slice(0, 10) || "",
+      fecha_limite: n.fecha_limite?.slice(0, 10) || "",
+      estado: n.estado,
+    });
+    setEditId(n.id);
+    setShowForm(true);
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-bold text-slate-800">Línea de tiempo</h3>
+          <p className="text-xs text-slate-400">Cronología de notificaciones judiciales</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {/* Filtro estado */}
+          <select
+            value={filterEstado}
+            onChange={(e) => setFilterEstado(e.target.value)}
+            className="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-600 bg-white focus:outline-none focus:ring-1 focus:ring-red-400"
+          >
+            <option value="todas">Todas</option>
+            <option value="pendiente">Pendientes</option>
+            <option value="respondida">Respondidas</option>
+            <option value="archivada">Archivadas</option>
+          </select>
+          <button
+            onClick={() => { setShowForm(true); setEditId(null); setForm({ ...EMPTY_NOTIF }); }}
+            className="flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700 transition-colors"
+          >
+            <Plus size={12} /> Nueva
+          </button>
+        </div>
+      </div>
+
+      {/* Formulario nueva / editar */}
+      {showForm && (
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 space-y-4">
+          <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+            {editId ? "Editar notificación" : "Nueva notificación"}
+          </h4>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Tipo *</label>
+              <select
+                value={form.tipo}
+                onChange={(e) => setForm((f) => ({ ...f, tipo: e.target.value }))}
+                className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-red-400"
+              >
+                {NOTIF_TIPOS.map((t) => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Estado</label>
+              <select
+                value={form.estado}
+                onChange={(e) => setForm((f) => ({ ...f, estado: e.target.value }))}
+                className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-red-400"
+              >
+                <option value="pendiente">Pendiente</option>
+                <option value="respondida">Respondida</option>
+                <option value="archivada">Archivada</option>
+              </select>
+            </div>
+            <div className="col-span-2">
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Título *</label>
+              <input
+                value={form.titulo}
+                onChange={(e) => setForm((f) => ({ ...f, titulo: e.target.value }))}
+                placeholder="Ej. Cédula de emplazamiento — Juicio Ordinario 673/25"
+                className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-red-400"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Fecha recepción *</label>
+              <input
+                type="date"
+                value={form.fecha_recepcion}
+                onChange={(e) => setForm((f) => ({ ...f, fecha_recepcion: e.target.value }))}
+                className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-red-400"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Fecha límite respuesta</label>
+              <input
+                type="date"
+                value={form.fecha_limite}
+                onChange={(e) => setForm((f) => ({ ...f, fecha_limite: e.target.value }))}
+                className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-red-400"
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Descripción / observaciones</label>
+              <textarea
+                value={form.descripcion}
+                onChange={(e) => setForm((f) => ({ ...f, descripcion: e.target.value }))}
+                rows={2}
+                placeholder="Detalles adicionales de la notificación..."
+                className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-red-400 resize-none"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => { setShowForm(false); setEditId(null); }}
+              className="px-4 py-2 text-xs font-bold text-slate-500 hover:text-slate-700 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving || !form.titulo || !form.fecha_recepcion}
+              className="flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
+            >
+              {saving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+              {editId ? "Guardar cambios" : "Añadir"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Timeline */}
+      {loading ? (
+        <div className="flex justify-center py-14">
+          <Loader2 size={20} className="animate-spin text-slate-300" />
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-300">
+          <Clock size={32} className="opacity-20" />
+          <p className="text-sm font-medium">Sin notificaciones registradas</p>
+          <button
+            onClick={() => { setShowForm(true); setEditId(null); setForm({ ...EMPTY_NOTIF }); }}
+            className="mt-1 text-xs font-bold text-red-500 hover:underline"
+          >
+            Añadir primera notificación
+          </button>
+        </div>
+      ) : (
+        <div className="relative">
+          {/* Línea vertical */}
+          <div className="absolute left-[19px] top-3 bottom-3 w-px bg-slate-200" />
+
+          <div className="space-y-0">
+            {filtered.map((n: any, idx: number) => {
+              const dotColor = NOTIF_DOT_COLORS[n.tipo] || "bg-slate-300";
+              const badgeColor = NOTIF_TIPO_COLORS[n.tipo] || "bg-slate-100 text-slate-600 border-slate-200";
+              const today = new Date();
+              const limite = n.fecha_limite ? new Date(n.fecha_limite) : null;
+              const isOverdue = limite && limite < today && n.estado === "pendiente";
+              return (
+                <div key={n.id} className="relative flex gap-4 pb-6 last:pb-0">
+                  {/* Dot */}
+                  <div className="relative z-10 flex-shrink-0 mt-1">
+                    <div className={`w-[10px] h-[10px] rounded-full border-2 border-white shadow-sm ${dotColor} mt-1`} />
+                  </div>
+
+                  {/* Card */}
+                  <div className={`flex-1 rounded-xl border bg-white px-5 py-4 transition-shadow hover:shadow-sm ${isOverdue ? "border-red-200" : "border-slate-200"}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        {/* Tipo badge + título */}
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
+                          <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${badgeColor}`}>
+                            {tipoLabel(n.tipo)}
+                          </span>
+                          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${NOTIF_ESTADO_BADGE[n.estado] || "bg-slate-100 text-slate-500"}`}>
+                            {n.estado}
+                          </span>
+                        </div>
+                        <p className="text-sm font-bold text-slate-800 leading-snug">{n.titulo}</p>
+                        {/* Expediente context line */}
+                        {expediente && (
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            {[expediente.tipo_proc, expediente.num_autos, expediente.juzgado]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </p>
+                        )}
+                        {n.descripcion && (
+                          <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">{n.descripcion}</p>
+                        )}
+                        {/* Fecha límite */}
+                        {n.fecha_limite && (
+                          <div className={`inline-flex items-center gap-1.5 mt-2 rounded-full border px-2.5 py-1 text-xs font-bold ${isOverdue ? "bg-red-50 border-red-200 text-red-600" : "bg-amber-50 border-amber-200 text-amber-700"}`}>
+                            <Calendar size={11} />
+                            {new Date(n.fecha_limite).toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" })}
+                            <span className="font-normal opacity-70">(Fecha límite de respuesta)</span>
+                            {isOverdue && <span className="ml-1 font-bold text-red-600">— VENCIDA</span>}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Fecha recepción + acciones */}
+                      <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                        <span className="text-xs font-semibold text-slate-400 whitespace-nowrap">
+                          {new Date(n.fecha_recepcion).toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" })}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => startEdit(n)}
+                            className="p-1 rounded text-slate-300 hover:text-slate-600 transition-colors"
+                            title="Editar"
+                          >
+                            <Edit3 size={12} />
+                          </button>
+                          {confirmDelete === n.id ? (
+                            <div className="flex items-center gap-1">
+                              <button onClick={() => handleDelete(n.id)} className="p-1 rounded text-red-500 hover:text-red-700"><Check size={12} /></button>
+                              <button onClick={() => setConfirmDelete(null)} className="p-1 rounded text-slate-400 hover:text-slate-600"><X size={12} /></button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setConfirmDelete(n.id)}
+                              className="p-1 rounded text-slate-300 hover:text-red-500 transition-colors"
+                              title="Eliminar"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function EmptyTab({ icon: Icon, label }: { icon: any; label: string }) {
   return (
@@ -2655,6 +3022,8 @@ export default function ExpedienteDetail() {
   const [billingLoading, setBillingLoading] = useState(false);
   const [agendaEvents, setAgendaEvents] = useState<any[] | null>(null);
   const [agendaLoading, setAgendaLoading] = useState(false);
+  const [notificaciones, setNotificaciones] = useState<any[] | null>(null);
+  const [notifLoading, setNotifLoading] = useState(false);
   const shouldOpenNuevaActuacion = searchParams.get("newActuacion") === "1";
   const shouldOpenNuevaTarea = searchParams.get("newTarea") === "1";
   const initialTareaType = searchParams.get("type") || "";
@@ -2696,6 +3065,21 @@ export default function ExpedienteDetail() {
       } catch { /* */ } finally { setAgendaLoading(false); }
     })();
   }, [tab, agendaEvents, getToken]);
+
+  useEffect(() => {
+    if (tab !== "cronologia" || notificaciones !== null) return;
+    (async () => {
+      setNotifLoading(true);
+      try {
+        const token = await getToken({ skipCache: true });
+        const res = await fetch(`/api/expedientes/${id}/notificaciones`, { headers: { Authorization: `Bearer ${token}` } });
+        if (res.ok) {
+          const d = await res.json();
+          setNotificaciones(d.data || []);
+        }
+      } catch { /* */ } finally { setNotifLoading(false); }
+    })();
+  }, [tab, notificaciones, id, getToken]);
 
   const fetchExp = useCallback(async () => {
     try {
@@ -3204,6 +3588,17 @@ export default function ExpedienteDetail() {
                 </div>
               );
             })()}
+
+            {tab === "cronologia" && (
+              <CronologiaTab
+                expedienteId={id!}
+                expediente={exp}
+                notificaciones={notificaciones}
+                loading={notifLoading}
+                getToken={getToken}
+                onRefresh={() => setNotificaciones(null)}
+              />
+            )}
 
             {tab === "historial" && <EmptyTab icon={Activity} label="Sin historial por ahora" />}
 

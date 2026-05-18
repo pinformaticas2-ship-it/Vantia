@@ -15,6 +15,12 @@ import {
   updateExpediente,
   deleteExpediente,
 } from '../controllers/expedientesController';
+import {
+  listNotificaciones,
+  createNotificacion,
+  updateNotificacion,
+  deleteNotificacion,
+} from '../controllers/notificacionesController';
 import noteRoutes from './noteRoutes';
 
 const router = Router();
@@ -33,5 +39,10 @@ router.post('/',      requireAuth, createExpediente);
 router.get('/:id',    requireAuth, getExpediente);
 router.put('/:id',    requireAuth, updateExpediente);
 router.delete('/:id', requireAuth, deleteExpediente);
+
+router.get('/:id/notificaciones',          requireAuth, listNotificaciones);
+router.post('/:id/notificaciones',         requireAuth, createNotificacion);
+router.put('/:id/notificaciones/:nid',     requireAuth, updateNotificacion);
+router.delete('/:id/notificaciones/:nid',  requireAuth, deleteNotificacion);
 
 export default router;
