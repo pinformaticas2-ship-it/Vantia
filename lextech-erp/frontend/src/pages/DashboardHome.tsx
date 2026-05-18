@@ -226,18 +226,22 @@ export default function DashboardHome() {
     pendientes: 0,
     completadas: 0,
   });
+  const [billingStats, setBillingStats] = useState<{
+    facturado: number; cobrado: number; pendiente: number; numFacturas: number;
+  } | null>(null);
 
   const fetchData = useCallback(async (silent = false) => {
     if (!silent) { setActLoading(true); setAgendaLoading(true); }
     try {
       const token = await getToken({ skipCache: true });
-      const [actRes, agendaRes, tasksRes] = await Promise.all([
+      const [actRes, agendaRes, tasksRes, billingRes] = await Promise.all([
         fetch("/api/activity/me?limit=10",    { headers: { Authorization: `Bearer ${token}` } }),
         fetch("/api/agenda/upcoming?limit=5", { headers: { Authorization: `Bearer ${token}` } }),
         fetch("/api/tasks/me",               { headers: { Authorization: `Bearer ${token}` } }),
+        fetch("/api/facturacion/bootstrap",  { headers: { Authorization: `Bearer ${token}` } }),
       ]);
-      const [actData, agendaData, tasksData] = await Promise.all([
-        safeJson(actRes), safeJson(agendaRes), safeJson(tasksRes),
+      const [actData, agendaData, tasksData, billingData] = await Promise.all([
+        safeJson(actRes), safeJson(agendaRes), safeJson(tasksRes), safeJson(billingRes),
       ]);
       if (actRes.ok)    setActivity(actData.data || []);
       if (agendaRes.ok) setAgendaEvents(agendaData.data || []);
@@ -261,6 +265,13 @@ export default function DashboardHome() {
         const completadas = tasks.filter((t: any) => t.estado === "completada").length;
 
         setTaskStats({ vencidas, proximas, urgentes, pendientes, completadas });
+      }
+      if (billingRes.ok) {
+        const facturas: any[] = billingData.facturas || [];
+        const facturado  = facturas.reduce((s: number, f: any) => s + Number(f.total || 0), 0);
+        const cobrado    = facturas.filter((f: any) => f.estado === 'cobrada').reduce((s: number, f: any) => s + Number(f.total || 0), 0);
+        const pendiente  = facturas.filter((f: any) => f.estado !== 'cobrada').reduce((s: number, f: any) => s + Number(f.total || 0), 0);
+        setBillingStats({ facturado, cobrado, pendiente, numFacturas: facturas.length });
       }
     } catch (_e) {
     } finally {
@@ -616,12 +627,43 @@ export default function DashboardHome() {
             </Link>
           )}
           {visibleWidgets.includes("facturacion") && (
-            <Link to="/dashboard/facturacion" className="block group bg-white rounded-2xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition-all">
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-bold text-slate-800 text-sm flex items-center gap-2">💶 Facturación</span>
+            <Link to="/dashboard/facturacion" className="block group bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all">
+              <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                <h3 className="font-bold text-slate-800 flex items-center gap-2 text-sm">
+                  💶 Facturación
+                </h3>
                 <ChevronRight size={14} className="text-slate-300 group-hover:text-red-500 transition-colors" />
               </div>
-              <p className="text-xs text-slate-500">Consulta facturas, cobros y estado de pagos.</p>
+              {!billingStats ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 size={18} className="animate-spin text-slate-300" />
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2">
+                    <div className="p-5 border-r border-slate-100">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Facturado</p>
+                      <p className="text-2xl font-black text-slate-800 leading-none">
+                        {billingStats.facturado.toLocaleString("es-ES", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}€
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-1">{billingStats.numFacturas} facturas</p>
+                    </div>
+                    <div className="p-5">
+                      <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest mb-1">Cobrado</p>
+                      <p className="text-2xl font-black text-emerald-600 leading-none">
+                        {billingStats.cobrado.toLocaleString("es-ES", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}€
+                      </p>
+                      <p className="text-[10px] text-emerald-300 mt-1">recibido</p>
+                    </div>
+                  </div>
+                  <div className="px-5 py-3 border-t border-slate-100 bg-amber-50">
+                    <p className="text-[10px] font-bold text-amber-500 uppercase tracking-widest mb-0.5">Pendiente de cobro</p>
+                    <p className={`text-xl font-black leading-none ${billingStats.pendiente > 0 ? "text-amber-600" : "text-slate-300"}`}>
+                      {billingStats.pendiente.toLocaleString("es-ES", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}€
+                    </p>
+                  </div>
+                </>
+              )}
             </Link>
           )}
         </div>
