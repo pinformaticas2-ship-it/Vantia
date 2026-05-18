@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef, ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useUser, useAuth } from "@clerk/clerk-react";
 import {
   Clock, Plus, CheckCircle2, Loader2, RefreshCw,
@@ -189,23 +190,47 @@ function StyledDropdown({ selected, label, options, onSelect }: {
   options: { id: string; label: string }[];
   onSelect: (id: string) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [open, setOpen]   = useState(false);
+  const [pos,  setPos]    = useState({ top: 0, left: 0 });
+  const btnRef            = useRef<HTMLButtonElement>(null);
+  const menuRef           = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    const h = (e: MouseEvent) => {
+      if (
+        menuRef.current && !menuRef.current.contains(e.target as Node) &&
+        btnRef.current  && !btnRef.current.contains(e.target as Node)
+      ) setOpen(false);
+    };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, []);
+
+  function handleOpen(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + window.scrollY + 4, left: r.left + window.scrollX });
+    }
+    setOpen(v => !v);
+  }
+
   return (
-    <div ref={ref} className="relative">
+    <>
       <button
-        onClick={e => { e.preventDefault(); e.stopPropagation(); setOpen(v => !v); }}
+        ref={btnRef}
+        onClick={handleOpen}
         className="flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
       >
         {label} <ChevronDown size={11} className={`transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
-      {open && (
-        <div className="absolute left-0 top-full z-50 mt-1.5 w-44 overflow-y-auto max-h-64 rounded-2xl border border-slate-200 bg-white shadow-2xl py-1">
+      {open && createPortal(
+        <div
+          ref={menuRef}
+          style={{ position: "absolute", top: pos.top, left: pos.left, zIndex: 9999 }}
+          className="w-44 overflow-y-auto max-h-72 rounded-2xl border border-slate-200 bg-white shadow-2xl py-1"
+        >
           {options.map(o => (
             <button
               key={o.id}
@@ -220,9 +245,10 @@ function StyledDropdown({ selected, label, options, onSelect }: {
               {o.label}
             </button>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
-    </div>
+    </>
   );
 }
 
