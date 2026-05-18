@@ -152,7 +152,6 @@ function SortableWidget({ id, children }: { id: string; children: (handle: React
       {...listeners} {...attributes}
       className="p-1 rounded text-slate-300 hover:text-slate-500 cursor-grab active:cursor-grabbing touch-none"
       title="Arrastrar para reordenar"
-      onPointerDown={e => e.stopPropagation()}
     >
       <GripVertical size={14} />
     </button>
