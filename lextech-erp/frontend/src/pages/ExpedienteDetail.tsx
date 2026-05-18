@@ -122,6 +122,15 @@ const Field = ({
   </div>
 );
 
+const EI = "w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm text-slate-700 bg-white focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100";
+
+const EF = ({ label, children }: { label: string; mono?: boolean; children: React.ReactNode }) => (
+  <div>
+    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{label}</p>
+    {children}
+  </div>
+);
+
 const Indicador = ({
   label,
   value,
@@ -3017,6 +3026,8 @@ export default function ExpedienteDetail() {
   const [tab, setTab] = useState<DetailTabKey>("perfil");
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [editForm, setEditForm] = useState<any>(null);
+  const setEF = (key: string, val: any) => setEditForm((prev: any) => ({ ...prev, [key]: val }));
   const [clientes, setClientes] = useState<any[]>([]);
   const [billing,  setBilling]  = useState<{ facturas: any[]; gastos: any[] } | null>(null);
   const [billingLoading, setBillingLoading] = useState(false);
@@ -3190,9 +3201,10 @@ export default function ExpedienteDetail() {
     linkedClient?.address_town,
   ].filter(Boolean);
 
-  if (editing) {
-    const initial: typeof EXP_EMPTY = {
+  const startEdit = () => {
+    setEditForm({
       anio: exp.anio,
+      num_exp: exp.num_exp,
       ref_propia: exp.ref_propia || "",
       ref_expediente: exp.ref_expediente || "",
       descripcion: exp.descripcion || "",
@@ -3221,20 +3233,10 @@ export default function ExpedienteDetail() {
       contacto: exp.contacto || "",
       centro: exp.centro || "",
       color: exp.color || "ninguno",
-      ...(exp.num_exp ? { num_exp: exp.num_exp } : {}),
-    } as typeof EXP_EMPTY;
-
-    return (
-      <ExpedienteModal
-        editId={id}
-        initial={initial}
-        clientes={clientes}
-        onSave={handleSave}
-        onClose={() => setEditing(false)}
-        saving={saving}
-      />
-    );
-  }
+    });
+    setEditing(true);
+    setTab("perfil");
+  };
 
   return (
     <div className="flex gap-6 animate-in fade-in duration-500">
@@ -3251,12 +3253,31 @@ export default function ExpedienteDetail() {
           </div>
           <div className="flex gap-2">
             <BackButton onClick={() => navigate("/dashboard/expedientes")} />
-            <button
-              onClick={() => setEditing(true)}
-              className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm active:scale-95 transition-all"
-            >
-              <Edit3 size={14} /> Editar
-            </button>
+            {editing ? (
+              <>
+                <button
+                  onClick={() => { setEditing(false); setEditForm(null); }}
+                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl shadow-sm active:scale-95 transition-all"
+                >
+                  <X size={14} /> Cancelar
+                </button>
+                <button
+                  onClick={() => handleSave(editForm)}
+                  disabled={saving || !editForm?.descripcion?.trim()}
+                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-xl shadow-sm active:scale-95 transition-all"
+                >
+                  {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                  Guardar cambios
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={startEdit}
+                className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm active:scale-95 transition-all"
+              >
+                <Edit3 size={14} /> Editar
+              </button>
+            )}
           </div>
         </div>
 
@@ -3323,7 +3344,7 @@ export default function ExpedienteDetail() {
           </div>
 
           <div className="p-5">
-            {tab === "perfil" && (
+            {tab === "perfil" && !editing && (
               <div className="space-y-4">
                 <Section title="Identificación" icon={FolderOpen} cols={4}>
                   <Field label="Núm. expediente" value={`${exp.anio}/${exp.num_exp}`} mono />
@@ -3363,6 +3384,109 @@ export default function ExpedienteDetail() {
                   <Field label="Centro" value={exp.centro} />
                   <Field label="Color" value={exp.color !== "ninguno" ? exp.color : "—"} />
                 </Section>
+              </div>
+            )}
+
+            {tab === "perfil" && editing && editForm && (
+              <div className="space-y-4">
+                {/* ── Identificación ── */}
+                <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                  <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+                    <FolderOpen size={14} className="text-slate-400" />
+                    <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Identificación</h3>
+                  </div>
+                  <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <EF label="Núm. expediente" mono><span className="text-sm font-mono text-slate-600">{editForm.anio}/{editForm.num_exp}</span></EF>
+                    <EF label="Fecha alta"><input type="date" value={editForm.fecha_inicio} onChange={e => setEF("fecha_inicio", e.target.value)} className={EI} /></EF>
+                    <EF label="Fecha cierre"><input type="date" value={editForm.fecha_cierre} onChange={e => setEF("fecha_cierre", e.target.value)} className={EI} /></EF>
+                    <EF label="Estado">
+                      <select value={editForm.estado} onChange={e => setEF("estado", e.target.value)} className={EI}>
+                        {Object.entries(ESTADOS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                      </select>
+                    </EF>
+                    <div className="col-span-2 md:col-span-4">
+                      <EF label="Descripción *"><input value={editForm.descripcion} onChange={e => setEF("descripcion", e.target.value)} className={EI} placeholder="Descripción del expediente" /></EF>
+                    </div>
+                    <EF label="Tipo">
+                      <select value={editForm.tipo} onChange={e => setEF("tipo", e.target.value)} className={EI}>
+                        {Object.entries(TIPOS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                      </select>
+                    </EF>
+                    <EF label="Tipos de asunto"><input value={editForm.tipos_asunto} onChange={e => setEF("tipos_asunto", e.target.value)} className={EI} placeholder="Ej. Civil, Penal…" /></EF>
+                    <EF label="Etapa"><input value={editForm.etapa} onChange={e => setEF("etapa", e.target.value)} className={EI} placeholder="Ej. Instrucción" /></EF>
+                    <EF label="Color">
+                      <select value={editForm.color} onChange={e => setEF("color", e.target.value)} className={EI}>
+                        {["ninguno","rojo","azul","verde","amarillo","naranja","morado"].map(c => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
+                      </select>
+                    </EF>
+                  </div>
+                </div>
+
+                {/* ── Procedimiento judicial ── */}
+                <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                  <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+                    <Scale size={14} className="text-slate-400" />
+                    <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Procedimiento judicial</h3>
+                  </div>
+                  <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <EF label="Tipo de procedimiento"><input value={editForm.tipo_proc} onChange={e => setEF("tipo_proc", e.target.value)} className={EI} placeholder="Ej. Juicio Ordinario" /></EF>
+                    <div className="col-span-2">
+                      <EF label="Juzgado / Tribunal"><input value={editForm.juzgado} onChange={e => setEF("juzgado", e.target.value)} className={EI} placeholder="Nombre del juzgado" /></EF>
+                    </div>
+                    <EF label="Procurador propio"><input value={editForm.procurador} onChange={e => setEF("procurador", e.target.value)} className={EI} /></EF>
+                    <EF label="N.I.G." mono><input value={editForm.nig} onChange={e => setEF("nig", e.target.value)} className={EI + " font-mono"} placeholder="NIG del procedimiento" /></EF>
+                    <EF label="Núm. autos" mono><input value={editForm.num_autos} onChange={e => setEF("num_autos", e.target.value)} className={EI + " font-mono"} placeholder="0000/0000" /></EF>
+                  </div>
+                </div>
+
+                {/* ── Cuantías económicas ── */}
+                <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                  <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+                    <ClipboardList size={14} className="text-slate-400" />
+                    <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Cuantías económicas</h3>
+                  </div>
+                  <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <EF label="Cuantía principal (€)"><input type="number" step="0.01" value={editForm.cuantia_principal} onChange={e => setEF("cuantia_principal", e.target.value)} className={EI} placeholder="0.00" /></EF>
+                    <EF label="Intereses (€)"><input type="number" step="0.01" value={editForm.intereses} onChange={e => setEF("intereses", e.target.value)} className={EI} placeholder="0.00" /></EF>
+                    <EF label="Costas (€)"><input type="number" step="0.01" value={editForm.costas} onChange={e => setEF("costas", e.target.value)} className={EI} placeholder="0.00" /></EF>
+                    <EF label="Cuantía total (€)"><input type="number" step="0.01" value={editForm.cuantia_total} onChange={e => setEF("cuantia_total", e.target.value)} className={EI} placeholder="0.00" /></EF>
+                    <EF label="Importe (€)"><input type="number" step="0.01" value={editForm.importe} onChange={e => setEF("importe", e.target.value)} className={EI} placeholder="0.00" /></EF>
+                    <EF label="Indeterminada">
+                      <label className="flex items-center gap-2 mt-1 cursor-pointer">
+                        <input type="checkbox" checked={Boolean(editForm.indeterminado)} onChange={e => setEF("indeterminado", e.target.checked)} className="w-4 h-4 accent-red-600" />
+                        <span className="text-sm text-slate-600">{editForm.indeterminado ? "Sí" : "No"}</span>
+                      </label>
+                    </EF>
+                  </div>
+                </div>
+
+                {/* ── Partes y referencias ── */}
+                <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                  <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+                    <MoreHorizontal size={14} className="text-slate-400" />
+                    <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Partes y referencias</h3>
+                  </div>
+                  <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <EF label="Cliente *">
+                      <select value={editForm.cliente_id} onChange={e => {
+                        const c = clientes.find((x: any) => x.id === e.target.value);
+                        setEF("cliente_id", e.target.value);
+                        setEF("cliente_nombre", c ? `${c.first_name || ""} ${c.last_name || ""}`.trim() || c.commercial_name || "" : "");
+                      }} className={EI}>
+                        <option value="">— Sin cliente —</option>
+                        {clientes.map((c: any) => (
+                          <option key={c.id} value={c.id}>{`${c.first_name || ""} ${c.last_name || ""}`.trim() || c.commercial_name || c.nif_cif}</option>
+                        ))}
+                      </select>
+                    </EF>
+                    <EF label="Parte contraria"><input value={editForm.contrario} onChange={e => setEF("contrario", e.target.value)} className={EI} /></EF>
+                    <EF label="Persona contacto"><input value={editForm.persona_contacto} onChange={e => setEF("persona_contacto", e.target.value)} className={EI} /></EF>
+                    <EF label="Contacto"><input value={editForm.contacto} onChange={e => setEF("contacto", e.target.value)} className={EI} /></EF>
+                    <EF label="Ref. propia" mono><input value={editForm.ref_propia} onChange={e => setEF("ref_propia", e.target.value)} className={EI + " font-mono"} /></EF>
+                    <EF label="Ref. expediente" mono><input value={editForm.ref_expediente} onChange={e => setEF("ref_expediente", e.target.value)} className={EI + " font-mono"} /></EF>
+                    <EF label="Centro"><input value={editForm.centro} onChange={e => setEF("centro", e.target.value)} className={EI} /></EF>
+                  </div>
+                </div>
               </div>
             )}
 
