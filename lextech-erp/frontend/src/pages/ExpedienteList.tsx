@@ -5170,7 +5170,7 @@ export default function ExpedienteList() {
               )}
             </div>
             <ToolBtn icon={Trash2}       label="Baja"       danger   disabled={!selected} onClick={() => selected && setDeleteId(selected)} />
-            <ToolBtn icon={Edit3}        label="Modificar"           disabled={!selected} onClick={() => { setEditItem(selectedExp); setShowModal(true); }} />
+            <ToolBtn icon={Edit3}        label="Modificar"           disabled={!selected} onClick={() => selected && navigate(`/dashboard/expedientes/${selected}?edit=1`)} />
 
             <div className="w-px h-5 bg-slate-200 mx-0.5" />
 

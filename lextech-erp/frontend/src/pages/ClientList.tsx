@@ -1983,7 +1983,7 @@ export default function ClientList() {
           <ToolBtn
             icon={Edit3} label="Modificar"
             disabled={!selected}
-            onClick={() => selected && navigate(`/dashboard/clientes/${selected}/edit`)}
+            onClick={() => selected && navigate(`/dashboard/clientes/${selected}?edit=1`)}
           />
 
           <div className="w-px h-5 bg-slate-200 mx-0.5" />
@@ -2668,7 +2668,7 @@ export default function ClientList() {
                           <ExternalLink size={11} /> Ver ficha
                         </Link>
                         <Link
-                          to={`/dashboard/clientes/${client.id}/edit`}
+                          to={`/dashboard/clientes/${client.id}?edit=1`}
                           onClick={e => e.stopPropagation()}
                           className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
                           title="Editar"

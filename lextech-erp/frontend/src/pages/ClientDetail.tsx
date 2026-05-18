@@ -3549,6 +3549,49 @@ export default function ClientDetail() {
   // Auto-refrescar datos del cliente: cada 30s, al volver a pestaña
   useAutoRefresh(() => fetchClient(true), { intervalMs: 30_000, enabled: !!id });
 
+  // Auto-start inline edit when navigated with ?edit=1
+  const autoEditRef = useRef(false);
+  useEffect(() => {
+    if (searchParams.get("edit") !== "1" || !client || autoEditRef.current) return;
+    autoEditRef.current = true;
+    setEditForm({
+      first_name: client.first_name || "",
+      last_name: client.last_name || "",
+      commercial_name: client.commercial_name || "",
+      type: client.type || "CLIENTE",
+      client_status: client.client_status || "Alta",
+      document_type: client.document_type || "DNI",
+      nif_cif: client.nif_cif || "",
+      legal_nature: client.legal_nature || "",
+      gender: client.gender || "",
+      birth_date: client.birth_date ? client.birth_date.slice(0, 10) : "",
+      nationality: client.nationality || "",
+      expedition_country: client.expedition_country || "",
+      address_street: client.address_street || "",
+      address_town: client.address_town || "",
+      address_cp: client.address_cp || "",
+      address_province: client.address_province || "",
+      address_country: client.address_country || "",
+      email: client.email || "",
+      phone_1: client.phone_1 || "",
+      phone_mobile: client.phone_mobile || "",
+      phone_2: client.phone_2 || "",
+      phone_3: client.phone_3 || "",
+      phone_fax: client.phone_fax || "",
+      website: client.website || "",
+      date_alta: client.date_alta ? client.date_alta.slice(0, 10) : "",
+      date_baja: client.date_baja ? client.date_baja.slice(0, 10) : "",
+      lopd: client.lopd || "",
+      commercial_communications: client.commercial_communications || "",
+      center: client.center || "",
+    });
+    setEditing(true);
+    setActiveTab("perfil");
+    const next = new URLSearchParams(searchParams);
+    next.delete("edit");
+    setSearchParams(next, { replace: true });
+  }, [client]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (loading) return (
     <div className="flex flex-col items-center justify-center h-64 text-slate-400">
       <Loader2 className="animate-spin text-red-600 mb-3" size={32} />

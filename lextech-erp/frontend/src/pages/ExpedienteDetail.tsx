@@ -3017,7 +3017,7 @@ function initialsFromName(name?: string | null) {
 export default function ExpedienteDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { getToken } = useAuth();
 
   const [exp, setExp] = useState<any>(null);
@@ -3125,6 +3125,40 @@ export default function ExpedienteDetail() {
     fetchExp();
     fetchClientes();
   }, [fetchExp, fetchClientes]);
+
+  // Auto-start inline edit when navigated with ?edit=1
+  const autoEditExpRef = useRef(false);
+  useEffect(() => {
+    if (searchParams.get("edit") !== "1" || !exp || autoEditExpRef.current) return;
+    autoEditExpRef.current = true;
+    setEditForm({
+      anio: exp.anio, num_exp: exp.num_exp,
+      ref_propia: exp.ref_propia || "", ref_expediente: exp.ref_expediente || "",
+      descripcion: exp.descripcion || "", tipo: exp.tipo || "judicial",
+      cliente_id: exp.cliente_id || "", cliente_nombre: exp.cliente_nombre || "",
+      contrario: exp.contrario || "", procurador: exp.procurador || "",
+      juzgado: exp.juzgado || "", tipo_proc: exp.tipo_proc || "",
+      num_autos: exp.num_autos || "", nig: exp.nig || "",
+      estado: exp.estado || "abierto", observaciones: exp.observaciones || "",
+      fecha_inicio: exp.fecha_inicio ? exp.fecha_inicio.slice(0, 10) : "",
+      fecha_cierre: exp.fecha_cierre ? exp.fecha_cierre.slice(0, 10) : "",
+      importe: exp.importe ? String(exp.importe) : "",
+      tipos_asunto: exp.tipos_asunto || "",
+      cuantia_principal: exp.cuantia_principal ? String(exp.cuantia_principal) : "",
+      intereses: exp.intereses ? String(exp.intereses) : "",
+      costas: exp.costas ? String(exp.costas) : "",
+      cuantia_total: exp.cuantia_total ? String(exp.cuantia_total) : "",
+      indeterminado: exp.indeterminado || false,
+      etapa: exp.etapa || "", persona_contacto: exp.persona_contacto || "",
+      contacto: exp.contacto || "", centro: exp.centro || "",
+      color: exp.color || "ninguno",
+    });
+    setEditing(true);
+    setTab("perfil");
+    const next = new URLSearchParams(searchParams);
+    next.delete("edit");
+    setSearchParams(next, { replace: true });
+  }, [exp]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSave = async (form: typeof EXP_EMPTY) => {
     setSaving(true);

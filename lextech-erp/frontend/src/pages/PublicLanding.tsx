@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { SignedIn, SignedOut, SignInButton } from "@clerk/clerk-react";
+import { SignedIn, SignedOut, SignIn } from "@clerk/clerk-react";
 import { Link } from "react-router-dom";
-import { Lock, ArrowRight, CheckCircle2 } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import VantiaBrand from "../components/VantiaBrand";
 
 const LEGAL_QUOTES = [
@@ -95,58 +95,50 @@ export default function PublicLanding() {
           <div className="absolute right-[14%] top-[18%] h-14 w-14 rounded-full border border-[#1e2f45]/10 bg-[#d7c08a]/10" />
           <div className="absolute left-[14%] bottom-[18%] h-20 w-20 rotate-12 rounded-[24px] border border-[#1e2f45]/10 bg-white/25" />
           <div className="absolute right-[10%] bottom-[14%] h-28 w-28 rounded-full border border-[#d7c08a]/18 bg-white/20" />
-          <div className="absolute left-1/2 top-[10%] h-px w-32 -translate-x-1/2 bg-[#b3924a]/15" />
         </div>
 
-        <div className="relative z-10 w-full max-w-md space-y-8">
+        <div className="relative z-10 w-full max-w-md space-y-6">
           <div className="flex justify-center lg:justify-start">
             <div className="rounded-[28px] border border-[#b3924a]/45 bg-white px-4 py-3 shadow-[0_18px_45px_rgba(30,47,69,0.12)]">
               <VantiaBrand size={42} subtitle="Acceso seguro" className="justify-center lg:justify-start" />
             </div>
           </div>
 
-          <div className="text-center lg:text-left">
-            <h2 className="text-3xl font-black text-[#1e2f45]">Bienvenido</h2>
-            <p className="mt-2 text-base font-medium text-[#1f2937]">Acceda a su espacio de trabajo digital.</p>
-          </div>
+          <SignedOut>
+            <SignIn
+              routing="hash"
+              appearance={{
+                variables: {
+                  colorPrimary: "#1e2f45",
+                  colorBackground: "#ffffff",
+                  borderRadius: "16px",
+                  fontFamily: "inherit",
+                },
+                elements: {
+                  rootBox: "w-full",
+                  card: "shadow-[0_18px_45px_rgba(30,47,69,0.12)] border border-[#e5e7eb] rounded-2xl",
+                  headerTitle: "text-[#1e2f45] font-black",
+                  headerSubtitle: "text-[#6b7280]",
+                  formButtonPrimary: "bg-[#1e2f45] hover:bg-[#243951] text-white font-bold rounded-xl",
+                  footerActionLink: "text-[#b3924a] hover:text-[#8a6e35]",
+                  identityPreviewText: "text-[#1e2f45]",
+                },
+              }}
+            />
+          </SignedOut>
 
-          <div className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
-            <div className="h-2.5 w-2.5 rounded-full bg-emerald-600 animate-pulse" />
-            <span className="text-sm font-bold text-emerald-950">Sistemas operativos: normal</span>
-          </div>
-
-          <div className="space-y-4">
-            <SignedOut>
-              <SignInButton mode="modal">
-                <button className="group relative flex w-full justify-center rounded-2xl border border-transparent bg-[#1e2f45] px-4 py-4 text-sm font-bold text-white shadow-[0_18px_45px_rgba(30,47,69,0.18)] transition-all hover:-translate-y-0.5 hover:bg-[#243951] focus:outline-none focus:ring-2 focus:ring-[#1e2f45] focus:ring-offset-2">
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-4">
-                    <Lock className="h-5 w-5 text-[#e4cf9f]" />
-                  </span>
-                  Iniciar sesion segura
-                  <ArrowRight className="ml-2 h-4 w-4 opacity-0 transition-all group-hover:translate-x-0.5 group-hover:opacity-100" />
+          <SignedIn>
+            <div className="text-center space-y-4">
+              <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm font-bold text-blue-950 shadow-sm">
+                Sesion activa detectada.
+              </div>
+              <Link to="/dashboard">
+                <button className="w-full rounded-2xl bg-[#b3924a] px-4 py-4 font-bold text-[#1e2f45] shadow-[0_18px_45px_rgba(179,146,74,0.2)] transition-all hover:bg-[#c19f58]">
+                  Entrar al dashboard
                 </button>
-              </SignInButton>
-
-              <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm">
-                <p className="text-center text-sm font-semibold text-[#111827]">
-                  Acceso restringido a personal autorizado.
-                </p>
-              </div>
-            </SignedOut>
-
-            <SignedIn>
-              <div className="text-center space-y-4">
-                <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm font-bold text-blue-950 shadow-sm">
-                  Sesion activa detectada.
-                </div>
-                <Link to="/dashboard">
-                  <button className="w-full rounded-2xl bg-[#b3924a] px-4 py-4 font-bold text-[#1e2f45] shadow-[0_18px_45px_rgba(179,146,74,0.2)] transition-all hover:bg-[#c19f58]">
-                    Entrar al dashboard
-                  </button>
-                </Link>
-              </div>
-            </SignedIn>
-          </div>
+              </Link>
+            </div>
+          </SignedIn>
         </div>
       </div>
     </div>
