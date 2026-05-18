@@ -27,6 +27,14 @@ const sanitizeAmount = (value: any) => {
   return Number.isFinite(num) ? num : null;
 };
 
+const mapQuipuStatusToErp = (status: string): string => {
+  const s = String(status || '').toLowerCase();
+  if (s === 'paid') return 'cobrada';
+  if (s === 'overdue') return 'vencida';
+  if (s === 'sent' || s === 'issued') return 'enviada';
+  return 'pendiente';
+};
+
 export const getBillingBootstrap = async (req: any, res: Response) => {
   const userId = req.auth?.userId;
   if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
@@ -71,11 +79,6 @@ export const getBillingBootstrap = async (req: any, res: Response) => {
                ) AS total_expedientes
         FROM entities e
         WHERE e.type = 'CLIENTE'
-          AND EXISTS (
-            SELECT 1
-            FROM expedientes exp
-            WHERE exp.cliente_id = e.id
-          )
         ORDER BY e.first_name ASC, e.last_name ASC
       `),
       pool.query(`
@@ -93,14 +96,67 @@ export const getBillingBootstrap = async (req: any, res: Response) => {
       `),
     ]);
 
+    // Obtener facturas de Quipu que aún no están importadas en facturacion_facturas
+    let quipuRows: any[] = [];
+    try {
+      const quipuFacturas = await pool.query(`
+        SELECT qi.id,
+               qi.external_id,
+               qi.number      AS num,
+               qi.contact_name AS contacto,
+               qi.issue_date   AS fecha,
+               qi.due_date     AS vencimiento,
+               qi.total_amount AS total,
+               qi.status
+        FROM quipu_invoices qi
+        WHERE qi.user_id = $1
+          AND NOT EXISTS (
+            SELECT 1 FROM facturacion_facturas ff
+            WHERE ff.user_id = $1
+              AND ff.quipu_id = qi.external_id
+          )
+        ORDER BY qi.issue_date DESC NULLS LAST
+      `, [userId]);
+
+      quipuRows = quipuFacturas.rows.map((qi: any) => ({
+        id:                   qi.id,
+        user_id:              userId,
+        num:                  qi.num || qi.external_id || '—',
+        contacto:             qi.contacto || 'Quipu',
+        fecha:                qi.fecha,
+        vencimiento:          qi.vencimiento,
+        total:                Number(qi.total || 0),
+        estado:               mapQuipuStatusToErp(qi.status),
+        area:                 'procesal',
+        responsable:          'Quipu',
+        forma_pago:           'transferencia',
+        serie:                'QUIPU',
+        tipo_cliente:         'empresa',
+        client_id:            null,
+        expediente_id:        null,
+        quipu_id:             qi.external_id,
+        // campos de expediente vacíos para que el mapper no falle
+        anio:                 null,
+        num_exp:              null,
+        ref_expediente:       null,
+        ref_propia:           null,
+        expediente_descripcion: null,
+      }));
+    } catch (_e: any) {
+      // quipu_invoices puede no existir si nunca se configuró Quipu
+    }
+
+    // Combinar: primero facturas locales, luego las de Quipu no importadas aún
+    const todasFacturas = [...facturas.rows, ...quipuRows];
+
     res.json({
       success: true,
       data: {
-        facturas: facturas.rows,
-        gastos: gastos.rows,
+        facturas:     todasFacturas,
+        gastos:       gastos.rows,
         presupuestos: presupuestos.rows,
-        clientes: clientes.rows,
-        expedientes: expedientes.rows,
+        clientes:     clientes.rows,
+        expedientes:  expedientes.rows,
       },
     });
   } catch (error: any) {
