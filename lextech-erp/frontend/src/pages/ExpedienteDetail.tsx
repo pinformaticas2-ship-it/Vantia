@@ -35,6 +35,10 @@ import {
   CheckCircle2,
   Link2,
   Mail,
+  Banknote,
+  TrendingUp,
+  TrendingDown,
+  BadgeEuro,
 } from "lucide-react";
 import { safeJson } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
@@ -132,18 +136,19 @@ const Indicador = ({
   </div>
 );
 
-type DetailTabKey = "perfil" | TabKey | "relacionados" | "actuacion";
+type DetailTabKey = "perfil" | TabKey | "relacionados" | "actuacion" | "economico";
 
 const DETAIL_TABS: { key: DetailTabKey; label: string; icon: any }[] = [
-  { key: "perfil", label: "Datos", icon: User },
-  { key: "notas", label: "Notas", icon: StickyNote },
-  { key: "clientes", label: "Cliente", icon: Users },
-  { key: "contrarios", label: "Contrarios", icon: Users },
-  { key: "relacionados", label: "Expedientes relacionados", icon: Link2 },
-  { key: "tareas", label: "Tareas / Plazos", icon: AlertTriangle },
-  { key: "actuacion", label: "Actuaciones", icon: ClipboardList },
-  { key: "adjuntos", label: "Adjuntos", icon: Paperclip },
-  { key: "historial", label: "Historial expediente", icon: Activity },
+  { key: "perfil",      label: "Datos",                  icon: User },
+  { key: "economico",   label: "Económico",              icon: Banknote },
+  { key: "notas",       label: "Notas",                  icon: StickyNote },
+  { key: "clientes",    label: "Cliente",                icon: Users },
+  { key: "contrarios",  label: "Contrarios",             icon: Users },
+  { key: "relacionados",label: "Expedientes relacionados",icon: Link2 },
+  { key: "tareas",      label: "Tareas / Plazos",        icon: AlertTriangle },
+  { key: "actuacion",   label: "Actuaciones",            icon: ClipboardList },
+  { key: "adjuntos",    label: "Adjuntos",               icon: Paperclip },
+  { key: "historial",   label: "Historial expediente",   icon: Activity },
 ];
 
 function EmptyTab({ icon: Icon, label }: { icon: any; label: string }) {
@@ -2644,6 +2649,8 @@ export default function ExpedienteDetail() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [clientes, setClientes] = useState<any[]>([]);
+  const [billing,  setBilling]  = useState<{ facturas: any[]; gastos: any[] } | null>(null);
+  const [billingLoading, setBillingLoading] = useState(false);
   const shouldOpenNuevaActuacion = searchParams.get("newActuacion") === "1";
   const shouldOpenNuevaTarea = searchParams.get("newTarea") === "1";
   const initialTareaType = searchParams.get("type") || "";
@@ -2654,6 +2661,22 @@ export default function ExpedienteDetail() {
       setTab(requestedTab as DetailTabKey);
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    if (tab !== "economico" || billing !== null) return;
+    (async () => {
+      setBillingLoading(true);
+      try {
+        const token = await getToken({ skipCache: true });
+        const res = await fetch("/api/facturacion/bootstrap", { headers: { Authorization: `Bearer ${token}` } });
+        const d = await safeJson(res);
+        if (res.ok) {
+          const data = d.data || d;
+          setBilling({ facturas: data.facturas || [], gastos: data.gastos || [] });
+        }
+      } catch { /* */ } finally { setBillingLoading(false); }
+    })();
+  }, [tab, billing, getToken]);
 
   const fetchExp = useCallback(async () => {
     try {
@@ -3067,6 +3090,102 @@ export default function ExpedienteDetail() {
                 expedienteId={id!}
               />
             )}
+            {tab === "economico" && (() => {
+              const expFacturas = (billing?.facturas || []).filter((f: any) => f.expediente_id === id);
+              const totalFacturado = expFacturas.reduce((s: number, f: any) => s + Number(f.total || 0), 0);
+              const totalCobrado   = expFacturas.filter((f: any) => f.estado === "cobrada").reduce((s: number, f: any) => s + Number(f.total || 0), 0);
+              const totalPendiente = expFacturas.filter((f: any) => f.estado !== "cobrada").reduce((s: number, f: any) => s + Number(f.total || 0), 0);
+              const ESTADO_BADGE: Record<string, string> = {
+                cobrada:  "bg-emerald-100 text-emerald-700",
+                pendiente:"bg-amber-100 text-amber-700",
+                vencida:  "bg-red-100 text-red-700",
+              };
+              return (
+                <div className="space-y-5">
+                  {/* Resumen */}
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                      <div className="flex items-center gap-2 mb-3">
+                        <BadgeEuro size={15} className="text-slate-400" />
+                        <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Facturado</p>
+                      </div>
+                      <p className="text-2xl font-black text-slate-800">{fmtMoney(totalFacturado)}</p>
+                      <p className="text-xs text-slate-400 mt-1">{expFacturas.length} factura{expFacturas.length !== 1 ? "s" : ""}</p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                      <div className="flex items-center gap-2 mb-3">
+                        <TrendingUp size={15} className="text-emerald-500" />
+                        <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Cobrado</p>
+                      </div>
+                      <p className="text-2xl font-black text-emerald-600">{fmtMoney(totalCobrado)}</p>
+                      <p className="text-xs text-slate-400 mt-1">facturas cobradas</p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                      <div className="flex items-center gap-2 mb-3">
+                        <TrendingDown size={15} className="text-amber-500" />
+                        <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Pendiente</p>
+                      </div>
+                      <p className="text-2xl font-black text-amber-600">{fmtMoney(totalPendiente)}</p>
+                      <p className="text-xs text-slate-400 mt-1">por cobrar</p>
+                    </div>
+                  </div>
+
+                  {/* Tabla facturas */}
+                  <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
+                    <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Banknote size={14} className="text-slate-400" />
+                        <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Facturas vinculadas</h3>
+                      </div>
+                      <Link to="/dashboard/facturacion" className="text-xs font-bold text-red-600 hover:underline flex items-center gap-1">
+                        Ir a facturación <ChevronRight size={11} />
+                      </Link>
+                    </div>
+                    {billingLoading ? (
+                      <div className="flex justify-center py-10">
+                        <Loader2 size={18} className="animate-spin text-slate-300" />
+                      </div>
+                    ) : expFacturas.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-12 gap-2 text-slate-300">
+                        <Banknote size={28} className="opacity-30" />
+                        <p className="text-sm font-medium">Sin facturas vinculadas a este expediente</p>
+                        <Link to="/dashboard/facturacion" className="mt-1 text-xs font-bold text-red-500 hover:underline">Crear factura</Link>
+                      </div>
+                    ) : (
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-slate-100">
+                            <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Núm.</th>
+                            <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Cliente</th>
+                            <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Fecha</th>
+                            <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Vencimiento</th>
+                            <th className="px-5 py-3 text-right text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total</th>
+                            <th className="px-5 py-3 text-center text-[11px] font-bold text-slate-400 uppercase tracking-wider">Estado</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                          {expFacturas.map((f: any) => (
+                            <tr key={f.id} className="hover:bg-slate-50 transition-colors">
+                              <td className="px-5 py-3 font-mono text-xs text-slate-700 font-semibold">{f.num}</td>
+                              <td className="px-5 py-3 text-xs text-slate-700 max-w-[180px] truncate">{f.contacto}</td>
+                              <td className="px-5 py-3 text-xs text-slate-500">{fmtDate(f.fecha)}</td>
+                              <td className="px-5 py-3 text-xs text-slate-500">{fmtDate(f.vencimiento)}</td>
+                              <td className="px-5 py-3 text-xs font-bold text-slate-800 text-right">{fmtMoney(f.total)}</td>
+                              <td className="px-5 py-3 text-center">
+                                <span className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold capitalize ${ESTADO_BADGE[f.estado] || "bg-slate-100 text-slate-600"}`}>
+                                  {f.estado}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+
             {tab === "historial" && <EmptyTab icon={Activity} label="Sin historial por ahora" />}
           </div>
         </div>
