@@ -159,17 +159,36 @@ function SortableWidget({ id, children }: { id: string; children: (handle: React
   return <div ref={setNodeRef} style={style}>{children(handle)}</div>;
 }
 
-// ── Billing period selector (pequeño dropdown) ────────────────────────────────
-const QUARTERS = [
+// ── Billing period selector ───────────────────────────────────────────────────
+const PERIODS = [
   { id: "all", label: "Todo el año" },
-  { id: "q1",  label: "Q1 (Ene–Mar)" },
-  { id: "q2",  label: "Q2 (Abr–Jun)" },
-  { id: "q3",  label: "Q3 (Jul–Sep)" },
-  { id: "q4",  label: "Q4 (Oct–Dic)" },
+  { id: "q1",  label: "Trimestre 1" },
+  { id: "q2",  label: "Trimestre 2" },
+  { id: "q3",  label: "Trimestre 3" },
+  { id: "q4",  label: "Trimestre 4" },
+  { id: "m0",  label: "Enero" },
+  { id: "m1",  label: "Febrero" },
+  { id: "m2",  label: "Marzo" },
+  { id: "m3",  label: "Abril" },
+  { id: "m4",  label: "Mayo" },
+  { id: "m5",  label: "Junio" },
+  { id: "m6",  label: "Julio" },
+  { id: "m7",  label: "Agosto" },
+  { id: "m8",  label: "Septiembre" },
+  { id: "m9",  label: "Octubre" },
+  { id: "m10", label: "Noviembre" },
+  { id: "m11", label: "Diciembre" },
 ];
-const QUARTER_MONTHS: Record<string, number[]> = { q1:[0,1,2], q2:[3,4,5], q3:[6,7,8], q4:[9,10,11] };
+const PERIOD_MONTHS: Record<string, number[]> = {
+  q1:[0,1,2], q2:[3,4,5], q3:[6,7,8], q4:[9,10,11],
+  m0:[0],m1:[1],m2:[2],m3:[3],m4:[4],m5:[5],m6:[6],m7:[7],m8:[8],m9:[9],m10:[10],m11:[11],
+};
 
-function PeriodDropdown({ label, options, onSelect, stopProp }: { label: string; options: { id: string; label: string }[]; onSelect: (id: string) => void; stopProp?: boolean }) {
+function StyledDropdown({ selected, label, options, onSelect }: {
+  selected: string; label: string;
+  options: { id: string; label: string }[];
+  onSelect: (id: string) => void;
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -180,19 +199,24 @@ function PeriodDropdown({ label, options, onSelect, stopProp }: { label: string;
   return (
     <div ref={ref} className="relative">
       <button
-        onClick={e => { if (stopProp) e.preventDefault(); e.stopPropagation(); setOpen(v => !v); }}
-        className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+        onClick={e => { e.preventDefault(); e.stopPropagation(); setOpen(v => !v); }}
+        className="flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
       >
-        {label} <ChevronDown size={10} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+        {label} <ChevronDown size={11} className={`transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
-        <div className="absolute left-0 top-full z-50 mt-1 w-36 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+        <div className="absolute left-0 top-full z-50 mt-1.5 w-44 overflow-y-auto max-h-64 rounded-2xl border border-slate-200 bg-white shadow-2xl py-1">
           {options.map(o => (
             <button
               key={o.id}
-              onClick={e => { if (stopProp) e.preventDefault(); e.stopPropagation(); onSelect(o.id); setOpen(false); }}
-              className="w-full px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+              onClick={e => { e.preventDefault(); e.stopPropagation(); onSelect(o.id); setOpen(false); }}
+              className={`flex w-full items-center gap-2 px-4 py-2 text-left text-sm transition-colors ${
+                o.id === selected
+                  ? "text-teal-600 font-semibold hover:bg-teal-50"
+                  : "text-slate-700 font-normal hover:bg-slate-50"
+              }`}
             >
+              <span className="w-4 shrink-0 text-teal-500">{o.id === selected ? "✓" : ""}</span>
               {o.label}
             </button>
           ))}
@@ -241,7 +265,7 @@ export default function DashboardHome() {
 
   // Billing period state
   const thisYear = new Date().getFullYear();
-  const yearOptions = Array.from({ length: 4 }, (_, i) => ({ id: String(thisYear - i), label: String(thisYear - i) }));
+  const yearOptions = Array.from({ length: thisYear - 2010 + 2 }, (_, i) => ({ id: String(thisYear + 1 - i), label: String(thisYear + 1 - i) }));
   const [billingYear, setBillingYear] = useState(String(thisYear));
   const [billingQtr,  setBillingQtr]  = useState("all");
 
@@ -309,7 +333,7 @@ export default function DashboardHome() {
   const billingCalc = (() => {
     if (!billingRaw) return null;
     const yr = Number(billingYear);
-    const allowedMonths = billingQtr === "all" ? null : QUARTER_MONTHS[billingQtr];
+    const allowedMonths = billingQtr === "all" ? null : PERIOD_MONTHS[billingQtr];
     const inRange = (fecha: string) => {
       if (!fecha) return false;
       const d = new Date(fecha);
@@ -467,17 +491,17 @@ export default function DashboardHome() {
           <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-2">
             <h3 className="font-bold text-slate-800 text-sm shrink-0">💶 Facturación</h3>
             <div className="flex items-center gap-1.5 flex-1 justify-end">
-              <PeriodDropdown
+              <StyledDropdown
+                selected={billingYear}
                 label={billingYear}
                 options={yearOptions}
                 onSelect={setBillingYear}
-                stopProp
               />
-              <PeriodDropdown
-                label={QUARTERS.find(q => q.id === billingQtr)?.label ?? "Todo el año"}
-                options={QUARTERS}
+              <StyledDropdown
+                selected={billingQtr}
+                label={PERIODS.find(p => p.id === billingQtr)?.label ?? "Todo el año"}
+                options={PERIODS}
                 onSelect={setBillingQtr}
-                stopProp
               />
               {handle}
               <button
