@@ -12,6 +12,7 @@ import {
   ScrollText, Receipt, Scale, UserCheck,
   MessageSquare, FileSignature, ShieldAlert, FilePlus,
   FilePlus2, Search, ChevronDown, ChevronRight as ChevronR,
+  Banknote, TrendingUp, TrendingDown, BadgeEuro,
 } from "lucide-react";
 import { safeJson } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
@@ -65,6 +66,8 @@ const Indicador = ({ label, value, color = "text-slate-700" }: any) => (
 const TABS = [
   { id: "perfil",      label: "Perfil",         icon: User },
   { id: "expedientes", label: "Expedientes",     icon: Briefcase },
+  { id: "economico",   label: "Económico",       icon: Banknote },
+  { id: "agenda",      label: "Agenda",          icon: Calendar },
   { id: "historial",   label: "Historial",       icon: Clock },
   { id: "notas",       label: "Notas",           icon: StickyNote },
   { id: "tareas",      label: "Tareas / Plazos", icon: AlertTriangle },
@@ -3254,6 +3257,228 @@ function PanelIndicadores({ clientId, onTabChange }: { clientId: string; onTabCh
   );
 }
 
+// ── Tab: Económico ────────────────────────────────────────────
+function TabEconomico({ clientId }: { clientId: string }) {
+  const { getToken } = useAuth();
+  const [billing, setBilling] = useState<{ facturas: any[]; gastos: any[] } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  function fmtMoney(v: any) {
+    if (v == null || v === "") return "—";
+    return Number(v).toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+  }
+  function fmtDate(d: string | null | undefined) {
+    if (!d) return "—";
+    return new Date(d).toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
+  }
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const token = await getToken({ skipCache: true });
+        const res = await fetch("/api/facturacion/bootstrap", { headers: { Authorization: `Bearer ${token}` } });
+        if (res.ok) {
+          const d = await res.json();
+          const data = d.data || d;
+          setBilling({ facturas: data.facturas || [], gastos: data.gastos || [] });
+        }
+      } catch { /* */ } finally { setLoading(false); }
+    })();
+  }, [clientId, getToken]);
+
+  const ESTADO_BADGE: Record<string, string> = {
+    cobrada:  "bg-emerald-100 text-emerald-700",
+    pendiente:"bg-amber-100 text-amber-700",
+    vencida:  "bg-red-100 text-red-700",
+  };
+
+  const clientFacturas = (billing?.facturas || []).filter((f: any) => f.client_id === clientId);
+  const totalFacturado = clientFacturas.reduce((s: number, f: any) => s + Number(f.total || 0), 0);
+  const totalCobrado   = clientFacturas.filter((f: any) => f.estado === "cobrada").reduce((s: number, f: any) => s + Number(f.total || 0), 0);
+  const totalPendiente = clientFacturas.filter((f: any) => f.estado !== "cobrada").reduce((s: number, f: any) => s + Number(f.total || 0), 0);
+
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-3 gap-4">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <BadgeEuro size={15} className="text-slate-400" />
+            <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Facturado</p>
+          </div>
+          <p className="text-2xl font-black text-slate-800">{fmtMoney(totalFacturado)}</p>
+          <p className="text-xs text-slate-400 mt-1">{clientFacturas.length} factura{clientFacturas.length !== 1 ? "s" : ""}</p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingUp size={15} className="text-emerald-500" />
+            <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Cobrado</p>
+          </div>
+          <p className="text-2xl font-black text-emerald-600">{fmtMoney(totalCobrado)}</p>
+          <p className="text-xs text-slate-400 mt-1">facturas cobradas</p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingDown size={15} className="text-amber-500" />
+            <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Pendiente</p>
+          </div>
+          <p className="text-2xl font-black text-amber-600">{fmtMoney(totalPendiente)}</p>
+          <p className="text-xs text-slate-400 mt-1">por cobrar</p>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
+        <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Banknote size={14} className="text-slate-400" />
+            <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Facturas del cliente</h3>
+          </div>
+          <Link to="/dashboard/facturacion" className="text-xs font-bold text-red-600 hover:underline flex items-center gap-1">
+            Ir a facturación <ChevronRight size={11} />
+          </Link>
+        </div>
+        {loading ? (
+          <div className="flex justify-center py-10">
+            <Loader2 size={18} className="animate-spin text-slate-300" />
+          </div>
+        ) : clientFacturas.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 gap-2 text-slate-300">
+            <Banknote size={28} className="opacity-30" />
+            <p className="text-sm font-medium">Sin facturas vinculadas a este cliente</p>
+            <Link to="/dashboard/facturacion" className="mt-1 text-xs font-bold text-red-500 hover:underline">Crear factura</Link>
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-100">
+                <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Núm.</th>
+                <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Expediente</th>
+                <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Fecha</th>
+                <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Vencimiento</th>
+                <th className="px-5 py-3 text-right text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total</th>
+                <th className="px-5 py-3 text-center text-[11px] font-bold text-slate-400 uppercase tracking-wider">Estado</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {clientFacturas.map((f: any) => (
+                <tr key={f.id} className="hover:bg-slate-50 transition-colors">
+                  <td className="px-5 py-3 font-mono text-xs text-slate-700 font-semibold">{f.num}</td>
+                  <td className="px-5 py-3 text-xs text-slate-500 max-w-[200px] truncate">{f.expediente_ref || "—"}</td>
+                  <td className="px-5 py-3 text-xs text-slate-500">{fmtDate(f.fecha)}</td>
+                  <td className="px-5 py-3 text-xs text-slate-500">{fmtDate(f.vencimiento)}</td>
+                  <td className="px-5 py-3 text-xs font-bold text-slate-800 text-right">{fmtMoney(f.total)}</td>
+                  <td className="px-5 py-3 text-center">
+                    <span className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold capitalize ${ESTADO_BADGE[f.estado] || "bg-slate-100 text-slate-600"}`}>
+                      {f.estado}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Tab: Agenda ───────────────────────────────────────────────
+function TabAgenda({ clientId }: { clientId: string }) {
+  const { getToken } = useAuth();
+  const [events, setEvents] = useState<any[] | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  function fmtDate(d: string | null | undefined) {
+    if (!d) return "—";
+    return new Date(d).toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" });
+  }
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const token = await getToken({ skipCache: true });
+        const res = await fetch("/api/agenda?limit=500", { headers: { Authorization: `Bearer ${token}` } });
+        if (res.ok) {
+          const d = await res.json();
+          setEvents((d.data || d) as any[]);
+        }
+      } catch { /* */ } finally { setLoading(false); }
+    })();
+  }, [clientId, getToken]);
+
+  const TYPE_BADGE: Record<string, string> = {
+    cita:    "bg-blue-100 text-blue-700",
+    plazo:   "bg-red-100 text-red-700",
+    reunion: "bg-purple-100 text-purple-700",
+    juicio:  "bg-orange-100 text-orange-700",
+    otro:    "bg-slate-100 text-slate-600",
+  };
+  const STATUS_BADGE: Record<string, string> = {
+    pendiente:  "bg-amber-100 text-amber-700",
+    completado: "bg-emerald-100 text-emerald-700",
+    cancelado:  "bg-slate-100 text-slate-500",
+  };
+
+  const clientEvents = (events || []).filter((e: any) => e.cliente_id === clientId);
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
+      <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Calendar size={14} className="text-slate-400" />
+          <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Eventos de agenda</h3>
+        </div>
+        <Link to="/dashboard/agenda" className="text-xs font-bold text-red-600 hover:underline flex items-center gap-1">
+          Ir a agenda <ChevronRight size={11} />
+        </Link>
+      </div>
+      {loading ? (
+        <div className="flex justify-center py-10">
+          <Loader2 size={18} className="animate-spin text-slate-300" />
+        </div>
+      ) : clientEvents.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 gap-2 text-slate-300">
+          <Calendar size={28} className="opacity-30" />
+          <p className="text-sm font-medium">Sin eventos vinculados a este cliente</p>
+          <Link to="/dashboard/agenda" className="mt-1 text-xs font-bold text-red-500 hover:underline">Crear evento</Link>
+        </div>
+      ) : (
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-slate-100">
+              <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Título</th>
+              <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Tipo</th>
+              <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Fecha inicio</th>
+              <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Fecha fin</th>
+              <th className="px-5 py-3 text-center text-[11px] font-bold text-slate-400 uppercase tracking-wider">Estado</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-50">
+            {clientEvents.map((e: any) => (
+              <tr key={e.id} className="hover:bg-slate-50 transition-colors">
+                <td className="px-5 py-3 text-xs text-slate-700 font-medium">{e.title}</td>
+                <td className="px-5 py-3">
+                  <span className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold capitalize ${TYPE_BADGE[e.type] || "bg-slate-100 text-slate-600"}`}>
+                    {e.type || "—"}
+                  </span>
+                </td>
+                <td className="px-5 py-3 text-xs text-slate-500">{fmtDate(e.start_at)}</td>
+                <td className="px-5 py-3 text-xs text-slate-500">{e.end_at ? fmtDate(e.end_at) : "—"}</td>
+                <td className="px-5 py-3 text-center">
+                  <span className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold capitalize ${STATUS_BADGE[e.status] || "bg-slate-100 text-slate-600"}`}>
+                    {e.status || "—"}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
 // ── Componente principal ──────────────────────────────────────
 export default function ClientDetail() {
   const { id } = useParams<{ id: string }>();
@@ -3468,6 +3693,16 @@ export default function ClientDetail() {
             {mountedTabs.has("expedientes") && (
               <div style={{ display: activeTab === "expedientes" ? "block" : "none" }}>
                 <TabExpedientes clientId={id!} />
+              </div>
+            )}
+            {mountedTabs.has("economico") && (
+              <div style={{ display: activeTab === "economico" ? "block" : "none" }}>
+                <TabEconomico clientId={id!} />
+              </div>
+            )}
+            {mountedTabs.has("agenda") && (
+              <div style={{ display: activeTab === "agenda" ? "block" : "none" }}>
+                <TabAgenda clientId={id!} />
               </div>
             )}
             {mountedTabs.has("historial") && (

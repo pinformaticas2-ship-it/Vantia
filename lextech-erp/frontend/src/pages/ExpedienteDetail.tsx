@@ -39,6 +39,7 @@ import {
   TrendingUp,
   TrendingDown,
   BadgeEuro,
+  ChevronRight,
 } from "lucide-react";
 import { safeJson } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
@@ -136,7 +137,7 @@ const Indicador = ({
   </div>
 );
 
-type DetailTabKey = "perfil" | TabKey | "relacionados" | "actuacion" | "economico";
+type DetailTabKey = "perfil" | TabKey | "relacionados" | "actuacion" | "economico" | "agenda";
 
 const DETAIL_TABS: { key: DetailTabKey; label: string; icon: any }[] = [
   { key: "perfil",      label: "Datos",                  icon: User },
@@ -149,6 +150,7 @@ const DETAIL_TABS: { key: DetailTabKey; label: string; icon: any }[] = [
   { key: "actuacion",   label: "Actuaciones",            icon: ClipboardList },
   { key: "adjuntos",    label: "Adjuntos",               icon: Paperclip },
   { key: "historial",   label: "Historial expediente",   icon: Activity },
+  { key: "agenda",      label: "Agenda",                 icon: Calendar },
 ];
 
 function EmptyTab({ icon: Icon, label }: { icon: any; label: string }) {
@@ -2651,6 +2653,8 @@ export default function ExpedienteDetail() {
   const [clientes, setClientes] = useState<any[]>([]);
   const [billing,  setBilling]  = useState<{ facturas: any[]; gastos: any[] } | null>(null);
   const [billingLoading, setBillingLoading] = useState(false);
+  const [agendaEvents, setAgendaEvents] = useState<any[] | null>(null);
+  const [agendaLoading, setAgendaLoading] = useState(false);
   const shouldOpenNuevaActuacion = searchParams.get("newActuacion") === "1";
   const shouldOpenNuevaTarea = searchParams.get("newTarea") === "1";
   const initialTareaType = searchParams.get("type") || "";
@@ -2677,6 +2681,21 @@ export default function ExpedienteDetail() {
       } catch { /* */ } finally { setBillingLoading(false); }
     })();
   }, [tab, billing, getToken]);
+
+  useEffect(() => {
+    if (tab !== "agenda" || agendaEvents !== null) return;
+    (async () => {
+      setAgendaLoading(true);
+      try {
+        const token = await getToken({ skipCache: true });
+        const res = await fetch("/api/agenda?limit=500", { headers: { Authorization: `Bearer ${token}` } });
+        if (res.ok) {
+          const d = await res.json();
+          setAgendaEvents((d.data || d) as any[]);
+        }
+      } catch { /* */ } finally { setAgendaLoading(false); }
+    })();
+  }, [tab, agendaEvents, getToken]);
 
   const fetchExp = useCallback(async () => {
     try {
@@ -3187,6 +3206,77 @@ export default function ExpedienteDetail() {
             })()}
 
             {tab === "historial" && <EmptyTab icon={Activity} label="Sin historial por ahora" />}
+
+            {tab === "agenda" && (() => {
+              const TYPE_BADGE: Record<string, string> = {
+                cita:    "bg-blue-100 text-blue-700",
+                plazo:   "bg-red-100 text-red-700",
+                reunion: "bg-purple-100 text-purple-700",
+                juicio:  "bg-orange-100 text-orange-700",
+                otro:    "bg-slate-100 text-slate-600",
+              };
+              const STATUS_BADGE: Record<string, string> = {
+                pendiente:   "bg-amber-100 text-amber-700",
+                completado:  "bg-emerald-100 text-emerald-700",
+                cancelado:   "bg-slate-100 text-slate-500",
+              };
+              const expEvents = (agendaEvents || []).filter((e: any) => e.expediente_id === id);
+              return (
+                <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
+                  <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Calendar size={14} className="text-slate-400" />
+                      <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Eventos de agenda</h3>
+                    </div>
+                    <Link to="/dashboard/agenda" className="text-xs font-bold text-red-600 hover:underline flex items-center gap-1">
+                      Ir a agenda <ChevronRight size={11} />
+                    </Link>
+                  </div>
+                  {agendaLoading ? (
+                    <div className="flex justify-center py-10">
+                      <Loader2 size={18} className="animate-spin text-slate-300" />
+                    </div>
+                  ) : expEvents.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 gap-2 text-slate-300">
+                      <Calendar size={28} className="opacity-30" />
+                      <p className="text-sm font-medium">Sin eventos vinculados a este expediente</p>
+                      <Link to="/dashboard/agenda" className="mt-1 text-xs font-bold text-red-500 hover:underline">Crear evento</Link>
+                    </div>
+                  ) : (
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-100">
+                          <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Título</th>
+                          <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Tipo</th>
+                          <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Fecha inicio</th>
+                          <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Fecha fin</th>
+                          <th className="px-5 py-3 text-center text-[11px] font-bold text-slate-400 uppercase tracking-wider">Estado</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                        {expEvents.map((e: any) => (
+                          <tr key={e.id} className="hover:bg-slate-50 transition-colors">
+                            <td className="px-5 py-3 text-xs text-slate-700 font-medium">{e.title}</td>
+                            <td className="px-5 py-3">
+                              <span className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold capitalize ${TYPE_BADGE[e.type] || "bg-slate-100 text-slate-600"}`}>
+                                {e.type || "—"}
+                              </span>
+                            </td>
+                            <td className="px-5 py-3 text-xs text-slate-500">{fmtDate(e.start_at)}</td>
+                            <td className="px-5 py-3 text-xs text-slate-500">{e.end_at ? fmtDate(e.end_at) : "—"}</td>
+                            <td className="px-5 py-3 text-center">
+                              <span className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold capitalize ${STATUS_BADGE[e.status] || "bg-slate-100 text-slate-600"}`}>
+                                {e.status || "—"}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>
