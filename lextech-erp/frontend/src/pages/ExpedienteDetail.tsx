@@ -1513,9 +1513,9 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
     };
   }, []);
 
-  const loadFiles = useCallback(async () => {
+  const loadFiles = useCallback(async (silent = false) => {
     try {
-      setLoading(true); setError(null);
+      if (!silent) { setLoading(true); setError(null); }
       const token = await getToken({ skipCache: true });
       const res = await fetch(`/api/tasks/${taskId}/files`, { headers: { Authorization: `Bearer ${token}` } });
       const data = await safeJson(res);
@@ -1528,24 +1528,9 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
           const absoluteUrl = /^https?:\/\//i.test(resolved) ? resolved : `${window.location.origin}${resolved}`;
           openUrlCache.current.set(file.id, absoluteUrl);
         });
-
-        const officeExts = new Set(['doc','docx','odt','rtf','dot','dotx','xls','xlsx','xlsm','xlsb','ods','csv','ppt','pptx','odp']);
-        void Promise.allSettled(fileList.map(async (file: any) => {
-          const ext = (file.original_name || '').split('.').pop()?.toLowerCase() ?? '';
-          if (!officeExts.has(ext) || openUrlCache.current.has(file.id)) return;
-          const tkRes = await fetch(`/api/tasks/${taskId}/files/${file.id}/temp-token`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          if (!tkRes.ok) return;
-          const { token: tempToken } = await tkRes.json();
-          const resolved = resolveApiUrl(`/api/tasks/files/dl/${tempToken}`);
-          const absoluteUrl = /^https?:\/\//i.test(resolved) ? resolved : `${window.location.origin}${resolved}`;
-          openUrlCache.current.set(file.id, absoluteUrl);
-        }));
       }
-      else setError(data?.error || "No se pudieron cargar los adjuntos.");
-    } finally { setLoading(false); }
+      else if (!silent) setError(data?.error || "No se pudieron cargar los adjuntos.");
+    } finally { if (!silent) setLoading(false); }
   }, [getToken, taskId]);
 
   useEffect(() => { loadFiles(); }, [loadFiles]);
@@ -1581,24 +1566,6 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
     } catch (_) { loadingThumbIds.current.delete(fileId); }
   }, [getToken, taskId]);
 
-  const prefetchOpenUrl = useCallback(async (fileId: string, fileName: string) => {
-    const ext = (fileName || '').split('.').pop()?.toLowerCase() ?? '';
-    const officeExts = new Set(['doc','docx','odt','rtf','dot','dotx','xls','xlsx','xlsm','xlsb','ods','csv','ppt','pptx','odp']);
-    if (!officeExts.has(ext) || openUrlCache.current.has(fileId)) return;
-    try {
-      const token = await getToken({ skipCache: true });
-      const tkRes = await fetch(`/api/tasks/${taskId}/files/${fileId}/temp-token`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!tkRes.ok) return;
-      const { token: tempToken } = await tkRes.json();
-      const resolved = resolveApiUrl(`/api/tasks/files/dl/${tempToken}`);
-      const absoluteUrl = /^https?:\/\//i.test(resolved) ? resolved : `${window.location.origin}${resolved}`;
-      openUrlCache.current.set(fileId, absoluteUrl);
-    } catch (_) {}
-  }, [getToken, taskId]);
-
   const openWithApp = useCallback(async (file: any) => {
     const ext = (file.original_name || '').split('.').pop()?.toLowerCase() ?? '';
     const wordExts = ['doc','docx','odt','rtf','dot','dotx'];
@@ -1609,7 +1576,7 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
     if (isOffice) {
       const tempUrl = openUrlCache.current.get(file.id);
       openUrlCache.current.delete(file.id);
-      void prefetchOpenUrl(file.id, file.original_name);
+      void loadFiles(true);
 
       if (tempUrl) {
         const scheme = wordExts.includes(ext)
@@ -1651,7 +1618,7 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
     a.click();
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(blobUrl), 10_000);
-  }, [getToken, prefetchOpenUrl, taskId]);
+  }, [getToken, loadFiles, taskId]);
 
   const openPreview = useCallback(async (file: any) => {
     const cached = previewCache.current.get(file.id);
@@ -1930,7 +1897,6 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
                           <div className="min-w-0">
                             <button
                               type="button"
-                              onMouseEnter={() => prefetchOpenUrl(file.id, file.original_name)}
                               onClick={() => { if (canPrev || canWord || canExcel) handlePrimaryOpen(file); }}
                               className={`text-xs font-medium text-slate-700 text-left truncate block max-w-[140px] ${(canPrev || canWord || canExcel) ? "hover:text-red-600 cursor-pointer" : "cursor-default"}`}
                               title={file.original_name}
@@ -2089,7 +2055,6 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
                             <div className="min-w-0">
                               <button
                                 type="button"
-                                onMouseEnter={() => prefetchOpenUrl(file.id, file.original_name)}
                                 onClick={() => { if (canPrev || canWord || canExcel) handlePrimaryOpen(file); }}
                                 className={`text-sm font-semibold text-slate-800 text-left truncate block max-w-[260px] ${(canPrev || canWord || canExcel) ? "hover:text-red-600" : ""}`}
                                 title={file.original_name}

@@ -2064,24 +2064,6 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
     window.dispatchEvent(new CustomEvent('historial-changed'));
   };
 
-  const prefetchOpenUrl = useCallback(async (fileId: string, fileName: string) => {
-    const ext = (fileName || '').split('.').pop()?.toLowerCase() ?? '';
-    const officeExts = new Set(['doc','docx','odt','rtf','dot','dotx','xls','xlsx','xlsm','xlsb','ods','csv','ppt','pptx','odp']);
-    if (!officeExts.has(ext) || openUrlCache.current.has(fileId)) return;
-    try {
-      const authToken = await getToken({ skipCache: true });
-      const tkRes = await fetch(`/api/files/${clientId}/${fileId}/temp-token`, {
-        method: 'POST', headers: { Authorization: `Bearer ${authToken}` },
-      });
-      if (tkRes.ok) {
-        const { token } = await tkRes.json();
-        const resolved = resolveApiUrl(`/api/files/dl/${token}`);
-        const absoluteUrl = /^https?:\/\//i.test(resolved) ? resolved : `${window.location.origin}${resolved}`;
-        openUrlCache.current.set(fileId, absoluteUrl);
-      }
-    } catch (_e) {}
-  }, [clientId, getToken]);
-
   const openWithApp = useCallback(async (f: any) => {
     const ext = (f.original_name || '').split('.').pop()?.toLowerCase() ?? '';
     const wordExts  = ['doc','docx','odt','rtf','dot','dotx'];
@@ -2094,8 +2076,8 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
       // Chrome silently drops ms-word:/ms-excel: navigation after any await, so this MUST be sync.
       const tempUrl = openUrlCache.current.get(f.id);
       openUrlCache.current.delete(f.id);
-      // Immediately start fetching a fresh token for the next click (fire-and-forget)
-      void prefetchOpenUrl(f.id, f.original_name);
+      // Silently refresh file list to get fresh open_token for next click
+      void loadFiles(true);
 
       if (tempUrl) {
         const scheme = wordExts.includes(ext) ? 'ms-word:ofe|u|'
@@ -2137,7 +2119,7 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
       document.body.removeChild(a);
       setTimeout(() => URL.revokeObjectURL(blobUrl), 10_000);
     } catch (_e) {}
-  }, [clientId, getToken]);
+  }, [clientId, getToken, loadFiles]);
 
   const openInWord = openWithApp;
 
@@ -2570,7 +2552,6 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
                               ) : (
                                 <span
                                   className={`h-10 w-10 rounded-lg flex items-center justify-center text-lg shrink-0 ${fi.color} ${f.mimetype?.startsWith('image/') ? 'animate-pulse' : ''} cursor-pointer hover:scale-105 transition-transform`}
-                                  onMouseEnter={() => prefetchOpenUrl(f.id, f.original_name)}
                                   onClick={() => { if (f.mimetype?.startsWith('image/')) loadThumb(f.id); else if (canPreview || canWord || canExcel) handleNameClick?.(); }}
                                 >
                                   {fi.icon}
@@ -2633,7 +2614,6 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
                             <button
                               title={canWord ? "Abrir en Word" : canExcel ? "Abrir en Excel" : f.mimetype === 'application/pdf' ? "Abrir PDF" : "Abrir"}
                               className="p-1.5 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-                              onMouseEnter={() => prefetchOpenUrl(f.id, f.original_name)}
                               onClick={() => openWithApp(f)}
                             >
                               <ExternalLink size={14} />
