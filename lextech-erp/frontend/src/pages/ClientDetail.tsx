@@ -2062,24 +2062,9 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
   };
 
   // ── Abrir en Word: llama al backend que abre el archivo con el SO ──
-  const openInWord = useCallback(async (f: any) => {
-    const token = await getToken({ skipCache: true });
-    try {
-      const res = await fetch(`/api/files/${clientId}/${f.id}/open-local`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) {
-        // Si open-local falla, descargamos como alternativa
-        await downloadWithAuth(f.id, f.original_name || 'documento.docx');
-      }
-    } catch (_err) {
-      await downloadWithAuth(f.id, f.original_name || 'documento.docx');
-    }
-  }, [clientId, getToken, downloadWithAuth]);
-
-  // ── Abrir PDF en el navegador (pestaña nueva) ─────────────────
-  const openInBrowser = useCallback(async (f: any) => {
+  // Abre el archivo en la aplicación nativa del SO (Word, PDF Studio, etc.)
+  // sin forzar descarga — el navegador/SO decide qué app usa según extensión y MIME
+  const openWithApp = useCallback(async (f: any) => {
     try {
       const token = await getToken({ skipCache: true });
       const res = await fetch(`/api/files/${clientId}/${f.id}/download`, {
@@ -2087,11 +2072,32 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
       });
       if (!res.ok) return;
       const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      const ext = (f.original_name || '').split('.').pop()?.toLowerCase() ?? '';
+      const mimeMap: Record<string, string> = {
+        pdf:  'application/pdf',
+        docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        doc:  'application/msword',
+        xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        xls:  'application/vnd.ms-excel',
+        pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        ppt:  'application/vnd.ms-powerpoint',
+        odt:  'application/vnd.oasis.opendocument.text',
+        ods:  'application/vnd.oasis.opendocument.spreadsheet',
+      };
+      const mime = mimeMap[ext] || blob.type || 'application/octet-stream';
+      const url = URL.createObjectURL(new Blob([blob], { type: mime }));
+      const a = document.createElement('a');
+      a.href = url;
+      // Sin a.download: el SO abre con la app por defecto (Word, PDF Studio, etc.)
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
     } catch (_e) {}
   }, [clientId, getToken]);
+
+  const openInWord    = openWithApp;
+  const openInBrowser = openWithApp;
 
   // ── Vista previa ─────────────────────────────────────────────
   const openPreview = async (f: any) => {
