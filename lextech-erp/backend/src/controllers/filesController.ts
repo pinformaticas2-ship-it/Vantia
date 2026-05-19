@@ -327,12 +327,13 @@ export const createTempToken = async (req: any, res: Response) => {
   const { clientId, fileId } = req.params;
   try {
     const check = await pool.query(
-      `SELECT id FROM client_files WHERE id = $1 AND client_id = $2`,
-      [fileId, clientId]
+      `SELECT id, client_id FROM client_files WHERE id = $1 LIMIT 1`,
+      [fileId]
     );
     if (check.rows.length === 0) return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
+    const realClientId = check.rows[0].client_id || clientId;
     const token = crypto.randomUUID();
-    _tempTokens.set(token, { clientId, fileId, exp: Date.now() + 30 * 60 * 1000 });
+    _tempTokens.set(token, { clientId: realClientId, fileId, exp: Date.now() + 30 * 60 * 1000 });
     res.json({ success: true, token });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
