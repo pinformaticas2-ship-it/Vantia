@@ -674,6 +674,7 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
                     <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Tipo</th>
                     <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Tamaño</th>
                     <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Fecha</th>
+                    <th className="px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden xl:table-cell">Modificado</th>
                     <th className="px-4 py-3"></th>
                   </tr>
                 </thead>
@@ -735,9 +736,14 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
                         <td className="px-4 py-3 text-xs text-slate-400 hidden md:table-cell">
                           {new Date(f.created_at).toLocaleDateString("es-ES")}
                         </td>
+                        <td className="px-4 py-3 text-xs text-slate-400 hidden xl:table-cell">
+                          {f.updated_at && f.updated_at !== f.created_at
+                            ? new Date(f.updated_at).toLocaleDateString("es-ES")
+                            : <span className="text-slate-300">—</span>}
+                        </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
-                            {/* Vista previa (PDF, imágenes, texto) */}
+                            {/* Vista previa — no se toca */}
                             {canOpenPreview && (
                               <button onClick={() => openPreview(f)} title="Vista previa"
                                 className="p-1.5 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors">
@@ -756,43 +762,32 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
                             >
                               <Edit3 size={14} />
                             </button>
-                            {/* PDF → Abrir en navegador */}
+                            {/* Abrir — adaptado al tipo de archivo */}
                             {f.mimetype === 'application/pdf' && (
-                              <button
-                                title="Abrir en navegador"
+                              <button title="Abrir en navegador"
                                 className="p-1.5 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-                                onClick={() => openInBrowser(f)}
-                              >
+                                onClick={() => openInBrowser(f)}>
                                 <ExternalLink size={14} />
                               </button>
                             )}
-                            {/* Word → Abrir en Word */}
                             {canWord && (
-                              <button
-                                title="Abrir en Word"
-                                className="p-1.5 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors"
-                                onClick={() => openInWord(f)}
-                              >
-                                <Download size={14} />
+                              <button title="Abrir en Word"
+                                className="p-1.5 text-slate-400 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+                                onClick={() => openInWord(f)}>
+                                <ExternalLink size={14} />
                               </button>
                             )}
-                            {/* Excel → Abrir en Excel */}
                             {canExcel && (
-                              <button
-                                title="Abrir en Excel"
-                                className="p-1.5 text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors"
-                                onClick={() => openInWord(f)}
-                              >
-                                <Download size={14} />
+                              <button title="Abrir en Excel"
+                                className="p-1.5 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors"
+                                onClick={() => openInWord(f)}>
+                                <ExternalLink size={14} />
                               </button>
                             )}
-                            {/* Otros archivos → Descargar */}
                             {!f.mimetype?.includes('pdf') && !canWord && !canExcel && (
-                              <button
-                                title="Descargar"
+                              <button title="Descargar"
                                 className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                                onClick={() => downloadWithAuth(f.id, f.original_name)}
-                              >
+                                onClick={() => downloadWithAuth(f.id, f.original_name)}>
                                 <Download size={14} />
                               </button>
                             )}

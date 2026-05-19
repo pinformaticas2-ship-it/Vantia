@@ -209,7 +209,7 @@ export const listFiles = async (req: any, res: Response) => {
   const { clientId } = req.params;
   try {
     const result = await pool.query(
-      `SELECT id, original_name, stored_name, mimetype, size_bytes, category, document_name, attachment_type, created_by, created_at
+      `SELECT id, original_name, stored_name, mimetype, size_bytes, category, document_name, attachment_type, created_by, created_at, updated_at
        FROM client_files WHERE client_id = $1 ORDER BY created_at DESC`,
       [clientId]
     );
@@ -354,9 +354,9 @@ export const updateFileMetadata = async (req: any, res: Response) => {
 
     const query = `
       UPDATE client_files
-      SET document_name = $1, attachment_type = $2 ${originalNameUpdate}
+      SET document_name = $1, attachment_type = $2, updated_at = NOW() ${originalNameUpdate}
       WHERE id = $3 AND client_id = $4
-      RETURNING id, document_name, attachment_type, original_name
+      RETURNING id, document_name, attachment_type, original_name, updated_at
     `;
 
     const result = await pool.query(query, params);
