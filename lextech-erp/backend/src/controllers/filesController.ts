@@ -233,7 +233,7 @@ export const listFiles = async (req: any, res: Response) => {
 // ─────────────────────────────────────────────────────────────
 export const uploadFiles = async (req: any, res: Response) => {
   const { clientId } = req.params;
-  const userId = req.auth?.userId || 'SYSTEM';
+  const userId = req.auth()?.userId || 'SYSTEM';
   const files: Express.Multer.File[] = req.files as Express.Multer.File[];
 
   if (!files || files.length === 0) {
@@ -366,7 +366,7 @@ export const downloadByToken = async (req: any, res: Response) => {
 // ─────────────────────────────────────────────────────────────
 export const deleteFile = async (req: any, res: Response) => {
   const { clientId, fileId } = req.params;
-  const userId = req.auth?.userId || 'SYSTEM';
+  const userId = req.auth()?.userId || 'SYSTEM';
   try {
     const result = await pool.query(
       `DELETE FROM client_files WHERE id = $1 AND client_id = $2 RETURNING stored_name, original_name, attachment_type`,
@@ -454,7 +454,7 @@ export const updateFileMetadata = async (req: any, res: Response) => {
 export const createBlankDocument = async (req: any, res: Response) => {
   const { clientId } = req.params;
   const { document_name, attachment_type } = req.body;
-  const userId = req.auth?.userId || 'SYSTEM';
+  const userId = req.auth()?.userId || 'SYSTEM';
 
   try {
     // Preparar buffer del .docx en blanco

@@ -3,11 +3,11 @@ import pool from '../config/database';
 import { logActivityForReq } from './activityController';
 
 function reqUserName(req: any): string {
-  const c = req.auth?.sessionClaims;
-  if (!c) return req.auth?.userId || 'Sistema';
+  const c = req.auth()?.sessionClaims;
+  if (!c) return req.auth()?.userId || 'Sistema';
   return c.name || c.full_name
     || [c.first_name, c.last_name].filter(Boolean).join(' ')
-    || c.email || req.auth?.userId || 'Sistema';
+    || c.email || req.auth()?.userId || 'Sistema';
 }
 
 function clampImportStatus(status: any): string {
@@ -193,7 +193,7 @@ export const createImportBatch = async (req: any, res: Response) => {
       : Math.max(totalCount - completedCount - errorCount, 0);
     const notes = typeof req.body?.notes === 'string' ? req.body.notes.trim() || null : null;
     const items = Array.isArray(req.body?.items) ? req.body.items : [];
-    const userId = req.auth?.userId || 'SYSTEM';
+    const userId = req.auth()?.userId || 'SYSTEM';
     const userName = reqUserName(req);
 
     await client.query('BEGIN');

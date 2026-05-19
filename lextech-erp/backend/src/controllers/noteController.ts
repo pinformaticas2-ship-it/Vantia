@@ -73,7 +73,7 @@ export const createNote = async (req: AuthenticatedRequest, res: Response) => {
       });
     }
 
-    const userId = req.auth?.userId || 'SYSTEM';
+    const userId = req.auth()?.userId || 'SYSTEM';
     const userName = userId === 'SYSTEM' ? 'Sistema' : await resolveUserName(userId);
 
     const result = await pool.query(

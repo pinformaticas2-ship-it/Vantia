@@ -14,7 +14,7 @@ export const auditLog = (action: string, entity: string) => {
   return async (req: any, _res: Response, next: NextFunction) => {
     next();
 
-    const userId = req.auth?.userId || 'ANONYMOUS';
+    const userId = req.auth()?.userId || 'ANONYMOUS';
     const ip = getClientIp(req);
     const details = JSON.stringify({
       body: req.body,

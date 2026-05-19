@@ -21,7 +21,7 @@ interface HistoryMessage {
 export const getChatHistory = async (req: Request, res: Response) => {
   const { moduleId } = req.query;
   // @ts-ignore
-  const userId = req.auth?.userId;
+  const userId = req.auth()?.userId;
 
   if (!moduleId || !userId) {
     return res.status(400).json({ success: false, error: 'Faltan parámetros.' });
@@ -62,7 +62,7 @@ export const chatVantia = async (req: any, res: Response) => {
     moduleId: string;
   } = req.body;
 
-  const userId = req.auth?.userId;
+  const userId = req.auth()?.userId;
 
   if (!message?.trim()) {
     return res.status(400).json({ success: false, error: 'El mensaje no puede estar vacío.' });
