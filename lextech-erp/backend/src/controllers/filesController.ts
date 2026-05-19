@@ -326,14 +326,8 @@ const isOfficeOpenable = (fileName?: string | null, mimeType?: string | null) =>
 export const createTempToken = async (req: any, res: Response) => {
   const { clientId, fileId } = req.params;
   try {
-    const check = await pool.query(
-      `SELECT id, client_id FROM client_files WHERE id = $1 LIMIT 1`,
-      [fileId]
-    );
-    if (check.rows.length === 0) return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
-    const realClientId = check.rows[0].client_id || clientId;
     const token = crypto.randomUUID();
-    _tempTokens.set(token, { clientId: realClientId, fileId, exp: Date.now() + 30 * 60 * 1000 });
+    _tempTokens.set(token, { clientId, fileId, exp: Date.now() + 30 * 60 * 1000 });
     res.json({ success: true, token });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
@@ -349,12 +343,13 @@ export const downloadByToken = async (req: any, res: Response) => {
   _tempTokens.delete(token);
   try {
     const result = await pool.query(
-      `SELECT stored_name, original_name, mimetype FROM client_files WHERE id = $1 AND client_id = $2`,
-      [data.fileId, data.clientId]
+      `SELECT stored_name, original_name, mimetype, client_id FROM client_files WHERE id = $1 LIMIT 1`,
+      [data.fileId]
     );
     if (result.rows.length === 0) return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
-    const { stored_name, original_name, mimetype } = result.rows[0];
-    const filePath = path.join(UPLOADS_ROOT, data.clientId, stored_name);
+    const { stored_name, original_name, mimetype, client_id } = result.rows[0];
+    const realClientId = client_id || data.clientId;
+    const filePath = path.join(UPLOADS_ROOT, realClientId, stored_name);
     if (!fs.existsSync(filePath)) return res.status(404).json({ success: false, error: 'Archivo no encontrado en disco.' });
     res.setHeader('Content-Type', mimetype);
     const asciiName = original_name.replace(/[^\x20-\x7E]/g, '_').replace(/"/g, '\\"');
