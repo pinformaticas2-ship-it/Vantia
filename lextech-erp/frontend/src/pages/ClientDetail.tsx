@@ -1957,6 +1957,13 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
       if (res.ok) {
         const fileList: any[] = data.data || [];
         setFiles(fileList);
+        for (const f of fileList) {
+          if (f.open_token) {
+            const resolved = resolveApiUrl(`/api/files/dl/${f.open_token}`);
+            const abs = /^https?:\/\//i.test(resolved) ? resolved : `${window.location.origin}${resolved}`;
+            openUrlCache.current.set(f.id, abs);
+          }
+        }
         const officeExts = new Set(['doc','docx','odt','rtf','dot','dotx','xls','xlsx','xlsm','xlsb','ods','csv','ppt','pptx','odp']);
         for (const f of fileList) {
           if (f.mimetype?.startsWith('image/')) loadThumb(f.id);
@@ -2118,7 +2125,7 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
         window.location.href = `${scheme}${tempUrl}`;
         return;
       }
-      // No pre-fetched URL — fall through to blob download as fallback.
+      return;
     }
 
     try {
@@ -3997,3 +4004,5 @@ export default function ClientDetail() {
     </div>
   );
 }
+
+

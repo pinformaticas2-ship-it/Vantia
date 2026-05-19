@@ -170,6 +170,11 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
         const officeExts = new Set(['doc','docx','odt','rtf','dot','dotx','xls','xlsx','xlsm','xlsb','ods','csv','ppt','pptx','odp']);
         for (const f of fileList) {
           if (f.mimetype?.startsWith('image/')) loadThumb(f.id);
+          if (f.open_token) {
+            const resolved = resolveApiUrl(`/api/files/dl/${f.open_token}`);
+            const abs = /^https?:\/\//i.test(resolved) ? resolved : `${window.location.origin}${resolved}`;
+            openUrlCache.current.set(f.id, abs);
+          }
           // Pre-fetch temp token for Office files so the click is always synchronous
           const ext = (f.original_name || '').split('.').pop()?.toLowerCase() ?? '';
           if (officeExts.has(ext) && !openUrlCache.current.has(f.id)) {
@@ -330,8 +335,7 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
         window.location.href = `${scheme}${tempUrl}`;
         return;
       }
-      // No pre-fetched URL — user clicked before hover/load pre-fetch completed.
-      // Fall through to blob download as fallback.
+      return;
     }
 
     // PDF / images: blob URL without a.download → browser opens inline (PDF viewer, image viewer)
@@ -1402,3 +1406,5 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
     </div>
   );
 }
+
+

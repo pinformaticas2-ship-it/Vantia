@@ -26,6 +26,20 @@ const _taskCleanupTimer = setInterval(() => {
 }, 60_000);
 if (typeof (_taskCleanupTimer as any).unref === 'function') (_taskCleanupTimer as any).unref();
 
+const isOfficeOpenable = (fileName?: string | null, mimeType?: string | null) => {
+  const ext = path.extname(fileName || '').toLowerCase();
+  const mime = String(mimeType || '').toLowerCase();
+  return [
+    '.doc', '.docx', '.odt', '.rtf', '.dot', '.dotx',
+    '.xls', '.xlsx', '.xlsm', '.xlsb', '.ods', '.csv',
+    '.ppt', '.pptx', '.odp',
+  ].includes(ext)
+    || mime.includes('word')
+    || mime.includes('excel')
+    || mime.includes('spreadsheet')
+    || mime.includes('presentation');
+};
+
 const getTaskFileRecord = async (taskId: string, fileId: string) => {
   const result = await pool.query(
     `SELECT stored_name, original_name, mimetype
@@ -238,8 +252,14 @@ export const listTaskFiles = async (req: any, res: Response) => {
        ORDER BY created_at DESC`,
       [id]
     );
+    const rows = result.rows.map((row: any) => {
+      if (!isOfficeOpenable(row.original_name, row.mimetype)) return row;
+      const token = crypto.randomUUID();
+      _taskTempTokens.set(token, { taskId: id, fileId: row.id, exp: Date.now() + 30 * 60 * 1000 });
+      return { ...row, open_token: token };
+    });
     ensureTaskFilesDir(id);
-    res.json({ success: true, data: result.rows });
+    res.json({ success: true, data: rows });
   } catch (e: any) {
     res.status(500).json({ success: false, error: explainTaskError(e) });
   }

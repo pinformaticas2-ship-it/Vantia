@@ -1522,6 +1522,12 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
       if (res.ok) {
         const fileList = data.data || [];
         setFiles(fileList);
+        fileList.forEach((file: any) => {
+          if (!file?.open_token) return;
+          const resolved = resolveApiUrl(`/api/tasks/files/dl/${file.open_token}`);
+          const absoluteUrl = /^https?:\/\//i.test(resolved) ? resolved : `${window.location.origin}${resolved}`;
+          openUrlCache.current.set(file.id, absoluteUrl);
+        });
 
         const officeExts = new Set(['doc','docx','odt','rtf','dot','dotx','xls','xlsx','xlsm','xlsb','ods','csv','ppt','pptx','odp']);
         void Promise.allSettled(fileList.map(async (file: any) => {
@@ -1615,6 +1621,7 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
         return;
       }
     }
+    if (isOffice) return;
 
     const token = await getToken({ skipCache: true });
     const res = await fetch(`/api/tasks/${taskId}/files/${file.id}/download`, {
@@ -3979,3 +3986,5 @@ export default function ExpedienteDetail() {
     </div>
   );
 }
+
+

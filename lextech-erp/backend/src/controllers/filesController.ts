@@ -214,9 +214,15 @@ export const listFiles = async (req: any, res: Response) => {
        FROM client_files WHERE client_id = $1 ORDER BY created_at DESC`,
       [clientId]
     );
+    const rows = result.rows.map((row: any) => {
+      if (!isOfficeOpenable(row.original_name, row.mimetype)) return row;
+      const token = crypto.randomUUID();
+      _tempTokens.set(token, { clientId, fileId: row.id, exp: Date.now() + 30 * 60 * 1000 });
+      return { ...row, open_token: token };
+    });
     // Asegurar que las carpetas del cliente existen (silencioso, en background)
     initClientFolders(clientId).catch(() => {});
-    res.json({ success: true, data: result.rows });
+    res.json({ success: true, data: rows });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -302,6 +308,20 @@ const _cleanupTimer = setInterval(() => {
   for (const [t, d] of _tempTokens) if (d.exp < now) _tempTokens.delete(t);
 }, 60_000);
 if (typeof (_cleanupTimer as any).unref === 'function') (_cleanupTimer as any).unref();
+
+const isOfficeOpenable = (fileName?: string | null, mimeType?: string | null) => {
+  const ext = path.extname(fileName || '').toLowerCase();
+  const mime = String(mimeType || '').toLowerCase();
+  return [
+    '.doc', '.docx', '.odt', '.rtf', '.dot', '.dotx',
+    '.xls', '.xlsx', '.xlsm', '.xlsb', '.ods', '.csv',
+    '.ppt', '.pptx', '.odp',
+  ].includes(ext)
+    || mime.includes('word')
+    || mime.includes('excel')
+    || mime.includes('spreadsheet')
+    || mime.includes('presentation');
+};
 
 export const createTempToken = async (req: any, res: Response) => {
   const { clientId, fileId } = req.params;
