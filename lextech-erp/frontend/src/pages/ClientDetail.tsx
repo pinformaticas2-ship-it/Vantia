@@ -2198,7 +2198,7 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
       return;
     }
 
-    if (isExcel) {
+    if (isExcelFile(f.mimetype || '', f.original_name || '')) {
       const html = await res.text();
       const blob = new Blob([html], { type: 'text/html' });
       const url = URL.createObjectURL(blob);
@@ -2563,13 +2563,11 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
                     const canPreview = isPreviewable(f.mimetype);
                     const canWord    = isWordFile(f.mimetype, f.original_name);
                     const canExcel   = isExcelFile(f.mimetype, f.original_name);
-                    const handleNameClick = canPreview
-                      ? () => openPreview(f)
-                      : canWord
+                    const handleNameClick = canWord || canExcel
+                      ? () => openWithApp(f)
+                      : canPreview
                         ? () => openPreview(f)
-                        : canExcel
-                          ? () => openPreview(f)
-                          : undefined;
+                        : undefined;
                     return (
                       <tr key={f.id} className="hover:bg-slate-50/60 transition-colors group">
                         <td className="px-4 py-3">
@@ -2581,11 +2579,12 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
                                   src={thumbs[f.id]}
                                   alt=""
                                   className="h-10 w-10 rounded-lg object-cover shrink-0 border border-slate-100 shadow-sm cursor-pointer hover:scale-105 transition-transform"
-                                  onClick={() => openPreview(f)}
+                                  onClick={handleNameClick}
                                 />
                               ) : (
                                 <span
                                   className={`h-10 w-10 rounded-lg flex items-center justify-center text-lg shrink-0 ${fi.color} ${f.mimetype?.startsWith('image/') ? 'animate-pulse' : ''} cursor-pointer hover:scale-105 transition-transform`}
+                                  onMouseEnter={() => prefetchOpenUrl(f.id, f.original_name)}
                                   onClick={() => { if (f.mimetype?.startsWith('image/')) loadThumb(f.id); else if (canPreview || canWord || canExcel) handleNameClick?.(); }}
                                 >
                                   {fi.icon}

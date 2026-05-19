@@ -41,7 +41,7 @@ import {
   BadgeEuro,
   ChevronRight,
 } from "lucide-react";
-import { safeJson } from "../lib/api";
+import { safeJson, resolveApiUrl } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
 import {
   TIPOS,
@@ -1499,6 +1499,7 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
   const loadingThumbIds = useRef<Set<string>>(new Set());
   const previewCache = useRef<Map<string, { url: string; name: string; mime: string; fileId: string }>>(new Map());
+  const openUrlCache = useRef<Map<string, string>>(new Map());
   const pendingUploadFile = useRef<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
@@ -1518,7 +1519,25 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
       const token = await getToken({ skipCache: true });
       const res = await fetch(`/api/tasks/${taskId}/files`, { headers: { Authorization: `Bearer ${token}` } });
       const data = await safeJson(res);
-      if (res.ok) setFiles(data.data || []);
+      if (res.ok) {
+        const fileList = data.data || [];
+        setFiles(fileList);
+
+        const officeExts = new Set(['doc','docx','odt','rtf','dot','dotx','xls','xlsx','xlsm','xlsb','ods','csv','ppt','pptx','odp']);
+        void Promise.allSettled(fileList.map(async (file: any) => {
+          const ext = (file.original_name || '').split('.').pop()?.toLowerCase() ?? '';
+          if (!officeExts.has(ext) || openUrlCache.current.has(file.id)) return;
+          const tkRes = await fetch(`/api/tasks/${taskId}/files/${file.id}/temp-token`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!tkRes.ok) return;
+          const { token: tempToken } = await tkRes.json();
+          const resolved = resolveApiUrl(`/api/tasks/files/dl/${tempToken}`);
+          const absoluteUrl = /^https?:\/\//i.test(resolved) ? resolved : `${window.location.origin}${resolved}`;
+          openUrlCache.current.set(file.id, absoluteUrl);
+        }));
+      }
       else setError(data?.error || "No se pudieron cargar los adjuntos.");
     } finally { setLoading(false); }
   }, [getToken, taskId]);
@@ -1555,6 +1574,77 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
       setThumbs((prev) => ({ ...prev, [fileId]: url }));
     } catch (_) { loadingThumbIds.current.delete(fileId); }
   }, [getToken, taskId]);
+
+  const prefetchOpenUrl = useCallback(async (fileId: string, fileName: string) => {
+    const ext = (fileName || '').split('.').pop()?.toLowerCase() ?? '';
+    const officeExts = new Set(['doc','docx','odt','rtf','dot','dotx','xls','xlsx','xlsm','xlsb','ods','csv','ppt','pptx','odp']);
+    if (!officeExts.has(ext) || openUrlCache.current.has(fileId)) return;
+    try {
+      const token = await getToken({ skipCache: true });
+      const tkRes = await fetch(`/api/tasks/${taskId}/files/${fileId}/temp-token`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!tkRes.ok) return;
+      const { token: tempToken } = await tkRes.json();
+      const resolved = resolveApiUrl(`/api/tasks/files/dl/${tempToken}`);
+      const absoluteUrl = /^https?:\/\//i.test(resolved) ? resolved : `${window.location.origin}${resolved}`;
+      openUrlCache.current.set(fileId, absoluteUrl);
+    } catch (_) {}
+  }, [getToken, taskId]);
+
+  const openWithApp = useCallback(async (file: any) => {
+    const ext = (file.original_name || '').split('.').pop()?.toLowerCase() ?? '';
+    const wordExts = ['doc','docx','odt','rtf','dot','dotx'];
+    const excelExts = ['xls','xlsx','xlsm','xlsb','ods','csv'];
+    const pptExts = ['ppt','pptx','odp'];
+    const isOffice = wordExts.includes(ext) || excelExts.includes(ext) || pptExts.includes(ext);
+
+    if (isOffice) {
+      const tempUrl = openUrlCache.current.get(file.id);
+      openUrlCache.current.delete(file.id);
+      void prefetchOpenUrl(file.id, file.original_name);
+
+      if (tempUrl) {
+        const scheme = wordExts.includes(ext)
+          ? 'ms-word:ofe|u|'
+          : excelExts.includes(ext)
+            ? 'ms-excel:ofe|u|'
+            : 'ms-powerpoint:ofe|u|';
+        window.location.href = `${scheme}${tempUrl}`;
+        return;
+      }
+    }
+
+    const token = await getToken({ skipCache: true });
+    const res = await fetch(`/api/tasks/${taskId}/files/${file.id}/download`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const mimeMap: Record<string, string> = {
+      pdf: 'application/pdf',
+      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      doc: 'application/msword',
+      xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      xls: 'application/vnd.ms-excel',
+      pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      ppt: 'application/vnd.ms-powerpoint',
+      odt: 'application/vnd.oasis.opendocument.text',
+      ods: 'application/vnd.oasis.opendocument.spreadsheet',
+    };
+    const mime = mimeMap[ext] || blob.type || 'application/octet-stream';
+    const blobUrl = URL.createObjectURL(new Blob([blob], { type: mime }));
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    if (mime !== 'application/pdf' && !mime.startsWith('image/') && !mime.startsWith('text/')) {
+      a.download = file.original_name || 'archivo';
+    }
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 10_000);
+  }, [getToken, prefetchOpenUrl, taskId]);
 
   const openPreview = useCallback(async (file: any) => {
     const cached = previewCache.current.get(file.id);
@@ -1595,6 +1685,14 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
       setPreview(entry);
     } catch (_) {}
   }, [getToken, taskId]);
+
+  const handlePrimaryOpen = useCallback((file: any) => {
+    if (isWordAct(file.mimetype || "", file.original_name || "") || isExcelAct(file.mimetype || "", file.original_name || "")) {
+      void openWithApp(file);
+      return;
+    }
+    void openPreview(file);
+  }, [openPreview, openWithApp]);
 
   const openMetadataForUpload = (file: File) => {
     pendingUploadFile.current = file;
@@ -1813,11 +1911,11 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
                       <td className="px-4 py-2.5">
                         <div className="flex items-center gap-2">
                           {file.mimetype?.startsWith("image/") && thumbs[file.id] ? (
-                            <img src={thumbs[file.id]} alt="" className="h-8 w-8 rounded object-cover shrink-0 cursor-pointer hover:scale-105 transition-transform" onClick={() => openPreview(file)} />
+                            <img src={thumbs[file.id]} alt="" className="h-8 w-8 rounded object-cover shrink-0 cursor-pointer hover:scale-105 transition-transform" onClick={() => handlePrimaryOpen(file)} />
                           ) : (
                             <span
                               className={`h-8 w-8 rounded flex items-center justify-center text-sm shrink-0 ${fi.color} cursor-pointer`}
-                              onClick={() => { if (file.mimetype?.startsWith("image/")) loadThumb(file.id); else if (canPrev || canWord || canExcel) openPreview(file); }}
+                              onClick={() => { if (file.mimetype?.startsWith("image/")) loadThumb(file.id); else if (canPrev || canWord || canExcel) handlePrimaryOpen(file); }}
                             >
                               {fi.icon}
                             </span>
@@ -1825,7 +1923,8 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
                           <div className="min-w-0">
                             <button
                               type="button"
-                              onClick={() => { if (canPrev || canWord || canExcel) openPreview(file); }}
+                              onMouseEnter={() => prefetchOpenUrl(file.id, file.original_name)}
+                              onClick={() => { if (canPrev || canWord || canExcel) handlePrimaryOpen(file); }}
                               className={`text-xs font-medium text-slate-700 text-left truncate block max-w-[140px] ${(canPrev || canWord || canExcel) ? "hover:text-red-600 cursor-pointer" : "cursor-default"}`}
                               title={file.original_name}
                             >
@@ -1850,7 +1949,7 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
                       <td className="px-4 py-2.5">
                         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                           {(canPrev || canWord || canExcel) && (
-                            <button type="button" onClick={() => openPreview(file)} title="Vista previa"
+                              <button type="button" onClick={() => openPreview(file)} title="Vista previa"
                               className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
                               <Eye size={13} />
                             </button>
@@ -1974,16 +2073,17 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
                             {file.mimetype?.startsWith("image/") && thumbs[file.id] ? (
-                              <img src={thumbs[file.id]} alt="" className="h-10 w-10 rounded-lg object-cover shrink-0 cursor-pointer hover:scale-105 transition-transform" onClick={() => openPreview(file)} />
+                              <img src={thumbs[file.id]} alt="" className="h-10 w-10 rounded-lg object-cover shrink-0 cursor-pointer hover:scale-105 transition-transform" onClick={() => handlePrimaryOpen(file)} />
                             ) : (
-                              <button type="button" className={`h-10 w-10 rounded-xl flex items-center justify-center text-sm shrink-0 ${fi.color}`} onClick={() => { if (file.mimetype?.startsWith("image/")) loadThumb(file.id); else if (canPrev || canWord || canExcel) openPreview(file); }}>
+                              <button type="button" className={`h-10 w-10 rounded-xl flex items-center justify-center text-sm shrink-0 ${fi.color}`} onClick={() => { if (file.mimetype?.startsWith("image/")) loadThumb(file.id); else if (canPrev || canWord || canExcel) handlePrimaryOpen(file); }}>
                                 {fi.icon}
                               </button>
                             )}
                             <div className="min-w-0">
                               <button
                                 type="button"
-                                onClick={() => { if (canPrev || canWord || canExcel) openPreview(file); }}
+                                onMouseEnter={() => prefetchOpenUrl(file.id, file.original_name)}
+                                onClick={() => { if (canPrev || canWord || canExcel) handlePrimaryOpen(file); }}
                                 className={`text-sm font-semibold text-slate-800 text-left truncate block max-w-[260px] ${(canPrev || canWord || canExcel) ? "hover:text-red-600" : ""}`}
                                 title={file.original_name}
                               >

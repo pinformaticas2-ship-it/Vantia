@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import pool from '../config/database';
 import { TEMP_ROOT, UPLOADS_CLIENTS_ROOT as CLIENT_UPLOADS_ROOT } from '../config/paths';
 import { logActivityForReq, resolveUserName } from './activityController';
@@ -15,6 +16,15 @@ const ensureTaskFilesDir = (taskId: string) => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   return dir;
 };
+
+const _taskTempTokens = new Map<string, { taskId: string; fileId: string; exp: number }>();
+const _taskCleanupTimer = setInterval(() => {
+  const now = Date.now();
+  for (const [token, data] of _taskTempTokens) {
+    if (data.exp < now) _taskTempTokens.delete(token);
+  }
+}, 60_000);
+if (typeof (_taskCleanupTimer as any).unref === 'function') (_taskCleanupTimer as any).unref();
 
 const getTaskFileRecord = async (taskId: string, fileId: string) => {
   const result = await pool.query(
@@ -312,6 +322,53 @@ export const downloadTaskFile = async (req: any, res: Response) => {
       'Content-Disposition',
       `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(original_name)}`
     );
+    res.sendFile(filePath);
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: explainTaskError(e) });
+  }
+};
+
+export const createTaskFileTempToken = async (req: any, res: Response) => {
+  const { id, fileId } = req.params;
+  try {
+    const fileRow = await getTaskFileRecord(id, fileId);
+    if (!fileRow) {
+      return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
+    }
+    const token = crypto.randomUUID();
+    _taskTempTokens.set(token, { taskId: id, fileId, exp: Date.now() + 30 * 60 * 1000 });
+    res.json({ success: true, token });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: explainTaskError(e) });
+  }
+};
+
+export const downloadTaskFileByToken = async (req: any, res: Response) => {
+  const { token } = req.params;
+  const data = _taskTempTokens.get(token);
+  if (!data || data.exp < Date.now()) {
+    return res.status(401).json({ success: false, error: 'Token inválido o expirado.' });
+  }
+  _taskTempTokens.delete(token);
+  try {
+    const fileRow = await getTaskFileRecord(data.taskId, data.fileId);
+    if (!fileRow) {
+      return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
+    }
+
+    const { stored_name, original_name, mimetype } = fileRow;
+    const filePath = path.join(TASK_FILES_ROOT, data.taskId, stored_name);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, error: 'Archivo no encontrado en disco.' });
+    }
+
+    res.setHeader('Content-Type', mimetype || 'application/octet-stream');
+    const asciiName = original_name.replace(/[^\x20-\x7E]/g, '_').replace(/"/g, '\\"');
+    res.setHeader(
+      'Content-Disposition',
+      `inline; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(original_name)}`
+    );
+    res.setHeader('Access-Control-Allow-Origin', '*');
     res.sendFile(filePath);
   } catch (e: any) {
     res.status(500).json({ success: false, error: explainTaskError(e) });

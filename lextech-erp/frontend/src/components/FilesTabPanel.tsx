@@ -778,9 +778,11 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
                     const canWord    = isWordFile(f.mimetype, f.original_name);
                     const canExcel   = isExcelFile(f.mimetype, f.original_name);
                     const canOpenPreview = alwaysShowPreview || canPreview || canWord || canExcel;
-                    const handleNameClick = canOpenPreview
-                      ? () => openPreview(f)
-                      : undefined;
+                    const handleNameClick = canWord || canExcel
+                      ? () => openWithApp(f)
+                      : canOpenPreview
+                        ? () => openPreview(f)
+                        : undefined;
                     return (
                       <tr key={f.id} className="hover:bg-slate-50/60 transition-colors group">
                         <td className="px-4 py-3">
@@ -792,11 +794,12 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
                                   src={thumbs[f.id]}
                                   alt=""
                                   className="h-10 w-10 rounded-lg object-cover shrink-0 border border-slate-100 shadow-sm cursor-pointer hover:scale-105 transition-transform"
-                                  onClick={() => openPreview(f)}
+                                  onClick={handleNameClick}
                                 />
                               ) : (
                                 <span
                                   className={`h-10 w-10 rounded-lg flex items-center justify-center text-lg shrink-0 ${fi.color} ${f.mimetype?.startsWith('image/') ? 'animate-pulse' : ''} cursor-pointer hover:scale-105 transition-transform`}
+                                  onMouseEnter={() => prefetchOpenUrl(f.id, f.original_name)}
                                   onClick={() => { if (f.mimetype?.startsWith('image/')) loadThumb(f.id); else if (canOpenPreview) handleNameClick?.(); }}
                                 >
                                   {fi.icon}

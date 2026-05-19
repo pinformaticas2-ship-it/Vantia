@@ -18,6 +18,8 @@ import {
   uploadTaskFiles,
   updateTaskFileMetadata,
   downloadTaskFile,
+  createTaskFileTempToken,
+  downloadTaskFileByToken,
   deleteTaskFile,
   previewTaskWordAsPdf,
   previewTaskWordAsHtml,
@@ -46,6 +48,8 @@ const uploadTaskFilesMiddleware = multer({
   limits: { fileSize: 50 * 1024 * 1024 },
 });
 
+router.get('/files/dl/:token', downloadTaskFileByToken);
+
 // ── Etapas (antes de rutas con :id) ──────────────────────────────
 router.get('/etapas',               requireAuth, getEtapas);
 router.post('/etapas',              requireAuth, createEtapa);
@@ -61,6 +65,7 @@ router.get('/:id/files/:fileId/preview-pdf', requireAuth, previewTaskWordAsPdf);
 router.get('/:id/files/:fileId/preview-html', requireAuth, previewTaskWordAsHtml);
 router.get('/:id/files/:fileId/preview-excel', requireAuth, previewTaskExcelAsHtml);
 router.get('/:id/files/:fileId/download', requireAuth, downloadTaskFile);
+router.post('/:id/files/:fileId/temp-token', requireAuth, createTaskFileTempToken);
 router.delete('/:id/files/:fileId', requireAuth, deleteTaskFile);
 router.put('/:id',                  requireAuth, updateTask);
 router.patch('/:id/estado',         requireAuth, patchTaskEstado);
