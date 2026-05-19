@@ -184,7 +184,7 @@ export const getEventById = async (req: any, res: Response) => {
 };
 
 export const createEvent = async (req: any, res: Response) => {
-  const userId = req.auth()?.userId || 'SYSTEM';
+  const userId = req.auth?.userId || 'SYSTEM';
   const {
     title, description, start_at, end_at, all_day,
     type, status, expediente_id, cliente_id, related_user_id, related_user_name, organization_context, location, color,
@@ -443,7 +443,7 @@ export const deleteEvent = async (req: any, res: Response) => {
 };
 
 export const importGoogleEvents = async (req: any, res: Response) => {
-  const userId = req.auth()?.userId || 'SYSTEM';
+  const userId = req.auth?.userId || 'SYSTEM';
   const rawEvents = Array.isArray(req.body?.events) ? req.body.events : [];
 
   if (!rawEvents.length) {
@@ -538,7 +538,7 @@ export const importGoogleEvents = async (req: any, res: Response) => {
 };
 
 export const syncGoogleEvents = async (req: any, res: Response) => {
-  const userId = req.auth()?.userId || 'SYSTEM';
+  const userId = req.auth?.userId || 'SYSTEM';
   const rawEvents = Array.isArray(req.body?.events) ? req.body.events : [];
   const from = req.body?.from as string | undefined;
   const to = req.body?.to as string | undefined;

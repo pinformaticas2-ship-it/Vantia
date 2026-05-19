@@ -132,7 +132,7 @@ export const getTasks = async (req: any, res: Response) => {
 
 // ── GET /api/tasks/me ── tareas del usuario autenticado ────────
 export const getMyTasks = async (req: any, res: Response) => {
-  const userId = req.auth()?.userId;
+  const userId = req.auth?.userId;
   if (!userId) return res.status(401).json({ error: 'No autenticado' });
   try {
     const result = await pool.query(
@@ -160,7 +160,7 @@ export const createTask = async (req: any, res: Response) => {
 
   if (!titulo?.trim()) return res.status(400).json({ error: 'El título es obligatorio' });
 
-  const userId   = req.auth()?.userId || 'SYSTEM';
+  const userId   = req.auth?.userId || 'SYSTEM';
   const userName = await resolveUserName(userId);
 
   try {
@@ -267,7 +267,7 @@ export const listTaskFiles = async (req: any, res: Response) => {
 
 export const uploadTaskFiles = async (req: any, res: Response) => {
   const { id } = req.params;
-  const userId = req.auth()?.userId || 'SYSTEM';
+  const userId = req.auth?.userId || 'SYSTEM';
   const files: Express.Multer.File[] = req.files as Express.Multer.File[];
 
   if (!files?.length) {
@@ -805,7 +805,7 @@ export const updateTask = async (req: any, res: Response) => {
     const existingQ = await pool.query(`SELECT * FROM client_tasks WHERE id = $1`, [id]);
     if (existingQ.rows.length === 0) return res.status(404).json({ error: 'Tarea no encontrada' });
     const existingTask = existingQ.rows[0];
-    const userId = req.auth()?.userId || existingTask.user_id || 'SYSTEM';
+    const userId = req.auth?.userId || existingTask.user_id || 'SYSTEM';
     const userName = existingTask.created_by || await resolveUserName(userId);
 
     const result = await pool.query(

@@ -18,14 +18,14 @@ const nullIfEmpty = (v: any) => {
 
 /** Extrae el nombre legible del usuario desde las sessionClaims de Clerk */
 function reqUserName(req: any): string {
-  const c = req.auth()?.sessionClaims;
-  if (!c) return req.auth()?.userId || 'Sistema';
+  const c = req.auth?.sessionClaims;
+  if (!c) return req.auth?.userId || 'Sistema';
   return c.name
     || c.full_name
     || [c.first_name, c.last_name].filter(Boolean).join(' ')
     || c.email
     || c.username
-    || req.auth()?.userId
+    || req.auth?.userId
     || 'Sistema';
 }
 
@@ -170,7 +170,7 @@ export const createEntity = async (req: any, res: Response) => {
     photo_url,
   } = req.body;
 
-  const userId = req.auth()?.userId || 'SYSTEM';
+  const userId = req.auth?.userId || 'SYSTEM';
 
   if (!first_name || !nif_cif) {
     return res.status(400).json({

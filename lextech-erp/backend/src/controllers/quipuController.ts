@@ -161,7 +161,7 @@ async function persistQuipuBootstrap(userId: string, settingId: string, bootstra
 }
 
 export const getQuipuStatus = async (req: any, res: Response) => {
-  const userId = req.auth()?.userId;
+  const userId = req.auth?.userId;
   if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
 
   try {
@@ -189,7 +189,7 @@ export const getQuipuStatus = async (req: any, res: Response) => {
 };
 
 export const saveQuipuCredentials = async (req: any, res: Response) => {
-  const userId = req.auth()?.userId;
+  const userId = req.auth?.userId;
   if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
 
   const appId = sanitizeText(req.body?.appId);
@@ -238,7 +238,7 @@ export const saveQuipuCredentials = async (req: any, res: Response) => {
 };
 
 export const disconnectQuipu = async (req: any, res: Response) => {
-  const userId = req.auth()?.userId;
+  const userId = req.auth?.userId;
   if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
 
   try {
@@ -251,7 +251,7 @@ export const disconnectQuipu = async (req: any, res: Response) => {
 };
 
 export const syncQuipuBootstrap = async (req: any, res: Response) => {
-  const userId = req.auth()?.userId;
+  const userId = req.auth?.userId;
   if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
 
   try {

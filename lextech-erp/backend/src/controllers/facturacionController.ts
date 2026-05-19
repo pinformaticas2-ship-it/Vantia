@@ -36,7 +36,7 @@ const mapQuipuStatusToErp = (status: string): string => {
 };
 
 export const getBillingBootstrap = async (req: any, res: Response) => {
-  const userId = req.auth()?.userId;
+  const userId = req.auth?.userId;
   if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
 
   try {
@@ -165,7 +165,7 @@ export const getBillingBootstrap = async (req: any, res: Response) => {
 };
 
 export const createFactura = async (req: any, res: Response) => {
-  const userId = req.auth()?.userId;
+  const userId = req.auth?.userId;
   if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
   const userName = await resolveUserName(userId);
   const {
@@ -212,7 +212,7 @@ export const createFactura = async (req: any, res: Response) => {
 };
 
 export const updateFactura = async (req: any, res: Response) => {
-  const userId = req.auth()?.userId;
+  const userId = req.auth?.userId;
   const { id } = req.params;
   if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
   const {
@@ -266,7 +266,7 @@ export const updateFactura = async (req: any, res: Response) => {
 };
 
 export const deleteFactura = async (req: any, res: Response) => {
-  const userId = req.auth()?.userId;
+  const userId = req.auth?.userId;
   const { id } = req.params;
   if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
 
@@ -281,7 +281,7 @@ export const deleteFactura = async (req: any, res: Response) => {
 };
 
 export const createGasto = async (req: any, res: Response) => {
-  const userId = req.auth()?.userId;
+  const userId = req.auth?.userId;
   if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
   const userName = await resolveUserName(userId);
   const { num, proveedor, fecha, total, cat, estado, area, responsable, deducible } = req.body;
@@ -318,7 +318,7 @@ export const createGasto = async (req: any, res: Response) => {
 };
 
 export const updateGasto = async (req: any, res: Response) => {
-  const userId = req.auth()?.userId;
+  const userId = req.auth?.userId;
   const { id } = req.params;
   if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
   const { num, proveedor, fecha, total, cat, estado, area, responsable, deducible } = req.body;
@@ -349,7 +349,7 @@ export const updateGasto = async (req: any, res: Response) => {
 };
 
 export const deleteGasto = async (req: any, res: Response) => {
-  const userId = req.auth()?.userId;
+  const userId = req.auth?.userId;
   const { id } = req.params;
   if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
 
@@ -364,7 +364,7 @@ export const deleteGasto = async (req: any, res: Response) => {
 };
 
 export const createPresupuesto = async (req: any, res: Response) => {
-  const userId = req.auth()?.userId;
+  const userId = req.auth?.userId;
   if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
   const userName = await resolveUserName(userId);
   const { num, contacto, fecha, total, estado, area, responsable, iguala, clientId, expedienteId } = req.body;
@@ -392,7 +392,7 @@ export const createPresupuesto = async (req: any, res: Response) => {
 };
 
 export const updatePresupuesto = async (req: any, res: Response) => {
-  const userId = req.auth()?.userId;
+  const userId = req.auth?.userId;
   const { id } = req.params;
   if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
   const { num, contacto, fecha, total, estado, area, responsable, iguala, clientId, expedienteId } = req.body;
@@ -424,7 +424,7 @@ export const updatePresupuesto = async (req: any, res: Response) => {
 };
 
 export const deletePresupuesto = async (req: any, res: Response) => {
-  const userId = req.auth()?.userId;
+  const userId = req.auth?.userId;
   const { id } = req.params;
   if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
 
