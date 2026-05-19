@@ -61,6 +61,7 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
   const loadingThumbIds = useRef<Set<string>>(new Set());
   const previewBlobUrl  = useRef<string | null>(null);
   const tplPreviewBlobUrl = useRef<string | null>(null);
+  const tplPreviewAbort  = useRef<AbortController | null>(null);
   // Cache de vistas previas: evita re-fetch del mismo archivo
   const previewCache = useRef<Map<string, { url: string; name: string; mime: string; appType?: 'word' | 'excel' }>>(new Map());
   const fileInputRef   = useRef<HTMLInputElement>(null);
@@ -404,6 +405,10 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
 
   // ── Cargar preview de una plantilla en el panel derecho ───────
   const loadTplPreview = async (file: { path: string; name: string; ext: string }) => {
+    if (tplPreviewAbort.current) tplPreviewAbort.current.abort();
+    const abort = new AbortController();
+    tplPreviewAbort.current = abort;
+
     setSelectedTpl(file);
     setTplPreviewHtml(null);
     if (tplPreviewBlobUrl.current) {
@@ -415,15 +420,18 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
     setTplPreviewLoading(true);
     try {
       const token = await getToken({ skipCache: true });
+      if (abort.signal.aborted) return;
       const isWordTemplate = file.ext === '.doc' || file.ext === '.docx';
 
       if (isWordTemplate) {
         const pdfRes = await fetch(`/api/files/templates/preview-pdf?path=${encodeURIComponent(file.path)}`, {
           headers: { Authorization: `Bearer ${token}` },
+          signal: abort.signal,
         });
         const contentType = pdfRes.headers.get('content-type') || '';
         if (pdfRes.ok && contentType.includes('application/pdf')) {
           const blob = await pdfRes.blob();
+          if (abort.signal.aborted) return;
           const url = URL.createObjectURL(blob);
           tplPreviewBlobUrl.current = url;
           setTplPreviewUrl(url);
@@ -434,15 +442,18 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
 
       const res = await fetch(`/api/files/templates/preview?path=${encodeURIComponent(file.path)}`, {
         headers: { Authorization: `Bearer ${token}` },
+        signal: abort.signal,
       });
       const html = await res.text();
+      if (abort.signal.aborted) return;
       setTplPreviewHtml(html);
       setTplPreviewMime('text/html');
     } catch (e: any) {
+      if (e.name === 'AbortError') return;
       setTplPreviewHtml(`<html><body style="padding:20px;font-family:sans-serif;color:#dc2626"><p>Error al cargar vista previa</p><p style="font-size:11px;color:#999">${e.message}</p></body></html>`);
       setTplPreviewMime('text/html');
     } finally {
-      setTplPreviewLoading(false);
+      if (!abort.signal.aborted) setTplPreviewLoading(false);
     }
   };
 
@@ -838,21 +849,13 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
                 </p>
               </div>
               <div className="flex items-center gap-1 shrink-0">
-                {/* Abrir en Word / Excel (para previsualización HTML) */}
-                {preview.fileId && preview.appType === 'word' && (
+                {/* Abrir en app nativa */}
+                {preview.fileId && (
                   <button
-                    onClick={() => openInWord({ id: preview.fileId!, original_name: preview.name })}
-                    className="flex items-center gap-1 text-[11px] font-semibold text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 px-2 py-1 rounded-lg transition-colors border border-neutral-200"
+                    onClick={() => openWithApp({ id: preview.fileId!, original_name: preview.name })}
+                    className="flex items-center gap-1.5 text-[11px] font-semibold text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 px-2 py-1 rounded-lg transition-colors border border-neutral-200"
                   >
-                    Abrir en Word
-                  </button>
-                )}
-                {preview.mime === "text/html" && preview.fileId && preview.appType === 'excel' && (
-                  <button
-                    onClick={() => openInWord({ id: preview.fileId!, original_name: preview.name })}
-                    className="flex items-center gap-1 text-[11px] font-semibold text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 px-2 py-1 rounded-lg transition-colors border border-neutral-200"
-                  >
-                    Abrir en Excel
+                    <ExternalLink size={11} /> Abrir
                   </button>
                 )}
                 {/* Abrir en pestaña nueva */}
@@ -1129,12 +1132,14 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
                           </div>
                         ) : tplPreviewMime === 'application/pdf' && tplPreviewUrl ? (
                           <iframe
+                            key={tplPreviewUrl}
                             src={`${tplPreviewUrl}#toolbar=1&navpanes=1&scrollbar=1&view=FitH`}
                             className="w-full h-full border-0"
                             title="Vista previa de plantilla"
                           />
                         ) : tplPreviewHtml ? (
                           <iframe
+                            key={selectedTpl?.path}
                             srcDoc={tplPreviewHtml}
                             className="w-full h-full border-0"
                             title="Vista previa de plantilla"
