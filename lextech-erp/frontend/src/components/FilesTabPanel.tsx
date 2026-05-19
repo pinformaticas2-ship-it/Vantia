@@ -29,7 +29,11 @@ function fmtSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 function isPreviewable(mime: string) { return mime === "application/pdf" || mime.startsWith("image/") || mime.startsWith("text/"); }
-function isWordFile(mime: string, name: string) { const n = name.toLowerCase(); return mime.includes("wordprocessingml") || n.endsWith(".docx"); }
+function isWordFile(mime: string, name: string) {
+  const n = name.toLowerCase();
+  return mime.includes("wordprocessingml") || mime.includes("msword") || mime.includes("opendocument.text") ||
+    ['.docx','.doc','.odt','.rtf','.dot','.dotx'].some(e => n.endsWith(e));
+}
 function isExcelFile(mime: string, name: string) { const n = name.toLowerCase(); return mime.includes("excel") || mime.includes("spreadsheetml") || mime.includes("spreadsheet") || n.endsWith(".xlsx") || n.endsWith(".xls") || n.endsWith(".xlsm") || n.endsWith(".csv"); }
 const PLANTILLAS: any[] = [];
 
@@ -263,59 +267,76 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
     window.dispatchEvent(new CustomEvent('historial-changed'));
   };
 
-  // Abre el archivo en la aplicación nativa del SO sin pasar por descarga del navegador.
-  // Para Word/Excel/PPT usa protocol handlers (ms-word:, ms-excel:, ms-powerpoint:).
-  // Para PDF e imágenes abre la URL temporal en nueva pestaña.
   const openWithApp = useCallback(async (f: any) => {
     const ext = (f.original_name || '').split('.').pop()?.toLowerCase() ?? '';
+    const wordExts  = ['doc','docx','odt','rtf','dot','dotx'];
+    const excelExts = ['xls','xlsx','xlsm','xlsb','ods','csv'];
+    const pptExts   = ['ppt','pptx','odp'];
+    const isOffice  = wordExts.includes(ext) || excelExts.includes(ext) || pptExts.includes(ext);
+
+    // Para Office: intentar protocol handler (ms-word:, ms-excel:, ms-powerpoint:)
+    // Solo funciona en producción donde la URL es absoluta (Railway HTTPS)
+    if (isOffice) {
+      try {
+        const authToken = await getToken({ skipCache: true });
+        const tkRes = await fetch(`/api/files/${entityId}/${f.id}/temp-token`, {
+          method: 'POST', headers: { Authorization: `Bearer ${authToken}` },
+        });
+        if (tkRes.ok) {
+          const { token } = await tkRes.json();
+          const tempUrl = resolveApiUrl(`/api/files/dl/${token}`);
+          if (/^https?:\/\//i.test(tempUrl)) {
+            const scheme = wordExts.includes(ext) ? 'ms-word:ofe|u|'
+              : excelExts.includes(ext) ? 'ms-excel:ofe|u|'
+              : 'ms-powerpoint:ofe|u|';
+            const a = document.createElement('a');
+            a.href = `${scheme}${tempUrl}`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            return;
+          }
+        }
+      } catch (_ignore) {}
+    }
+
+    // Para PDF/imágenes: blob URL sin a.download → el navegador los muestra inline
+    // Para Office en dev (URL relativa) o si falla el token: blob con nombre correcto
     try {
       const authToken = await getToken({ skipCache: true });
-      const tokenRes = await fetch(`/api/files/${entityId}/${f.id}/temp-token`, {
-        method: 'POST',
+      const res = await fetch(`/api/files/${entityId}/${f.id}/download`, {
         headers: { Authorization: `Bearer ${authToken}` },
       });
-      if (!tokenRes.ok) throw new Error('no-token');
-      const { token } = await tokenRes.json();
-      const tempUrl = resolveApiUrl(`/api/files/dl/${token}`);
-      const isAbsolute = /^https?:\/\//i.test(tempUrl);
-
-      const triggerProtocol = (scheme: string) => {
-        const a = document.createElement('a');
-        a.href = `${scheme}${tempUrl}`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const mimeMap: Record<string, string> = {
+        pdf: 'application/pdf',
+        docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        doc: 'application/msword',
+        xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        xls: 'application/vnd.ms-excel',
+        pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        ppt: 'application/vnd.ms-powerpoint',
+        odt: 'application/vnd.oasis.opendocument.text',
+        ods: 'application/vnd.oasis.opendocument.spreadsheet',
       };
-
-      if (isAbsolute && ['doc','docx','odt','rtf','dot','dotx'].includes(ext)) {
-        triggerProtocol('ms-word:ofe|u|');
-      } else if (isAbsolute && ['xls','xlsx','xlsm','xlsb','ods','csv'].includes(ext)) {
-        triggerProtocol('ms-excel:ofe|u|');
-      } else if (isAbsolute && ['ppt','pptx','odp'].includes(ext)) {
-        triggerProtocol('ms-powerpoint:ofe|u|');
-      } else {
-        window.open(tempUrl, '_blank');
+      const mime = mimeMap[ext] || blob.type || 'application/octet-stream';
+      const blobUrl = URL.createObjectURL(new Blob([blob], { type: mime }));
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      // Sin a.download → el navegador decide (PDF/imágenes inline, resto pregunta dónde guardar)
+      // Con a.download para Office → al menos conserva el nombre original
+      if (mime !== 'application/pdf' && !mime.startsWith('image/') && !mime.startsWith('text/')) {
+        a.download = f.original_name || 'archivo';
       }
-    } catch (_e) {
-      // Fallback: blob URL (dev o si falla el token)
-      try {
-        const token = await getToken({ skipCache: true });
-        const res = await fetch(`/api/files/${entityId}/${f.id}/download`, { headers: { Authorization: `Bearer ${token}` } });
-        if (!res.ok) return;
-        const blob = await res.blob();
-        const url = URL.createObjectURL(new Blob([blob], { type: blob.type || 'application/octet-stream' }));
-        const a = document.createElement('a');
-        a.href = url;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(url), 10_000);
-      } catch (_e2) {}
-    }
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 10_000);
+    } catch (_e) {}
   }, [entityId, getToken]);
 
-  const openInWord    = openWithApp;
-  const openInBrowser = openWithApp;
+  const openInWord = openWithApp;
 
   // ── Vista previa ─────────────────────────────────────────────
   const openPreview = async (f: any) => {
@@ -802,35 +823,14 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
                             >
                               <Edit3 size={14} />
                             </button>
-                            {/* Abrir — adaptado al tipo de archivo */}
-                            {f.mimetype === 'application/pdf' && (
-                              <button title="Abrir en navegador"
-                                className="p-1.5 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-                                onClick={() => openInBrowser(f)}>
-                                <ExternalLink size={14} />
-                              </button>
-                            )}
-                            {canWord && (
-                              <button title="Abrir en Word"
-                                className="p-1.5 text-slate-400 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
-                                onClick={() => openInWord(f)}>
-                                <ExternalLink size={14} />
-                              </button>
-                            )}
-                            {canExcel && (
-                              <button title="Abrir en Excel"
-                                className="p-1.5 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors"
-                                onClick={() => openInWord(f)}>
-                                <ExternalLink size={14} />
-                              </button>
-                            )}
-                            {!f.mimetype?.includes('pdf') && !canWord && !canExcel && (
-                              <button title="Descargar"
-                                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                                onClick={() => downloadWithAuth(f.id, f.original_name)}>
-                                <Download size={14} />
-                              </button>
-                            )}
+                            {/* Abrir en app nativa / navegador */}
+                            <button
+                              title={canWord ? "Abrir en Word" : canExcel ? "Abrir en Excel" : f.mimetype === 'application/pdf' ? "Abrir PDF" : "Abrir"}
+                              className="p-1.5 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                              onClick={() => openWithApp(f)}
+                            >
+                              <ExternalLink size={14} />
+                            </button>
                             <button onClick={() => handleDelete(f.id)} title="Eliminar"
                               className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
                               <Trash2 size={14} />
