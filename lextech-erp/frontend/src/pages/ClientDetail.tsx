@@ -1958,38 +1958,17 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
         const fileList: any[] = data.data || [];
         setFiles(fileList);
         for (const f of fileList) {
+          if (f.mimetype?.startsWith('image/')) loadThumb(f.id);
           if (f.open_token) {
             const resolved = resolveApiUrl(`/api/files/dl/${f.open_token}`);
             const abs = /^https?:\/\//i.test(resolved) ? resolved : `${window.location.origin}${resolved}`;
             openUrlCache.current.set(f.id, abs);
           }
         }
-        const officeExts = new Set(['doc','docx','odt','rtf','dot','dotx','xls','xlsx','xlsm','xlsb','ods','csv','ppt','pptx','odp']);
-        for (const f of fileList) {
-          if (f.mimetype?.startsWith('image/')) loadThumb(f.id);
-          // Pre-fetch temp token for Office files so the click is always synchronous
-          const ext = (f.original_name || '').split('.').pop()?.toLowerCase() ?? '';
-          if (officeExts.has(ext) && !openUrlCache.current.has(f.id)) {
-            void (async () => {
-              try {
-                const authToken = await getToken({ skipCache: true });
-                const tkRes = await fetch(`/api/files/${clientId}/${f.id}/temp-token`, {
-                  method: 'POST', headers: { Authorization: `Bearer ${authToken}` },
-                });
-                if (tkRes.ok) {
-                  const { token: tk } = await tkRes.json();
-                  const resolved = resolveApiUrl(`/api/files/dl/${tk}`);
-                  const abs = /^https?:\/\//i.test(resolved) ? resolved : `${window.location.origin}${resolved}`;
-                  openUrlCache.current.set(f.id, abs);
-                }
-              } catch (_e) {}
-            })();
-          }
-        }
       }
     } catch (_e) {}
     finally { if (!silent) setLoadingFiles(false); }
-  }, [clientId, loadThumb, getToken]);
+  }, [clientId, loadThumb]);
 
   useEffect(() => { loadFiles(); }, [loadFiles]);
 
