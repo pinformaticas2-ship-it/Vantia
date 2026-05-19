@@ -66,6 +66,8 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
   const previewBlobUrl  = useRef<string | null>(null);
   const tplPreviewBlobUrl = useRef<string | null>(null);
   const tplPreviewAbort  = useRef<AbortController | null>(null);
+  // Cache de URLs temporales para abrir en Word/Excel (pre-fetched on hover)
+  const openUrlCache     = useRef<Map<string, string>>(new Map());
   // Cache de vistas previas: evita re-fetch del mismo archivo
   const previewCache = useRef<Map<string, { url: string; name: string; mime: string; appType?: 'word' | 'excel' }>>(new Map());
   const fileInputRef   = useRef<HTMLInputElement>(null);
@@ -267,6 +269,25 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
     window.dispatchEvent(new CustomEvent('historial-changed'));
   };
 
+  // Pre-fetches a temp URL for Office files on hover so the click handler is synchronous.
+  // Chrome blocks protocol handlers (ms-word:) opened after async await — hover pre-fetch avoids this.
+  const prefetchOpenUrl = useCallback(async (fileId: string, fileName: string) => {
+    const ext = (fileName || '').split('.').pop()?.toLowerCase() ?? '';
+    const officeExts = new Set(['doc','docx','odt','rtf','dot','dotx','xls','xlsx','xlsm','xlsb','ods','csv','ppt','pptx','odp']);
+    if (!officeExts.has(ext) || openUrlCache.current.has(fileId)) return;
+    try {
+      const authToken = await getToken({ skipCache: true });
+      const tkRes = await fetch(`/api/files/${entityId}/${fileId}/temp-token`, {
+        method: 'POST', headers: { Authorization: `Bearer ${authToken}` },
+      });
+      if (tkRes.ok) {
+        const { token } = await tkRes.json();
+        const tempUrl = resolveApiUrl(`/api/files/dl/${token}`);
+        if (/^https?:\/\//i.test(tempUrl)) openUrlCache.current.set(fileId, tempUrl);
+      }
+    } catch (_e) {}
+  }, [entityId, getToken]);
+
   const openWithApp = useCallback(async (f: any) => {
     const ext = (f.original_name || '').split('.').pop()?.toLowerCase() ?? '';
     const wordExts  = ['doc','docx','odt','rtf','dot','dotx'];
@@ -274,34 +295,38 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
     const pptExts   = ['ppt','pptx','odp'];
     const isOffice  = wordExts.includes(ext) || excelExts.includes(ext) || pptExts.includes(ext);
 
-    // Para Office: intentar protocol handler (ms-word:, ms-excel:, ms-powerpoint:)
-    // Solo funciona en producción donde la URL es absoluta (Railway HTTPS)
     if (isOffice) {
-      try {
-        const authToken = await getToken({ skipCache: true });
-        const tkRes = await fetch(`/api/files/${entityId}/${f.id}/temp-token`, {
-          method: 'POST', headers: { Authorization: `Bearer ${authToken}` },
-        });
-        if (tkRes.ok) {
-          const { token } = await tkRes.json();
-          const tempUrl = resolveApiUrl(`/api/files/dl/${token}`);
-          if (/^https?:\/\//i.test(tempUrl)) {
-            const scheme = wordExts.includes(ext) ? 'ms-word:ofe|u|'
-              : excelExts.includes(ext) ? 'ms-excel:ofe|u|'
-              : 'ms-powerpoint:ofe|u|';
-            const a = document.createElement('a');
-            a.href = `${scheme}${tempUrl}`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            return;
+      // Use pre-fetched URL if available (synchronous — preserves user gesture for Chrome protocol handler)
+      let tempUrl = openUrlCache.current.get(f.id);
+      openUrlCache.current.delete(f.id);
+
+      if (!tempUrl) {
+        // User clicked without hovering first — fetch now (async, but window.location.href still works)
+        try {
+          const authToken = await getToken({ skipCache: true });
+          const tkRes = await fetch(`/api/files/${entityId}/${f.id}/temp-token`, {
+            method: 'POST', headers: { Authorization: `Bearer ${authToken}` },
+          });
+          if (tkRes.ok) {
+            const { token } = await tkRes.json();
+            const resolved = resolveApiUrl(`/api/files/dl/${token}`);
+            if (/^https?:\/\//i.test(resolved)) tempUrl = resolved;
           }
-        }
-      } catch (_ignore) {}
+        } catch (_e) {}
+      }
+
+      if (tempUrl) {
+        const scheme = wordExts.includes(ext) ? 'ms-word:ofe|u|'
+          : excelExts.includes(ext) ? 'ms-excel:ofe|u|'
+          : 'ms-powerpoint:ofe|u|';
+        // window.location.href for custom protocols is NOT blocked by popup blocker (unlike window.open)
+        window.location.href = `${scheme}${tempUrl}`;
+        return;
+      }
     }
 
-    // Para PDF/imágenes: blob URL sin a.download → el navegador los muestra inline
-    // Para Office en dev (URL relativa) o si falla el token: blob con nombre correcto
+    // PDF / images: blob URL without a.download → browser opens inline (PDF viewer, image viewer)
+    // Office fallback (dev env or token failure): blob with correct filename
     try {
       const authToken = await getToken({ skipCache: true });
       const res = await fetch(`/api/files/${entityId}/${f.id}/download`, {
@@ -324,8 +349,6 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
       const blobUrl = URL.createObjectURL(new Blob([blob], { type: mime }));
       const a = document.createElement('a');
       a.href = blobUrl;
-      // Sin a.download → el navegador decide (PDF/imágenes inline, resto pregunta dónde guardar)
-      // Con a.download para Office → al menos conserva el nombre original
       if (mime !== 'application/pdf' && !mime.startsWith('image/') && !mime.startsWith('text/')) {
         a.download = f.original_name || 'archivo';
       }
@@ -827,6 +850,7 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
                             <button
                               title={canWord ? "Abrir en Word" : canExcel ? "Abrir en Excel" : f.mimetype === 'application/pdf' ? "Abrir PDF" : "Abrir"}
                               className="p-1.5 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                              onMouseEnter={() => prefetchOpenUrl(f.id, f.original_name)}
                               onClick={() => openWithApp(f)}
                             >
                               <ExternalLink size={14} />

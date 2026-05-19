@@ -1857,6 +1857,7 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
   const previewBlobUrl  = useRef<string | null>(null);
   const tplPreviewBlobUrl = useRef<string | null>(null);
   const tplPreviewAbort  = useRef<AbortController | null>(null);
+  const openUrlCache     = useRef<Map<string, string>>(new Map());
   // Cache de vistas previas: evita re-fetch del mismo archivo
   const previewCache = useRef<Map<string, { url: string; name: string; mime: string; appType?: 'word' | 'excel' }>>(new Map());
   const fileInputRef   = useRef<HTMLInputElement>(null);
@@ -2058,6 +2059,23 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
     window.dispatchEvent(new CustomEvent('historial-changed'));
   };
 
+  const prefetchOpenUrl = useCallback(async (fileId: string, fileName: string) => {
+    const ext = (fileName || '').split('.').pop()?.toLowerCase() ?? '';
+    const officeExts = new Set(['doc','docx','odt','rtf','dot','dotx','xls','xlsx','xlsm','xlsb','ods','csv','ppt','pptx','odp']);
+    if (!officeExts.has(ext) || openUrlCache.current.has(fileId)) return;
+    try {
+      const authToken = await getToken({ skipCache: true });
+      const tkRes = await fetch(`/api/files/${clientId}/${fileId}/temp-token`, {
+        method: 'POST', headers: { Authorization: `Bearer ${authToken}` },
+      });
+      if (tkRes.ok) {
+        const { token } = await tkRes.json();
+        const tempUrl = resolveApiUrl(`/api/files/dl/${token}`);
+        if (/^https?:\/\//i.test(tempUrl)) openUrlCache.current.set(fileId, tempUrl);
+      }
+    } catch (_e) {}
+  }, [clientId, getToken]);
+
   const openWithApp = useCallback(async (f: any) => {
     const ext = (f.original_name || '').split('.').pop()?.toLowerCase() ?? '';
     const wordExts  = ['doc','docx','odt','rtf','dot','dotx'];
@@ -2066,27 +2084,30 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
     const isOffice  = wordExts.includes(ext) || excelExts.includes(ext) || pptExts.includes(ext);
 
     if (isOffice) {
-      try {
-        const authToken = await getToken({ skipCache: true });
-        const tkRes = await fetch(`/api/files/${clientId}/${f.id}/temp-token`, {
-          method: 'POST', headers: { Authorization: `Bearer ${authToken}` },
-        });
-        if (tkRes.ok) {
-          const { token } = await tkRes.json();
-          const tempUrl = resolveApiUrl(`/api/files/dl/${token}`);
-          if (/^https?:\/\//i.test(tempUrl)) {
-            const scheme = wordExts.includes(ext) ? 'ms-word:ofe|u|'
-              : excelExts.includes(ext) ? 'ms-excel:ofe|u|'
-              : 'ms-powerpoint:ofe|u|';
-            const a = document.createElement('a');
-            a.href = `${scheme}${tempUrl}`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            return;
+      let tempUrl = openUrlCache.current.get(f.id);
+      openUrlCache.current.delete(f.id);
+
+      if (!tempUrl) {
+        try {
+          const authToken = await getToken({ skipCache: true });
+          const tkRes = await fetch(`/api/files/${clientId}/${f.id}/temp-token`, {
+            method: 'POST', headers: { Authorization: `Bearer ${authToken}` },
+          });
+          if (tkRes.ok) {
+            const { token } = await tkRes.json();
+            const resolved = resolveApiUrl(`/api/files/dl/${token}`);
+            if (/^https?:\/\//i.test(resolved)) tempUrl = resolved;
           }
-        }
-      } catch (_ignore) {}
+        } catch (_e) {}
+      }
+
+      if (tempUrl) {
+        const scheme = wordExts.includes(ext) ? 'ms-word:ofe|u|'
+          : excelExts.includes(ext) ? 'ms-excel:ofe|u|'
+          : 'ms-powerpoint:ofe|u|';
+        window.location.href = `${scheme}${tempUrl}`;
+        return;
+      }
     }
 
     try {
@@ -2616,6 +2637,7 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
                             <button
                               title={canWord ? "Abrir en Word" : canExcel ? "Abrir en Excel" : f.mimetype === 'application/pdf' ? "Abrir PDF" : "Abrir"}
                               className="p-1.5 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                              onMouseEnter={() => prefetchOpenUrl(f.id, f.original_name)}
                               onClick={() => openWithApp(f)}
                             >
                               <ExternalLink size={14} />

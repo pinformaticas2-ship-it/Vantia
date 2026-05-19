@@ -297,10 +297,11 @@ export const downloadFile = async (req: any, res: Response) => {
 // Lets native apps (Word, Excel, PDF Studio) fetch files directly
 // ─────────────────────────────────────────────────────────────
 const _tempTokens = new Map<string, { clientId: string; fileId: string; exp: number }>();
-setInterval(() => {
+const _cleanupTimer = setInterval(() => {
   const now = Date.now();
   for (const [t, d] of _tempTokens) if (d.exp < now) _tempTokens.delete(t);
-}, 60_000).unref();
+}, 60_000);
+if (typeof (_cleanupTimer as any).unref === 'function') (_cleanupTimer as any).unref();
 
 export const createTempToken = async (req: any, res: Response) => {
   const { clientId, fileId } = req.params;
