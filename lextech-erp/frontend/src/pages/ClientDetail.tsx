@@ -2190,8 +2190,6 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
       if (data.success && data.data) {
         setEditingFile(null);
         await loadFiles();
-        // Descargar con auth para que Word lo abra
-        await downloadWithAuth(data.data.id, data.data.original_name);
       }
     } catch (_e) {
       // Error al crear documento
@@ -2331,11 +2329,9 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
             });
           }
           await loadFiles();
-          // Descargar con auth (Word o cualquier otro tipo)
-          await downloadWithAuth(fileId, finalFileName);
         }
-        setShowTemplates(false); // Cerrar modal de plantillas
-        setEditingFile(null); // Cerrar modal de edición
+        setShowTemplates(false);
+        setEditingFile(null);
         setPendingTemplate(null);
       }
     } catch (_e) {
@@ -2371,20 +2367,27 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
     finally { setSavingMetadata(false); }
   };
 
-  // ── Generar documento desde plantilla ────────────────────────
-  const generateDoc = (plantilla: typeof PLANTILLAS[0]) => {
+  // ── Generar documento desde plantilla — guardar como adjunto ──
+  const generateDoc = async (plantilla: typeof PLANTILLAS[0]) => {
     setGenLoading(plantilla.id);
-    setTimeout(() => {
+    try {
       const html = plantilla.generate(client);
-      const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = `${plantilla.id}_${client.first_name}_${client.last_name || ""}_${new Date().toISOString().split("T")[0]}.html`;
-      a.click();
-      URL.revokeObjectURL(a.href);
-      setGenLoading(null);
+      const fileName = `${plantilla.id}_${client.first_name}_${client.last_name || ""}_${new Date().toISOString().split("T")[0]}.html`;
+      const file = new File([new Blob([html], { type: "text/html;charset=utf-8" })], fileName, { type: "text/html" });
+      const fd = new FormData();
+      fd.append("files", file);
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/files/${clientId}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+      if (res.ok) await loadFiles();
       setShowTemplates(false);
-    }, 300);
+    } catch (_e) {
+    } finally {
+      setGenLoading(null);
+    }
   };
 
   return (

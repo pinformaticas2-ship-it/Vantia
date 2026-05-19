@@ -567,20 +567,27 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
     finally { setSavingMetadata(false); }
   };
 
-  // ── Generar documento desde plantilla ────────────────────────
-  const generateDoc = (plantilla: typeof PLANTILLAS[0]) => {
+  // ── Generar documento desde plantilla — guardar como adjunto ──
+  const generateDoc = async (plantilla: typeof PLANTILLAS[0]) => {
     setGenLoading(plantilla.id);
-    setTimeout(() => {
+    try {
       const html = plantilla.generate(entity ?? {});
-      const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = `${plantilla.id}_${entity?.first_name ?? ""}_${entity?.last_name ?? ""}_${new Date().toISOString().split("T")[0]}.html`;
-      a.click();
-      URL.revokeObjectURL(a.href);
-      setGenLoading(null);
+      const fileName = `${plantilla.id}_${entity?.first_name ?? ""}_${entity?.last_name ?? ""}_${new Date().toISOString().split("T")[0]}.html`;
+      const file = new File([new Blob([html], { type: "text/html;charset=utf-8" })], fileName, { type: "text/html" });
+      const fd = new FormData();
+      fd.append("files", file);
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/files/${entityId}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      });
+      if (res.ok) await loadFiles();
       setShowTemplates(false);
-    }, 300);
+    } catch (_e) {
+    } finally {
+      setGenLoading(null);
+    }
   };
 
   return (
