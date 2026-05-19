@@ -312,7 +312,7 @@ export const createTempToken = async (req: any, res: Response) => {
     );
     if (check.rows.length === 0) return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
     const token = crypto.randomUUID();
-    _tempTokens.set(token, { clientId, fileId, exp: Date.now() + 5 * 60 * 1000 });
+    _tempTokens.set(token, { clientId, fileId, exp: Date.now() + 30 * 60 * 1000 });
     res.json({ success: true, token });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });

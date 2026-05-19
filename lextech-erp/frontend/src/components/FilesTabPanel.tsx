@@ -165,15 +165,34 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
       const res = await fetch(`/api/files/${entityId}`, { headers: { Authorization: `Bearer ${token}` } });
       const data = await safeJson(res);
       if (res.ok) {
-        setFiles(data.data || []);
-        // Pre-cargar thumbnails de imágenes
-        for (const f of (data.data || [])) {
+        const fileList: any[] = data.data || [];
+        setFiles(fileList);
+        const officeExts = new Set(['doc','docx','odt','rtf','dot','dotx','xls','xlsx','xlsm','xlsb','ods','csv','ppt','pptx','odp']);
+        for (const f of fileList) {
           if (f.mimetype?.startsWith('image/')) loadThumb(f.id);
+          // Pre-fetch temp token for Office files so the click is always synchronous
+          const ext = (f.original_name || '').split('.').pop()?.toLowerCase() ?? '';
+          if (officeExts.has(ext) && !openUrlCache.current.has(f.id)) {
+            void (async () => {
+              try {
+                const authToken = await getToken({ skipCache: true });
+                const tkRes = await fetch(`/api/files/${entityId}/${f.id}/temp-token`, {
+                  method: 'POST', headers: { Authorization: `Bearer ${authToken}` },
+                });
+                if (tkRes.ok) {
+                  const { token: tk } = await tkRes.json();
+                  const resolved = resolveApiUrl(`/api/files/dl/${tk}`);
+                  const abs = /^https?:\/\//i.test(resolved) ? resolved : `${window.location.origin}${resolved}`;
+                  openUrlCache.current.set(f.id, abs);
+                }
+              } catch (_e) {}
+            })();
+          }
         }
       }
     } catch (_e) {}
     finally { if (!silent) setLoadingFiles(false); }
-  }, [entityId, loadThumb]);
+  }, [entityId, loadThumb, getToken]);
 
   useEffect(() => { loadFiles(); }, [loadFiles]);
 
@@ -282,8 +301,9 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
       });
       if (tkRes.ok) {
         const { token } = await tkRes.json();
-        const tempUrl = resolveApiUrl(`/api/files/dl/${token}`);
-        if (/^https?:\/\//i.test(tempUrl)) openUrlCache.current.set(fileId, tempUrl);
+        const resolved = resolveApiUrl(`/api/files/dl/${token}`);
+        const absoluteUrl = /^https?:\/\//i.test(resolved) ? resolved : `${window.location.origin}${resolved}`;
+        openUrlCache.current.set(fileId, absoluteUrl);
       }
     } catch (_e) {}
   }, [entityId, getToken]);
@@ -296,33 +316,22 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
     const isOffice  = wordExts.includes(ext) || excelExts.includes(ext) || pptExts.includes(ext);
 
     if (isOffice) {
-      // Use pre-fetched URL if available (synchronous — preserves user gesture for Chrome protocol handler)
-      let tempUrl = openUrlCache.current.get(f.id);
+      // Synchronous path: use pre-fetched URL (preserves user gesture for Chrome protocol handler).
+      // Chrome silently drops ms-word:/ms-excel: navigation after any await, so this MUST be sync.
+      const tempUrl = openUrlCache.current.get(f.id);
       openUrlCache.current.delete(f.id);
-
-      if (!tempUrl) {
-        // User clicked without hovering first — fetch now (async, but window.location.href still works)
-        try {
-          const authToken = await getToken({ skipCache: true });
-          const tkRes = await fetch(`/api/files/${entityId}/${f.id}/temp-token`, {
-            method: 'POST', headers: { Authorization: `Bearer ${authToken}` },
-          });
-          if (tkRes.ok) {
-            const { token } = await tkRes.json();
-            const resolved = resolveApiUrl(`/api/files/dl/${token}`);
-            if (/^https?:\/\//i.test(resolved)) tempUrl = resolved;
-          }
-        } catch (_e) {}
-      }
+      // Immediately start fetching a fresh token for the next click (fire-and-forget)
+      void prefetchOpenUrl(f.id, f.original_name);
 
       if (tempUrl) {
         const scheme = wordExts.includes(ext) ? 'ms-word:ofe|u|'
           : excelExts.includes(ext) ? 'ms-excel:ofe|u|'
           : 'ms-powerpoint:ofe|u|';
-        // window.location.href for custom protocols is NOT blocked by popup blocker (unlike window.open)
         window.location.href = `${scheme}${tempUrl}`;
         return;
       }
+      // No pre-fetched URL — user clicked before hover/load pre-fetch completed.
+      // Fall through to blob download as fallback.
     }
 
     // PDF / images: blob URL without a.download → browser opens inline (PDF viewer, image viewer)
@@ -357,7 +366,7 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
       document.body.removeChild(a);
       setTimeout(() => URL.revokeObjectURL(blobUrl), 10_000);
     } catch (_e) {}
-  }, [entityId, getToken]);
+  }, [entityId, getToken, prefetchOpenUrl]);
 
   const openInWord = openWithApp;
 
@@ -404,7 +413,7 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
       return;
     }
 
-    if (isExcel) {
+    if (isExcelFile(f.mimetype, f.original_name)) {
       const html = await res.text();
       const blob = new Blob([html], { type: 'text/html' });
       const url = URL.createObjectURL(blob);

@@ -1955,15 +1955,34 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
       const res = await fetch(`/api/files/${clientId}`, { headers: { Authorization: `Bearer ${token}` } });
       const data = await safeJson(res);
       if (res.ok) {
-        setFiles(data.data || []);
-        // Pre-cargar thumbnails de imágenes
-        for (const f of (data.data || [])) {
+        const fileList: any[] = data.data || [];
+        setFiles(fileList);
+        const officeExts = new Set(['doc','docx','odt','rtf','dot','dotx','xls','xlsx','xlsm','xlsb','ods','csv','ppt','pptx','odp']);
+        for (const f of fileList) {
           if (f.mimetype?.startsWith('image/')) loadThumb(f.id);
+          // Pre-fetch temp token for Office files so the click is always synchronous
+          const ext = (f.original_name || '').split('.').pop()?.toLowerCase() ?? '';
+          if (officeExts.has(ext) && !openUrlCache.current.has(f.id)) {
+            void (async () => {
+              try {
+                const authToken = await getToken({ skipCache: true });
+                const tkRes = await fetch(`/api/files/${clientId}/${f.id}/temp-token`, {
+                  method: 'POST', headers: { Authorization: `Bearer ${authToken}` },
+                });
+                if (tkRes.ok) {
+                  const { token: tk } = await tkRes.json();
+                  const resolved = resolveApiUrl(`/api/files/dl/${tk}`);
+                  const abs = /^https?:\/\//i.test(resolved) ? resolved : `${window.location.origin}${resolved}`;
+                  openUrlCache.current.set(f.id, abs);
+                }
+              } catch (_e) {}
+            })();
+          }
         }
       }
     } catch (_e) {}
     finally { if (!silent) setLoadingFiles(false); }
-  }, [clientId, loadThumb]);
+  }, [clientId, loadThumb, getToken]);
 
   useEffect(() => { loadFiles(); }, [loadFiles]);
 
@@ -2070,8 +2089,9 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
       });
       if (tkRes.ok) {
         const { token } = await tkRes.json();
-        const tempUrl = resolveApiUrl(`/api/files/dl/${token}`);
-        if (/^https?:\/\//i.test(tempUrl)) openUrlCache.current.set(fileId, tempUrl);
+        const resolved = resolveApiUrl(`/api/files/dl/${token}`);
+        const absoluteUrl = /^https?:\/\//i.test(resolved) ? resolved : `${window.location.origin}${resolved}`;
+        openUrlCache.current.set(fileId, absoluteUrl);
       }
     } catch (_e) {}
   }, [clientId, getToken]);
@@ -2084,22 +2104,12 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
     const isOffice  = wordExts.includes(ext) || excelExts.includes(ext) || pptExts.includes(ext);
 
     if (isOffice) {
-      let tempUrl = openUrlCache.current.get(f.id);
+      // Synchronous path: use pre-fetched URL (preserves user gesture for Chrome protocol handler).
+      // Chrome silently drops ms-word:/ms-excel: navigation after any await, so this MUST be sync.
+      const tempUrl = openUrlCache.current.get(f.id);
       openUrlCache.current.delete(f.id);
-
-      if (!tempUrl) {
-        try {
-          const authToken = await getToken({ skipCache: true });
-          const tkRes = await fetch(`/api/files/${clientId}/${f.id}/temp-token`, {
-            method: 'POST', headers: { Authorization: `Bearer ${authToken}` },
-          });
-          if (tkRes.ok) {
-            const { token } = await tkRes.json();
-            const resolved = resolveApiUrl(`/api/files/dl/${token}`);
-            if (/^https?:\/\//i.test(resolved)) tempUrl = resolved;
-          }
-        } catch (_e) {}
-      }
+      // Immediately start fetching a fresh token for the next click (fire-and-forget)
+      void prefetchOpenUrl(f.id, f.original_name);
 
       if (tempUrl) {
         const scheme = wordExts.includes(ext) ? 'ms-word:ofe|u|'
@@ -2108,6 +2118,7 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
         window.location.href = `${scheme}${tempUrl}`;
         return;
       }
+      // No pre-fetched URL — fall through to blob download as fallback.
     }
 
     try {
