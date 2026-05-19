@@ -142,6 +142,22 @@ app.get('/api/health/storage', (_req, res) => {
   });
 });
 
+app.get('/api/health/version', (_req, res) => {
+  res.json({
+    status: 'ok',
+    commit:
+      process.env.RAILWAY_GIT_COMMIT_SHA ||
+      process.env.SOURCE_VERSION ||
+      process.env.VERCEL_GIT_COMMIT_SHA ||
+      'unknown',
+    branch:
+      process.env.RAILWAY_GIT_BRANCH ||
+      process.env.VERCEL_GIT_COMMIT_REF ||
+      'unknown',
+    deployedAt: new Date().toISOString(),
+  });
+});
+
 // Health check de base de datos — visita http://localhost:4000/api/health/db para diagnosticar
 app.get('/api/health/db', async (_req, res) => {
   try {
