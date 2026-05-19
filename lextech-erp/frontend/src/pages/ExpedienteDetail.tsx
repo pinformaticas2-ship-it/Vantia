@@ -1587,6 +1587,9 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
         window.location.href = `${scheme}${tempUrl}`;
         return;
       }
+      // Fallback: download so the user can open manually while backend token is unavailable
+      handleDownload(file.id, file.original_name);
+      return;
     }
     if (isOffice) return;
 

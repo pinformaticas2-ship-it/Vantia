@@ -296,6 +296,8 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
         window.location.href = `${scheme}${tempUrl}`;
         return;
       }
+      // Fallback: download so the user can open manually while backend token is unavailable
+      downloadWithAuth(f.id, f.original_name);
       return;
     }
 
@@ -331,7 +333,7 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
       document.body.removeChild(a);
       setTimeout(() => URL.revokeObjectURL(blobUrl), 10_000);
     } catch (_e) {}
-  }, [entityId, getToken, loadFiles]);
+  }, [entityId, getToken, loadFiles, downloadWithAuth]);
 
   const openInWord = openWithApp;
 

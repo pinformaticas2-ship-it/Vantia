@@ -2086,6 +2086,8 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
         window.location.href = `${scheme}${tempUrl}`;
         return;
       }
+      // Fallback: download so the user can open manually while backend token is unavailable
+      downloadWithAuth(f.id, f.original_name);
       return;
     }
 
@@ -2119,7 +2121,7 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
       document.body.removeChild(a);
       setTimeout(() => URL.revokeObjectURL(blobUrl), 10_000);
     } catch (_e) {}
-  }, [clientId, getToken, loadFiles]);
+  }, [clientId, getToken, loadFiles, downloadWithAuth]);
 
   const openInWord = openWithApp;
 
