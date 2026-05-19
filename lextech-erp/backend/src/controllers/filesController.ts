@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 import pool from '../config/database';
 import { logActivityForReq } from './activityController';
 import { CLIENT_FILES_ROOT as LOCAL_CLIENT_FILES_ROOT, TEMP_ROOT, UPLOADS_CLIENTS_ROOT as UPLOADS_ROOT } from '../config/paths';
@@ -285,6 +286,58 @@ export const downloadFile = async (req: any, res: Response) => {
       'Content-Disposition',
       `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(original_name)}`
     );
+    res.sendFile(filePath);
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+// Temporary one-time download tokens (no auth header required)
+// Lets native apps (Word, Excel, PDF Studio) fetch files directly
+// ─────────────────────────────────────────────────────────────
+const _tempTokens = new Map<string, { clientId: string; fileId: string; exp: number }>();
+setInterval(() => {
+  const now = Date.now();
+  for (const [t, d] of _tempTokens) if (d.exp < now) _tempTokens.delete(t);
+}, 60_000).unref();
+
+export const createTempToken = async (req: any, res: Response) => {
+  const { clientId, fileId } = req.params;
+  try {
+    const check = await pool.query(
+      `SELECT id FROM client_files WHERE id = $1 AND client_id = $2`,
+      [fileId, clientId]
+    );
+    if (check.rows.length === 0) return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
+    const token = crypto.randomUUID();
+    _tempTokens.set(token, { clientId, fileId, exp: Date.now() + 5 * 60 * 1000 });
+    res.json({ success: true, token });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+export const downloadByToken = async (req: any, res: Response) => {
+  const { token } = req.params;
+  const data = _tempTokens.get(token);
+  if (!data || data.exp < Date.now()) {
+    return res.status(401).json({ success: false, error: 'Token inválido o expirado.' });
+  }
+  _tempTokens.delete(token);
+  try {
+    const result = await pool.query(
+      `SELECT stored_name, original_name, mimetype FROM client_files WHERE id = $1 AND client_id = $2`,
+      [data.fileId, data.clientId]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
+    const { stored_name, original_name, mimetype } = result.rows[0];
+    const filePath = path.join(UPLOADS_ROOT, data.clientId, stored_name);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ success: false, error: 'Archivo no encontrado en disco.' });
+    res.setHeader('Content-Type', mimetype);
+    const asciiName = original_name.replace(/[^\x20-\x7E]/g, '_').replace(/"/g, '\\"');
+    res.setHeader('Content-Disposition', `inline; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(original_name)}`);
+    res.setHeader('Access-Control-Allow-Origin', '*');
     res.sendFile(filePath);
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });

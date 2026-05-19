@@ -14,7 +14,7 @@ import {
   FilePlus2, Search, ChevronDown, ChevronRight as ChevronR,
   Banknote, TrendingUp, TrendingDown, BadgeEuro,
 } from "lucide-react";
-import { safeJson } from "../lib/api";
+import { safeJson, resolveApiUrl } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
 import { EtapaSelect } from "../components/EtapaSelect";
 import BackButton from "../components/BackButton";
@@ -2062,39 +2062,55 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
     window.dispatchEvent(new CustomEvent('historial-changed'));
   };
 
-  // ── Abrir en Word: llama al backend que abre el archivo con el SO ──
-  // Abre el archivo en la aplicación nativa del SO (Word, PDF Studio, etc.)
-  // sin forzar descarga — el navegador/SO decide qué app usa según extensión y MIME
+  // Abre el archivo en la aplicación nativa del SO sin pasar por descarga del navegador.
+  // Para Word/Excel/PPT usa protocol handlers (ms-word:, ms-excel:, ms-powerpoint:).
+  // Para PDF e imágenes abre la URL temporal en nueva pestaña.
   const openWithApp = useCallback(async (f: any) => {
+    const ext = (f.original_name || '').split('.').pop()?.toLowerCase() ?? '';
     try {
-      const token = await getToken({ skipCache: true });
-      const res = await fetch(`/api/files/${clientId}/${f.id}/download`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const authToken = await getToken({ skipCache: true });
+      const tokenRes = await fetch(`/api/files/${clientId}/${f.id}/temp-token`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${authToken}` },
       });
-      if (!res.ok) return;
-      const blob = await res.blob();
-      const ext = (f.original_name || '').split('.').pop()?.toLowerCase() ?? '';
-      const mimeMap: Record<string, string> = {
-        pdf:  'application/pdf',
-        docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        doc:  'application/msword',
-        xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        xls:  'application/vnd.ms-excel',
-        pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-        ppt:  'application/vnd.ms-powerpoint',
-        odt:  'application/vnd.oasis.opendocument.text',
-        ods:  'application/vnd.oasis.opendocument.spreadsheet',
+      if (!tokenRes.ok) throw new Error('no-token');
+      const { token } = await tokenRes.json();
+      const tempUrl = resolveApiUrl(`/api/files/dl/${token}`);
+      const isAbsolute = /^https?:\/\//i.test(tempUrl);
+
+      const triggerProtocol = (scheme: string) => {
+        const a = document.createElement('a');
+        a.href = `${scheme}${tempUrl}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
       };
-      const mime = mimeMap[ext] || blob.type || 'application/octet-stream';
-      const url = URL.createObjectURL(new Blob([blob], { type: mime }));
-      const a = document.createElement('a');
-      a.href = url;
-      // Sin a.download: el SO abre con la app por defecto (Word, PDF Studio, etc.)
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 10_000);
-    } catch (_e) {}
+
+      if (isAbsolute && ['doc','docx','odt','rtf','dot','dotx'].includes(ext)) {
+        triggerProtocol('ms-word:ofe|u|');
+      } else if (isAbsolute && ['xls','xlsx','xlsm','xlsb','ods','csv'].includes(ext)) {
+        triggerProtocol('ms-excel:ofe|u|');
+      } else if (isAbsolute && ['ppt','pptx','odp'].includes(ext)) {
+        triggerProtocol('ms-powerpoint:ofe|u|');
+      } else {
+        window.open(tempUrl, '_blank');
+      }
+    } catch (_e) {
+      // Fallback: blob URL (dev o si falla el token)
+      try {
+        const token = await getToken({ skipCache: true });
+        const res = await fetch(`/api/files/${clientId}/${f.id}/download`, { headers: { Authorization: `Bearer ${token}` } });
+        if (!res.ok) return;
+        const blob = await res.blob();
+        const url = URL.createObjectURL(new Blob([blob], { type: blob.type || 'application/octet-stream' }));
+        const a = document.createElement('a');
+        a.href = url;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      } catch (_e2) {}
+    }
   }, [clientId, getToken]);
 
   const openInWord    = openWithApp;

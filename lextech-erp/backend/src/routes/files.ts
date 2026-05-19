@@ -5,7 +5,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 const uuidv4 = () => crypto.randomUUID();
 import { requireAuth } from '../middleware/auth';
-import { listFiles, uploadFiles, downloadFile, deleteFile, UPLOADS_ROOT, listTemplates, downloadTemplate, downloadBlank, createBlankDocument, updateFileMetadata, openFileLocally, previewDocxAsHtml, previewExcelAsHtml, previewTemplateAsHtml, testPreviewImages, previewWordAsPdf, previewTemplateAsPdf } from '../controllers/filesController';
+import { listFiles, uploadFiles, downloadFile, deleteFile, UPLOADS_ROOT, listTemplates, downloadTemplate, downloadBlank, createBlankDocument, updateFileMetadata, openFileLocally, previewDocxAsHtml, previewExcelAsHtml, previewTemplateAsHtml, testPreviewImages, previewWordAsPdf, previewTemplateAsPdf, createTempToken, downloadByToken } from '../controllers/filesController';
 const router = Router();
 
 // Multer: guarda en uploads/clients/:clientId/ con nombre único
@@ -27,6 +27,9 @@ const upload = multer({
   limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB max por archivo
 });
 
+// ── Token temporal de descarga (sin auth, para apps nativas) ────
+router.get('/dl/:token',              downloadByToken);
+
 // ── Rutas de plantillas (ANTES de las rutas dinámicas) ──────────
 router.get('/templates',              requireAuth, listTemplates);
 router.get('/templates/preview-pdf',  requireAuth, previewTemplateAsPdf);
@@ -45,6 +48,7 @@ router.get('/:clientId/:fileId/preview-pdf',        requireAuth, previewWordAsPd
 router.get('/:clientId/:fileId/preview-html',       requireAuth, previewDocxAsHtml);
 router.get('/:clientId/:fileId/preview-excel',      requireAuth, previewExcelAsHtml);
 router.get('/:clientId/:fileId/download',           requireAuth, downloadFile);
+router.post('/:clientId/:fileId/temp-token',        requireAuth, createTempToken);
 router.delete('/:clientId/:fileId',                 requireAuth, deleteFile);
 
 export default router;
