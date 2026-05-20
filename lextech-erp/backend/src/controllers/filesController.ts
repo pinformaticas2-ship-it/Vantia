@@ -340,7 +340,9 @@ export const downloadByToken = async (req: any, res: Response) => {
   if (!data || data.exp < Date.now()) {
     return res.status(401).json({ success: false, error: 'Token inválido o expirado.' });
   }
-  _tempTokens.delete(token);
+  // HEAD requests (Office probes URL before GET) — answer with headers but keep token alive
+  const isHead = req.method === 'HEAD';
+  if (!isHead) _tempTokens.delete(token);
   try {
     const result = await pool.query(
       `SELECT stored_name, original_name, mimetype, client_id FROM client_files WHERE id = $1 LIMIT 1`,
@@ -355,6 +357,7 @@ export const downloadByToken = async (req: any, res: Response) => {
     const asciiName = original_name.replace(/[^\x20-\x7E]/g, '_').replace(/"/g, '\\"');
     res.setHeader('Content-Disposition', `inline; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(original_name)}`);
     res.setHeader('Access-Control-Allow-Origin', '*');
+    if (isHead) return res.status(200).end();
     res.sendFile(filePath);
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });

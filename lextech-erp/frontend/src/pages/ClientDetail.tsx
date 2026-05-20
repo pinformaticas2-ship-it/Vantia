@@ -2083,7 +2083,11 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
         const scheme = wordExts.includes(ext) ? 'ms-word:ofe|u|'
           : excelExts.includes(ext) ? 'ms-excel:ofe|u|'
           : 'ms-powerpoint:ofe|u|';
-        window.location.href = `${scheme}${tempUrl}`;
+        const a = document.createElement('a');
+        a.href = `${scheme}${tempUrl}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
         return;
       }
       // Fallback: download so the user can open manually while backend token is unavailable
