@@ -7,3 +7,9 @@ aptPkgs = [
   "tesseract-ocr-spa",
   "tesseract-ocr-eng"
 ]
+
+[phases.build]
+cmds = ["npm run build"]
+
+[start]
+cmd = "node dist/server.js"
