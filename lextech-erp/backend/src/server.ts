@@ -123,7 +123,7 @@ app.use('/api/quipu',             quipuRoutes);
 
 // Health check básico
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', timestamp: new Date().toISOString(), build: 'b63960c' });
 });
 
 // Diagnóstico de rutas de almacenamiento
