@@ -129,15 +129,21 @@ app.get('/health', (_req, res) => {
 // Diagnóstico de rutas de almacenamiento
 app.get('/api/health/storage', (_req, res) => {
   const fs = require('fs');
+  const path = require('path');
   const { UPLOADS_ROOT, CLIENT_FILES_ROOT, DATA_ROOT } = require('./config/paths');
   const check = (p: string) => ({ path: p, exists: fs.existsSync(p) });
+  const docplantCwd  = path.join(process.cwd(), 'DocPlant');
+  const docplantDir  = path.resolve(__dirname, '../../DocPlant');
   res.json({
     cwd: process.cwd(),
+    __dirname,
     DATA_ROOT_env: process.env.DATA_ROOT || '(no configurado)',
     paths: {
       DATA_ROOT: check(DATA_ROOT),
       UPLOADS_ROOT: check(UPLOADS_ROOT),
       CLIENT_FILES_ROOT: check(CLIENT_FILES_ROOT),
+      DocPlant_via_cwd: check(docplantCwd),
+      DocPlant_via_dirname: check(docplantDir),
     }
   });
 });

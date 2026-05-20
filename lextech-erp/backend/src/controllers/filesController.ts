@@ -1653,10 +1653,12 @@ export { ensureClientDir, UPLOADS_ROOT };
 // PLANTILLAS — DocPlant
 // ─────────────────────────────────────────────────────────────
 
-// DocPlant está en la raíz del backend (junto a package.json)
+// DocPlant está en la raíz del backend (junto a package.json).
+// Usamos __dirname (dist/controllers/) → ../../DocPlant para ser
+// independientes del CWD que Railway pueda establecer.
 const DOCPLANT_ROOT = process.env.DOCPLANT_PATH
   ? path.resolve(process.env.DOCPLANT_PATH)
-  : path.join(process.cwd(), 'DocPlant');
+  : path.resolve(__dirname, '../../DocPlant');
 
 // Blank .docx completo — generado y verificado con Python/zipfile
 const BLANK_DOCX_B64 =
