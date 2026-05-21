@@ -4,7 +4,7 @@ import fs from 'fs';
 import crypto from 'crypto';
 import pool from '../config/database';
 import { logActivityForReq } from './activityController';
-import { CLIENT_FILES_ROOT as LOCAL_CLIENT_FILES_ROOT, TEMP_ROOT, UPLOADS_CLIENTS_ROOT as UPLOADS_ROOT } from '../config/paths';
+import { CLIENT_FILES_ROOT as LOCAL_CLIENT_FILES_ROOT, DATA_ROOT, TEMP_ROOT, UPLOADS_CLIENTS_ROOT as UPLOADS_ROOT } from '../config/paths';
 
 const LIBREOFFICE_ENABLED =
   String(process.env.ENABLE_LIBREOFFICE_PREVIEW || "true").trim().toLowerCase() !== "false";
@@ -1691,9 +1691,19 @@ export { ensureClientDir, UPLOADS_ROOT };
 // DocPlant está en la raíz del backend (junto a package.json).
 // Usamos __dirname (dist/controllers/) → ../../DocPlant para ser
 // independientes del CWD que Railway pueda establecer.
-const DOCPLANT_ROOT = process.env.DOCPLANT_PATH
-  ? path.resolve(process.env.DOCPLANT_PATH)
-  : path.resolve(__dirname, '../../DocPlant');
+function getDocPlantRoot() {
+  const candidates = [
+    process.env.DOCPLANT_PATH ? path.resolve(process.env.DOCPLANT_PATH) : null,
+    path.resolve(process.cwd(), 'DocPlant'),
+    path.resolve(process.cwd(), 'backend/DocPlant'),
+    path.resolve(__dirname, '../../DocPlant'),
+    path.resolve(__dirname, '../../../DocPlant'),
+    path.resolve(DATA_ROOT, 'DocPlant'),
+  ].filter(Boolean) as string[];
+
+  const existing = candidates.find((candidate) => fs.existsSync(candidate));
+  return { root: existing || candidates[0], candidates };
+}
 
 // Blank .docx completo — generado y verificado con Python/zipfile
 const BLANK_DOCX_B64 =
@@ -1779,8 +1789,9 @@ export const previewTemplateAsHtml = async (req: any, res: Response) => {
   const relPath = req.query.path as string | undefined;
   if (!relPath) return res.status(400).json({ success: false, error: 'Parámetro path requerido.' });
 
-  const resolved = path.resolve(DOCPLANT_ROOT, relPath);
-  const docplantRoot = path.resolve(DOCPLANT_ROOT);
+  const { root } = getDocPlantRoot();
+  const resolved = path.resolve(root, relPath);
+  const docplantRoot = path.resolve(root);
   if (!resolved.startsWith(docplantRoot + path.sep) && resolved !== docplantRoot) {
     return res.status(403).json({ success: false, error: 'Acceso denegado.' });
   }
@@ -2443,9 +2454,9 @@ export async function migrateLocalFoldersStructure(): Promise<void> {
 // GET /api/files/templates
 export const listTemplates = (_req: any, res: Response) => {
   try {
-    const root = DOCPLANT_ROOT;
+    const { root, candidates } = getDocPlantRoot();
     if (!fs.existsSync(root)) {
-      return res.json({ success: true, data: [], warning: `DocPlant no encontrado en: ${root}` });
+      return res.json({ success: true, data: [], warning: `DocPlant no encontrado en: ${root}. Candidatos: ${candidates.join(' | ')}` });
     }
     const allFiles = scanDocPlant(root, '');
     const map = new Map<string, TemplateFile[]>();
@@ -2469,8 +2480,9 @@ export const previewTemplateAsPdf = async (req: any, res: Response) => {
   const relPath = req.query.path as string | undefined;
   if (!relPath) return res.status(400).json({ success: false, error: 'Parámetro path requerido.' });
 
-  const resolved = path.resolve(DOCPLANT_ROOT, relPath);
-  const docplantRoot = path.resolve(DOCPLANT_ROOT);
+  const { root } = getDocPlantRoot();
+  const resolved = path.resolve(root, relPath);
+  const docplantRoot = path.resolve(root);
   if (!resolved.startsWith(docplantRoot + path.sep) && resolved !== docplantRoot) {
     return res.status(403).json({ success: false, error: 'Acceso denegado.' });
   }
@@ -2620,9 +2632,10 @@ sys.exit(1)
 export const downloadTemplate = (req: any, res: Response) => {
   const filePath = req.query.path as string | undefined;
   if (!filePath) return res.status(400).json({ success: false, error: 'Parámetro path requerido.' });
-  const resolved = path.resolve(DOCPLANT_ROOT, filePath);
-  const root = path.resolve(DOCPLANT_ROOT);
-  if (!resolved.startsWith(root + path.sep) && resolved !== root) {
+  const { root } = getDocPlantRoot();
+  const resolved = path.resolve(root, filePath);
+  const normalizedRoot = path.resolve(root);
+  if (!resolved.startsWith(normalizedRoot + path.sep) && resolved !== normalizedRoot) {
     return res.status(403).json({ success: false, error: 'Acceso denegado.' });
   }
   if (!fs.existsSync(resolved)) {
