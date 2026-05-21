@@ -165,6 +165,17 @@ app.get('/api/health/version', (_req, res) => {
 });
 
 // Health check de base de datos — visita http://localhost:4000/api/health/db para diagnosticar
+app.get('/api/files/setup/vantia-protocol.ps1', (_req, res) => {
+  const fs = require('fs');
+  const path = require('path');
+  const scriptPath = path.resolve(__dirname, '../resources/vantia-setup.ps1');
+  if (!fs.existsSync(scriptPath)) return res.status(404).send('Script no encontrado.');
+  res.setHeader('Content-Type', 'application/octet-stream');
+  res.setHeader('Content-Disposition', 'attachment; filename="vantia-setup.ps1"');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.sendFile(scriptPath);
+});
+
 app.get('/api/health/db', async (_req, res) => {
   try {
     const result = await pool.query(`

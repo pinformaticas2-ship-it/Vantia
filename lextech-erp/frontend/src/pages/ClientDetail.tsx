@@ -2080,8 +2080,12 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
       void loadFiles(true);
 
       if (tempUrl) {
-        // Server-side redirect preserves literal | in Location header (browser encoding bypass)
-        window.open(`${tempUrl}/launch`, '_blank', 'noopener,noreferrer');
+        const scheme = wordExts.includes(ext) ? 'ms-word'
+          : excelExts.includes(ext) ? 'ms-excel'
+          : 'ms-powerpoint';
+        const uri = `${scheme}:ofe|u|${tempUrl}`;
+        const b64 = btoa(uri).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        window.location.href = `vantia:${b64}`;
         return;
       }
       // Fallback: download so the user can open manually while backend token is unavailable
