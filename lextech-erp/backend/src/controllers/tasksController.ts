@@ -4,10 +4,12 @@ import path from 'path';
 import crypto from 'crypto';
 import pool from '../config/database';
 import { TEMP_ROOT, UPLOADS_CLIENTS_ROOT as CLIENT_UPLOADS_ROOT } from '../config/paths';
-import { logActivityForReq, resolveUserName } from './activityController';
+import { logActivity, logActivityForReq, resolveUserName } from './activityController';
 
 const LIBREOFFICE_ENABLED =
   String(process.env.ENABLE_LIBREOFFICE_PREVIEW || "true").trim().toLowerCase() !== "false";
+
+const OFFICE_TEMP_TOKEN_TTL_MS = 12 * 60 * 60 * 1000;
 
 export const TASK_FILES_ROOT = path.join(CLIENT_UPLOADS_ROOT, '..', 'task-files');
 
@@ -255,7 +257,7 @@ export const listTaskFiles = async (req: any, res: Response) => {
     const rows = result.rows.map((row: any) => {
       if (!isOfficeOpenable(row.original_name, row.mimetype)) return row;
       const token = crypto.randomUUID();
-      _taskTempTokens.set(token, { taskId: id, fileId: row.id, exp: Date.now() + 30 * 60 * 1000 });
+      _taskTempTokens.set(token, { taskId: id, fileId: row.id, exp: Date.now() + OFFICE_TEMP_TOKEN_TTL_MS });
       return { ...row, open_token: token };
     });
     ensureTaskFilesDir(id);
@@ -356,7 +358,7 @@ export const createTaskFileTempToken = async (req: any, res: Response) => {
       return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
     }
     const token = crypto.randomUUID();
-    _taskTempTokens.set(token, { taskId: id, fileId, exp: Date.now() + 30 * 60 * 1000 });
+    _taskTempTokens.set(token, { taskId: id, fileId, exp: Date.now() + OFFICE_TEMP_TOKEN_TTL_MS });
     res.json({ success: true, token });
   } catch (e: any) {
     res.status(500).json({ success: false, error: explainTaskError(e) });
@@ -370,7 +372,6 @@ export const downloadTaskFileByToken = async (req: any, res: Response) => {
     return res.status(401).json({ success: false, error: 'Token inválido o expirado.' });
   }
   const isHead = req.method === 'HEAD';
-  if (!isHead) _taskTempTokens.delete(token);
   try {
     const fileRow = await getTaskFileRecord(data.taskId, data.fileId);
     if (!fileRow) {
@@ -392,6 +393,78 @@ export const downloadTaskFileByToken = async (req: any, res: Response) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     if (isHead) return res.status(200).end();
     res.sendFile(filePath);
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: explainTaskError(e) });
+  }
+};
+
+export const syncTaskFileByToken = async (req: any, res: Response) => {
+  const { token } = req.params;
+  const data = _taskTempTokens.get(token);
+  if (!data || data.exp < Date.now()) {
+    return res.status(401).json({ success: false, error: 'Token inválido o expirado.' });
+  }
+
+  try {
+    const fileRow = await pool.query(
+      `SELECT stored_name, original_name
+       FROM task_files
+       WHERE id = $1 AND task_id = $2
+       LIMIT 1`,
+      [data.fileId, data.taskId]
+    );
+    if (!fileRow.rows.length) {
+      return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
+    }
+
+    const { stored_name, original_name } = fileRow.rows[0];
+    const filePath = path.join(TASK_FILES_ROOT, data.taskId, stored_name);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, error: 'Archivo no encontrado en disco.' });
+    }
+
+    const body = req.body as Buffer | undefined;
+    if (!body || !Buffer.isBuffer(body) || body.length === 0) {
+      return res.status(400).json({ success: false, error: 'No se recibió contenido para sincronizar.' });
+    }
+
+    fs.writeFileSync(filePath, body);
+    const stat = fs.statSync(filePath);
+
+    await pool.query(
+      `UPDATE task_files
+       SET size_bytes = $1,
+           updated_at = NOW()
+       WHERE id = $2 AND task_id = $3`,
+      [stat.size, data.fileId, data.taskId]
+    );
+
+    const taskInfo = await pool.query(`SELECT client_id FROM client_tasks WHERE id = $1 LIMIT 1`, [data.taskId]);
+    const clientId = taskInfo.rows[0]?.client_id || null;
+
+    await logActivity(
+      'SYSTEM',
+      'Sistema',
+      `Adjunto actualizado desde Office: ${original_name}`,
+      'TASK',
+      data.taskId,
+      original_name,
+      { eventType: 'UPDATE' }
+    );
+
+    if (clientId) {
+      await logActivity(
+        'SYSTEM',
+        'Sistema',
+        `Adjunto de actuación actualizado desde Office: ${original_name}`,
+        'CLIENT',
+        clientId,
+        original_name,
+        { eventType: 'UPDATE' }
+      );
+    }
+
+    res.json({ success: true, updated_at: stat.mtime.toISOString(), size_bytes: stat.size });
   } catch (e: any) {
     res.status(500).json({ success: false, error: explainTaskError(e) });
   }

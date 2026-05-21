@@ -1596,7 +1596,11 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
       void loadFiles(true);
 
       if (tempUrl) {
-        const b64 = encodeVantiaPayload({ url: tempUrl, name: file.original_name || `documento.${ext || 'bin'}` });
+        const b64 = encodeVantiaPayload({
+          url: tempUrl,
+          syncUrl: `${tempUrl}/sync`,
+          name: file.original_name || `documento.${ext || 'bin'}`,
+        });
         window.location.href = `vantia:${b64}`;
         return;
       }

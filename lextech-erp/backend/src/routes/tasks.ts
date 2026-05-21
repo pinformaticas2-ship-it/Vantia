@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import express, { Router } from 'express';
 import multer from 'multer';
 import path from 'path';
 import crypto from 'crypto';
@@ -22,6 +22,7 @@ import {
   downloadTaskFileByToken,
   launchTaskFileWithOffice,
   taskOfficeBridgePage,
+  syncTaskFileByToken,
   deleteTaskFile,
   previewTaskWordAsPdf,
   previewTaskWordAsHtml,
@@ -30,6 +31,7 @@ import {
 } from '../controllers/tasksController';
 
 const router = Router();
+const rawBinary = express.raw({ type: 'application/octet-stream', limit: '100mb' });
 const uuidv4 = () => crypto.randomUUID();
 
 const taskFilesStorage = multer.diskStorage({
@@ -53,6 +55,7 @@ const uploadTaskFilesMiddleware = multer({
 router.get('/files/dl/:token/launch', launchTaskFileWithOffice);
 router.get('/files/dl/:token/bridge', taskOfficeBridgePage);
 router.get('/files/dl/:token', downloadTaskFileByToken);
+router.put('/files/dl/:token/sync', rawBinary, syncTaskFileByToken);
 
 // ── Etapas (antes de rutas con :id) ──────────────────────────────
 router.get('/etapas',               requireAuth, getEtapas);

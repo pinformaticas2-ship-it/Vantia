@@ -1,12 +1,13 @@
-import { Router } from 'express';
+import express, { Router } from 'express';
 import multer from 'multer';
 import path from 'path';
 import crypto from 'crypto';
 import fs from 'fs';
 const uuidv4 = () => crypto.randomUUID();
 import { requireAuth } from '../middleware/auth';
-import { listFiles, uploadFiles, downloadFile, deleteFile, UPLOADS_ROOT, listTemplates, downloadTemplate, downloadBlank, createBlankDocument, updateFileMetadata, openFileLocally, previewDocxAsHtml, previewExcelAsHtml, previewTemplateAsHtml, testPreviewImages, previewWordAsPdf, previewTemplateAsPdf, createTempToken, downloadByToken, launchWithOffice, officeBridgePage } from '../controllers/filesController';
+import { listFiles, uploadFiles, downloadFile, deleteFile, UPLOADS_ROOT, listTemplates, downloadTemplate, downloadBlank, createBlankDocument, updateFileMetadata, openFileLocally, previewDocxAsHtml, previewExcelAsHtml, previewTemplateAsHtml, testPreviewImages, previewWordAsPdf, previewTemplateAsPdf, createTempToken, downloadByToken, launchWithOffice, officeBridgePage, syncClientFileByToken } from '../controllers/filesController';
 const router = Router();
+const rawBinary = express.raw({ type: 'application/octet-stream', limit: '100mb' });
 
 // Multer: guarda en uploads/clients/:clientId/ con nombre único
 const storage = multer.diskStorage({
@@ -31,6 +32,7 @@ const upload = multer({
 router.get('/dl/:token/launch',       launchWithOffice);
 router.get('/dl/:token/bridge',       officeBridgePage);
 router.get('/dl/:token',              downloadByToken);
+router.put('/dl/:token/sync',         rawBinary, syncClientFileByToken);
 
 // ── Rutas de plantillas (ANTES de las rutas dinámicas) ──────────
 router.get('/templates',              requireAuth, listTemplates);

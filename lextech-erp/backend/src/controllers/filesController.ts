@@ -3,11 +3,13 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import pool from '../config/database';
-import { logActivityForReq } from './activityController';
+import { logActivity, logActivityForReq } from './activityController';
 import { CLIENT_FILES_ROOT as LOCAL_CLIENT_FILES_ROOT, DATA_ROOT, TEMP_ROOT, UPLOADS_CLIENTS_ROOT as UPLOADS_ROOT } from '../config/paths';
 
 const LIBREOFFICE_ENABLED =
   String(process.env.ENABLE_LIBREOFFICE_PREVIEW || "true").trim().toLowerCase() !== "false";
+
+const OFFICE_TEMP_TOKEN_TTL_MS = 12 * 60 * 60 * 1000;
 
 type LocalEditWatcher = {
   watcher: fs.FSWatcher;
@@ -217,7 +219,7 @@ export const listFiles = async (req: any, res: Response) => {
     const rows = result.rows.map((row: any) => {
       if (!isOfficeOpenable(row.original_name, row.mimetype)) return row;
       const token = crypto.randomUUID();
-      _tempTokens.set(token, { clientId, fileId: row.id, exp: Date.now() + 30 * 60 * 1000 });
+      _tempTokens.set(token, { clientId, fileId: row.id, exp: Date.now() + OFFICE_TEMP_TOKEN_TTL_MS });
       return { ...row, open_token: token };
     });
     // Asegurar que las carpetas del cliente existen (silencioso, en background)
@@ -327,7 +329,7 @@ export const createTempToken = async (req: any, res: Response) => {
   const { clientId, fileId } = req.params;
   try {
     const token = crypto.randomUUID();
-    _tempTokens.set(token, { clientId, fileId, exp: Date.now() + 30 * 60 * 1000 });
+    _tempTokens.set(token, { clientId, fileId, exp: Date.now() + OFFICE_TEMP_TOKEN_TTL_MS });
     res.json({ success: true, token });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
@@ -342,7 +344,6 @@ export const downloadByToken = async (req: any, res: Response) => {
   }
   // HEAD requests (Office probes URL before GET) — answer with headers but keep token alive
   const isHead = req.method === 'HEAD';
-  if (!isHead) _tempTokens.delete(token);
   try {
     const result = await pool.query(
       `SELECT stored_name, original_name, mimetype, client_id FROM client_files WHERE id = $1 LIMIT 1`,
@@ -359,6 +360,64 @@ export const downloadByToken = async (req: any, res: Response) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     if (isHead) return res.status(200).end();
     res.sendFile(filePath);
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+export const syncClientFileByToken = async (req: any, res: Response) => {
+  const { token } = req.params;
+  const data = _tempTokens.get(token);
+  if (!data || data.exp < Date.now()) {
+    return res.status(401).json({ success: false, error: 'Token inválido o expirado.' });
+  }
+
+  try {
+    const result = await pool.query(
+      `SELECT stored_name, original_name, client_id
+       FROM client_files
+       WHERE id = $1
+       LIMIT 1`,
+      [data.fileId]
+    );
+    if (!result.rows.length) {
+      return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
+    }
+
+    const { stored_name, original_name, client_id } = result.rows[0];
+    const realClientId = client_id || data.clientId;
+    const filePath = path.join(UPLOADS_ROOT, realClientId, stored_name);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, error: 'Archivo no encontrado en disco.' });
+    }
+
+    const body = req.body as Buffer | undefined;
+    if (!body || !Buffer.isBuffer(body) || body.length === 0) {
+      return res.status(400).json({ success: false, error: 'No se recibió contenido para sincronizar.' });
+    }
+
+    fs.writeFileSync(filePath, body);
+    const stat = fs.statSync(filePath);
+
+    await pool.query(
+      `UPDATE client_files
+       SET size_bytes = $1,
+           updated_at = NOW()
+       WHERE id = $2 AND client_id = $3`,
+      [stat.size, data.fileId, realClientId]
+    );
+
+    await logActivity(
+      'SYSTEM',
+      'Sistema',
+      `Adjunto actualizado desde Office: ${original_name}`,
+      'CLIENT',
+      realClientId,
+      original_name,
+      { eventType: 'UPDATE' }
+    );
+
+    res.json({ success: true, updated_at: stat.mtime.toISOString(), size_bytes: stat.size });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }

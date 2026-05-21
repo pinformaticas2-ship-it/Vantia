@@ -50,9 +50,46 @@ try {
     if ($baseName.Length -gt 80) { $baseName = $baseName.Substring(0, 80) }
 
     $targetPath = Join-Path $tempRoot ("{0}-{1}{2}" -f $baseName, ([guid]::NewGuid().ToString('N')), $ext)
+    $syncUrl = [string]$data.syncUrl
+    if ([string]::IsNullOrWhiteSpace($syncUrl)) { $syncUrl = "$($data.url)/sync" }
 
     Invoke-WebRequest -Uri $data.url -OutFile $targetPath -UseBasicParsing
-    Start-Process -FilePath $targetPath
+
+    $lastUploadedMtime = if (Test-Path $targetPath) { (Get-Item $targetPath).LastWriteTimeUtc.Ticks } else { 0 }
+
+    function Sync-VantiaTempFile {
+      param(
+        [string]$PathToSync,
+        [string]$TargetSyncUrl,
+        [ref]$LastUploadedTicks
+      )
+
+      if ([string]::IsNullOrWhiteSpace($TargetSyncUrl)) { return }
+      if (!(Test-Path $PathToSync)) { return }
+
+      $item = Get-Item $PathToSync
+      if ($item.LastWriteTimeUtc.Ticks -le $LastUploadedTicks.Value) { return }
+
+      Invoke-WebRequest -Uri $TargetSyncUrl -Method Put -InFile $PathToSync -ContentType 'application/octet-stream' -UseBasicParsing | Out-Null
+      $LastUploadedTicks.Value = (Get-Item $PathToSync).LastWriteTimeUtc.Ticks
+    }
+
+    $proc = Start-Process -FilePath $targetPath -PassThru
+    $deadline = (Get-Date).AddHours(12)
+
+    do {
+      Start-Sleep -Seconds 2
+      try {
+        Sync-VantiaTempFile -PathToSync $targetPath -TargetSyncUrl $syncUrl -LastUploadedTicks ([ref]$lastUploadedMtime)
+      } catch {
+        # Reintentaremos en la siguiente vuelta si Word está guardando o la red falla.
+      }
+    } while ((Get-Date) -lt $deadline -and -not $proc.HasExited)
+
+    try {
+      Sync-VantiaTempFile -PathToSync $targetPath -TargetSyncUrl $syncUrl -LastUploadedTicks ([ref]$lastUploadedMtime)
+    } catch {}
+
     exit 0
   }
 

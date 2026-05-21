@@ -2094,7 +2094,11 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
       void loadFiles(true);
 
       if (tempUrl) {
-        const b64 = encodeVantiaPayload({ url: tempUrl, name: f.original_name || `documento.${ext || 'bin'}` });
+        const b64 = encodeVantiaPayload({
+          url: tempUrl,
+          syncUrl: `${tempUrl}/sync`,
+          name: f.original_name || `documento.${ext || 'bin'}`,
+        });
         window.location.href = `vantia:${b64}`;
         return;
       }
