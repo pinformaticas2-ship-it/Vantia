@@ -1969,7 +1969,7 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
         for (const f of fileList) {
           if (f.mimetype?.startsWith('image/')) loadThumb(f.id);
           if (f.open_token) {
-            const resolved = resolveApiUrl(`/api/files/dl/${f.open_token}/bridge`);
+            const resolved = resolveApiUrl(`/api/files/dl/${f.open_token}`);
             const abs = /^https?:\/\//i.test(resolved) ? resolved : `${window.location.origin}${resolved}`;
             openUrlCache.current.set(f.id, abs);
           }
@@ -2086,7 +2086,14 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
       void loadFiles(true);
 
       if (tempUrl) {
-        launchOfficeUrl(tempUrl);
+        const scheme = wordExts.includes(ext)
+          ? 'ms-word'
+          : excelExts.includes(ext)
+            ? 'ms-excel'
+            : 'ms-powerpoint';
+        const uri = `${scheme}:ofe|u|${tempUrl}`;
+        const b64 = btoa(uri).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        window.location.href = `vantia:${b64}`;
         return;
       }
       await downloadWithAuth(f.id, f.original_name);

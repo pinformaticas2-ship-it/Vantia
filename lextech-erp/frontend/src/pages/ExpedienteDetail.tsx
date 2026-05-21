@@ -1533,7 +1533,7 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
         setFiles(fileList);
         fileList.forEach((file: any) => {
           if (!file?.open_token) return;
-          const resolved = resolveApiUrl(`/api/tasks/files/dl/${file.open_token}/bridge`);
+          const resolved = resolveApiUrl(`/api/tasks/files/dl/${file.open_token}`);
           const absoluteUrl = /^https?:\/\//i.test(resolved) ? resolved : `${window.location.origin}${resolved}`;
           openUrlCache.current.set(file.id, absoluteUrl);
         });
@@ -1588,7 +1588,14 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
       void loadFiles(true);
 
       if (tempUrl) {
-        launchOfficeUrl(tempUrl);
+        const scheme = wordExts.includes(ext)
+          ? 'ms-word'
+          : excelExts.includes(ext)
+            ? 'ms-excel'
+            : 'ms-powerpoint';
+        const uri = `${scheme}:ofe|u|${tempUrl}`;
+        const b64 = btoa(uri).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        window.location.href = `vantia:${b64}`;
         return;
       }
     }
