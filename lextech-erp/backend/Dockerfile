@@ -15,14 +15,16 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
 
-# Copy source and traineddata files
+# Copy source, traineddata and templates
 COPY src ./src
 COPY tsconfig.json ./
 COPY eng.traineddata ./
 COPY spa.traineddata ./
+COPY DocPlant ./DocPlant
+COPY resources ./resources
 
-# Compile TypeScript
-RUN npm install typescript --no-save && npx tsc
+# Compile TypeScript and put DocPlant alongside dist/ for runtime
+RUN npm install typescript --no-save && npx tsc && cp -r DocPlant dist/DocPlant
 
 EXPOSE 4000
 
