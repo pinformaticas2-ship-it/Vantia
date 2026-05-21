@@ -103,6 +103,17 @@ app.use(compression());
 // Servir archivos estáticos (fotos DNI subidas, etc.)
 app.use('/uploads', express.static(UPLOADS_ROOT));
 
+// ── Conector Windows: script de instalación del protocolo vantia: ────────────
+app.get('/api/files/setup/vantia-protocol.ps1', (_req, res) => {
+  const fs = require('fs');
+  const scriptPath = require('path').resolve(__dirname, '../../resources/vantia-setup.ps1');
+  if (!fs.existsSync(scriptPath)) return res.status(404).send('Script no encontrado.');
+  res.setHeader('Content-Type', 'application/octet-stream');
+  res.setHeader('Content-Disposition', 'attachment; filename="vantia-setup.ps1"');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.sendFile(scriptPath);
+});
+
 // --- RUTAS ---
 app.use('/api/entities', entityRoutes);
 app.use('/api/ocr', ocrRoutes);

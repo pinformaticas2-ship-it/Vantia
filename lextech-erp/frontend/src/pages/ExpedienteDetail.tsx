@@ -1579,15 +1579,16 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
       void loadFiles(true);
 
       if (tempUrl) {
-        // Server-side redirect preserves literal | in Location header (browser encoding bypass)
-        window.open(`${tempUrl}/launch`, '_blank', 'noopener,noreferrer');
+        const scheme = wordExts.includes(ext) ? 'ms-word'
+          : excelExts.includes(ext) ? 'ms-excel' : 'ms-powerpoint';
+        const uri = `${scheme}:ofe|u|${tempUrl}`;
+        const b64 = btoa(uri).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        window.location.href = `vantia:${b64}`;
         return;
       }
-      // Fallback: download so the user can open manually while backend token is unavailable
       handleDownload(file.id, file.original_name);
       return;
     }
-    if (isOffice) return;
 
     const token = await getToken({ skipCache: true });
     const res = await fetch(`/api/tasks/${taskId}/files/${file.id}/download`, {
