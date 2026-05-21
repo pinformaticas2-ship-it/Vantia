@@ -282,22 +282,19 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
     const isOffice  = wordExts.includes(ext) || excelExts.includes(ext) || pptExts.includes(ext);
 
     if (isOffice) {
+      // Synchronous path: use pre-fetched URL (preserves user gesture for Chrome protocol handler).
+      // Chrome silently drops ms-word:/ms-excel: navigation after any await, so this MUST be sync.
       const tempUrl = openUrlCache.current.get(f.id);
       openUrlCache.current.delete(f.id);
+      // Silently refresh file list to get fresh open_token for next click
       void loadFiles(true);
 
       if (tempUrl) {
-        const scheme = wordExts.includes(ext) ? 'ms-word'
-          : excelExts.includes(ext) ? 'ms-excel' : 'ms-powerpoint';
-        // Chrome encodes | → %7C. Workaround: base64url-encode the full URI and send it
-        // via the custom vantia: protocol handler (installed once via vantia-setup.ps1).
-        // The Windows handler decodes base64url → ms-word:ofe|u|URL with literal | and
-        // calls Start-Process, which invokes Word via ShellExecute without re-encoding.
-        const uri = `${scheme}:ofe|u|${tempUrl}`;
-        const b64 = btoa(uri).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-        window.location.href = `vantia:${b64}`;
+        // Server-side redirect preserves literal | in Location header (browser encoding bypass)
+        window.open(`${tempUrl}/launch`, '_blank', 'noopener,noreferrer');
         return;
       }
+      // Fallback: download so the user can open manually while backend token is unavailable
       downloadWithAuth(f.id, f.original_name);
       return;
     }
