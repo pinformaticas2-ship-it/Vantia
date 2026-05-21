@@ -1579,16 +1579,8 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
       void loadFiles(true);
 
       if (tempUrl) {
-        const scheme = wordExts.includes(ext)
-          ? 'ms-word:ofe|u|'
-          : excelExts.includes(ext)
-            ? 'ms-excel:ofe|u|'
-            : 'ms-powerpoint:ofe|u|';
-        const a = document.createElement('a');
-        a.href = `${scheme}${tempUrl}`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        // Server-side redirect preserves literal | in Location header (browser encoding bypass)
+        window.open(`${tempUrl}/launch`, '_blank', 'noopener,noreferrer');
         return;
       }
       // Fallback: download so the user can open manually while backend token is unavailable

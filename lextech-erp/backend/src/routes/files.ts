@@ -5,7 +5,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 const uuidv4 = () => crypto.randomUUID();
 import { requireAuth } from '../middleware/auth';
-import { listFiles, uploadFiles, downloadFile, deleteFile, UPLOADS_ROOT, listTemplates, downloadTemplate, downloadBlank, createBlankDocument, updateFileMetadata, openFileLocally, previewDocxAsHtml, previewExcelAsHtml, previewTemplateAsHtml, testPreviewImages, previewWordAsPdf, previewTemplateAsPdf, createTempToken, downloadByToken } from '../controllers/filesController';
+import { listFiles, uploadFiles, downloadFile, deleteFile, UPLOADS_ROOT, listTemplates, downloadTemplate, downloadBlank, createBlankDocument, updateFileMetadata, openFileLocally, previewDocxAsHtml, previewExcelAsHtml, previewTemplateAsHtml, testPreviewImages, previewWordAsPdf, previewTemplateAsPdf, createTempToken, downloadByToken, launchWithOffice } from '../controllers/filesController';
 const router = Router();
 
 // Multer: guarda en uploads/clients/:clientId/ con nombre único
@@ -28,6 +28,7 @@ const upload = multer({
 });
 
 // ── Token temporal de descarga (sin auth, para apps nativas) ────
+router.get('/dl/:token/launch',       launchWithOffice);
 router.get('/dl/:token',              downloadByToken);
 
 // ── Rutas de plantillas (ANTES de las rutas dinámicas) ──────────

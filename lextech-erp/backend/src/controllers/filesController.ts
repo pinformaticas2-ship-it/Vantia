@@ -365,6 +365,41 @@ export const downloadByToken = async (req: any, res: Response) => {
 };
 
 // ─────────────────────────────────────────────────────────────
+// GET /api/files/dl/:token/launch  — redirect server-side a ms-word/excel/powerpoint
+// El redirect HTTP preserva | sin codificar (evita %7C de Chrome)
+// ─────────────────────────────────────────────────────────────
+export const launchWithOffice = async (req: any, res: Response) => {
+  const { token } = req.params;
+  const data = _tempTokens.get(token);
+  if (!data || data.exp < Date.now()) {
+    return res.status(401).send('Token inválido o expirado.');
+  }
+  try {
+    const result = await pool.query(
+      `SELECT original_name FROM client_files WHERE id = $1 LIMIT 1`,
+      [data.fileId]
+    );
+    if (result.rows.length === 0) return res.status(404).send('Archivo no encontrado.');
+    const { original_name } = result.rows[0];
+    const ext = (original_name || '').split('.').pop()?.toLowerCase() ?? '';
+    const excelExts = ['xls','xlsx','xlsm','xlsb','ods','csv'];
+    const pptExts   = ['ppt','pptx','odp'];
+    const scheme = excelExts.includes(ext) ? 'ms-excel'
+      : pptExts.includes(ext) ? 'ms-powerpoint'
+      : 'ms-word';
+    const proto = req.headers['x-forwarded-proto'] || req.protocol;
+    const host  = req.headers['x-forwarded-host']  || req.get('host');
+    const fileUrl = `${proto}://${host}/api/files/dl/${token}`;
+    // Literal | in Location header — Chrome passes it as-is to Windows ShellExecute
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Location', `${scheme}:ofe|u|${fileUrl}`);
+    res.status(302).end();
+  } catch (err: any) {
+    res.status(500).send(err.message);
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
 // DELETE /api/files/:clientId/:fileId  — borrar archivo
 // ─────────────────────────────────────────────────────────────
 export const deleteFile = async (req: any, res: Response) => {
