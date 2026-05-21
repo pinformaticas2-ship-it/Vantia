@@ -71,6 +71,15 @@ const Indicador = ({ label, value, color = "text-slate-700" }: any) => (
   </div>
 );
 
+function launchOfficeUrl(url: string) {
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.style.display = 'none';
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+}
+
 // ── Tabs ──────────────────────────────────────────────────────
 const TABS = [
   { id: "perfil",      label: "Perfil",         icon: User },
@@ -1960,7 +1969,7 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
         for (const f of fileList) {
           if (f.mimetype?.startsWith('image/')) loadThumb(f.id);
           if (f.open_token) {
-            const resolved = resolveApiUrl(`/api/files/dl/${f.open_token}`);
+            const resolved = resolveApiUrl(`/api/files/dl/${f.open_token}/launch`);
             const abs = /^https?:\/\//i.test(resolved) ? resolved : `${window.location.origin}${resolved}`;
             openUrlCache.current.set(f.id, abs);
           }
@@ -2072,18 +2081,15 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
     const isOffice  = wordExts.includes(ext) || excelExts.includes(ext) || pptExts.includes(ext);
 
     if (isOffice) {
-      // Synchronous path: use pre-fetched URL (preserves user gesture for Chrome protocol handler).
-      // Chrome silently drops ms-word:/ms-excel: navigation after any await, so this MUST be sync.
+      // Synchronous path: open a normal HTTPS /launch URL so the backend can emit the final
+      // Office redirect without Chrome rewriting the ofe|u| command.
       const tempUrl = openUrlCache.current.get(f.id);
       openUrlCache.current.delete(f.id);
       // Silently refresh file list to get fresh open_token for next click
       void loadFiles(true);
 
       if (tempUrl) {
-        const scheme = wordExts.includes(ext) ? 'ms-word:ofe|u|'
-          : excelExts.includes(ext) ? 'ms-excel:ofe|u|'
-          : 'ms-powerpoint:ofe|u|';
-        window.location.href = `${scheme}${tempUrl}`;
+        launchOfficeUrl(tempUrl);
         return;
       }
       // Fallback: download so the user can open manually while backend token is unavailable

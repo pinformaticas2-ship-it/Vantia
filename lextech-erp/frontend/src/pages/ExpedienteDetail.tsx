@@ -1478,6 +1478,15 @@ function openMailDraft(subject: string, body?: string) {
   window.open(`mailto:?${params.toString()}`);
 }
 
+function launchOfficeUrl(url: string) {
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.style.display = 'none';
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+}
+
 function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
   const { getToken } = useAuth();
   const [files, setFiles] = useState<any[]>([]);
@@ -1524,7 +1533,7 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
         setFiles(fileList);
         fileList.forEach((file: any) => {
           if (!file?.open_token) return;
-          const resolved = resolveApiUrl(`/api/tasks/files/dl/${file.open_token}`);
+          const resolved = resolveApiUrl(`/api/tasks/files/dl/${file.open_token}/launch`);
           const absoluteUrl = /^https?:\/\//i.test(resolved) ? resolved : `${window.location.origin}${resolved}`;
           openUrlCache.current.set(file.id, absoluteUrl);
         });
@@ -1579,17 +1588,13 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
       void loadFiles(true);
 
       if (tempUrl) {
-        const scheme = wordExts.includes(ext) ? 'ms-word:ofe|u|'
-          : excelExts.includes(ext) ? 'ms-excel:ofe|u|'
-          : 'ms-powerpoint:ofe|u|';
-        window.location.href = `${scheme}${tempUrl}`;
+        launchOfficeUrl(tempUrl);
         return;
       }
       // Fallback: download so the user can open manually while backend token is unavailable
       handleDownload(file.id, file.original_name);
       return;
     }
-    if (isOffice) return;
 
     const token = await getToken({ skipCache: true });
     const res = await fetch(`/api/tasks/${taskId}/files/${file.id}/download`, {

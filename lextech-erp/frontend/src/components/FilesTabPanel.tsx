@@ -37,6 +37,15 @@ function isWordFile(mime: string, name: string) {
 function isExcelFile(mime: string, name: string) { const n = name.toLowerCase(); return mime.includes("excel") || mime.includes("spreadsheetml") || mime.includes("spreadsheet") || n.endsWith(".xlsx") || n.endsWith(".xls") || n.endsWith(".xlsm") || n.endsWith(".csv"); }
 const PLANTILLAS: any[] = [];
 
+function launchOfficeUrl(url: string) {
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.style.display = 'none';
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+}
+
 export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: { entityId: string; entity?: any; alwaysShowPreview?: boolean }) {
   const { getToken } = useAuth();
 
@@ -170,7 +179,7 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
         for (const f of fileList) {
           if (f.mimetype?.startsWith('image/')) loadThumb(f.id);
           if (f.open_token) {
-            const resolved = resolveApiUrl(`/api/files/dl/${f.open_token}`);
+            const resolved = resolveApiUrl(`/api/files/dl/${f.open_token}/launch`);
             const abs = /^https?:\/\//i.test(resolved) ? resolved : `${window.location.origin}${resolved}`;
             openUrlCache.current.set(f.id, abs);
           }
@@ -282,18 +291,15 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
     const isOffice  = wordExts.includes(ext) || excelExts.includes(ext) || pptExts.includes(ext);
 
     if (isOffice) {
-      // Synchronous path: use pre-fetched URL (preserves user gesture for Chrome protocol handler).
-      // Chrome silently drops ms-word:/ms-excel: navigation after any await, so this MUST be sync.
+      // Synchronous path: use a normal HTTPS /launch URL so the server can emit the final
+      // ms-word:/ms-excel: redirect without Chrome re-encoding the Office command.
       const tempUrl = openUrlCache.current.get(f.id);
       openUrlCache.current.delete(f.id);
       // Silently refresh file list to get fresh open_token for next click
       void loadFiles(true);
 
       if (tempUrl) {
-        const scheme = wordExts.includes(ext) ? 'ms-word:ofe|u|'
-          : excelExts.includes(ext) ? 'ms-excel:ofe|u|'
-          : 'ms-powerpoint:ofe|u|';
-        window.location.href = `${scheme}${tempUrl}`;
+        launchOfficeUrl(tempUrl);
         return;
       }
       // Fallback: download so the user can open manually while backend token is unavailable

@@ -369,7 +369,8 @@ export const downloadTaskFileByToken = async (req: any, res: Response) => {
   if (!data || data.exp < Date.now()) {
     return res.status(401).json({ success: false, error: 'Token inválido o expirado.' });
   }
-  _taskTempTokens.delete(token);
+  const isHead = req.method === 'HEAD';
+  if (!isHead) _taskTempTokens.delete(token);
   try {
     const fileRow = await getTaskFileRecord(data.taskId, data.fileId);
     if (!fileRow) {
@@ -389,9 +390,42 @@ export const downloadTaskFileByToken = async (req: any, res: Response) => {
       `inline; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(original_name)}`
     );
     res.setHeader('Access-Control-Allow-Origin', '*');
+    if (isHead) return res.status(200).end();
     res.sendFile(filePath);
   } catch (e: any) {
     res.status(500).json({ success: false, error: explainTaskError(e) });
+  }
+};
+
+export const launchTaskFileWithOffice = async (req: any, res: Response) => {
+  const { token } = req.params;
+  const data = _taskTempTokens.get(token);
+  if (!data || data.exp < Date.now()) {
+    return res.status(401).send('Token inválido o expirado.');
+  }
+  try {
+    const fileRow = await getTaskFileRecord(data.taskId, data.fileId);
+    if (!fileRow) {
+      return res.status(404).send('Archivo no encontrado.');
+    }
+
+    const ext = (fileRow.original_name || '').split('.').pop()?.toLowerCase() ?? '';
+    const excelExts = ['xls','xlsx','xlsm','xlsb','ods','csv'];
+    const pptExts = ['ppt','pptx','odp'];
+    const scheme = excelExts.includes(ext)
+      ? 'ms-excel'
+      : pptExts.includes(ext)
+        ? 'ms-powerpoint'
+        : 'ms-word';
+    const proto = req.headers['x-forwarded-proto'] || req.protocol;
+    const host = req.headers['x-forwarded-host'] || req.get('host');
+    const fileUrl = `${proto}://${host}/api/tasks/files/dl/${token}`;
+
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Location', `${scheme}:ofe|u|${fileUrl}`);
+    res.status(302).end();
+  } catch (e: any) {
+    res.status(500).send(explainTaskError(e));
   }
 };
 

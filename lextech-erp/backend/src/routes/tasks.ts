@@ -20,6 +20,7 @@ import {
   downloadTaskFile,
   createTaskFileTempToken,
   downloadTaskFileByToken,
+  launchTaskFileWithOffice,
   deleteTaskFile,
   previewTaskWordAsPdf,
   previewTaskWordAsHtml,
@@ -48,6 +49,7 @@ const uploadTaskFilesMiddleware = multer({
   limits: { fileSize: 50 * 1024 * 1024 },
 });
 
+router.get('/files/dl/:token/launch', launchTaskFileWithOffice);
 router.get('/files/dl/:token', downloadTaskFileByToken);
 
 // ── Etapas (antes de rutas con :id) ──────────────────────────────
