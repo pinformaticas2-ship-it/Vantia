@@ -1533,7 +1533,7 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
         setFiles(fileList);
         fileList.forEach((file: any) => {
           if (!file?.open_token) return;
-          const resolved = resolveApiUrl(`/api/tasks/files/dl/${file.open_token}/bridge`);
+          const resolved = resolveApiUrl(`/api/tasks/files/dl/${file.open_token}`);
           const absoluteUrl = /^https?:\/\//i.test(resolved) ? resolved : `${window.location.origin}${resolved}`;
           openUrlCache.current.set(file.id, absoluteUrl);
         });
@@ -1576,6 +1576,28 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
   }, [getToken, taskId]);
 
   const openWithApp = useCallback(async (file: any) => {
+    const ext = (file.original_name || '').split('.').pop()?.toLowerCase() ?? '';
+    const wordExts = ['doc','docx','odt','rtf','dot','dotx'];
+    const excelExts = ['xls','xlsx','xlsm','xlsb','ods','csv'];
+    const pptExts = ['ppt','pptx','odp'];
+    const isOffice = wordExts.includes(ext) || excelExts.includes(ext) || pptExts.includes(ext);
+
+    if (isOffice) {
+      const tempUrl = openUrlCache.current.get(file.id);
+      openUrlCache.current.delete(file.id);
+      void loadFiles(true);
+
+      if (tempUrl) {
+        const officeUrl = wordExts.includes(ext)
+          ? `ms-word:${tempUrl}`
+          : excelExts.includes(ext)
+            ? `ms-excel:${tempUrl}`
+            : `ms-powerpoint:${tempUrl}`;
+        launchOfficeUrl(officeUrl);
+        return;
+      }
+    }
+
     const token = await getToken({ skipCache: true });
     const res = await fetch(`/api/tasks/${taskId}/files/${file.id}/download`, { headers: { Authorization: `Bearer ${token}` } });
     if (!res.ok) return;
@@ -1588,7 +1610,7 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
     anchor.click();
     document.body.removeChild(anchor);
     setTimeout(() => URL.revokeObjectURL(url), 10_000);
-  }, [getToken, taskId]);
+  }, [getToken, loadFiles, taskId]);
 
   const openPreview = useCallback(async (file: any) => {
     const cached = previewCache.current.get(file.id);
@@ -1631,8 +1653,12 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
   }, [getToken, taskId]);
 
   const handlePrimaryOpen = useCallback((file: any) => {
+    if (isWordAct(file.mimetype || "", file.original_name || "") || isExcelAct(file.mimetype || "", file.original_name || "")) {
+      void openWithApp(file);
+      return;
+    }
     void openPreview(file);
-  }, [openPreview]);
+  }, [openPreview, openWithApp]);
 
   const openMetadataForUpload = (file: File) => {
     pendingUploadFile.current = file;

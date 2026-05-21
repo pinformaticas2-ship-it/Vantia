@@ -179,7 +179,7 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
         for (const f of fileList) {
           if (f.mimetype?.startsWith('image/')) loadThumb(f.id);
           if (f.open_token) {
-            const resolved = resolveApiUrl(`/api/files/dl/${f.open_token}/bridge`);
+            const resolved = resolveApiUrl(`/api/files/dl/${f.open_token}`);
             const abs = /^https?:\/\//i.test(resolved) ? resolved : `${window.location.origin}${resolved}`;
             openUrlCache.current.set(f.id, abs);
           }
@@ -284,8 +284,32 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
   };
 
   const openWithApp = useCallback(async (f: any) => {
+    const ext = (f.original_name || '').split('.').pop()?.toLowerCase() ?? '';
+    const wordExts  = ['doc','docx','odt','rtf','dot','dotx'];
+    const excelExts = ['xls','xlsx','xlsm','xlsb','ods','csv'];
+    const pptExts   = ['ppt','pptx','odp'];
+    const isOffice  = wordExts.includes(ext) || excelExts.includes(ext) || pptExts.includes(ext);
+
+    if (isOffice) {
+      const tempUrl = openUrlCache.current.get(f.id);
+      openUrlCache.current.delete(f.id);
+      void loadFiles(true);
+
+      if (tempUrl) {
+        const officeUrl = wordExts.includes(ext)
+          ? `ms-word:${tempUrl}`
+          : excelExts.includes(ext)
+            ? `ms-excel:${tempUrl}`
+            : `ms-powerpoint:${tempUrl}`;
+        launchOfficeUrl(officeUrl);
+        return;
+      }
+      await downloadWithAuth(f.id, f.original_name);
+      return;
+    }
+
     await downloadWithAuth(f.id, f.original_name);
-  }, [downloadWithAuth]);
+  }, [downloadWithAuth, loadFiles]);
 
   const openInWord = openWithApp;
 
@@ -698,7 +722,7 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
                     const canExcel   = isExcelFile(f.mimetype, f.original_name);
                     const canOpenPreview = alwaysShowPreview || canPreview || canWord || canExcel;
                     const handleNameClick = canWord || canExcel
-                      ? () => openPreview(f)
+                      ? () => openWithApp(f)
                       : canOpenPreview
                         ? () => openPreview(f)
                         : undefined;
@@ -728,7 +752,7 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
                               <button
                                 onClick={handleNameClick}
                                 className={`text-sm font-medium text-slate-700 text-left truncate block max-w-[180px] ${canOpenPreview ? "hover:text-red-600 hover:underline cursor-pointer" : ""}`}
-                                title={canWord ? "Vista previa" : canExcel ? "Vista previa" : f.original_name}
+                                title={canWord ? "Abrir en Word" : canExcel ? "Abrir en Excel" : f.original_name}
                             >
                               {f.original_name}
                             </button>
@@ -776,13 +800,13 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
                             >
                               <Edit3 size={14} />
                             </button>
-                            {/* Descargar */}
+                            {/* Abrir / descargar */}
                             <button
-                              title="Descargar"
+                              title={canWord ? "Abrir en Word" : canExcel ? "Abrir en Excel" : "Descargar"}
                               className="p-1.5 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
                               onClick={() => openWithApp(f)}
                             >
-                              <Download size={14} />
+                              <ExternalLink size={14} />
                             </button>
                             <button onClick={() => handleDelete(f.id)} title="Eliminar"
                               className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
@@ -820,13 +844,13 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
                 </p>
               </div>
               <div className="flex items-center gap-1 shrink-0">
-                {/* Descargar */}
+                {/* Abrir / descargar */}
                 {preview.fileId && (
                   <button
                     onClick={() => openWithApp({ id: preview.fileId!, original_name: preview.name })}
                     className="flex items-center gap-1.5 text-[11px] font-semibold text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 px-2 py-1 rounded-lg transition-colors border border-neutral-200"
                   >
-                    <Download size={11} /> Descargar
+                    <ExternalLink size={11} /> Abrir
                   </button>
                 )}
                 {/* Abrir en pestaña nueva */}
@@ -1178,7 +1202,7 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
             </div>
             <div className="p-6 space-y-4">
               <p className="text-sm text-slate-600">
-                Este es un documento Word. Puedes descargarlo o usar la vista previa web cuando esté disponible.
+                Este es un documento Word. Vamos a intentar abrirlo directamente en Microsoft Word.
               </p>
               <div className="flex gap-3">
                 <button
@@ -1188,8 +1212,8 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
                   }}
                   className="flex-1 px-4 py-2.5 bg-red-700 text-white font-medium text-sm rounded-lg hover:bg-red-800 transition-colors flex items-center justify-center gap-2"
                 >
-                  <Download size={14} />
-                  Descargar Word
+                  <ExternalLink size={14} />
+                  Abrir en Word
                 </button>
                 <button
                   onClick={() => setWordPreview(null)}
