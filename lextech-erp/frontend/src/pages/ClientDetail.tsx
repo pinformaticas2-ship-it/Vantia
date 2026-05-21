@@ -71,15 +71,6 @@ const Indicador = ({ label, value, color = "text-slate-700" }: any) => (
   </div>
 );
 
-function launchOfficeUrl(url: string) {
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.style.display = 'none';
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
-}
-
 // ── Tabs ──────────────────────────────────────────────────────
 const TABS = [
   { id: "perfil",      label: "Perfil",         icon: User },
@@ -2086,12 +2077,14 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
       void loadFiles(true);
 
       if (tempUrl) {
-        const officeUrl = wordExts.includes(ext)
-          ? `ms-word:${tempUrl}`
+        const scheme = wordExts.includes(ext)
+          ? 'ms-word'
           : excelExts.includes(ext)
-            ? `ms-excel:${tempUrl}`
-            : `ms-powerpoint:${tempUrl}`;
-        launchOfficeUrl(officeUrl);
+            ? 'ms-excel'
+            : 'ms-powerpoint';
+        const uri = `${scheme}:ofe|u|${tempUrl}`;
+        const b64 = btoa(uri).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        window.location.href = `vantia:${b64}`;
         return;
       }
       await downloadWithAuth(f.id, f.original_name);

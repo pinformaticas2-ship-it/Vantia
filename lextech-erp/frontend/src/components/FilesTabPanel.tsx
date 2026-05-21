@@ -37,15 +37,6 @@ function isWordFile(mime: string, name: string) {
 function isExcelFile(mime: string, name: string) { const n = name.toLowerCase(); return mime.includes("excel") || mime.includes("spreadsheetml") || mime.includes("spreadsheet") || n.endsWith(".xlsx") || n.endsWith(".xls") || n.endsWith(".xlsm") || n.endsWith(".csv"); }
 const PLANTILLAS: any[] = [];
 
-function launchOfficeUrl(url: string) {
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.style.display = 'none';
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
-}
-
 export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: { entityId: string; entity?: any; alwaysShowPreview?: boolean }) {
   const { getToken } = useAuth();
 
@@ -290,23 +281,25 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
     const pptExts   = ['ppt','pptx','odp'];
     const isOffice  = wordExts.includes(ext) || excelExts.includes(ext) || pptExts.includes(ext);
 
-    if (isOffice) {
-      const tempUrl = openUrlCache.current.get(f.id);
-      openUrlCache.current.delete(f.id);
-      void loadFiles(true);
+      if (isOffice) {
+        const tempUrl = openUrlCache.current.get(f.id);
+        openUrlCache.current.delete(f.id);
+        void loadFiles(true);
 
-      if (tempUrl) {
-        const officeUrl = wordExts.includes(ext)
-          ? `ms-word:${tempUrl}`
-          : excelExts.includes(ext)
-            ? `ms-excel:${tempUrl}`
-            : `ms-powerpoint:${tempUrl}`;
-        launchOfficeUrl(officeUrl);
+        if (tempUrl) {
+          const scheme = wordExts.includes(ext)
+            ? 'ms-word'
+            : excelExts.includes(ext)
+              ? 'ms-excel'
+              : 'ms-powerpoint';
+          const uri = `${scheme}:ofe|u|${tempUrl}`;
+          const b64 = btoa(uri).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+          window.location.href = `vantia:${b64}`;
+          return;
+        }
+        await downloadWithAuth(f.id, f.original_name);
         return;
       }
-      await downloadWithAuth(f.id, f.original_name);
-      return;
-    }
 
     await downloadWithAuth(f.id, f.original_name);
   }, [downloadWithAuth, loadFiles]);

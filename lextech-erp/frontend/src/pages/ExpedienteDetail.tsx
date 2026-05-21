@@ -1478,15 +1478,6 @@ function openMailDraft(subject: string, body?: string) {
   window.open(`mailto:?${params.toString()}`);
 }
 
-function launchOfficeUrl(url: string) {
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.style.display = 'none';
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
-}
-
 function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
   const { getToken } = useAuth();
   const [files, setFiles] = useState<any[]>([]);
@@ -1588,12 +1579,14 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
       void loadFiles(true);
 
       if (tempUrl) {
-        const officeUrl = wordExts.includes(ext)
-          ? `ms-word:${tempUrl}`
+        const scheme = wordExts.includes(ext)
+          ? 'ms-word'
           : excelExts.includes(ext)
-            ? `ms-excel:${tempUrl}`
-            : `ms-powerpoint:${tempUrl}`;
-        launchOfficeUrl(officeUrl);
+            ? 'ms-excel'
+            : 'ms-powerpoint';
+        const uri = `${scheme}:ofe|u|${tempUrl}`;
+        const b64 = btoa(uri).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        window.location.href = `vantia:${b64}`;
         return;
       }
     }
