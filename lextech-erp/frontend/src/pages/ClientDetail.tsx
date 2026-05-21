@@ -80,6 +80,14 @@ function launchOfficeUrl(url: string) {
   document.body.removeChild(anchor);
 }
 
+function encodeVantiaPayload(payload: unknown) {
+  const json = JSON.stringify(payload);
+  const bytes = new TextEncoder().encode(json);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
 // ── Tabs ──────────────────────────────────────────────────────
 const TABS = [
   { id: "perfil",      label: "Perfil",         icon: User },
@@ -2086,13 +2094,7 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
       void loadFiles(true);
 
       if (tempUrl) {
-        const scheme = wordExts.includes(ext)
-          ? 'ms-word'
-          : excelExts.includes(ext)
-            ? 'ms-excel'
-            : 'ms-powerpoint';
-        const uri = `${scheme}:ofe|u|${tempUrl}`;
-        const b64 = btoa(uri).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        const b64 = encodeVantiaPayload({ url: tempUrl, name: f.original_name || `documento.${ext || 'bin'}` });
         window.location.href = `vantia:${b64}`;
         return;
       }
