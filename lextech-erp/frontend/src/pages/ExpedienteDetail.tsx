@@ -1579,12 +1579,10 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
       void loadFiles(true);
 
       if (tempUrl) {
-        const scheme = wordExts.includes(ext) ? 'ms-word'
-          : excelExts.includes(ext) ? 'ms-excel'
-          : 'ms-powerpoint';
-        const uri = `${scheme}:ofe|u|${tempUrl}`;
-        const b64 = btoa(uri).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-        window.location.href = `vantia:${b64}`;
+        const scheme = wordExts.includes(ext) ? 'ms-word:ofe|u|'
+          : excelExts.includes(ext) ? 'ms-excel:ofe|u|'
+          : 'ms-powerpoint:ofe|u|';
+        window.location.href = `${scheme}${tempUrl}`;
         return;
       }
       // Fallback: download so the user can open manually while backend token is unavailable
