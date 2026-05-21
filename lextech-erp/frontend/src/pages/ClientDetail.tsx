@@ -2072,19 +2072,20 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
     const isOffice  = wordExts.includes(ext) || excelExts.includes(ext) || pptExts.includes(ext);
 
     if (isOffice) {
-      // Synchronous path: use pre-fetched URL (preserves user gesture for Chrome protocol handler).
-      // Chrome silently drops ms-word:/ms-excel: navigation after any await, so this MUST be sync.
       const tempUrl = openUrlCache.current.get(f.id);
       openUrlCache.current.delete(f.id);
-      // Silently refresh file list to get fresh open_token for next click
       void loadFiles(true);
 
+      // Chrome encodes | → %7C breaking ms-word:ofe|u| — use direct download instead.
+      // Chrome shows the file in the download bar; user clicks "Abrir" → Word opens it.
       if (tempUrl) {
-        // Server-side redirect preserves literal | in Location header (browser encoding bypass)
-        window.open(`${tempUrl}/launch`, '_blank', 'noopener,noreferrer');
+        const a = document.createElement('a');
+        a.href = tempUrl;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
         return;
       }
-      // Fallback: download so the user can open manually while backend token is unavailable
       downloadWithAuth(f.id, f.original_name);
       return;
     }
