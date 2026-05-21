@@ -1576,55 +1576,19 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
   }, [getToken, taskId]);
 
   const openWithApp = useCallback(async (file: any) => {
-    const ext = (file.original_name || '').split('.').pop()?.toLowerCase() ?? '';
-    const wordExts = ['doc','docx','odt','rtf','dot','dotx'];
-    const excelExts = ['xls','xlsx','xlsm','xlsb','ods','csv'];
-    const pptExts = ['ppt','pptx','odp'];
-    const isOffice = wordExts.includes(ext) || excelExts.includes(ext) || pptExts.includes(ext);
-
-    if (isOffice) {
-      const tempUrl = openUrlCache.current.get(file.id);
-      openUrlCache.current.delete(file.id);
-      void loadFiles(true);
-
-      if (tempUrl) {
-        launchOfficeUrl(tempUrl);
-        return;
-      }
-      // Fallback: download so the user can open manually while backend token is unavailable
-      handleDownload(file.id, file.original_name);
-      return;
-    }
-
     const token = await getToken({ skipCache: true });
-    const res = await fetch(`/api/tasks/${taskId}/files/${file.id}/download`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const res = await fetch(`/api/tasks/${taskId}/files/${file.id}/download`, { headers: { Authorization: `Bearer ${token}` } });
     if (!res.ok) return;
     const blob = await res.blob();
-    const mimeMap: Record<string, string> = {
-      pdf: 'application/pdf',
-      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      doc: 'application/msword',
-      xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      xls: 'application/vnd.ms-excel',
-      pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      ppt: 'application/vnd.ms-powerpoint',
-      odt: 'application/vnd.oasis.opendocument.text',
-      ods: 'application/vnd.oasis.opendocument.spreadsheet',
-    };
-    const mime = mimeMap[ext] || blob.type || 'application/octet-stream';
-    const blobUrl = URL.createObjectURL(new Blob([blob], { type: mime }));
-    const a = document.createElement('a');
-    a.href = blobUrl;
-    if (mime !== 'application/pdf' && !mime.startsWith('image/') && !mime.startsWith('text/')) {
-      a.download = file.original_name || 'archivo';
-    }
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 10_000);
-  }, [getToken, loadFiles, taskId]);
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = file.original_name || "archivo";
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  }, [getToken, taskId]);
 
   const openPreview = useCallback(async (file: any) => {
     const cached = previewCache.current.get(file.id);
@@ -1667,12 +1631,8 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
   }, [getToken, taskId]);
 
   const handlePrimaryOpen = useCallback((file: any) => {
-    if (isWordAct(file.mimetype || "", file.original_name || "") || isExcelAct(file.mimetype || "", file.original_name || "")) {
-      void openWithApp(file);
-      return;
-    }
     void openPreview(file);
-  }, [openPreview, openWithApp]);
+  }, [openPreview]);
 
   const openMetadataForUpload = (file: File) => {
     pendingUploadFile.current = file;

@@ -2074,60 +2074,8 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
   };
 
   const openWithApp = useCallback(async (f: any) => {
-    const ext = (f.original_name || '').split('.').pop()?.toLowerCase() ?? '';
-    const wordExts  = ['doc','docx','odt','rtf','dot','dotx'];
-    const excelExts = ['xls','xlsx','xlsm','xlsb','ods','csv'];
-    const pptExts   = ['ppt','pptx','odp'];
-    const isOffice  = wordExts.includes(ext) || excelExts.includes(ext) || pptExts.includes(ext);
-
-    if (isOffice) {
-      // Synchronous path: open a normal HTTPS /launch URL so the backend can emit the final
-      // Office redirect without Chrome rewriting the ofe|u| command.
-      const tempUrl = openUrlCache.current.get(f.id);
-      openUrlCache.current.delete(f.id);
-      // Silently refresh file list to get fresh open_token for next click
-      void loadFiles(true);
-
-      if (tempUrl) {
-        launchOfficeUrl(tempUrl);
-        return;
-      }
-      // Fallback: download so the user can open manually while backend token is unavailable
-      downloadWithAuth(f.id, f.original_name);
-      return;
-    }
-
-    try {
-      const authToken = await getToken({ skipCache: true });
-      const res = await fetch(`/api/files/${clientId}/${f.id}/download`, {
-        headers: { Authorization: `Bearer ${authToken}` },
-      });
-      if (!res.ok) return;
-      const blob = await res.blob();
-      const mimeMap: Record<string, string> = {
-        pdf: 'application/pdf',
-        docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        doc: 'application/msword',
-        xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        xls: 'application/vnd.ms-excel',
-        pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-        ppt: 'application/vnd.ms-powerpoint',
-        odt: 'application/vnd.oasis.opendocument.text',
-        ods: 'application/vnd.oasis.opendocument.spreadsheet',
-      };
-      const mime = mimeMap[ext] || blob.type || 'application/octet-stream';
-      const blobUrl = URL.createObjectURL(new Blob([blob], { type: mime }));
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      if (mime !== 'application/pdf' && !mime.startsWith('image/') && !mime.startsWith('text/')) {
-        a.download = f.original_name || 'archivo';
-      }
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 10_000);
-    } catch (_e) {}
-  }, [clientId, getToken, loadFiles, downloadWithAuth]);
+    await downloadWithAuth(f.id, f.original_name);
+  }, [downloadWithAuth]);
 
   const openInWord = openWithApp;
 
@@ -2540,7 +2488,7 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
                     const canWord    = isWordFile(f.mimetype, f.original_name);
                     const canExcel   = isExcelFile(f.mimetype, f.original_name);
                     const handleNameClick = canWord || canExcel
-                      ? () => openWithApp(f)
+                      ? () => openPreview(f)
                       : canPreview
                         ? () => openPreview(f)
                         : undefined;
@@ -2570,7 +2518,7 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
                               <button
                                 onClick={handleNameClick}
                                 className={`text-sm font-medium text-slate-700 text-left truncate block max-w-[180px] ${(canPreview || canWord || canExcel) ? "hover:text-red-600 hover:underline cursor-pointer" : ""}`}
-                                title={canWord ? "Abrir en Word" : canExcel ? "Abrir en Excel" : f.original_name}
+                                title={canWord ? "Vista previa" : canExcel ? "Vista previa" : f.original_name}
                             >
                               {f.original_name}
                             </button>
@@ -2618,13 +2566,13 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
                             >
                               <Edit3 size={14} />
                             </button>
-                            {/* Abrir en app nativa / navegador */}
+                            {/* Descargar */}
                             <button
-                              title={canWord ? "Abrir en Word" : canExcel ? "Abrir en Excel" : f.mimetype === 'application/pdf' ? "Abrir PDF" : "Abrir"}
+                              title="Descargar"
                               className="p-1.5 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
                               onClick={() => openWithApp(f)}
                             >
-                              <ExternalLink size={14} />
+                              <Download size={14} />
                             </button>
                             <button onClick={() => handleDelete(f.id)} title="Eliminar"
                               className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
@@ -2662,13 +2610,13 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
                 </p>
               </div>
               <div className="flex items-center gap-1 shrink-0">
-                {/* Abrir en app nativa */}
+                {/* Descargar */}
                 {preview.fileId && (
                   <button
                     onClick={() => openWithApp({ id: preview.fileId!, original_name: preview.name })}
                     className="flex items-center gap-1.5 text-[11px] font-semibold text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 px-2 py-1 rounded-lg transition-colors border border-neutral-200"
                   >
-                    <ExternalLink size={11} /> Abrir
+                    <Download size={11} /> Descargar
                   </button>
                 )}
                 {/* Abrir en pestaña nueva */}
@@ -3020,7 +2968,7 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
             </div>
             <div className="p-6 space-y-4">
               <p className="text-sm text-slate-600">
-                Este es un documento Word. Para editarlo, abrelo en Microsoft Word.
+                Este es un documento Word. Puedes descargarlo o usar la vista previa web cuando esté disponible.
               </p>
               <div className="flex gap-3">
                 <button
@@ -3031,7 +2979,7 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
                   className="flex-1 px-4 py-2.5 bg-red-700 text-white font-medium text-sm rounded-lg hover:bg-red-800 transition-colors flex items-center justify-center gap-2"
                 >
                   <Download size={14} />
-                  Abrir en Word
+                  Descargar Word
                 </button>
                 <button
                   onClick={() => setWordPreview(null)}

@@ -284,62 +284,8 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
   };
 
   const openWithApp = useCallback(async (f: any) => {
-    const ext = (f.original_name || '').split('.').pop()?.toLowerCase() ?? '';
-    const wordExts  = ['doc','docx','odt','rtf','dot','dotx'];
-    const excelExts = ['xls','xlsx','xlsm','xlsb','ods','csv'];
-    const pptExts   = ['ppt','pptx','odp'];
-    const isOffice  = wordExts.includes(ext) || excelExts.includes(ext) || pptExts.includes(ext);
-
-    if (isOffice) {
-      // Synchronous path: use a normal HTTPS /launch URL so the server can emit the final
-      // ms-word:/ms-excel: redirect without Chrome re-encoding the Office command.
-      const tempUrl = openUrlCache.current.get(f.id);
-      openUrlCache.current.delete(f.id);
-      // Silently refresh file list to get fresh open_token for next click
-      void loadFiles(true);
-
-      if (tempUrl) {
-        launchOfficeUrl(tempUrl);
-        return;
-      }
-      // Fallback: download so the user can open manually while backend token is unavailable
-      downloadWithAuth(f.id, f.original_name);
-      return;
-    }
-
-    // PDF / images: blob URL without a.download → browser opens inline (PDF viewer, image viewer)
-    // Office fallback (dev env or token failure): blob with correct filename
-    try {
-      const authToken = await getToken({ skipCache: true });
-      const res = await fetch(`/api/files/${entityId}/${f.id}/download`, {
-        headers: { Authorization: `Bearer ${authToken}` },
-      });
-      if (!res.ok) return;
-      const blob = await res.blob();
-      const mimeMap: Record<string, string> = {
-        pdf: 'application/pdf',
-        docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        doc: 'application/msword',
-        xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        xls: 'application/vnd.ms-excel',
-        pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-        ppt: 'application/vnd.ms-powerpoint',
-        odt: 'application/vnd.oasis.opendocument.text',
-        ods: 'application/vnd.oasis.opendocument.spreadsheet',
-      };
-      const mime = mimeMap[ext] || blob.type || 'application/octet-stream';
-      const blobUrl = URL.createObjectURL(new Blob([blob], { type: mime }));
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      if (mime !== 'application/pdf' && !mime.startsWith('image/') && !mime.startsWith('text/')) {
-        a.download = f.original_name || 'archivo';
-      }
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 10_000);
-    } catch (_e) {}
-  }, [entityId, getToken, loadFiles, downloadWithAuth]);
+    await downloadWithAuth(f.id, f.original_name);
+  }, [downloadWithAuth]);
 
   const openInWord = openWithApp;
 
@@ -752,7 +698,7 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
                     const canExcel   = isExcelFile(f.mimetype, f.original_name);
                     const canOpenPreview = alwaysShowPreview || canPreview || canWord || canExcel;
                     const handleNameClick = canWord || canExcel
-                      ? () => openWithApp(f)
+                      ? () => openPreview(f)
                       : canOpenPreview
                         ? () => openPreview(f)
                         : undefined;
@@ -782,7 +728,7 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
                               <button
                                 onClick={handleNameClick}
                                 className={`text-sm font-medium text-slate-700 text-left truncate block max-w-[180px] ${canOpenPreview ? "hover:text-red-600 hover:underline cursor-pointer" : ""}`}
-                                title={canWord ? "Abrir en Word" : canExcel ? "Abrir en Excel" : f.original_name}
+                                title={canWord ? "Vista previa" : canExcel ? "Vista previa" : f.original_name}
                             >
                               {f.original_name}
                             </button>
@@ -830,13 +776,13 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
                             >
                               <Edit3 size={14} />
                             </button>
-                            {/* Abrir en app nativa / navegador */}
+                            {/* Descargar */}
                             <button
-                              title={canWord ? "Abrir en Word" : canExcel ? "Abrir en Excel" : f.mimetype === 'application/pdf' ? "Abrir PDF" : "Abrir"}
+                              title="Descargar"
                               className="p-1.5 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
                               onClick={() => openWithApp(f)}
                             >
-                              <ExternalLink size={14} />
+                              <Download size={14} />
                             </button>
                             <button onClick={() => handleDelete(f.id)} title="Eliminar"
                               className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
@@ -874,13 +820,13 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
                 </p>
               </div>
               <div className="flex items-center gap-1 shrink-0">
-                {/* Abrir en app nativa */}
+                {/* Descargar */}
                 {preview.fileId && (
                   <button
                     onClick={() => openWithApp({ id: preview.fileId!, original_name: preview.name })}
                     className="flex items-center gap-1.5 text-[11px] font-semibold text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 px-2 py-1 rounded-lg transition-colors border border-neutral-200"
                   >
-                    <ExternalLink size={11} /> Abrir
+                    <Download size={11} /> Descargar
                   </button>
                 )}
                 {/* Abrir en pestaña nueva */}
@@ -1232,7 +1178,7 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
             </div>
             <div className="p-6 space-y-4">
               <p className="text-sm text-slate-600">
-                Este es un documento Word. Para editarlo, abrelo en Microsoft Word.
+                Este es un documento Word. Puedes descargarlo o usar la vista previa web cuando esté disponible.
               </p>
               <div className="flex gap-3">
                 <button
@@ -1243,7 +1189,7 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
                   className="flex-1 px-4 py-2.5 bg-red-700 text-white font-medium text-sm rounded-lg hover:bg-red-800 transition-colors flex items-center justify-center gap-2"
                 >
                   <Download size={14} />
-                  Abrir en Word
+                  Descargar Word
                 </button>
                 <button
                   onClick={() => setWordPreview(null)}
