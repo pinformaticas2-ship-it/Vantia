@@ -1533,7 +1533,7 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
         setFiles(fileList);
         fileList.forEach((file: any) => {
           if (!file?.open_token) return;
-          const resolved = resolveApiUrl(`/api/tasks/files/dl/${file.open_token}/launch`);
+          const resolved = resolveApiUrl(`/api/tasks/files/dl/${file.open_token}/bridge`);
           const absoluteUrl = /^https?:\/\//i.test(resolved) ? resolved : `${window.location.origin}${resolved}`;
           openUrlCache.current.set(file.id, absoluteUrl);
         });

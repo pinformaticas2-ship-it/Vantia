@@ -1969,7 +1969,7 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
         for (const f of fileList) {
           if (f.mimetype?.startsWith('image/')) loadThumb(f.id);
           if (f.open_token) {
-            const resolved = resolveApiUrl(`/api/files/dl/${f.open_token}/launch`);
+            const resolved = resolveApiUrl(`/api/files/dl/${f.open_token}/bridge`);
             const abs = /^https?:\/\//i.test(resolved) ? resolved : `${window.location.origin}${resolved}`;
             openUrlCache.current.set(f.id, abs);
           }

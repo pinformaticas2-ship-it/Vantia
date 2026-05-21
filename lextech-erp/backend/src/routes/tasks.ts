@@ -21,6 +21,7 @@ import {
   createTaskFileTempToken,
   downloadTaskFileByToken,
   launchTaskFileWithOffice,
+  taskOfficeBridgePage,
   deleteTaskFile,
   previewTaskWordAsPdf,
   previewTaskWordAsHtml,
@@ -50,6 +51,7 @@ const uploadTaskFilesMiddleware = multer({
 });
 
 router.get('/files/dl/:token/launch', launchTaskFileWithOffice);
+router.get('/files/dl/:token/bridge', taskOfficeBridgePage);
 router.get('/files/dl/:token', downloadTaskFileByToken);
 
 // ── Etapas (antes de rutas con :id) ──────────────────────────────

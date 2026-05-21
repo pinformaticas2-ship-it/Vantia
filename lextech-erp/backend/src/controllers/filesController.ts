@@ -399,6 +399,67 @@ export const launchWithOffice = async (req: any, res: Response) => {
   }
 };
 
+export const officeBridgePage = async (req: any, res: Response) => {
+  const { token } = req.params;
+  const data = _tempTokens.get(token);
+  if (!data || data.exp < Date.now()) {
+    return res.status(401).send('Token inválido o expirado.');
+  }
+  try {
+    const result = await pool.query(
+      `SELECT original_name FROM client_files WHERE id = $1 LIMIT 1`,
+      [data.fileId]
+    );
+    if (result.rows.length === 0) return res.status(404).send('Archivo no encontrado.');
+    const { original_name } = result.rows[0];
+    const ext = (original_name || '').split('.').pop()?.toLowerCase() ?? '';
+    const excelExts = ['xls','xlsx','xlsm','xlsb','ods','csv'];
+    const pptExts = ['ppt','pptx','odp'];
+    const scheme = excelExts.includes(ext) ? 'ms-excel'
+      : pptExts.includes(ext) ? 'ms-powerpoint'
+      : 'ms-word';
+    const proto = req.headers['x-forwarded-proto'] || req.protocol;
+    const host = req.headers['x-forwarded-host'] || req.get('host');
+    const fileUrl = `${proto}://${host}/api/files/dl/${token}`;
+    const officeUrl = `${scheme}:ofe|u|${fileUrl}`;
+    const safeName = String(original_name || 'documento').replace(/[&<>"]/g, (ch) => (
+      ch === '&' ? '&amp;' : ch === '<' ? '&lt;' : ch === '>' ? '&gt;' : '&quot;'
+    ));
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(`<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Abrir documento</title>
+  <style>
+    body { font-family: Segoe UI, Arial, sans-serif; background: #f8fafc; color: #0f172a; display:flex; align-items:center; justify-content:center; min-height:100vh; margin:0; }
+    .card { width:min(480px, calc(100vw - 32px)); background:white; border:1px solid #e2e8f0; border-radius:16px; padding:24px; box-shadow:0 10px 30px rgba(15,23,42,.08); }
+    h1 { font-size:20px; margin:0 0 8px; }
+    p { color:#475569; line-height:1.5; }
+    a { display:inline-block; margin-top:12px; padding:12px 16px; background:#dc2626; color:white; text-decoration:none; border-radius:10px; font-weight:700; }
+    .hint { font-size:13px; color:#64748b; margin-top:12px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Abrir en Office</h1>
+    <p>Intentando abrir <strong>${safeName}</strong> en la aplicación de escritorio.</p>
+    <a id="office-link" href="${officeUrl}">Abrir documento</a>
+    <p class="hint">Si no se abre automáticamente, pulsa el botón.</p>
+  </div>
+  <script>
+    const link = document.getElementById('office-link');
+    setTimeout(() => link.click(), 50);
+  </script>
+</body>
+</html>`);
+  } catch (err: any) {
+    res.status(500).send(err.message);
+  }
+};
+
 // ─────────────────────────────────────────────────────────────
 // DELETE /api/files/:clientId/:fileId  — borrar archivo
 // ─────────────────────────────────────────────────────────────
