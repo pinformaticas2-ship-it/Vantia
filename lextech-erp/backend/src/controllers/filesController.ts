@@ -1694,11 +1694,9 @@ export { ensureClientDir, UPLOADS_ROOT };
 function getDocPlantRoot() {
   const candidates = [
     process.env.DOCPLANT_PATH ? path.resolve(process.env.DOCPLANT_PATH) : null,
+    path.resolve(__dirname, '../DocPlant'),    // dist/controllers → dist/DocPlant (nixpacks cp)
+    path.resolve(__dirname, '../../DocPlant'), // dist/controllers → repo-root/DocPlant
     path.resolve(process.cwd(), 'DocPlant'),
-    path.resolve(process.cwd(), 'backend/DocPlant'),
-    path.resolve(__dirname, '../../DocPlant'),
-    path.resolve(__dirname, '../../../DocPlant'),
-    path.resolve(DATA_ROOT, 'DocPlant'),
   ].filter(Boolean) as string[];
 
   const existing = candidates.find((candidate) => fs.existsSync(candidate));

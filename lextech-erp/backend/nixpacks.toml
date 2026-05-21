@@ -9,7 +9,7 @@ aptPkgs = [
 ]
 
 [phases.build]
-cmds = ["npm run build"]
+cmds = ["npm run build", "cp -r DocPlant dist/DocPlant"]
 
 [start]
 cmd = "node dist/server.js"
