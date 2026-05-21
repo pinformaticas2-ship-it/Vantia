@@ -355,7 +355,7 @@ export const downloadByToken = async (req: any, res: Response) => {
     if (!fs.existsSync(filePath)) return res.status(404).json({ success: false, error: 'Archivo no encontrado en disco.' });
     res.setHeader('Content-Type', mimetype);
     const asciiName = original_name.replace(/[^\x20-\x7E]/g, '_').replace(/"/g, '\\"');
-    res.setHeader('Content-Disposition', `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(original_name)}`);
+    res.setHeader('Content-Disposition', `inline; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(original_name)}`);
     res.setHeader('Access-Control-Allow-Origin', '*');
     if (isHead) return res.status(200).end();
     res.sendFile(filePath);

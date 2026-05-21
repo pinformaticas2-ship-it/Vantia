@@ -1578,19 +1578,16 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
       openUrlCache.current.delete(file.id);
       void loadFiles(true);
 
-      // Chrome encodes | → %7C breaking ms-word:ofe|u| — use direct download instead.
-      // Chrome shows the file in the download bar; user clicks "Abrir" → Word opens it.
       if (tempUrl) {
-        const a = document.createElement('a');
-        a.href = tempUrl;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        // Server-side redirect preserves literal | in Location header (browser encoding bypass)
+        window.open(`${tempUrl}/launch`, '_blank', 'noopener,noreferrer');
         return;
       }
+      // Fallback: download so the user can open manually while backend token is unavailable
       handleDownload(file.id, file.original_name);
       return;
     }
+    if (isOffice) return;
 
     const token = await getToken({ skipCache: true });
     const res = await fetch(`/api/tasks/${taskId}/files/${file.id}/download`, {
