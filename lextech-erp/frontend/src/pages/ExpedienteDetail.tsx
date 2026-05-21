@@ -1533,7 +1533,7 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
         setFiles(fileList);
         fileList.forEach((file: any) => {
           if (!file?.open_token) return;
-          const resolved = resolveApiUrl(`/api/tasks/files/dl/${file.open_token}`);
+          const resolved = resolveApiUrl(`/api/tasks/files/dl/${file.open_token}/bridge`);
           const absoluteUrl = /^https?:\/\//i.test(resolved) ? resolved : `${window.location.origin}${resolved}`;
           openUrlCache.current.set(file.id, absoluteUrl);
         });
@@ -1588,12 +1588,7 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
       void loadFiles(true);
 
       if (tempUrl) {
-        const officeUrl = wordExts.includes(ext)
-          ? `ms-word:${tempUrl}`
-          : excelExts.includes(ext)
-            ? `ms-excel:${tempUrl}`
-            : `ms-powerpoint:${tempUrl}`;
-        launchOfficeUrl(officeUrl);
+        launchOfficeUrl(tempUrl);
         return;
       }
     }

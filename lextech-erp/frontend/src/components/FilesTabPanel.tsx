@@ -179,7 +179,7 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
         for (const f of fileList) {
           if (f.mimetype?.startsWith('image/')) loadThumb(f.id);
           if (f.open_token) {
-            const resolved = resolveApiUrl(`/api/files/dl/${f.open_token}`);
+            const resolved = resolveApiUrl(`/api/files/dl/${f.open_token}/bridge`);
             const abs = /^https?:\/\//i.test(resolved) ? resolved : `${window.location.origin}${resolved}`;
             openUrlCache.current.set(f.id, abs);
           }
@@ -296,12 +296,7 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
       void loadFiles(true);
 
       if (tempUrl) {
-        const officeUrl = wordExts.includes(ext)
-          ? `ms-word:${tempUrl}`
-          : excelExts.includes(ext)
-            ? `ms-excel:${tempUrl}`
-            : `ms-powerpoint:${tempUrl}`;
-        launchOfficeUrl(officeUrl);
+        launchOfficeUrl(tempUrl);
         return;
       }
       await downloadWithAuth(f.id, f.original_name);

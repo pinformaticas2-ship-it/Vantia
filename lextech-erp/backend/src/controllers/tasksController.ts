@@ -453,6 +453,7 @@ export const taskOfficeBridgePage = async (req: any, res: Response) => {
     const host = req.headers['x-forwarded-host'] || req.get('host');
     const fileUrl = `${proto}://${host}/api/tasks/files/dl/${token}`;
     const officeUrl = `${scheme}:ofe|u|${fileUrl}`;
+    const officeOnlineUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(fileUrl)}`;
     const safeName = String(fileRow.original_name || 'documento').replace(/[&<>"]/g, (ch) => (
       ch === '&' ? '&amp;' : ch === '<' ? '&lt;' : ch === '>' ? '&gt;' : '&quot;'
     ));
@@ -466,23 +467,36 @@ export const taskOfficeBridgePage = async (req: any, res: Response) => {
   <title>Abrir documento</title>
   <style>
     body { font-family: Segoe UI, Arial, sans-serif; background: #f8fafc; color: #0f172a; display:flex; align-items:center; justify-content:center; min-height:100vh; margin:0; }
-    .card { width:min(480px, calc(100vw - 32px)); background:white; border:1px solid #e2e8f0; border-radius:16px; padding:24px; box-shadow:0 10px 30px rgba(15,23,42,.08); }
+    .card { width:min(520px, calc(100vw - 32px)); background:white; border:1px solid #e2e8f0; border-radius:16px; padding:24px; box-shadow:0 10px 30px rgba(15,23,42,.08); text-align:center; }
     h1 { font-size:20px; margin:0 0 8px; }
-    p { color:#475569; line-height:1.5; }
-    a { display:inline-block; margin-top:12px; padding:12px 16px; background:#dc2626; color:white; text-decoration:none; border-radius:10px; font-weight:700; }
-    .hint { font-size:13px; color:#64748b; margin-top:12px; }
+    p { color:#475569; line-height:1.5; margin-bottom:20px; }
+    .btn-group { display:flex; flex-direction:column; gap:12px; }
+    .btn { display:block; padding:14px 16px; text-decoration:none; border-radius:10px; font-weight:700; }
+    .btn-primary { background:#dc2626; color:white; }
+    .btn-secondary { background:#2b579a; color:white; }
+    .hint { font-size:13px; color:#64748b; margin-top:16px; }
+    #launcher-frame { display:none; width:0; height:0; border:0; }
   </style>
 </head>
 <body>
   <div class="card">
-    <h1>Abrir en Office</h1>
-    <p>Intentando abrir <strong>${safeName}</strong> en la aplicación de escritorio.</p>
-    <a id="office-link" href="${officeUrl}">Abrir documento</a>
-    <p class="hint">Si no se abre automáticamente, pulsa el botón.</p>
+    <h1>Abrir documento</h1>
+    <p>Estamos intentando abrir <strong>${safeName}</strong> en la aplicación de escritorio.</p>
+    <div class="btn-group">
+      <a href="${officeUrl}" class="btn btn-primary">Reintentar Word Escritorio</a>
+      <a href="${officeOnlineUrl}" target="_blank" rel="noreferrer" class="btn btn-secondary">Abrir en Office Online</a>
+    </div>
+    <p class="hint">Si Word no se abre, usa Office Online para consultar el documento en el navegador.</p>
   </div>
+  <iframe id="launcher-frame" title="office-launcher"></iframe>
   <script>
-    const link = document.getElementById('office-link');
-    setTimeout(() => link.click(), 50);
+    function launch() {
+      const frame = document.getElementById('launcher-frame');
+      if (frame) frame.src = "${officeUrl}";
+    }
+    window.onload = () => {
+      setTimeout(launch, 500);
+    };
   </script>
 </body>
 </html>`);
