@@ -99,12 +99,14 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
   const [editAttachmentType, setEditAttachmentType] = useState('Sin clasificar');
   const [savingMetadata, setSavingMetadata] = useState(false);
   const [pdfOpenMenu, setPdfOpenMenu] = useState<{ file: any; x: number; y: number } | null>(null);
+  const [openingMessage, setOpeningMessage] = useState<string | null>(null);
   // Plantilla pendiente de guardar
   const [pendingTemplate, setPendingTemplate] = useState<{ filePath: string; fileName: string } | null>(null);
   // Cola de archivos pendientes de adjuntar (mostrar modal uno a uno)
   const [uploadQueue, setUploadQueue]       = useState<File[]>([]);
   const [uploadQueueTotal, setUploadQueueTotal] = useState(0);
   const pendingUploadFile = useRef<File | null>(null);
+  const openingMessageTimer = useRef<number | null>(null);
   // Vista previa de Word
   const [wordPreview, setWordPreview] = useState<{ id: string; name: string; mime: string } | null>(null);
 
@@ -132,6 +134,15 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
         previewBlobUrl.current = null;
       }
     };
+  }, []);
+
+  const showOpeningMessage = useCallback((message: string) => {
+    setOpeningMessage(message);
+    if (openingMessageTimer.current) window.clearTimeout(openingMessageTimer.current);
+    openingMessageTimer.current = window.setTimeout(() => {
+      setOpeningMessage(null);
+      openingMessageTimer.current = null;
+    }, 4000);
   }, []);
 
   useEffect(() => {
@@ -214,6 +225,7 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
 
   const openPdfInBrowser = useCallback(async (file: any) => {
     try {
+      showOpeningMessage('Abriendo con navegador...');
       const token = await getToken({ skipCache: true });
       const res = await fetch(`/api/files/${entityId}/${file.id}/download`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -228,12 +240,14 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
       window.open(url, '_blank', 'noopener,noreferrer');
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (_e) {
+      setOpeningMessage(null);
       alert('No se pudo abrir el PDF en el navegador.');
     }
-  }, [entityId, getToken]);
+  }, [entityId, getToken, showOpeningMessage]);
 
   const openPdfWithPdfStudio = useCallback(async (file: any) => {
     try {
+      showOpeningMessage('Abriendo con PDF Studio...');
       const tempUrl = await getTempOpenUrl(file.id);
       const b64 = encodeVantiaPayload({
         url: tempUrl,
@@ -243,9 +257,10 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
       });
       window.location.href = `vantia:${b64}`;
     } catch (error: any) {
+      setOpeningMessage(null);
       alert(error?.message || 'No se pudo abrir el PDF en PDF Studio.');
     }
-  }, [getTempOpenUrl]);
+  }, [getTempOpenUrl, showOpeningMessage]);
 
   const showPdfOpenMenu = useCallback((event: React.MouseEvent, file: any) => {
     event.preventDefault();
@@ -1284,6 +1299,12 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
           </div>
         </div>,
         document.body
+      )}
+
+      {openingMessage && (
+        <div className="fixed right-5 top-5 z-[10004] rounded-xl border border-slate-200 bg-white/95 px-4 py-3 text-sm font-medium text-slate-700 shadow-2xl backdrop-blur">
+          {openingMessage}
+        </div>
       )}
 
       {pdfOpenMenu && createPortal(

@@ -1518,6 +1518,7 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
   // Preview
   const [preview, setPreview] = useState<{ url: string; name: string; mime: string; fileId: string } | null>(null);
   const [pdfOpenMenu, setPdfOpenMenu] = useState<{ file: any; x: number; y: number } | null>(null);
+  const [openingMessage, setOpeningMessage] = useState<string | null>(null);
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
   const loadingThumbIds = useRef<Set<string>>(new Set());
   const previewCache = useRef<Map<string, { url: string; name: string; mime: string; fileId: string }>>(new Map());
@@ -1525,6 +1526,7 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
   const pendingUploadFile = useRef<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
+  const openingMessageTimer = useRef<number | null>(null);
 
   useEffect(() => {
     return () => {
@@ -1548,6 +1550,15 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [pdfOpenMenu]);
+
+  const showOpeningMessage = useCallback((message: string) => {
+    setOpeningMessage(message);
+    if (openingMessageTimer.current) window.clearTimeout(openingMessageTimer.current);
+    openingMessageTimer.current = window.setTimeout(() => {
+      setOpeningMessage(null);
+      openingMessageTimer.current = null;
+    }, 4000);
+  }, []);
 
   const loadFiles = useCallback(async (silent = false) => {
     try {
@@ -1661,6 +1672,7 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
 
   const openPdfInBrowser = useCallback(async (file: any) => {
     try {
+      showOpeningMessage("Abriendo con navegador...");
       const token = await getToken({ skipCache: true });
       const res = await fetch(`/api/tasks/${taskId}/files/${file.id}/download`, { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) {
@@ -1673,12 +1685,14 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
       window.open(url, "_blank", "noopener,noreferrer");
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (_) {
+      setOpeningMessage(null);
       setError("No se pudo abrir el PDF en el navegador.");
     }
-  }, [getToken, taskId]);
+  }, [getToken, taskId, showOpeningMessage]);
 
   const openPdfWithPdfStudio = useCallback(async (file: any) => {
     try {
+      showOpeningMessage("Abriendo con PDF Studio...");
       const tempUrl = await getTempOpenUrl(file.id);
       const b64 = encodeVantiaPayload({
         url: tempUrl,
@@ -1688,9 +1702,10 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
       });
       window.location.href = `vantia:${b64}`;
     } catch (error: any) {
+      setOpeningMessage(null);
       setError(error?.message || "No se pudo abrir el PDF en PDF Studio.");
     }
-  }, [getTempOpenUrl]);
+  }, [getTempOpenUrl, showOpeningMessage]);
 
   const showPdfOpenMenu = useCallback((event: React.MouseEvent, file: any) => {
     event.preventDefault();
@@ -2224,6 +2239,12 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
           </>
         )}
       </div>
+
+      {openingMessage && (
+        <div className="fixed right-5 top-5 z-[171] rounded-xl border border-slate-200 bg-white/95 px-4 py-3 text-sm font-medium text-slate-700 shadow-2xl backdrop-blur">
+          {openingMessage}
+        </div>
+      )}
 
       {pdfOpenMenu && typeof document !== "undefined" && createPortal(
         <div
