@@ -812,6 +812,7 @@ function TimeGridView({
   onEventClick,
   onGcalEventClick,
   onDayHeaderClick,
+  onResizeEvent,
 }: {
   days: string[];
   eventsByDay: Record<string, AgendaEvent[]>;
