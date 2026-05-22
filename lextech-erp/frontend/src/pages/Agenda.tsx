@@ -1031,7 +1031,7 @@ function TimeGridView({
                       style={{ top: topPx, height: heightPx, zIndex: isResizing ? 30 : 10 }}
                     >
                       <div className="font-semibold truncate leading-tight">{ev.title}</div>
-                      <div className="text-white/80 text-[10px] leading-tight">
+                      <div className={`text-[10px] leading-tight transition-opacity duration-200 ${isResizing ? "opacity-0" : "text-white/80"}`}>
                         {fmtTime(ev.start_at)}{effectiveEndAt ? ` – ${fmtTime(effectiveEndAt)}` : ""}
                       </div>
                       {/* Handle de resize */}
