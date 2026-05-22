@@ -27,6 +27,59 @@ function Show-VantiaError([string]$message) {
   }
 }
 
+function Find-PdfStudioExecutable {
+  $candidates = @(
+    'C:\Program Files\PDF Studio 2025\pdfstudio64.exe',
+    'C:\Program Files\PDF Studio 2025\pdfstudio.exe',
+    'C:\Program Files\PDF Studio 2024\pdfstudio64.exe',
+    'C:\Program Files\PDF Studio 2024\pdfstudio.exe',
+    'C:\Program Files\PDF Studio 2023\pdfstudio64.exe',
+    'C:\Program Files\PDF Studio 2023\pdfstudio.exe',
+    'C:\Program Files\PDF Studio 2022\pdfstudio64.exe',
+    'C:\Program Files\PDF Studio 2022\pdfstudio.exe',
+    'C:\Program Files (x86)\PDF Studio 2025\pdfstudio.exe',
+    'C:\Program Files (x86)\PDF Studio 2024\pdfstudio.exe',
+    'C:\Program Files (x86)\PDF Studio 2023\pdfstudio.exe',
+    'C:\Program Files (x86)\PDF Studio 2022\pdfstudio.exe'
+  )
+
+  foreach ($candidate in $candidates) {
+    if (Test-Path $candidate) { return $candidate }
+  }
+
+  foreach ($root in @('C:\Program Files', 'C:\Program Files (x86)')) {
+    $found = Get-ChildItem $root -Directory -Filter 'PDF Studio*' -ErrorAction SilentlyContinue |
+      Sort-Object Name -Descending |
+      ForEach-Object {
+        foreach ($exeName in @('pdfstudio64.exe', 'pdfstudio.exe')) {
+          $fullPath = Join-Path $_.FullName $exeName
+          if (Test-Path $fullPath) { return $fullPath }
+        }
+      } |
+      Select-Object -First 1
+    if ($found) { return $found }
+  }
+
+  return $null
+}
+
+function Open-VantiaFile {
+  param(
+    [string]$PathToOpen,
+    [string]$PreferredApp
+  )
+
+  if ($PreferredApp -eq 'pdfstudio') {
+    $pdfStudioPath = Find-PdfStudioExecutable
+    if ([string]::IsNullOrWhiteSpace($pdfStudioPath)) {
+      throw 'No se ha encontrado PDF Studio instalado en este equipo.'
+    }
+    return Start-Process -FilePath $pdfStudioPath -ArgumentList @($PathToOpen) -PassThru
+  }
+
+  return Start-Process -FilePath $PathToOpen -PassThru
+}
+
 try {
   if ($payload.StartsWith('{')) {
     $data = $payload | ConvertFrom-Json
@@ -51,6 +104,7 @@ try {
 
     $targetPath = Join-Path $tempRoot ("{0}-{1}{2}" -f $baseName, ([guid]::NewGuid().ToString('N')), $ext)
     $syncUrl = [string]$data.syncUrl
+    $preferredApp = [string]$data.preferredApp
     if ([string]::IsNullOrWhiteSpace($syncUrl)) { $syncUrl = "$($data.url)/sync" }
 
     Invoke-WebRequest -Uri $data.url -OutFile $targetPath -UseBasicParsing
@@ -74,7 +128,7 @@ try {
       $LastUploadedTicks.Value = (Get-Item $PathToSync).LastWriteTimeUtc.Ticks
     }
 
-    $proc = Start-Process -FilePath $targetPath -PassThru
+    $proc = Open-VantiaFile -PathToOpen $targetPath -PreferredApp $preferredApp
     $deadline = (Get-Date).AddHours(12)
 
     do {

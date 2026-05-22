@@ -29,6 +29,10 @@ function fmtSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 function isPreviewable(mime: string) { return mime === "application/pdf" || mime.startsWith("image/") || mime.startsWith("text/"); }
+function isPdfFile(mime: string, name: string) {
+  const n = (name || "").toLowerCase();
+  return mime === "application/pdf" || n.endsWith(".pdf");
+}
 function isWordFile(mime: string, name: string) {
   const n = name.toLowerCase();
   return mime.includes("wordprocessingml") || mime.includes("msword") || mime.includes("opendocument.text") ||
@@ -94,6 +98,7 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
   const [editDocName, setEditDocName] = useState('');
   const [editAttachmentType, setEditAttachmentType] = useState('Sin clasificar');
   const [savingMetadata, setSavingMetadata] = useState(false);
+  const [pdfOpenMenu, setPdfOpenMenu] = useState<{ file: any; x: number; y: number } | null>(null);
   // Plantilla pendiente de guardar
   const [pendingTemplate, setPendingTemplate] = useState<{ filePath: string; fileName: string } | null>(null);
   // Cola de archivos pendientes de adjuntar (mostrar modal uno a uno)
@@ -128,6 +133,20 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!pdfOpenMenu) return;
+    const closeMenu = () => setPdfOpenMenu(null);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPdfOpenMenu(null);
+    };
+    window.addEventListener('click', closeMenu);
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('click', closeMenu);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [pdfOpenMenu]);
 
   // ── Cargar thumbnails de imágenes ─────────────────────────────
   const loadThumb = useCallback(async (fileId: string) => {
@@ -172,6 +191,67 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
       alert('Error al descargar el archivo');
     }
   }, [entityId, getToken]);
+
+  const getTempOpenUrl = useCallback(async (fileId: string) => {
+    const cached = openUrlCache.current.get(fileId);
+    if (cached) return cached;
+
+    const token = await getToken({ skipCache: true });
+    const res = await fetch(`/api/files/${entityId}/${fileId}/temp-token`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await safeJson(res);
+    if (!res.ok || !data?.token) {
+      throw new Error(data?.error || 'No se pudo generar el acceso temporal.');
+    }
+
+    const resolved = resolveApiUrl(`/api/files/dl/${data.token}`);
+    const absoluteUrl = /^https?:\/\//i.test(resolved) ? resolved : `${window.location.origin}${resolved}`;
+    openUrlCache.current.set(fileId, absoluteUrl);
+    return absoluteUrl;
+  }, [entityId, getToken]);
+
+  const openPdfInBrowser = useCallback(async (file: any) => {
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/files/${entityId}/${file.id}/download`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(`Error al abrir PDF: ${err.error || res.status}`);
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank', 'noopener,noreferrer');
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (_e) {
+      alert('No se pudo abrir el PDF en el navegador.');
+    }
+  }, [entityId, getToken]);
+
+  const openPdfWithPdfStudio = useCallback(async (file: any) => {
+    try {
+      const tempUrl = await getTempOpenUrl(file.id);
+      const b64 = encodeVantiaPayload({
+        url: tempUrl,
+        syncUrl: `${tempUrl}/sync`,
+        name: file.original_name || 'documento.pdf',
+        preferredApp: 'pdfstudio',
+      });
+      window.location.href = `vantia:${b64}`;
+    } catch (error: any) {
+      alert(error?.message || 'No se pudo abrir el PDF en PDF Studio.');
+    }
+  }, [getTempOpenUrl]);
+
+  const showPdfOpenMenu = useCallback((event: React.MouseEvent, file: any) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setPdfOpenMenu({ file, x: event.clientX, y: event.clientY });
+  }, []);
 
   // ── Cargar archivos ──────────────────────────────────────────
   // silent=true: refresco en segundo plano — no muestra spinner
@@ -728,9 +808,12 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
                     const canPreview = isPreviewable(f.mimetype);
                     const canWord    = isWordFile(f.mimetype, f.original_name);
                     const canExcel   = isExcelFile(f.mimetype, f.original_name);
+                    const isPdf      = isPdfFile(f.mimetype, f.original_name);
                     const canOpenPreview = alwaysShowPreview || canPreview || canWord || canExcel;
                     const handleNameClick = canWord || canExcel
                       ? () => openWithApp(f)
+                      : isPdf
+                        ? undefined
                       : canOpenPreview
                         ? () => openPreview(f)
                         : undefined;
@@ -750,7 +833,11 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
                               ) : (
                                 <span
                                   className={`h-10 w-10 rounded-lg flex items-center justify-center text-lg shrink-0 ${fi.color} ${f.mimetype?.startsWith('image/') ? 'animate-pulse' : ''} cursor-pointer hover:scale-105 transition-transform`}
-                                  onClick={() => { if (f.mimetype?.startsWith('image/')) loadThumb(f.id); else if (canOpenPreview) handleNameClick?.(); }}
+                                  onClick={(event) => {
+                                    if (f.mimetype?.startsWith('image/')) loadThumb(f.id);
+                                    else if (isPdf) showPdfOpenMenu(event, f);
+                                    else if (canOpenPreview) handleNameClick?.();
+                                  }}
                                 >
                                   {fi.icon}
                                 </span>
@@ -758,9 +845,9 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
                             }
                             <div className="min-w-0">
                               <button
-                                onClick={handleNameClick}
+                                onClick={isPdf ? (event) => showPdfOpenMenu(event, f) : handleNameClick}
                                 className={`text-sm font-medium text-slate-700 text-left truncate block max-w-[180px] ${canOpenPreview ? "hover:text-red-600 hover:underline cursor-pointer" : ""}`}
-                                title={canWord ? "Abrir en Word" : canExcel ? "Abrir en Excel" : f.original_name}
+                                title={canWord ? "Abrir en Word" : canExcel ? "Abrir en Excel" : isPdf ? "Abrir PDF" : f.original_name}
                             >
                               {f.original_name}
                             </button>
@@ -810,9 +897,9 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
                             </button>
                             {/* Abrir / descargar */}
                             <button
-                              title={canWord ? "Abrir en Word" : canExcel ? "Abrir en Excel" : "Descargar"}
+                              title={canWord ? "Abrir en Word" : canExcel ? "Abrir en Excel" : isPdf ? "Abrir PDF" : "Descargar"}
                               className="p-1.5 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-                              onClick={() => openWithApp(f)}
+                              onClick={isPdf ? (event) => showPdfOpenMenu(event, f) : () => openWithApp(f)}
                             >
                               <ExternalLink size={14} />
                             </button>
@@ -855,7 +942,14 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
                 {/* Abrir / descargar */}
                 {preview.fileId && (
                   <button
-                    onClick={() => openWithApp({ id: preview.fileId!, original_name: preview.name })}
+                    onClick={(event) => {
+                      const sourceFile = files.find((item) => item.id === preview.fileId);
+                      if (preview.mime === 'application/pdf' && sourceFile) {
+                        showPdfOpenMenu(event, sourceFile);
+                        return;
+                      }
+                      void openWithApp({ id: preview.fileId!, original_name: preview.name });
+                    }}
                     className="flex items-center gap-1.5 text-[11px] font-semibold text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 px-2 py-1 rounded-lg transition-colors border border-neutral-200"
                   >
                     <ExternalLink size={11} /> Abrir
@@ -1188,6 +1282,34 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
             )}
 
           </div>
+        </div>,
+        document.body
+      )}
+
+      {pdfOpenMenu && createPortal(
+        <div
+          className="fixed z-[10003] min-w-[220px] rounded-xl border border-slate-200 bg-white p-1 shadow-2xl"
+          style={{ left: Math.min(pdfOpenMenu.x, window.innerWidth - 236), top: Math.min(pdfOpenMenu.y + 8, window.innerHeight - 120) }}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <button
+            onClick={() => {
+              void openPdfInBrowser(pdfOpenMenu.file);
+              setPdfOpenMenu(null);
+            }}
+            className="flex w-full items-center rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100"
+          >
+            Abrir en navegador
+          </button>
+          <button
+            onClick={() => {
+              void openPdfWithPdfStudio(pdfOpenMenu.file);
+              setPdfOpenMenu(null);
+            }}
+            className="flex w-full items-center rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100"
+          >
+            Abrir con PDF Studio
+          </button>
         </div>,
         document.body
       )}

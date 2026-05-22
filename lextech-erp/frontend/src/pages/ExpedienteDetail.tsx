@@ -1470,6 +1470,10 @@ function fmtSizeAct(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 function isPrevAct(mime: string) { return mime === "application/pdf" || mime?.startsWith("image/") || mime?.startsWith("text/"); }
+function isPdfAct(mime: string, name: string) {
+  const n = (name || "").toLowerCase();
+  return mime === "application/pdf" || n.endsWith(".pdf");
+}
 function isWordAct(mime: string, name: string) { const n = (name || "").toLowerCase(); return mime?.includes("word") || mime?.includes("officedocument.wordprocessingml") || n.endsWith(".doc") || n.endsWith(".docx"); }
 function isExcelAct(mime: string, name: string) { const n = (name || "").toLowerCase(); return mime?.includes("excel") || mime?.includes("spreadsheetml") || n.endsWith(".xlsx") || n.endsWith(".xls") || n.endsWith(".csv"); }
 function openMailDraft(subject: string, body?: string) {
@@ -1513,6 +1517,7 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
   const [query, setQuery] = useState("");
   // Preview
   const [preview, setPreview] = useState<{ url: string; name: string; mime: string; fileId: string } | null>(null);
+  const [pdfOpenMenu, setPdfOpenMenu] = useState<{ file: any; x: number; y: number } | null>(null);
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
   const loadingThumbIds = useRef<Set<string>>(new Set());
   const previewCache = useRef<Map<string, { url: string; name: string; mime: string; fileId: string }>>(new Map());
@@ -1529,6 +1534,20 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
       previewCache.current.clear();
     };
   }, []);
+
+  useEffect(() => {
+    if (!pdfOpenMenu) return;
+    const closeMenu = () => setPdfOpenMenu(null);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPdfOpenMenu(null);
+    };
+    window.addEventListener("click", closeMenu);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("click", closeMenu);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [pdfOpenMenu]);
 
   const loadFiles = useCallback(async (silent = false) => {
     try {
@@ -1619,6 +1638,65 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
     document.body.removeChild(anchor);
     setTimeout(() => URL.revokeObjectURL(url), 10_000);
   }, [getToken, loadFiles, taskId]);
+
+  const getTempOpenUrl = useCallback(async (fileId: string) => {
+    const cached = openUrlCache.current.get(fileId);
+    if (cached) return cached;
+
+    const token = await getToken({ skipCache: true });
+    const res = await fetch(`/api/tasks/${taskId}/files/${fileId}/temp-token`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await safeJson(res);
+    if (!res.ok || !data?.token) {
+      throw new Error(data?.error || "No se pudo generar el acceso temporal.");
+    }
+
+    const resolved = resolveApiUrl(`/api/tasks/files/dl/${data.token}`);
+    const absoluteUrl = /^https?:\/\//i.test(resolved) ? resolved : `${window.location.origin}${resolved}`;
+    openUrlCache.current.set(fileId, absoluteUrl);
+    return absoluteUrl;
+  }, [getToken, taskId]);
+
+  const openPdfInBrowser = useCallback(async (file: any) => {
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/tasks/${taskId}/files/${file.id}/download`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setError(err?.error || "No se pudo abrir el PDF en el navegador.");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank", "noopener,noreferrer");
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (_) {
+      setError("No se pudo abrir el PDF en el navegador.");
+    }
+  }, [getToken, taskId]);
+
+  const openPdfWithPdfStudio = useCallback(async (file: any) => {
+    try {
+      const tempUrl = await getTempOpenUrl(file.id);
+      const b64 = encodeVantiaPayload({
+        url: tempUrl,
+        syncUrl: `${tempUrl}/sync`,
+        name: file.original_name || "documento.pdf",
+        preferredApp: "pdfstudio",
+      });
+      window.location.href = `vantia:${b64}`;
+    } catch (error: any) {
+      setError(error?.message || "No se pudo abrir el PDF en PDF Studio.");
+    }
+  }, [getTempOpenUrl]);
+
+  const showPdfOpenMenu = useCallback((event: React.MouseEvent, file: any) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setPdfOpenMenu({ file, x: event.clientX, y: event.clientY });
+  }, []);
 
   const openPreview = useCallback(async (file: any) => {
     const cached = previewCache.current.get(file.id);
@@ -1879,6 +1957,7 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
                   const canPrev = isPrevAct(file.mimetype);
                   const canWord = isWordAct(file.mimetype, file.original_name);
                   const canExcel = isExcelAct(file.mimetype, file.original_name);
+                  const isPdf = isPdfAct(file.mimetype, file.original_name);
                   const isActive = preview?.fileId === file.id;
                   return (
                     <tr key={file.id} className={`hover:bg-slate-50/70 transition-colors group ${isActive ? "bg-red-50/40" : ""}`}>
@@ -1889,7 +1968,11 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
                           ) : (
                             <span
                               className={`h-8 w-8 rounded flex items-center justify-center text-sm shrink-0 ${fi.color} cursor-pointer`}
-                              onClick={() => { if (file.mimetype?.startsWith("image/")) loadThumb(file.id); else if (canPrev || canWord || canExcel) handlePrimaryOpen(file); }}
+                              onClick={(event) => {
+                                if (file.mimetype?.startsWith("image/")) loadThumb(file.id);
+                                else if (isPdf) showPdfOpenMenu(event, file);
+                                else if (canPrev || canWord || canExcel) handlePrimaryOpen(file);
+                              }}
                             >
                               {fi.icon}
                             </span>
@@ -1897,7 +1980,7 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
                           <div className="min-w-0">
                             <button
                               type="button"
-                              onClick={() => { if (canPrev || canWord || canExcel) handlePrimaryOpen(file); }}
+                              onClick={isPdf ? (event) => showPdfOpenMenu(event, file) : () => { if (canPrev || canWord || canExcel) handlePrimaryOpen(file); }}
                               className={`text-xs font-medium text-slate-700 text-left truncate block max-w-[140px] ${(canPrev || canWord || canExcel) ? "hover:text-red-600 cursor-pointer" : "cursor-default"}`}
                               title={file.original_name}
                             >
@@ -2040,6 +2123,7 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
                     const canPrev = isPrevAct(file.mimetype);
                     const canWord = isWordAct(file.mimetype, file.original_name);
                     const canExcel = isExcelAct(file.mimetype, file.original_name);
+                    const isPdf = isPdfAct(file.mimetype, file.original_name);
                     const isActive = preview?.fileId === file.id;
                     return (
                       <tr key={file.id} className={`group transition-colors ${isActive ? "bg-red-50/50" : "hover:bg-slate-50/70"}`}>
@@ -2048,14 +2132,14 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
                             {file.mimetype?.startsWith("image/") && thumbs[file.id] ? (
                               <img src={thumbs[file.id]} alt="" className="h-10 w-10 rounded-lg object-cover shrink-0 cursor-pointer hover:scale-105 transition-transform" onClick={() => handlePrimaryOpen(file)} />
                             ) : (
-                              <button type="button" className={`h-10 w-10 rounded-xl flex items-center justify-center text-sm shrink-0 ${fi.color}`} onClick={() => { if (file.mimetype?.startsWith("image/")) loadThumb(file.id); else if (canPrev || canWord || canExcel) handlePrimaryOpen(file); }}>
+                              <button type="button" className={`h-10 w-10 rounded-xl flex items-center justify-center text-sm shrink-0 ${fi.color}`} onClick={isPdf ? (event) => showPdfOpenMenu(event, file) : () => { if (file.mimetype?.startsWith("image/")) loadThumb(file.id); else if (canPrev || canWord || canExcel) handlePrimaryOpen(file); }}>
                                 {fi.icon}
                               </button>
                             )}
                             <div className="min-w-0">
                               <button
                                 type="button"
-                                onClick={() => { if (canPrev || canWord || canExcel) handlePrimaryOpen(file); }}
+                                onClick={isPdf ? (event) => showPdfOpenMenu(event, file) : () => { if (canPrev || canWord || canExcel) handlePrimaryOpen(file); }}
                                 className={`text-sm font-semibold text-slate-800 text-left truncate block max-w-[260px] ${(canPrev || canWord || canExcel) ? "hover:text-red-600" : ""}`}
                                 title={file.original_name}
                               >
@@ -2140,6 +2224,34 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
           </>
         )}
       </div>
+
+      {pdfOpenMenu && typeof document !== "undefined" && createPortal(
+        <div
+          className="fixed z-[170] min-w-[220px] rounded-xl border border-slate-200 bg-white p-1 shadow-2xl"
+          style={{ left: Math.min(pdfOpenMenu.x, window.innerWidth - 236), top: Math.min(pdfOpenMenu.y + 8, window.innerHeight - 120) }}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <button
+            onClick={() => {
+              void openPdfInBrowser(pdfOpenMenu.file);
+              setPdfOpenMenu(null);
+            }}
+            className="flex w-full items-center rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100"
+          >
+            Abrir en navegador
+          </button>
+          <button
+            onClick={() => {
+              void openPdfWithPdfStudio(pdfOpenMenu.file);
+              setPdfOpenMenu(null);
+            }}
+            className="flex w-full items-center rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100"
+          >
+            Abrir con PDF Studio
+          </button>
+        </div>,
+        document.body
+      )}
 
       {/* Modal editar metadatos */}
       {editingFile && typeof document !== "undefined" && createPortal(
