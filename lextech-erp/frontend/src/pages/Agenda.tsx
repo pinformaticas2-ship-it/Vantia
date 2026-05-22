@@ -87,6 +87,8 @@ interface AgendaOrganizationExpediente {
   related_users?: AgendaOrganizationUser[];
 }
 
+type AgendaViewMode = "month" | "week" | "day";
+
 // ── Config de tipos de evento ─────────────────────────────────────────────────
 const EVENT_TYPES: Record<string, { label: string; color: string; bg: string; dot: string; icon: any }> = {
   cita:    { label: "Cita",       color: "text-blue-700",   bg: "bg-blue-500",   dot: "bg-blue-500",   icon: Users },
@@ -138,6 +140,48 @@ function moveIsoToDateKeepingTime(iso: string, targetDateKey: string) {
   return moved.toISOString();
 }
 
+function addDays(date: Date, amount: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + amount);
+  return next;
+}
+
+function startOfWeek(date: Date) {
+  const current = new Date(date);
+  const day = current.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  current.setDate(current.getDate() + diff);
+  current.setHours(0, 0, 0, 0);
+  return current;
+}
+
+function formatDayNumber(date: Date) {
+  return new Intl.DateTimeFormat("es-ES", { day: "numeric" }).format(date);
+}
+
+function formatWeekdayShort(date: Date) {
+  return new Intl.DateTimeFormat("es-ES", { weekday: "short" }).format(date);
+}
+
+function formatWeekdayLong(date: Date) {
+  return new Intl.DateTimeFormat("es-ES", { weekday: "long", day: "numeric", month: "long" }).format(date);
+}
+
+function buildDateTimeForSlot(dateKey: string, hour: number, minutes = 0) {
+  return `${dateKey}T${String(hour).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function eventMinutesFromMidnight(dateStr: string) {
+  const date = new Date(dateStr);
+  return date.getHours() * 60 + date.getMinutes();
+}
+
+function eventDurationMinutes(startAt: string, endAt?: string | null) {
+  if (!endAt) return 60;
+  const diff = new Date(endAt).getTime() - new Date(startAt).getTime();
+  return Math.max(30, Math.round(diff / 60000));
+}
+
 function stripHtml(value?: string | null) {
   return String(value || "").replace(/<[^>]+>/g, "").trim();
 }
@@ -182,11 +226,18 @@ function buildCalendarDays(year: number, month: number): (Date | null)[] {
 }
 
 // ── Formulario vacío ──────────────────────────────────────────────────────────
-const emptyForm = (date?: string) => ({
+const emptyForm = (date?: string) => {
+  const baseStart = date
+    ? (date.includes("T") ? date : `${date}T09:00`)
+    : localDatetimeInput(new Date().toISOString());
+  const endSource = new Date(inputToISO(baseStart) || new Date().toISOString());
+  endSource.setHours(endSource.getHours() + 1);
+
+  return ({
   title: "",
   description: "",
-  start_at: date ? `${date}T09:00` : localDatetimeInput(new Date().toISOString()),
-  end_at: date ? `${date}T10:00` : localDatetimeInput(new Date(Date.now() + 3600000).toISOString()),
+  start_at: baseStart,
+  end_at: localDatetimeInput(endSource.toISOString()),
   all_day: false,
   type: "cita",
   status: "pendiente",
@@ -196,7 +247,8 @@ const emptyForm = (date?: string) => ({
   related_user_id: "",
   related_user_name: "",
   organization_context: "",
-});
+  });
+};
 
 // ── Modal de evento ───────────────────────────────────────────────────────────
 function EventModal({
@@ -348,6 +400,164 @@ function EventModal({
               Todo el dia
             </label>
           </div>
+          ) : (
+            <div className="flex-1 min-h-0 overflow-auto bg-white">
+              <div className="sticky top-0 z-10 border-b border-slate-100 bg-white">
+                <div className={`grid ${viewMode === "day" ? "grid-cols-[72px_minmax(0,1fr)]" : `grid-cols-[72px_repeat(${visibleWeekDays.length},minmax(0,1fr))]`}`}>
+                  <div className="border-r border-slate-100 px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-400">Hora</div>
+                  {visibleWeekDays.map((day) => {
+                    const key = isoDate(day);
+                    const isToday = key === todayStr;
+                    const isSelected = key === selectedDay;
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setSelectedDay(key)}
+                        className={`border-r border-slate-100 px-3 py-3 text-left transition-colors ${isSelected ? "bg-red-50/70" : "hover:bg-slate-50"}`}
+                      >
+                        <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{formatWeekdayShort(day)}</div>
+                        <div className={`mt-1 inline-flex h-8 min-w-8 items-center justify-center rounded-full px-2 text-sm font-bold ${isToday ? "bg-red-600 text-white" : "text-slate-800"}`}>
+                          {formatDayNumber(day)}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className={`grid border-t border-slate-100 ${viewMode === "day" ? "grid-cols-[72px_minmax(0,1fr)]" : `grid-cols-[72px_repeat(${visibleWeekDays.length},minmax(0,1fr))]`}`}>
+                  <div className="border-r border-slate-100 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Todo el día</div>
+                  {visibleWeekDays.map((day) => {
+                    const key = isoDate(day);
+                    const allDayLex = allDayWeekEventsByDay[key] || [];
+                    const allDayGoogle = (gcalWeekEventsByDay[key] || []).filter((ev) => !ev.start.dateTime);
+                    return (
+                      <div key={`allday-${key}`} className="min-h-[54px] border-r border-slate-100 px-2 py-2">
+                        <div className="space-y-1">
+                          {allDayLex.map((ev) => {
+                            const tc = EVENT_TYPES[ev.type] || EVENT_TYPES.otro;
+                            return (
+                              <button
+                                key={ev.id}
+                                type="button"
+                                onClick={() => openEdit(ev)}
+                                className={`flex w-full items-center gap-1 rounded-lg px-2 py-1 text-left text-[11px] font-semibold ${tc.color} bg-slate-50 hover:bg-slate-100 ${ev.status === "cancelado" ? "opacity-50 line-through" : ""}`}
+                              >
+                                <span className={`h-2 w-2 rounded-full ${tc.dot}`} />
+                                <span className="truncate">{ev.title}</span>
+                              </button>
+                            );
+                          })}
+                          {allDayGoogle.map((ev) => (
+                            <button
+                              key={`gcal-all-${ev.id}`}
+                              type="button"
+                              onClick={() => setGcalModal(ev)}
+                              className="flex w-full items-center gap-1 rounded-lg bg-blue-50 px-2 py-1 text-left text-[11px] font-semibold text-blue-700 hover:bg-blue-100"
+                            >
+                              <img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_16dp.png" alt="" className="h-3 w-3 shrink-0" />
+                              <span className="truncate">{ev.summary}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className={`grid ${viewMode === "day" ? "grid-cols-[72px_minmax(0,1fr)]" : `grid-cols-[72px_repeat(${visibleWeekDays.length},minmax(0,1fr))]`}`}>
+                <div className="border-r border-slate-100">
+                  {timeSlots.map((hour) => (
+                    <div key={`label-${hour}`} className="relative border-b border-slate-100 px-3" style={{ height: `${HOUR_SLOT_HEIGHT}px` }}>
+                      <span className="absolute -top-2 left-3 bg-white px-1 text-[10px] font-semibold text-slate-400">
+                        {`${String(hour).padStart(2, "0")}:00`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                {visibleWeekDays.map((day) => {
+                  const key = isoDate(day);
+                  const lexEvents = lexWeekEventsByDay[key] || [];
+                  const googleTimed = (gcalWeekEventsByDay[key] || []).filter((ev) => !!ev.start.dateTime);
+                  return (
+                    <div
+                      key={`timecol-${key}`}
+                      className={`relative border-r border-slate-100 ${key === selectedDay ? "bg-red-50/30" : "bg-white"}`}
+                      style={{ height: `${timeSlots.length * HOUR_SLOT_HEIGHT}px` }}
+                      onClick={() => setSelectedDay(key)}
+                    >
+                      {timeSlots.map((hour) => (
+                        <button
+                          key={`${key}-${hour}`}
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setSelectedDay(key);
+                            openNew(buildDateTimeForSlot(key, hour));
+                          }}
+                          className="absolute inset-x-0 border-b border-slate-100 hover:bg-red-50/40 transition-colors"
+                          style={{ top: `${(hour - HOUR_START) * HOUR_SLOT_HEIGHT}px`, height: `${HOUR_SLOT_HEIGHT}px` }}
+                        />
+                      ))}
+                      {lexEvents.map((ev) => {
+                        const tc = EVENT_TYPES[ev.type] || EVENT_TYPES.otro;
+                        const top = ((eventMinutesFromMidnight(ev.start_at) - HOUR_START * 60) / 60) * HOUR_SLOT_HEIGHT;
+                        const height = Math.max(36, (eventDurationMinutes(ev.start_at, ev.end_at) / 60) * HOUR_SLOT_HEIGHT);
+                        return (
+                          <button
+                            key={ev.id}
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setSelectedDay(key);
+                              openEdit(ev);
+                            }}
+                            className={`absolute left-1.5 right-1.5 overflow-hidden rounded-xl border px-2 py-1 text-left shadow-sm transition-all hover:shadow ${ev.status === "cancelado" ? "opacity-50 line-through" : ""}`}
+                            style={{ top: `${top}px`, height: `${height}px`, backgroundColor: "#fff", borderColor: "#e2e8f0" }}
+                          >
+                            <div className="flex items-center gap-1">
+                              <span className={`h-2 w-2 rounded-full ${tc.dot}`} />
+                              <span className={`truncate text-[11px] font-bold ${tc.color}`}>{ev.title}</span>
+                            </div>
+                            <div className="mt-1 text-[10px] text-slate-500">
+                              {fmtTime(ev.start_at)}{ev.end_at ? ` - ${fmtTime(ev.end_at)}` : ""}
+                            </div>
+                            {ev.location && <div className="truncate text-[10px] text-slate-400">{ev.location}</div>}
+                          </button>
+                        );
+                      })}
+                      {googleTimed.map((ev) => {
+                        const startStr = ev.start.dateTime!;
+                        const endStr = ev.end.dateTime || ev.start.dateTime!;
+                        const top = ((eventMinutesFromMidnight(startStr) - HOUR_START * 60) / 60) * HOUR_SLOT_HEIGHT;
+                        const height = Math.max(36, (eventDurationMinutes(startStr, endStr) / 60) * HOUR_SLOT_HEIGHT);
+                        return (
+                          <button
+                            key={`gcal-time-${ev.id}`}
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setSelectedDay(key);
+                              setGcalModal(ev);
+                            }}
+                            className="absolute left-1.5 right-1.5 overflow-hidden rounded-xl border border-blue-200 bg-blue-50 px-2 py-1 text-left shadow-sm hover:bg-blue-100"
+                            style={{ top: `${top}px`, height: `${height}px` }}
+                          >
+                            <div className="flex items-center gap-1">
+                              <img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_16dp.png" alt="" className="h-3 w-3 shrink-0" />
+                              <span className="truncate text-[11px] font-bold text-blue-700">{ev.summary}</span>
+                            </div>
+                            <div className="mt-1 text-[10px] text-blue-500">
+                              {fmtTime(startStr)}{endStr ? ` - ${fmtTime(endStr)}` : ""}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         {errorMsg && (
@@ -767,12 +977,16 @@ function GoogleEventModal({
 // ── Componente principal Agenda ───────────────────────────────────────────────
 export default function Agenda() {
   const { getToken } = useAuth();
+  const HOUR_START = 7;
+  const HOUR_END = 22;
+  const HOUR_SLOT_HEIGHT = 72;
 
   // Estado del calendario
   const today = useMemo(() => new Date(), []);
   const [viewYear,  setViewYear]  = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [selectedDay, setSelectedDay] = useState<string>(isoDate(today));
+  const [viewMode, setViewMode] = useState<AgendaViewMode>("week");
 
   // Datos LexTech
   const [events,   setEvents]   = useState<AgendaEvent[]>([]);
@@ -1131,19 +1345,32 @@ export default function Agenda() {
     syncGoogleEventsToErp(gcalEvents);
   }, [gcalEnabled, gcalToken, gcalEvents, syncGoogleEventsToErp]);
 
-  // Navegar mes
+  const syncVisibleDate = useCallback((date: Date) => {
+    setViewYear(date.getFullYear());
+    setViewMonth(date.getMonth());
+    setSelectedDay(isoDate(date));
+  }, []);
+
+  const currentViewDate = useMemo(() => new Date(`${selectedDay}T12:00:00`), [selectedDay]);
+
   const prevMonth = () => {
-    if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11); }
-    else setViewMonth(m => m - 1);
+    const baseDate = new Date(currentViewDate);
+    if (viewMode === "month") {
+      syncVisibleDate(new Date(baseDate.getFullYear(), baseDate.getMonth() - 1, 1));
+      return;
+    }
+    syncVisibleDate(addDays(baseDate, viewMode === "week" ? -7 : -1));
   };
   const nextMonth = () => {
-    if (viewMonth === 11) { setViewYear(y => y + 1); setViewMonth(0); }
-    else setViewMonth(m => m + 1);
+    const baseDate = new Date(currentViewDate);
+    if (viewMode === "month") {
+      syncVisibleDate(new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 1));
+      return;
+    }
+    syncVisibleDate(addDays(baseDate, viewMode === "week" ? 7 : 1));
   };
   const goToday = () => {
-    setViewYear(today.getFullYear());
-    setViewMonth(today.getMonth());
-    setSelectedDay(isoDate(today));
+    syncVisibleDate(today);
   };
 
   // Índice de eventos por día
@@ -1165,6 +1392,59 @@ export default function Agenda() {
 
   // Días del calendario
   const calDays = useMemo(() => buildCalendarDays(viewYear, viewMonth), [viewYear, viewMonth]);
+  const timeSlots = useMemo(
+    () => Array.from({ length: HOUR_END - HOUR_START + 1 }, (_, idx) => HOUR_START + idx),
+    [HOUR_END, HOUR_START]
+  );
+  const weekDays = useMemo(() => {
+    const start = startOfWeek(currentViewDate);
+    return Array.from({ length: 7 }, (_, idx) => addDays(start, idx));
+  }, [currentViewDate]);
+  const activeRangeLabel = useMemo(() => {
+    if (viewMode === "month") return `${MESES[viewMonth]} ${viewYear}`;
+    if (viewMode === "day") return formatWeekdayLong(currentViewDate);
+    const first = weekDays[0];
+    const last = weekDays[6];
+    const sameMonth = first.getMonth() === last.getMonth();
+    const sameYear = first.getFullYear() === last.getFullYear();
+    const startLabel = `${formatDayNumber(first)} ${MESES[first.getMonth()]}`;
+    const endLabel = sameMonth
+      ? `${formatDayNumber(last)} ${sameYear ? "" : `${MESES[last.getMonth()]} `}${last.getFullYear()}`
+      : `${formatDayNumber(last)} ${MESES[last.getMonth()]} ${last.getFullYear()}`;
+    return `${startLabel} - ${endLabel.trim()}`;
+  }, [currentViewDate, viewMode, viewMonth, viewYear, weekDays]);
+  const lexWeekEventsByDay = useMemo(() => {
+    const map: Record<string, AgendaEvent[]> = {};
+    for (const day of weekDays) {
+      const key = isoDate(day);
+      map[key] = (eventsByDay[key] || []).filter((ev) => !ev.all_day).sort((a, b) => a.start_at.localeCompare(b.start_at));
+    }
+    return map;
+  }, [eventsByDay, weekDays]);
+  const allDayWeekEventsByDay = useMemo(() => {
+    const map: Record<string, AgendaEvent[]> = {};
+    for (const day of weekDays) {
+      const key = isoDate(day);
+      map[key] = (eventsByDay[key] || []).filter((ev) => ev.all_day).sort((a, b) => a.start_at.localeCompare(b.start_at));
+    }
+    return map;
+  }, [eventsByDay, weekDays]);
+  const gcalWeekEventsByDay = useMemo(() => {
+    const map: Record<string, GCalEvent[]> = {};
+    for (const day of weekDays) {
+      const key = isoDate(day);
+      map[key] = (gcalEventsByDay[key] || []).sort((a, b) => {
+        const aStart = a.start.dateTime || `${a.start.date}T00:00:00`;
+        const bStart = b.start.dateTime || `${b.start.date}T00:00:00`;
+        return aStart.localeCompare(bStart);
+      });
+    }
+    return map;
+  }, [gcalEventsByDay, weekDays]);
+  const visibleWeekDays = useMemo(
+    () => (viewMode === "day" ? [currentViewDate] : weekDays),
+    [currentViewDate, viewMode, weekDays]
+  );
 
   // Guardar evento (crear o editar)
   const handleSave = async (data: any) => {
@@ -1438,7 +1718,7 @@ export default function Agenda() {
               <ChevronLeft size={15} />
             </button>
             <span className="font-bold text-slate-800 text-sm px-1 min-w-[130px] text-center">
-              {MESES[viewMonth]} {viewYear}
+              {activeRangeLabel}
             </span>
             <button onClick={nextMonth} className="p-2 hover:text-red-600 rounded-lg transition-colors text-slate-500">
               <ChevronRight size={15} />
@@ -1450,6 +1730,25 @@ export default function Agenda() {
           >
             Hoy
           </button>
+          <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white p-1">
+            {[
+              { id: "month", label: "Mes" },
+              { id: "week", label: "Semana" },
+              { id: "day", label: "Día" },
+            ].map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setViewMode(item.id as AgendaViewMode)}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+                  viewMode === item.id
+                    ? "bg-red-600 text-white"
+                    : "text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
 
           {/* ── Google Calendar ── */}
           {gcalEnabled ? (
@@ -1536,6 +1835,8 @@ export default function Agenda() {
 
         {/* ── Rejilla calendario ─────────────────────────────── */}
         <div className="agenda-google-grid flex-1 min-w-0 flex flex-col overflow-hidden border-r border-slate-100">
+          {viewMode === "month" ? (
+            <>
           {/* Días de la semana */}
           <div className="grid grid-cols-7 border-b border-slate-100 bg-slate-50 shrink-0">
             {DIAS.map(d => (
@@ -1550,8 +1851,9 @@ export default function Agenda() {
             {loading ? (
               <div className="flex justify-center items-center h-40">
                 <Loader2 size={22} className="animate-spin text-slate-300" />
-              </div>
-            ) : (
+          </div>
+            </>
+          ) : (
               <div className="grid grid-cols-7 auto-rows-fr min-h-full">
                 {calDays.map((date, idx) => {
                   if (!date) {
