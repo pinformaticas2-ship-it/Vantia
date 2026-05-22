@@ -182,8 +182,15 @@ function buildCalendarDays(year: number, month: number): (Date | null)[] {
 }
 
 // ── Time-grid helpers ─────────────────────────────────────────────────────────
-const HOUR_HEIGHT = 64;
+const HOUR_HEIGHT = 60;
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
+
+function fmtHour(h: number): string {
+  if (h === 0)  return "12 AM";
+  if (h < 12)   return `${h} AM`;
+  if (h === 12) return "12 PM";
+  return `${h - 12} PM`;
+}
 
 function getMondayOfWeek(dateStr: string): Date {
   const d = new Date(dateStr + "T12:00:00");
@@ -819,36 +826,48 @@ function TimeGridView({
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  const [nowMins, setNowMins] = useState(() => {
+    const n = new Date();
+    return n.getHours() * 60 + n.getMinutes();
+  });
+  useEffect(() => {
+    const id = setInterval(() => {
+      const n = new Date();
+      setNowMins(n.getHours() * 60 + n.getMinutes());
+    }, 60000);
+    return () => clearInterval(id);
+  }, []);
+  const nowTopPx = (nowMins / 60) * HOUR_HEIGHT;
+
   useEffect(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = 7 * HOUR_HEIGHT;
+      const n = new Date();
+      const mins = n.getHours() * 60 + n.getMinutes();
+      scrollRef.current.scrollTop = Math.max(0, (mins / 60 - 1.5) * HOUR_HEIGHT);
     }
   }, []);
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+    <div className="flex flex-col flex-1 min-h-0 overflow-hidden bg-white">
       {/* Cabecera de días */}
-      <div className="flex shrink-0 border-b border-slate-200 bg-slate-50">
-        <div className="w-14 shrink-0 border-r border-slate-100" />
+      <div className="flex shrink-0 border-b border-gray-200 bg-white">
+        <div className="w-16 shrink-0" />
         {days.map(dateStr => {
           const d = new Date(dateStr + "T12:00:00");
           const dow = d.getDay();
           const dayLabel = DIAS[dow === 0 ? 6 : dow - 1];
           const isToday = dateStr === todayStr;
-          const isSel = dateStr === selectedDay;
           return (
             <div
               key={dateStr}
-              className="flex-1 py-2 text-center border-l border-slate-100 cursor-pointer hover:bg-slate-100 transition-colors"
+              className="flex-1 py-3 text-center border-l border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
               onClick={() => onDayHeaderClick(dateStr)}
             >
-              <div className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">
+              <div className={`text-[11px] font-medium uppercase tracking-wider ${isToday ? "text-blue-600" : "text-gray-500"}`}>
                 {dayLabel}
               </div>
-              <div className={`mx-auto mt-1 h-7 w-7 flex items-center justify-center rounded-full text-sm font-bold ${
-                isToday ? "bg-red-600 text-white"
-                : isSel && days.length === 1 ? "bg-red-100 text-red-700"
-                : "text-slate-700"
+              <div className={`mx-auto mt-1 h-10 w-10 flex items-center justify-center rounded-full text-xl font-normal ${
+                isToday ? "bg-blue-600 text-white" : "text-gray-700 hover:bg-gray-100"
               }`}>
                 {d.getDate()}
               </div>
@@ -858,22 +877,22 @@ function TimeGridView({
       </div>
 
       {/* Banda de eventos de todo el día */}
-      <div className="flex shrink-0 border-b border-slate-200 bg-white min-h-[28px]">
-        <div className="w-14 shrink-0 border-r border-slate-100 flex items-end justify-end pr-1 pb-1">
-          <span className="text-[9px] text-slate-400 select-none">todo día</span>
+      <div className="flex shrink-0 border-b border-gray-200 bg-white min-h-[28px]">
+        <div className="w-16 shrink-0 border-r border-gray-100 flex items-end justify-end pr-2 pb-1">
+          <span className="text-[9px] text-gray-400 select-none">Todo el día</span>
         </div>
         {days.map(dateStr => {
           const allDayLex = (eventsByDay[dateStr] || []).filter(ev => ev.all_day);
           const allDayGcal = (gcalEventsByDay[dateStr] || []).filter(ev => !ev.start.dateTime);
           return (
-            <div key={dateStr} className="flex-1 border-l border-slate-100 px-0.5 py-0.5 space-y-0.5">
+            <div key={dateStr} className="flex-1 border-l border-gray-100 px-0.5 py-0.5 space-y-0.5">
               {allDayLex.map(ev => {
                 const tc = EVENT_TYPES[ev.type] || EVENT_TYPES.otro;
                 return (
                   <div
                     key={ev.id}
                     onClick={() => onEventClick(ev)}
-                    className={`text-[10px] font-semibold truncate px-1.5 py-0.5 rounded cursor-pointer text-white ${tc.bg}`}
+                    className={`text-[11px] font-medium truncate px-2 py-0.5 rounded cursor-pointer text-white ${tc.bg}`}
                   >
                     {ev.title}
                   </div>
@@ -883,7 +902,7 @@ function TimeGridView({
                 <div
                   key={ev.id}
                   onClick={() => onGcalEventClick(ev)}
-                  className="text-[10px] font-semibold truncate px-1.5 py-0.5 rounded cursor-pointer bg-blue-500 text-white"
+                  className="text-[11px] font-medium truncate px-2 py-0.5 rounded cursor-pointer bg-blue-500 text-white"
                 >
                   {ev.summary}
                 </div>
@@ -895,43 +914,58 @@ function TimeGridView({
 
       {/* Rejilla horaria con scroll */}
       <div ref={scrollRef} className="flex flex-1 overflow-y-auto bg-white">
-        {/* Columna de horas */}
-        <div className="w-14 shrink-0 border-r border-slate-100 relative bg-white" style={{ height: 24 * HOUR_HEIGHT }}>
+        {/* Columna de horas (estilo Google AM/PM) */}
+        <div className="w-16 shrink-0 relative bg-white" style={{ height: 24 * HOUR_HEIGHT }}>
           {HOURS.map(h => (
             <div
               key={h}
-              className="absolute right-1.5 text-[10px] text-slate-400 select-none"
-              style={{ top: h * HOUR_HEIGHT - 7 }}
+              className="absolute right-2 text-[10px] text-gray-400 select-none -translate-y-[7px] text-right"
+              style={{ top: h * HOUR_HEIGHT }}
             >
-              {h > 0 ? `${String(h).padStart(2, "0")}:00` : ""}
+              {h > 0 ? fmtHour(h) : ""}
             </div>
           ))}
         </div>
 
         {/* Columnas de días */}
-        <div className="flex flex-1" style={{ height: 24 * HOUR_HEIGHT }}>
+        <div className="flex flex-1 border-l border-gray-200" style={{ height: 24 * HOUR_HEIGHT }}>
           {days.map(dateStr => {
+            const isToday = dateStr === todayStr;
             const timedEvs = (eventsByDay[dateStr] || []).filter(ev => !ev.all_day);
             const timedGcal = (gcalEventsByDay[dateStr] || []).filter(ev => !!ev.start.dateTime);
             return (
-              <div key={dateStr} className="flex-1 border-l border-slate-100 relative">
+              <div key={dateStr} className="flex-1 border-r border-gray-200 relative">
                 {/* Celdas de hora (clic para crear) */}
                 {HOURS.map(h => (
                   <div
                     key={h}
-                    className={`absolute w-full cursor-pointer hover:bg-red-50/40 transition-colors ${h > 0 ? "border-t border-slate-100" : ""}`}
+                    className="absolute w-full cursor-pointer hover:bg-blue-50/30 transition-colors"
                     style={{ top: h * HOUR_HEIGHT, height: HOUR_HEIGHT }}
                     onClick={() => onSlotClick(dateStr, h)}
-                  />
+                  >
+                    {h > 0 && <div className="border-t border-gray-100 w-full" />}
+                  </div>
                 ))}
                 {/* Líneas de media hora */}
                 {HOURS.map(h => (
                   <div
                     key={`half-${h}`}
-                    className="absolute w-full border-t border-slate-50 pointer-events-none"
+                    className="absolute w-full pointer-events-none"
                     style={{ top: h * HOUR_HEIGHT + HOUR_HEIGHT / 2 }}
-                  />
+                  >
+                    <div className="border-t border-gray-50 w-full" />
+                  </div>
                 ))}
+                {/* Línea de hora actual (solo en la columna de hoy) */}
+                {isToday && (
+                  <div
+                    className="absolute left-0 right-0 pointer-events-none flex items-center"
+                    style={{ top: nowTopPx, zIndex: 20 }}
+                  >
+                    <div className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0 -ml-1" />
+                    <div className="flex-1 border-t-2 border-red-500" />
+                  </div>
+                )}
                 {/* Eventos LexTech con hora */}
                 {timedEvs.map(ev => {
                   const start = new Date(ev.start_at);
@@ -944,11 +978,11 @@ function TimeGridView({
                     <div
                       key={ev.id}
                       onClick={e => { e.stopPropagation(); onEventClick(ev); }}
-                      className={`absolute left-0.5 right-0.5 rounded px-1.5 py-1 text-[10px] font-semibold text-white cursor-pointer overflow-hidden shadow-sm ${tc.bg} ${movingEventId === ev.id ? "opacity-60" : "hover:brightness-110"} transition-all`}
+                      className={`absolute left-1 right-1 rounded px-2 py-1 text-[11px] font-medium text-white cursor-pointer overflow-hidden shadow-sm ${tc.bg} ${movingEventId === ev.id ? "opacity-60" : "hover:brightness-110"} transition-all`}
                       style={{ top: topPx, height: heightPx, zIndex: 10 }}
                     >
-                      <div className="font-bold truncate leading-tight">{ev.title}</div>
-                      <div className="text-white/80 text-[9px] leading-tight">
+                      <div className="font-semibold truncate leading-tight">{ev.title}</div>
+                      <div className="text-white/80 text-[10px] leading-tight">
                         {fmtTime(ev.start_at)}{ev.end_at ? ` – ${fmtTime(ev.end_at)}` : ""}
                       </div>
                     </div>
@@ -965,11 +999,11 @@ function TimeGridView({
                     <div
                       key={ev.id}
                       onClick={e => { e.stopPropagation(); onGcalEventClick(ev); }}
-                      className="absolute left-0.5 right-0.5 rounded px-1.5 py-1 text-[10px] font-semibold text-white cursor-pointer overflow-hidden shadow-sm bg-blue-500 hover:bg-blue-600 transition-all"
+                      className="absolute left-1 right-1 rounded px-2 py-1 text-[11px] font-medium text-white cursor-pointer overflow-hidden shadow-sm bg-blue-500 hover:bg-blue-600 transition-all"
                       style={{ top: topPx, height: heightPx, zIndex: 10 }}
                     >
-                      <div className="font-bold truncate leading-tight">{ev.summary}</div>
-                      <div className="text-white/80 text-[9px] leading-tight">
+                      <div className="font-semibold truncate leading-tight">{ev.summary}</div>
+                      <div className="text-white/80 text-[10px] leading-tight">
                         {start.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
                         {" – "}
                         {end.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
