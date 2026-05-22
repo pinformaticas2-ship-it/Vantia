@@ -823,8 +823,47 @@ function TimeGridView({
   onEventClick: (ev: AgendaEvent) => void;
   onGcalEventClick: (ev: GCalEvent) => void;
   onDayHeaderClick: (dateStr: string) => void;
+  onResizeEvent: (id: string, newEndAt: string) => Promise<void>;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // ── Resize de eventos ────────────────────────────────────────────────────────
+  // usamos ref para el estado mutable (no causa re-render en cada mousemove)
+  const resizingRef = useRef<{ id: string; startAt: string; endAt: string } | null>(null);
+  const [resizingDisplay, setResizingDisplay] = useState<{ id: string; endAt: string } | null>(null);
+  const onResizeEventRef = useRef(onResizeEvent);
+  onResizeEventRef.current = onResizeEvent;
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!resizingRef.current || !scrollRef.current) return;
+      const rect = scrollRef.current.getBoundingClientRect();
+      const rawY = e.clientY - rect.top + scrollRef.current.scrollTop;
+      const totalMins = Math.max(0, Math.min((rawY / HOUR_HEIGHT) * 60, 24 * 60 - 1));
+      const snapped = Math.round(totalMins / 15) * 15;
+      const start = new Date(resizingRef.current.startAt);
+      const startMins = start.getHours() * 60 + start.getMinutes();
+      const newEndMins = Math.max(snapped, startMins + 15);
+      const end = new Date(resizingRef.current.startAt);
+      end.setHours(Math.floor(newEndMins / 60), newEndMins % 60, 0, 0);
+      const newEndAt = end.toISOString();
+      resizingRef.current = { ...resizingRef.current, endAt: newEndAt };
+      setResizingDisplay(prev => prev ? { ...prev, endAt: newEndAt } : null);
+    };
+    const handleMouseUp = async () => {
+      const ev = resizingRef.current;
+      if (!ev) return;
+      resizingRef.current = null;
+      setResizingDisplay(null);
+      await onResizeEventRef.current(ev.id, ev.endAt);
+    };
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, []);
 
   const [nowMins, setNowMins] = useState(() => {
     const n = new Date();
@@ -849,6 +888,10 @@ function TimeGridView({
 
   return (
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden bg-white">
+      {/* Overlay de cursor durante resize */}
+      {resizingDisplay && (
+        <div className="fixed inset-0 cursor-s-resize" style={{ zIndex: 9999 }} />
+      )}
       {/* Cabecera de días */}
       <div className="flex shrink-0 border-b border-gray-200 bg-white">
         <div className="w-16 shrink-0" />
@@ -968,22 +1011,36 @@ function TimeGridView({
                 )}
                 {/* Eventos LexTech con hora */}
                 {timedEvs.map(ev => {
+                  const isResizing = resizingDisplay?.id === ev.id;
+                  const effectiveEndAt = isResizing ? resizingDisplay!.endAt : ev.end_at;
                   const start = new Date(ev.start_at);
-                  const end = ev.end_at ? new Date(ev.end_at) : new Date(start.getTime() + 3600000);
+                  const end = effectiveEndAt ? new Date(effectiveEndAt) : new Date(start.getTime() + 3600000);
                   const topPx = (start.getHours() + start.getMinutes() / 60) * HOUR_HEIGHT;
-                  const durationH = Math.max((end.getTime() - start.getTime()) / 3600000, 0.33);
+                  const durationH = Math.max((end.getTime() - start.getTime()) / 3600000, 0.25);
                   const heightPx = durationH * HOUR_HEIGHT - 2;
                   const tc = EVENT_TYPES[ev.type] || EVENT_TYPES.otro;
                   return (
                     <div
                       key={ev.id}
-                      onClick={e => { e.stopPropagation(); onEventClick(ev); }}
-                      className={`absolute left-1 right-1 rounded px-2 py-1 text-[11px] font-medium text-white cursor-pointer overflow-hidden shadow-sm ${tc.bg} ${movingEventId === ev.id ? "opacity-60" : "hover:brightness-110"} transition-all`}
-                      style={{ top: topPx, height: heightPx, zIndex: 10 }}
+                      onClick={e => { if (isResizing) return; e.stopPropagation(); onEventClick(ev); }}
+                      className={`absolute left-1 right-1 rounded px-2 py-1 text-[11px] font-medium text-white cursor-pointer overflow-visible shadow-sm ${tc.bg} ${movingEventId === ev.id ? "opacity-60" : isResizing ? "brightness-110 shadow-md" : "hover:brightness-110"} transition-all select-none`}
+                      style={{ top: topPx, height: heightPx, zIndex: isResizing ? 30 : 10 }}
                     >
                       <div className="font-semibold truncate leading-tight">{ev.title}</div>
                       <div className="text-white/80 text-[10px] leading-tight">
-                        {fmtTime(ev.start_at)}{ev.end_at ? ` – ${fmtTime(ev.end_at)}` : ""}
+                        {fmtTime(ev.start_at)}{effectiveEndAt ? ` – ${fmtTime(effectiveEndAt)}` : ""}
+                      </div>
+                      {/* Handle de resize */}
+                      <div
+                        className="absolute bottom-0 left-0 right-0 h-3 cursor-s-resize flex items-end justify-center pb-0.5 rounded-b"
+                        onMouseDown={e => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          resizingRef.current = { id: ev.id, startAt: ev.start_at, endAt: ev.end_at || new Date(start.getTime() + 3600000).toISOString() };
+                          setResizingDisplay({ id: ev.id, endAt: ev.end_at || new Date(start.getTime() + 3600000).toISOString() });
+                        }}
+                      >
+                        <div className="w-8 h-1 rounded-full bg-white/50 hover:bg-white/90 transition-colors" />
                       </div>
                     </div>
                   );
@@ -1725,6 +1782,20 @@ export default function Agenda() {
     setShowModal(true);
   };
 
+  const handleResizeEvent = useCallback(async (id: string, newEndAt: string) => {
+    const ev = events.find(e => e.id === id);
+    if (!ev) return;
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/agenda/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ ...ev, end_at: newEndAt }),
+      });
+      if (res.ok) await fetchEvents(true);
+    } catch {}
+  }, [events, getToken, fetchEvents]);
+
   const todayStr = isoDate(today);
 
   return (
@@ -1881,6 +1952,7 @@ export default function Agenda() {
               onEventClick={openEdit}
               onGcalEventClick={ev => setGcalModal(ev)}
               onDayHeaderClick={dateStr => { setSelectedDay(dateStr); setView("day"); }}
+              onResizeEvent={handleResizeEvent}
             />
           )}
         </div>
