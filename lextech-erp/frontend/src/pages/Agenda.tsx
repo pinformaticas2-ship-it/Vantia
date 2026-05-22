@@ -957,7 +957,7 @@ function TimeGridView({
       </div>
 
       {/* Rejilla horaria con scroll */}
-      <div ref={scrollRef} className="flex flex-1 overflow-y-auto bg-white">
+      <div ref={scrollRef} className="flex flex-1 overflow-y-auto bg-white scroll-smooth">
         {/* Columna de horas (estilo Google AM/PM) */}
         <div className="w-16 shrink-0 relative bg-white" style={{ height: 24 * HOUR_HEIGHT }}>
           {HOURS.map(h => (
@@ -983,11 +983,14 @@ function TimeGridView({
                 {HOURS.map(h => (
                   <div
                     key={h}
-                    className="absolute w-full cursor-pointer hover:bg-blue-50/30 transition-colors"
+                    className="absolute w-full cursor-pointer group/slot hover:bg-blue-50/40 transition-colors duration-75"
                     style={{ top: h * HOUR_HEIGHT, height: HOUR_HEIGHT }}
                     onClick={() => onSlotClick(dateStr, h)}
                   >
                     {h > 0 && <div className="border-t border-gray-100 w-full" />}
+                    <span className="absolute left-1 top-0.5 text-[9px] text-blue-400 opacity-0 group-hover/slot:opacity-100 transition-opacity duration-75 select-none pointer-events-none font-medium">
+                      {fmtHour(h)}
+                    </span>
                   </div>
                 ))}
                 {/* Líneas de media hora */}
@@ -997,7 +1000,7 @@ function TimeGridView({
                     className="absolute w-full pointer-events-none"
                     style={{ top: h * HOUR_HEIGHT + HOUR_HEIGHT / 2 }}
                   >
-                    <div className="border-t border-gray-50 w-full" />
+                    <div className="border-t border-dashed border-gray-100 w-full" />
                   </div>
                 ))}
                 {/* Línea de hora actual (solo en la columna de hoy) */}
@@ -1024,7 +1027,7 @@ function TimeGridView({
                     <div
                       key={ev.id}
                       onClick={e => { if (isResizing) return; e.stopPropagation(); onEventClick(ev); }}
-                      className={`absolute left-1 right-1 rounded px-2 py-1 text-[11px] font-medium text-white cursor-pointer overflow-visible shadow-sm ${tc.bg} ${movingEventId === ev.id ? "opacity-60" : isResizing ? "brightness-110 shadow-md" : "hover:brightness-110"} transition-all select-none`}
+                      className={`absolute left-1 right-1 rounded px-2 py-1 text-[11px] font-medium text-white cursor-pointer overflow-visible shadow-sm group/ev ${tc.bg} ${movingEventId === ev.id ? "opacity-60" : isResizing ? "brightness-110 shadow-lg" : "hover:brightness-110 hover:shadow-md"} transition-all duration-150 select-none`}
                       style={{ top: topPx, height: heightPx, zIndex: isResizing ? 30 : 10 }}
                     >
                       <div className="font-semibold truncate leading-tight">{ev.title}</div>
@@ -1033,7 +1036,7 @@ function TimeGridView({
                       </div>
                       {/* Handle de resize */}
                       <div
-                        className="absolute bottom-0 left-0 right-0 h-3 cursor-s-resize flex items-end justify-center pb-0.5 rounded-b"
+                        className="absolute bottom-0 left-0 right-0 h-3 cursor-s-resize flex items-end justify-center pb-0.5 rounded-b opacity-0 group-hover/ev:opacity-100 transition-opacity duration-150"
                         onMouseDown={e => {
                           e.stopPropagation();
                           e.preventDefault();
@@ -1057,7 +1060,7 @@ function TimeGridView({
                     <div
                       key={ev.id}
                       onClick={e => { e.stopPropagation(); onGcalEventClick(ev); }}
-                      className="absolute left-1 right-1 rounded px-2 py-1 text-[11px] font-medium text-white cursor-pointer overflow-hidden shadow-sm bg-blue-500 hover:bg-blue-600 transition-all"
+                      className="absolute left-1 right-1 rounded px-2 py-1 text-[11px] font-medium text-white cursor-pointer overflow-hidden shadow-sm bg-blue-500 hover:bg-blue-600 hover:shadow-md transition-all duration-150"
                       style={{ top: topPx, height: heightPx, zIndex: 10 }}
                     >
                       <div className="font-semibold truncate leading-tight">{ev.summary}</div>
@@ -1818,19 +1821,19 @@ export default function Agenda() {
           <div className="flex items-center bg-slate-100 rounded-xl p-1 gap-0.5">
             <button
               onClick={() => setView("month")}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${view === "month" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all duration-200 ${view === "month" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700 hover:bg-white/60"}`}
             >
               Mes
             </button>
             <button
               onClick={() => setView("week")}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${view === "week" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all duration-200 ${view === "week" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700 hover:bg-white/60"}`}
             >
               Semana
             </button>
             <button
               onClick={() => setView("day")}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${view === "day" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all duration-200 ${view === "day" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700 hover:bg-white/60"}`}
             >
               Día
             </button>
