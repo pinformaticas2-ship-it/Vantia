@@ -1789,6 +1789,7 @@ export default function Agenda() {
   const handleResizeEvent = useCallback(async (id: string, newEndAt: string) => {
     const ev = events.find(e => e.id === id);
     if (!ev) return;
+    setEvents(prev => prev.map(e => e.id === id ? { ...e, end_at: newEndAt } : e));
     try {
       const token = await getToken({ skipCache: true });
       const res = await fetch(`/api/agenda/${id}`, {
@@ -1797,7 +1798,10 @@ export default function Agenda() {
         body: JSON.stringify({ ...ev, end_at: newEndAt }),
       });
       if (res.ok) await fetchEvents(true);
-    } catch {}
+      else setEvents(prev => prev.map(e => e.id === id ? ev : e));
+    } catch {
+      setEvents(prev => prev.map(e => e.id === id ? ev : e));
+    }
   }, [events, getToken, fetchEvents]);
 
   const todayStr = isoDate(today);
