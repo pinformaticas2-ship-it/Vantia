@@ -1819,6 +1819,10 @@ function fmtSize(bytes: number) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
+function fmtDateTime(value?: string | null) {
+  if (!value) return "—";
+  return new Date(value).toLocaleString("es-ES");
+}
 
 function isPreviewable(mime: string) {
   return mime === "application/pdf" || mime.startsWith("image/") || mime.startsWith("text/");
@@ -2673,11 +2677,11 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-400 hidden md:table-cell">{fmtSize(f.size_bytes)}</td>
                         <td className="px-4 py-3 text-xs text-slate-400 hidden md:table-cell">
-                          {new Date(f.created_at).toLocaleDateString("es-ES")}
+                          {fmtDateTime(f.created_at)}
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-400 hidden xl:table-cell">
                           {f.updated_at && f.updated_at !== f.created_at
-                            ? new Date(f.updated_at).toLocaleDateString("es-ES")
+                            ? fmtDateTime(f.updated_at)
                             : <span className="text-slate-300">—</span>}
                         </td>
                         <td className="px-4 py-3">
@@ -2750,7 +2754,7 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
                   <button
                     onClick={(event) => {
                       const sourceFile = files.find((item) => item.id === preview.fileId);
-                      if (preview.mime === 'application/pdf' && sourceFile) {
+                      if (sourceFile && isPdfFile(sourceFile.mimetype || "", sourceFile.original_name || "")) {
                         showPdfOpenMenu(event, sourceFile);
                         return;
                       }
@@ -2758,7 +2762,10 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
                     }}
                     className="flex items-center gap-1.5 text-[11px] font-semibold text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 px-2 py-1 rounded-lg transition-colors border border-neutral-200"
                   >
-                    <ExternalLink size={11} /> Abrir
+                    <ExternalLink size={11} /> Abrir {(() => {
+                      const sourceFile = files.find((item) => item.id === preview.fileId);
+                      return sourceFile && isPdfFile(sourceFile.mimetype || "", sourceFile.original_name || "") ? <ChevronDown size={11} /> : null;
+                    })()}
                   </button>
                 )}
                 {/* Abrir en pestaña nueva */}

@@ -14,11 +14,13 @@ import {
   Paperclip,
   Upload,
   Download,
+  ExternalLink,
   FilePlus2,
   Sparkles,
   Eye,
   RefreshCw,
   Calendar,
+  ChevronDown,
   Hash,
   User,
   StickyNote,
@@ -1761,6 +1763,31 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
     void openPreview(file);
   }, [openPreview, openWithApp]);
 
+  const isPreviewSourcePdf = useCallback((fileId?: string) => {
+    if (!fileId) return false;
+    const sourceFile = files.find((item) => item.id === fileId);
+    return !!sourceFile && isPdfAct(sourceFile.mimetype || "", sourceFile.original_name || "");
+  }, [files]);
+
+  const handlePreviewOpen = useCallback((event: React.MouseEvent | null, fileId: string, fileName: string) => {
+    const sourceFile = files.find((item) => item.id === fileId);
+    if (sourceFile && isPdfAct(sourceFile.mimetype || "", sourceFile.original_name || "") && event) {
+      showPdfOpenMenu(event, sourceFile);
+      return;
+    }
+    if (sourceFile) {
+      if (isWordAct(sourceFile.mimetype || "", sourceFile.original_name || "") || isExcelAct(sourceFile.mimetype || "", sourceFile.original_name || "")) {
+        void openWithApp(sourceFile);
+        return;
+      }
+      if (sourceFile.mimetype?.startsWith("image/") || sourceFile.mimetype?.startsWith("text/")) {
+        void handleDownload(fileId, fileName);
+        return;
+      }
+    }
+    void handleDownload(fileId, fileName);
+  }, [files, handleDownload, openWithApp, showPdfOpenMenu]);
+
   const openMetadataForUpload = (file: File) => {
     pendingUploadFile.current = file;
     setEditDocName(file.name.replace(/\.[^/.]+$/, ""));
@@ -2060,9 +2087,9 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
                 <p className="text-xs font-semibold text-slate-700 truncate" title={preview.name}>{preview.name}</p>
               </div>
               <div className="flex items-center gap-1 shrink-0">
-                <button type="button" onClick={() => handleDownload(preview.fileId, preview.name)} title="Descargar"
+                <button type="button" onClick={(event) => handlePreviewOpen(event, preview.fileId, preview.name)} title={isPreviewSourcePdf(preview.fileId) ? "Opciones de apertura" : "Abrir"}
                   className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-lg transition-colors">
-                  <Download size={13} />
+                  <span className="flex items-center gap-1"><ExternalLink size={13} />{isPreviewSourcePdf(preview.fileId) && <ChevronDown size={11} />}</span>
                 </button>
                 <button type="button" onClick={() => setPreview(null)} title="Cerrar"
                   className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-lg transition-colors">
@@ -2084,9 +2111,9 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
                   <span className="text-5xl mb-4">📎</span>
                   <p className="text-sm font-semibold text-slate-700">{preview.name}</p>
                   <p className="mt-1 text-xs text-slate-400">Vista previa no disponible para este tipo de archivo</p>
-                  <button type="button" onClick={() => handleDownload(preview.fileId, preview.name)}
+                  <button type="button" onClick={(event) => handlePreviewOpen(event, preview.fileId, preview.name)}
                     className="mt-4 inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl">
-                    <Download size={12} /> Descargar
+                    <ExternalLink size={12} /> Abrir
                   </button>
                 </div>
               )}
@@ -2209,8 +2236,8 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
                     <p className="mt-1 text-sm font-semibold text-slate-800 truncate" title={preview.name}>{preview.name}</p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <button type="button" onClick={() => handleDownload(preview.fileId, preview.name)} className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-600 rounded-xl border border-slate-200 hover:bg-white">
-                      <Download size={12} /> Descargar
+                    <button type="button" onClick={(event) => handlePreviewOpen(event, preview.fileId, preview.name)} className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-600 rounded-xl border border-slate-200 hover:bg-white">
+                      <ExternalLink size={12} /> Abrir {isPreviewSourcePdf(preview.fileId) && <ChevronDown size={11} />}
                     </button>
                     <button type="button" onClick={() => setPreview(null)} className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-600 rounded-xl border border-slate-200 hover:bg-white">
                       <X size={12} /> Cerrar
