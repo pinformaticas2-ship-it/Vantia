@@ -1029,7 +1029,7 @@ export default function Agenda() {
   const [viewYear,  setViewYear]  = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [selectedDay, setSelectedDay] = useState<string>(isoDate(today));
-  const [view, setView] = useState<"month" | "week" | "day">("month");
+  const [view, setView] = useState<"month" | "week" | "day">("week");
 
   // Datos LexTech
   const [events,   setEvents]   = useState<AgendaEvent[]>([]);
