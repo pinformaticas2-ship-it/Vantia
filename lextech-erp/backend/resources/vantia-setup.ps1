@@ -7,6 +7,7 @@ $ErrorActionPreference = 'Stop'
 
 $vantiaDir  = Join-Path $env:APPDATA 'Vantia'
 $helperPath = Join-Path $vantiaDir   'vantia-open.ps1'
+$launcherPath = Join-Path $vantiaDir 'vantia-open.vbs'
 
 if (!(Test-Path $vantiaDir)) { New-Item -ItemType Directory -Path $vantiaDir | Out-Null }
 
@@ -154,12 +155,28 @@ try {
 }
 '@
 
+Set-Content -Path $launcherPath -Encoding ASCII -Value @'
+Dim shell, helperPath, rawArg, command
+
+Set shell = CreateObject("WScript.Shell")
+helperPath = Replace(WScript.ScriptFullName, "vantia-open.vbs", "vantia-open.ps1")
+
+If WScript.Arguments.Count > 0 Then
+  rawArg = WScript.Arguments(0)
+Else
+  rawArg = ""
+End If
+
+command = "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File """ & helperPath & """ """ & Replace(rawArg, """", """""") & """"
+shell.Run command, 0, False
+'@
+
 $base = 'HKCU:\Software\Classes\vantia'
 New-Item -Path "$base\shell\open\command" -Force | Out-Null
 Set-ItemProperty -Path $base -Name '(Default)' -Value 'URL:Vantia Office Protocol'
 Set-ItemProperty -Path $base -Name 'URL Protocol' -Value ''
 Set-ItemProperty -Path "$base\shell\open\command" -Name '(Default)' `
-  -Value "powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$helperPath`" `"%1`""
+  -Value "wscript.exe `"$launcherPath`" `"%1`""
 
 Write-Host ""
 Write-Host "  Conector Vantia instalado correctamente." -ForegroundColor Green
