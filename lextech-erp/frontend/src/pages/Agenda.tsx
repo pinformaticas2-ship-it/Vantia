@@ -181,22 +181,51 @@ function buildCalendarDays(year: number, month: number): (Date | null)[] {
   return days;
 }
 
+// ── Time-grid helpers ─────────────────────────────────────────────────────────
+const HOUR_HEIGHT = 64;
+const HOURS = Array.from({ length: 24 }, (_, i) => i);
+
+function getMondayOfWeek(dateStr: string): Date {
+  const d = new Date(dateStr + "T12:00:00");
+  const dow = d.getDay();
+  d.setDate(d.getDate() + (dow === 0 ? -6 : 1 - dow));
+  return d;
+}
+
+function addDays(dateStr: string, n: number): string {
+  const d = new Date(dateStr + "T12:00:00");
+  d.setDate(d.getDate() + n);
+  return isoDate(d);
+}
+
 // ── Formulario vacío ──────────────────────────────────────────────────────────
-const emptyForm = (date?: string) => ({
-  title: "",
-  description: "",
-  start_at: date ? `${date}T09:00` : localDatetimeInput(new Date().toISOString()),
-  end_at: date ? `${date}T10:00` : localDatetimeInput(new Date(Date.now() + 3600000).toISOString()),
-  all_day: false,
-  type: "cita",
-  status: "pendiente",
-  location: "",
-  expediente_id: "",
-  cliente_id: "",
-  related_user_id: "",
-  related_user_name: "",
-  organization_context: "",
-});
+const emptyForm = (date?: string) => {
+  // date puede ser "YYYY-MM-DD" o "YYYY-MM-DDTHH:mm" (cuando se hace clic en una franja horaria)
+  const hasTime = (date || "").length > 10;
+  const startAt = date
+    ? (hasTime ? date : `${date}T09:00`)
+    : localDatetimeInput(new Date().toISOString());
+  const endAt = !date
+    ? localDatetimeInput(new Date(Date.now() + 3600000).toISOString())
+    : hasTime
+      ? `${date.slice(0, 10)}T${String(Math.min(parseInt(date.slice(11, 13), 10) + 1, 23)).padStart(2, "0")}:00`
+      : `${date}T10:00`;
+  return {
+    title: "",
+    description: "",
+    start_at: startAt,
+    end_at: endAt,
+    all_day: false,
+    type: "cita",
+    status: "pendiente",
+    location: "",
+    expediente_id: "",
+    cliente_id: "",
+    related_user_id: "",
+    related_user_name: "",
+    organization_context: "",
+  };
+};
 
 // ── Modal de evento ───────────────────────────────────────────────────────────
 function EventModal({
@@ -764,6 +793,199 @@ function GoogleEventModal({
   );
 }
 
+// ── Vista de rejilla horaria (Semana / Día) ───────────────────────────────────
+function TimeGridView({
+  days,
+  eventsByDay,
+  gcalEventsByDay,
+  selectedDay,
+  todayStr,
+  movingEventId,
+  onSlotClick,
+  onEventClick,
+  onGcalEventClick,
+  onDayHeaderClick,
+}: {
+  days: string[];
+  eventsByDay: Record<string, AgendaEvent[]>;
+  gcalEventsByDay: Record<string, GCalEvent[]>;
+  selectedDay: string;
+  todayStr: string;
+  movingEventId: string | null;
+  onSlotClick: (dateStr: string, hour: number) => void;
+  onEventClick: (ev: AgendaEvent) => void;
+  onGcalEventClick: (ev: GCalEvent) => void;
+  onDayHeaderClick: (dateStr: string) => void;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = 7 * HOUR_HEIGHT;
+    }
+  }, []);
+
+  return (
+    <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+      {/* Cabecera de días */}
+      <div className="flex shrink-0 border-b border-slate-200 bg-slate-50">
+        <div className="w-14 shrink-0 border-r border-slate-100" />
+        {days.map(dateStr => {
+          const d = new Date(dateStr + "T12:00:00");
+          const dow = d.getDay();
+          const dayLabel = DIAS[dow === 0 ? 6 : dow - 1];
+          const isToday = dateStr === todayStr;
+          const isSel = dateStr === selectedDay;
+          return (
+            <div
+              key={dateStr}
+              className="flex-1 py-2 text-center border-l border-slate-100 cursor-pointer hover:bg-slate-100 transition-colors"
+              onClick={() => onDayHeaderClick(dateStr)}
+            >
+              <div className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">
+                {dayLabel}
+              </div>
+              <div className={`mx-auto mt-1 h-7 w-7 flex items-center justify-center rounded-full text-sm font-bold ${
+                isToday ? "bg-red-600 text-white"
+                : isSel && days.length === 1 ? "bg-red-100 text-red-700"
+                : "text-slate-700"
+              }`}>
+                {d.getDate()}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Banda de eventos de todo el día */}
+      <div className="flex shrink-0 border-b border-slate-200 bg-white min-h-[28px]">
+        <div className="w-14 shrink-0 border-r border-slate-100 flex items-end justify-end pr-1 pb-1">
+          <span className="text-[9px] text-slate-400 select-none">todo día</span>
+        </div>
+        {days.map(dateStr => {
+          const allDayLex = (eventsByDay[dateStr] || []).filter(ev => ev.all_day);
+          const allDayGcal = (gcalEventsByDay[dateStr] || []).filter(ev => !ev.start.dateTime);
+          return (
+            <div key={dateStr} className="flex-1 border-l border-slate-100 px-0.5 py-0.5 space-y-0.5">
+              {allDayLex.map(ev => {
+                const tc = EVENT_TYPES[ev.type] || EVENT_TYPES.otro;
+                return (
+                  <div
+                    key={ev.id}
+                    onClick={() => onEventClick(ev)}
+                    className={`text-[10px] font-semibold truncate px-1.5 py-0.5 rounded cursor-pointer text-white ${tc.bg}`}
+                  >
+                    {ev.title}
+                  </div>
+                );
+              })}
+              {allDayGcal.map(ev => (
+                <div
+                  key={ev.id}
+                  onClick={() => onGcalEventClick(ev)}
+                  className="text-[10px] font-semibold truncate px-1.5 py-0.5 rounded cursor-pointer bg-blue-500 text-white"
+                >
+                  {ev.summary}
+                </div>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Rejilla horaria con scroll */}
+      <div ref={scrollRef} className="flex flex-1 overflow-y-auto bg-white">
+        {/* Columna de horas */}
+        <div className="w-14 shrink-0 border-r border-slate-100 relative bg-white" style={{ height: 24 * HOUR_HEIGHT }}>
+          {HOURS.map(h => (
+            <div
+              key={h}
+              className="absolute right-1.5 text-[10px] text-slate-400 select-none"
+              style={{ top: h * HOUR_HEIGHT - 7 }}
+            >
+              {h > 0 ? `${String(h).padStart(2, "0")}:00` : ""}
+            </div>
+          ))}
+        </div>
+
+        {/* Columnas de días */}
+        <div className="flex flex-1" style={{ height: 24 * HOUR_HEIGHT }}>
+          {days.map(dateStr => {
+            const timedEvs = (eventsByDay[dateStr] || []).filter(ev => !ev.all_day);
+            const timedGcal = (gcalEventsByDay[dateStr] || []).filter(ev => !!ev.start.dateTime);
+            return (
+              <div key={dateStr} className="flex-1 border-l border-slate-100 relative">
+                {/* Celdas de hora (clic para crear) */}
+                {HOURS.map(h => (
+                  <div
+                    key={h}
+                    className={`absolute w-full cursor-pointer hover:bg-red-50/40 transition-colors ${h > 0 ? "border-t border-slate-100" : ""}`}
+                    style={{ top: h * HOUR_HEIGHT, height: HOUR_HEIGHT }}
+                    onClick={() => onSlotClick(dateStr, h)}
+                  />
+                ))}
+                {/* Líneas de media hora */}
+                {HOURS.map(h => (
+                  <div
+                    key={`half-${h}`}
+                    className="absolute w-full border-t border-slate-50 pointer-events-none"
+                    style={{ top: h * HOUR_HEIGHT + HOUR_HEIGHT / 2 }}
+                  />
+                ))}
+                {/* Eventos LexTech con hora */}
+                {timedEvs.map(ev => {
+                  const start = new Date(ev.start_at);
+                  const end = ev.end_at ? new Date(ev.end_at) : new Date(start.getTime() + 3600000);
+                  const topPx = (start.getHours() + start.getMinutes() / 60) * HOUR_HEIGHT;
+                  const durationH = Math.max((end.getTime() - start.getTime()) / 3600000, 0.33);
+                  const heightPx = durationH * HOUR_HEIGHT - 2;
+                  const tc = EVENT_TYPES[ev.type] || EVENT_TYPES.otro;
+                  return (
+                    <div
+                      key={ev.id}
+                      onClick={e => { e.stopPropagation(); onEventClick(ev); }}
+                      className={`absolute left-0.5 right-0.5 rounded px-1.5 py-1 text-[10px] font-semibold text-white cursor-pointer overflow-hidden shadow-sm ${tc.bg} ${movingEventId === ev.id ? "opacity-60" : "hover:brightness-110"} transition-all`}
+                      style={{ top: topPx, height: heightPx, zIndex: 10 }}
+                    >
+                      <div className="font-bold truncate leading-tight">{ev.title}</div>
+                      <div className="text-white/80 text-[9px] leading-tight">
+                        {fmtTime(ev.start_at)}{ev.end_at ? ` – ${fmtTime(ev.end_at)}` : ""}
+                      </div>
+                    </div>
+                  );
+                })}
+                {/* Eventos Google Calendar con hora */}
+                {timedGcal.map(ev => {
+                  const start = new Date(ev.start.dateTime as string);
+                  const end = ev.end.dateTime ? new Date(ev.end.dateTime) : new Date(start.getTime() + 3600000);
+                  const topPx = (start.getHours() + start.getMinutes() / 60) * HOUR_HEIGHT;
+                  const durationH = Math.max((end.getTime() - start.getTime()) / 3600000, 0.33);
+                  const heightPx = durationH * HOUR_HEIGHT - 2;
+                  return (
+                    <div
+                      key={ev.id}
+                      onClick={e => { e.stopPropagation(); onGcalEventClick(ev); }}
+                      className="absolute left-0.5 right-0.5 rounded px-1.5 py-1 text-[10px] font-semibold text-white cursor-pointer overflow-hidden shadow-sm bg-blue-500 hover:bg-blue-600 transition-all"
+                      style={{ top: topPx, height: heightPx, zIndex: 10 }}
+                    >
+                      <div className="font-bold truncate leading-tight">{ev.summary}</div>
+                      <div className="text-white/80 text-[9px] leading-tight">
+                        {start.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
+                        {" – "}
+                        {end.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Componente principal Agenda ───────────────────────────────────────────────
 export default function Agenda() {
   const { getToken } = useAuth();
@@ -773,6 +995,7 @@ export default function Agenda() {
   const [viewYear,  setViewYear]  = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [selectedDay, setSelectedDay] = useState<string>(isoDate(today));
+  const [view, setView] = useState<"month" | "week" | "day">("month");
 
   // Datos LexTech
   const [events,   setEvents]   = useState<AgendaEvent[]>([]);
@@ -1146,6 +1369,34 @@ export default function Agenda() {
     setSelectedDay(isoDate(today));
   };
 
+  const navigatePrev = () => {
+    if (view === "month") { prevMonth(); return; }
+    const n = view === "week" ? -7 : -1;
+    const nd = addDays(selectedDay, n);
+    setSelectedDay(nd);
+    const d = new Date(nd + "T12:00:00");
+    setViewYear(d.getFullYear());
+    setViewMonth(d.getMonth());
+  };
+
+  const navigateNext = () => {
+    if (view === "month") { nextMonth(); return; }
+    const n = view === "week" ? 7 : 1;
+    const nd = addDays(selectedDay, n);
+    setSelectedDay(nd);
+    const d = new Date(nd + "T12:00:00");
+    setViewYear(d.getFullYear());
+    setViewMonth(d.getMonth());
+  };
+
+  const openNewAtSlot = (dateStr: string, hour: number) => {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    setEditEvent(null);
+    setDefaultDate(`${dateStr}T${pad(hour)}:00`);
+    setErrorMsg(null);
+    setShowModal(true);
+  };
+
   // Índice de eventos por día
   const eventsByDay = useMemo(() => {
     const map: Record<string, AgendaEvent[]> = {};
@@ -1165,6 +1416,31 @@ export default function Agenda() {
 
   // Días del calendario
   const calDays = useMemo(() => buildCalendarDays(viewYear, viewMonth), [viewYear, viewMonth]);
+
+  // Días de la semana activa (para vista semana)
+  const weekDays = useMemo(() => {
+    const monday = getMondayOfWeek(selectedDay);
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(monday);
+      d.setDate(d.getDate() + i);
+      return isoDate(d);
+    });
+  }, [selectedDay]);
+
+  // Etiqueta de navegación según vista
+  const navLabel = useMemo(() => {
+    if (view === "month") return `${MESES[viewMonth]} ${viewYear}`;
+    if (view === "week") {
+      const first = new Date(weekDays[0] + "T12:00:00");
+      const last  = new Date(weekDays[6] + "T12:00:00");
+      const firstFmt = first.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
+      const lastFmt  = last.toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" });
+      return `${firstFmt} – ${lastFmt}`;
+    }
+    return new Date(selectedDay + "T12:00:00").toLocaleDateString("es-ES", {
+      weekday: "long", day: "numeric", month: "long", year: "numeric",
+    });
+  }, [view, viewMonth, viewYear, weekDays, selectedDay]);
 
   // Guardar evento (crear o editar)
   const handleSave = async (data: any) => {
@@ -1432,15 +1708,36 @@ export default function Agenda() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Navegación mes */}
+          {/* Selector de vista */}
+          <div className="flex items-center bg-slate-100 rounded-xl p-1 gap-0.5">
+            <button
+              onClick={() => setView("month")}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${view === "month" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+            >
+              Mes
+            </button>
+            <button
+              onClick={() => setView("week")}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${view === "week" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+            >
+              Semana
+            </button>
+            <button
+              onClick={() => setView("day")}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${view === "day" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+            >
+              Día
+            </button>
+          </div>
+          {/* Navegación */}
           <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl px-1">
-            <button onClick={prevMonth} className="p-2 hover:text-red-600 rounded-lg transition-colors text-slate-500">
+            <button onClick={navigatePrev} className="p-2 hover:text-red-600 rounded-lg transition-colors text-slate-500">
               <ChevronLeft size={15} />
             </button>
-            <span className="font-bold text-slate-800 text-sm px-1 min-w-[130px] text-center">
-              {MESES[viewMonth]} {viewYear}
+            <span className="font-bold text-slate-800 text-sm px-1 min-w-[150px] text-center">
+              {navLabel}
             </span>
-            <button onClick={nextMonth} className="p-2 hover:text-red-600 rounded-lg transition-colors text-slate-500">
+            <button onClick={navigateNext} className="p-2 hover:text-red-600 rounded-lg transition-colors text-slate-500">
               <ChevronRight size={15} />
             </button>
           </div>
@@ -1531,7 +1828,29 @@ export default function Agenda() {
         </div>
       </div>
 
-      {/* ── Cuerpo: calendario + panel día ────────────────────── */}
+      {/* ── Cuerpo ────────────────────────────────────────────── */}
+      {view !== "month" ? (
+        <div className="flex flex-1 min-h-0 overflow-hidden">
+          {loading ? (
+            <div className="flex flex-1 justify-center items-center">
+              <Loader2 size={22} className="animate-spin text-slate-300" />
+            </div>
+          ) : (
+            <TimeGridView
+              days={view === "week" ? weekDays : [selectedDay]}
+              eventsByDay={eventsByDay}
+              gcalEventsByDay={gcalEventsByDay}
+              selectedDay={selectedDay}
+              todayStr={todayStr}
+              movingEventId={movingEventId}
+              onSlotClick={openNewAtSlot}
+              onEventClick={openEdit}
+              onGcalEventClick={ev => setGcalModal(ev)}
+              onDayHeaderClick={dateStr => { setSelectedDay(dateStr); setView("day"); }}
+            />
+          )}
+        </div>
+      ) : (
       <div className="agenda-google-body flex flex-1 min-h-0 overflow-hidden">
 
         {/* ── Rejilla calendario ─────────────────────────────── */}
@@ -1827,6 +2146,7 @@ export default function Agenda() {
           </div>
         </aside>
       </div>
+      )}
 
       {/* ── Modal crear/editar LexTech ────────────────────────── */}
       {showModal && (
