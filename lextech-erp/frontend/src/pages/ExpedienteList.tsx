@@ -3930,6 +3930,11 @@ export default function ExpedienteList() {
       : extractedDemandados.length && !extractedDemandantes.length
         ? "demandados"
         : "demandantes";
+    const ext = (item.payload?.extractedData as any) || {};
+    const procuradorDemandante = normalizeImportedName(ext.procurador_demandante || (draft as any).procurador_demandante);
+    const procuradorDemandado  = normalizeImportedName(ext.procurador_demandado  || (draft as any).procurador_demandado);
+    const procuradorPropio    = inferredRepresentaA === "demandados" ? procuradorDemandado  : procuradorDemandante;
+    const procuradorContrario = inferredRepresentaA === "demandados" ? procuradorDemandante : procuradorDemandado;
     setDocumentImportVerifyItem(item);
     setDocumentImportVerifyError(null);
     setDocumentImportRepresentaA(inferredRepresentaA);
@@ -3938,9 +3943,10 @@ export default function ExpedienteList() {
       ...draft,
       cliente_nombre: normalizeImportedName(draft.cliente_nombre),
       contrario: normalizeImportedName(draft.contrario),
-      procurador: normalizeImportedName(draft.procurador),
+      procurador: procuradorPropio || normalizeImportedName(draft.procurador),
+      procurador_contrario: procuradorContrario,
       cuantia_principal: draft.cuantia_principal != null ? String(draft.cuantia_principal) : "",
-    });
+    } as typeof EXP_EMPTY);
     setViewMode("documentImportVerify");
   }, []);
 
