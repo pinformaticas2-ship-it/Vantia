@@ -30,6 +30,17 @@ function userName(req: Request) { return (req as any).auth?.name || 'Sistema'; }
 const ok = (res: Response, data: any) => res.json({ success: true, data });
 const err = (res: Response, msg: string, s = 500) => res.status(s).json({ success: false, error: msg });
 
+// multer delivers UTF-8 filenames as latin-1 strings — fix before storing
+function fixFileName(name: string): string {
+  try {
+    const fixed = Buffer.from(name, 'latin1').toString('utf-8');
+    // sanity check: if the result is valid UTF-8 and contains no replacement chars, use it
+    return fixed;
+  } catch {
+    return name;
+  }
+}
+
 const VALID_TIPOS = [
   'judicial', 'extrajudicial', 'monitorio', 'obligacion_hacer',
   'prejudicial', 'diligencias', 'penal', 'laboral', 'contencioso', 'otro',
@@ -1416,7 +1427,7 @@ export async function uploadDocumentImport(req: Request, res: Response) {
          (user_id, user_name, file_name, status, total_count, notes)
        VALUES ($1,$2,$3,'processing',0,$4)
        RETURNING id`,
-      [uid, unam, zipFile.originalname, 'Importación desde documentos ZIP'],
+      [uid, unam, fixFileName(zipFile.originalname), 'Importación desde documentos ZIP'],
     );
     batchId = batchResult.rows[0].id;
 
@@ -1456,7 +1467,7 @@ export async function uploadDocumentImport(req: Request, res: Response) {
           textPreview = extractTextFromFile(file).trim();
         } catch (extractError: any) {
           extractionWarning = String(extractError?.message || extractError || 'La extracción clásica falló');
-          console.warn(`[documentImport] ExtracciÃ³n clÃ¡sica con incidencia en ${file.name}:`, extractionWarning);
+          console.warn(`[documentImport] Extracción clásica con incidencia en ${file.name}:`, extractionWarning);
           textPreview = '';
         }
         const visionFirst = file.ext === '.pdf' || ['.jpg', '.jpeg', '.png', '.tiff', '.tif', '.bmp', '.webp'].includes(file.ext);
