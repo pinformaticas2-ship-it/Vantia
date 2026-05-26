@@ -19,6 +19,8 @@ import { AtajosButton } from "../components/AtajosSystem";
 import AdjuntosModal from "../components/AdjuntosModal";
 import ColumnVisibilityModal from "../components/ColumnVisibilityModal";
 import BackButton from "../components/BackButton";
+import { UndoToast } from "../components/UndoToast";
+import { useUndoDelete } from "../lib/useUndoDelete";
 
 type ViewMode = "list" | "detail" | "multiselect" | "csvImport" | "csvImportConfigure" | "csvImportReview" | "csvImportComplete" | "csvImportHistory" | "csvImportErrorDetail" | "documentImport" | "documentImportVerify";
 import { safeJson, resolveApiUrl, resolveUploadUrl } from "../lib/api";
@@ -3654,8 +3656,18 @@ export default function ExpedienteList() {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Confirmación borrado
+  // Confirmación borrado + undo
   const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  const { pending: pendingDelete, startDelete, undo: undoDelete, dismiss: dismissDelete } = useUndoDelete<any>({
+    onDelete: async (id: string) => {
+      const token = await getToken({ skipCache: true });
+      await fetch(`/api/expedientes/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    },
+  });
 
   // Vistas
   const [viewMode, setViewMode] = useState<ViewMode>("list");
@@ -4271,16 +4283,18 @@ export default function ExpedienteList() {
     finally { setSaving(false); }
   };
 
-  const handleDelete = async (id: string) => {
-    try {
-      const token = await getToken({ skipCache: true });
-      await fetch(`/api/expedientes/${id}`, {
-        method: "DELETE", headers: { Authorization: `Bearer ${token}` },
-      });
-      setExpedientes(prev => prev.filter(x => x.id !== id));
-      setDeleteId(null);
-      if (selected === id) setSelected(null);
-    } catch (e: any) { alert(e.message); }
+  const handleDelete = (id: string) => {
+    const item = expedientes.find(x => x.id === id);
+    if (!item) return;
+    setExpedientes(prev => prev.filter(x => x.id !== id));
+    setDeleteId(null);
+    if (selected === id) setSelected(null);
+    startDelete(id, item);
+  };
+
+  const handleUndoDelete = () => {
+    const item = undoDelete();
+    if (item) setExpedientes(prev => [...prev, item]);
   };
 
   // ── Acciones toolbar ──────────────────────────────────────────
@@ -5246,7 +5260,7 @@ export default function ExpedienteList() {
               </div>
               <div>
                 <h3 className="font-bold text-slate-900 text-sm">¿Eliminar expediente?</h3>
-                <p className="text-xs text-slate-500 mt-1">Esta acción no se puede deshacer.</p>
+                <p className="text-xs text-slate-500 mt-1">Tendrás 15 segundos para deshacer la eliminación.</p>
               </div>
             </div>
             <div className="flex gap-2 justify-end">
@@ -5257,6 +5271,16 @@ export default function ExpedienteList() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── Undo toast ──────────────────────────────────────── */}
+      {pendingDelete && (
+        <UndoToast
+          message="Expediente eliminado"
+          startedAt={pendingDelete.startedAt}
+          onUndo={handleUndoDelete}
+          onDismiss={dismissDelete}
+        />
       )}
 
       <div className="flex flex-col gap-0 animate-in fade-in duration-300" style={{ height: "calc(100vh - 96px)" }}>

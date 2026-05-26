@@ -2,13 +2,15 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   FolderOpen, Loader2, Paperclip, Activity, FileSpreadsheet,
   Users, ClipboardList, MoreHorizontal,
-  Upload, Trash2, Eye, Download, ExternalLink, Maximize2,
+  Upload, Trash2, Eye, Download, ExternalLink, Maximize2, AlertTriangle,
 } from "lucide-react";
 import AppSelect from "./AppSelect";
 import { useAuth } from "@clerk/clerk-react";
 import { safeJson } from "../lib/api";
 import AdjuntosModal from "./AdjuntosModal";
 import BackButton from "./BackButton";
+import { UndoToast } from "./UndoToast";
+import { useUndoDelete } from "../lib/useUndoDelete";
 
 // ── Constantes compartidas ────────────────────────────────────
 export const TIPOS: Record<string, { label: string; short: string; color: string }> = {
@@ -182,6 +184,15 @@ export function AdjuntosPanel({ entityId, entityName, onOpenFull }: {
   const [error, setError]           = useState<string | null>(null);
   const [isDrag, setIsDrag]         = useState(false);
   const fileRef                     = useRef<HTMLInputElement>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  const { pending: pendingFileDel, startDelete: startFileDel, undo: undoFileDel, dismiss: dismissFileDel } = useUndoDelete<any>({
+    onDelete: async (fileId: string) => {
+      const token = await getToken({ skipCache: true });
+      await fetch(`/api/files/${entityId}/${fileId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      window.dispatchEvent(new CustomEvent("historial-changed"));
+    },
+  });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -223,16 +234,17 @@ export function AdjuntosPanel({ entityId, entityName, onOpenFull }: {
     finally { setUploading(false); }
   };
 
-  const del = async (fileId: string, name: string) => {
-    if (!confirm(`¿Eliminar "${name}"?`)) return;
-    try {
-      const token = await getToken({ skipCache: true });
-      const res = await fetch(`/api/files/${entityId}/${fileId}`, {
-        method: "DELETE", headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) { setFiles(p => p.filter(f => f.id !== fileId)); window.dispatchEvent(new CustomEvent("historial-changed")); }
-      else { const d = await res.json().catch(() => ({})); setError(d?.error || "Error al eliminar"); }
-    } catch (e: any) { setError(e?.message || "Error al eliminar"); }
+  const del = (fileId: string) => {
+    const file = files.find(f => f.id === fileId);
+    if (!file) return;
+    setConfirmDeleteId(null);
+    setFiles(p => p.filter(f => f.id !== fileId));
+    startFileDel(fileId, file);
+  };
+
+  const handleUndoDel = () => {
+    const item = undoFileDel();
+    if (item) setFiles(p => [...p, item]);
   };
 
   const downloadFile = async (fileId: string, fileName: string) => {
@@ -336,7 +348,7 @@ export function AdjuntosPanel({ entityId, entityName, onOpenFull }: {
                         className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors"
                       ><Download size={12} /></button>
                       <button
-                        onClick={() => del(f.id, f.document_name || f.original_name)}
+                        onClick={() => setConfirmDeleteId(f.id)}
                         title="Eliminar"
                         className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
                       ><Trash2 size={12} /></button>
@@ -348,6 +360,35 @@ export function AdjuntosPanel({ entityId, entityName, onOpenFull }: {
           </table>
         )}
       </div>
+
+      {confirmDeleteId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm mx-4 p-6">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="p-2 bg-red-100 rounded-xl shrink-0">
+                <AlertTriangle size={18} className="text-red-600" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900 text-sm">¿Eliminar este archivo?</h3>
+                <p className="text-xs text-slate-500 mt-1">Tendrás 15 segundos para deshacer.</p>
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setConfirmDeleteId(null)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
+              <button onClick={() => del(confirmDeleteId!)} className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg active:scale-95">Eliminar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingFileDel && (
+        <UndoToast
+          message="Archivo eliminado"
+          startedAt={pendingFileDel.startedAt}
+          onUndo={handleUndoDel}
+          onDismiss={dismissFileDel}
+        />
+      )}
     </div>
   );
 }

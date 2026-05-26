@@ -22,6 +22,8 @@ import { AtajosButton } from "../components/AtajosSystem";
 import AdjuntosModal from "../components/AdjuntosModal";
 import { EtapaSelect } from "../components/EtapaSelect";
 import ColumnVisibilityModal from "../components/ColumnVisibilityModal";
+import { UndoToast } from "../components/UndoToast";
+import { useUndoDelete } from "../lib/useUndoDelete";
 
 // ── Helpers ───────────────────────────────────────────────────
 const statusColor: Record<string, string> = {
@@ -1122,6 +1124,13 @@ export default function ClientList() {
   const [refreshSpin, setRefreshSpin] = useState(false);                     // animación refresco
   const [bajaConfirm, setBajaConfirm] = useState(false);                     // modal confirmar baja
   const [bajaLoading, setBajaLoading] = useState(false);                     // spinner baja
+
+  const { pending: pendingClientDelete, startDelete: startClientDelete, undo: undoClientDelete, dismiss: dismissClientDelete } = useUndoDelete<any>({
+    onDelete: async (id: string) => {
+      const token = await getToken({ skipCache: true });
+      await fetch(`/api/entities/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    },
+  });
   const [showQuickTaskModal, setShowQuickTaskModal] = useState(false);
   const [quickTaskSaving, setQuickTaskSaving] = useState(false);
   const [quickTaskError, setQuickTaskError] = useState<string | null>(null);
@@ -1311,28 +1320,19 @@ export default function ClientList() {
   };
 
   // ── Dar de baja = eliminar cliente ─────────────────────────
-  const handleBaja = async () => {
+  const handleBaja = () => {
     if (!selected) return;
-    setBajaLoading(true);
-    try {
-      const token = await getToken({ skipCache: true });
-      const res = await fetch(`/api/entities/${selected}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const result = await safeJson(res);
-      if (res.ok) {
-        setClients(prev => prev.filter(c => c.id !== selected));
-        setBajaConfirm(false);
-        setSelected(null);
-      } else {
-        alert(result.error || "Error al eliminar el cliente");
-      }
-    } catch (err: any) {
-      alert(err.message);
-    } finally {
-      setBajaLoading(false);
-    }
+    const client = clients.find(c => c.id === selected);
+    if (!client) return;
+    setClients(prev => prev.filter(c => c.id !== selected));
+    setBajaConfirm(false);
+    setSelected(null);
+    startClientDelete(selected, client);
+  };
+
+  const handleUndoClient = () => {
+    const item = undoClientDelete();
+    if (item) setClients(prev => [...prev, item]);
   };
 
   // ── Dar de alta (reactivar) ─────────────────────────────────
@@ -1640,11 +1640,20 @@ export default function ClientList() {
     {bajaConfirm && selectedClient && (
       <ConfirmModal
         title={`Eliminar a ${selectedClient.first_name} ${selectedClient.last_name}`}
-        message={`Se borrará el cliente de la base de datos de forma permanente. Esta acción no se puede deshacer.`}
-        confirmLabel={bajaLoading ? "Eliminando…" : "Eliminar cliente"}
+        message={`Se borrará el cliente de la base de datos. Tendrás 15 segundos para deshacer.`}
+        confirmLabel="Eliminar cliente"
         danger
         onConfirm={handleBaja}
         onCancel={() => setBajaConfirm(false)}
+      />
+    )}
+
+    {pendingClientDelete && (
+      <UndoToast
+        message={`Cliente eliminado`}
+        startedAt={pendingClientDelete.startedAt}
+        onUndo={handleUndoClient}
+        onDismiss={dismissClientDelete}
       />
     )}
     {showQuickTaskModal && selectedClient && (

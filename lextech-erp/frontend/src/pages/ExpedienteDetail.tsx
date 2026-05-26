@@ -55,6 +55,8 @@ import {
 import { FilesTabPanel } from "../components/FilesTabPanel";
 import { EtapaSelect } from "../components/EtapaSelect";
 import BackButton from "../components/BackButton";
+import { UndoToast } from "../components/UndoToast";
+import { useUndoDelete } from "../lib/useUndoDelete";
 
 function fmtDate(d: string | null | undefined) {
   if (!d) return "—";
@@ -243,12 +245,24 @@ function CronologiaTab({
   const [editId, setEditId] = React.useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = React.useState<string | null>(null);
   const [filterEstado, setFilterEstado] = React.useState<string>("todas");
+  const [removedNotifIds, setRemovedNotifIds] = React.useState<string[]>([]);
+
+  const { pending: pendingNotifDelete, startDelete: startNotifDelete, undo: undoNotifDelete, dismiss: dismissNotifDelete } = useUndoDelete<any>({
+    onDelete: async (id: string) => {
+      const token = await getToken({ skipCache: true });
+      await fetch(`/api/expedientes/${expedienteId}/notificaciones/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      onRefresh();
+    },
+  });
 
   const tipoLabel = (tipo: string) =>
     NOTIF_TIPOS.find((t) => t.value === tipo)?.label || tipo;
 
   const filtered = (notificaciones || []).filter(
-    (n: any) => filterEstado === "todas" || n.estado === filterEstado
+    (n: any) => (filterEstado === "todas" || n.estado === filterEstado) && !removedNotifIds.includes(n.id)
   );
 
   async function handleSave() {
@@ -277,16 +291,17 @@ function CronologiaTab({
     } catch { /* */ } finally { setSaving(false); }
   }
 
-  async function handleDelete(nid: string) {
-    try {
-      const token = await getToken({ skipCache: true });
-      await fetch(`/api/expedientes/${expedienteId}/notificaciones/${nid}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setConfirmDelete(null);
-      onRefresh();
-    } catch { /* */ }
+  function handleDelete(nid: string) {
+    const item = (notificaciones || []).find((n: any) => n.id === nid);
+    if (!item) return;
+    setConfirmDelete(null);
+    setRemovedNotifIds(prev => [...prev, nid]);
+    startNotifDelete(nid, item);
+  }
+
+  function handleUndoNotif() {
+    const item = undoNotifDelete();
+    if (item) setRemovedNotifIds(prev => prev.filter(id => id !== item.id));
   }
 
   function startEdit(n: any) {
@@ -527,6 +542,15 @@ function CronologiaTab({
           </div>
         </div>
       )}
+
+      {pendingNotifDelete && (
+        <UndoToast
+          message="Notificación eliminada"
+          startedAt={pendingNotifDelete.startedAt}
+          onUndo={handleUndoNotif}
+          onDismiss={dismissNotifDelete}
+        />
+      )}
     </div>
   );
 }
@@ -572,6 +596,13 @@ function TabNotas({
   const [editContent, setEditContent] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [legacySaving, setLegacySaving] = useState(false);
+
+  const { pending: pendingNotaDelete, startDelete: startNotaDelete, undo: undoNotaDelete, dismiss: dismissNotaDelete } = useUndoDelete<Nota>({
+    onDelete: async (id: string) => {
+      const headers = await authHeaders();
+      await fetch(`/api/expedientes/${expedienteId}/notes/${id}`, { method: "DELETE", headers });
+    },
+  });
 
   const authHeaders = useCallback(async (): Promise<Record<string, string>> => {
     const token = await getToken({ skipCache: true });
@@ -729,18 +760,15 @@ function TabNotas({
       return;
     }
 
-    try {
-      const headers = await authHeaders();
-      const response = await fetch(`/api/expedientes/${expedienteId}/notes/${notaId}`, {
-        method: "DELETE",
-        headers,
-      });
-      if (response.ok) {
-        setNotas((prev) => prev.filter((n) => n.id !== notaId));
-      }
-    } catch (error) {
-      console.error("Error eliminando nota expediente:", error);
-    }
+    const nota = notas.find((n) => n.id === notaId);
+    if (!nota) return;
+    setNotas((prev) => prev.filter((n) => n.id !== notaId));
+    startNotaDelete(notaId, nota);
+  };
+
+  const handleUndoNota = () => {
+    const item = undoNotaDelete();
+    if (item) setNotas((prev) => [...prev, item]);
   };
 
   if (loading) {
@@ -896,7 +924,7 @@ function TabNotas({
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm p-5 space-y-4">
             <div className="space-y-1">
               <h4 className="text-base font-bold text-slate-900">Eliminar nota</h4>
-              <p className="text-sm text-slate-500">Esta acción no se puede deshacer.</p>
+              <p className="text-sm text-slate-500">Tendrás 15 segundos para deshacer.</p>
             </div>
             <div className="flex justify-end gap-2">
               <button type="button" onClick={() => setConfirmDeleteId(null)} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50">
@@ -908,6 +936,15 @@ function TabNotas({
             </div>
           </div>
         </div>
+      )}
+
+      {pendingNotaDelete && (
+        <UndoToast
+          message="Nota eliminada"
+          startedAt={pendingNotaDelete.startedAt}
+          onUndo={handleUndoNota}
+          onDismiss={dismissNotaDelete}
+        />
       )}
     </div>
   );
@@ -979,6 +1016,14 @@ function TabTareas({
   const [filterVencidas, setFilterVencidas] = useState(false);
   const [search, setSearch] = useState("");
   const [confirmDeleteTareaId, setConfirmDeleteTareaId] = useState<string | null>(null);
+
+  const { pending: pendingTareaDelete, startDelete: startTareaDelete, undo: undoTareaDelete, dismiss: dismissTareaDelete } = useUndoDelete<any>({
+    onDelete: async (id: string) => {
+      const token = await getToken({ skipCache: true });
+      await fetch(`/api/tasks/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      window.dispatchEvent(new CustomEvent("historial-changed"));
+    },
+  });
 
   useEffect(() => {
     setForm((prev) => ({
@@ -1115,16 +1160,19 @@ function TabTareas({
     }
   };
 
-  const confirmDeleteTarea = async () => {
+  const confirmDeleteTarea = () => {
     if (!confirmDeleteTareaId) return;
     const taskId = confirmDeleteTareaId;
+    const tarea = tareas.find((x) => x.id === taskId);
+    if (!tarea) return;
     setConfirmDeleteTareaId(null);
-    const token = await getToken({ skipCache: true });
-    const res = await fetch(`/api/tasks/${taskId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
-    if (res.ok) {
-      setTareas((prev) => prev.filter((x) => x.id !== taskId));
-      window.dispatchEvent(new CustomEvent("historial-changed"));
-    }
+    setTareas((prev) => prev.filter((x) => x.id !== taskId));
+    startTareaDelete(taskId, tarea);
+  };
+
+  const handleUndoTarea = () => {
+    const item = undoTareaDelete();
+    if (item) setTareas((prev) => [...prev, item]);
   };
 
   const isVencida = (t: any) => t.plazo && t.estado !== "completada" && new Date(t.plazo) < new Date();
@@ -1425,7 +1473,7 @@ function TabTareas({
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-900">Eliminar tarea</h3>
-                  <p className="text-sm text-slate-500">Esta acción no se puede deshacer.</p>
+                  <p className="text-sm text-slate-500">Tendrás 15 segundos para deshacer.</p>
                 </div>
               </div>
             </div>
@@ -1439,6 +1487,15 @@ function TabTareas({
             </div>
           </div>
         </div>
+      )}
+
+      {pendingTareaDelete && (
+        <UndoToast
+          message="Tarea eliminada"
+          startedAt={pendingTareaDelete.startedAt}
+          onUndo={handleUndoTarea}
+          onDismiss={dismissTareaDelete}
+        />
       )}
     </div>
   );
@@ -1508,7 +1565,15 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
   const [uploading, setUploading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmDeleteFileId, setConfirmDeleteFileId] = useState<string | null>(null);
   const [editingFile, setEditingFile] = useState<any | null>(null);
+
+  const { pending: pendingFileDelete, startDelete: startFileDelete, undo: undoFileDelete, dismiss: dismissFileDelete } = useUndoDelete<any>({
+    onDelete: async (id: string) => {
+      const token = await getToken({ skipCache: true });
+      await fetch(`/api/tasks/${taskId}/files/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+    },
+  });
   const [editDocName, setEditDocName] = useState("");
   const [editAttachmentType, setEditAttachmentType] = useState("Sin clasificar");
   const [showTemplates, setShowTemplates] = useState(false);
@@ -1838,13 +1903,18 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
     setTimeout(() => URL.revokeObjectURL(url), 10_000);
   };
 
-  const handleDelete = async (fileId: string) => {
-    const token = await getToken({ skipCache: true });
-    const res = await fetch(`/api/tasks/${taskId}/files/${fileId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
-    if (res.ok) {
-      setFiles((prev) => prev.filter((item) => item.id !== fileId));
-      if (preview?.fileId === fileId) setPreview(null);
-    }
+  const handleDelete = (fileId: string) => {
+    const file = files.find((f) => f.id === fileId);
+    if (!file) return;
+    setConfirmDeleteFileId(null);
+    setFiles((prev) => prev.filter((item) => item.id !== fileId));
+    if (preview?.fileId === fileId) setPreview(null);
+    startFileDelete(fileId, file);
+  };
+
+  const handleUndoFile = () => {
+    const item = undoFileDelete();
+    if (item) setFiles((prev) => [...prev, item]);
   };
 
   const loadTemplates = useCallback(async () => {
@@ -2062,7 +2132,7 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
                             className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors">
                             <Edit3 size={13} />
                           </button>
-                          <button type="button" onClick={() => handleDelete(file.id)} title="Eliminar"
+                          <button type="button" onClick={() => setConfirmDeleteFileId(file.id)} title="Eliminar"
                             className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
                             <Trash2 size={13} />
                           </button>
@@ -2216,7 +2286,7 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
                             <button type="button" onClick={() => { setEditDocName(file.document_name || file.original_name); setEditAttachmentType(file.attachment_type || "Sin clasificar"); setEditingFile(file); }} title="Editar" className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors">
                               <Edit3 size={14} />
                             </button>
-                            <button type="button" onClick={() => handleDelete(file.id)} title="Eliminar" className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                            <button type="button" onClick={() => setConfirmDeleteFileId(file.id)} title="Eliminar" className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
                               <Trash2 size={14} />
                             </button>
                           </div>
@@ -2398,6 +2468,35 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
           </div>
         </div>,
         document.body
+      )}
+
+      {confirmDeleteFileId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm mx-4 p-6">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="p-2 bg-red-100 rounded-xl shrink-0">
+                <AlertTriangle size={18} className="text-red-600" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900 text-sm">¿Eliminar archivo adjunto?</h3>
+                <p className="text-xs text-slate-500 mt-1">Tendrás 15 segundos para deshacer.</p>
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setConfirmDeleteFileId(null)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
+              <button onClick={() => handleDelete(confirmDeleteFileId!)} className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg active:scale-95">Eliminar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingFileDelete && (
+        <UndoToast
+          message="Archivo eliminado"
+          startedAt={pendingFileDelete.startedAt}
+          onUndo={handleUndoFile}
+          onDismiss={dismissFileDelete}
+        />
       )}
     </div>
   );
