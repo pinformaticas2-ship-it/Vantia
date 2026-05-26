@@ -1229,6 +1229,7 @@ async function createExpediente(
     clienteNombre = cr.rows[0]?.n || null;
   }
 
+  // INSERT con campos base (siempre existentes)
   const { rows } = await pool.query(
     `INSERT INTO expedientes
        (anio, num_exp, ref_propia, ref_expediente, descripcion, tipo,
@@ -1238,10 +1239,8 @@ async function createExpediente(
         tipos_asunto, cuantia_principal, intereses, costas, cuantia_total,
         indeterminado, etapa, persona_contacto, contacto, centro, color,
         demandantes, demandados, fecha_notificacion,
-        abogado_propio, abogado_contrario, procurador_contrario,
-        abogado_demandante, abogado_demandado, procurador_demandante, procurador_demandado,
         created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34)
      RETURNING id, anio, num_exp`,
     [
       yr, numExp,
@@ -1276,18 +1275,41 @@ async function createExpediente(
       data.demandantes ? JSON.stringify(data.demandantes) : null,
       data.demandados ? JSON.stringify(data.demandados) : null,
       data.fecha_notificacion || null,
-      data.abogado_propio?.trim() || null,
-      data.abogado_contrario?.trim() || null,
-      data.procurador_contrario?.trim() || null,
-      data.abogado_demandante?.trim() || null,
-      data.abogado_demandado?.trim() || null,
-      data.procurador_demandante?.trim() || null,
-      data.procurador_demandado?.trim() || null,
       userName_,
     ],
   );
 
-  return rows[0];
+  const expediente = rows[0];
+
+  // UPDATE opcional para los campos de abogados/procuradores — no bloquea si la migración no se aplicó todavía
+  try {
+    await pool.query(
+      `UPDATE expedientes
+         SET abogado_propio        = $1,
+             abogado_contrario     = $2,
+             procurador_contrario  = $3,
+             abogado_demandante    = $4,
+             abogado_demandado     = $5,
+             procurador_demandante = $6,
+             procurador_demandado  = $7
+       WHERE id = $8`,
+      [
+        data.abogado_propio?.trim()        || null,
+        data.abogado_contrario?.trim()     || null,
+        data.procurador_contrario?.trim()  || null,
+        data.abogado_demandante?.trim()    || null,
+        data.abogado_demandado?.trim()     || null,
+        data.procurador_demandante?.trim() || null,
+        data.procurador_demandado?.trim()  || null,
+        expediente.id,
+      ],
+    );
+  } catch (updateErr: any) {
+    // Las columnas aún no existen en BD — no es fatal, el expediente ya fue creado
+    console.warn('[createExpediente] No se pudieron guardar campos de abogados/procuradores:', String(updateErr?.message || updateErr));
+  }
+
+  return expediente;
 }
 
 function persistDocumentForReview(batchId: string, rowNumber: number, file: DocFile) {
