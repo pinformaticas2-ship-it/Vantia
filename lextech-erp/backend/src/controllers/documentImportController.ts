@@ -648,17 +648,17 @@ function explainImportFailure(error: any, fileName: string) {
 
   if (lower.includes('api key was reported as leaked') || lower.includes('clave gemini filtrada')) {
     return {
-      userError: `No se pudo leer "${fileName}" con IA porque la clave de Gemini del servidor estÃ¡ bloqueada por seguridad.`,
+      userError: `No se pudo leer "${fileName}" con IA porque la clave de Gemini del servidor está bloqueada por seguridad.`,
       developerError: developer,
     };
   }
   if (lower.includes('quota exceeded') || lower.includes('too many requests') || lower.includes('sin cuota')) {
     return {
-      userError: `No se pudo leer "${fileName}" con IA porque la cuota de Gemini del servidor estÃ¡ agotada.`,
+      userError: `No se pudo leer "${fileName}" con IA porque la cuota de Gemini del servidor está agotada.`,
       developerError: developer,
     };
   }
-  if (lower.includes('gemini vision devolviÃ³ vacÃ­o') || lower.includes('gemini vision no devolviÃ³')) {
+  if (lower.includes('gemini vision devolvió vacío') || lower.includes('gemini vision no devolvió')) {
     return {
       userError: `No se pudo leer el contenido de "${fileName}" con la IA visual del servidor.`,
       developerError: developer,
@@ -676,7 +676,7 @@ function explainImportFailure(error: any, fileName: string) {
       developerError: developer,
     };
   }
-  if (lower.includes('ocr del pdf') || lower.includes('ocr se ejecutÃ³')) {
+  if (lower.includes('ocr del pdf') || lower.includes('ocr se ejecutó')) {
     return {
       userError: `No se pudo leer el contenido de "${fileName}" porque el PDF parece escaneado pero no se pudo obtener texto legible.`,
       developerError: developer,
@@ -684,19 +684,19 @@ function explainImportFailure(error: any, fileName: string) {
   }
   if (lower.includes('no se pudo extraer texto')) {
     return {
-      userError: `No se pudo leer el contenido de "${fileName}". Comprueba que el documento sea legible o que no estÃ© corrupto.`,
+      userError: `No se pudo leer el contenido de "${fileName}". Comprueba que el documento sea legible o que no esté corrupto.`,
       developerError: developer,
     };
   }
   if (lower.includes('gemini')) {
     return {
-      userError: `No se pudo interpretar juridicamente "${fileName}". Revisa el documento o completa los datos a mano en la verificacion.`,
+      userError: `No se pudo interpretar jurídicamente "${fileName}". Revisa el documento o completa los datos a mano en la verificación.`,
       developerError: developer,
     };
   }
   if (lower.includes('pdf') || lower.includes('ocr') || lower.includes('tesseract') || lower.includes('pdftotext')) {
     return {
-      userError: `No se pudo extraer texto util de "${fileName}". Intenta con un PDF con texto o una imagen mas nÃ­tida.`,
+      userError: `No se pudo extraer texto útil de "${fileName}". Intenta con un PDF con texto o una imagen más nítida.`,
       developerError: developer,
     };
   }
@@ -1353,7 +1353,7 @@ export async function uploadDocumentImport(req: Request, res: Response) {
   if (!uid) return err(res, 'No autenticado', 401);
 
   const zipFile = (req as any).file;
-  if (!zipFile) return err(res, 'No se recibiÃ³ ningÃºn archivo ZIP', 400);
+  if (!zipFile) return err(res, 'No se recibió ningún archivo ZIP', 400);
 
   const clienteId = req.body.cliente_id || null;
   const procuradorForzado = req.body.procurador || null;
@@ -1367,7 +1367,7 @@ export async function uploadDocumentImport(req: Request, res: Response) {
          (user_id, user_name, file_name, status, total_count, notes)
        VALUES ($1,$2,$3,'processing',0,$4)
        RETURNING id`,
-      [uid, unam, zipFile.originalname, 'ImportaciÃ³n desde documentos ZIP'],
+      [uid, unam, zipFile.originalname, 'Importación desde documentos ZIP'],
     );
     batchId = batchResult.rows[0].id;
 
@@ -1377,7 +1377,7 @@ export async function uploadDocumentImport(req: Request, res: Response) {
     if (files.length === 0) {
       await pool.query(
         `UPDATE expediente_import_batches SET status='failed', notes=$1 WHERE id=$2`,
-        ['El ZIP no contiene documentos en formato soportado (PDF, DOCX, TXT, imÃ¡genes)', batchId],
+        ['El ZIP no contiene documentos en formato soportado (PDF, DOCX, TXT, imágenes)', batchId],
       );
       return err(res, 'El ZIP no contiene documentos soportados', 400);
     }
@@ -1406,7 +1406,7 @@ export async function uploadDocumentImport(req: Request, res: Response) {
         try {
           textPreview = extractTextFromFile(file).trim();
         } catch (extractError: any) {
-          extractionWarning = String(extractError?.message || extractError || 'La extracciÃ³n clÃ¡sica fallÃ³');
+          extractionWarning = String(extractError?.message || extractError || 'La extracción clásica falló');
           console.warn(`[documentImport] ExtracciÃ³n clÃ¡sica con incidencia en ${file.name}:`, extractionWarning);
           textPreview = '';
         }
@@ -1517,7 +1517,7 @@ export async function uploadDocumentImport(req: Request, res: Response) {
     const counters = await refreshBatchCounters(batchId);
     await pool.query(
       `UPDATE expediente_import_batches SET notes=$1 WHERE id=$2`,
-      [`${reviewCount} documentos listos para revisiÃ³n y ${errorCount} con incidencias.`, batchId],
+      [`${reviewCount} documentos listos para revisión y ${errorCount} con incidencias.`, batchId],
     );
 
     return ok(res, {
@@ -1571,7 +1571,7 @@ export async function acceptDocumentImportItem(req: Request, res: Response) {
     const draft = verifiedDraft || payload.draft || {};
 
     if (!draft.descripcion || !String(draft.descripcion).trim()) {
-      return err(res, 'AÃ±ade una descripciÃ³n antes de aceptar el expediente', 400);
+      return err(res, 'Añade una descripción antes de aceptar el expediente', 400);
     }
     if (!draft.cliente_id && !String(draft.cliente_nombre || '').trim()) {
       return err(res, 'Indica un cliente escribiendo el nombre o seleccionando uno existente antes de aceptar el expediente', 400);
@@ -1652,7 +1652,7 @@ export async function listDocumentImportBatches(req: Request, res: Response) {
   try {
     const { rows } = await pool.query(
       `SELECT * FROM expediente_import_batches
-       WHERE user_id=$1 AND notes IS NOT NULL
+       WHERE user_id=$1
        ORDER BY created_at DESC LIMIT 20`,
       [uid],
     );

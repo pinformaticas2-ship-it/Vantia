@@ -2443,6 +2443,14 @@ function ZipUploadIllustration({ hasFile, clicked }: { hasFile: boolean; clicked
   );
 }
 
+function batchStatusLabel(status: string) {
+  if (status === "completed")  return "Completada";
+  if (status === "failed")     return "Fallida";
+  if (status === "processing") return "Procesando";
+  if (status === "reviewing")  return "En revisión";
+  return status;
+}
+
 // ── ZipDropArea ───────────────────────────────────────────────────────────────
 // Área de drag-and-drop para ZIP — hooks correctamente en componente propio
 function ZipDropArea({ zipFileName, onSelectFile, onFileChange }: {
@@ -2521,7 +2529,6 @@ function DocumentImportView({
   historyError,
   successNotice,
   onBack,
-  onOpenSettings,
   onToggleAutoAssign,
   onChangeClient,
   onChangeProcurador,
@@ -2549,7 +2556,6 @@ function DocumentImportView({
   historyError: string | null;
   successNotice: string | null;
   onBack: () => void;
-  onOpenSettings: () => void;
   onToggleAutoAssign: () => void;
   onChangeClient: (value: string) => void;
   onChangeProcurador: (value: string) => void;
@@ -2589,16 +2595,8 @@ function DocumentImportView({
         onChange={(e) => onFileChange(e.target.files?.[0] ?? null)}
       />
 
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center gap-4">
         <BackButton label="Volver a Expedientes" onClick={onBack} />
-
-        <button
-          onClick={onOpenSettings}
-          className="rounded-xl border border-slate-200 bg-white p-3 text-slate-600 shadow-sm transition-colors hover:border-[#ab0433]/30 hover:bg-red-50 hover:text-[#ab0433]"
-          title="Configuracion"
-        >
-          <Settings2 size={16} />
-        </button>
       </div>
 
       <div>
@@ -2727,7 +2725,14 @@ function DocumentImportView({
         <section className="rounded-[24px] border border-slate-200 bg-white px-6 py-6 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h2 className="text-[15px] font-bold text-slate-900">Última importación</h2>
+              <div className="flex items-center gap-3">
+                <h2 className="text-[15px] font-bold text-slate-900">Última importación</h2>
+                {activeBatch && (activeBatch.pending_count ?? 0) > 0 && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-800">
+                    {activeBatch.pending_count} pendiente{(activeBatch.pending_count ?? 0) !== 1 ? "s" : ""}
+                  </span>
+                )}
+              </div>
               <p className="mt-1 text-sm text-slate-500">
                 Estado del lote y expedientes creados a partir de tus documentos.
               </p>
@@ -2740,7 +2745,7 @@ function DocumentImportView({
                   ? "bg-red-50 text-red-700"
                   : "bg-amber-50 text-amber-700"
               }`}>
-                {activeBatch.status === "completed" ? "Completada" : activeBatch.status === "failed" ? "Fallida" : "Procesando"}
+                {batchStatusLabel(activeBatch.status)}
               </span>
             )}
           </div>
@@ -2881,7 +2886,7 @@ function DocumentImportView({
                     ? "bg-red-50 text-red-700"
                     : "bg-amber-50 text-amber-700"
                 }`}>
-                  {batch.status}
+                  {batchStatusLabel(batch.status)}
                 </span>
               </div>
             ))}
@@ -3060,6 +3065,62 @@ function DocumentImportVerifyView({
     if (match) { onChange("cliente_id", match.value); onChange("cliente_nombre", match.label); return; }
     onChange("cliente_id", "");
     onChange("cliente_nombre", value);
+  };
+
+  const demandantesList: string[] = (() => {
+    if (Array.isArray(form.demandantes) && form.demandantes.length > 0) return form.demandantes as string[];
+    return clientInputValue ? [clientInputValue] : [];
+  })();
+
+  const demandadosList: string[] = (() => {
+    if (Array.isArray(form.demandados) && form.demandados.length > 0) return form.demandados as string[];
+    return safeContrario ? safeContrario.split(" | ").filter(Boolean) : [];
+  })();
+
+  const handleDemandanteChange = (index: number, value: string) => {
+    const next = [...demandantesList];
+    next[index] = value;
+    onChange("demandantes", next);
+    if (index === 0) {
+      const norm = value.trim().toLowerCase();
+      const match = clientOptions.find(o => o.label.trim().toLowerCase() === norm);
+      if (match) { onChange("cliente_id", match.value); onChange("cliente_nombre", match.label); }
+      else { onChange("cliente_id", ""); onChange("cliente_nombre", value); }
+    }
+  };
+
+  const addDemandante = () => {
+    const next = demandantesList.length ? [...demandantesList, ""] : [clientInputValue, ""];
+    onChange("demandantes", next);
+  };
+
+  const removeDemandante = (index: number) => {
+    const next = demandantesList.filter((_, i) => i !== index);
+    onChange("demandantes", next);
+    if (index === 0) {
+      const first = next[0] ?? "";
+      const norm = first.trim().toLowerCase();
+      const match = clientOptions.find(o => o.label.trim().toLowerCase() === norm);
+      if (match) { onChange("cliente_id", match.value); onChange("cliente_nombre", match.label); }
+      else { onChange("cliente_id", ""); onChange("cliente_nombre", first); }
+    }
+  };
+
+  const handleDemandadoChange = (index: number, value: string) => {
+    const next = [...demandadosList];
+    next[index] = value;
+    onChange("demandados", next);
+    onChange("contrario", next.filter(Boolean).join(" | "));
+  };
+
+  const addDemandado = () => {
+    onChange("demandados", [...demandadosList, ""]);
+  };
+
+  const removeDemandado = (index: number) => {
+    const next = demandadosList.filter((_, i) => i !== index);
+    onChange("demandados", next);
+    onChange("contrario", next.filter(Boolean).join(" | "));
   };
 
   // Cálculo fecha límite (20 días hábiles)
@@ -3244,37 +3305,57 @@ function DocumentImportVerifyView({
           </PanelSection>
 
           {/* Demandantes */}
-          <PanelSection title="Demandantes">
-            <PartyRow
-              color="blue"
-              value={clientInputValue}
-              onChange={handleClientInputChange}
-            />
+          <PanelSection title="Demandantes" onAdd={addDemandante}>
             <datalist id={`doc-import-clients-${item.id}`}>
               {clientOptions.map(o => <option key={o.value} value={o.label} />)}
             </datalist>
+            {demandantesList.length === 0 ? (
+              <PartyRow color="blue" value={clientInputValue} onChange={handleClientInputChange} />
+            ) : (
+              demandantesList.map((name, i) => (
+                <PartyRow
+                  key={i}
+                  color="blue"
+                  value={name}
+                  onChange={v => handleDemandanteChange(i, v)}
+                  onRemove={demandantesList.length > 1 ? () => removeDemandante(i) : undefined}
+                />
+              ))
+            )}
           </PanelSection>
 
           {/* Demandados */}
-          <PanelSection title="Demandados">
-            <PartyRow
-              color="red"
-              value={safeContrario}
-              onChange={v => onChange("contrario", v)}
-            />
+          <PanelSection title="Demandados" onAdd={addDemandado}>
+            {demandadosList.length === 0 ? (
+              <PartyRow
+                color="red"
+                value={safeContrario}
+                onChange={v => { onChange("contrario", v); onChange("demandados", v ? [v] : []); }}
+              />
+            ) : (
+              demandadosList.map((name, i) => (
+                <PartyRow
+                  key={i}
+                  color="red"
+                  value={name}
+                  onChange={v => handleDemandadoChange(i, v)}
+                  onRemove={demandadosList.length > 1 ? () => removeDemandado(i) : undefined}
+                />
+              ))
+            )}
           </PanelSection>
 
           {/* Representación contraria */}
           <PanelSection title="Representación contraria">
-            {safeProcurador ? (
-              <div className="flex items-center gap-2 mt-2">
-                <div className="w-2 h-2 rounded-full bg-slate-400 shrink-0" />
-                <input value={safeProcurador} onChange={e => onChange("procurador", e.target.value)}
-                  className="flex-1 border border-slate-200 rounded-lg px-2 py-1.5 text-sm text-slate-700 focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100 bg-white" />
-              </div>
-            ) : (
-              <p className="text-xs text-slate-400 italic mt-1">Sin representación detectada</p>
-            )}
+            <div className="flex items-center gap-2 mt-2">
+              <div className="w-2 h-2 rounded-full bg-slate-400 shrink-0" />
+              <input
+                value={safeProcurador}
+                onChange={e => onChange("procurador", e.target.value)}
+                placeholder="Nombre del procurador…"
+                className="flex-1 border border-slate-200 rounded-lg px-2 py-1.5 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100 bg-white"
+              />
+            </div>
           </PanelSection>
 
           {/* Campos adicionales */}
@@ -3332,23 +3413,16 @@ function DocumentImportVerifyView({
           className="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors">
           Cancelar
         </button>
-        <div className="flex items-center gap-2">
-          <button type="button" onClick={onBack}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-slate-700 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
-            <ExternalLink size={14} />
-            Ver expediente
-          </button>
-          <button type="button" onClick={onAccept} disabled={!canAccept}
-            className={`inline-flex items-center gap-2 px-5 py-2 text-sm font-bold rounded-xl transition-all ${
-              canAccept
-                ? "bg-[#ab0433] text-white shadow-md shadow-red-200 hover:bg-[#8f0329] active:scale-[0.98]"
-                : "bg-slate-200 text-slate-400 cursor-not-allowed"
-            }`}
-          >
-            {saving ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
-            {saving ? "Creando…" : "Verificar datos"}
-          </button>
-        </div>
+        <button type="button" onClick={onAccept} disabled={!canAccept}
+          className={`inline-flex items-center gap-2 px-5 py-2 text-sm font-bold rounded-xl transition-all ${
+            canAccept
+              ? "bg-[#ab0433] text-white shadow-md shadow-red-200 hover:bg-[#8f0329] active:scale-[0.98]"
+              : "bg-slate-200 text-slate-400 cursor-not-allowed"
+          }`}
+        >
+          {saving ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
+          {saving ? "Creando expediente…" : "Crear expediente"}
+        </button>
       </div>
     </div>
   , document.body);
@@ -4583,7 +4657,6 @@ export default function ExpedienteList() {
         historyError={documentImportHistoryError}
         successNotice={documentImportSuccessNotice}
         onBack={() => switchView("list")}
-        onOpenSettings={() => alert("La configuración avanzada de importación documental la dejamos preparada para la siguiente fase.")}
         onToggleAutoAssign={() => {
           setDocumentImportAutoAssignOrganizations((prev) => {
             const next = !prev;
