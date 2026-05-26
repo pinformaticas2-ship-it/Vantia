@@ -59,6 +59,15 @@ export const EXP_EMPTY = {
   demandantes: [] as string[],
   demandados:  [] as string[],
   representacion_contraria: [] as Array<{ nombre: string; rol: string; colegiado: string }>,
+  // Representación legal
+  abogado_propio:        "",
+  abogado_contrario:     "",
+  procurador_contrario:  "",
+  // Campos intermedios de extracción IA (calculan propio/contrario según representaA)
+  abogado_demandante:    "",
+  abogado_demandado:     "",
+  procurador_demandante: "",
+  procurador_demandado:  "",
 };
 
 const TIPOS_ASUNTO_GROUPS: Array<{ label: string; items: string[] }> = [

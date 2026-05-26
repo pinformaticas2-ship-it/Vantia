@@ -3037,8 +3037,16 @@ function DocumentImportVerifyView({
   const safeClienteId        = String(form.cliente_id ?? "");
   const safeClienteNombre    = normalizeImportedName(form.cliente_nombre);
   const safeDescripcion      = String(form.descripcion ?? "");
-  const safeContrario        = normalizeImportedName(form.contrario);
-  const safeProcurador       = normalizeImportedName(form.procurador);
+  const safeContrario           = normalizeImportedName(form.contrario);
+  const safeProcurador          = normalizeImportedName(form.procurador);
+  const safeAbogadoPropio       = String((form as any).abogado_propio ?? "");
+  const safeAbogadoContrario    = String((form as any).abogado_contrario ?? "");
+  const safeProcuradorContrario = String((form as any).procurador_contrario ?? "");
+
+  const ABOGADOS_DESPACHO = [
+    "REBECA RODRIGUEZ PANIAGUA",
+    "FRANCISCO JAVIER FERRÁNDEZ PINA",
+  ];
   const safeJuzgado          = String(form.juzgado ?? "");
   const safeTipoProc         = String(form.tipo_proc ?? "");
   const safeTipoAsunto       = String(form.tipos_asunto ?? "");
@@ -3122,6 +3130,26 @@ function DocumentImportVerifyView({
     onChange("demandados", next);
     onChange("contrario", next.filter(Boolean).join(" | "));
   };
+
+  // Auto-rellenar abogado/procurador contrario al cambiar representaA
+  useEffect(() => {
+    const ext = (item.payload?.extractedData as any) || {};
+    const aboD  = normalizeImportedName(ext.abogado_demandante);
+    const aboDem = normalizeImportedName(ext.abogado_demandado);
+    const procD  = normalizeImportedName(ext.procurador_demandante);
+    const procDem = normalizeImportedName(ext.procurador_demandado);
+
+    if (representaA === "demandantes") {
+      if (procD)   onChange("procurador" as any,           procD);
+      if (aboDem)  onChange("abogado_contrario" as any,    aboDem);
+      if (procDem) onChange("procurador_contrario" as any, procDem);
+    } else {
+      if (procDem) onChange("procurador" as any,           procDem);
+      if (aboD)    onChange("abogado_contrario" as any,    aboD);
+      if (procD)   onChange("procurador_contrario" as any, procD);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [representaA]);
 
   // Cálculo fecha límite (20 días hábiles)
   const deadlineDate   = addWorkingDays(safeFechaInicio, 20);
@@ -3345,16 +3373,70 @@ function DocumentImportVerifyView({
             )}
           </PanelSection>
 
-          {/* Representación contraria */}
-          <PanelSection title="Representación contraria">
-            <div className="flex items-center gap-2 mt-2">
-              <div className="w-2 h-2 rounded-full bg-slate-400 shrink-0" />
-              <input
-                value={safeProcurador}
-                onChange={e => onChange("procurador", e.target.value)}
-                placeholder="Nombre del procurador…"
-                className="flex-1 border border-slate-200 rounded-lg px-2 py-1.5 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100 bg-white"
-              />
+          {/* Abogados y Procuradores */}
+          <PanelSection title="Abogados y Procuradores">
+            <div className="grid grid-cols-2 gap-x-3 gap-y-3 mt-2">
+
+              {/* Abogado propio — siempre del despacho */}
+              <div>
+                <p className={`${lbl} flex items-center gap-1`}>
+                  <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                  Abogado propio
+                </p>
+                <select
+                  value={safeAbogadoPropio}
+                  onChange={e => onChange("abogado_propio" as any, e.target.value)}
+                  className="mt-1 w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm text-slate-700 bg-white focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100"
+                >
+                  <option value="">— Seleccionar —</option>
+                  {ABOGADOS_DESPACHO.map(a => (
+                    <option key={a} value={a}>{a}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Abogado contrario */}
+              <div>
+                <p className={`${lbl} flex items-center gap-1`}>
+                  <span className="inline-block w-2 h-2 rounded-full bg-red-400 shrink-0" />
+                  Abogado contrario
+                </p>
+                <input
+                  value={safeAbogadoContrario}
+                  onChange={e => onChange("abogado_contrario" as any, e.target.value)}
+                  placeholder="Nombre del abogado contrario…"
+                  className={`mt-1 ${inp}`}
+                />
+              </div>
+
+              {/* Procurador propio */}
+              <div>
+                <p className={`${lbl} flex items-center gap-1`}>
+                  <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                  Procurador propio
+                </p>
+                <input
+                  value={safeProcurador}
+                  onChange={e => onChange("procurador", e.target.value)}
+                  placeholder="Nombre del procurador propio…"
+                  className={`mt-1 ${inp}`}
+                />
+              </div>
+
+              {/* Procurador contrario */}
+              <div>
+                <p className={`${lbl} flex items-center gap-1`}>
+                  <span className="inline-block w-2 h-2 rounded-full bg-red-400 shrink-0" />
+                  Procurador contrario
+                </p>
+                <input
+                  value={safeProcuradorContrario}
+                  onChange={e => onChange("procurador_contrario" as any, e.target.value)}
+                  placeholder="Nombre del procurador contrario…"
+                  className={`mt-1 ${inp}`}
+                />
+              </div>
+
             </div>
           </PanelSection>
 

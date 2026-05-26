@@ -738,10 +738,15 @@ Tipos validos: ${VALID_TIPOS.join(', ')}
 Estados validos: ${VALID_ESTADOS.join(', ')}
 
 IMPORTANTE:
-- demandantes: array JSON con TODOS los demandantes/parte actora (puede haber mas de uno y deben ir separados en elementos distintos)
-- demandados: array JSON con TODOS los demandados/parte contraria (puede haber mas de uno y deben ir separados en elementos distintos)
+- demandantes: array JSON con TODOS los demandantes/parte actora (separados en elementos distintos)
+- demandados: array JSON con TODOS los demandados/parte contraria (separados en elementos distintos)
 - cliente_nombre: primer elemento de demandantes
 - contrario: todos los demandados separados por " | "
+- abogado_demandante: nombre completo del abogado/a que representa a la parte demandante (campo "Abogado/a:" del encabezado del demandante)
+- abogado_demandado: nombre completo del abogado/a que representa a la parte demandada (campo "Abogado/a:" del encabezado del demandado)
+- procurador_demandante: nombre completo del procurador/a de la parte demandante (campo "Procurador/a:" del encabezado del demandante)
+- procurador_demandado: nombre completo del procurador/a de la parte demandada (campo "Procurador/a:" del encabezado del demandado)
+- procurador: usa procurador_demandante si no sabes que parte representamos (valor por defecto)
 - fecha_inicio: fecha de inicio del procedimiento (NO la fecha del documento) en YYYY-MM-DD
 - fecha_notificacion: fecha en que se notifico al demandado en YYYY-MM-DD. Busca ACTIVAMENTE:
   1) "Notificado/a", "Notif.", "Ntfdo." + fecha (ej: "Notificado 15/3/24")
@@ -759,6 +764,10 @@ Devuelve EXCLUSIVAMENTE JSON valido con esta forma:
   "demandados": [],
   "cliente_nombre": null,
   "contrario": null,
+  "abogado_demandante": null,
+  "abogado_demandado": null,
+  "procurador_demandante": null,
+  "procurador_demandado": null,
   "procurador": null,
   "juzgado": null,
   "tipo_proc": null,
@@ -976,8 +985,8 @@ async function parseExpedienteFromVision(file: DocFile, ocrText: string): Promis
       'Analiza TODAS las paginas adjuntas con maxima atencion. Lee el texto impreso Y cualquier texto escrito a mano, sellos, anotaciones marginales, fechas y numeros manuscritos.',
       ocrSection,
       'Devuelve EXCLUSIVAMENTE JSON valido con esta forma:',
-      '{"transcription":null,"tipo":null,"estado":null,"descripcion":null,"demandantes":[],"demandados":[],"cliente_nombre":null,"contrario":null,"procurador":null,"juzgado":null,"tipo_proc":null,"num_autos":null,"nig":null,"fecha_inicio":null,"fecha_notificacion":null,"ref_expediente":null,"tipos_asunto":null,"cuantia_principal":null,"observaciones":null}',
-      'Reglas generales: transcription=transcribe TODO el texto visible impreso Y manuscrito (campo MAS IMPORTANTE, nunca null si hay texto); demandantes=array JSON con TODOS los demandantes/parte actora (separados en elementos distintos); demandados=array JSON con TODOS los demandados (separados en elementos distintos); cliente_nombre=primer demandante; contrario=todos los demandados unidos por " | "; descripcion=1-2 frases de que trata el documento; juzgado=nombre completo del juzgado; num_autos=numero de autos; nig=NIG si aparece; fecha_inicio=fecha de inicio del procedimiento en YYYY-MM-DD (NO la fecha del documento); cuantia_principal=importe numerico sin simbolos de moneda; tipo en [judicial,extrajudicial,monitorio,obligacion_hacer,prejudicial,diligencias,penal,laboral,contencioso,otro]; observaciones=anotaciones manuscritas importantes; usa null/[] si no es visible.',
+      '{"transcription":null,"tipo":null,"estado":null,"descripcion":null,"demandantes":[],"demandados":[],"cliente_nombre":null,"contrario":null,"abogado_demandante":null,"abogado_demandado":null,"procurador_demandante":null,"procurador_demandado":null,"procurador":null,"juzgado":null,"tipo_proc":null,"num_autos":null,"nig":null,"fecha_inicio":null,"fecha_notificacion":null,"ref_expediente":null,"tipos_asunto":null,"cuantia_principal":null,"observaciones":null}',
+      'Reglas generales: transcription=transcribe TODO el texto visible impreso Y manuscrito (campo MAS IMPORTANTE, nunca null si hay texto); demandantes=array con TODOS los demandantes separados; demandados=array con TODOS los demandados separados; cliente_nombre=primer demandante; contrario=demandados unidos por " | "; abogado_demandante=nombre completo del abogado/a de la parte demandante (campo "Abogado/a:" junto al demandante); abogado_demandado=nombre completo del abogado/a de la parte demandada; procurador_demandante=nombre completo del procurador/a de la parte demandante (campo "Procurador/a:" junto al demandante); procurador_demandado=nombre completo del procurador/a de la parte demandada; procurador=procurador_demandante como valor por defecto; descripcion=1-2 frases de que trata el documento; juzgado=nombre completo del juzgado; num_autos=numero de autos; nig=NIG si aparece; fecha_inicio=fecha inicio procedimiento YYYY-MM-DD (NO fecha del documento); cuantia_principal=importe numerico sin simbolos; tipo en [judicial,extrajudicial,monitorio,obligacion_hacer,prejudicial,diligencias,penal,laboral,contencioso,otro]; observaciones=anotaciones manuscritas importantes; usa null/[] si no es visible.',
       'REGLA CRITICA para fecha_notificacion: Es la fecha en que se notifico al demandado, en YYYY-MM-DD. BUSCA ACTIVAMENTE en TODAS las paginas, especialmente en la ULTIMA pagina (que suele ser la cedula de notificacion):',
       '  1) Anotacion manuscrita "Notificado" / "Notif." / "Ntfdo." o similar, seguida o acompanada de una fecha (ej: "Notificado 15/3/24", "Notif. 4-11-23")',
       '  2) CUALQUIER fecha escrita a mano que aparezca sola o en un margen, sin texto impreso alrededor — en un documento judicial casi siempre es la fecha de notificacion',
@@ -1070,8 +1079,8 @@ async function parseExpedienteFromVisionOpenAI(file: DocFile, ocrText: string): 
       'Lee el texto impreso Y cualquier texto manuscrito, sellos, anotaciones al margen, fechas escritas a mano y numeros manuscritos.',
       ocrSection,
       'Devuelve EXCLUSIVAMENTE JSON valido (sin markdown) con exactamente estos campos:',
-      '{"transcription":null,"tipo":null,"estado":null,"descripcion":null,"demandantes":[],"demandados":[],"cliente_nombre":null,"contrario":null,"procurador":null,"juzgado":null,"tipo_proc":null,"num_autos":null,"nig":null,"fecha_inicio":null,"fecha_notificacion":null,"ref_expediente":null,"tipos_asunto":null,"cuantia_principal":null,"observaciones":null}',
-      'Reglas generales: transcription=transcribe TODO el texto visible impreso Y manuscrito; demandantes=array con TODOS los demandantes separados en elementos distintos; demandados=array con TODOS los demandados separados; cliente_nombre=primer demandante; contrario=demandados unidos por " | "; descripcion=1-2 frases resumen; juzgado=nombre completo; num_autos=numero de autos; nig=NIG si aparece; fecha_inicio=fecha inicio procedimiento YYYY-MM-DD (NO fecha del documento); cuantia_principal=importe numerico sin simbolos; tipo en [judicial,extrajudicial,monitorio,obligacion_hacer,prejudicial,diligencias,penal,laboral,contencioso,otro]; observaciones=anotaciones manuscritas relevantes; usa null/[] si no es visible.',
+      '{"transcription":null,"tipo":null,"estado":null,"descripcion":null,"demandantes":[],"demandados":[],"cliente_nombre":null,"contrario":null,"abogado_demandante":null,"abogado_demandado":null,"procurador_demandante":null,"procurador_demandado":null,"procurador":null,"juzgado":null,"tipo_proc":null,"num_autos":null,"nig":null,"fecha_inicio":null,"fecha_notificacion":null,"ref_expediente":null,"tipos_asunto":null,"cuantia_principal":null,"observaciones":null}',
+      'Reglas generales: transcription=transcribe TODO el texto visible impreso Y manuscrito; demandantes=array con TODOS los demandantes separados; demandados=array con TODOS los demandados separados; cliente_nombre=primer demandante; contrario=demandados unidos por " | "; abogado_demandante=nombre completo del abogado/a de la parte demandante (campo "Abogado/a:" junto al demandante en el encabezado); abogado_demandado=nombre completo del abogado/a de la parte demandada; procurador_demandante=nombre completo del procurador/a de la parte demandante (campo "Procurador/a:" junto al demandante); procurador_demandado=nombre completo del procurador/a de la parte demandada; procurador=procurador_demandante como valor por defecto; descripcion=1-2 frases resumen; juzgado=nombre completo; num_autos=numero de autos; nig=NIG si aparece; fecha_inicio=fecha inicio procedimiento YYYY-MM-DD (NO fecha del documento); cuantia_principal=importe numerico sin simbolos; tipo en [judicial,extrajudicial,monitorio,obligacion_hacer,prejudicial,diligencias,penal,laboral,contencioso,otro]; observaciones=anotaciones manuscritas relevantes; usa null/[] si no es visible.',
       'REGLA CRITICA para fecha_notificacion (YYYY-MM-DD): Busca en TODAS las paginas, especialmente en la ULTIMA (cedula de notificacion):',
       '  1) Anotacion manuscrita "Notificado/a", "Notif.", "Ntfdo." seguida de una fecha (ej: "Notificado 15/3/24")',
       '  2) Cualquier fecha escrita a mano sola o en un margen — en un documento judicial impreso, una fecha manuscrita aislada ES la fecha de notificacion',
@@ -1164,7 +1173,7 @@ function buildDraftFromExtracted(
     cliente_id: clienteId || '',
     cliente_nombre: extractedData.cliente_nombre || '',
     contrario: extractedData.contrario || '',
-    procurador: procuradorOverride || extractedData.procurador || '',
+    procurador: procuradorOverride || extractedData.procurador || extractedData.procurador_demandante || '',
     juzgado: extractedData.juzgado || '',
     tipo_proc: extractedData.tipo_proc || '',
     num_autos: extractedData.num_autos || '',
@@ -1175,6 +1184,15 @@ function buildDraftFromExtracted(
     fecha_notificacion: extractedData.fecha_notificacion || null,
     demandantes: extractedData.demandantes || null,
     demandados: extractedData.demandados || null,
+    // Campos de representación legal extraídos de la IA
+    abogado_demandante: extractedData.abogado_demandante || '',
+    abogado_demandado: extractedData.abogado_demandado || '',
+    procurador_demandante: extractedData.procurador_demandante || '',
+    procurador_demandado: extractedData.procurador_demandado || '',
+    // Estos se calculan en el frontend según representaA
+    abogado_propio: '',
+    abogado_contrario: '',
+    procurador_contrario: '',
     fecha_cierre: '',
     importe: '',
     tipos_asunto: extractedData.tipos_asunto || '',
@@ -1220,8 +1238,10 @@ async function createExpediente(
         tipos_asunto, cuantia_principal, intereses, costas, cuantia_total,
         indeterminado, etapa, persona_contacto, contacto, centro, color,
         demandantes, demandados, fecha_notificacion,
+        abogado_propio, abogado_contrario, procurador_contrario,
+        abogado_demandante, abogado_demandado, procurador_demandante, procurador_demandado,
         created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41)
      RETURNING id, anio, num_exp`,
     [
       yr, numExp,
@@ -1256,6 +1276,13 @@ async function createExpediente(
       data.demandantes ? JSON.stringify(data.demandantes) : null,
       data.demandados ? JSON.stringify(data.demandados) : null,
       data.fecha_notificacion || null,
+      data.abogado_propio?.trim() || null,
+      data.abogado_contrario?.trim() || null,
+      data.procurador_contrario?.trim() || null,
+      data.abogado_demandante?.trim() || null,
+      data.abogado_demandado?.trim() || null,
+      data.procurador_demandante?.trim() || null,
+      data.procurador_demandado?.trim() || null,
       userName_,
     ],
   );
