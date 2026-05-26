@@ -3671,7 +3671,61 @@ export default function ExpedienteList() {
 
   // Vistas
   const [viewMode, setViewMode] = useState<ViewMode>("list");
-  const switchView = (v: ViewMode) => setViewMode(v);
+  const switchView = (v: ViewMode) => { setViewMode(v); if (v !== "multiselect") setSelectedIds(new Set()); };
+
+  // Multiselect
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkStateLoading, setBulkStateLoading] = useState(false);
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+  const [showBulkStateMenu, setShowBulkStateMenu] = useState(false);
+  const bulkStateMenuRef = useRef<HTMLDivElement>(null);
+
+  const toggleSelectId = (id: string) => setSelectedIds(prev => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
+  const selectAll = () => setSelectedIds(new Set(filtered.map(e => e.id)));
+  const deselectAll = () => setSelectedIds(new Set());
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedIds);
+    setBulkDeleteConfirm(false);
+    setExpedientes(prev => prev.filter(e => !selectedIds.has(e.id)));
+    setSelectedIds(new Set());
+    for (const id of ids) {
+      try {
+        const token = await getToken({ skipCache: true });
+        await fetch(`/api/expedientes/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      } catch { /* ignore individual failures */ }
+    }
+  };
+
+  const handleBulkChangeState = async (estado: string) => {
+    const ids = Array.from(selectedIds);
+    setShowBulkStateMenu(false);
+    setBulkStateLoading(true);
+    setExpedientes(prev => prev.map(e => selectedIds.has(e.id) ? { ...e, estado } : e));
+    setSelectedIds(new Set());
+    try {
+      const token = await getToken({ skipCache: true });
+      await Promise.all(ids.map(id =>
+        fetch(`/api/expedientes/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ estado }),
+        })
+      ));
+    } catch { /* ignore */ } finally { setBulkStateLoading(false); }
+  };
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (bulkStateMenuRef.current && !bulkStateMenuRef.current.contains(e.target as Node)) setShowBulkStateMenu(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
   const csvInputRef = useRef<HTMLInputElement>(null);
   const documentImportInputRef = useRef<HTMLInputElement>(null);
   const [csvFileName, setCsvFileName] = useState<string | null>(null);
@@ -5901,6 +5955,157 @@ export default function ExpedienteList() {
           {/* ══════════════════════════════════════════════════
               VISTA DETALLE — tarjetas expandibles
           \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 */}
+          {/* ── VISTA MULTISELECT ─────────────────────────────── */}
+          {viewMode === "multiselect" && (
+            <div className="flex flex-col flex-1 overflow-hidden">
+              {/* Barra de acciones masivas */}
+              <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-100 bg-slate-50/80 flex-wrap">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={filtered.length > 0 && selectedIds.size === filtered.length}
+                    ref={el => { if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < filtered.length; }}
+                    onChange={e => e.target.checked ? selectAll() : deselectAll()}
+                    className="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500 cursor-pointer"
+                  />
+                  <span className="text-xs font-semibold text-slate-600">
+                    {selectedIds.size > 0
+                      ? `${selectedIds.size} seleccionado${selectedIds.size !== 1 ? "s" : ""}`
+                      : "Seleccionar todo"}
+                  </span>
+                </label>
+
+                {selectedIds.size > 0 && (
+                  <>
+                    <div className="w-px h-4 bg-slate-200" />
+                    <div className="relative" ref={bulkStateMenuRef}>
+                      <button
+                        onClick={() => setShowBulkStateMenu(v => !v)}
+                        disabled={bulkStateLoading}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        <Activity size={12} />
+                        Cambiar estado
+                        <ChevronDown size={10} className={showBulkStateMenu ? "rotate-180" : ""} />
+                      </button>
+                      {showBulkStateMenu && (
+                        <div className="absolute left-0 top-full mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden min-w-[160px]">
+                          {Object.entries(ESTADOS).map(([key, conf]) => (
+                            <button key={key} onClick={() => handleBulkChangeState(key)}
+                              className="w-full flex items-center gap-2 px-3 py-2.5 text-xs font-semibold text-left hover:bg-slate-50 transition-colors">
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${conf.color}`}>{conf.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <button onClick={() => setBulkDeleteConfirm(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors">
+                      <Trash2 size={12} />
+                      Eliminar {selectedIds.size}
+                    </button>
+                    <button onClick={deselectAll}
+                      className="ml-auto flex items-center gap-1 px-2.5 py-1.5 text-xs text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
+                      <X size={11} /> Limpiar
+                    </button>
+                  </>
+                )}
+              </div>
+
+              {/* Lista con checkboxes */}
+              <div className="overflow-auto flex-1">
+                <table className="w-full text-left text-sm min-w-[600px]">
+                  <thead className="bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
+                    <tr>
+                      <th className="pl-4 pr-2 py-2.5 w-10">
+                        <input type="checkbox"
+                          checked={filtered.length > 0 && selectedIds.size === filtered.length}
+                          ref={el => { if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < filtered.length; }}
+                          onChange={e => e.target.checked ? selectAll() : deselectAll()}
+                          className="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500 cursor-pointer" />
+                      </th>
+                      <th className="px-3 py-2.5 text-[11px] font-bold text-slate-500 uppercase tracking-wide w-20">Exp.</th>
+                      <th className="px-3 py-2.5 text-[11px] font-bold text-slate-500 uppercase tracking-wide">Descripción</th>
+                      <th className="px-3 py-2.5 text-[11px] font-bold text-slate-500 uppercase tracking-wide w-32 hidden sm:table-cell">Tipo</th>
+                      <th className="px-3 py-2.5 text-[11px] font-bold text-slate-500 uppercase tracking-wide w-32 hidden md:table-cell">Cliente</th>
+                      <th className="px-3 py-2.5 text-[11px] font-bold text-slate-500 uppercase tracking-wide w-24">Estado</th>
+                      <th className="w-10" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.length === 0 ? (
+                      <tr><td colSpan={7} className="py-20 text-center text-slate-400">
+                        <div className="flex flex-col items-center gap-3">
+                          <FolderOpen size={36} className="opacity-15" />
+                          <p className="font-medium text-sm">No hay expedientes</p>
+                        </div>
+                      </td></tr>
+                    ) : filtered.map(exp => {
+                      const isSel = selectedIds.has(exp.id);
+                      const tipoConf   = TIPOS[exp.tipo]   || TIPOS.otro;
+                      const estadoConf = ESTADOS[exp.estado] || ESTADOS.abierto;
+                      return (
+                        <tr key={exp.id} onClick={() => toggleSelectId(exp.id)}
+                          className={`border-b border-slate-50 cursor-pointer transition-colors group ${isSel ? "bg-red-50 hover:bg-red-100" : "hover:bg-slate-50"}`}>
+                          <td className="pl-4 pr-2 py-3">
+                            <input type="checkbox" checked={isSel}
+                              onChange={() => toggleSelectId(exp.id)} onClick={e => e.stopPropagation()}
+                              className="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500 cursor-pointer" />
+                          </td>
+                          <td className="px-3 py-3">
+                            <span className={`font-extrabold text-base ${isSel ? "text-red-700" : "text-slate-700"}`}>{exp.anio}/{exp.num_exp}</span>
+                          </td>
+                          <td className="px-3 py-3">
+                            <span className="font-semibold text-slate-800 truncate block max-w-[280px]">
+                              {exp.descripcion || <span className="text-slate-300 font-normal">Sin descripción</span>}
+                            </span>
+                            {exp.cliente_nombre && <span className="text-xs text-slate-400 block md:hidden truncate">{exp.cliente_nombre}</span>}
+                          </td>
+                          <td className="px-3 py-3 hidden sm:table-cell">
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${tipoConf.color}`}>{tipoConf.short}</span>
+                          </td>
+                          <td className="px-3 py-3 hidden md:table-cell">
+                            <span className="text-xs text-slate-600 truncate block max-w-[120px]">{exp.cliente_nombre || "—"}</span>
+                          </td>
+                          <td className="px-3 py-3">
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${estadoConf.color}`}>{estadoConf.label}</span>
+                          </td>
+                          <td className="px-3 py-3 text-right">
+                            <button onClick={e => { e.stopPropagation(); navigate(`/dashboard/expedientes/${exp.id}`); }}
+                              className="p-1 rounded-lg text-slate-200 hover:text-red-500 hover:bg-red-50 transition-colors inline-flex opacity-0 group-hover:opacity-100" title="Abrir">
+                              <ExternalLink size={13} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* ── Confirmar borrado masivo ── */}
+          {bulkDeleteConfirm && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+              <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm mx-4 p-6">
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="p-2 bg-red-100 rounded-xl shrink-0">
+                    <AlertTriangle size={18} className="text-red-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900 text-sm">¿Eliminar {selectedIds.size} expediente{selectedIds.size !== 1 ? "s" : ""}?</h3>
+                    <p className="text-xs text-slate-500 mt-1">Esta acción no se puede deshacer.</p>
+                  </div>
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <button onClick={() => setBulkDeleteConfirm(false)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
+                  <button onClick={handleBulkDelete} className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg active:scale-95">Eliminar todos</button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {viewMode === "detail" && (
             <div className="overflow-auto flex-1 p-4">
               {filtered.length === 0 ? (
