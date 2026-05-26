@@ -2539,6 +2539,8 @@ function DocumentImportView({
   onStartImport,
   onReloadHistory,
   onVerifyItem,
+  onDeleteBatch,
+  onReviewBatch,
   inputRef,
 }: {
   zipFile: File | null;
@@ -2566,6 +2568,8 @@ function DocumentImportView({
   onStartImport: () => void;
   onReloadHistory: () => void;
   onVerifyItem: (item: DocumentImportItem) => void;
+  onDeleteBatch: (batchId: string) => void;
+  onReviewBatch: (batch: ImportBatch) => void;
   inputRef: React.RefObject<HTMLInputElement>;
 }) {
   const navigate = useNavigate();
@@ -2875,21 +2879,39 @@ function DocumentImportView({
           <div className="mt-5 space-y-3">
             {history.map((batch) => (
               <div key={batch.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 px-4 py-3">
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-slate-900">{batch.file_name}</p>
                   <p className="mt-1 text-xs text-slate-400">
                     {new Date(batch.created_at).toLocaleString("es-ES")} · {batch.completed_count}/{batch.total_count} creados
                   </p>
                 </div>
-                <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
-                  batch.status === "completed"
-                    ? "bg-emerald-50 text-emerald-700"
-                    : batch.status === "failed"
-                    ? "bg-red-50 text-red-700"
-                    : "bg-amber-50 text-amber-700"
-                }`}>
-                  {batchStatusLabel(batch.status)}
-                </span>
+                <div className="flex items-center gap-2 shrink-0">
+                  {(batch.status === "reviewing" || batch.status === "processing") && (
+                    <button
+                      onClick={() => onReviewBatch(batch)}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 border border-amber-200 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition-colors"
+                    >
+                      <Eye size={12} />
+                      Revisar
+                    </button>
+                  )}
+                  <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
+                    batch.status === "completed"
+                      ? "bg-emerald-50 text-emerald-700"
+                      : batch.status === "failed"
+                      ? "bg-red-50 text-red-700"
+                      : "bg-amber-50 text-amber-700"
+                  }`}>
+                    {batchStatusLabel(batch.status)}
+                  </span>
+                  <button
+                    onClick={() => onDeleteBatch(batch.id)}
+                    className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                    title="Eliminar este lote"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -3971,6 +3993,33 @@ export default function ExpedienteList() {
     getToken,
   ]);
 
+  const handleDeleteBatch = useCallback(async (batchId: string) => {
+    setDocumentImportHistory(prev => prev.filter(b => b.id !== batchId));
+    try {
+      const token = await getToken({ skipCache: true });
+      await fetch(`/api/expedientes/documents/batch/${batchId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch { /* ignore */ }
+  }, [getToken]);
+
+  const handleReviewBatch = useCallback(async (batch: ImportBatch) => {
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/expedientes/documents/batch/${batch.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await safeJson(res);
+      if (!res.ok) throw new Error(data.error || "No se pudieron cargar los elementos del lote");
+      setDocumentImportActiveBatch(data.data?.batch || batch);
+      setDocumentImportItems(data.data?.items || []);
+      setViewMode("documentImport");
+    } catch (e: any) {
+      alert(e.message || "Error al cargar el lote");
+    }
+  }, [getToken]);
+
   async function handleStartDocumentImport() {
     if (!documentImportZipFile) {
       setDocumentImportError("Selecciona primero un archivo ZIP.");
@@ -4824,6 +4873,8 @@ export default function ExpedienteList() {
         onStartImport={handleStartDocumentImport}
         onReloadHistory={() => fetchDocumentImportHistory()}
         onVerifyItem={openDocumentImportVerify}
+        onDeleteBatch={handleDeleteBatch}
+        onReviewBatch={handleReviewBatch}
         inputRef={documentImportInputRef}
       />
     );

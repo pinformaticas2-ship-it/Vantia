@@ -1710,3 +1710,21 @@ export async function listDocumentImportBatches(req: Request, res: Response) {
     return err(res, error.message);
   }
 }
+
+export async function deleteDocumentImportBatch(req: Request, res: Response) {
+  const uid = userId(req);
+  if (!uid) return err(res, 'No autenticado', 401);
+  const { id } = req.params;
+
+  try {
+    await pool.query(`DELETE FROM expediente_import_items WHERE batch_id=$1`, [id]);
+    const { rowCount } = await pool.query(
+      `DELETE FROM expediente_import_batches WHERE id=$1 AND user_id=$2`,
+      [id, uid],
+    );
+    if (!rowCount) return err(res, 'Lote no encontrado', 404);
+    return ok(res, { deleted: true });
+  } catch (error: any) {
+    return err(res, error.message);
+  }
+}

@@ -8,6 +8,7 @@ import {
   getDocumentImportBatch,
   listDocumentImportBatches,
   acceptDocumentImportItem,
+  deleteDocumentImportBatch,
 } from '../controllers/documentImportController';
 
 const router = Router();
@@ -25,6 +26,7 @@ const upload = multer({
 router.post('/upload',   requireAuth, upload.single('zip'), uploadDocumentImport);
 router.get('/batch/:id', requireAuth, getDocumentImportBatch);
 router.get('/batches',   requireAuth, listDocumentImportBatches);
+router.delete('/batch/:id', requireAuth, deleteDocumentImportBatch);
 router.post('/batch/:batchId/items/:itemId/accept', requireAuth, acceptDocumentImportItem);
 
 export default router;
