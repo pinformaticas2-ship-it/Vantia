@@ -104,11 +104,13 @@ export default function PublicLanding() {
           <div className="absolute right-[10%] bottom-[14%] h-28 w-28 rounded-full border border-[#d7c08a]/18 bg-white/20" />
         </div>
 
-        <div className="relative z-10 w-full max-w-md space-y-6">
-          <div className="flex justify-center lg:justify-start">
-            <div className="rounded-[28px] border border-[#b3924a]/45 bg-white px-4 py-3 shadow-[0_18px_45px_rgba(30,47,69,0.12)]">
-              <VantiaBrand size={42} subtitle="Acceso seguro" className="justify-center lg:justify-start" />
-            </div>
+        <div className="relative z-10 w-full max-w-md space-y-8">
+          {/* Logo grande en la zona superior */}
+          <div className="flex flex-col items-center lg:items-start gap-1">
+            <VantiaBrand size={72} subtitle="Suite legal profesional" className="justify-center lg:justify-start" />
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#1e2f45]/40 mt-1">
+              Acceso seguro
+            </p>
           </div>
 
           <SignedOut>
