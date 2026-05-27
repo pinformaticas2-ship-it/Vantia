@@ -231,6 +231,7 @@ function CronologiaTab({
   loading,
   getToken,
   onRefresh,
+  locked = false,
 }: {
   expedienteId: string;
   expediente: any;
@@ -238,6 +239,7 @@ function CronologiaTab({
   loading: boolean;
   getToken: any;
   onRefresh: () => void;
+  locked?: boolean;
 }) {
   const [showForm, setShowForm] = React.useState(false);
   const [form, setForm] = React.useState({ ...EMPTY_NOTIF });
@@ -319,6 +321,11 @@ function CronologiaTab({
 
   return (
     <div className="space-y-4">
+      {locked && (
+        <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs font-semibold text-amber-800">
+          <AlertTriangle size={13} className="shrink-0" /> Expediente cerrado — no se pueden añadir ni modificar notificaciones.
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -337,12 +344,14 @@ function CronologiaTab({
             <option value="respondida">Respondidas</option>
             <option value="archivada">Archivadas</option>
           </select>
-          <button
-            onClick={() => { setShowForm(true); setEditId(null); setForm({ ...EMPTY_NOTIF }); }}
-            className="flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700 transition-colors"
-          >
-            <Plus size={12} /> Nueva
-          </button>
+          {!locked && (
+            <button
+              onClick={() => { setShowForm(true); setEditId(null); setForm({ ...EMPTY_NOTIF }); }}
+              className="flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700 transition-colors"
+            >
+              <Plus size={12} /> Nueva
+            </button>
+          )}
         </div>
       </div>
 
@@ -443,12 +452,14 @@ function CronologiaTab({
         <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-300">
           <Clock size={32} className="opacity-20" />
           <p className="text-sm font-medium">Sin notificaciones registradas</p>
-          <button
-            onClick={() => { setShowForm(true); setEditId(null); setForm({ ...EMPTY_NOTIF }); }}
-            className="mt-1 text-xs font-bold text-red-500 hover:underline"
-          >
-            Añadir primera notificación
-          </button>
+          {!locked && (
+            <button
+              onClick={() => { setShowForm(true); setEditId(null); setForm({ ...EMPTY_NOTIF }); }}
+              className="mt-1 text-xs font-bold text-red-500 hover:underline"
+            >
+              Añadir primera notificación
+            </button>
+          )}
         </div>
       ) : (
         <div className="relative">
@@ -579,10 +590,12 @@ function TabNotas({
   expedienteId,
   legacyNote,
   onLegacyUpdated,
+  locked = false,
 }: {
   expedienteId: string;
   legacyNote?: string | null;
   onLegacyUpdated?: (next: string) => void;
+  locked?: boolean;
 }) {
   const { getToken } = useAuth();
   const [notas, setNotas] = useState<Nota[]>([]);
@@ -798,6 +811,12 @@ function TabNotas({
 
   return (
     <div className="space-y-4">
+      {locked && (
+        <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs font-semibold text-amber-800">
+          <AlertTriangle size={13} className="shrink-0" /> Expediente cerrado — no se pueden añadir ni modificar notas.
+        </div>
+      )}
+      {!locked && (
       <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
         <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Nueva nota</p>
         <textarea
@@ -850,6 +869,7 @@ function TabNotas({
           </button>
         </div>
       </div>
+      )}
 
       {visibleNotas.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded-xl p-12 flex flex-col items-center gap-3 text-slate-400">
@@ -890,7 +910,7 @@ function TabNotas({
                   {n.created_by && !/^user_[A-Za-z0-9]+$/.test(n.created_by) ? n.created_by : "Usuario"}{!n.isLegacy ? ` · ${new Date(n.created_at).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}` : ""}
                 </p>
 
-                {!n.isLegacy && (
+                {!n.isLegacy && !locked && (
                 <div className="flex gap-2 justify-end pt-2">
                   {editingId === n.id ? (
                     <>
@@ -986,6 +1006,7 @@ function TabTareas({
   numProc,
   initialCreate = false,
   initialType = "",
+  locked = false,
 }: {
   expedienteId: string;
   clienteId?: string | null;
@@ -994,6 +1015,7 @@ function TabTareas({
   numProc?: string | null;
   initialCreate?: boolean;
   initialType?: string;
+  locked?: boolean;
 }) {
   const { getToken } = useAuth();
   const [tareas, setTareas] = useState<any[]>([]);
@@ -1210,6 +1232,11 @@ function TabTareas({
 
   return (
     <div className="space-y-4">
+      {locked && (
+        <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs font-semibold text-amber-800">
+          <AlertTriangle size={13} className="shrink-0" /> Expediente cerrado — no se pueden añadir ni modificar tareas.
+        </div>
+      )}
       <div className="space-y-2">
         <div className="flex flex-wrap justify-between items-center gap-3">
           <div className="flex gap-1 bg-slate-100 rounded-xl p-1 text-xs">
@@ -1219,16 +1246,18 @@ function TabTareas({
               </button>
             ))}
           </div>
-          <button
-            onClick={() => { setShowForm((v) => !v); setForm({ ...TAREA_EMPTY, expediente: expedienteRef || "", expediente_id: expedienteId, juzgado: juzgado || "", num_proc: numProc || "" }); }}
-            disabled={!clienteId}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-red-700 hover:bg-red-800 rounded-xl shadow-sm active:scale-95 transition-all disabled:opacity-50"
-          >
-            <Plus size={15} /> Nueva tarea
-          </button>
+          {!locked && (
+            <button
+              onClick={() => { setShowForm((v) => !v); setForm({ ...TAREA_EMPTY, expediente: expedienteRef || "", expediente_id: expedienteId, juzgado: juzgado || "", num_proc: numProc || "" }); }}
+              disabled={!clienteId}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-red-700 hover:bg-red-800 rounded-xl shadow-sm active:scale-95 transition-all disabled:opacity-50"
+            >
+              <Plus size={15} /> Nueva tarea
+            </button>
+          )}
         </div>
 
-        {!clienteId && (
+        {!clienteId && !locked && (
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
             Para crear tareas desde el expediente, primero debe haber un cliente vinculado.
           </div>
@@ -1503,11 +1532,20 @@ function TabTareas({
 
 function TabAdjuntosExpediente({
   expedienteId,
+  locked = false,
 }: {
   expedienteId: string;
+  locked?: boolean;
 }) {
   return (
-    <FilesTabPanel entityId={expedienteId} alwaysShowPreview />
+    <div className="space-y-3">
+      {locked && (
+        <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs font-semibold text-amber-800">
+          <AlertTriangle size={13} className="shrink-0" /> Expediente cerrado — solo lectura. No se pueden subir ni eliminar adjuntos.
+        </div>
+      )}
+      <FilesTabPanel entityId={expedienteId} alwaysShowPreview />
+    </div>
   );
 }
 
@@ -1558,7 +1596,7 @@ function encodeVantiaPayload(payload: unknown) {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
-function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
+function ActuacionAdjuntosPanel({ taskId, locked = false }: { taskId: string; locked?: boolean }) {
   const { getToken } = useAuth();
   const [files, setFiles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2007,23 +2045,27 @@ function ActuacionAdjuntosPanel({ taskId }: { taskId: string }) {
           >
             <Mail size={12} /> Enviar correo
           </button>
-          <button type="button" onClick={() => folderInputRef.current?.click()}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:border-slate-300 rounded-lg transition-colors">
-            <FolderOpen size={12} /> Importar carpeta
-          </button>
-          <button type="button" onClick={() => fileInputRef.current?.click()}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:border-slate-300 rounded-lg transition-colors">
-            <Upload size={12} /> Subir archivo
-          </button>
-          <button type="button" onClick={createBlankDocument} disabled={uploading}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:border-slate-300 rounded-lg transition-colors disabled:opacity-50">
-            <FilePlus2 size={12} /> Nuevo documento
-          </button>
-          <button type="button"
-            onClick={() => { setShowTemplates(true); if (!docPlantFolders.length) void loadTemplates(); }}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors">
-            <Sparkles size={12} /> Usar plantilla
-          </button>
+          {!locked && (
+            <>
+              <button type="button" onClick={() => folderInputRef.current?.click()}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:border-slate-300 rounded-lg transition-colors">
+                <FolderOpen size={12} /> Importar carpeta
+              </button>
+              <button type="button" onClick={() => fileInputRef.current?.click()}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:border-slate-300 rounded-lg transition-colors">
+                <Upload size={12} /> Subir archivo
+              </button>
+              <button type="button" onClick={createBlankDocument} disabled={uploading}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:border-slate-300 rounded-lg transition-colors disabled:opacity-50">
+                <FilePlus2 size={12} /> Nuevo documento
+              </button>
+              <button type="button"
+                onClick={() => { setShowTemplates(true); if (!docPlantFolders.length) void loadTemplates(); }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors">
+                <Sparkles size={12} /> Usar plantilla
+              </button>
+            </>
+          )}
         </div>
         <input ref={fileInputRef} type="file" className="hidden" onChange={(e) => { handleSingleUpload(e.target.files); e.currentTarget.value = ""; }} />
         <input ref={folderInputRef} type="file" multiple {...({ webkitdirectory: "", directory: "" } as any)} className="hidden" onChange={(e) => { handleFolderImport(e.target.files); e.currentTarget.value = ""; }} />
@@ -2705,7 +2747,7 @@ function ActuacionModal({
             </div>
             {selectedActuacion ? (
               <div className="p-5">
-                <ActuacionAdjuntosPanel taskId={selectedActuacion.id} />
+                <ActuacionAdjuntosPanel taskId={selectedActuacion.id} locked={locked} />
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center text-center px-8 py-14">
@@ -2729,6 +2771,7 @@ function TabActuacion({
   juzgado,
   numProc,
   initialCreate = false,
+  locked = false,
 }: {
   expedienteId: string;
   clienteId?: string | null;
@@ -2736,6 +2779,7 @@ function TabActuacion({
   juzgado?: string | null;
   numProc?: string | null;
   initialCreate?: boolean;
+  locked?: boolean;
 }) {
   const { getToken } = useAuth();
   const mapActuacionToForm = useCallback((item?: any | null): TareaForm => ({
@@ -2903,7 +2947,12 @@ function TabActuacion({
 
   return (
     <div className="space-y-4">
-      {!clienteId && (
+      {locked && (
+        <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs font-semibold text-amber-800">
+          <AlertTriangle size={13} className="shrink-0" /> Expediente cerrado — no se pueden crear ni modificar actuaciones.
+        </div>
+      )}
+      {!clienteId && !locked && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           Para crear actuaciones desde este expediente, primero debe haber un cliente vinculado.
         </div>
@@ -2921,15 +2970,17 @@ function TabActuacion({
             <Clock size={14} className="text-slate-400" />
             <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Actuaciones registradas</h3>
           </div>
-          <button
-            type="button"
-            onClick={handleOpenNew}
-            disabled={!clienteId}
-            className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-sm disabled:opacity-50"
-          >
-            <Plus size={12} />
-            Crear actuación
-          </button>
+          {!locked && (
+            <button
+              type="button"
+              onClick={handleOpenNew}
+              disabled={!clienteId}
+              className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-sm disabled:opacity-50"
+            >
+              <Plus size={12} />
+              Crear actuación
+            </button>
+          )}
         </div>
         <div className="p-5">
           {loading ? (
@@ -3009,9 +3060,11 @@ function TabActuacion({
 function TabExpedientesRelacionados({
   expedienteId,
   currentRef,
+  locked = false,
 }: {
   expedienteId: string;
   currentRef: string;
+  locked?: boolean;
 }) {
   const { getToken } = useAuth();
   const [related, setRelated] = useState<any[]>([]);
@@ -3123,27 +3176,34 @@ function TabExpedientesRelacionados({
 
   return (
     <>
+      {locked && (
+        <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs font-semibold text-amber-800">
+          <AlertTriangle size={13} className="shrink-0" /> Expediente cerrado — no se pueden asociar expedientes relacionados.
+        </div>
+      )}
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
         <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Link2 size={14} className="text-slate-400" />
             <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Expedientes relacionados</h3>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              setShowModal(true);
-              setQuery("");
-              setHasSearched(false);
-              setSearchError("");
-              setAssociateError("");
-              setSearchResults([]);
-            }}
-            className="inline-flex items-center gap-2 px-3 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-sm active:scale-95 transition-all"
-          >
-            <Plus size={12} />
-            Asociar expedientes
-          </button>
+          {!locked && (
+            <button
+              type="button"
+              onClick={() => {
+                setShowModal(true);
+                setQuery("");
+                setHasSearched(false);
+                setSearchError("");
+                setAssociateError("");
+                setSearchResults([]);
+              }}
+              className="inline-flex items-center gap-2 px-3 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-sm active:scale-95 transition-all"
+            >
+              <Plus size={12} />
+              Asociar expedientes
+            </button>
+          )}
         </div>
 
         <div className="p-5">
@@ -3922,6 +3982,7 @@ export default function ExpedienteDetail() {
                 expedienteId={id!}
                 legacyNote={exp.observaciones}
                 onLegacyUpdated={(next) => setExp((prev: any) => (prev ? { ...prev, observaciones: next || null } : prev))}
+                locked={exp?.estado === "cerrado"}
               />
             )}
 
@@ -4005,6 +4066,7 @@ export default function ExpedienteDetail() {
               <TabExpedientesRelacionados
                 expedienteId={id!}
                 currentRef={exp.ref_expediente || `${exp.anio}/${exp.num_exp}`}
+                locked={exp?.estado === "cerrado"}
               />
             )}
 
@@ -4027,6 +4089,7 @@ export default function ExpedienteDetail() {
                 numProc={exp.num_autos}
                 initialCreate={shouldOpenNuevaTarea}
                 initialType={initialTareaType}
+                locked={exp?.estado === "cerrado"}
               />
             )}
             {tab === "actuacion" && (
@@ -4037,11 +4100,13 @@ export default function ExpedienteDetail() {
                 juzgado={exp.juzgado}
                 numProc={exp.num_autos}
                 initialCreate={shouldOpenNuevaActuacion}
+                locked={exp?.estado === "cerrado"}
               />
             )}
             {tab === "adjuntos" && (
               <TabAdjuntosExpediente
                 expedienteId={id!}
+                locked={exp?.estado === "cerrado"}
               />
             )}
             {tab === "economico" && (() => {
@@ -4174,6 +4239,7 @@ export default function ExpedienteDetail() {
                 loading={notifLoading}
                 getToken={getToken}
                 onRefresh={() => setNotificaciones(null)}
+                locked={exp?.estado === "cerrado"}
               />
             )}
 
