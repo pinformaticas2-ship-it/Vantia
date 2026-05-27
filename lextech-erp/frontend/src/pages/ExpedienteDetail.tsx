@@ -3607,11 +3607,11 @@ export default function ExpedienteDetail() {
     <div className="flex gap-6 animate-in fade-in duration-500">
       <div className="flex-1 min-w-0 space-y-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm text-slate-500">
-            <Link to="/dashboard/expedientes" className="hover:text-slate-800 transition-colors">
+          <div className="flex items-center gap-2 text-sm text-slate-500 min-w-0 overflow-hidden">
+            <Link to="/dashboard/expedientes" className="hover:text-slate-800 transition-colors shrink-0">
               Expedientes
             </Link>
-            <span>/</span>
+            <span className="shrink-0">/</span>
             <span className="text-slate-800 font-medium truncate">
               {exp.descripcion || `${exp.anio}/${exp.num_exp}`}
             </span>
