@@ -3366,6 +3366,8 @@ export default function ExpedienteDetail() {
   const [agendaLoading, setAgendaLoading] = useState(false);
   const [notificaciones, setNotificaciones] = useState<any[] | null>(null);
   const [notifLoading, setNotifLoading] = useState(false);
+  const [historial, setHistorial] = useState<any[] | null>(null);
+  const [historialLoading, setHistorialLoading] = useState(false);
   const shouldOpenNuevaActuacion = searchParams.get("newActuacion") === "1";
   const shouldOpenNuevaTarea = searchParams.get("newTarea") === "1";
   const initialTareaType = searchParams.get("type") || "";
@@ -3407,6 +3409,21 @@ export default function ExpedienteDetail() {
       } catch { /* */ } finally { setAgendaLoading(false); }
     })();
   }, [tab, agendaEvents, getToken]);
+
+  useEffect(() => {
+    if (tab !== "historial") return;
+    (async () => {
+      setHistorialLoading(true);
+      try {
+        const token = await getToken({ skipCache: true });
+        const res = await fetch(`/api/expedientes/${id}/historial`, { headers: { Authorization: `Bearer ${token}` } });
+        if (res.ok) {
+          const d = await res.json();
+          setHistorial(d.data || []);
+        }
+      } catch { /* */ } finally { setHistorialLoading(false); }
+    })();
+  }, [tab, id, getToken]);
 
   useEffect(() => {
     if (tab !== "cronologia" || notificaciones !== null) return;
@@ -4115,7 +4132,60 @@ export default function ExpedienteDetail() {
               />
             )}
 
-            {tab === "historial" && <EmptyTab icon={Activity} label="Sin historial por ahora" />}
+            {tab === "historial" && (() => {
+              const TYPE_CFG: Record<string, { label: string; dot: string; badge: string }> = {
+                alta:     { label: "Alta",       dot: "bg-emerald-500", badge: "bg-emerald-100 text-emerald-700" },
+                cierre:   { label: "Cierre",     dot: "bg-red-500",     badge: "bg-red-100 text-red-700" },
+                nota:     { label: "Nota",       dot: "bg-amber-400",   badge: "bg-amber-100 text-amber-700" },
+                tarea:    { label: "Tarea",      dot: "bg-blue-500",    badge: "bg-blue-100 text-blue-700" },
+                actuacion:{ label: "Actuación",  dot: "bg-purple-500",  badge: "bg-purple-100 text-purple-700" },
+                cambio:   { label: "Cambio",     dot: "bg-slate-400",   badge: "bg-slate-100 text-slate-600" },
+              };
+              const fmtFull = (d: string) => new Date(d).toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
+              const fmtShort = (d: string) => new Date(d).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" });
+              if (historialLoading) return (
+                <div className="flex items-center justify-center py-16 text-slate-400">
+                  <Loader2 className="w-5 h-5 animate-spin mr-2" /><span className="text-sm">Cargando historial…</span>
+                </div>
+              );
+              if (!historial || historial.length === 0) return <EmptyTab icon={Activity} label="Sin historial por ahora" />;
+              return (
+                <div className="px-1 py-2">
+                  <ol className="relative border-l border-slate-200 ml-3 space-y-0">
+                    {historial.map((ev, i) => {
+                      const cfg = TYPE_CFG[ev.type] || TYPE_CFG.cambio;
+                      return (
+                        <li key={i} className="ml-6 pb-7 last:pb-0">
+                          <span className={`absolute -left-[7px] mt-1.5 h-3 w-3 rounded-full border-2 border-white ${cfg.dot}`} />
+                          <div className="flex flex-wrap items-start gap-2">
+                            <span className={`mt-0.5 shrink-0 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${cfg.badge}`}>
+                              {cfg.label}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm text-slate-800 leading-snug">{ev.title}</p>
+                              <div className="flex flex-wrap items-center gap-3 mt-1">
+                                <time className="text-[11px] text-slate-400" title={fmtFull(ev.timestamp)}>
+                                  {fmtShort(ev.timestamp)}
+                                </time>
+                                {ev.user_name && (
+                                  <span className="text-[11px] text-slate-400">· {ev.user_name}</span>
+                                )}
+                                {ev.meta?.estado && (
+                                  <span className="text-[11px] text-slate-400">· Estado: {ev.meta.estado}</span>
+                                )}
+                                {ev.meta?.plazo && (
+                                  <span className="text-[11px] text-slate-400">· Plazo: {fmtShort(ev.meta.plazo)}</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ol>
+                </div>
+              );
+            })()}
 
             {tab === "agenda" && (() => {
               const TYPE_BADGE: Record<string, string> = {

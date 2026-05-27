@@ -14,6 +14,7 @@ import {
   updateImportBatch,
   updateExpediente,
   deleteExpediente,
+  getExpedienteHistorial,
 } from '../controllers/expedientesController';
 import {
   listNotificaciones,
@@ -36,6 +37,7 @@ router.get('/',       requireAuth, getExpedientes);
 router.post('/imports', requireAuth, createImportBatch);
 router.patch('/imports/:id', requireAuth, updateImportBatch);
 router.post('/',      requireAuth, createExpediente);
+router.get('/:id/historial', requireAuth, getExpedienteHistorial);
 router.get('/:id',    requireAuth, getExpediente);
 router.put('/:id',    requireAuth, updateExpediente);
 router.delete('/:id', requireAuth, deleteExpediente);

@@ -546,9 +546,67 @@ export const updateExpediente = async (req: any, res: Response) => {
       ]
     );
     if (!r.rows.length) return res.status(404).json({ error: 'Expediente no encontrado' });
-    res.json({ data: r.rows[0] });
+    const exp = r.rows[0];
+    const label = exp.descripcion ? `${exp.anio}/${exp.num_exp} - ${exp.descripcion}` : `${exp.anio}/${exp.num_exp}`;
+    logActivityForReq(req, `Expediente actualizado: ${label}`, 'EXPEDIENTE', exp.id, 'UPDATE' as any);
+    res.json({ data: exp });
   } catch (e: any) {
     res.status(e?.code === '22P02' ? 400 : 500).json({ error: friendlyExpedienteError(e) });
+  }
+};
+
+export const getExpedienteHistorial = async (req: any, res: Response) => {
+  const { id } = req.params;
+  try {
+    const [expRes, actRes, notesRes, tasksRes] = await Promise.all([
+      pool.query(
+        `SELECT id, anio, num_exp, descripcion, estado, created_at, fecha_inicio, fecha_cierre FROM expedientes WHERE id=$1`,
+        [id]
+      ),
+      pool.query(
+        `SELECT user_name, action_type, event_type, created_at FROM activity_log
+         WHERE entity_id=$1 ORDER BY created_at ASC LIMIT 500`,
+        [id]
+      ),
+      pool.query(
+        `SELECT content, category, created_by, created_at FROM notes WHERE expediente_id=$1 ORDER BY created_at ASC`,
+        [id]
+      ),
+      pool.query(
+        `SELECT titulo, tipo, estado, plazo, created_at FROM client_tasks WHERE expediente_id=$1 ORDER BY created_at ASC`,
+        [id]
+      ),
+    ]);
+
+    if (!expRes.rows.length) return res.status(404).json({ error: 'Expediente no encontrado' });
+    const exp = expRes.rows[0];
+    const events: any[] = [];
+
+    events.push({
+      type: 'alta',
+      timestamp: exp.fecha_inicio || exp.created_at,
+      title: 'Expediente dado de alta',
+      user_name: null,
+    });
+
+    for (const a of actRes.rows) {
+      events.push({ type: 'cambio', timestamp: a.created_at, title: a.action_type, user_name: a.user_name });
+    }
+    for (const n of notesRes.rows) {
+      const preview = n.content.length > 100 ? n.content.slice(0, 100) + '…' : n.content;
+      events.push({ type: 'nota', timestamp: n.created_at, title: preview, user_name: n.created_by, meta: { category: n.category } });
+    }
+    for (const t of tasksRes.rows) {
+      events.push({ type: t.tipo === 'actuacion' ? 'actuacion' : 'tarea', timestamp: t.created_at, title: t.titulo, user_name: null, meta: { estado: t.estado, plazo: t.plazo } });
+    }
+    if (exp.fecha_cierre) {
+      events.push({ type: 'cierre', timestamp: exp.fecha_cierre, title: 'Expediente cerrado', user_name: null });
+    }
+
+    events.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    return res.json({ success: true, data: events });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
   }
 };
 
