@@ -73,22 +73,22 @@ export default function PublicLanding() {
           </p>
         </div>
 
-        {/* Stats + trust indicators */}
-        <div className="relative z-10 space-y-4">
-          <div className="grid grid-cols-3 gap-3">
-            <StatCard number="500+" label="Despachos" sublabel="en toda España" />
-            <StatCard number="99.9%" label="Disponibilidad" sublabel="SLA garantizado" />
-            <StatCard number="0" label="Brechas" sublabel="desde 2022" />
-          </div>
-          <div className="flex items-start gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
-            <span className="text-2xl mt-0.5">⚖️</span>
-            <div>
-              <p className="text-sm font-bold text-white/90">
-                "VantIA ha transformado la gestión de nuestro despacho. Lo que antes llevaba días, ahora son minutos."
-              </p>
-              <p className="mt-1.5 text-xs font-semibold text-[#d7c08a]">— Bufete Martínez & Asociados, Madrid</p>
-            </div>
-          </div>
+        <div className="relative z-10 space-y-3">
+          <FeatureCard
+            emoji="🔒"
+            title="Cifrado Zero-Trust"
+            desc="Cada expediente viaja y se almacena con cifrado de extremo a extremo de grado bancario."
+          />
+          <FeatureCard
+            emoji="⚡"
+            title="Extracción con IA"
+            desc="Sube un ZIP de documentos y la IA extrae partes, juzgado, cuantías y fechas automáticamente."
+          />
+          <FeatureCard
+            emoji="📋"
+            title="Trazabilidad total"
+            desc="Cada acción queda registrada con usuario, fecha y hora. Auditoría completa siempre disponible."
+          />
         </div>
 
         <div className="relative z-10 text-sm font-semibold text-white">
@@ -154,12 +154,14 @@ export default function PublicLanding() {
   );
 }
 
-function StatCard({ number, label, sublabel }: { number: string; label: string; sublabel: string }) {
+function FeatureCard({ emoji, title, desc }: { emoji: string; title: string; desc: string }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-0.5 rounded-2xl border border-white/12 bg-black/20 px-3 py-4 text-center backdrop-blur-sm">
-      <span className="text-2xl font-black text-[#d7c08a]">{number}</span>
-      <span className="text-xs font-bold text-white">{label}</span>
-      <span className="text-[10px] font-medium text-white/45">{sublabel}</span>
+    <div className="flex items-start gap-4 rounded-2xl border border-white/12 bg-black/20 px-4 py-4 backdrop-blur-sm">
+      <span className="text-xl mt-0.5 shrink-0">{emoji}</span>
+      <div>
+        <p className="text-sm font-bold text-white">{title}</p>
+        <p className="mt-0.5 text-xs leading-relaxed text-white/55">{desc}</p>
+      </div>
     </div>
   );
 }
