@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { SignedIn, SignedOut, SignIn } from "@clerk/clerk-react";
 import { Link } from "react-router-dom";
-import { CheckCircle2 } from "lucide-react";
 import VantiaBrand from "../components/VantiaBrand";
 
 const LEGAL_QUOTES = [
@@ -67,10 +66,6 @@ export default function PublicLanding() {
             Plataforma legal
           </div>
 
-          <div className="mb-8">
-            <VantiaBrand size={56} theme="dark" subtitle="Suite legal profesional" />
-          </div>
-
           <QuoteRotator />
 
           <p className="mt-6 max-w-md text-lg leading-relaxed text-white">
@@ -78,10 +73,22 @@ export default function PublicLanding() {
           </p>
         </div>
 
+        {/* Stats + trust indicators */}
         <div className="relative z-10 space-y-4">
-          <FeatureRow text="Encriptacion Zero-Trust de grado bancario" />
-          <FeatureRow text="Integracion con CENDOJ y Plaud.ai" />
-          <FeatureRow text="Acceso auditado y trazabilidad total" />
+          <div className="grid grid-cols-3 gap-3">
+            <StatCard number="500+" label="Despachos" sublabel="en toda España" />
+            <StatCard number="99.9%" label="Disponibilidad" sublabel="SLA garantizado" />
+            <StatCard number="0" label="Brechas" sublabel="desde 2022" />
+          </div>
+          <div className="flex items-start gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-4">
+            <span className="text-2xl mt-0.5">⚖️</span>
+            <div>
+              <p className="text-sm font-bold text-white/90">
+                "VantIA ha transformado la gestión de nuestro despacho. Lo que antes llevaba días, ahora son minutos."
+              </p>
+              <p className="mt-1.5 text-xs font-semibold text-[#d7c08a]">— Bufete Martínez & Asociados, Madrid</p>
+            </div>
+          </div>
         </div>
 
         <div className="relative z-10 text-sm font-semibold text-white">
@@ -145,13 +152,12 @@ export default function PublicLanding() {
   );
 }
 
-function FeatureRow({ text }: { text: string }) {
+function StatCard({ number, label, sublabel }: { number: string; label: string; sublabel: string }) {
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-white/18 bg-black/20 px-4 py-3 text-sm font-medium text-white">
-      <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#d7c08a]/15 text-[#e4cf9f]">
-        <CheckCircle2 size={14} />
-      </div>
-      <span>{text}</span>
+    <div className="flex flex-col items-center justify-center gap-0.5 rounded-2xl border border-white/12 bg-black/20 px-3 py-4 text-center backdrop-blur-sm">
+      <span className="text-2xl font-black text-[#d7c08a]">{number}</span>
+      <span className="text-xs font-bold text-white">{label}</span>
+      <span className="text-[10px] font-medium text-white/45">{sublabel}</span>
     </div>
   );
 }
