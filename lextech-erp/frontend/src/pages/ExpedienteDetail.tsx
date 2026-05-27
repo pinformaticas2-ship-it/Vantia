@@ -3531,6 +3531,31 @@ export default function ExpedienteDetail() {
     }
   };
 
+  const handleToggleEstado = async () => {
+    if (!exp) return;
+    const closing = exp.estado !== "cerrado";
+    setSaving(true);
+    try {
+      const token = await getToken({ skipCache: true });
+      const patch = closing
+        ? { ...exp, estado: "cerrado", fecha_cierre: new Date().toISOString().slice(0, 10) }
+        : { ...exp, estado: "abierto",  fecha_cierre: "" };
+      const res = await fetch(`/api/expedientes/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(patch),
+      });
+      const d = await safeJson(res);
+      if (!res.ok) { alert(d.error || "Error al cambiar el estado"); return; }
+      await fetchExp();
+      setHistorial(null);
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-slate-400">
@@ -3584,6 +3609,7 @@ export default function ExpedienteDetail() {
   ].filter(Boolean);
 
   const startEdit = () => {
+    if (exp?.estado === "cerrado") return;
     setEditForm({
       anio: exp.anio,
       num_exp: exp.num_exp,
@@ -3633,7 +3659,7 @@ export default function ExpedienteDetail() {
               {exp.descripcion || `${exp.anio}/${exp.num_exp}`}
             </span>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 shrink-0">
             <BackButton onClick={() => navigate("/dashboard/expedientes")} />
             {editing ? (
               <>
@@ -3652,13 +3678,32 @@ export default function ExpedienteDetail() {
                   Guardar cambios
                 </button>
               </>
-            ) : (
+            ) : exp?.estado === "cerrado" ? (
               <button
-                onClick={startEdit}
-                className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm active:scale-95 transition-all"
+                onClick={handleToggleEstado}
+                disabled={saving}
+                className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-50 rounded-xl shadow-sm active:scale-95 transition-all"
               >
-                <Edit3 size={14} /> Editar
+                {saving ? <Loader2 size={14} className="animate-spin" /> : <FolderOpen size={14} />}
+                Reabrir expediente
               </button>
+            ) : (
+              <>
+                <button
+                  onClick={handleToggleEstado}
+                  disabled={saving}
+                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50 rounded-xl shadow-sm active:scale-95 transition-all"
+                >
+                  {saving ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
+                  Cerrar expediente
+                </button>
+                <button
+                  onClick={startEdit}
+                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm active:scale-95 transition-all"
+                >
+                  <Edit3 size={14} /> Editar
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -3728,11 +3773,16 @@ export default function ExpedienteDetail() {
           <div className="p-5">
             {tab === "perfil" && !editing && (
               <div className="space-y-4">
+                {exp.estado === "cerrado" && (
+                  <div className="flex items-center gap-3 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-500">
+                    <X size={15} className="shrink-0 text-slate-400" />
+                    <span>Este expediente está <strong className="text-slate-700">cerrado</strong>. No se pueden realizar modificaciones. Pulsa <strong className="text-emerald-700">Reabrir expediente</strong> para editarlo.</span>
+                  </div>
+                )}
                 <Section title="Identificación" icon={FolderOpen} cols={4}>
                   <Field label="Núm. expediente" value={`${exp.anio}/${exp.num_exp}`} mono />
                   <Field label="Fecha alta" value={fmtDate(exp.fecha_inicio)} />
                   <Field label="Fecha cierre" value={fmtDate(exp.fecha_cierre)} />
-                  <Field label="Estado" value={estadoConf.label} />
                   <Field label="Descripción" value={exp.descripcion} wide />
                   <Field label="Tipo" value={tipoConf.label} />
                   <Field label="Tipos de asunto" value={exp.tipos_asunto} />
@@ -3781,11 +3831,6 @@ export default function ExpedienteDetail() {
                     <EF label="Núm. expediente" mono><span className="text-sm font-mono text-slate-600">{editForm.anio}/{editForm.num_exp}</span></EF>
                     <EF label="Fecha alta"><input type="date" value={editForm.fecha_inicio} onChange={e => setEF("fecha_inicio", e.target.value)} className={EI} /></EF>
                     <EF label="Fecha cierre"><input type="date" value={editForm.fecha_cierre} onChange={e => setEF("fecha_cierre", e.target.value)} className={EI} /></EF>
-                    <EF label="Estado">
-                      <select value={editForm.estado} onChange={e => setEF("estado", e.target.value)} className={EI}>
-                        {Object.entries(ESTADOS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-                      </select>
-                    </EF>
                     <div className="col-span-2 md:col-span-4">
                       <EF label="Descripción *"><input value={editForm.descripcion} onChange={e => setEF("descripcion", e.target.value)} className={EI} placeholder="Descripción del expediente" /></EF>
                     </div>
