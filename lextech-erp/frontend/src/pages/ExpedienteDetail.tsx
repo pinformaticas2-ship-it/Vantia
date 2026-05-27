@@ -4186,8 +4186,14 @@ export default function ExpedienteDetail() {
                 actuacion:{ label: "Actuación",  dot: "bg-purple-500",  badge: "bg-purple-100 text-purple-700" },
                 cambio:   { label: "Cambio",     dot: "bg-slate-400",   badge: "bg-slate-100 text-slate-600" },
               };
-              const fmtFull = (d: string) => new Date(d).toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
-              const fmtShort = (d: string) => new Date(d).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" });
+              const fmtFull = (d: string) => new Date(d).toLocaleString("es-ES", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+              const fmtShort = (d: string) => {
+                const hasTime = d.length > 10 && d.includes("T");
+                return new Date(d).toLocaleString("es-ES", {
+                  day: "2-digit", month: "short", year: "numeric",
+                  ...(hasTime ? { hour: "2-digit", minute: "2-digit" } : {}),
+                });
+              };
               if (historialLoading) return (
                 <div className="flex items-center justify-center py-16 text-slate-400">
                   <Loader2 className="w-5 h-5 animate-spin mr-2" /><span className="text-sm">Cargando historial…</span>

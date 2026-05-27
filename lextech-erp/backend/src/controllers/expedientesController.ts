@@ -560,7 +560,7 @@ export const getExpedienteHistorial = async (req: any, res: Response) => {
   try {
     const [expRes, actRes, notesRes, tasksRes] = await Promise.all([
       pool.query(
-        `SELECT id, anio, num_exp, descripcion, estado, created_at, fecha_inicio, fecha_cierre FROM expedientes WHERE id=$1`,
+        `SELECT id, anio, num_exp, descripcion, estado, created_at, updated_at, fecha_inicio, fecha_cierre FROM expedientes WHERE id=$1`,
         [id]
       ),
       pool.query(
@@ -600,7 +600,10 @@ export const getExpedienteHistorial = async (req: any, res: Response) => {
       events.push({ type: t.tipo === 'actuacion' ? 'actuacion' : 'tarea', timestamp: t.created_at, title: t.titulo, user_name: null, meta: { estado: t.estado, plazo: t.plazo } });
     }
     if (exp.fecha_cierre) {
-      events.push({ type: 'cierre', timestamp: exp.fecha_cierre, title: 'Expediente cerrado', user_name: null });
+      // Use updated_at (full timestamp) when the expediente was last saved as "cerrado".
+      // Fall back to end-of-day on fecha_cierre so it sorts after same-day events.
+      const cierreTs = exp.updated_at || (exp.fecha_cierre + 'T23:59:59.000Z');
+      events.push({ type: 'cierre', timestamp: cierreTs, title: 'Expediente cerrado', user_name: null });
     }
 
     events.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
