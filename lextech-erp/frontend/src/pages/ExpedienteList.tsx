@@ -121,7 +121,7 @@ const CSV_UNASSIGNED = "Sin asignar";
 
 const CSV_FIELD_DEFINITIONS: CsvFieldDefinition[] = [
   { id: "anio",             label: "Año",                    help: "Año del expediente",                                         aliases: ["año", "anio", "ejercicio"] },
-  { id: "ref_propia",       label: "Referencia interna",     help: "Código único del caso (ID interno del despacho)",  required: true, aliases: ["referencia", "ref. propia", "ref propia", "referencia propia", "id expediente", "id del expediente", "expediente", "ref"] },
+  { id: "ref_propia",       label: "Referencia interna",     help: "Código único del caso (ID interno del despacho)",            aliases: ["referencia", "ref. propia", "ref propia", "referencia propia", "id expediente", "id del expediente", "expediente", "ref"] },
   { id: "num_proc",         label: "Nº Procedimiento",       help: "Número del procedimiento judicial (num. autos)",             aliases: ["num.", "numero", "numero procedimiento", "n procedimiento", "procedimiento", "num procedimiento", "num. autos", "num autos", "autos", "numero autos"] },
   { id: "descripcion",      label: "Descripción",            help: "Resumen o asunto del expediente",                            aliases: ["descripcion", "descripción", "detalle", "asunto", "observacion", "observación", "concepto"] },
   { id: "tipo_procedimiento", label: "Tipo de Procedimiento", help: "Tipo de procedimiento (ej: Procedimiento ordinario)",       aliases: ["tipo", "tipo proc.", "tipo proc", "tipo procedimiento", "procedimiento tipo", "clase procedimiento"] },
@@ -241,47 +241,10 @@ function buildCsvMappings(headers: string[], rows: CsvPreviewRow[]) {
   });
 }
 
-function validateRequiredCsvValue(fieldId: string, value: string) {
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return "No tiene valor informado";
-  }
-  if (fieldId === "ref_propia" && trimmed.length < 1) {
-    return "La referencia no puede estar vacía";
-  }
-  return null;
-}
-
 function validateCsvImport(mappings: CsvFieldMapping[], rows: CsvPreviewRow[]): CsvImportSummary {
-  const requiredMappings = mappings.filter((field) => field.required);
   const issues: CsvImportIssue[] = [];
 
-  // Validate required fields per row
-  rows.forEach((row, index) => {
-    requiredMappings.forEach((field) => {
-      if (field.selected === CSV_UNASSIGNED) {
-        issues.push({
-          rowNumber: index + 1,
-          fieldId: field.id,
-          fieldLabel: field.label,
-          message: "El campo obligatorio no está asignado a ninguna columna del CSV",
-        });
-        return;
-      }
-      const rawValue = row[field.selected] || "";
-      const validationError = validateRequiredCsvValue(field.id, rawValue);
-      if (validationError) {
-        issues.push({
-          rowNumber: index + 1,
-          fieldId: field.id,
-          fieldLabel: field.label,
-          message: validationError,
-        });
-      }
-    });
-  });
-
-  // Detect duplicate ref_propia within the CSV
+  // Only warn about duplicate ref_propia within the CSV (informational, doesn't block)
   const refMapping = mappings.find(m => m.id === "ref_propia");
   if (refMapping && refMapping.selected !== CSV_UNASSIGNED) {
     const seen = new Map<string, number>();
@@ -301,13 +264,13 @@ function validateCsvImport(mappings: CsvFieldMapping[], rows: CsvPreviewRow[]): 
     });
   }
 
-  const rowsWithErrors = new Set(issues.map((issue) => issue.rowNumber));
-  const totalProcessed = rows.length;
-  const errorCount = rowsWithErrors.size;
-  const successCount = Math.max(totalProcessed - errorCount, 0);
-  const successRate = totalProcessed > 0 ? Math.round((successCount / totalProcessed) * 100) : 0;
-
-  return { totalProcessed, successCount, errorCount, successRate, issues };
+  return {
+    totalProcessed: rows.length,
+    successCount: rows.length,
+    errorCount: 0,
+    successRate: 100,
+    issues,
+  };
 }
 
 function buildCsvSummary(totalProcessed: number, issues: CsvImportIssue[]): CsvImportSummary {
@@ -1698,27 +1661,27 @@ function CsvImportReviewView({
               <p className="mt-1 text-sm text-slate-500">{fileName || "archivo.csv"} - {previewRows.length} registros</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-emerald-600">
-            {validationSummary.errorCount === 0 ? <Check size={16} /> : <AlertTriangle size={16} />}
-            <span className={`text-sm font-medium ${validationSummary.errorCount === 0 ? "text-emerald-600" : "text-amber-600"}`}>
-              {validationSummary.errorCount === 0
-                ? "Todos los campos obligatorios estan validados"
-                : `${validationSummary.errorCount} registros tienen errores obligatorios`}
+          <div className="flex items-center gap-2">
+            {validationSummary.issues.length === 0 ? <Check size={16} className="text-emerald-600" /> : <AlertTriangle size={16} className="text-amber-500" />}
+            <span className={`text-sm font-medium ${validationSummary.issues.length === 0 ? "text-emerald-600" : "text-amber-600"}`}>
+              {validationSummary.issues.length === 0
+                ? `${previewRows.length} registros listos para importar`
+                : `${previewRows.length} registros — ${validationSummary.issues.length} ${validationSummary.issues.length === 1 ? "aviso" : "avisos"}`}
             </span>
           </div>
         </div>
       </div>
 
-      {validationSummary.errorCount > 0 && (
+      {validationSummary.issues.length > 0 && (
         <div className="rounded-[22px] border border-amber-200 bg-amber-50 p-5 shadow-sm">
           <div className="flex items-start gap-3">
             <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-600" />
             <div>
               <p className="text-base font-bold text-amber-900">
-                {validationSummary.errorCount} {validationSummary.errorCount === 1 ? "registro tiene" : "registros tienen"} errores y se saltarán
+                {validationSummary.issues.length === 1 ? "1 aviso detectado" : `${validationSummary.issues.length} avisos detectados`}
               </p>
               <p className="mt-1 text-sm text-amber-800">
-                Los {validationSummary.successCount} registros sin errores se importarán igualmente. Puedes continuar o volver a corregir el CSV.
+                Se importarán todos los registros igualmente. Los avisos son solo informativos.
               </p>
             </div>
           </div>
@@ -4150,28 +4113,12 @@ export default function ExpedienteList() {
 
   const handleImportCsv = async () => {
     const token = await getToken({ skipCache: true });
-    const baseSummary = validateCsvImport(csvFieldMappings, csvPreviewRows);
-    const issues: CsvImportIssue[] = [...baseSummary.issues];
+    const issues: CsvImportIssue[] = [...validateCsvImport(csvFieldMappings, csvPreviewRows).issues];
     const results: CsvRowImportResult[] = new Array(csvPreviewRows.length);
 
-    // Separate valid rows from pre-validation failures
-    const toProcess: { index: number; row: CsvPreviewRow }[] = [];
-    csvPreviewRows.forEach((row, index) => {
-      const rowNumber = index + 1;
-      if (issues.some(issue => issue.rowNumber === rowNumber)) {
-        results[index] = {
-          rowNumber,
-          status: "failed",
-          reference: (buildExpedientePayload(row, csvFieldMappings).ref_propia as string) || null,
-          error_message: "La fila tiene errores en campos obligatorios",
-          payload: buildExpedientePayload(row, csvFieldMappings),
-        };
-      } else {
-        toProcess.push({ index, row });
-      }
-    });
+    // All rows go to the API — no client-side pre-filtering
+    const toProcess = csvPreviewRows.map((row, index) => ({ index, row }));
 
-    // Process in parallel batches of 8
     const CONCURRENCY = 8;
     let doneCount = 0;
     setCsvImportProgress({ done: 0, total: toProcess.length });
