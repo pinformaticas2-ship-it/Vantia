@@ -1544,7 +1544,7 @@ function TabAdjuntosExpediente({
           <AlertTriangle size={13} className="shrink-0" /> Expediente cerrado — solo lectura. No se pueden subir ni eliminar adjuntos.
         </div>
       )}
-      <FilesTabPanel entityId={expedienteId} alwaysShowPreview />
+      <FilesTabPanel entityId={expedienteId} alwaysShowPreview locked={locked} />
     </div>
   );
 }

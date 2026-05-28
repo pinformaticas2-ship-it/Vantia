@@ -62,7 +62,7 @@ function encodeVantiaPayload(payload: unknown) {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
-export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: { entityId: string; entity?: any; alwaysShowPreview?: boolean }) {
+export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false, locked = false }: { entityId: string; entity?: any; alwaysShowPreview?: boolean; locked?: boolean }) {
   const { getToken } = useAuth();
 
   const [files, setFiles]           = useState<any[]>([]);
@@ -736,29 +736,33 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
         <div className="flex flex-wrap gap-2">
           {/* Importar carpeta */}
           <button
-            onClick={() => folderInputRef.current?.click()}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl transition-all"
+            onClick={() => !locked && folderInputRef.current?.click()}
+            disabled={locked}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <FolderOpen size={13} /> Importar carpeta
           </button>
           {/* Subir archivos */}
           <button
-            onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl transition-all"
+            onClick={() => !locked && fileInputRef.current?.click()}
+            disabled={locked}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Upload size={13} /> Subir archivo
           </button>
           {/* Nuevo documento en blanco */}
           <button
-            onClick={showCreateBlankModal}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl transition-all"
+            onClick={!locked ? showCreateBlankModal : undefined}
+            disabled={locked}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <FilePlus2 size={13} /> Nuevo
           </button>
           {/* Crear desde plantilla */}
           <button
-            onClick={() => openTemplatesModal()}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm active:scale-95 transition-all"
+            onClick={!locked ? () => openTemplatesModal() : undefined}
+            disabled={locked}
+            className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Sparkles size={13} /> Usar plantilla
           </button>
@@ -778,12 +782,12 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
 
       {/* Drop zone */}
       <div
-        onDrop={onDrop}
-        onDragOver={e => { e.preventDefault(); setIsDragOver(true); }}
-        onDragLeave={() => setIsDragOver(false)}
-        onClick={() => fileInputRef.current?.click()}
-        className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center gap-2 cursor-pointer transition-all
-          ${isDragOver ? "border-red-400 bg-red-50/50 scale-[1.01]" : "border-slate-200 hover:border-red-300 hover:bg-red-50/20"}`}
+        onDrop={!locked ? onDrop : undefined}
+        onDragOver={!locked ? e => { e.preventDefault(); setIsDragOver(true); } : undefined}
+        onDragLeave={!locked ? () => setIsDragOver(false) : undefined}
+        onClick={!locked ? () => fileInputRef.current?.click() : undefined}
+        className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center gap-2 transition-all
+          ${locked ? "border-slate-100 bg-slate-50/50 cursor-not-allowed opacity-50" : `cursor-pointer ${isDragOver ? "border-red-400 bg-red-50/50 scale-[1.01]" : "border-slate-200 hover:border-red-300 hover:bg-red-50/20"}`}`}
       >
         {uploading
           ? <><Loader2 size={26} className="text-red-500 animate-spin" /><p className="text-sm font-medium text-red-600">Subiendo archivos…</p></>
@@ -903,6 +907,7 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
                               </button>
                             )}
                             {/* Editar metadatos */}
+                            {!locked && (
                             <button
                               title="Editar"
                               className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
@@ -914,6 +919,7 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
                             >
                               <Edit3 size={14} />
                             </button>
+                            )}
                             {/* Abrir / descargar */}
                             <button
                               title={canWord ? "Abrir en Word" : canExcel ? "Abrir en Excel" : isPdf ? "Abrir PDF" : "Descargar"}
@@ -922,10 +928,12 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false }: {
                             >
                               <ExternalLink size={14} />
                             </button>
+                            {!locked && (
                             <button onClick={() => handleDelete(f.id)} title="Eliminar"
                               className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
                               <Trash2 size={14} />
                             </button>
+                            )}
                           </div>
                         </td>
                       </tr>
