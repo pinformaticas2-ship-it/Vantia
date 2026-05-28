@@ -3081,6 +3081,7 @@ function TabExpedientesRelacionados({
   const [hasSearched, setHasSearched] = useState(false);
   const [searchError, setSearchError] = useState("");
   const [associateError, setAssociateError] = useState("");
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadRelated = useCallback(async (silent = false) => {
     try {
@@ -3138,9 +3139,26 @@ function TabExpedientesRelacionados({
       setSearchResults([]);
       return;
     }
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     setHasSearched(true);
     await searchExpedientes(term);
   };
+
+  useEffect(() => {
+    if (!showModal) return;
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    const term = query.trim();
+    if (term.length >= 2) {
+      searchDebounceRef.current = setTimeout(() => {
+        setHasSearched(true);
+        searchExpedientes(term);
+      }, 380);
+    } else if (!term) {
+      setHasSearched(false);
+      setSearchResults([]);
+    }
+    return () => { if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current); };
+  }, [query, showModal, searchExpedientes]);
 
   useEffect(() => {
     if (!showModal) return;
@@ -3335,51 +3353,83 @@ function TabExpedientesRelacionados({
                 </div>
               )}
 
-              <div className="max-h-[420px] overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50/70">
+              <div className="rounded-2xl border border-slate-200 overflow-hidden">
                 {!hasSearched ? (
-                  <div className="px-5 py-10 text-center">
-                    <p className="text-sm font-medium text-slate-600">Empieza escribiendo para buscar expedientes</p>
-                    <p className="mt-1 text-xs text-slate-400">Busca por referencia, descripción, NIG o juzgado.</p>
+                  <div className="flex flex-col items-center justify-center px-6 py-12 bg-slate-50/60 text-center gap-3">
+                    <div className="h-12 w-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-slate-300">
+                      <Search size={20} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-600">Busca un expediente</p>
+                      <p className="mt-0.5 text-xs text-slate-400">Escribe la referencia, descripción, NIG o juzgado</p>
+                    </div>
                   </div>
                 ) : searching ? (
-                  <div className="flex items-center gap-2 px-5 py-8 text-sm text-slate-400">
-                    <Loader2 size={15} className="animate-spin" />
+                  <div className="flex items-center justify-center gap-2.5 px-5 py-12 bg-slate-50/60 text-sm text-slate-400">
+                    <Loader2 size={16} className="animate-spin" />
                     Buscando expedientes...
                   </div>
                 ) : searchResults.length === 0 ? (
-                  <div className="px-5 py-10 text-center">
-                    <p className="text-sm font-medium text-slate-600">No hay expedientes disponibles para asociar</p>
-                    <p className="mt-1 text-xs text-slate-400">Prueba con otra búsqueda o revisa si ya están relacionados.</p>
+                  <div className="flex flex-col items-center justify-center px-6 py-12 bg-slate-50/60 text-center gap-3">
+                    <div className="h-12 w-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-slate-300">
+                      <AlertCircle size={20} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-600">Sin resultados</p>
+                      <p className="mt-0.5 text-xs text-slate-400">Prueba con otra búsqueda o revisa si ya están relacionados.</p>
+                    </div>
                   </div>
                 ) : (
-                  <div className="divide-y divide-slate-200">
-                    {searchResults.map((item) => {
-                      const ref = item.ref_expediente || `${item.anio}/${item.num_exp}`;
-                      return (
-                        <div key={item.id} className="flex items-center justify-between gap-4 px-5 py-4">
-                          <div className="min-w-0">
-                            <p className="text-sm font-semibold text-slate-800 break-words">
-                              {item.descripcion || `Expediente ${ref}`}
-                            </p>
-                            <p className="mt-1 text-xs text-slate-500 break-words">
-                              {ref}
-                              {item.nig ? ` · NIG ${item.nig}` : ""}
-                              {item.juzgado ? ` · ${item.juzgado}` : ""}
-                            </p>
+                  <>
+                    <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border-b border-slate-200">
+                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">
+                        {searchResults.length} {searchResults.length === 1 ? "expediente encontrado" : "expedientes encontrados"}
+                      </span>
+                    </div>
+                    <div className="max-h-[360px] overflow-y-auto divide-y divide-slate-100">
+                      {searchResults.map((item) => {
+                        const ref = item.ref_expediente || `${item.anio}/${item.num_exp}`;
+                        const tipoConf = TIPOS[item.tipo] || TIPOS.otro;
+                        const estadoConf = ESTADOS[item.estado] || ESTADOS.abierto;
+                        const meta = [item.cliente_nombre, item.juzgado, item.tipo_proc].filter(Boolean).join(" · ");
+                        return (
+                          <div key={item.id} className="group flex items-center gap-4 px-4 py-3.5 hover:bg-blue-50/40 transition-colors bg-white">
+                            <div className="shrink-0 h-9 w-9 rounded-xl bg-slate-100 group-hover:bg-white group-hover:border group-hover:border-slate-200 flex items-center justify-center text-slate-400 transition-all">
+                              <Scale size={15} />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-mono text-[11px] font-bold bg-slate-100 text-slate-600 rounded px-1.5 py-0.5">
+                                  {ref}
+                                </span>
+                                <span className={`text-[10px] font-bold rounded-full px-2 py-0.5 uppercase ${tipoConf.color}`}>
+                                  {tipoConf.short}
+                                </span>
+                                <span className={`text-[10px] font-bold rounded-full px-2 py-0.5 uppercase ${estadoConf.color}`}>
+                                  {estadoConf.label}
+                                </span>
+                              </div>
+                              {item.descripcion && (
+                                <p className="mt-1 text-sm font-semibold text-slate-800 truncate">{item.descripcion}</p>
+                              )}
+                              {meta && (
+                                <p className="mt-0.5 text-[11px] text-slate-400 truncate">{meta}</p>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => associateExpediente(item.id)}
+                              disabled={savingId === item.id}
+                              className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl disabled:opacity-60 disabled:cursor-not-allowed transition-all active:scale-95 shadow-sm"
+                            >
+                              {savingId === item.id ? <Loader2 size={11} className="animate-spin" /> : <Link2 size={11} />}
+                              Asociar
+                            </button>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => associateExpediente(item.id)}
-                            disabled={savingId === item.id}
-                            className="shrink-0 inline-flex items-center gap-2 px-3 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-                          >
-                            {savingId === item.id ? <Loader2 size={12} className="animate-spin" /> : <span className="text-[12px] leading-none">🤝</span>}
-                            Asociar
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  </>
                 )}
               </div>
             </div>
