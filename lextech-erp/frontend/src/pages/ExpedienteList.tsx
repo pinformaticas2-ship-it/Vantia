@@ -5460,7 +5460,7 @@ export default function ExpedienteList() {
               )}
             </div>
             <ToolBtn icon={Trash2}       label="Baja"       danger   disabled={!selected} onClick={() => selected && setDeleteId(selected)} />
-            <ToolBtn icon={Edit3}        label="Modificar"           disabled={!selected} onClick={() => selected && navigate(`/dashboard/expedientes/${selected}?edit=1`)} />
+            <ToolBtn icon={Edit3}        label="Modificar"           disabled={!selected || selectedExp?.estado === "cerrado"} onClick={() => selected && selectedExp?.estado !== "cerrado" && navigate(`/dashboard/expedientes/${selected}?edit=1`)} />
 
             <div className="w-px h-5 bg-slate-200 mx-0.5" />
 
@@ -5918,7 +5918,12 @@ export default function ExpedienteList() {
                         ${isSel ? colorStyle.rowSelected : colorStyle.row}`}
                     >
                       {/* Año */}
-                      {visibleColumns.anio && <td className={`pl-4 pr-3 py-3 font-mono ${isSel ? colorStyle.yearSelected : colorStyle.year}`}>{exp.anio}</td>}
+                      {visibleColumns.anio && <td className={`pl-4 pr-3 py-3 font-mono relative ${isSel ? colorStyle.yearSelected : colorStyle.year}`}>
+                        {exp.estado === "cerrado" && (
+                          <span className="absolute top-0 left-0 w-4 h-4 bg-amber-500" style={{ clipPath: "polygon(0 0, 100% 0, 0 100%)" }} title="Expediente cerrado" />
+                        )}
+                        {exp.anio}
+                      </td>}
 
                       {/* Núm */}
                       {visibleColumns.num_exp && <td className="px-3 py-3">
@@ -6109,7 +6114,10 @@ export default function ExpedienteList() {
                               onChange={() => toggleSelectId(exp.id)} onClick={e => e.stopPropagation()}
                               className="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500 cursor-pointer" />
                           </td>
-                          <td className="px-3 py-3">
+                          <td className="px-3 py-3 relative">
+                            {exp.estado === "cerrado" && (
+                              <span className="absolute top-0 left-0 w-4 h-4 bg-amber-500" style={{ clipPath: "polygon(0 0, 100% 0, 0 100%)" }} title="Expediente cerrado" />
+                            )}
                             <span className={`font-extrabold text-base ${isSel ? "text-red-700" : "text-slate-700"}`}>{exp.anio}/{exp.num_exp}</span>
                           </td>
                           <td className="px-3 py-3">
