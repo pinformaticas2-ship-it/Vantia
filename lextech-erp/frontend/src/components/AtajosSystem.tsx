@@ -107,7 +107,7 @@ export function NuevoAtajoModal({
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/40 backdrop-blur-sm px-4"
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/30 px-4"
       onClick={onClose}
     >
       <div
@@ -352,7 +352,7 @@ export function ListadoAtajosModal({
   return (
     <>
       <div
-        className="fixed inset-0 z-[190] flex items-center justify-center bg-slate-950/40 backdrop-blur-sm px-4"
+        className="fixed inset-0 z-[190] flex items-center justify-center bg-slate-950/30 px-4"
         onClick={onClose}
       >
         <div
@@ -540,7 +540,7 @@ export function ListadoAtajosModal({
       {/* Confirm delete */}
       {confirmDeleteId && (
         <div
-          className="fixed inset-0 z-[210] flex items-center justify-center bg-slate-950/40 backdrop-blur-sm px-4"
+          className="fixed inset-0 z-[210] flex items-center justify-center bg-slate-950/30 px-4"
           onClick={() => setConfirmDeleteId(null)}
         >
           <div
