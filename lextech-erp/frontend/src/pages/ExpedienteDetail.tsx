@@ -4066,7 +4066,7 @@ export default function ExpedienteDetail() {
               <TabExpedientesRelacionados
                 expedienteId={id!}
                 currentRef={exp.ref_expediente || `${exp.anio}/${exp.num_exp}`}
-                locked={exp?.estado === "cerrado"}
+                locked={false}
               />
             )}
 
