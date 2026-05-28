@@ -120,40 +120,22 @@ interface CsvRowImportResult {
 const CSV_UNASSIGNED = "Sin asignar";
 
 const CSV_FIELD_DEFINITIONS: CsvFieldDefinition[] = [
-  { id: "anio", label: "Año", help: "Año del expediente si viene informado en el CSV", aliases: ["año", "anio", "ejercicio"] },
-  { id: "ref_propia", label: "Referencia", help: "Codigo unico del caso (ID del expediente)", required: true, aliases: ["referencia", "ref. propia", "ref propia", "referencia propia", "id expediente", "id del expediente", "expediente"] },
-  { id: "num_proc", label: "Numero de Procedimiento", help: "Numero del procedimiento judicial", required: true, aliases: ["num.", "numero", "numero procedimiento", "n procedimiento", "procedimiento", "num procedimiento"] },
-  { id: "tipo_juzgado", label: "Tipo de Juzgado", help: "Tipo de juzgado (ej: Juzgado de Primera Instancia)", required: true, aliases: ["tipo juzgado", "clase juzgado", "organo judicial"] },
-  { id: "numero_juzgado", label: "Numero de Juzgado", help: "Numero del juzgado", required: true, aliases: ["num. autos", "num autos", "numero juzgado", "n juzgado", "autos"] },
-  { id: "poblacion", label: "Poblacion", help: "Municipio donde se tramita el procedimiento", required: true, aliases: ["poblacion", "población", "municipio", "localidad", "partido judicial"] },
-  { id: "tipo_procedimiento", label: "Tipo de Procedimiento", help: "Tipo de procedimiento judicial", required: true, aliases: ["tipo", "tipo proc.", "tipo proc", "tipo procedimiento", "procedimiento tipo"] },
-  { id: "descripcion", label: "Descripcion", help: "Resumen interno del expediente", aliases: ["descripcion", "descripción", "detalle", "asunto", "observacion", "observación"] },
-  { id: "cliente", label: "Cliente", help: "Cliente asociado al expediente", aliases: ["cliente", "demandante", "parte actora"] },
-  { id: "estado", label: "Estado", help: "Estado inicial del expediente", aliases: ["estado", "situacion", "situación"] },
-  { id: "nig", label: "NIG", help: "Numero de identificacion general", aliases: ["nig", "numero identificacion general"] },
-  { id: "contrario", label: "Contrario", help: "Parte contraria del procedimiento", aliases: ["contrario", "demandado", "parte contraria"] },
-  { id: "procurador", label: "Procurador", help: "Procurador vinculado al asunto", aliases: ["procurador"] },
-  { id: "observaciones", label: "Observaciones", help: "Notas adicionales de la importacion", aliases: ["observaciones", "notas", "comentarios"] },
-];
-
-const CSV_ALLOWED_COURT_TYPES = [
-  "juzgado de primera instancia",
-  "juzgado de instruccion",
-  "juzgado de primera instancia e instruccion",
-  "juzgado de lo penal",
-  "juzgado de lo social",
-  "juzgado de lo mercantil",
-  "juzgado contencioso administrativo",
-  "juzgado de violencia sobre la mujer",
-  "juzgado de menores",
-  "juzgado de vigilancia penitenciaria",
-  "juzgado de familia",
-  "juzgado de paz",
-  "juzgado central de instruccion",
-  "juzgado central de lo penal",
-  "audiencia provincial",
-  "tribunal supremo",
-  "tribunal superior de justicia",
+  { id: "anio",             label: "Año",                    help: "Año del expediente",                                         aliases: ["año", "anio", "ejercicio"] },
+  { id: "ref_propia",       label: "Referencia interna",     help: "Código único del caso (ID interno del despacho)",  required: true, aliases: ["referencia", "ref. propia", "ref propia", "referencia propia", "id expediente", "id del expediente", "expediente", "ref"] },
+  { id: "num_proc",         label: "Nº Procedimiento",       help: "Número del procedimiento judicial (num. autos)",             aliases: ["num.", "numero", "numero procedimiento", "n procedimiento", "procedimiento", "num procedimiento", "num. autos", "num autos", "autos", "numero autos"] },
+  { id: "descripcion",      label: "Descripción",            help: "Resumen o asunto del expediente",                            aliases: ["descripcion", "descripción", "detalle", "asunto", "observacion", "observación", "concepto"] },
+  { id: "tipo_procedimiento", label: "Tipo de Procedimiento", help: "Tipo de procedimiento (ej: Procedimiento ordinario)",       aliases: ["tipo", "tipo proc.", "tipo proc", "tipo procedimiento", "procedimiento tipo", "clase procedimiento"] },
+  { id: "juzgado",          label: "Juzgado / Tribunal",     help: "Nombre completo del juzgado o tribunal (texto libre)",       aliases: ["juzgado", "tribunal", "organo judicial", "sede", "organo", "juzgado tribunal"] },
+  { id: "tipo_juzgado",     label: "Tipo de Juzgado",        help: "Tipo de órgano judicial si viene en columna separada",       aliases: ["tipo juzgado", "clase juzgado", "tipo organo"] },
+  { id: "numero_juzgado",   label: "Nº Juzgado",             help: "Número del juzgado si viene en columna separada",            aliases: ["numero juzgado", "n juzgado", "num juzgado", "numero del juzgado"] },
+  { id: "poblacion",        label: "Población",              help: "Municipio/sede del juzgado si viene en columna separada",    aliases: ["poblacion", "población", "municipio", "localidad", "partido judicial", "ciudad"] },
+  { id: "cliente",          label: "Cliente",                help: "Nombre del cliente asociado",                                aliases: ["cliente", "demandante", "parte actora", "actor"] },
+  { id: "contrario",        label: "Parte contraria",        help: "Nombre del demandado o parte contraria",                     aliases: ["contrario", "demandado", "parte contraria", "demandados"] },
+  { id: "procurador",       label: "Procurador",             help: "Procurador vinculado al asunto",                             aliases: ["procurador"] },
+  { id: "nig",              label: "NIG",                    help: "Número de identificación general",                           aliases: ["nig", "numero identificacion general", "n.i.g"] },
+  { id: "estado",           label: "Estado",                 help: "Estado del expediente (abierto/cerrado/suspendido)",         aliases: ["estado", "situacion", "situación", "status"] },
+  { id: "fecha_inicio",     label: "Fecha de alta",          help: "Fecha de alta del expediente (DD/MM/YYYY o YYYY-MM-DD)",     aliases: ["fecha inicio", "fecha alta", "fecha apertura", "inicio", "fecha", "alta"] },
+  { id: "observaciones",    label: "Observaciones",          help: "Notas adicionales",                                          aliases: ["observaciones", "notas", "comentarios", "nota"] },
 ];
 
 function normalizeCsvHeader(value: string) {
@@ -264,49 +246,9 @@ function validateRequiredCsvValue(fieldId: string, value: string) {
   if (!trimmed) {
     return "No tiene valor informado";
   }
-
-  if (fieldId === "num_proc") {
-    const compact = trimmed.replace(/\s+/g, "");
-    if (!/\d/.test(compact)) {
-      return "El numero de procedimiento debe contener digitos";
-    }
-    if (!/^[A-Za-z0-9./-]+$/.test(compact)) {
-      return "El numero de procedimiento contiene caracteres no validos";
-    }
-    const digitsOnly = compact.replace(/\D/g, "");
-    if (!digitsOnly || /^0+$/.test(digitsOnly)) {
-      return "El numero de procedimiento no puede ser cero ni vacio";
-    }
+  if (fieldId === "ref_propia" && trimmed.length < 1) {
+    return "La referencia no puede estar vacía";
   }
-
-  if (fieldId === "numero_juzgado") {
-    const digitsOnly = trimmed.replace(/\D/g, "");
-    if (!digitsOnly) {
-      return "El numero de juzgado debe contener digitos";
-    }
-    if (/^0+$/.test(digitsOnly)) {
-      return "El numero de juzgado no puede ser cero";
-    }
-  }
-
-  if (fieldId === "tipo_juzgado") {
-    const normalized = normalizeCsvHeader(trimmed);
-    const isKnownCourtType = CSV_ALLOWED_COURT_TYPES.some((type) => (
-      normalized === type || normalized.includes(type) || type.includes(normalized)
-    ));
-    if (!isKnownCourtType) {
-      return "Tipo de juzgado invalido o no reconocido";
-    }
-  }
-
-  if ((fieldId === "tipo_juzgado" || fieldId === "tipo_procedimiento") && trimmed.length < 3) {
-    return "El valor es demasiado corto para considerarlo valido";
-  }
-
-  if (fieldId === "poblacion" && trimmed.length < 2) {
-    return "La poblacion o municipio no parece valido";
-  }
-
   return null;
 }
 
@@ -314,6 +256,7 @@ function validateCsvImport(mappings: CsvFieldMapping[], rows: CsvPreviewRow[]): 
   const requiredMappings = mappings.filter((field) => field.required);
   const issues: CsvImportIssue[] = [];
 
+  // Validate required fields per row
   rows.forEach((row, index) => {
     requiredMappings.forEach((field) => {
       if (field.selected === CSV_UNASSIGNED) {
@@ -321,11 +264,10 @@ function validateCsvImport(mappings: CsvFieldMapping[], rows: CsvPreviewRow[]): 
           rowNumber: index + 1,
           fieldId: field.id,
           fieldLabel: field.label,
-          message: "El campo obligatorio no esta asignado a ninguna columna del CSV",
+          message: "El campo obligatorio no está asignado a ninguna columna del CSV",
         });
         return;
       }
-
       const rawValue = row[field.selected] || "";
       const validationError = validateRequiredCsvValue(field.id, rawValue);
       if (validationError) {
@@ -339,19 +281,33 @@ function validateCsvImport(mappings: CsvFieldMapping[], rows: CsvPreviewRow[]): 
     });
   });
 
+  // Detect duplicate ref_propia within the CSV
+  const refMapping = mappings.find(m => m.id === "ref_propia");
+  if (refMapping && refMapping.selected !== CSV_UNASSIGNED) {
+    const seen = new Map<string, number>();
+    rows.forEach((row, index) => {
+      const val = (row[refMapping.selected] || "").trim().toLowerCase();
+      if (!val) return;
+      if (seen.has(val)) {
+        issues.push({
+          rowNumber: index + 1,
+          fieldId: "ref_propia",
+          fieldLabel: "Referencia interna",
+          message: `Referencia duplicada en el CSV (ya aparece en fila ${seen.get(val)})`,
+        });
+      } else {
+        seen.set(val, index + 1);
+      }
+    });
+  }
+
   const rowsWithErrors = new Set(issues.map((issue) => issue.rowNumber));
   const totalProcessed = rows.length;
   const errorCount = rowsWithErrors.size;
   const successCount = Math.max(totalProcessed - errorCount, 0);
   const successRate = totalProcessed > 0 ? Math.round((successCount / totalProcessed) * 100) : 0;
 
-  return {
-    totalProcessed,
-    successCount,
-    errorCount,
-    successRate,
-    issues,
-  };
+  return { totalProcessed, successCount, errorCount, successRate, issues };
 }
 
 function buildCsvSummary(totalProcessed: number, issues: CsvImportIssue[]): CsvImportSummary {
@@ -396,6 +352,22 @@ function inferExpedienteTipo(value: string) {
   return "judicial";
 }
 
+function parseCsvDate(raw: string): string | null {
+  const s = raw.trim();
+  if (!s) return null;
+  // YYYY-MM-DD already
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  // DD/MM/YYYY or DD-MM-YYYY
+  const dmyMatch = s.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/);
+  if (dmyMatch) return `${dmyMatch[3]}-${dmyMatch[2].padStart(2, "0")}-${dmyMatch[1].padStart(2, "0")}`;
+  // MM/DD/YYYY
+  const mdyMatch = s.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/);
+  if (mdyMatch) return `${mdyMatch[3]}-${mdyMatch[1].padStart(2, "0")}-${mdyMatch[2].padStart(2, "0")}`;
+  const d = new Date(s);
+  if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  return null;
+}
+
 function buildExpedientePayload(row: CsvPreviewRow, mappings: CsvFieldMapping[]) {
   const anioRaw = getCsvMappedValue(row, mappings, "anio");
   const referencia = getCsvMappedValue(row, mappings, "ref_propia");
@@ -404,15 +376,27 @@ function buildExpedientePayload(row: CsvPreviewRow, mappings: CsvFieldMapping[])
   const numeroJuzgado = getCsvMappedValue(row, mappings, "numero_juzgado");
   const poblacion = getCsvMappedValue(row, mappings, "poblacion");
   const tipoProcedimiento = getCsvMappedValue(row, mappings, "tipo_procedimiento");
-  const descripcion = getCsvMappedValue(row, mappings, "descripcion") || `${tipoProcedimiento} - ${referencia || numeroProcedimiento}`;
+  const juzgadoDireto = getCsvMappedValue(row, mappings, "juzgado");
+  const descripcionRaw = getCsvMappedValue(row, mappings, "descripcion");
   const cliente = getCsvMappedValue(row, mappings, "cliente");
   const contrario = getCsvMappedValue(row, mappings, "contrario");
   const procurador = getCsvMappedValue(row, mappings, "procurador");
   const nig = getCsvMappedValue(row, mappings, "nig");
   const estado = normalizeExpedienteEstado(getCsvMappedValue(row, mappings, "estado"));
   const observaciones = getCsvMappedValue(row, mappings, "observaciones");
-  const juzgado = [tipoJuzgado, numeroJuzgado ? `Nº ${numeroJuzgado}` : "", poblacion].filter(Boolean).join(" · ");
+  const fechaInicioRaw = getCsvMappedValue(row, mappings, "fecha_inicio");
+
+  // Juzgado: prefer direct column, fallback to assembled parts
+  const juzgadoAssembled = [tipoJuzgado, numeroJuzgado ? `Nº ${numeroJuzgado}` : "", poblacion].filter(Boolean).join(" · ");
+  const juzgado = juzgadoDireto || juzgadoAssembled || null;
+
+  // Descripción: CSV value → "tipoProcedimiento – ref/num" → generic
+  const descripcion = descripcionRaw
+    || (tipoProcedimiento ? `${tipoProcedimiento}${referencia ? ` — ${referencia}` : ""}` : null)
+    || (referencia || numeroProcedimiento || "Expediente importado");
+
   const parsedYear = Number.parseInt(anioRaw, 10);
+  const today = new Date().toISOString().slice(0, 10);
 
   return {
     anio: Number.isFinite(parsedYear) ? parsedYear : new Date().getFullYear(),
@@ -422,13 +406,13 @@ function buildExpedientePayload(row: CsvPreviewRow, mappings: CsvFieldMapping[])
     cliente_nombre: cliente || null,
     contrario: contrario || null,
     procurador: procurador || null,
-    juzgado: juzgado || null,
+    juzgado,
     tipo_proc: tipoProcedimiento || null,
     num_autos: numeroProcedimiento || null,
     nig: nig || null,
     estado,
     observaciones: observaciones || null,
-    fecha_inicio: new Date().toISOString().slice(0, 10),
+    fecha_inicio: parseCsvDate(fechaInicioRaw) ?? today,
     color: "ninguno",
   };
 }
@@ -1642,6 +1626,7 @@ function CsvImportReviewView({
   mappings,
   previewRows,
   validationSummary,
+  importProgress,
   onBack,
   onImport,
   onOpenHistory,
@@ -1651,6 +1636,7 @@ function CsvImportReviewView({
   mappings: CsvFieldMapping[];
   previewRows: CsvPreviewRow[];
   validationSummary: CsvImportSummary;
+  importProgress: { done: number; total: number } | null;
   onBack: () => void;
   onImport: () => void;
   onOpenHistory: () => void;
@@ -1729,13 +1715,10 @@ function CsvImportReviewView({
             <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-600" />
             <div>
               <p className="text-base font-bold text-amber-900">
-                Se han detectado errores en campos obligatorios
+                {validationSummary.errorCount} {validationSummary.errorCount === 1 ? "registro tiene" : "registros tienen"} errores y se saltarán
               </p>
               <p className="mt-1 text-sm text-amber-800">
-                El sistema validara estrictamente estas columnas: Referencia, Numero de procedimiento, Tipo de juzgado, Numero de juzgado, Poblacion/Municipio y Tipo de procedimiento.
-              </p>
-              <p className="mt-2 text-sm text-amber-800">
-                Al finalizar se mostraran los registros correctos, los errores y el porcentaje real de exito.
+                Los {validationSummary.successCount} registros sin errores se importarán igualmente. Puedes continuar o volver a corregir el CSV.
               </p>
             </div>
           </div>
@@ -1749,44 +1732,59 @@ function CsvImportReviewView({
             <thead className="border-b border-slate-200 bg-slate-50">
               <tr className="text-sm font-semibold text-slate-800">
                 <th className="px-4 py-4">Referencia</th>
+                <th className="px-4 py-4">Descripción</th>
                 <th className="px-4 py-4">Nº Procedimiento</th>
-                <th className="px-4 py-4">Tipo de Juzgado</th>
-                <th className="px-4 py-4">Nº Juzgado</th>
-                <th className="px-4 py-4">Población</th>
+                <th className="px-4 py-4">Juzgado / Tribunal</th>
                 <th className="px-4 py-4">Tipo Procedimiento</th>
-                <th className="px-4 py-4">NIG</th>
                 <th className="px-4 py-4">Cliente</th>
-                <th className="px-4 py-4">Contrario</th>
-                <th className="px-4 py-4">Procurador</th>
+                <th className="px-4 py-4">Fecha alta</th>
+                <th className="px-4 py-4">Estado</th>
               </tr>
             </thead>
             <tbody>
               <tr className="text-base text-slate-900">
                 <td className={cellClassName("ref_propia")}>{getMappedValue("ref_propia")}</td>
+                <td className={cellClassName("descripcion")}>{getMappedValue("descripcion")}</td>
                 <td className={cellClassName("num_proc")}>{getMappedValue("num_proc")}</td>
-                <td className={cellClassName("tipo_juzgado")}>{getMappedValue("tipo_juzgado")}</td>
-                <td className={cellClassName("numero_juzgado")}>{getMappedValue("numero_juzgado")}</td>
-                <td className={cellClassName("poblacion")}>{getMappedValue("poblacion")}</td>
+                <td className="px-4 py-4">{getMappedValue("juzgado") !== "-" ? getMappedValue("juzgado") : [getMappedValue("tipo_juzgado"), getMappedValue("numero_juzgado"), getMappedValue("poblacion")].filter(v => v !== "-").join(" · ") || "-"}</td>
                 <td className={cellClassName("tipo_procedimiento")}>{getMappedValue("tipo_procedimiento")}</td>
-                <td className={cellClassName("nig")}>{getMappedValue("nig")}</td>
                 <td className={cellClassName("cliente")}>{getMappedValue("cliente")}</td>
-                <td className={cellClassName("contrario")}>{getMappedValue("contrario")}</td>
-                <td className={cellClassName("procurador")}>{getMappedValue("procurador")}</td>
+                <td className={cellClassName("fecha_inicio")}>{getMappedValue("fecha_inicio")}</td>
+                <td className={cellClassName("estado")}>{getMappedValue("estado")}</td>
               </tr>
             </tbody>
           </table>
         </div>
       </div>
 
+      {importProgress && (
+        <div className="rounded-[22px] border border-blue-200 bg-blue-50 p-5 shadow-sm">
+          <div className="flex items-center justify-between gap-4 mb-2">
+            <div className="flex items-center gap-2 text-blue-700">
+              <Loader2 size={16} className="animate-spin" />
+              <span className="text-sm font-semibold">Importando expedientes…</span>
+            </div>
+            <span className="text-sm font-bold text-blue-700">{importProgress.done} / {importProgress.total}</span>
+          </div>
+          <div className="h-2 rounded-full bg-blue-200 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-blue-600 transition-all duration-300"
+              style={{ width: `${importProgress.total > 0 ? Math.round((importProgress.done / importProgress.total) * 100) : 0}%` }}
+            />
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between border-t border-slate-200 pt-5">
         <BackButton onClick={onBack} />
         <button
           type="button"
           onClick={onImport}
-          className="inline-flex items-center gap-2 rounded-xl bg-[#ab0433] px-6 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[#92042c] hover:shadow"
+          disabled={!!importProgress}
+          className="inline-flex items-center gap-2 rounded-xl bg-[#ab0433] px-6 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[#92042c] hover:shadow disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          <Upload size={16} />
-          Importar expedientes
+          {importProgress ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+          {importProgress ? "Importando…" : "Importar expedientes"}
         </button>
       </div>
     </div>
@@ -3776,6 +3774,7 @@ export default function ExpedienteList() {
   const [csvPreviewRows, setCsvPreviewRows] = useState<CsvPreviewRow[]>([]);
   const [csvFieldMappings, setCsvFieldMappings] = useState<CsvFieldMapping[]>(() => buildCsvMappings([], []));
   const [csvImportBatchId, setCsvImportBatchId] = useState<string | null>(null);
+  const [csvImportProgress, setCsvImportProgress] = useState<{ done: number; total: number } | null>(null);
   const [csvImportSummary, setCsvImportSummary] = useState<CsvImportSummary>({
     totalProcessed: 0,
     successCount: 0,
@@ -4152,81 +4151,62 @@ export default function ExpedienteList() {
   const handleImportCsv = async () => {
     const token = await getToken({ skipCache: true });
     const baseSummary = validateCsvImport(csvFieldMappings, csvPreviewRows);
-    const issues = [...baseSummary.issues];
-    const results: CsvRowImportResult[] = [];
+    const issues: CsvImportIssue[] = [...baseSummary.issues];
+    const results: CsvRowImportResult[] = new Array(csvPreviewRows.length);
 
-    for (let index = 0; index < csvPreviewRows.length; index += 1) {
-      const row = csvPreviewRows[index];
+    // Separate valid rows from pre-validation failures
+    const toProcess: { index: number; row: CsvPreviewRow }[] = [];
+    csvPreviewRows.forEach((row, index) => {
       const rowNumber = index + 1;
-      const rowHasBlockingErrors = issues.some((issue) => issue.rowNumber === rowNumber);
-      const payload = buildExpedientePayload(row, csvFieldMappings);
-      const reference = String(payload.ref_propia || "") || null;
-
-      if (rowHasBlockingErrors) {
-        results.push({
+      if (issues.some(issue => issue.rowNumber === rowNumber)) {
+        results[index] = {
           rowNumber,
           status: "failed",
-          reference,
+          reference: (buildExpedientePayload(row, csvFieldMappings).ref_propia as string) || null,
           error_message: "La fila tiene errores en campos obligatorios",
-          payload,
-        });
-        continue;
+          payload: buildExpedientePayload(row, csvFieldMappings),
+        };
+      } else {
+        toProcess.push({ index, row });
       }
+    });
 
-      try {
-        const res = await fetch("/api/expedientes", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        });
-        const data = await safeJson(res);
-        if (!res.ok) {
-          const message = data.error || "No se pudo crear el expediente";
-          issues.push({
-            rowNumber,
-            fieldId: "expediente",
-            fieldLabel: "Expediente",
-            message,
+    // Process in parallel batches of 8
+    const CONCURRENCY = 8;
+    let doneCount = 0;
+    setCsvImportProgress({ done: 0, total: toProcess.length });
+
+    for (let i = 0; i < toProcess.length; i += CONCURRENCY) {
+      const batch = toProcess.slice(i, i + CONCURRENCY);
+      await Promise.all(batch.map(async ({ index, row }) => {
+        const rowNumber = index + 1;
+        const payload = buildExpedientePayload(row, csvFieldMappings);
+        const reference = (payload.ref_propia as string) || null;
+        try {
+          const res = await fetch("/api/expedientes", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify(payload),
           });
-          results.push({
-            rowNumber,
-            status: "failed",
-            reference,
-            error_message: message,
-            payload,
-          });
-          continue;
+          const data = await safeJson(res);
+          if (!res.ok) {
+            const message = data.error || "No se pudo crear el expediente";
+            issues.push({ rowNumber, fieldId: "expediente", fieldLabel: "Expediente", message });
+            results[index] = { rowNumber, status: "failed", reference, error_message: message, payload };
+          } else {
+            results[index] = { rowNumber, status: "completed", reference, error_message: null, payload, created_expediente_id: data.data?.id || null };
+          }
+        } catch (e: any) {
+          const message = e.message || "No se pudo crear el expediente";
+          issues.push({ rowNumber, fieldId: "expediente", fieldLabel: "Expediente", message });
+          results[index] = { rowNumber, status: "failed", reference, error_message: message, payload };
         }
-
-        results.push({
-          rowNumber,
-          status: "completed",
-          reference,
-          error_message: null,
-          payload,
-          created_expediente_id: data.data?.id || null,
-        });
-      } catch (e: any) {
-        const message = e.message || "No se pudo crear el expediente";
-        issues.push({
-          rowNumber,
-          fieldId: "expediente",
-          fieldLabel: "Expediente",
-          message,
-        });
-        results.push({
-          rowNumber,
-          status: "failed",
-          reference,
-          error_message: message,
-          payload,
-        });
-      }
+        doneCount += 1;
+        setCsvImportProgress({ done: doneCount, total: toProcess.length });
+      }));
     }
 
+    setCsvImportProgress(null);
     const summary = buildCsvSummary(csvPreviewRows.length, issues);
     setCsvImportSummary(summary);
 
@@ -4234,25 +4214,22 @@ export default function ExpedienteList() {
       try {
         await fetch(`/api/expedientes/imports/${csvImportBatchId}`, {
           method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify({
-            status: summary.errorCount > 0 ? "failed" : "completed",
+            status: summary.successCount > 0 ? "completed" : "failed",
             total_count: summary.totalProcessed,
             completed_count: summary.successCount,
             error_count: summary.errorCount,
             pending_count: 0,
             notes: summary.errorCount > 0
-              ? "Importacion finalizada con incidencias en campos obligatorios o creacion de expedientes."
-              : "Importacion completada correctamente.",
+              ? `Importación finalizada: ${summary.successCount} correctos, ${summary.errorCount} con errores.`
+              : "Importación completada correctamente.",
           }),
         });
       } catch {}
     }
 
-    if (results.some((item) => item.status === "completed")) {
+    if (results.some(item => item?.status === "completed")) {
       fetchExpedientes(true);
       fetchImportHistory(true);
     }
@@ -4814,6 +4791,7 @@ export default function ExpedienteList() {
         mappings={csvFieldMappings}
         previewRows={csvPreviewRows}
         validationSummary={validateCsvImport(csvFieldMappings, csvPreviewRows)}
+        importProgress={csvImportProgress}
         onBack={() => switchView("csvImportConfigure")}
         onImport={handleImportCsv}
         onOpenHistory={() => switchView("csvImportHistory")}
