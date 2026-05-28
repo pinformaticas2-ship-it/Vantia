@@ -5608,7 +5608,7 @@ export default function ExpedienteList() {
             <div className="w-px h-5 bg-slate-200 mx-0.5" />
 
             <ToolBtn icon={GitMerge}     label="Asociar"       disabled={!selectedExp} onClick={openRelacionarModal} />
-            <ToolBtn icon={Paperclip}    label="Adjuntos"      disabled={!selected} onClick={() => selected && setShowAdjuntos(true)} />
+            <ToolBtn icon={Paperclip}    label="Adjuntos"      disabled={!selected || selectedExp?.estado === "cerrado"} onClick={() => selected && selectedExp?.estado !== "cerrado" && setShowAdjuntos(true)} />
             <div className="w-px h-5 bg-slate-200 mx-0.5" />
 
             <ToolBtn icon={FileSpreadsheet} label="Excel"    onClick={openExportModal} />
