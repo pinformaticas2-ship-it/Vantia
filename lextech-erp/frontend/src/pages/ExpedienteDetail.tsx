@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
+﻿import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useParams, useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
@@ -940,7 +940,7 @@ function TabNotas({
       )}
 
       {confirmDeleteId && (
-        <div className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-slate-950/40 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm p-5 space-y-4">
             <div className="space-y-1">
               <h4 className="text-base font-bold text-slate-900">Eliminar nota</h4>
@@ -1493,7 +1493,7 @@ function TabTareas({
       )}
 
       {confirmDeleteTareaId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setConfirmDeleteTareaId(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setConfirmDeleteTareaId(null)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="p-6 space-y-4">
               <div className="flex items-center gap-3">
@@ -2384,7 +2384,7 @@ function ActuacionAdjuntosPanel({ taskId, locked = false }: { taskId: string; lo
       </div>
 
       {openingMessage && (
-        <div className="fixed right-5 top-5 z-[171] rounded-xl border border-slate-200 bg-white/95 px-4 py-3 text-sm font-medium text-slate-700 shadow-2xl backdrop-blur">
+        <div className="fixed right-5 top-5 z-[171] rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-2xl">
           {openingMessage}
         </div>
       )}
@@ -2419,7 +2419,7 @@ function ActuacionAdjuntosPanel({ taskId, locked = false }: { taskId: string; lo
 
       {/* Modal editar metadatos */}
       {editingFile && typeof document !== "undefined" && createPortal(
-        <div className="fixed inset-0 z-[160] flex items-center justify-center bg-slate-950/40 backdrop-blur-sm p-4" onClick={() => setEditingFile(null)}>
+        <div className="fixed inset-0 z-[160] flex items-center justify-center bg-slate-950/40 p-4" onClick={() => setEditingFile(null)}>
           <div className="w-full max-w-lg rounded-2xl bg-white border border-slate-200 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="px-5 py-4 border-b border-slate-100">
               <h4 className="text-base font-bold text-slate-900">{editingFile.id === "PENDING_UPLOAD" ? "Preparar adjunto" : "Editar adjunto"}</h4>
@@ -2452,7 +2452,7 @@ function ActuacionAdjuntosPanel({ taskId, locked = false }: { taskId: string; lo
 
       {/* Modal plantillas */}
       {showTemplates && typeof document !== "undefined" && createPortal(
-        <div className="fixed inset-0 z-[155] flex items-center justify-center bg-slate-950/40 backdrop-blur-sm p-4" onClick={() => setShowTemplates(false)}>
+        <div className="fixed inset-0 z-[155] flex items-center justify-center bg-slate-950/40 p-4" onClick={() => setShowTemplates(false)}>
           <div className="w-full max-w-5xl rounded-3xl bg-white border border-slate-200 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <div>
@@ -2517,7 +2517,7 @@ function ActuacionAdjuntosPanel({ taskId, locked = false }: { taskId: string; lo
       )}
 
       {confirmDeleteFileId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm mx-4 p-6">
             <div className="flex items-start gap-3 mb-4">
               <div className="p-2 bg-red-100 rounded-xl shrink-0">
@@ -2590,7 +2590,7 @@ function ActuacionModal({
   ].filter(Boolean).join("\n");
 
   return createPortal(
-    <div className="fixed inset-0 z-[140] flex items-center justify-center bg-slate-950/45 backdrop-blur-sm p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[140] flex items-center justify-center bg-slate-950/45 p-4" onClick={onClose}>
       <div
         className="w-full max-w-[1500px] flex flex-col overflow-hidden rounded-3xl bg-white border border-slate-200 shadow-2xl"
         style={{ height: "92vh" }}
@@ -3290,7 +3290,7 @@ function TabExpedientesRelacionados({
 
       {showModal && typeof document !== "undefined" && createPortal(
         <div
-          className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/40 backdrop-blur-sm px-4"
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/40 px-4"
           onClick={() => setShowModal(false)}
         >
           <div

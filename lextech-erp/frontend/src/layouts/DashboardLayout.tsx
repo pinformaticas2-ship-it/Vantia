@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+﻿import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Briefcase, Users, Settings,
@@ -824,7 +824,7 @@ export default function DashboardLayout() {
       {/* Menú Móvil */}
       {isMobileOpen && (
         <div className="fixed inset-0 z-50 flex md:hidden">
-          <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm" onClick={() => setIsMobileOpen(false)} />
+          <div className="fixed inset-0 bg-slate-900/80" onClick={() => setIsMobileOpen(false)} />
           <div className="relative w-64 h-full shadow-2xl">
             <button onClick={() => setIsMobileOpen(false)} className="absolute right-4 top-6 text-slate-400 hover:text-white z-10">
               <X className="h-6 w-6" />
@@ -846,7 +846,7 @@ export default function DashboardLayout() {
         </div>
 
         {/* Topbar */}
-        <header className="relative h-18 border-b bg-white/80 backdrop-blur-md flex items-center justify-between px-5 md:px-8 sticky top-0 z-20 py-4">
+        <header className="relative h-18 border-b bg-white flex items-center justify-between px-5 md:px-8 sticky top-0 z-20 py-4">
           <div className="flex items-center gap-4">
             <button className="md:hidden p-2 rounded-xl hover:bg-slate-100 text-slate-600" onClick={() => setIsMobileOpen(true)}>
               <Menu className="h-5 w-5" />

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAuth } from "@clerk/clerk-react";
 import {
@@ -954,7 +954,7 @@ export default function Documental() {
 
     </div>
     {showBlockModal && typeof document !== "undefined" && createPortal(
-      <div className="fixed inset-0 z-[100] overflow-hidden bg-slate-950/35 backdrop-blur-sm">
+      <div className="fixed inset-0 z-[100] overflow-hidden bg-slate-950/35">
         <div className="fixed inset-0 grid place-items-center px-4 py-6">
           <div className="my-auto w-full max-w-4xl overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl max-h-[calc(100vh-3rem)]">
             <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">

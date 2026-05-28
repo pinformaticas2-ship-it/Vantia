@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { SignedIn, SignedOut, SignIn } from "@clerk/clerk-react";
 import { Link } from "react-router-dom";
 import VantiaBrand from "../components/VantiaBrand";
@@ -156,7 +156,7 @@ export default function PublicLanding() {
 
 function FeatureCard({ emoji, title, desc }: { emoji: string; title: string; desc: string }) {
   return (
-    <div className="flex items-start gap-4 rounded-2xl border border-white/12 bg-black/20 px-4 py-4 backdrop-blur-sm">
+    <div className="flex items-start gap-4 rounded-2xl border border-white/12 bg-black/20 px-4 py-4">
       <span className="text-xl mt-0.5 shrink-0">{emoji}</span>
       <div>
         <p className="text-sm font-bold text-white">{title}</p>
@@ -196,7 +196,7 @@ function QuoteRotator() {
           to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
-      <div className="flex h-[320px] flex-col justify-between rounded-[30px] border border-white/14 bg-black/20 p-8 backdrop-blur-sm">
+      <div className="flex h-[320px] flex-col justify-between rounded-[30px] border border-white/14 bg-black/20 p-8">
         <p
           key={index}
           className={`font-black leading-tight text-white ${quoteSizeClass}`}

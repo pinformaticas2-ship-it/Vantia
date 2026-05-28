@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from "react";
+﻿import React, { useState, useRef, useCallback, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useAuth } from "@clerk/clerk-react";
 import {
@@ -1080,7 +1080,7 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false, loc
 
       {/* Modal plantillas */}
       {showTemplates && createPortal(
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => {
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40" onClick={() => {
           if (tplPreviewBlobUrl.current) {
             URL.revokeObjectURL(tplPreviewBlobUrl.current);
             tplPreviewBlobUrl.current = null;
@@ -1317,7 +1317,7 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false, loc
       )}
 
       {openingMessage && (
-        <div className="fixed right-5 top-5 z-[10004] rounded-xl border border-slate-200 bg-white/95 px-4 py-3 text-sm font-medium text-slate-700 shadow-2xl backdrop-blur">
+        <div className="fixed right-5 top-5 z-[10004] rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-2xl">
           {openingMessage}
         </div>
       )}
@@ -1352,7 +1352,7 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false, loc
 
       {/* Modal vista previa de Word */}
       {wordPreview && createPortal(
-        <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setWordPreview(null)}>
+        <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/40" onClick={() => setWordPreview(null)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
               <div className="flex items-center gap-3">
@@ -1396,7 +1396,7 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false, loc
 
       {/* Modal editar metadatos del archivo */}
       {editingFile && createPortal(
-        <div className="fixed inset-0 z-[10002] flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setEditingFile(null)}>
+        <div className="fixed inset-0 z-[10002] flex items-center justify-center bg-black/40" onClick={() => setEditingFile(null)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
 
             {/* Header */}

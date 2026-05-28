@@ -1,4 +1,4 @@
-import React, {
+﻿import React, {
   useDeferredValue, useEffect, useState, useCallback, useMemo, useRef,
 } from "react";
 import { useAuth } from "@clerk/clerk-react";
@@ -321,10 +321,10 @@ function EventModal({
 
   return createPortal(
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
       <div className="relative w-full max-w-6xl overflow-hidden rounded-[30px] border border-slate-200 bg-[#fbfcfe] shadow-[0_40px_100px_rgba(15,23,42,0.22)] animate-in zoom-in-95 duration-200">
         {/* cabecera */}
-        <div className="border-b border-slate-200 bg-white/90 px-6 pb-5 pt-5 backdrop-blur">
+        <div className="border-b border-slate-200 bg-white px-6 pb-5 pt-5">
           <div className="flex items-start justify-between gap-4">
             <div className="flex min-w-0 flex-1 items-start gap-3">
               <BackButton onClick={onClose} />
@@ -692,7 +692,7 @@ function GoogleEventModal({
 
   return createPortal(
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
         <div className="px-5 py-4 flex items-center justify-between bg-blue-600 text-white">
           <div className="flex items-center gap-2.5">

@@ -1,4 +1,4 @@
-import React, {
+﻿import React, {
   useEffect, useState, useRef, useCallback, useMemo,
 } from "react";
 import { useAuth, useUser } from "@clerk/clerk-react";
@@ -457,7 +457,7 @@ function ImageLightbox({
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_transparent_0%,_rgba(15,23,42,0.2)_42%,_rgba(2,6,23,0.8)_100%)]" />
 
       <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between gap-3 px-4 py-4 sm:px-6">
-        <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-white/10 bg-black/20 px-3 py-2 backdrop-blur-md">
+        <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-white/10 bg-black/20 px-3 py-2">
           <Av url={authorAvatarUrl} name={authorName} size={10} />
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-white">{authorName}</p>
@@ -468,7 +468,7 @@ function ImageLightbox({
             {feedback && <p className="mt-0.5 text-[11px] text-slate-300">{feedback}</p>}
           </div>
         </div>
-        <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-2 py-2 shadow-lg shadow-black/10 backdrop-blur-xl">
+        <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-2 py-2 shadow-lg shadow-black/10">
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); void handleDownload(); }}
@@ -558,7 +558,7 @@ function ImageLightbox({
       </div>
 
       <div className="absolute inset-x-0 bottom-0 z-10 flex items-center justify-between px-4 py-4 sm:px-6">
-        <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/20 px-2 py-2 text-xs text-slate-300 backdrop-blur-md">
+        <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/20 px-2 py-2 text-xs text-slate-300">
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); zoomOut(); }}
@@ -594,10 +594,10 @@ function ImageLightbox({
             <RotateCcw size={15} />
           </button>
         </div>
-        <div className="rounded-full border border-white/10 bg-black/20 px-3 py-2 text-xs text-slate-300 backdrop-blur-md">
+        <div className="rounded-full border border-white/10 bg-black/20 px-3 py-2 text-xs text-slate-300">
           Usa `+`, `-`, rueda o `0` para el zoom
         </div>
-        <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/20 px-2 py-2 backdrop-blur-md">
+        <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/20 px-2 py-2">
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); void handleDownload(); }}
@@ -2040,7 +2040,7 @@ function ModalCrearCanal({ sysUsers, getToken, onClose, onCreate }: {
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[480px] border border-slate-200 overflow-hidden">
 
         {/* ── PASO 1: Nombre ── */}
@@ -3035,14 +3035,14 @@ function MessageInput({ canalId, canalNombre, replyTo, editingMsg, miembros, cur
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className={`relative bg-white/95 backdrop-blur rounded-[1.35rem] border focus-within:border-red-300 focus-within:shadow-[0_12px_40px_-18px_rgba(220,38,38,0.45)] transition-all overflow-hidden shadow-lg shadow-slate-200/60 ${
+        className={`relative bg-white rounded-[1.35rem] border focus-within:border-red-300 focus-within:shadow-[0_12px_40px_-18px_rgba(220,38,38,0.45)] transition-all overflow-hidden shadow-lg shadow-slate-200/60 ${
           isDraggingImage
             ? "border-red-300 bg-red-50/80 shadow-[0_18px_50px_-22px_rgba(220,38,38,0.45)]"
             : "border-slate-200"
         }`}
       >
         {isDraggingImage && (
-          <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-red-50/75 backdrop-blur-[1px]">
+          <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-red-50/75">
             <div className="rounded-3xl border border-red-200 bg-white/95 px-5 py-4 text-center shadow-xl">
               <div className="mx-auto mb-2 flex h-11 w-11 items-center justify-center rounded-2xl bg-red-100 text-red-500">
                 <ImageIcon size={20} />
@@ -4249,7 +4249,7 @@ export default function Chat() {
       <aside className="w-64 shrink-0 flex flex-col bg-[radial-gradient(circle_at_top,_rgba(239,68,68,0.2),_transparent_28%),linear-gradient(180deg,_#0f172a_0%,_#111827_46%,_#020617_100%)] rounded-l-[1.6rem] overflow-hidden border-r border-white/10">
 
         {/* Workspace header — estilo Slack */}
-        <div className="flex items-center justify-between px-3 py-3 border-b border-white/10 shrink-0 backdrop-blur-sm">
+        <div className="flex items-center justify-between px-3 py-3 border-b border-white/10 shrink-0">
           <button className="flex items-center gap-2 min-w-0 flex-1 hover:bg-white/5 rounded-xl px-2.5 py-2 transition-all duration-200 group">
             <div className="w-9 h-9 rounded-2xl bg-[#ab0433] flex items-center justify-center shrink-0 shadow-lg shadow-red-950/30 text-white font-black text-sm">
               V
@@ -4270,7 +4270,7 @@ export default function Chat() {
           </button>
         </div>
         {/* Buscador de canales + crear */}
-        <div className="px-3 py-3 border-b border-white/10 shrink-0 backdrop-blur-sm">
+        <div className="px-3 py-3 border-b border-white/10 shrink-0">
           <div className="flex gap-1.5">
             <div className="flex-1 relative">
               {canalSearching
@@ -4480,7 +4480,7 @@ export default function Chat() {
       </aside>
 
       {/* ══ MAIN AREA ════════════════════════════════════════════════════════ */}
-      <div className="flex flex-1 flex-col min-w-0 overflow-hidden bg-[linear-gradient(180deg,_rgba(255,255,255,0.92)_0%,_rgba(248,250,252,0.96)_100%)] backdrop-blur-sm">
+      <div className="flex flex-1 flex-col min-w-0 overflow-hidden bg-[linear-gradient(180deg,_rgba(255,255,255,0.92)_0%,_rgba(248,250,252,0.96)_100%)]">
         {!canalActivo?(
           <div className="flex flex-col items-center justify-center flex-1 gap-5 bg-[radial-gradient(circle_at_top,_rgba(248,113,113,0.15),_transparent_30%),linear-gradient(180deg,_rgba(248,250,252,0.95),_rgba(241,245,249,0.9))]">
             <div className="w-20 h-20 rounded-[1.7rem] bg-white shadow-lg border border-slate-200 flex items-center justify-center">
@@ -4498,7 +4498,7 @@ export default function Chat() {
         ):(
           <>
             {/* Canal header */}
-            <div className={`flex items-center gap-3 px-5 py-3.5 border-b border-slate-200/80 shrink-0 bg-white/75 backdrop-blur transition-all duration-200 ${isSwitchingChat ? "translate-y-1 opacity-70" : "translate-y-0 opacity-100"}`}>
+            <div className={`flex items-center gap-3 px-5 py-3.5 border-b border-slate-200/80 shrink-0 bg-white transition-all duration-200 ${isSwitchingChat ? "translate-y-1 opacity-70" : "translate-y-0 opacity-100"}`}>
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 {canalActivo.tipo==="privado"
                   ?<Lock size={16} className="text-slate-400 shrink-0"/>
@@ -4590,7 +4590,7 @@ export default function Chat() {
                       return (
                         <React.Fragment key={m.id}>
                           {firstUnreadMessageId === m.id && (
-                            <div className="sticky top-0 z-10 px-4 py-2 bg-gradient-to-b from-white/95 via-white/90 to-transparent backdrop-blur-sm">
+                            <div className="sticky top-0 z-10 px-4 py-2 bg-gradient-to-b from-white/95 via-white/90 to-transparent">
                               <div className="flex items-center gap-3">
                                 <div className="h-px flex-1 bg-red-200" />
                                 <span className="shrink-0 rounded-full bg-[#ab0433]/10 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-[#ab0433] border border-[#ab0433]/20">

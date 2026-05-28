@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from "react";
+﻿import React, { useEffect, useState, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
@@ -813,7 +813,7 @@ function TabNotas({ clientId }: { clientId: string }) {
       {/* ── Modal confirmación borrar nota ── */}
       {confirmDeleteId && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
           onClick={() => setConfirmDeleteId(null)}
         >
           <div
@@ -1496,7 +1496,7 @@ function TabTareas({ clientId, autoOpen = false, initialTaskType = "" }: { clien
 
       {/* ── Modal confirmación borrar tarea ── */}
       {confirmDeleteTareaId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
           onClick={() => setConfirmDeleteTareaId(null)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden"
             onClick={e => e.stopPropagation()}>
@@ -2863,7 +2863,7 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
 
       {/* Modal plantillas */}
       {showTemplates && createPortal(
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => {
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40" onClick={() => {
           if (tplPreviewBlobUrl.current) {
             URL.revokeObjectURL(tplPreviewBlobUrl.current);
             tplPreviewBlobUrl.current = null;
@@ -3100,7 +3100,7 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
       )}
 
       {openingMessage && (
-        <div className="fixed right-5 top-5 z-[10004] rounded-xl border border-slate-200 bg-white/95 px-4 py-3 text-sm font-medium text-slate-700 shadow-2xl backdrop-blur">
+        <div className="fixed right-5 top-5 z-[10004] rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-2xl">
           {openingMessage}
         </div>
       )}
@@ -3135,7 +3135,7 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
 
       {/* Modal vista previa de Word */}
       {wordPreview && createPortal(
-        <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setWordPreview(null)}>
+        <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/40" onClick={() => setWordPreview(null)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
               <div className="flex items-center gap-3">
@@ -3179,7 +3179,7 @@ function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
 
       {/* Modal editar metadatos del archivo */}
       {editingFile && createPortal(
-        <div className="fixed inset-0 z-[10002] flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setEditingFile(null)}>
+        <div className="fixed inset-0 z-[10002] flex items-center justify-center bg-black/40" onClick={() => setEditingFile(null)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
 
             {/* Header */}
@@ -3871,7 +3871,7 @@ export default function ClientDetail() {
             {/* Lightbox foto */}
             {photoZoom && client.photo_url && (
               <div
-                className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
                 onClick={() => setPhotoZoom(false)}
               >
                 <div className="relative max-w-2xl w-full mx-4" onClick={e => e.stopPropagation()}>

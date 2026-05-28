@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Módulo de Correo — Gmail-style (3 paneles)
  * OAuth Google para Gmail · IMAP para otras cuentas
  * El usuario autenticado (Clerk) se usa como identidad principal
@@ -959,7 +959,7 @@ function ConnectAccountModal({
     </svg>
   );
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
           <h2 className="text-base font-bold text-gray-900">Conectar cuenta de correo</h2>
@@ -1561,7 +1561,7 @@ function EmailReader({
 
   return (
     <div className="flex flex-col h-full min-h-0 bg-[#f6f8fb]">
-      <div className="flex items-center gap-1 px-4 py-3 border-b border-slate-200 bg-white/95 backdrop-blur flex-shrink-0">
+      <div className="flex items-center gap-1 px-4 py-3 border-b border-slate-200 bg-white flex-shrink-0">
         <button
           onClick={onBack}
           className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors">
@@ -1938,7 +1938,7 @@ function ImapForm({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div>
@@ -3431,7 +3431,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
       )}
 
       {labelModalOpen && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/35 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/35 p-4">
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -3509,7 +3509,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
       )}
 
       {pendingDeleteLabel && (
-        <div className="fixed inset-0 z-[71] flex items-center justify-center bg-slate-950/35 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-[71] flex items-center justify-center bg-slate-950/35 p-4">
           <div className="w-full max-w-md rounded-[28px] border border-slate-200 bg-white shadow-[0_40px_80px_rgba(15,23,42,0.22)] overflow-hidden">
             <div className="px-6 pt-6 pb-4 bg-gradient-to-br from-white via-white to-red-50/40 border-b border-slate-100">
               <div className="flex items-center gap-3">
@@ -3552,7 +3552,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
       )}
 
       {pendingDeleteAccount && (
-        <div className="fixed inset-0 z-[71] flex items-center justify-center bg-slate-950/35 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-[71] flex items-center justify-center bg-slate-950/35 p-4">
           <div className="w-full max-w-md rounded-[28px] border border-slate-200 bg-white shadow-[0_40px_80px_rgba(15,23,42,0.22)] overflow-hidden">
             <div className="px-6 pt-6 pb-4 bg-gradient-to-br from-white via-white to-red-50/40 border-b border-slate-100">
               <div className="flex items-center gap-3">

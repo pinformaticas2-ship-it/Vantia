@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from "react";
+﻿import React, { useState, useRef, useCallback, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useAuth } from "@clerk/clerk-react";
 import {
@@ -1290,7 +1290,7 @@ export default function AdjuntosModal({
 
       {/* ── Templates modal ── */}
       {showTemplates && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowTemplates(false)}>
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40" onClick={() => setShowTemplates(false)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl mx-4 overflow-hidden flex flex-col" style={{ height: "88vh" }} onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-3 border-b border-slate-100 shrink-0 bg-slate-50">
               <div className="flex items-center gap-3">
@@ -1436,7 +1436,7 @@ export default function AdjuntosModal({
 
       {/* ── Metadata / upload modal ── */}
       {editingFile && (
-        <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setEditingFile(null)}>
+        <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/40" onClick={() => setEditingFile(null)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <div>
@@ -1540,7 +1540,7 @@ export default function AdjuntosModal({
   const overlays = (
     <>
       {confirmDeleteFileId && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/30 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/30">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm mx-4 p-6">
             <div className="flex items-start gap-3 mb-4">
               <div className="p-2 bg-red-100 rounded-xl shrink-0">
@@ -1572,7 +1572,7 @@ export default function AdjuntosModal({
   if (inline) return <>{innerContent}{overlays}</>;
   return createPortal(
     <>
-      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
         {innerContent}
       </div>
       {overlays}
