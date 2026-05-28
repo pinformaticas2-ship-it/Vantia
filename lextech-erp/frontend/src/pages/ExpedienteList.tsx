@@ -4984,14 +4984,7 @@ export default function ExpedienteList() {
                   <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
                   <input
                     value={relacionarQuery}
-                    onChange={(e) => {
-                      const nextValue = e.target.value;
-                      setRelacionarQuery(nextValue);
-                      if (!nextValue.trim()) {
-                        setRelacionarHasSearched(false);
-                        setRelacionarResults([]);
-                      }
-                    }}
+                    onChange={(e) => setRelacionarQuery(e.target.value)}
                     placeholder="Buscar por referencia, descripción, NIG, juzgado..."
                     autoFocus
                     spellCheck={false}

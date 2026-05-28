@@ -3154,8 +3154,8 @@ function TabExpedientesRelacionados({
         searchExpedientes(term);
       }, 380);
     } else if (!term) {
-      setHasSearched(false);
-      setSearchResults([]);
+      setHasSearched(true);
+      searchExpedientes("");
     }
     return () => { if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current); };
   }, [query, showModal, searchExpedientes]);
@@ -3215,10 +3215,11 @@ function TabExpedientesRelacionados({
               onClick={() => {
                 setShowModal(true);
                 setQuery("");
-                setHasSearched(false);
                 setSearchError("");
                 setAssociateError("");
                 setSearchResults([]);
+                setHasSearched(true);
+                searchExpedientes("");
               }}
               className="inline-flex items-center gap-2 px-3 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-sm active:scale-95 transition-all"
             >
@@ -3316,14 +3317,7 @@ function TabExpedientesRelacionados({
                   <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
                   <input
                     value={query}
-                    onChange={(e) => {
-                      const nextValue = e.target.value;
-                      setQuery(nextValue);
-                      if (!nextValue.trim()) {
-                        setHasSearched(false);
-                        setSearchResults([]);
-                      }
-                    }}
+                    onChange={(e) => setQuery(e.target.value)}
                     placeholder="Buscar por referencia, descripción, NIG, juzgado..."
                     autoFocus
                     spellCheck={false}
