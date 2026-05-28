@@ -2168,6 +2168,7 @@ function ActuacionAdjuntosPanel({ taskId, locked = false }: { taskId: string; lo
                             className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
                             <Download size={13} />
                           </button>
+                          {!locked && (<>
                           <button type="button"
                             onClick={() => { setEditDocName(file.document_name || file.original_name); setEditAttachmentType(file.attachment_type || "Sin clasificar"); setEditingFile(file); }}
                             title="Editar"
@@ -2178,6 +2179,7 @@ function ActuacionAdjuntosPanel({ taskId, locked = false }: { taskId: string; lo
                             className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
                             <Trash2 size={13} />
                           </button>
+                          </>)}
                         </div>
                       </td>
                     </tr>
@@ -2234,6 +2236,7 @@ function ActuacionAdjuntosPanel({ taskId, locked = false }: { taskId: string; lo
         )}
       </div>
 
+      {!locked && (
       <div
         className={`rounded-2xl border-2 border-dashed px-6 py-10 text-center transition-colors ${isDragOver ? "border-red-300 bg-red-50" : "border-slate-200 bg-slate-50/60"}`}
         onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
@@ -2244,6 +2247,7 @@ function ActuacionAdjuntosPanel({ taskId, locked = false }: { taskId: string; lo
         <p className="text-sm font-semibold text-slate-700">Arrastra archivos o carpetas aquí</p>
         <p className="mt-1 text-xs text-slate-400">PDF, Word, Excel, imágenes. Máx. 50 MB por archivo.</p>
       </div>
+      )}
 
       <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
         {loading ? (
