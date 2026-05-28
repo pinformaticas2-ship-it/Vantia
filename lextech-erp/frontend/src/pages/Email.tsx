@@ -1321,7 +1321,7 @@ function Sidebar({
                     </div>
                     {isActive && <div className="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" />}
                     {needsReauth && (
-                      <AlertCircle size={12} className="text-orange-400 flex-shrink-0" title="Sesión expirada" />
+                      <span title="Sesión expirada"><AlertCircle size={12} className="text-orange-400 flex-shrink-0" /></span>
                     )}
                   </button>
                   {isActive && (
@@ -2394,11 +2394,11 @@ export default function Email() {
       }
     } catch { /* noop */ }
 
-    // Token expirado → mostrar pantalla de reconexión, no lanzar OAuth todavía
+    // Token expirado → limpiar emails y lanzar OAuth directamente
     setEmails([]);
     setGmailProfile(null);
-    setGmailExpired(true);
-  }, [gmailToken, gmailProfile]);
+    connectGoogle(profile.email);
+  }, [connectGoogle, gmailToken, gmailProfile]);
 
   // ── Desconectar Gmail ─────────────────────────────────────────────────────
   const disconnectGmail = useCallback(() => {
@@ -2426,7 +2426,8 @@ export default function Email() {
     if (code === 401 || code === 403) {
       setGmailToken('');
       localStorage.removeItem(GMAIL_TOKEN_KEY);
-      setError('Tu sesión de Gmail expiró. Vuelve a conectar.');
+      setEmails([]);
+      setGmailExpired(true);
     }
   }, []);
 
@@ -3342,7 +3343,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
                 <p className="text-sm text-red-500 mb-4">{error}</p>
                 {!gmail && (
                   <button
-                    onClick={connectGoogle}
+                    onClick={() => connectGoogle()}
                     className="flex items-center gap-2 text-sm text-[#ab0433] hover:text-[#8f022a] font-medium bg-red-50 px-4 py-2 rounded-full">
                     <LogIn size={15} /> Reconectar Gmail
                   </button>
