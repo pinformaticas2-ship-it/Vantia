@@ -14,6 +14,7 @@ import {
   Bug, History, TrendingUp, UserMinus, Pencil, PenLine, Bookmark, BarChart2,
   AlignJustify, LayoutList, ListChecks, Upload, Eye, Settings2, SlidersHorizontal, Check, Search, CheckCircle2,
   Download, FileCode2, FileText, ArrowRight, ArrowLeft, ChevronsRight, ChevronsLeft,
+  Scale, Link2,
 } from "lucide-react";
 import { AtajosButton } from "../components/AtajosSystem";
 import AdjuntosModal from "../components/AdjuntosModal";
@@ -3798,6 +3799,7 @@ export default function ExpedienteList() {
   const [relacionarSavingId, setRelacionarSavingId] = useState<string | null>(null);
   const [relacionarSearchError, setRelacionarSearchError] = useState("");
   const [relacionarAssociateError, setRelacionarAssociateError] = useState("");
+  const relacionarDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showExportModal, setShowExportModal] = useState(false);
   const [showExportTemplateEditor, setShowExportTemplateEditor] = useState(false);
   const [exportEditorMode, setExportEditorMode] = useState<"create" | "edit">("create");
@@ -4571,6 +4573,22 @@ export default function ExpedienteList() {
     };
   }, [showRelacionarModal]);
 
+  useEffect(() => {
+    if (!showRelacionarModal) return;
+    if (relacionarDebounceRef.current) clearTimeout(relacionarDebounceRef.current);
+    const term = relacionarQuery.trim();
+    if (term.length >= 2) {
+      relacionarDebounceRef.current = setTimeout(() => {
+        setRelacionarHasSearched(true);
+        searchRelacionarExpedientes(term);
+      }, 380);
+    } else if (!term) {
+      setRelacionarHasSearched(true);
+      searchRelacionarExpedientes("");
+    }
+    return () => { if (relacionarDebounceRef.current) clearTimeout(relacionarDebounceRef.current); };
+  }, [relacionarQuery, showRelacionarModal, searchRelacionarExpedientes]);
+
   const handleRefresh = async () => {
     setRefreshSpin(true);
     await fetchExpedientes(false);
@@ -5003,48 +5021,83 @@ export default function ExpedienteList() {
                 </div>
               )}
 
-              <div className="max-h-[420px] overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50/70">
+              <div className="rounded-2xl border border-slate-200 overflow-hidden">
                 {!relacionarHasSearched ? (
-                  <div className="px-5 py-10 text-center">
-                    <p className="text-sm font-medium text-slate-600">Empieza escribiendo para buscar expedientes</p>
-                    <p className="mt-1 text-xs text-slate-400">Busca por referencia, descripción, NIG o juzgado.</p>
+                  <div className="flex flex-col items-center justify-center px-6 py-12 bg-slate-50/60 text-center gap-3">
+                    <div className="h-12 w-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-slate-300">
+                      <Search size={20} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-600">Busca un expediente</p>
+                      <p className="mt-0.5 text-xs text-slate-400">Escribe la referencia, descripción, NIG o juzgado</p>
+                    </div>
                   </div>
                 ) : relacionarSearching || loadingRelatedExpedientes ? (
-                  <div className="flex items-center gap-2 px-5 py-8 text-sm text-slate-400">
-                    <Loader2 size={15} className="animate-spin" />
+                  <div className="flex items-center justify-center gap-2.5 px-5 py-12 bg-slate-50/60 text-sm text-slate-400">
+                    <Loader2 size={16} className="animate-spin" />
                     Buscando expedientes...
                   </div>
                 ) : relacionarResults.length === 0 ? (
-                  <div className="px-5 py-10 text-center">
-                    <p className="text-sm font-medium text-slate-600">No hay expedientes disponibles para asociar</p>
-                    <p className="mt-1 text-xs text-slate-400">Prueba con otra búsqueda o revisa si ya están relacionados.</p>
+                  <div className="flex flex-col items-center justify-center px-6 py-12 bg-slate-50/60 text-center gap-3">
+                    <div className="h-12 w-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-slate-300">
+                      <AlertCircle size={20} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-600">Sin resultados</p>
+                      <p className="mt-0.5 text-xs text-slate-400">Prueba con otra búsqueda o revisa si ya están relacionados.</p>
+                    </div>
                   </div>
                 ) : (
-                  <div className="divide-y divide-slate-200">
-                    {relacionarResults.map((item) => (
-                      <div key={item.id} className="flex items-center justify-between gap-4 px-5 py-4">
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-slate-800 break-words">
-                            {item.descripcion || `Expediente ${item.ref_expediente || `${item.anio}/${item.num_exp}`}`}
-                          </p>
-                          <p className="mt-1 text-xs text-slate-500 break-words">
-                            {item.ref_expediente || `${item.anio}/${item.num_exp}`}
-                            {item.nig ? ` · NIG ${item.nig}` : ""}
-                            {item.juzgado ? ` · ${item.juzgado}` : ""}
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => associateExpedienteFromList(item.id)}
-                          disabled={relacionarSavingId === item.id}
-                          className="shrink-0 inline-flex items-center gap-2 px-3 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-                        >
-                          {relacionarSavingId === item.id ? <Loader2 size={12} className="animate-spin" /> : <span className="text-[12px] leading-none">🤝</span>}
-                          Asociar
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+                  <>
+                    <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border-b border-slate-200">
+                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">
+                        {relacionarResults.length} {relacionarResults.length === 1 ? "expediente encontrado" : "expedientes encontrados"}
+                      </span>
+                    </div>
+                    <div className="max-h-[360px] overflow-y-auto divide-y divide-slate-100">
+                      {relacionarResults.map((item) => {
+                        const ref = item.ref_expediente || `${item.anio}/${item.num_exp}`;
+                        const tipoConf = TIPOS[item.tipo] || TIPOS.otro;
+                        const estadoConf = ESTADOS[item.estado] || ESTADOS.abierto;
+                        const meta = [item.cliente_nombre, item.juzgado, item.tipo_proc].filter(Boolean).join(" · ");
+                        return (
+                          <div key={item.id} className="group flex items-center gap-4 px-4 py-3.5 hover:bg-blue-50/40 transition-colors bg-white">
+                            <div className="shrink-0 h-9 w-9 rounded-xl bg-slate-100 group-hover:bg-white group-hover:border group-hover:border-slate-200 flex items-center justify-center text-slate-400 transition-all">
+                              <Scale size={15} />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-mono text-[11px] font-bold bg-slate-100 text-slate-600 rounded px-1.5 py-0.5">
+                                  {ref}
+                                </span>
+                                <span className={`text-[10px] font-bold rounded-full px-2 py-0.5 uppercase ${tipoConf.color}`}>
+                                  {tipoConf.short}
+                                </span>
+                                <span className={`text-[10px] font-bold rounded-full px-2 py-0.5 uppercase ${estadoConf.color}`}>
+                                  {estadoConf.label}
+                                </span>
+                              </div>
+                              {item.descripcion && (
+                                <p className="mt-1 text-sm font-semibold text-slate-800 truncate">{item.descripcion}</p>
+                              )}
+                              {meta && (
+                                <p className="mt-0.5 text-[11px] text-slate-400 truncate">{meta}</p>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => associateExpedienteFromList(item.id)}
+                              disabled={relacionarSavingId === item.id}
+                              className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl disabled:opacity-60 disabled:cursor-not-allowed transition-all active:scale-95 shadow-sm"
+                            >
+                              {relacionarSavingId === item.id ? <Loader2 size={11} className="animate-spin" /> : <Link2 size={11} />}
+                              Asociar
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
                 )}
               </div>
             </div>
