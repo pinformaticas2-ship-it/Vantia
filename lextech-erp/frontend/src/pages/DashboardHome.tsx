@@ -638,19 +638,20 @@ export default function DashboardHome() {
               <Plus size={15} /> Nuevo Expediente <ChevronDown size={13} className={`transition-transform ${showAltaMenu?"rotate-180":""}`} />
             </button>
             {showAltaMenu && (
-              <div className="absolute right-0 top-full z-50 mt-2 w-[300px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
-                <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
-                  <p className="text-sm font-semibold text-slate-600">Elige cómo quieres agregar expedientes</p>
+              <div className="absolute right-0 top-full z-50 mt-2 w-[300px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-300/40">
+                <div className="border-b border-slate-100 px-5 py-4">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-400">Alta de expedientes</p>
+                  <h3 className="mt-1 text-[15px] font-bold text-slate-900">Elige cómo quieres agregar expedientes</h3>
                 </div>
-                <div className="p-2">
+                <div className="px-3 py-3">
                   {[
-                    { label:"Crear manualmente", desc:"Crea un expediente desde cero introduciendo los datos", icon:<Plus size={15}/>, cls:"bg-green-100 text-green-600", to:"/dashboard/expedientes?nuevo=1" },
-                    { label:"Importar desde CSV", desc:"Sube un archivo CSV con múltiples expedientes", icon:<FileSpreadsheet size={15}/>, cls:"bg-blue-100 text-blue-600", to:"/dashboard/expedientes?mode=csv" },
-                    { label:"Desde documentos", desc:"Procesa documentos para crear expedientes", icon:<ClipboardList size={15}/>, cls:"bg-amber-100 text-amber-700", to:"/dashboard/expedientes?mode=docs" },
+                    { label:"Crear manualmente", desc:"Crea un expediente desde cero introduciendo los datos manualmente.", icon:<Plus size={17}/>, cls:"bg-emerald-100 text-emerald-600", to:"/dashboard/expedientes?nuevo=1" },
+                    { label:"Importar desde CSV", desc:"Sube un archivo CSV con múltiples expedientes a la vez.", icon:<FileSpreadsheet size={17}/>, cls:"bg-blue-100 text-blue-600", to:"/dashboard/expedientes?mode=csv" },
+                    { label:"Desde documentos", desc:"Procesa documentos para crear expedientes automáticamente.", icon:<ClipboardList size={17}/>, cls:"bg-amber-100 text-amber-700", to:"/dashboard/expedientes?mode=docs" },
                   ].map(item => (
-                    <button key={item.label} onClick={() => { setShowAltaMenu(false); navigate(item.to); }} className="flex w-full items-start gap-3 rounded-xl px-3 py-3 text-left hover:bg-slate-50 transition-colors">
-                      <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${item.cls}`}>{item.icon}</div>
-                      <div><p className="text-[15px] font-semibold text-slate-800">{item.label}</p><p className="mt-0.5 text-sm leading-6 text-slate-500">{item.desc}</p></div>
+                    <button key={item.label} onClick={() => { setShowAltaMenu(false); navigate(item.to); }} className="flex w-full items-start gap-3 rounded-2xl px-3 py-3 text-left hover:bg-slate-50 transition-colors">
+                      <div className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${item.cls}`}>{item.icon}</div>
+                      <div><p className="text-base font-bold text-slate-800">{item.label}</p><p className="mt-1 text-sm leading-6 text-slate-500">{item.desc}</p></div>
                     </button>
                   ))}
                 </div>
