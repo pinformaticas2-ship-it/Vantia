@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Bookmark, Plus, X, Search, ChevronDown, Check,
   Pencil, Trash2, Settings, AlertTriangle, ChevronUp,
@@ -102,73 +102,93 @@ export function NuevoAtajoModal({
     }));
   };
 
-  const lbl = "block text-xs font-semibold text-slate-500 mb-1";
-  const inp = "w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100 bg-white";
+  const lbl = "block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5";
+  const inp = "w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 outline-none focus:border-slate-300 focus:bg-white transition-colors";
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-sm"
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/40 backdrop-blur-sm px-4"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden"
+        className="w-full max-w-lg rounded-3xl bg-white border border-slate-200 shadow-2xl overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center gap-2.5 px-5 py-3.5 bg-amber-50 border-b border-amber-100">
-          <div className="p-1.5 bg-amber-100 rounded-lg">
-            <Bookmark size={14} className="text-amber-600" />
+        <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+              <Bookmark size={15} className="text-amber-600" />
+            </div>
+            <div>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+                {initial ? "Modificar atajo" : "Nuevo atajo"} · {modulo}
+              </p>
+              <h3 className="text-base font-bold text-slate-900">
+                {initial ? (initial.nombre || "Editar atajo") : "Crear nuevo atajo"}
+              </h3>
+            </div>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-bold text-amber-800">
-              {initial ? "Modificar Atajo" : "Nuevo Atajo"} — {modulo} — [Usu]
-            </p>
-            <p className="text-[10px] text-amber-600">
-              Los atajos ofrecen una forma rápida de realizar una o varias acciones con un sólo clic
-            </p>
-          </div>
-          <button onClick={onClose} className="p-1 text-amber-400 hover:text-amber-700 rounded-lg">
+          <button
+            onClick={onClose}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-400 hover:text-slate-700 hover:border-slate-300 transition-colors"
+          >
             <X size={15} />
           </button>
         </div>
 
-        <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+        {/* Body */}
+        <div className="p-5 space-y-4 max-h-[65vh] overflow-y-auto">
+
+          {/* Nombre */}
+          <div>
+            <label className={lbl}>Nombre del atajo</label>
+            <input
+              value={form.nombre}
+              onChange={e => set("nombre", e.target.value)}
+              placeholder="Ej: Enviar Correo de Bienvenida"
+              autoFocus
+              className={inp}
+            />
+          </div>
+
+          <div className="h-px bg-slate-100" />
 
           {/* Acción */}
           <div>
-            <label className={lbl}>¿Qué acción quieres realizar?</label>
+            <label className={lbl}>Acción</label>
             <select value={form.accion} onChange={e => set("accion", e.target.value)} className={inp}>
               {ACCIONES.map(a => <option key={a} value={a === ACCIONES[0] ? "" : a}>{a}</option>)}
             </select>
           </div>
 
-          {/* Documento */}
-          <div>
-            <label className={lbl}>¿Qué documento quieres enviar?</label>
-            <select value={form.documento} onChange={e => set("documento", e.target.value)} className={inp}>
-              <option value=""></option>
-              <option value="Carátula Expediente">Carátula Expediente</option>
-              <option value="Informe Detallado">Informe Detallado</option>
-              <option value="Informe Resumido">Informe Resumido</option>
-              <option value="Valoración">Valoración</option>
-              <option value="Solicitud Documentación">Solicitud Documentación</option>
-              <option value="Provisión de Fondos">Provisión de Fondos</option>
-              <option value="Firma de Documento">Firma de Documento</option>
-              <option value="Comunicación Novedades">Comunicación Novedades</option>
-            </select>
-          </div>
-
-          {/* Forma de envío */}
-          <div>
-            <label className={lbl}>¿Cómo lo quieres enviar?</label>
-            <select value={form.formaEnvio} onChange={e => set("formaEnvio", e.target.value)} className={inp}>
-              {FORMAS_ENVIO.map(f => <option key={f} value={f}>{f || "— Seleccionar —"}</option>)}
-            </select>
+          {/* Documento + Forma de envío */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={lbl}>Documento</label>
+              <select value={form.documento} onChange={e => set("documento", e.target.value)} className={inp}>
+                <option value="">— Ninguno —</option>
+                <option value="Carátula Expediente">Carátula Expediente</option>
+                <option value="Informe Detallado">Informe Detallado</option>
+                <option value="Informe Resumido">Informe Resumido</option>
+                <option value="Valoración">Valoración</option>
+                <option value="Solicitud Documentación">Solicitud Documentación</option>
+                <option value="Provisión de Fondos">Provisión de Fondos</option>
+                <option value="Firma de Documento">Firma de Documento</option>
+                <option value="Comunicación Novedades">Comunicación Novedades</option>
+              </select>
+            </div>
+            <div>
+              <label className={lbl}>Forma de envío</label>
+              <select value={form.formaEnvio} onChange={e => set("formaEnvio", e.target.value)} className={inp}>
+                {FORMAS_ENVIO.map(f => <option key={f} value={f}>{f || "— Seleccionar —"}</option>)}
+              </select>
+            </div>
           </div>
 
           {/* Plantilla de correo */}
           <div>
-            <label className={lbl}>¿Qué plantilla de Correo quieres utilizar para el contenido del mensaje?</label>
+            <label className={lbl}>Plantilla de correo</label>
             <div className="relative">
               <input
                 value={form.plantillaCorreo}
@@ -176,80 +196,59 @@ export function NuevoAtajoModal({
                 placeholder="Buscar plantilla..."
                 className={`${inp} pr-9`}
               />
-              <Search size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300" />
+              <Search size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" />
             </div>
           </div>
 
-          {/* Módulos */}
-          <div>
-            <label className={lbl}>¿Desde qué módulos quieres usar este atajo?</label>
-            <div className="flex gap-2">
-              {MODULOS_DISPONIBLES.map(m => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => toggleModulo(m)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${
-                    form.modulos.includes(m)
-                      ? "border-red-300 bg-red-50 text-red-700"
-                      : "border-slate-200 text-slate-500 hover:border-slate-300"
-                  }`}
-                >
-                  {form.modulos.includes(m) && <Check size={11} />}
-                  {m}
-                </button>
-              ))}
-            </div>
-          </div>
+          <div className="h-px bg-slate-100" />
 
-          {/* Nombre */}
-          <div>
-            <label className={lbl}>¿Con qué nombre quieres identificar este atajo?</label>
-            <input
-              value={form.nombre}
-              onChange={e => set("nombre", e.target.value)}
-              placeholder="Ej: Enviar Correo de Bienvenida"
-              className={inp}
-            />
-          </div>
-
-          {/* Consejo */}
-          <div className="flex items-start gap-3 p-3 bg-amber-50 rounded-xl border border-amber-100">
-            <div className="p-1.5 bg-amber-100 rounded-lg shrink-0 mt-0.5">
-              <Bookmark size={12} className="text-amber-500" />
+          {/* Módulos + Carpeta */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={lbl}>Módulos</label>
+              <div className="flex gap-1.5 flex-wrap">
+                {MODULOS_DISPONIBLES.map(m => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => toggleModulo(m)}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
+                      form.modulos.includes(m)
+                        ? "border-red-300 bg-red-50 text-red-700"
+                        : "border-slate-200 bg-white text-slate-500 hover:border-slate-300"
+                    }`}
+                  >
+                    {form.modulos.includes(m) && <Check size={10} />}
+                    {m}
+                  </button>
+                ))}
+              </div>
             </div>
             <div>
-              <p className="text-[11px] text-amber-700 font-medium">
-                Consejo de MN: Organiza tus Atajos en carpetas para localizarlos más fácilmente dentro del botón Atajos de los módulos de MN
-              </p>
+              <label className={lbl}>Carpeta</label>
+              <select value={form.carpeta} onChange={e => set("carpeta", e.target.value)} className={inp}>
+                {CARPETAS_DEFAULT.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
             </div>
-          </div>
-
-          {/* Carpeta */}
-          <div>
-            <label className={lbl}>Carpeta en la que se mostrará el atajo</label>
-            <select value={form.carpeta} onChange={e => set("carpeta", e.target.value)} className={inp}>
-              {CARPETAS_DEFAULT.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
           </div>
 
           {/* Opciones */}
-          <div className="flex gap-4">
-            <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+          <div className="flex items-center gap-5 rounded-xl bg-slate-50 border border-slate-100 px-4 py-3">
+            <label className="flex items-center gap-2 text-xs font-medium text-slate-600 cursor-pointer select-none">
               <input
                 type="checkbox"
                 checked={form.habilitado}
                 onChange={e => set("habilitado", e.target.checked)}
-                className="rounded border-slate-300 text-red-600 focus:ring-red-400"
+                className="rounded border-slate-300 accent-red-600"
               />
               Habilitado
             </label>
-            <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+            <label className="flex items-center gap-2 text-xs font-medium text-slate-600 cursor-pointer select-none">
               <input
                 type="checkbox"
                 checked={form.enBarra}
                 onChange={e => set("enBarra", e.target.checked)}
-                className="rounded border-slate-300 text-red-600 focus:ring-red-400"
+                className="rounded border-slate-300 accent-red-600"
               />
               Mostrar en barra de atajos
             </label>
@@ -257,17 +256,14 @@ export function NuevoAtajoModal({
         </div>
 
         {/* Footer */}
-        <div className="flex gap-2 px-5 py-3.5 border-t border-slate-100 bg-slate-50">
+        <div className="flex items-center gap-2 px-5 py-3.5 border-t border-slate-100 bg-slate-50">
           <button
             onClick={() => {
               if (!form.nombre.trim()) return;
-              onSave({
-                id: initial?.id || newId(),
-                ...form,
-              });
+              onSave({ id: initial?.id || newId(), ...form });
             }}
             disabled={!form.nombre.trim()}
-            className="px-5 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-40 rounded-xl active:scale-95 transition-all"
+            className="px-5 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl active:scale-95 transition-all"
           >
             Guardar
           </button>
@@ -351,30 +347,34 @@ export function ListadoAtajosModal({
 
   const th = "px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-left whitespace-nowrap";
   const td = "px-3 py-2.5 text-xs text-slate-700";
+  const filterSel = "border border-slate-200 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:border-red-400 text-slate-700";
 
   return (
     <>
       <div
-        className="fixed inset-0 z-[190] flex items-center justify-center bg-black/40 backdrop-blur-sm"
+        className="fixed inset-0 z-[190] flex items-center justify-center bg-slate-950/40 backdrop-blur-sm px-4"
         onClick={onClose}
       >
         <div
-          className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl mx-4 overflow-hidden flex flex-col"
+          className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col"
           style={{ maxHeight: "85vh" }}
           onClick={e => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center gap-2.5 px-5 py-3.5 bg-amber-50 border-b border-amber-100 shrink-0">
-            <div className="p-1.5 bg-amber-100 rounded-lg">
-              <Bookmark size={14} className="text-amber-600" />
+          <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-slate-100 shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+                <Bookmark size={15} className="text-amber-600" />
+              </div>
+              <div>
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Configuración · {modulo}</p>
+                <h3 className="text-base font-bold text-slate-900">Atajos de acción</h3>
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold text-amber-800">Listado Atajos — [Usu]</p>
-              <p className="text-[10px] text-amber-600">
-                Los atajos ofrecen una forma rápida de realizar una o varias acciones con un solo clic. Verás el botón Atajos en todos los listados y ventanas principales del programa. Pulsa "Alta" para crear un nuevo Atajo
-              </p>
-            </div>
-            <button onClick={onClose} className="p-1 text-amber-400 hover:text-amber-700 rounded-lg">
+            <button
+              onClick={onClose}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-400 hover:text-slate-700 hover:border-slate-300 transition-colors"
+            >
               <X size={15} />
             </button>
           </div>
@@ -406,41 +406,28 @@ export function ListadoAtajosModal({
               <ChevronUp size={15} className="text-slate-400 hover:text-red-600 cursor-pointer p-0.5 hover:bg-slate-50 transition-colors" />
               <ChevronDownIcon size={15} className="text-slate-400 hover:text-red-600 cursor-pointer p-0.5 hover:bg-slate-50 transition-colors" />
               <span className="w-px h-4 bg-slate-200 mx-0.5" />
-              <ChevronUp size={15} className="text-slate-400 hover:text-red-600 cursor-pointer p-0.5 hover:bg-slate-50 transition-colors rotate-180 scale-y-150" style={{transform:"scaleY(2)"}} />
+              <ChevronUp size={15} className="text-slate-400 hover:text-red-600 cursor-pointer p-0.5 hover:bg-slate-50 transition-colors" style={{transform:"scaleY(2)"}} />
               <ChevronDownIcon size={15} className="text-slate-400 hover:text-red-600 cursor-pointer p-0.5 hover:bg-slate-50 transition-colors" style={{transform:"scaleY(2)"}} />
             </div>
           </div>
 
           {/* Barra de búsqueda / filtros */}
-          <div className="flex items-center gap-2 px-4 py-2 border-b border-slate-100 bg-slate-50/60 shrink-0 flex-wrap">
-            <span className="text-xs font-semibold text-slate-500">Buscar</span>
-            <input
-              value={buscar}
-              onChange={e => setBuscar(e.target.value)}
-              className="border border-slate-200 rounded-lg px-2.5 py-1 text-xs w-48 focus:outline-none focus:border-red-400 bg-white"
-              placeholder="Buscar atajo..."
-            />
-            <span className="text-xs text-slate-400 ml-1">en</span>
-            <select
-              value="Nombre Atajo"
-              className="border border-slate-200 rounded-lg px-2 py-1 text-xs bg-white focus:outline-none focus:border-red-400"
-            >
-              <option>Nombre Atajo</option>
-            </select>
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-2">Módulo</span>
-            <select
-              value={moduloFiltro}
-              onChange={e => setModuloFiltro(e.target.value)}
-              className="border border-slate-200 rounded-lg px-2 py-1 text-xs bg-white focus:outline-none focus:border-red-400"
-            >
+          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-100 bg-slate-50/60 shrink-0 flex-wrap">
+            <div className="relative">
+              <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" />
+              <input
+                value={buscar}
+                onChange={e => setBuscar(e.target.value)}
+                className="border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 text-xs w-44 focus:outline-none focus:border-red-400 bg-white text-slate-700"
+                placeholder="Buscar atajo..."
+              />
+            </div>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Módulo</span>
+            <select value={moduloFiltro} onChange={e => setModuloFiltro(e.target.value)} className={filterSel}>
               {modulosFiltroOpts.map(m => <option key={m} value={m}>{m}</option>)}
             </select>
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-2">Categoría</span>
-            <select
-              value={categoriaFiltro}
-              onChange={e => setCategoriaFiltro(e.target.value)}
-              className="border border-slate-200 rounded-lg px-2 py-1 text-xs bg-white focus:outline-none focus:border-red-400"
-            >
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Carpeta</span>
+            <select value={categoriaFiltro} onChange={e => setCategoriaFiltro(e.target.value)} className={filterSel}>
               {carpetas.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
@@ -463,9 +450,11 @@ export function ListadoAtajosModal({
                 {filtrados.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="py-16 text-center">
-                      <div className="flex flex-col items-center gap-3 text-slate-300">
-                        <Bookmark size={32} className="opacity-30" />
-                        <p className="text-sm font-medium text-slate-400">No hay atajos todavía</p>
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="h-12 w-12 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-300">
+                          <Bookmark size={20} />
+                        </div>
+                        <p className="text-sm font-semibold text-slate-500">No hay atajos todavía</p>
                         <button
                           onClick={() => setShowNuevo(true)}
                           className="text-red-600 text-xs font-bold hover:underline"
@@ -551,14 +540,14 @@ export function ListadoAtajosModal({
       {/* Confirm delete */}
       {confirmDeleteId && (
         <div
-          className="fixed inset-0 z-[210] flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          className="fixed inset-0 z-[210] flex items-center justify-center bg-slate-950/40 backdrop-blur-sm px-4"
           onClick={() => setConfirmDeleteId(null)}
         >
           <div
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6"
+            className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-sm p-6"
             onClick={e => e.stopPropagation()}
           >
-            <div className="flex items-start gap-3 mb-4">
+            <div className="flex items-start gap-3 mb-5">
               <div className="p-2 bg-red-100 rounded-xl shrink-0">
                 <AlertTriangle size={18} className="text-red-600" />
               </div>
@@ -568,10 +557,18 @@ export function ListadoAtajosModal({
               </div>
             </div>
             <div className="flex gap-2 justify-end">
-              <button onClick={() => setConfirmDeleteId(null)}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
-              <button onClick={() => handleDelete(confirmDeleteId)}
-                className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg active:scale-95">Eliminar</button>
+              <button
+                onClick={() => setConfirmDeleteId(null)}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => handleDelete(confirmDeleteId)}
+                className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl active:scale-95 transition-all"
+              >
+                Eliminar
+              </button>
             </div>
           </div>
         </div>
@@ -598,10 +595,8 @@ export function AtajosButton({ modulo }: { modulo: string }) {
     return () => document.removeEventListener("mousedown", outside);
   }, []);
 
-  // Solo los atajos de este módulo, habilitados y en barra
   const visibles = atajos.filter(a => a.modulos.includes(modulo) && a.habilitado && a.enBarra);
 
-  // Agrupados por carpeta
   const porCarpeta: Record<string, Atajo[]> = {};
   visibles.forEach(a => {
     if (!porCarpeta[a.carpeta]) porCarpeta[a.carpeta] = [];
@@ -659,7 +654,6 @@ export function AtajosButton({ modulo }: { modulo: string }) {
               ))
             )}
 
-            {/* Acciones fijas al final */}
             <button
               onClick={() => { setOpen(false); setShowNuevo(true); }}
               className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-colors italic"
