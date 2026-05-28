@@ -293,6 +293,7 @@ export function ListadoAtajosModal({
   const [buscar, setBuscar] = useState("");
   const [moduloFiltro, setModuloFiltro] = useState(modulo);
   const [categoriaFiltro, setCategoriaFiltro] = useState("Todos");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editando, setEditando] = useState<Atajo | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [showNuevo, setShowNuevo] = useState(false);
@@ -310,6 +311,7 @@ export function ListadoAtajosModal({
     return matchBuscar && matchModulo && matchCat;
   });
 
+  const selectedAtajo = filtrados.find(a => a.id === selectedId) ?? null;
   const carpetas = ["Todos", ...Array.from(new Set(atajos.map(a => a.carpeta)))];
   const modulosFiltroOpts = ["Todos", ...MODULOS_DISPONIBLES];
 
@@ -333,6 +335,7 @@ export function ListadoAtajosModal({
   const handleDelete = (id: string) => {
     persist(atajos.filter(a => a.id !== id));
     setConfirmDeleteId(null);
+    if (selectedId === id) setSelectedId(null);
   };
 
   const handleSave = (saved: Atajo) => {
@@ -345,9 +348,9 @@ export function ListadoAtajosModal({
     setShowNuevo(false);
   };
 
-  const th = "px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-left whitespace-nowrap";
-  const td = "px-3 py-2.5 text-xs text-slate-700";
-  const filterSel = "border border-slate-200 rounded-lg px-2 py-1.5 text-xs bg-white focus:outline-none focus:border-red-400 text-slate-700";
+  const th = "px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-left whitespace-nowrap";
+  const td = "px-4 py-3 text-xs text-slate-700";
+  const filterSel = "border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:border-red-400 text-slate-700 min-w-[110px]";
 
   return (
     <>
@@ -356,7 +359,7 @@ export function ListadoAtajosModal({
         onClick={onClose}
       >
         <div
-          className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col"
+          className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col"
           style={{ maxHeight: "85vh" }}
           onClick={e => e.stopPropagation()}
         >
@@ -380,70 +383,72 @@ export function ListadoAtajosModal({
           </div>
 
           {/* Toolbar */}
-          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-100 bg-white shrink-0">
+          <div className="flex items-center gap-1.5 px-4 py-2.5 border-b border-slate-100 shrink-0">
             <button
               onClick={() => setShowNuevo(true)}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg active:scale-95 transition-all"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg active:scale-95 transition-all"
             >
-              <Plus size={12} /> Alta
+              <Plus size={12} /> Nuevo
+            </button>
+            <span className="w-px h-4 bg-slate-200 mx-1" />
+            <button
+              disabled={!selectedAtajo}
+              onClick={() => selectedAtajo && setEditando(selectedAtajo)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-slate-600 border border-slate-200 hover:bg-slate-50 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <Pencil size={11} /> Modificar
             </button>
             <button
-              disabled={!filtrados.length}
-              onClick={() => confirmDeleteId ? handleDelete(confirmDeleteId) : setConfirmDeleteId(filtrados[0]?.id)}
-              className="px-3.5 py-1.5 text-xs font-semibold text-slate-600 border border-slate-200 hover:bg-slate-100 rounded-lg disabled:opacity-40 transition-colors"
+              disabled={!selectedAtajo}
+              onClick={() => selectedAtajo && setConfirmDeleteId(selectedAtajo.id)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-slate-500 border border-slate-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
-              Baja
+              <Trash2 size={11} /> Eliminar
             </button>
-            <button
-              disabled={!filtrados.length}
-              className="px-3.5 py-1.5 text-xs font-semibold text-slate-600 border border-slate-200 hover:bg-slate-100 rounded-lg disabled:opacity-40 transition-colors"
-              onClick={() => filtrados[0] && setEditando(filtrados[0])}
-            >
-              Modificar
-            </button>
-
-            <div className="flex items-center gap-0.5 ml-auto border border-slate-200 rounded-lg overflow-hidden">
-              <ChevronUp size={15} className="text-slate-400 hover:text-red-600 cursor-pointer p-0.5 hover:bg-slate-50 transition-colors" />
-              <ChevronDownIcon size={15} className="text-slate-400 hover:text-red-600 cursor-pointer p-0.5 hover:bg-slate-50 transition-colors" />
-              <span className="w-px h-4 bg-slate-200 mx-0.5" />
-              <ChevronUp size={15} className="text-slate-400 hover:text-red-600 cursor-pointer p-0.5 hover:bg-slate-50 transition-colors" style={{transform:"scaleY(2)"}} />
-              <ChevronDownIcon size={15} className="text-slate-400 hover:text-red-600 cursor-pointer p-0.5 hover:bg-slate-50 transition-colors" style={{transform:"scaleY(2)"}} />
-            </div>
+            {filtrados.length > 0 && (
+              <span className="ml-auto text-[11px] font-semibold text-slate-400">
+                {filtrados.length} {filtrados.length === 1 ? "atajo" : "atajos"}
+              </span>
+            )}
           </div>
 
           {/* Barra de búsqueda / filtros */}
-          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-slate-100 bg-slate-50/60 shrink-0 flex-wrap">
-            <div className="relative">
+          <div className="flex items-center gap-3 px-4 py-2.5 border-b border-slate-100 bg-slate-50/60 shrink-0">
+            <div className="relative flex-1 max-w-[220px]">
               <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" />
               <input
                 value={buscar}
                 onChange={e => setBuscar(e.target.value)}
-                className="border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 text-xs w-44 focus:outline-none focus:border-red-400 bg-white text-slate-700"
+                className="w-full border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:border-red-400 bg-white text-slate-700"
                 placeholder="Buscar atajo..."
               />
             </div>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Módulo</span>
-            <select value={moduloFiltro} onChange={e => setModuloFiltro(e.target.value)} className={filterSel}>
-              {modulosFiltroOpts.map(m => <option key={m} value={m}>{m}</option>)}
-            </select>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Carpeta</span>
-            <select value={categoriaFiltro} onChange={e => setCategoriaFiltro(e.target.value)} className={filterSel}>
-              {carpetas.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Módulo</span>
+              <select value={moduloFiltro} onChange={e => setModuloFiltro(e.target.value)} className={filterSel}>
+                {modulosFiltroOpts.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Carpeta</span>
+              <select value={categoriaFiltro} onChange={e => setCategoriaFiltro(e.target.value)} className={filterSel}>
+                {carpetas.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
           </div>
 
           {/* Tabla */}
           <div className="overflow-auto flex-1">
-            <table className="w-full text-left min-w-[700px]">
+            <table className="w-full text-left">
               <thead className="bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
                 <tr>
-                  <th className={th}>Nombre Atajo</th>
-                  <th className={th}>Módulo</th>
-                  <th className={th}>Forma de Envío</th>
+                  <th className={th}>Nombre del atajo</th>
+                  <th className={th}>Módulos</th>
+                  <th className={th}>Forma de envío</th>
                   <th className={th}>Carpeta</th>
-                  <th className={`${th} text-center`}>Habilitado</th>
-                  <th className={`${th} text-center`}>Barra de Atajo</th>
-                  <th className={th}></th>
+                  <th className={`${th} text-center`}>Activo</th>
+                  <th className={`${th} text-center`}>En barra</th>
+                  <th className={th + " w-16"}></th>
                 </tr>
               </thead>
               <tbody>
@@ -464,63 +469,68 @@ export function ListadoAtajosModal({
                       </div>
                     </td>
                   </tr>
-                ) : filtrados.map((a, idx) => (
-                  <tr
-                    key={a.id}
-                    className="border-b border-slate-50 hover:bg-slate-50/80 transition-colors group"
-                  >
-                    <td className={`${td} font-semibold`}>{a.nombre}</td>
-                    <td className={td}>{a.modulos.join(", ")}</td>
-                    <td className={td}>{a.formaEnvio || <span className="text-slate-300">—</span>}</td>
-                    <td className={td}>{a.carpeta}</td>
-                    <td className={`${td} text-center`}>
-                      <button onClick={() => toggleHabilitado(a.id)}>
-                        {a.habilitado
+                ) : filtrados.map((a, idx) => {
+                  const isSelected = selectedId === a.id;
+                  return (
+                    <tr
+                      key={a.id}
+                      onClick={() => setSelectedId(isSelected ? null : a.id)}
+                      className={`border-b border-slate-100 cursor-pointer transition-colors group ${
+                        isSelected
+                          ? "bg-red-50 border-l-2 border-l-red-500"
+                          : "hover:bg-slate-50"
+                      }`}
+                    >
+                      <td className={`${td} font-semibold ${isSelected ? "text-red-700" : ""}`}>
+                        {a.nombre}
+                      </td>
+                      <td className={td}>
+                        <div className="flex gap-1 flex-wrap">
+                          {a.modulos.map(m => (
+                            <span key={m} className="inline-block bg-slate-100 text-slate-600 text-[10px] font-bold uppercase rounded-full px-2 py-0.5">{m}</span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className={td}>{a.formaEnvio || <span className="text-slate-300">—</span>}</td>
+                      <td className={td}>{a.carpeta}</td>
+                      <td className={`${td} text-center`}>
+                        <button
+                          onClick={e => { e.stopPropagation(); toggleHabilitado(a.id); }}
+                          title={a.habilitado ? "Deshabilitar" : "Habilitar"}
+                        >
+                          {a.habilitado
+                            ? <Check size={14} className="text-emerald-500 mx-auto" />
+                            : <span className="text-slate-200 block text-center leading-none">—</span>}
+                        </button>
+                      </td>
+                      <td className={`${td} text-center`}>
+                        {a.enBarra
                           ? <Check size={14} className="text-emerald-500 mx-auto" />
-                          : <span className="text-slate-200 mx-auto block text-center">—</span>}
-                      </button>
-                    </td>
-                    <td className={`${td} text-center`}>
-                      {a.enBarra
-                        ? <Check size={14} className="text-emerald-500 mx-auto" />
-                        : <span className="text-slate-200 mx-auto block text-center">—</span>}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={() => moveUp(idx)}
-                          disabled={idx === 0}
-                          className="p-1 text-slate-300 hover:text-slate-600 disabled:opacity-20 transition-colors"
-                          title="Subir"
-                        >
-                          <ChevronUp size={12} />
-                        </button>
-                        <button
-                          onClick={() => moveDown(idx)}
-                          disabled={idx === filtrados.length - 1}
-                          className="p-1 text-slate-300 hover:text-slate-600 disabled:opacity-20 transition-colors"
-                          title="Bajar"
-                        >
-                          <ChevronDownIcon size={12} />
-                        </button>
-                        <button
-                          onClick={() => setEditando(a)}
-                          className="p-1 text-slate-300 hover:text-blue-500 transition-colors"
-                          title="Modificar"
-                        >
-                          <Pencil size={12} />
-                        </button>
-                        <button
-                          onClick={() => setConfirmDeleteId(a.id)}
-                          className="p-1 text-slate-300 hover:text-red-500 transition-colors"
-                          title="Eliminar"
-                        >
-                          <Trash2 size={12} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          : <span className="text-slate-200 block text-center leading-none">—</span>}
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={e => { e.stopPropagation(); moveUp(idx); }}
+                            disabled={idx === 0}
+                            className="p-1 rounded text-slate-300 hover:text-slate-600 disabled:opacity-20 transition-colors"
+                            title="Subir"
+                          >
+                            <ChevronUp size={12} />
+                          </button>
+                          <button
+                            onClick={e => { e.stopPropagation(); moveDown(idx); }}
+                            disabled={idx === filtrados.length - 1}
+                            className="p-1 rounded text-slate-300 hover:text-slate-600 disabled:opacity-20 transition-colors"
+                            title="Bajar"
+                          >
+                            <ChevronDownIcon size={12} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
