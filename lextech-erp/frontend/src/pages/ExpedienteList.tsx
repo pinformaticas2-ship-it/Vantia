@@ -5580,7 +5580,7 @@ export default function ExpedienteList() {
             <DropdownToolBtn
               icon={ClipboardList}
               label="Tareas"
-              disabled={!selected}
+              disabled={!selected || selectedExp?.estado === "cerrado"}
               items={[
                 {
                   label: "Nueva actuación",
@@ -5591,11 +5591,6 @@ export default function ExpedienteList() {
                   label: "Crear obligaciones",
                   icon: ClipboardList,
                   onClick: () => selected && navigate(`/dashboard/expedientes/${selected}?tab=tareas&newTarea=1&type=plazo_procesal`),
-                },
-                {
-                  label: "Ver historial",
-                  icon: History,
-                  onClick: () => selected && navigate(`/dashboard/expedientes/${selected}`),
                 },
               ]}
             />
