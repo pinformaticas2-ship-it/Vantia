@@ -14,7 +14,7 @@ import {
   Bug, History, TrendingUp, UserMinus, Pencil, PenLine, Bookmark, BarChart2,
   AlignJustify, LayoutList, ListChecks, Upload, Eye, Settings2, SlidersHorizontal, Check, Search, CheckCircle2,
   Download, FileCode2, FileText, ArrowRight, ArrowLeft, ChevronsRight, ChevronsLeft,
-  Scale, Link2,
+  Scale, Link2, Lock, LockOpen,
 } from "lucide-react";
 import { AtajosButton } from "../components/AtajosSystem";
 import AdjuntosModal from "../components/AdjuntosModal";
@@ -4393,6 +4393,30 @@ export default function ExpedienteList() {
       alert(e?.message || "No se pudo asignar el color");
     }
   }, [getToken, selectedExp]);
+  const toggleExpedienteEstado = useCallback(async () => {
+    if (!selectedExp) return;
+    const newEstado = selectedExp.estado === "cerrado" ? "abierto" : "cerrado";
+    // Optimistic update
+    setExpedientes((prev) => prev.map((e) => e.id === selectedExp.id ? { ...e, estado: newEstado } : e));
+    setShowOpciones(false);
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/expedientes/${selectedExp.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ ...selectedExp, estado: newEstado }),
+      });
+      const d = await safeJson(res);
+      if (!res.ok) {
+        // Revert on failure
+        setExpedientes((prev) => prev.map((e) => e.id === selectedExp.id ? { ...e, estado: selectedExp.estado } : e));
+        alert(d.error || "No se pudo cambiar el estado del expediente");
+      }
+    } catch {
+      setExpedientes((prev) => prev.map((e) => e.id === selectedExp.id ? { ...e, estado: selectedExp.estado } : e));
+    }
+  }, [getToken, selectedExp]);
+
   const relatedExpedienteIds = useMemo(() => new Set(relatedExpedientes.map((item) => item.id)), [relatedExpedientes]);
 
   const loadRelatedExpedientes = useCallback(async (expedienteId: string, silent = false) => {
@@ -5682,6 +5706,16 @@ export default function ExpedienteList() {
                 <div className="h-px bg-slate-100 my-1.5" />
 
                 {/* Grupo 3: acciones especiales */}
+                <button
+                  disabled={!selectedExp}
+                  onClick={toggleExpedienteEstado}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {selectedExp?.estado === "cerrado"
+                    ? <><LockOpen size={12} className="text-slate-400" /> Reabrir expediente</>
+                    : <><Lock size={12} className="text-slate-400" /> Cerrar expediente</>
+                  }
+                </button>
                 <button onClick={() => alert("Alta Acción")}
                   className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
                   <Zap size={12} className="text-slate-400" /> Alta Acción
