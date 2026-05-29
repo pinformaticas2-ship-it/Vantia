@@ -3061,6 +3061,221 @@ function TabActuacion({
   );
 }
 
+// ── Tab Cliente vinculado ──────────────────────────────────────────────────────
+function TabClienteVinculado({ exp, clientes, linkedClient, linkedClientDisplayName, linkedClientSummary, fallbackClientName, draftClientName, expedienteId, onPatch }: {
+  exp: any; clientes: any[]; linkedClient: any; linkedClientDisplayName: string; linkedClientSummary: string[]; fallbackClientName: string; draftClientName: { first_name: string; last_name: string }; expedienteId: string; onPatch: (fields: Record<string, any>) => Promise<boolean>;
+}) {
+  const [clientSearch, setClientSearch] = useState("");
+  const [showPicker, setShowPicker] = useState(false);
+  const [linkSaving, setLinkSaving] = useState(false);
+
+  const filtered = clientSearch.trim()
+    ? clientes.filter(c => {
+        const name = (c.commercial_name || `${c.first_name || ""} ${c.last_name || ""}`.trim()).toLowerCase();
+        return name.includes(clientSearch.toLowerCase()) || (c.nif_cif || "").toLowerCase().includes(clientSearch.toLowerCase());
+      })
+    : clientes.slice(0, 20);
+
+  const linkCliente = async (c: any) => {
+    setLinkSaving(true);
+    const name = c.commercial_name || `${c.first_name || ""} ${c.last_name || ""}`.trim();
+    await onPatch({ cliente_id: c.id, cliente_nombre: name });
+    setShowPicker(false); setClientSearch(""); setLinkSaving(false);
+  };
+
+  const unlinkCliente = async () => {
+    setLinkSaving(true);
+    await onPatch({ cliente_id: null, cliente_nombre: "" });
+    setLinkSaving(false);
+  };
+
+  const isClosed = exp?.estado === "cerrado";
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Users size={14} className="text-slate-400" />
+            <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Cliente vinculado</h3>
+          </div>
+          {!isClosed && exp.cliente_id && !showPicker && (
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => setShowPicker(true)} className="text-xs font-bold text-red-600 hover:underline">Cambiar</button>
+              <button type="button" onClick={unlinkCliente} disabled={linkSaving} className="text-xs font-bold text-slate-400 hover:text-slate-600 disabled:opacity-50">Desasignar</button>
+            </div>
+          )}
+        </div>
+        <div className="p-5 space-y-3">
+          {exp.cliente_id ? (
+            <Link to={`/dashboard/clientes/${exp.cliente_id}`}
+              className="flex items-start gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 transition-colors hover:border-blue-200 hover:bg-blue-50/40">
+              {linkedClient?.photo_url ? (
+                <img src={linkedClient.photo_url} alt={linkedClientDisplayName || "Cliente"} className="h-14 w-14 rounded-2xl object-cover border border-slate-200 bg-white" />
+              ) : (
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-200 bg-white text-sm font-bold text-slate-600">{initialsFromName(linkedClientDisplayName)}</div>
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-blue-600 hover:underline">{linkedClientDisplayName || "Sin asignar"}</p>
+                {linkedClientSummary.length > 0 && <p className="mt-1 text-xs text-slate-500 break-words">{linkedClientSummary.join(" · ")}</p>}
+                {exp.persona_contacto && <p className="mt-2 text-xs text-slate-500">Contacto: {exp.persona_contacto}</p>}
+              </div>
+              <ExternalLink size={13} className="text-slate-300 shrink-0 mt-1" />
+            </Link>
+          ) : fallbackClientName && !showPicker ? (
+            <div className="flex items-start gap-4 rounded-2xl border border-amber-200 bg-amber-50/60 px-4 py-4">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-200 bg-white text-sm font-bold text-slate-600">{initialsFromName(fallbackClientName)}</div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-slate-800">{fallbackClientName}</p>
+                <p className="mt-1 text-xs text-amber-700">Nombre detectado pero sin cliente vinculado en el ERP.</p>
+              </div>
+            </div>
+          ) : !showPicker ? (
+            <div className="flex flex-col items-center justify-center py-10 gap-2 text-slate-300">
+              <Users size={28} className="opacity-30" /><p className="text-sm font-medium">Sin cliente asignado</p>
+            </div>
+          ) : null}
+
+          {showPicker && !isClosed && (
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+              <div className="relative">
+                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input autoFocus value={clientSearch} onChange={e => setClientSearch(e.target.value)}
+                  placeholder="Buscar por nombre o NIF..."
+                  className="w-full pl-8 pr-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-red-400" />
+              </div>
+              <div className="max-h-52 overflow-y-auto space-y-1">
+                {filtered.length === 0 ? (
+                  <p className="text-xs text-slate-400 text-center py-4">Sin resultados</p>
+                ) : filtered.map(c => {
+                  const name = c.commercial_name || `${c.first_name || ""} ${c.last_name || ""}`.trim();
+                  return (
+                    <button key={c.id} type="button" onClick={() => linkCliente(c)} disabled={linkSaving}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white hover:shadow-sm transition-all text-left disabled:opacity-50">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-200 text-[10px] font-bold text-slate-600 shrink-0">{initialsFromName(name)}</div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-slate-800 truncate">{name}</p>
+                        <p className="text-[10px] text-slate-400">{c.nif_cif}{c.address_town ? ` · ${c.address_town}` : ""}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              <button type="button" onClick={() => { setShowPicker(false); setClientSearch(""); }} className="text-xs text-slate-400 hover:text-slate-600">Cancelar</button>
+            </div>
+          )}
+
+          {!isClosed && (
+            <div className="flex flex-wrap gap-2 pt-1">
+              {!showPicker && (
+                <button type="button" onClick={() => setShowPicker(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:border-slate-300 rounded-xl transition-all">
+                  <Search size={12} /> {exp.cliente_id ? "Cambiar cliente" : "Buscar cliente existente"}
+                </button>
+              )}
+              <Link
+                to={`/dashboard/clientes/new?mode=manual&expediente_id=${encodeURIComponent(expedienteId)}${fallbackClientName ? `&first_name=${encodeURIComponent(draftClientName.first_name)}&last_name=${encodeURIComponent(draftClientName.last_name)}&commercial_name=${encodeURIComponent(fallbackClientName)}` : ""}`}
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm transition-all">
+                <Plus size={12} /> Crear nuevo cliente
+              </Link>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Tab Contrarios ─────────────────────────────────────────────────────────────
+function TabContrarios({ exp, onPatch }: { exp: any; onPatch: (fields: Record<string, any>) => Promise<boolean> }) {
+  const [editing, setEditing] = useState(false);
+  const [cForm, setCForm] = useState({ contrario: exp.contrario || "", procurador_contrario: exp.procurador_contrario || "" });
+  const [saving, setSaving] = useState(false);
+
+  const isClosed = exp?.estado === "cerrado";
+  const hasData = !!(exp.contrario || exp.procurador_contrario);
+
+  const handleSaveContrario = async () => {
+    setSaving(true);
+    const ok = await onPatch(cForm);
+    if (ok) setEditing(false);
+    setSaving(false);
+  };
+
+  const handleClear = async () => {
+    setSaving(true);
+    await onPatch({ contrario: "", procurador_contrario: "" });
+    setCForm({ contrario: "", procurador_contrario: "" });
+    setSaving(false);
+  };
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+      <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Users size={14} className="text-slate-400" />
+          <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Parte contraria</h3>
+        </div>
+        {!isClosed && !editing && (
+          <div className="flex items-center gap-2">
+            <button type="button"
+              onClick={() => { setCForm({ contrario: exp.contrario || "", procurador_contrario: exp.procurador_contrario || "" }); setEditing(true); }}
+              className="text-xs font-bold text-red-600 hover:underline">
+              {hasData ? "Editar" : "Añadir parte contraria"}
+            </button>
+            {hasData && <button type="button" onClick={handleClear} disabled={saving} className="text-xs font-bold text-slate-400 hover:text-slate-600 disabled:opacity-50">Limpiar</button>}
+          </div>
+        )}
+      </div>
+      <div className="p-5">
+        {editing && !isClosed ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nombre parte contraria</label>
+                <input autoFocus value={cForm.contrario} onChange={e => setCForm(f => ({ ...f, contrario: e.target.value }))}
+                  placeholder="Nombre o razón social..."
+                  className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-1 focus:ring-red-400" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Procurador contrario</label>
+                <input value={cForm.procurador_contrario} onChange={e => setCForm(f => ({ ...f, procurador_contrario: e.target.value }))}
+                  placeholder="Nombre del procurador..."
+                  className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-1 focus:ring-red-400" />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setEditing(false)} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancelar</button>
+              <button type="button" onClick={handleSaveContrario} disabled={saving}
+                className="px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-700 disabled:opacity-50 flex items-center gap-2">
+                {saving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Guardar
+              </button>
+            </div>
+          </div>
+        ) : hasData ? (
+          <div className="flex items-start gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200 bg-white text-sm font-bold text-slate-600 shrink-0">
+              {initialsFromName(exp.contrario || "?")}
+            </div>
+            <div className="min-w-0 flex-1 space-y-1">
+              <p className="text-sm font-semibold text-slate-800">{exp.contrario || <span className="text-slate-400 font-normal">Sin nombre</span>}</p>
+              {exp.procurador_contrario && <p className="text-xs text-slate-500">Procurador contrario: {exp.procurador_contrario}</p>}
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-10 gap-2 text-slate-300">
+            <Users size={28} className="opacity-30" />
+            <p className="text-sm font-medium">Sin parte contraria registrada</p>
+            {!isClosed && (
+              <button type="button" onClick={() => setEditing(true)} className="mt-1 text-xs font-bold text-red-500 hover:underline">Añadir parte contraria</button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Apuntes contables ─────────────────────────────────────────────────────────
 const TIPO_APUNTE_CFG = {
   cargo:  { label: "Cargo (debe)",  dot: "bg-red-500",     badge: "bg-red-100 text-red-700",         sign: "-" },
@@ -3890,6 +4105,19 @@ export default function ExpedienteDetail() {
     }
   };
 
+  const patchExp = async (fields: Record<string, any>) => {
+    const token = await getToken({ skipCache: true });
+    const res = await fetch(`/api/expedientes/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ ...exp, ...fields }),
+    });
+    const d = await safeJson(res);
+    if (!res.ok) { alert(d.error || "Error al guardar"); return false; }
+    await fetchExp();
+    return true;
+  };
+
   const handleToggleEstado = async () => {
     if (!exp) return;
     const closing = exp.estado !== "cerrado";
@@ -4286,79 +4514,21 @@ export default function ExpedienteDetail() {
             )}
 
             {tab === "clientes" && (
-              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-                <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
-                  <Users size={14} className="text-slate-400" />
-                  <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Cliente vinculado</h3>
-                </div>
-                <div className="p-5 space-y-2">
-                  {exp.cliente_id ? (
-                    <Link
-                      to={`/dashboard/clientes/${exp.cliente_id}`}
-                      className="flex items-start gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 transition-colors hover:border-blue-200 hover:bg-blue-50/40"
-                    >
-                      {linkedClient?.photo_url ? (
-                        <img
-                          src={linkedClient.photo_url}
-                          alt={linkedClientDisplayName || "Cliente"}
-                          className="h-14 w-14 rounded-2xl object-cover border border-slate-200 bg-white"
-                        />
-                      ) : (
-                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-200 bg-white text-sm font-bold text-slate-600">
-                          {initialsFromName(linkedClientDisplayName)}
-                        </div>
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-blue-600 hover:underline">{linkedClientDisplayName || "Sin asignar"}</p>
-                        {linkedClientSummary.length > 0 && (
-                          <p className="mt-1 text-xs text-slate-500 break-words">{linkedClientSummary.join(" · ")}</p>
-                        )}
-                        {exp.persona_contacto && (
-                          <p className="mt-2 text-xs text-slate-500">Contacto expediente: {exp.persona_contacto}</p>
-                        )}
-                      </div>
-                    </Link>
-                  ) : fallbackClientName ? (
-                    <>
-                      <div className="flex items-start gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-200 bg-white text-sm font-bold text-slate-600">
-                          {initialsFromName(fallbackClientName)}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-semibold text-slate-800">{fallbackClientName}</p>
-                          <p className="mt-1 text-xs text-slate-500">Cliente detectado en el expediente, aún no dado de alta en el ERP.</p>
-                          {exp.persona_contacto && (
-                            <p className="mt-2 text-xs text-slate-500">Contacto expediente: {exp.persona_contacto}</p>
-                          )}
-                        </div>
-                      </div>
-                      <Link
-                        to={`/dashboard/clientes/new?mode=manual&expediente_id=${encodeURIComponent(id || "")}&first_name=${encodeURIComponent(draftClientName.first_name)}&last_name=${encodeURIComponent(draftClientName.last_name)}&commercial_name=${encodeURIComponent(fallbackClientName)}`}
-                        className="inline-flex items-center gap-2 px-3 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-sm active:scale-95 transition-all"
-                      >
-                        Dar de alta a este cliente
-                      </Link>
-                    </>
-                  ) : (
-                    <p className="text-sm text-slate-300">Sin asignar</p>
-                  )}
-                  {exp.contacto && <p className="text-sm text-slate-500">{exp.contacto}</p>}
-                </div>
-              </div>
+              <TabClienteVinculado
+                exp={exp}
+                clientes={clientes}
+                linkedClient={linkedClient}
+                linkedClientDisplayName={linkedClientDisplayName}
+                linkedClientSummary={linkedClientSummary}
+                fallbackClientName={fallbackClientName}
+                draftClientName={draftClientName}
+                expedienteId={id!}
+                onPatch={patchExp}
+              />
             )}
 
             {tab === "contrarios" && (
-              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-                <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
-                  <Users size={14} className="text-slate-400" />
-                  <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Parte contraria</h3>
-                </div>
-                <div className="p-5">
-                  <p className="text-sm text-slate-700 font-medium">
-                    {exp.contrario || <span className="text-slate-300 font-normal">—</span>}
-                  </p>
-                </div>
-              </div>
+              <TabContrarios exp={exp} onPatch={patchExp} />
             )}
 
             {tab === "relacionados" && (

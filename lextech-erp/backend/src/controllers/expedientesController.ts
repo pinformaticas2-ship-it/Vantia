@@ -492,7 +492,7 @@ export const createExpediente = async (req: any, res: Response) => {
 export const updateExpediente = async (req: any, res: Response) => {
   const {
     ref_propia, ref_expediente, descripcion, tipo, cliente_id, cliente_nombre,
-    contrario, procurador, juzgado, tipo_proc, num_autos, nig,
+    contrario, procurador, procurador_contrario, juzgado, tipo_proc, num_autos, nig,
     estado, observaciones, fecha_inicio, fecha_cierre, importe,
     tipos_asunto, cuantia_principal, intereses, costas, cuantia_total,
     indeterminado, etapa, persona_contacto, contacto, centro, color,
@@ -518,8 +518,9 @@ export const updateExpediente = async (req: any, res: Response) => {
          tipos_asunto=$18, cuantia_principal=$19, intereses=$20, costas=$21,
          cuantia_total=$22, indeterminado=$23, etapa=$24,
          persona_contacto=$25, contacto=$26, centro=$27, color=$28,
+         procurador_contrario=$29,
          updated_at=NOW()
-       WHERE id=$29 RETURNING *`,
+       WHERE id=$30 RETURNING *`,
       [
         nullableText(ref_propia), nullableText(ref_expediente),
         nullableText(descripcion), tipo || 'judicial',
@@ -542,6 +543,7 @@ export const updateExpediente = async (req: any, res: Response) => {
         nullableText(contacto),
         nullableText(centro),
         nullableText(color) || 'ninguno',
+        nullableText(procurador_contrario),
         req.params.id,
       ]
     );
