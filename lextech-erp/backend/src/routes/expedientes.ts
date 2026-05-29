@@ -28,6 +28,7 @@ import {
   updateApunte,
   deleteApunte,
 } from '../controllers/apuntesController';
+import { getEmailsByExpediente } from '../controllers/emailController';
 import noteRoutes from './noteRoutes';
 
 const router = Router();
@@ -53,6 +54,7 @@ router.post('/:id/notificaciones',         requireAuth, createNotificacion);
 router.put('/:id/notificaciones/:nid',     requireAuth, updateNotificacion);
 router.delete('/:id/notificaciones/:nid',  requireAuth, deleteNotificacion);
 
+router.get('/:id/emails',                 requireAuth, getEmailsByExpediente);
 router.get('/:id/apuntes',                requireAuth, listApuntes);
 router.post('/:id/apuntes',               requireAuth, createApunte);
 router.put('/:id/apuntes/:apunteId',      requireAuth, updateApunte);
