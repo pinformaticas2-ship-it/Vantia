@@ -96,6 +96,26 @@ export const getBillingBootstrap = async (req: any, res: Response) => {
       `),
     ]);
 
+    // Quipu synced data: contacts and bank accounts (fail silently if tables don't exist yet)
+    let quipuContactsRows: any[] = [];
+    let quipuBankAccountsRows: any[] = [];
+    try {
+      const [qc, qba] = await Promise.all([
+        pool.query(
+          `SELECT external_id AS id, kind, contact_name AS name, tax_id, email
+           FROM quipu_contacts WHERE user_id = $1 ORDER BY contact_name ASC`,
+          [userId]
+        ),
+        pool.query(
+          `SELECT external_id AS id, name, iban, current_balance AS balance, bank_name, currency_code
+           FROM quipu_bank_accounts WHERE user_id = $1 ORDER BY name ASC`
+          , [userId]
+        ).catch(() => ({ rows: [] as any[] })), // table may not exist yet
+      ]);
+      quipuContactsRows = qc.rows;
+      quipuBankAccountsRows = qba.rows;
+    } catch { /* quipu tables may not exist */ }
+
     // Obtener facturas de Quipu que aún no están importadas en facturacion_facturas
     let quipuRows: any[] = [];
     try {
@@ -152,11 +172,13 @@ export const getBillingBootstrap = async (req: any, res: Response) => {
     res.json({
       success: true,
       data: {
-        facturas:     todasFacturas,
-        gastos:       gastos.rows,
-        presupuestos: presupuestos.rows,
-        clientes:     clientes.rows,
-        expedientes:  expedientes.rows,
+        facturas:            todasFacturas,
+        gastos:              gastos.rows,
+        presupuestos:        presupuestos.rows,
+        clientes:            clientes.rows,
+        expedientes:         expedientes.rows,
+        quipuContacts:       quipuContactsRows,
+        quipuBankAccounts:   quipuBankAccountsRows,
       },
     });
   } catch (error: any) {

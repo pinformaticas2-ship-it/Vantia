@@ -932,6 +932,32 @@ export default function Facturacion() {
             }))
           : [],
       );
+      // Quipu synced data comes directly from the bootstrap — no separate calls needed
+      if (Array.isArray(data.quipuContacts)) {
+        setQuipuContacts(data.quipuContacts.map((r: any) => ({
+          id: String(r.id),
+          kind: r.kind || "client",
+          name: r.name || "Sin nombre",
+          fullName: r.name || "",
+          taxId: r.tax_id || "",
+          email: r.email || "",
+          phone: "",
+          address: "",
+          countryCode: "ES",
+        })));
+      }
+      if (Array.isArray(data.quipuBankAccounts) && data.quipuBankAccounts.length > 0) {
+        setQuipuBankAccounts(data.quipuBankAccounts.map((r: any) => ({
+          id: String(r.id),
+          name: r.name || "Cuenta bancaria",
+          iban: r.iban || "",
+          balance: Number(r.balance ?? 0),
+          bankName: r.bank_name || "",
+          currency: r.currency_code || "EUR",
+          updatedAt: "",
+        })));
+        if (!selectedBankAccountId) setSelectedBankAccountId(String(data.quipuBankAccounts[0].id));
+      }
     } catch (error: any) {
       setErrorMsg(error?.message || "No se pudo cargar el módulo de facturación.");
     } finally {
@@ -1097,13 +1123,8 @@ export default function Facturacion() {
         lastSyncAt: response?.data?.summary?.syncedAt || new Date().toISOString(),
         syncSummary: response?.data?.summary || null,
       }));
-      // Reload billing data and synced Quipu tables
+      // loadBilling now includes quipuContacts + quipuBankAccounts — one call gets everything
       await loadBilling();
-      setQuipuContacts([]);      // force reload on next tab visit
-      setQuipuBankAccounts([]);  // force reload on next tab visit
-      // Reload immediately if already on those tabs
-      await loadQuipuContacts();
-      await loadQuipuBankAccounts();
     } catch (error: any) {
       setErrorMsg(error?.message || "No se pudo sincronizar Quipu.");
     } finally {
