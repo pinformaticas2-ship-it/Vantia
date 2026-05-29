@@ -96,7 +96,40 @@ export const getBillingBootstrap = async (req: any, res: Response) => {
       `),
     ]);
 
-    // Quipu synced data: contacts and bank accounts (fail silently if tables don't exist yet)
+    // Obtener facturas de Quipu que aún no están importadas en facturacion_facturas
+    let quipuRows: any[] = [];
+    try {
+      const quipuFacturas = await pool.query(`
+        SELECT qi.id, qi.external_id,
+               qi.number AS num, qi.contact_name AS contacto,
+               qi.issue_date AS fecha, qi.due_date AS vencimiento,
+               qi.total_amount AS total, qi.status
+        FROM quipu_invoices qi
+        WHERE qi.user_id = $1
+          AND NOT EXISTS (
+            SELECT 1 FROM facturacion_facturas ff
+            WHERE ff.user_id = $1 AND ff.quipu_id = qi.external_id
+          )
+        ORDER BY qi.issue_date DESC NULLS LAST
+      `, [userId]);
+      quipuRows = quipuFacturas.rows.map((qi: any) => ({
+        id: qi.id, user_id: userId,
+        num: qi.num || qi.external_id || '—',
+        contacto: qi.contacto || 'Quipu',
+        fecha: qi.fecha, vencimiento: qi.vencimiento,
+        total: Number(qi.total || 0),
+        estado: mapQuipuStatusToErp(qi.status),
+        area: 'procesal', responsable: 'Quipu',
+        forma_pago: 'transferencia', serie: 'QUIPU', tipo_cliente: 'empresa',
+        client_id: null, expediente_id: null, quipu_id: qi.external_id,
+        anio: null, num_exp: null, ref_expediente: null, ref_propia: null,
+        expediente_descripcion: null,
+      }));
+    } catch { /* quipu_invoices may not exist */ }
+
+    const todasFacturas = [...facturas.rows, ...quipuRows];
+
+    // Quipu synced contacts and bank accounts (loaded from local DB after sync)
     let quipuContactsRows: any[] = [];
     let quipuBankAccountsRows: any[] = [];
     try {
@@ -104,81 +137,28 @@ export const getBillingBootstrap = async (req: any, res: Response) => {
         pool.query(
           `SELECT external_id AS id, kind, contact_name AS name, tax_id, email
            FROM quipu_contacts WHERE user_id = $1 ORDER BY contact_name ASC`,
-          [userId]
+          [userId],
         ),
         pool.query(
           `SELECT external_id AS id, name, iban, current_balance AS balance, bank_name, currency_code
-           FROM quipu_bank_accounts WHERE user_id = $1 ORDER BY name ASC`
-          , [userId]
-        ).catch(() => ({ rows: [] as any[] })), // table may not exist yet
+           FROM quipu_bank_accounts WHERE user_id = $1 ORDER BY name ASC`,
+          [userId],
+        ).catch(() => ({ rows: [] as any[] })),
       ]);
       quipuContactsRows = qc.rows;
       quipuBankAccountsRows = qba.rows;
-    } catch { /* quipu tables may not exist */ }
-
-    // Obtener facturas de Quipu que aún no están importadas en facturacion_facturas
-    let quipuRows: any[] = [];
-    try {
-      const quipuFacturas = await pool.query(`
-        SELECT qi.id,
-               qi.external_id,
-               qi.number      AS num,
-               qi.contact_name AS contacto,
-               qi.issue_date   AS fecha,
-               qi.due_date     AS vencimiento,
-               qi.total_amount AS total,
-               qi.status
-        FROM quipu_invoices qi
-        WHERE qi.user_id = $1
-          AND NOT EXISTS (
-            SELECT 1 FROM facturacion_facturas ff
-            WHERE ff.user_id = $1
-              AND ff.quipu_id = qi.external_id
-          )
-        ORDER BY qi.issue_date DESC NULLS LAST
-      `, [userId]);
-
-      quipuRows = quipuFacturas.rows.map((qi: any) => ({
-        id:                   qi.id,
-        user_id:              userId,
-        num:                  qi.num || qi.external_id || '—',
-        contacto:             qi.contacto || 'Quipu',
-        fecha:                qi.fecha,
-        vencimiento:          qi.vencimiento,
-        total:                Number(qi.total || 0),
-        estado:               mapQuipuStatusToErp(qi.status),
-        area:                 'procesal',
-        responsable:          'Quipu',
-        forma_pago:           'transferencia',
-        serie:                'QUIPU',
-        tipo_cliente:         'empresa',
-        client_id:            null,
-        expediente_id:        null,
-        quipu_id:             qi.external_id,
-        // campos de expediente vacíos para que el mapper no falle
-        anio:                 null,
-        num_exp:              null,
-        ref_expediente:       null,
-        ref_propia:           null,
-        expediente_descripcion: null,
-      }));
-    } catch (_e: any) {
-      // quipu_invoices puede no existir si nunca se configuró Quipu
-    }
-
-    // Combinar: primero facturas locales, luego las de Quipu no importadas aún
-    const todasFacturas = [...facturas.rows, ...quipuRows];
+    } catch { /* quipu tables may not exist yet */ }
 
     res.json({
       success: true,
       data: {
-        facturas:            todasFacturas,
-        gastos:              gastos.rows,
-        presupuestos:        presupuestos.rows,
-        clientes:            clientes.rows,
-        expedientes:         expedientes.rows,
-        quipuContacts:       quipuContactsRows,
-        quipuBankAccounts:   quipuBankAccountsRows,
+        facturas:          todasFacturas,
+        gastos:            gastos.rows,
+        presupuestos:      presupuestos.rows,
+        clientes:          clientes.rows,
+        expedientes:       expedientes.rows,
+        quipuContacts:     quipuContactsRows,
+        quipuBankAccounts: quipuBankAccountsRows,
       },
     });
   } catch (error: any) {
