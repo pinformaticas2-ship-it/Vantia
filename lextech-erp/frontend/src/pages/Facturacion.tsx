@@ -1217,11 +1217,12 @@ export default function Facturacion() {
       setQuipuBankAccounts(rows.map((r: any) => ({
         id: String(r.id),
         name: r.attributes?.name || "Cuenta bancaria",
-        iban: r.attributes?.iban || "",
-        balance: Number(r.attributes?.balance || 0),
-        bankName: r.attributes?.bank_name || "",
-        currency: r.attributes?.currency || "EUR",
-        updatedAt: r.attributes?.updated_at || "",
+        iban: r.attributes?.iban || r.attributes?.account_number || "",
+        // Quipu uses current_balance; fallback to balance
+        balance: Number(r.attributes?.current_balance ?? r.attributes?.balance ?? 0),
+        bankName: r.attributes?.entity_bank_name || r.attributes?.bank_name || "",
+        currency: r.attributes?.currency_code || r.attributes?.currency || "EUR",
+        updatedAt: r.attributes?.updated_at || r.attributes?.last_reconciled_at || "",
       })));
       if (rows.length > 0 && !selectedBankAccountId) setSelectedBankAccountId(String(rows[0].id));
     } catch (e: any) { setQuipuError(e?.message || "Error al cargar cuentas bancarias"); }
@@ -1236,11 +1237,11 @@ export default function Facturacion() {
       const rows: any[] = res?.data || [];
       setQuipuTransactions(rows.map((r: any) => ({
         id: String(r.id),
-        date: String(r.attributes?.date || "").slice(0, 10),
-        description: r.attributes?.description || r.attributes?.concept || "",
-        amount: Number(r.attributes?.amount || 0),
-        balanceAfter: r.attributes?.balance_after != null ? Number(r.attributes.balance_after) : undefined,
-        kind: r.attributes?.kind || "",
+        date: String(r.attributes?.date || r.attributes?.issued_at || "").slice(0, 10),
+        description: r.attributes?.description || r.attributes?.concept || r.attributes?.notes || "",
+        amount: Number(r.attributes?.amount ?? r.attributes?.total_amount ?? 0),
+        balanceAfter: r.attributes?.balance_after ?? r.attributes?.running_balance ?? null,
+        kind: r.attributes?.kind || r.attributes?.transaction_type || "",
       })));
     } catch { setQuipuTransactions([]); }
     finally { setLoadingQuipu(false); }
@@ -1931,30 +1932,56 @@ export default function Facturacion() {
                     <KpiCard label="Gastos del periodo" value={fmtEur(gastosMensuales)} sub="Control de costes" color="green" icon={TrendingDown} />
                   </div>
 
-                  <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-                    <OdooSection title="Emitido vs cobrado" subtitle="Comparativa mensual entre la facturación emitida y lo realmente cobrado.">
-                      <div className="mb-4 flex items-center gap-4">
-                        <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-600"><span className="inline-block h-2.5 w-2.5 rounded-full bg-blue-400" /> Emitido</span>
-                        <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-600"><span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-400" /> Cobrado</span>
-                      </div>
-                      <SimpleBarChart data={monthlySeries.length ? monthlySeries : []} />
-                    </OdooSection>
-
-                    <OdooSection title="Control de explotación" subtitle="Balance rápido del ciclo de facturación del despacho.">
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <OdooMiniStat label="Facturas registradas" value={String(filteredFacturas.length)} tone="blue" />
-                        <OdooMiniStat label="Presupuestos activos" value={String(filteredPresupuestos.length)} tone="violet" />
-                        <OdooMiniStat label="Gastos registrados" value={String(filteredGastos.length)} tone="red" />
-                        <OdooMiniStat label="Clientes del circuito" value={String(clientes.length)} tone="slate" />
-                      </div>
-                      <div className="mt-5 border-t border-slate-100 pt-4">
-                        <h4 className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Gastos por categoría</h4>
-                        <div className="mt-3">
-                          <CategoryChart data={gastosPorCategoria} />
+                  {/* ── Ingresos y Gastos (gráfico barras tipo Quipu) ── */}
+                  <OdooSection
+                    title="Ingresos y Gastos"
+                    action={
+                      <div className="flex items-center gap-2">
+                        <div className="relative" ref={yearMenuRef}>
+                          <button onClick={() => setShowYearMenu(v => !v)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                            {filterYear} <ChevronDown size={11} />
+                          </button>
+                          {showYearMenu && (
+                            <div className="absolute left-0 top-full z-30 mt-1 w-24 rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
+                              {availableYears.map(y => (
+                                <button key={y} onClick={() => { setFilterYear(y); setShowYearMenu(false); }} className={`flex w-full items-center gap-1.5 px-3 py-2 text-xs transition-colors ${filterYear === y ? "font-bold text-emerald-700" : "text-slate-600 hover:bg-slate-50"}`}>
+                                  {filterYear === y && "✓"} {y}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div className="relative" ref={periodMenuRef}>
+                          <button onClick={() => setShowPeriodMenu(v => !v)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                            {PERIOD_OPTIONS.find(o => o.value === filterPeriod)?.label ?? "Todo el año"} <ChevronDown size={11} />
+                          </button>
+                          {showPeriodMenu && (
+                            <div className="absolute right-0 top-full z-30 mt-1 w-40 rounded-xl border border-slate-200 bg-white py-1 shadow-xl max-h-60 overflow-y-auto">
+                              {PERIOD_OPTIONS.map(opt => (
+                                <button key={opt.value} onClick={() => { setFilterPeriod(opt.value); setShowPeriodMenu(false); }} className={`flex w-full items-center gap-1.5 px-3 py-2 text-xs transition-colors ${filterPeriod === opt.value ? "font-bold text-emerald-700" : "text-slate-600 hover:bg-slate-50"}`}>
+                                  {filterPeriod === opt.value && "✓"} {opt.label}
+                                </button>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
-                    </OdooSection>
-                  </div>
+                    }
+                  >
+                    <MonthlyBarChart
+                      facturas={filteredFacturas}
+                      gastos={filteredGastos}
+                      year={filterYear}
+                    />
+                  </OdooSection>
+
+                  {/* ── Análisis de ingresos por cliente (tipo Quipu) ── */}
+                  <OdooSection
+                    title="Análisis de ingresos"
+                    action={<span className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600">Clientes</span>}
+                  >
+                    <ClientIncomeChart facturas={filteredFacturas} />
+                  </OdooSection>
 
                   <TableShell title="Cobros pendientes de facturas" count={`${filteredCobrosPendientes.length} registros`} headers={["Número", "Cliente", "Expediente", "Vencimiento", "Pendiente", "Estado", ""]}>
                     {filteredCobrosPendientes.map((row) => (
@@ -2120,6 +2147,149 @@ export default function Facturacion() {
           onSave={saveContact}
         />
       )}
+    </div>
+  );
+}
+
+// ── MonthlyBarChart (Ingresos y Gastos, tipo Quipu) ───────────
+const MONTH_LABELS = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+
+function MonthlyBarChart({ facturas, gastos, year }: { facturas: Factura[]; gastos: Gasto[]; year: number }) {
+  const [tooltip, setTooltip] = useState<{ x: number; y: number; mes: string; ing: number; gas: number } | null>(null);
+  const W = 600; const H = 160; const PAD_L = 36; const PAD_R = 8; const PAD_T = 10; const PAD_B = 30;
+  const chartW = W - PAD_L - PAD_R;
+  const chartH = H - PAD_T - PAD_B;
+  const barW   = Math.floor(chartW / 12 * 0.4);
+
+  const monthly = MONTH_LABELS.map((label, mi) => {
+    const ing = facturas.filter(f => { const d = new Date(f.fecha); return d.getFullYear() === year && d.getMonth() === mi; }).reduce((s, f) => s + f.total, 0);
+    const gas = gastos.filter(g => { const d = new Date(g.fecha); return d.getFullYear() === year && d.getMonth() === mi; }).reduce((s, g) => s + g.total, 0);
+    return { label, ing, gas };
+  });
+
+  const maxVal = Math.max(...monthly.flatMap(m => [m.ing, m.gas]), 1);
+  const toY = (v: number) => PAD_T + chartH - (v / maxVal) * chartH;
+  const xCenter = (i: number) => PAD_L + (i + 0.5) * (chartW / 12);
+  const curMonth = new Date().getMonth();
+
+  // Y axis labels
+  const yTicks = [0, maxVal * 0.25, maxVal * 0.5, maxVal * 0.75, maxVal].map(v => ({
+    v, label: v >= 1000 ? `${(v / 1000).toFixed(1)}K` : v.toFixed(0), y: toY(v),
+  }));
+
+  return (
+    <div className="relative">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 200 }}
+        onMouseLeave={() => setTooltip(null)}>
+        {/* Y grid */}
+        {yTicks.map((t, i) => (
+          <g key={i}>
+            <line x1={PAD_L} x2={W - PAD_R} y1={t.y} y2={t.y} stroke="#e2e8f0" strokeWidth={0.5} />
+            <text x={PAD_L - 4} y={t.y + 3.5} fontSize={9} fill="#94a3b8" textAnchor="end">{t.label}</text>
+          </g>
+        ))}
+
+        {/* Bars */}
+        {monthly.map((m, i) => {
+          const cx = xCenter(i);
+          const isCurrent = i === curMonth && new Date().getFullYear() === year;
+          const hIng = Math.max((m.ing / maxVal) * chartH, m.ing > 0 ? 1 : 0);
+          const hGas = Math.max((m.gas / maxVal) * chartH, m.gas > 0 ? 1 : 0);
+          return (
+            <g key={i}
+              onMouseEnter={e => {
+                const svgEl = (e.currentTarget.ownerSVGElement as SVGSVGElement);
+                const rect = svgEl.getBoundingClientRect();
+                const scale = W / rect.width;
+                setTooltip({ x: cx / scale, y: 0, mes: m.label, ing: m.ing, gas: m.gas });
+              }}>
+              {/* Current month highlight */}
+              {isCurrent && <rect x={cx - (chartW / 12) / 2} y={PAD_T} width={chartW / 12} height={chartH} fill="#f1f5f9" rx={2} />}
+              {/* Income bar (green) */}
+              {m.ing > 0 && <rect x={cx - barW - 1} y={toY(m.ing)} width={barW} height={hIng} fill="#22c55e" rx={2} />}
+              {/* Expense bar (red) */}
+              {m.gas > 0 && <rect x={cx + 1} y={toY(m.gas)} width={barW} height={hGas} fill="#ef4444" rx={2} />}
+              {/* Click area */}
+              <rect x={cx - (chartW / 12) / 2} y={PAD_T} width={chartW / 12} height={chartH} fill="transparent" style={{ cursor: "pointer" }} />
+            </g>
+          );
+        })}
+
+        {/* X labels */}
+        {monthly.map((m, i) => (
+          <text key={i} x={xCenter(i)} y={H - 8} fontSize={9} fill="#94a3b8" textAnchor="middle">{m.label}</text>
+        ))}
+      </svg>
+
+      {/* Tooltip */}
+      {tooltip && (
+        <div className="pointer-events-none absolute z-10 rounded-xl bg-slate-900 px-3 py-2 text-xs text-white shadow-xl"
+          style={{ left: tooltip.x, top: 10, transform: "translateX(-50%)" }}>
+          <p className="font-bold mb-1">{tooltip.mes}</p>
+          <p className="text-emerald-400">Ingresos: {fmtEur(tooltip.ing)}</p>
+          <p className="text-red-400">Gastos: {fmtEur(tooltip.gas)}</p>
+        </div>
+      )}
+
+      {/* Legend */}
+      <div className="mt-2 flex items-center justify-center gap-5">
+        <span className="flex items-center gap-1.5 text-xs text-slate-500"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-red-500" /> loss</span>
+        <span className="flex items-center gap-1.5 text-xs text-slate-500"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-emerald-500" /> profit</span>
+      </div>
+    </div>
+  );
+}
+
+// ── ClientIncomeChart (Análisis de ingresos, tipo Quipu) ───────
+function ClientIncomeChart({ facturas }: { facturas: Factura[] }) {
+  // Group by client
+  const byClient = new Map<string, { label: string; total: number }>();
+  facturas.forEach(f => {
+    const key = f.contacto || "Sin contacto";
+    const cur = byClient.get(key) || { label: key, total: 0 };
+    cur.total += f.total;
+    byClient.set(key, cur);
+  });
+  const rows = Array.from(byClient.values()).sort((a, b) => b.total - a.total).slice(0, 8);
+
+  if (rows.length === 0) {
+    return <p className="py-6 text-center text-sm text-slate-400">Sin datos de ingresos para el periodo seleccionado.</p>;
+  }
+
+  const maxVal = Math.max(...rows.map(r => r.total), 1);
+  const W = 520; const H = rows.length * 28 + 20;
+  const BAR_H = 16; const PAD_L = 8; const PAD_R = 130;
+  const barMaxW = W - PAD_L - PAD_R;
+
+  return (
+    <div className="flex gap-4">
+      <svg viewBox={`0 0 ${W} ${H}`} className="flex-1" style={{ height: H }}>
+        {rows.map((r, i) => {
+          const bw = (r.total / maxVal) * barMaxW;
+          const y = i * 28 + 6;
+          const colors = ["#22c55e","#16a34a","#15803d","#166534","#4ade80","#86efac","#bbf7d0","#dcfce7"];
+          return (
+            <g key={r.label}>
+              <rect x={PAD_L} y={y} width={Math.max(bw, 2)} height={BAR_H} fill={colors[i % colors.length]} rx={2} />
+            </g>
+          );
+        })}
+        {/* X axis line */}
+        <line x1={PAD_L} x2={PAD_L} y1={0} y2={H} stroke="#e2e8f0" strokeWidth={1} />
+      </svg>
+      {/* Legend / amounts */}
+      <div className="flex flex-col gap-1 pt-1.5 shrink-0">
+        {rows.map((r, i) => {
+          const colors = ["bg-emerald-500","bg-emerald-600","bg-emerald-700","bg-emerald-800","bg-green-400","bg-green-300","bg-green-200","bg-green-100"];
+          return (
+            <div key={r.label} className="flex items-center gap-2 text-xs" style={{ height: 28 }}>
+              <span className={`inline-block h-3 w-3 rounded-sm shrink-0 ${colors[i % colors.length]}`} />
+              <span className="text-slate-600 truncate max-w-[120px]">{r.label}</span>
+              <span className="ml-auto font-bold text-slate-800 pl-2">{fmtEur(r.total)}</span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
