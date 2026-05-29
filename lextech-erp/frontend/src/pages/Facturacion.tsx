@@ -1268,13 +1268,13 @@ export default function Facturacion() {
 
   useEffect(() => {
     if (!quipuStatus.connected) return;
+    if ((tab === "dashboard" || tab === "bank_accounts") && quipuBankAccounts.length === 0) loadQuipuBankAccounts();
     if (tab === "contacts"      && quipuContacts.length === 0)     loadQuipuContacts();
-    if (tab === "bank_accounts" && quipuBankAccounts.length === 0) loadQuipuBankAccounts();
     if (tab === "receipts"      && quipuReceipts.length === 0)     loadQuipuReceipts();
   }, [tab, quipuStatus.connected]);
 
   useEffect(() => {
-    if (selectedBankAccountId && tab === "bank_accounts") {
+    if (selectedBankAccountId && (tab === "bank_accounts" || tab === "dashboard")) {
       loadQuipuTransactions(selectedBankAccountId);
     }
   }, [selectedBankAccountId, tab]);
@@ -1759,44 +1759,117 @@ export default function Facturacion() {
                     </div>
                   </div>
 
-                  {/* ── Resumen financiero tipo Quipu ── */}
-                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                    <div className="grid grid-cols-1 divide-y divide-slate-100 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-                      {/* Ingresos */}
-                      <div className="px-6 py-5">
-                        <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Ingresos</p>
-                        <p className="mt-2 text-3xl font-black text-emerald-600">{fmtEur(totalFacturado)}</p>
-                        <div className="mt-3 space-y-1.5 text-xs">
-                          <div className="flex justify-between text-slate-500"><span>IVA repercutido (21%)</span><span className="font-semibold">{fmtEur(totalFacturado - totalFacturado / 1.21)}</span></div>
-                          <div className="flex justify-between text-slate-500"><span>Base imponible</span><span className="font-semibold">{fmtEur(totalFacturado / 1.21)}</span></div>
-                          <div className="flex justify-between text-slate-500"><span>Cobrado</span><span className="font-semibold text-emerald-600">{fmtEur(totalCobrado)}</span></div>
-                          <div className="flex justify-between text-slate-500"><span>Pendiente de cobro</span><span className="font-semibold text-amber-600">{fmtEur(totalPendiente)}</span></div>
+                  {/* ── Resumen financiero (layout exacto Quipu) ── */}
+                  {(() => {
+                    const ivaRep  = totalFacturado - totalFacturado / 1.21;
+                    const ivaSop  = gastosMensuales - gastosMensuales / 1.21;
+                    const ivaLiq  = ivaRep - ivaSop;
+                    const irpfRet = 0; // IRPF retenido (no calculable sin líneas de factura)
+                    const irpfDed = 0;
+                    const irpfLiq = irpfRet - irpfDed;
+                    return (
+                      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                        <div className="px-5 py-3 border-b border-slate-100 bg-slate-50">
+                          <p className="text-sm font-bold text-slate-700">Resumen financiero</p>
+                        </div>
+                        {/* Fila 1: Ingresos | Gastos */}
+                        <div className="grid grid-cols-2 border-b border-slate-100">
+                          <div className="px-6 py-4 border-r border-slate-100">
+                            <p className="text-xs text-slate-500 font-medium">Ingresos</p>
+                            <p className="mt-1 text-2xl font-black text-emerald-600">{fmtEur(totalFacturado)}</p>
+                          </div>
+                          <div className="px-6 py-4">
+                            <p className="text-xs text-slate-500 font-medium">Gastos</p>
+                            <p className="mt-1 text-2xl font-black text-red-500">{fmtEur(gastosMensuales)}</p>
+                          </div>
+                        </div>
+                        {/* Fila 2: IVA+IRPF desglosados */}
+                        <div className="grid grid-cols-4 border-b border-slate-100 text-xs">
+                          <div className="px-5 py-3 border-r border-slate-100">
+                            <p className="text-slate-400 font-medium">IVA</p>
+                            <p className="mt-0.5 font-semibold text-slate-700">{fmtEur(ivaRep)}</p>
+                          </div>
+                          <div className="px-5 py-3 border-r border-slate-100">
+                            <p className="text-slate-400 font-medium">IRPF</p>
+                            <p className="mt-0.5 font-semibold text-slate-700">{fmtEur(irpfRet)}</p>
+                          </div>
+                          <div className="px-5 py-3 border-r border-slate-100">
+                            <p className="text-slate-400 font-medium">IVA</p>
+                            <p className="mt-0.5 font-semibold text-slate-700">{fmtEur(ivaSop)}</p>
+                          </div>
+                          <div className="px-5 py-3">
+                            <p className="text-slate-400 font-medium">IRPF</p>
+                            <p className="mt-0.5 font-semibold text-slate-700">{fmtEur(irpfDed)}</p>
+                          </div>
+                        </div>
+                        {/* Fila 3: IVA a liquidar | IRPF a liquidar */}
+                        <div className="grid grid-cols-2 bg-slate-50/60 text-xs">
+                          <div className="px-5 py-3 border-r border-slate-100">
+                            <p className="text-slate-400 font-medium">IVA a liquidar</p>
+                            <p className={`mt-0.5 font-bold ${ivaLiq >= 0 ? "text-slate-700" : "text-red-600"}`}>{fmtEur(ivaLiq)}</p>
+                          </div>
+                          <div className="px-5 py-3">
+                            <p className="text-slate-400 font-medium">IRPF a liquidar</p>
+                            <p className={`mt-0.5 font-bold ${irpfLiq >= 0 ? "text-slate-700" : "text-red-600"}`}>{fmtEur(irpfLiq)}</p>
+                          </div>
                         </div>
                       </div>
-                      {/* Gastos */}
-                      <div className="px-6 py-5">
-                        <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Gastos</p>
-                        <p className="mt-2 text-3xl font-black text-red-500">{fmtEur(gastosMensuales)}</p>
-                        <div className="mt-3 space-y-1.5 text-xs">
-                          <div className="flex justify-between text-slate-500"><span>IVA soportado (21%)</span><span className="font-semibold">{fmtEur(gastosMensuales - gastosMensuales / 1.21)}</span></div>
-                          <div className="flex justify-between text-slate-500"><span>Base imponible</span><span className="font-semibold">{fmtEur(gastosMensuales / 1.21)}</span></div>
-                          <div className="flex justify-between text-slate-500"><span>Pendiente de pago</span><span className="font-semibold text-red-500">{fmtEur(pagosPendientes)}</span></div>
-                          <div className="flex justify-between text-slate-500"><span>Deducible</span><span className="font-semibold">{fmtEur(filteredGastos.filter(g => g.deducible).reduce((s, g) => s + g.total, 0))}</span></div>
-                        </div>
+                    );
+                  })()}
+
+                  {/* ── Cuentas bancarias en dashboard (Quipu style) ── */}
+                  {quipuStatus.connected && (
+                    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                      <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-slate-50">
+                        <p className="text-sm font-bold text-slate-700">Cuentas bancarias</p>
+                        <button onClick={loadQuipuBankAccounts} disabled={loadingQuipu} className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 transition-colors">
+                          <RefreshCw size={11} className={loadingQuipu ? "animate-spin" : ""} />
+                        </button>
                       </div>
-                      {/* Total / Margen */}
-                      <div className="px-6 py-5">
-                        <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Total</p>
-                        <p className={`mt-2 text-3xl font-black ${totalFacturado - gastosMensuales >= 0 ? "text-slate-900" : "text-red-600"}`}>{fmtEur(totalFacturado - gastosMensuales)}</p>
-                        <div className="mt-3 space-y-1.5 text-xs">
-                          <div className="flex justify-between text-slate-500"><span>Margen bruto</span><span className="font-semibold">{fmtEur(margenBruto)}</span></div>
-                          <div className="flex justify-between text-slate-500"><span>Presupuestado</span><span className="font-semibold">{fmtEur(totalPresupuestado)}</span></div>
-                          <div className="flex justify-between text-slate-500"><span>Facturas vencidas</span><span className="font-semibold text-red-500">{facturasVencidas}</span></div>
-                          <div className="flex justify-between text-slate-500"><span>Tickets pendientes</span><span className="font-semibold text-amber-600">{ticketsPendientes}</span></div>
+                      {loadingQuipu && quipuBankAccounts.length === 0 ? (
+                        <div className="flex items-center justify-center gap-2 py-8 text-sm text-slate-400">
+                          <Loader2 size={15} className="animate-spin" /> Cargando cuentas...
                         </div>
-                      </div>
+                      ) : quipuBankAccounts.length === 0 ? (
+                        <div className="px-5 py-6 text-sm text-slate-400 text-center">Sin cuentas bancarias. Sincroniza Quipu primero.</div>
+                      ) : (
+                        <div className="flex gap-0 divide-x divide-slate-100">
+                          {/* Lista de cuentas */}
+                          <div className="flex-shrink-0 w-64">
+                            {/* Fila "Todos" */}
+                            <button
+                              onClick={() => setSelectedBankAccountId(null)}
+                              className={`w-full flex items-center justify-between px-4 py-3 text-sm font-bold transition-colors ${!selectedBankAccountId ? "bg-emerald-600 text-white" : "text-slate-700 hover:bg-slate-50"}`}
+                            >
+                              <span>Todos</span>
+                              <span>{fmtEur(quipuBankAccounts.reduce((s, a) => s + a.balance, 0))}</span>
+                            </button>
+                            {quipuBankAccounts.map(acc => (
+                              <button
+                                key={acc.id}
+                                onClick={() => setSelectedBankAccountId(acc.id)}
+                                className={`w-full flex items-center justify-between px-4 py-2.5 text-xs transition-colors border-t border-slate-100 ${selectedBankAccountId === acc.id ? "bg-slate-100 font-semibold text-slate-900" : "text-slate-600 hover:bg-slate-50"}`}
+                              >
+                                <span className="truncate mr-2 uppercase font-semibold text-[11px]">{acc.name}</span>
+                                <span className="font-bold shrink-0">{fmtEur(acc.balance)}</span>
+                              </button>
+                            ))}
+                          </div>
+                          {/* Gráfico de línea */}
+                          <div className="flex-1 px-4 py-3 min-h-[140px]">
+                            <BankBalanceChart
+                              transactions={quipuTransactions}
+                              currentBalance={
+                                selectedBankAccountId
+                                  ? (quipuBankAccounts.find(a => a.id === selectedBankAccountId)?.balance ?? 0)
+                                  : quipuBankAccounts.reduce((s, a) => s + a.balance, 0)
+                              }
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
+                  )}
 
                   {/* ── Vencimiento (aging) ── */}
                   <OdooSection title="Vencimiento" subtitle="Análisis de cobros y pagos por antigüedad.">
@@ -2048,6 +2121,95 @@ export default function Facturacion() {
         />
       )}
     </div>
+  );
+}
+
+// ── BankBalanceChart ───────────────────────────────────────────
+function BankBalanceChart({
+  transactions,
+  currentBalance,
+}: {
+  transactions: QuipuTransaction[];
+  currentBalance: number;
+}) {
+  const W = 420; const H = 100; const PAD = 16;
+
+  // Build balance-over-time points from transactions (most recent last)
+  const sorted = [...transactions].sort((a, b) => a.date.localeCompare(b.date));
+  const points: { label: string; balance: number }[] = [];
+
+  // Reconstruct backwards from current balance
+  let bal = currentBalance;
+  const reversed = [...sorted].reverse();
+  const historic = reversed.map(tx => {
+    const before = bal - tx.amount;
+    bal = before;
+    return { label: tx.date.slice(5), balance: before }; // MM-DD label
+  }).reverse();
+
+  // Combine: historic + current point
+  const allPts = [...historic.slice(-14), { label: "Hoy", balance: currentBalance }];
+
+  if (allPts.length < 2) {
+    // Just show a flat line at current balance
+    return (
+      <div className="flex items-center justify-center h-full text-xs text-slate-400">
+        {allPts.length === 0 ? "Sin movimientos" : fmtEur(currentBalance)}
+      </div>
+    );
+  }
+
+  const balances = allPts.map(p => p.balance);
+  const minB = Math.min(...balances);
+  const maxB = Math.max(...balances);
+  const range = maxB - minB || 1;
+
+  const xStep = (W - PAD * 2) / (allPts.length - 1);
+  const toX = (i: number) => PAD + i * xStep;
+  const toY = (b: number) => H - PAD - ((b - minB) / range) * (H - PAD * 2);
+
+  const pathD = allPts.map((p, i) => `${i === 0 ? "M" : "L"}${toX(i).toFixed(1)},${toY(p.balance).toFixed(1)}`).join(" ");
+  const areaD = `${pathD} L${toX(allPts.length - 1).toFixed(1)},${H} L${toX(0).toFixed(1)},${H} Z`;
+
+  // Y-axis labels
+  const yLabels = [minB, (minB + maxB) / 2, maxB].map(v => ({
+    y: toY(v),
+    label: v >= 1000 ? `${(v / 1000).toFixed(1)}K` : v.toFixed(0),
+  }));
+
+  // X-axis labels (every ~3 pts)
+  const xLabels = allPts
+    .map((p, i) => ({ i, label: p.label }))
+    .filter((_, i) => i % Math.ceil(allPts.length / 7) === 0 || i === allPts.length - 1);
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full" style={{ minHeight: 100 }}>
+      <defs>
+        <linearGradient id="bankGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#10b981" stopOpacity="0.15" />
+          <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      {/* Grid lines */}
+      {yLabels.map((yl, i) => (
+        <g key={i}>
+          <line x1={PAD} x2={W - PAD} y1={yl.y} y2={yl.y} stroke="#e2e8f0" strokeWidth="1" />
+          <text x={0} y={yl.y + 4} fontSize="9" fill="#94a3b8" textAnchor="start">{yl.label}</text>
+        </g>
+      ))}
+      {/* Area fill */}
+      <path d={areaD} fill="url(#bankGrad)" />
+      {/* Line */}
+      <path d={pathD} fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      {/* Dots */}
+      {allPts.map((p, i) => (
+        <circle key={i} cx={toX(i)} cy={toY(p.balance)} r="3" fill="#10b981" stroke="white" strokeWidth="1.5" />
+      ))}
+      {/* X labels */}
+      {xLabels.map(xl => (
+        <text key={xl.i} x={toX(xl.i)} y={H - 2} fontSize="9" fill="#94a3b8" textAnchor="middle">{xl.label}</text>
+      ))}
+    </svg>
   );
 }
 
