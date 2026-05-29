@@ -3,6 +3,8 @@ import pool from '../config/database';
 import { logActivityForReq, resolveUserName } from './activityController';
 import {
   fetchQuipuBootstrap,
+  quipuOwnerFetch,
+  fetchQuipuPaginatedList,
   requestQuipuToken,
   summarizeQuipuBootstrap,
 } from '../services/quipuService';
@@ -319,5 +321,370 @@ export const syncQuipuBootstrap = async (req: any, res: Response) => {
     });
   } catch (error: any) {
     res.status(400).json({ success: false, error: error?.message || 'No se pudo sincronizar con Quipu.' });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────
+// LIVE PROXY helpers
+// ─────────────────────────────────────────────────────────────────
+
+async function requireSettings(userId: string, res: Response) {
+  const settings = await getStoredQuipuSettings(userId);
+  if (!settings) {
+    res.status(400).json({ success: false, error: 'Quipu no está configurado. Ve a Configuración → Quipu.' });
+    return null;
+  }
+  return settings;
+}
+
+// ── Contactos ──────────────────────────────────────────────────
+
+export const getQuipuContacts = async (req: any, res: Response) => {
+  const userId = req.auth?.userId;
+  if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  const settings = await requireSettings(userId, res);
+  if (!settings) return;
+  try {
+    const kind = req.query.kind || '';
+    const path = `/contactos${kind ? `?filter[kind]=${kind}` : ''}`;
+    const data = await fetchQuipuPaginatedList(settings, path);
+    res.json({ success: true, data });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e?.message || 'Error al obtener contactos de Quipu.' });
+  }
+};
+
+export const createQuipuContact = async (req: any, res: Response) => {
+  const userId = req.auth?.userId;
+  if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  const settings = await requireSettings(userId, res);
+  if (!settings) return;
+  try {
+    const data = await quipuOwnerFetch(settings, '/contactos', {
+      method: 'POST',
+      body: JSON.stringify({ data: { type: 'contacts', attributes: req.body } }),
+    });
+    res.status(201).json({ success: true, data });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e?.message || 'Error al crear contacto en Quipu.' });
+  }
+};
+
+export const updateQuipuContact = async (req: any, res: Response) => {
+  const userId = req.auth?.userId;
+  if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  const settings = await requireSettings(userId, res);
+  if (!settings) return;
+  try {
+    const data = await quipuOwnerFetch(settings, `/contactos/${req.params.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ data: { type: 'contacts', id: req.params.id, attributes: req.body } }),
+    });
+    res.json({ success: true, data });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e?.message || 'Error al actualizar contacto en Quipu.' });
+  }
+};
+
+export const deleteQuipuContact = async (req: any, res: Response) => {
+  const userId = req.auth?.userId;
+  if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  const settings = await requireSettings(userId, res);
+  if (!settings) return;
+  try {
+    await quipuOwnerFetch(settings, `/contactos/${req.params.id}`, { method: 'DELETE' });
+    res.json({ success: true });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e?.message || 'Error al eliminar contacto en Quipu.' });
+  }
+};
+
+// ── Facturas (invoices) ────────────────────────────────────────
+
+export const getQuipuInvoices = async (req: any, res: Response) => {
+  const userId = req.auth?.userId;
+  if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  const settings = await requireSettings(userId, res);
+  if (!settings) return;
+  try {
+    const { kind, status, contact_id, from, to } = req.query;
+    const params = new URLSearchParams();
+    params.set('sort', '-issued_at');
+    if (kind)       params.set('filter[kind]', String(kind));
+    if (status)     params.set('filter[status]', String(status));
+    if (contact_id) params.set('filter[contact_id]', String(contact_id));
+    if (from)       params.set('filter[from_date]', String(from));
+    if (to)         params.set('filter[to_date]', String(to));
+    const data = await fetchQuipuPaginatedList(settings, `/invoices?${params.toString()}`);
+    res.json({ success: true, data });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e?.message || 'Error al obtener facturas de Quipu.' });
+  }
+};
+
+export const getQuipuInvoiceDetail = async (req: any, res: Response) => {
+  const userId = req.auth?.userId;
+  if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  const settings = await requireSettings(userId, res);
+  if (!settings) return;
+  try {
+    const data = await quipuOwnerFetch(settings, `/invoices/${req.params.id}?include=items,contact,numbering_series`);
+    res.json({ success: true, data });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e?.message || 'Error al obtener factura de Quipu.' });
+  }
+};
+
+export const createQuipuInvoice = async (req: any, res: Response) => {
+  const userId = req.auth?.userId;
+  if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  const settings = await requireSettings(userId, res);
+  if (!settings) return;
+  try {
+    const data = await quipuOwnerFetch(settings, '/invoices', {
+      method: 'POST',
+      body: JSON.stringify(req.body),
+    });
+    await logActivityForReq(req, 'Factura creada en Quipu', 'QUIPU', String(data?.data?.id || ''), undefined, 'CREATE');
+    res.status(201).json({ success: true, data });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e?.message || 'Error al crear factura en Quipu.' });
+  }
+};
+
+export const updateQuipuInvoice = async (req: any, res: Response) => {
+  const userId = req.auth?.userId;
+  if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  const settings = await requireSettings(userId, res);
+  if (!settings) return;
+  try {
+    const data = await quipuOwnerFetch(settings, `/invoices/${req.params.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(req.body),
+    });
+    await logActivityForReq(req, 'Factura actualizada en Quipu', 'QUIPU', req.params.id, undefined, 'UPDATE');
+    res.json({ success: true, data });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e?.message || 'Error al actualizar factura en Quipu.' });
+  }
+};
+
+export const deleteQuipuInvoice = async (req: any, res: Response) => {
+  const userId = req.auth?.userId;
+  if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  const settings = await requireSettings(userId, res);
+  if (!settings) return;
+  try {
+    await quipuOwnerFetch(settings, `/invoices/${req.params.id}`, { method: 'DELETE' });
+    await logActivityForReq(req, 'Factura eliminada en Quipu', 'QUIPU', req.params.id, undefined, 'DELETE');
+    res.json({ success: true });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e?.message || 'Error al eliminar factura en Quipu.' });
+  }
+};
+
+export const sendQuipuInvoiceByEmail = async (req: any, res: Response) => {
+  const userId = req.auth?.userId;
+  if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  const settings = await requireSettings(userId, res);
+  if (!settings) return;
+  try {
+    const data = await quipuOwnerFetch(settings, `/invoices/${req.params.id}/send_by_email`, {
+      method: 'POST',
+      body: JSON.stringify(req.body || {}),
+    });
+    res.json({ success: true, data });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e?.message || 'Error al enviar factura por email.' });
+  }
+};
+
+// ── Cobros (receipts) ──────────────────────────────────────────
+
+export const getQuipuReceipts = async (req: any, res: Response) => {
+  const userId = req.auth?.userId;
+  if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  const settings = await requireSettings(userId, res);
+  if (!settings) return;
+  try {
+    const data = await fetchQuipuPaginatedList(settings, '/receipts?sort=-settlement_date');
+    res.json({ success: true, data });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e?.message || 'Error al obtener cobros de Quipu.' });
+  }
+};
+
+export const createQuipuReceipt = async (req: any, res: Response) => {
+  const userId = req.auth?.userId;
+  if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  const settings = await requireSettings(userId, res);
+  if (!settings) return;
+  try {
+    const data = await quipuOwnerFetch(settings, '/receipts', {
+      method: 'POST',
+      body: JSON.stringify(req.body),
+    });
+    res.status(201).json({ success: true, data });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e?.message || 'Error al crear cobro en Quipu.' });
+  }
+};
+
+// ── Cuentas bancarias ──────────────────────────────────────────
+
+export const getQuipuBankAccounts = async (req: any, res: Response) => {
+  const userId = req.auth?.userId;
+  if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  const settings = await requireSettings(userId, res);
+  if (!settings) return;
+  try {
+    const data = await fetchQuipuPaginatedList(settings, '/bank_accounts');
+    res.json({ success: true, data });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e?.message || 'Error al obtener cuentas bancarias de Quipu.' });
+  }
+};
+
+export const getQuipuBankTransactions = async (req: any, res: Response) => {
+  const userId = req.auth?.userId;
+  if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  const settings = await requireSettings(userId, res);
+  if (!settings) return;
+  try {
+    const { from, to } = req.query;
+    const params = new URLSearchParams();
+    params.set('sort', '-date');
+    if (from) params.set('filter[from_date]', String(from));
+    if (to)   params.set('filter[to_date]', String(to));
+    const data = await fetchQuipuPaginatedList(
+      settings,
+      `/bank_accounts/${req.params.id}/bank_transactions?${params.toString()}`,
+    );
+    res.json({ success: true, data });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e?.message || 'Error al obtener movimientos bancarios.' });
+  }
+};
+
+// ── Series de numeración ───────────────────────────────────────
+
+export const getQuipuNumberingSeries = async (req: any, res: Response) => {
+  const userId = req.auth?.userId;
+  if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  const settings = await requireSettings(userId, res);
+  if (!settings) return;
+  try {
+    const data = await fetchQuipuPaginatedList(settings, '/numbering_series');
+    res.json({ success: true, data });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e?.message || 'Error al obtener series de numeración.' });
+  }
+};
+
+// ── Empresa ────────────────────────────────────────────────────
+
+export const getQuipuCompany = async (req: any, res: Response) => {
+  const userId = req.auth?.userId;
+  if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  const settings = await requireSettings(userId, res);
+  if (!settings) return;
+  try {
+    const data = await quipuOwnerFetch(settings, '/company');
+    res.json({ success: true, data });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e?.message || 'Error al obtener datos de empresa.' });
+  }
+};
+
+// ── Push factura local → Quipu ─────────────────────────────────
+
+export const pushLocalFacturaToQuipu = async (req: any, res: Response) => {
+  const userId = req.auth?.userId;
+  if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  const settings = await requireSettings(userId, res);
+  if (!settings) return;
+  const { id } = req.params;
+
+  try {
+    const facturaRes = await pool.query(
+      `SELECT ff.*, e.first_name, e.last_name, e.commercial_name
+       FROM facturacion_facturas ff
+       LEFT JOIN entities e ON e.id = ff.client_id
+       WHERE ff.id = $1 AND ff.user_id = $2`,
+      [id, userId],
+    );
+    if (!facturaRes.rows.length) return res.status(404).json({ success: false, error: 'Factura no encontrada.' });
+    const f = facturaRes.rows[0];
+
+    if (f.quipu_id) return res.status(400).json({ success: false, error: 'Esta factura ya está en Quipu.' });
+
+    // Find or create contact in Quipu
+    let contactQuipuId: string | null = null;
+    if (f.contacto) {
+      const contacts = await fetchQuipuPaginatedList<any>(settings, `/contactos?filter[kind]=client`);
+      const match = contacts.find((c: any) => {
+        const name = String(c?.attributes?.name || c?.attributes?.full_name || '').toLowerCase();
+        return name === f.contacto.toLowerCase();
+      });
+      if (match) {
+        contactQuipuId = String(match.id);
+      } else {
+        const newContact = await quipuOwnerFetch<any>(settings, '/contactos', {
+          method: 'POST',
+          body: JSON.stringify({
+            data: {
+              type: 'contacts',
+              attributes: { kind: 'client', name: f.contacto },
+            },
+          }),
+        });
+        contactQuipuId = String(newContact?.data?.id || '');
+      }
+    }
+
+    const grossAmount = Number(f.total) / 1.21; // assume 21% IVA
+
+    const payload: any = {
+      data: {
+        type: 'invoices',
+        attributes: {
+          kind: 'revenue',
+          number: f.num,
+          issue_date: f.fecha ? String(f.fecha).slice(0, 10) : new Date().toISOString().slice(0, 10),
+          due_date: f.vencimiento ? String(f.vencimiento).slice(0, 10) : null,
+          subject: f.contacto || 'Factura',
+          payment_method: f.forma_pago === 'transferencia' ? 'bank_transfer' : (f.forma_pago || 'bank_transfer'),
+          items_attributes: [
+            {
+              concept: f.contacto || 'Servicios profesionales',
+              quantity: 1,
+              unitary_amount: grossAmount.toFixed(2),
+              vat_percent: 21,
+            },
+          ],
+        },
+        relationships: contactQuipuId
+          ? { contact: { data: { id: contactQuipuId, type: 'contacts' } } }
+          : undefined,
+      },
+    };
+
+    const created = await quipuOwnerFetch<any>(settings, '/invoices', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+
+    const quipuId = String(created?.data?.id || '');
+    if (quipuId) {
+      await pool.query(
+        `UPDATE facturacion_facturas SET quipu_id = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3`,
+        [quipuId, id, userId],
+      );
+    }
+
+    await logActivityForReq(req, `Factura ${f.num} enviada a Quipu`, 'QUIPU', quipuId, f.contacto, 'CREATE');
+    res.json({ success: true, data: { quipuId, quipuInvoice: created?.data } });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e?.message || 'Error al enviar factura a Quipu.' });
   }
 };

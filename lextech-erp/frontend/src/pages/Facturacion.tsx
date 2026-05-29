@@ -3,24 +3,72 @@ import { useAuth } from "@clerk/clerk-react";
 import {
   AlertCircle,
   Banknote,
+  Building2,
   CheckCircle2,
   ChevronDown,
   Clock,
+  CreditCard,
   ExternalLink,
   FileSpreadsheet,
   Link as LinkIcon,
+  Loader2,
   Pencil,
   Plus,
   RefreshCw,
   Save,
+  Settings,
   Trash2,
   TrendingDown,
+  Upload,
+  Users,
   X,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 
 type FilterPeriod = "year" | "q1" | "q2" | "q3" | "q4" | "jan" | "feb" | "mar" | "apr" | "may" | "jun" | "jul" | "aug" | "sep" | "oct" | "nov" | "dec";
-type TabKey = "dashboard" | "facturas" | "gastos" | "presupuestos";
+type TabKey = "dashboard" | "facturas" | "gastos" | "presupuestos" | "contacts" | "bank_accounts" | "receipts" | "config";
+
+type QuipuContact = {
+  id: string;
+  kind: string;
+  name: string;
+  fullName?: string;
+  taxId?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  countryCode?: string;
+};
+
+type QuipuBankAccount = {
+  id: string;
+  name: string;
+  iban?: string;
+  balance: number;
+  bankName?: string;
+  currency?: string;
+  updatedAt?: string;
+};
+
+type QuipuTransaction = {
+  id: string;
+  date: string;
+  description: string;
+  amount: number;
+  balanceAfter?: number;
+  kind?: string;
+};
+
+type QuipuReceipt = {
+  id: string;
+  number?: string;
+  settlementDate: string;
+  amount: number;
+  contactName?: string;
+  invoiceNumber?: string;
+  paymentMethod?: string;
+  kind?: string;
+};
 type BillingArea = "procesal" | "mercantil" | "laboral" | "familia" | "penal" | "fiscal";
 type PaymentMethod = "transferencia" | "tarjeta" | "domiciliacion" | "bizum" | "efectivo";
 type BillingFormType = "factura" | "gasto" | "presupuesto";
@@ -830,12 +878,28 @@ export default function Facturacion() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [quipuStatus, setQuipuStatus] = useState<QuipuStatus>({ connected: false });
   const [showQuipuModal, setShowQuipuModal] = useState(false);
+  // Quipu live data
+  const [quipuContacts, setQuipuContacts] = useState<QuipuContact[]>([]);
+  const [quipuBankAccounts, setQuipuBankAccounts] = useState<QuipuBankAccount[]>([]);
+  const [selectedBankAccountId, setSelectedBankAccountId] = useState<string | null>(null);
+  const [quipuTransactions, setQuipuTransactions] = useState<QuipuTransaction[]>([]);
+  const [quipuReceipts, setQuipuReceipts] = useState<QuipuReceipt[]>([]);
+  const [loadingQuipu, setLoadingQuipu] = useState(false);
+  const [quipuError, setQuipuError] = useState<string | null>(null);
+  const [pushingToQuipuId, setPushingToQuipuId] = useState<string | null>(null);
+  const [showContactEditor, setShowContactEditor] = useState(false);
+  const [editingContact, setEditingContact] = useState<QuipuContact | null>(null);
+  const [savingContact, setSavingContact] = useState(false);
 
-  const TABS: { key: TabKey; label: string }[] = [
-    { key: "dashboard", label: "Resumen" },
-    { key: "facturas", label: "Facturas de cliente" },
-    { key: "gastos", label: "Gastos del despacho" },
-    { key: "presupuestos", label: "Presupuestos y ofertas" },
+  const TABS: { key: TabKey; label: string; icon?: React.ComponentType<any>; quipuOnly?: boolean }[] = [
+    { key: "dashboard",     label: "Vista general" },
+    { key: "facturas",      label: "Facturas" },
+    { key: "gastos",        label: "Gastos" },
+    { key: "presupuestos",  label: "Presupuestos" },
+    { key: "receipts",      label: "Cobros",           icon: CreditCard,   quipuOnly: true },
+    { key: "contacts",      label: "Contactos",         icon: Users,        quipuOnly: true },
+    { key: "bank_accounts", label: "Cuentas bancarias", icon: Building2,    quipuOnly: true },
+    { key: "config",        label: "Configuración",     icon: Settings },
   ];
 
   const loadBilling = useCallback(async () => {
@@ -1121,6 +1185,139 @@ export default function Facturacion() {
     }
   };
 
+  // ── Quipu live loaders ───────────────────────────────────────
+
+  const loadQuipuContacts = useCallback(async () => {
+    if (!quipuStatus.connected) return;
+    setLoadingQuipu(true); setQuipuError(null);
+    try {
+      const res = await apiFetch("/api/quipu/contacts", { getToken });
+      const rows: any[] = res?.data || [];
+      setQuipuContacts(rows.map((r: any) => ({
+        id: String(r.id),
+        kind: r.attributes?.kind || "client",
+        name: r.attributes?.name || r.attributes?.full_name || "Sin nombre",
+        fullName: r.attributes?.full_name || "",
+        taxId: r.attributes?.tax_id || "",
+        email: r.attributes?.email || "",
+        phone: r.attributes?.phone || "",
+        address: r.attributes?.address || "",
+        countryCode: r.attributes?.country_code || "ES",
+      })));
+    } catch (e: any) { setQuipuError(e?.message || "Error al cargar contactos"); }
+    finally { setLoadingQuipu(false); }
+  }, [getToken, quipuStatus.connected]);
+
+  const loadQuipuBankAccounts = useCallback(async () => {
+    if (!quipuStatus.connected) return;
+    setLoadingQuipu(true); setQuipuError(null);
+    try {
+      const res = await apiFetch("/api/quipu/bank_accounts", { getToken });
+      const rows: any[] = res?.data || [];
+      setQuipuBankAccounts(rows.map((r: any) => ({
+        id: String(r.id),
+        name: r.attributes?.name || "Cuenta bancaria",
+        iban: r.attributes?.iban || "",
+        balance: Number(r.attributes?.balance || 0),
+        bankName: r.attributes?.bank_name || "",
+        currency: r.attributes?.currency || "EUR",
+        updatedAt: r.attributes?.updated_at || "",
+      })));
+      if (rows.length > 0 && !selectedBankAccountId) setSelectedBankAccountId(String(rows[0].id));
+    } catch (e: any) { setQuipuError(e?.message || "Error al cargar cuentas bancarias"); }
+    finally { setLoadingQuipu(false); }
+  }, [getToken, quipuStatus.connected, selectedBankAccountId]);
+
+  const loadQuipuTransactions = useCallback(async (bankAccountId: string) => {
+    if (!quipuStatus.connected || !bankAccountId) return;
+    setLoadingQuipu(true);
+    try {
+      const res = await apiFetch(`/api/quipu/bank_accounts/${bankAccountId}/transactions`, { getToken });
+      const rows: any[] = res?.data || [];
+      setQuipuTransactions(rows.map((r: any) => ({
+        id: String(r.id),
+        date: String(r.attributes?.date || "").slice(0, 10),
+        description: r.attributes?.description || r.attributes?.concept || "",
+        amount: Number(r.attributes?.amount || 0),
+        balanceAfter: r.attributes?.balance_after != null ? Number(r.attributes.balance_after) : undefined,
+        kind: r.attributes?.kind || "",
+      })));
+    } catch { setQuipuTransactions([]); }
+    finally { setLoadingQuipu(false); }
+  }, [getToken, quipuStatus.connected]);
+
+  const loadQuipuReceipts = useCallback(async () => {
+    if (!quipuStatus.connected) return;
+    setLoadingQuipu(true); setQuipuError(null);
+    try {
+      const res = await apiFetch("/api/quipu/receipts", { getToken });
+      const rows: any[] = res?.data || [];
+      setQuipuReceipts(rows.map((r: any) => ({
+        id: String(r.id),
+        number: r.attributes?.number || "",
+        settlementDate: String(r.attributes?.settlement_date || "").slice(0, 10),
+        amount: Number(r.attributes?.amount || 0),
+        contactName: r.attributes?.contact_name || "",
+        invoiceNumber: r.attributes?.invoice_number || "",
+        paymentMethod: r.attributes?.payment_method || "",
+        kind: r.attributes?.kind || "",
+      })));
+    } catch (e: any) { setQuipuError(e?.message || "Error al cargar cobros"); }
+    finally { setLoadingQuipu(false); }
+  }, [getToken, quipuStatus.connected]);
+
+  useEffect(() => {
+    if (!quipuStatus.connected) return;
+    if (tab === "contacts"      && quipuContacts.length === 0)     loadQuipuContacts();
+    if (tab === "bank_accounts" && quipuBankAccounts.length === 0) loadQuipuBankAccounts();
+    if (tab === "receipts"      && quipuReceipts.length === 0)     loadQuipuReceipts();
+  }, [tab, quipuStatus.connected]);
+
+  useEffect(() => {
+    if (selectedBankAccountId && tab === "bank_accounts") {
+      loadQuipuTransactions(selectedBankAccountId);
+    }
+  }, [selectedBankAccountId, tab]);
+
+  const pushToQuipu = useCallback(async (facturaId: string) => {
+    setPushingToQuipuId(facturaId);
+    try {
+      await apiFetch(`/api/quipu/push-factura/${facturaId}`, { method: "POST", getToken });
+      await loadBilling();
+    } catch (e: any) { setErrorMsg(e?.message || "Error al enviar factura a Quipu."); }
+    finally { setPushingToQuipuId(null); }
+  }, [getToken, loadBilling]);
+
+  const saveContact = async (attrs: Partial<QuipuContact>) => {
+    setSavingContact(true);
+    try {
+      if (editingContact?.id) {
+        await apiFetch(`/api/quipu/contacts/${editingContact.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ kind: attrs.kind, name: attrs.name, tax_id: attrs.taxId, email: attrs.email, phone: attrs.phone }),
+          getToken,
+        });
+      } else {
+        await apiFetch("/api/quipu/contacts", {
+          method: "POST",
+          body: JSON.stringify({ kind: attrs.kind || "client", name: attrs.name, tax_id: attrs.taxId, email: attrs.email, phone: attrs.phone }),
+          getToken,
+        });
+      }
+      await loadQuipuContacts();
+      setShowContactEditor(false); setEditingContact(null);
+    } catch (e: any) { setErrorMsg(e?.message || "Error al guardar contacto."); }
+    finally { setSavingContact(false); }
+  };
+
+  const deleteContact = async (id: string) => {
+    if (!confirm("¿Eliminar este contacto de Quipu?")) return;
+    try {
+      await apiFetch(`/api/quipu/contacts/${id}`, { method: "DELETE", getToken });
+      setQuipuContacts(prev => prev.filter(c => c.id !== id));
+    } catch (e: any) { setErrorMsg(e?.message || "Error al eliminar contacto."); }
+  };
+
   const totalPendiente = filteredCobrosPendientes.reduce((sum, row) => sum + row.pendiente, 0);
   const totalFacturado = filteredFacturas.reduce((sum, row) => sum + row.total, 0);
   const totalCobrado = filteredFacturas.filter((row) => row.estado === "cobrada").reduce((sum, row) => sum + row.total, 0);
@@ -1295,6 +1492,197 @@ export default function Facturacion() {
                 </div>
               </OdooSection>
 
+              {/* ══ CONTACTOS ══════════════════════════════════════════════════════ */}
+              {tab === "contacts" && (
+                <div className="space-y-4">
+                  {!quipuStatus.connected ? (
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-8 text-center text-sm text-amber-700">
+                      Conecta Quipu para gestionar contactos.
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-semibold text-slate-600">{quipuContacts.length} contactos en Quipu</p>
+                        <div className="flex gap-2">
+                          <button onClick={loadQuipuContacts} disabled={loadingQuipu} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50">
+                            <RefreshCw size={12} className={loadingQuipu ? "animate-spin" : ""} /> Actualizar
+                          </button>
+                          <button onClick={() => { setEditingContact(null); setShowContactEditor(true); }} className="inline-flex items-center gap-1.5 rounded-xl bg-red-700 px-3 py-2 text-xs font-bold text-white hover:bg-red-800">
+                            <Plus size={12} /> Nuevo contacto
+                          </button>
+                        </div>
+                      </div>
+                      {quipuError && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{quipuError}</div>}
+                      <TableShell title="Contactos de Quipu" count={`${quipuContacts.length} registros`} headers={["Nombre", "Tipo", "NIF/CIF", "Email", "Teléfono", ""]}>
+                        {loadingQuipu ? (
+                          <tr><td colSpan={6} className="px-5 py-8 text-center text-sm text-slate-400"><Loader2 size={16} className="inline animate-spin mr-2" />Cargando...</td></tr>
+                        ) : quipuContacts.map(c => (
+                          <tr key={c.id} className="transition-colors hover:bg-slate-50/60">
+                            <td className="px-5 py-3 text-sm font-semibold text-slate-800">{c.name}</td>
+                            <td className="px-5 py-3"><span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${c.kind === "client" ? "bg-blue-100 text-blue-700" : c.kind === "provider" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-600"}`}>{c.kind === "client" ? "Cliente" : c.kind === "provider" ? "Proveedor" : c.kind}</span></td>
+                            <td className="px-5 py-3 text-sm text-slate-500 font-mono">{c.taxId || "—"}</td>
+                            <td className="px-5 py-3 text-sm text-slate-500">{c.email || "—"}</td>
+                            <td className="px-5 py-3 text-sm text-slate-500">{c.phone || "—"}</td>
+                            <td className="px-5 py-3">
+                              <div className="flex justify-end gap-2">
+                                <ActionIconButton title="Editar" onClick={() => { setEditingContact(c); setShowContactEditor(true); }}><Pencil size={13} /></ActionIconButton>
+                                <ActionIconButton title="Eliminar" tone="red" onClick={() => deleteContact(c.id)}><Trash2 size={13} /></ActionIconButton>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </TableShell>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* ══ CUENTAS BANCARIAS ═══════════════════════════════════════════════ */}
+              {tab === "bank_accounts" && (
+                <div className="space-y-4">
+                  {!quipuStatus.connected ? (
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-8 text-center text-sm text-amber-700">Conecta Quipu para ver cuentas bancarias.</div>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-semibold text-slate-600">Cuentas conectadas a Quipu</p>
+                        <button onClick={loadQuipuBankAccounts} disabled={loadingQuipu} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50">
+                          <RefreshCw size={12} className={loadingQuipu ? "animate-spin" : ""} /> Actualizar
+                        </button>
+                      </div>
+                      {quipuError && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{quipuError}</div>}
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+                        {quipuBankAccounts.map(acc => (
+                          <button key={acc.id} onClick={() => setSelectedBankAccountId(acc.id)}
+                            className={`rounded-2xl border p-5 text-left transition-all ${selectedBankAccountId === acc.id ? "border-blue-300 bg-blue-50 shadow-sm" : "border-slate-200 bg-white hover:border-slate-300"}`}>
+                            <div className="flex items-center justify-between gap-3 mb-3">
+                              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100"><Building2 size={16} className="text-slate-500" /></div>
+                              <span className="text-xs font-semibold text-slate-400">{acc.currency || "EUR"}</span>
+                            </div>
+                            <p className="text-sm font-bold text-slate-800 truncate">{acc.name}</p>
+                            {acc.bankName && <p className="text-xs text-slate-500 mt-0.5">{acc.bankName}</p>}
+                            {acc.iban && <p className="text-[11px] font-mono text-slate-400 mt-1 truncate">{acc.iban}</p>}
+                            <p className={`mt-3 text-xl font-bold ${acc.balance >= 0 ? "text-emerald-600" : "text-red-600"}`}>{fmtEur(acc.balance)}</p>
+                            {acc.updatedAt && <p className="text-[10px] text-slate-400 mt-1">Actualizado {fmtDate(acc.updatedAt)}</p>}
+                          </button>
+                        ))}
+                        {loadingQuipu && !quipuBankAccounts.length && (
+                          <div className="col-span-3 flex items-center justify-center py-8 text-sm text-slate-400"><Loader2 size={16} className="animate-spin mr-2" />Cargando cuentas...</div>
+                        )}
+                      </div>
+                      {selectedBankAccountId && (
+                        <TableShell title="Movimientos bancarios" count={`${quipuTransactions.length} movimientos`} headers={["Fecha", "Descripción", "Importe", "Saldo tras mov.", "Tipo"]}>
+                          {loadingQuipu ? (
+                            <tr><td colSpan={5} className="px-5 py-8 text-center text-sm text-slate-400"><Loader2 size={16} className="inline animate-spin mr-2" />Cargando movimientos...</td></tr>
+                          ) : quipuTransactions.length === 0 ? (
+                            <tr><td colSpan={5} className="px-5 py-8 text-center text-sm text-slate-400">Sin movimientos registrados</td></tr>
+                          ) : quipuTransactions.map(tx => (
+                            <tr key={tx.id} className="transition-colors hover:bg-slate-50/60">
+                              <td className="px-5 py-3 text-sm text-slate-600">{fmtDate(tx.date)}</td>
+                              <td className="px-5 py-3 text-sm text-slate-700">{tx.description || "—"}</td>
+                              <td className={`px-5 py-3 text-sm font-bold ${tx.amount >= 0 ? "text-emerald-600" : "text-red-600"}`}>{tx.amount >= 0 ? "+" : ""}{fmtEur(tx.amount)}</td>
+                              <td className="px-5 py-3 text-sm font-semibold text-slate-800">{tx.balanceAfter != null ? fmtEur(tx.balanceAfter) : "—"}</td>
+                              <td className="px-5 py-3 text-xs text-slate-500">{tx.kind || "—"}</td>
+                            </tr>
+                          ))}
+                        </TableShell>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* ══ COBROS ══════════════════════════════════════════════════════════ */}
+              {tab === "receipts" && (
+                <div className="space-y-4">
+                  {!quipuStatus.connected ? (
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-8 text-center text-sm text-amber-700">Conecta Quipu para ver cobros.</div>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-semibold text-slate-600">{quipuReceipts.length} cobros registrados en Quipu</p>
+                        <button onClick={loadQuipuReceipts} disabled={loadingQuipu} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50">
+                          <RefreshCw size={12} className={loadingQuipu ? "animate-spin" : ""} /> Actualizar
+                        </button>
+                      </div>
+                      {quipuError && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{quipuError}</div>}
+                      <TableShell title="Cobros de Quipu" count={`${quipuReceipts.length} registros`} headers={["Número", "Contacto", "Factura", "Fecha cobro", "Importe", "Forma de pago", "Tipo"]}>
+                        {loadingQuipu ? (
+                          <tr><td colSpan={7} className="px-5 py-8 text-center text-sm text-slate-400"><Loader2 size={16} className="inline animate-spin mr-2" />Cargando cobros...</td></tr>
+                        ) : quipuReceipts.length === 0 ? (
+                          <tr><td colSpan={7} className="px-5 py-8 text-center text-sm text-slate-400">Sin cobros registrados</td></tr>
+                        ) : quipuReceipts.map(r => (
+                          <tr key={r.id} className="transition-colors hover:bg-slate-50/60">
+                            <td className="px-5 py-3 text-sm font-semibold text-slate-800">{r.number || "—"}</td>
+                            <td className="px-5 py-3 text-sm text-slate-600">{r.contactName || "—"}</td>
+                            <td className="px-5 py-3 text-sm text-slate-500">{r.invoiceNumber || "—"}</td>
+                            <td className="px-5 py-3 text-sm text-slate-500">{fmtDate(r.settlementDate)}</td>
+                            <td className="px-5 py-3 text-sm font-bold text-emerald-700">{fmtEur(r.amount)}</td>
+                            <td className="px-5 py-3 text-xs text-slate-500">{r.paymentMethod || "—"}</td>
+                            <td className="px-5 py-3"><span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${r.kind === "revenue" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"}`}>{r.kind === "revenue" ? "Cobro" : r.kind || "—"}</span></td>
+                          </tr>
+                        ))}
+                      </TableShell>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* ══ CONFIGURACIÓN ═══════════════════════════════════════════════════ */}
+              {tab === "config" && (
+                <div className="space-y-4 max-w-2xl">
+                  <OdooSection title="Conexión con Quipu" subtitle="Gestiona las credenciales API para sincronizar facturas, contactos y cuentas bancarias.">
+                    {quipuStatus.connected ? (
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-3 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3">
+                          <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
+                          <div>
+                            <p className="text-sm font-semibold text-emerald-800">Quipu conectado</p>
+                            <p className="text-xs text-emerald-700 mt-0.5">
+                              {quipuStatus.lastSyncAt ? `Última sincronización: ${new Date(quipuStatus.lastSyncAt).toLocaleString("es-ES")}` : "Sin sincronizar aún"}
+                            </p>
+                          </div>
+                        </div>
+                        {quipuStatus.syncSummary && (
+                          <div className="grid grid-cols-3 gap-3">
+                            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-center">
+                              <p className="text-2xl font-bold text-slate-900">{quipuStatus.syncSummary.contacts || 0}</p>
+                              <p className="text-xs text-slate-500 mt-0.5">Contactos</p>
+                            </div>
+                            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-center">
+                              <p className="text-2xl font-bold text-slate-900">{quipuStatus.syncSummary.invoices || 0}</p>
+                              <p className="text-xs text-slate-500 mt-0.5">Facturas Quipu</p>
+                            </div>
+                            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-center">
+                              <p className="text-2xl font-bold text-slate-900">{quipuStatus.syncSummary.numberingSeries || 0}</p>
+                              <p className="text-xs text-slate-500 mt-0.5">Series</p>
+                            </div>
+                          </div>
+                        )}
+                        <div className="flex gap-3">
+                          <button onClick={syncQuipu} disabled={saving} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60">
+                            <RefreshCw size={14} className={saving ? "animate-spin" : ""} /> Sincronizar ahora
+                          </button>
+                          <button onClick={() => setShowQuipuModal(true)} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                            <Settings size={14} /> Editar credenciales
+                          </button>
+                          <button onClick={disconnectQuipu} disabled={saving} className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-60">
+                            <Trash2 size={14} /> Desconectar
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <p className="text-sm text-slate-500">Conecta con Quipu para sincronizar tu contabilidad automáticamente.</p>
+                        <button onClick={() => setShowQuipuModal(true)} className="inline-flex items-center gap-2 rounded-xl bg-red-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-800">
+                          <ExternalLink size={14} /> Conectar Quipu
+                        </button>
+                      </div>
+                    )}
+                  </OdooSection>
+                </div>
+              )}
+
               {tab === "dashboard" && (
                 <>
                   {/* ── Filtros de periodo ── */}
@@ -1371,6 +1759,96 @@ export default function Facturacion() {
                     </div>
                   </div>
 
+                  {/* ── Resumen financiero tipo Quipu ── */}
+                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                    <div className="grid grid-cols-1 divide-y divide-slate-100 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+                      {/* Ingresos */}
+                      <div className="px-6 py-5">
+                        <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Ingresos</p>
+                        <p className="mt-2 text-3xl font-black text-emerald-600">{fmtEur(totalFacturado)}</p>
+                        <div className="mt-3 space-y-1.5 text-xs">
+                          <div className="flex justify-between text-slate-500"><span>IVA repercutido (21%)</span><span className="font-semibold">{fmtEur(totalFacturado - totalFacturado / 1.21)}</span></div>
+                          <div className="flex justify-between text-slate-500"><span>Base imponible</span><span className="font-semibold">{fmtEur(totalFacturado / 1.21)}</span></div>
+                          <div className="flex justify-between text-slate-500"><span>Cobrado</span><span className="font-semibold text-emerald-600">{fmtEur(totalCobrado)}</span></div>
+                          <div className="flex justify-between text-slate-500"><span>Pendiente de cobro</span><span className="font-semibold text-amber-600">{fmtEur(totalPendiente)}</span></div>
+                        </div>
+                      </div>
+                      {/* Gastos */}
+                      <div className="px-6 py-5">
+                        <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Gastos</p>
+                        <p className="mt-2 text-3xl font-black text-red-500">{fmtEur(gastosMensuales)}</p>
+                        <div className="mt-3 space-y-1.5 text-xs">
+                          <div className="flex justify-between text-slate-500"><span>IVA soportado (21%)</span><span className="font-semibold">{fmtEur(gastosMensuales - gastosMensuales / 1.21)}</span></div>
+                          <div className="flex justify-between text-slate-500"><span>Base imponible</span><span className="font-semibold">{fmtEur(gastosMensuales / 1.21)}</span></div>
+                          <div className="flex justify-between text-slate-500"><span>Pendiente de pago</span><span className="font-semibold text-red-500">{fmtEur(pagosPendientes)}</span></div>
+                          <div className="flex justify-between text-slate-500"><span>Deducible</span><span className="font-semibold">{fmtEur(filteredGastos.filter(g => g.deducible).reduce((s, g) => s + g.total, 0))}</span></div>
+                        </div>
+                      </div>
+                      {/* Total / Margen */}
+                      <div className="px-6 py-5">
+                        <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Total</p>
+                        <p className={`mt-2 text-3xl font-black ${totalFacturado - gastosMensuales >= 0 ? "text-slate-900" : "text-red-600"}`}>{fmtEur(totalFacturado - gastosMensuales)}</p>
+                        <div className="mt-3 space-y-1.5 text-xs">
+                          <div className="flex justify-between text-slate-500"><span>Margen bruto</span><span className="font-semibold">{fmtEur(margenBruto)}</span></div>
+                          <div className="flex justify-between text-slate-500"><span>Presupuestado</span><span className="font-semibold">{fmtEur(totalPresupuestado)}</span></div>
+                          <div className="flex justify-between text-slate-500"><span>Facturas vencidas</span><span className="font-semibold text-red-500">{facturasVencidas}</span></div>
+                          <div className="flex justify-between text-slate-500"><span>Tickets pendientes</span><span className="font-semibold text-amber-600">{ticketsPendientes}</span></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ── Vencimiento (aging) ── */}
+                  <OdooSection title="Vencimiento" subtitle="Análisis de cobros y pagos por antigüedad.">
+                    {(() => {
+                      const now = new Date(); now.setHours(0,0,0,0);
+                      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                      const endOfNext  = new Date(now.getFullYear(), now.getMonth() + 2, 0);
+                      const buckets = [
+                        { label: "Atrasado",      test: (d: Date) => d < now },
+                        { label: "Este mes",      test: (d: Date) => d >= now && d <= endOfMonth },
+                        { label: "Próximo mes",   test: (d: Date) => d > endOfMonth && d <= endOfNext },
+                        { label: "Más adelante",  test: (d: Date) => d > endOfNext },
+                      ];
+                      const rows = buckets.map(b => {
+                        const cobrar = filteredCobrosPendientes.filter(f => { const d = f.vencimiento ? new Date(f.vencimiento) : new Date(0); return b.test(d); }).reduce((s, f) => s + f.pendiente, 0);
+                        const pagar  = filteredGastos.filter(g => g.estado === "pendiente" && (() => { const d = g.fecha ? new Date(g.fecha) : new Date(0); return b.test(d); })()).reduce((s, g) => s + g.total, 0);
+                        return { label: b.label, cobrar, pagar, resultado: cobrar - pagar };
+                      });
+                      const totCobrar = rows.reduce((s, r) => s + r.cobrar, 0);
+                      const totPagar  = rows.reduce((s, r) => s + r.pagar,  0);
+                      return (
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full text-left text-sm">
+                            <thead><tr className="border-b border-slate-100">
+                              <th className="pb-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 pr-8">Periodo</th>
+                              <th className="pb-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 text-right pr-8">A cobrar</th>
+                              <th className="pb-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 text-right pr-8">A pagar</th>
+                              <th className="pb-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 text-right">Resultado</th>
+                            </tr></thead>
+                            <tbody className="divide-y divide-slate-50">
+                              {rows.map(r => (
+                                <tr key={r.label}>
+                                  <td className="py-2.5 pr-8 font-medium text-slate-700">{r.label}</td>
+                                  <td className={`py-2.5 pr-8 text-right font-semibold ${r.cobrar > 0 ? "text-emerald-600" : "text-slate-300"}`}>{fmtEur(r.cobrar)}</td>
+                                  <td className={`py-2.5 pr-8 text-right font-semibold ${r.pagar  > 0 ? "text-red-500"     : "text-slate-300"}`}>{fmtEur(r.pagar)}</td>
+                                  <td className={`py-2.5 text-right font-bold ${r.resultado >= 0 ? "text-slate-800" : "text-red-600"}`}>{fmtEur(r.resultado)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                            <tfoot><tr className="border-t-2 border-slate-200">
+                              <td className="pt-2.5 pr-8 text-[11px] font-black uppercase tracking-widest text-slate-500">Total</td>
+                              <td className="pt-2.5 pr-8 text-right font-black text-emerald-600">{fmtEur(totCobrar)}</td>
+                              <td className="pt-2.5 pr-8 text-right font-black text-red-500">{fmtEur(totPagar)}</td>
+                              <td className={`pt-2.5 text-right font-black ${totCobrar - totPagar >= 0 ? "text-slate-900" : "text-red-600"}`}>{fmtEur(totCobrar - totPagar)}</td>
+                            </tr></tfoot>
+                          </table>
+                        </div>
+                      );
+                    })()}
+                  </OdooSection>
+
+                  {/* ── KPIs rápidos ── */}
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <KpiCard label="Cobros pendientes" value={fmtEur(totalPendiente)} sub={`${filterYear} · ${PERIOD_OPTIONS.find(o => o.value === filterPeriod)?.label ?? ""}`} color="amber" icon={Banknote} />
                     <KpiCard label="Facturas vencidas" value={String(facturasVencidas)} sub={`${filterYear} · ${PERIOD_OPTIONS.find(o => o.value === filterPeriod)?.label ?? ""}`} color="red" icon={AlertCircle} />
@@ -1447,6 +1925,18 @@ export default function Facturacion() {
                       <td className="px-5 py-3"><EstadoBadge estado={row.estado} /></td>
                       <td className="px-5 py-3">
                         <div className="flex justify-end gap-2">
+                          {quipuStatus.connected && !(row as any).quipu_id && (
+                            <ActionIconButton title="Enviar a Quipu" onClick={() => pushToQuipu(row.id)}>
+                              {pushingToQuipuId === row.id
+                                ? <Loader2 size={13} className="animate-spin" />
+                                : <Upload size={13} />}
+                            </ActionIconButton>
+                          )}
+                          {(row as any).quipu_id && (
+                            <span title="Ya en Quipu" className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-200 text-emerald-500">
+                              <CheckCircle2 size={13} />
+                            </span>
+                          )}
                           <ActionIconButton title="Editar factura" onClick={() => openEditor("factura", row)}>
                             <Pencil size={14} />
                           </ActionIconButton>
@@ -1547,6 +2037,100 @@ export default function Facturacion() {
           onSave={saveQuipuCredentials}
         />
       )}
+
+      {/* ── Editor de contacto Quipu ──────────────────────────────── */}
+      {showContactEditor && (
+        <ContactEditorModal
+          initial={editingContact}
+          saving={savingContact}
+          onClose={() => { setShowContactEditor(false); setEditingContact(null); }}
+          onSave={saveContact}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── ContactEditorModal ─────────────────────────────────────────
+function ContactEditorModal({
+  initial,
+  saving,
+  onClose,
+  onSave,
+}: {
+  initial: QuipuContact | null;
+  saving: boolean;
+  onClose: () => void;
+  onSave: (attrs: any) => void;
+}) {
+  const [form, setForm] = useState({
+    kind: initial?.kind || "client",
+    name: initial?.name || "",
+    taxId: initial?.taxId || "",
+    email: initial?.email || "",
+    phone: initial?.phone || "",
+    address: initial?.address || "",
+  });
+  const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
+  const lbl = "block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5";
+  const inp = "w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 outline-none focus:border-slate-300 focus:bg-white transition-colors";
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/30 px-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-3xl bg-white border border-slate-200 shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-xl bg-blue-100 flex items-center justify-center"><Users size={15} className="text-blue-600" /></div>
+            <div>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Contacto Quipu</p>
+              <h3 className="text-base font-bold text-slate-900">{initial ? "Editar contacto" : "Nuevo contacto"}</h3>
+            </div>
+          </div>
+          <button onClick={onClose} className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-400 hover:text-slate-700 transition-colors"><X size={15} /></button>
+        </div>
+        <div className="p-5 space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={lbl}>Tipo</label>
+              <select value={form.kind} onChange={e => set("kind", e.target.value)} className={inp}>
+                <option value="client">Cliente</option>
+                <option value="provider">Proveedor</option>
+                <option value="both">Ambos</option>
+              </select>
+            </div>
+            <div>
+              <label className={lbl}>NIF / CIF</label>
+              <input value={form.taxId} onChange={e => set("taxId", e.target.value)} placeholder="B12345678" className={inp} />
+            </div>
+          </div>
+          <div>
+            <label className={lbl}>Nombre *</label>
+            <input value={form.name} onChange={e => set("name", e.target.value)} placeholder="Nombre del contacto" className={inp} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={lbl}>Email</label>
+              <input value={form.email} onChange={e => set("email", e.target.value)} placeholder="email@ejemplo.com" type="email" className={inp} />
+            </div>
+            <div>
+              <label className={lbl}>Teléfono</label>
+              <input value={form.phone} onChange={e => set("phone", e.target.value)} placeholder="+34 600 000 000" className={inp} />
+            </div>
+          </div>
+          <div>
+            <label className={lbl}>Dirección</label>
+            <input value={form.address} onChange={e => set("address", e.target.value)} placeholder="Calle Mayor 1, Madrid" className={inp} />
+          </div>
+        </div>
+        <div className="flex items-center gap-2 px-5 py-3.5 border-t border-slate-100 bg-slate-50">
+          <button onClick={() => form.name.trim() && onSave(form)} disabled={!form.name.trim() || saving}
+            className="inline-flex items-center gap-2 px-5 py-2 text-sm font-bold text-white bg-red-700 hover:bg-red-800 disabled:opacity-40 rounded-xl active:scale-95 transition-all">
+            {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            {initial ? "Guardar cambios" : "Crear contacto"}
+          </button>
+          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 rounded-xl transition-colors">Cancelar</button>
+        </div>
+      </div>
     </div>
   );
 }
