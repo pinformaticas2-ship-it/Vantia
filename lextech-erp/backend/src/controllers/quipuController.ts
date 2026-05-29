@@ -27,6 +27,27 @@ function mapQuipuStatus(status: string): string {
   return 'pendiente';
 }
 
+async function ensureQuipuBankAccountsTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS quipu_bank_accounts (
+      id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      user_id           VARCHAR(150) NOT NULL,
+      quipu_setting_id  UUID REFERENCES quipu_settings(id) ON DELETE CASCADE,
+      external_id       VARCHAR(255) NOT NULL,
+      external_type     VARCHAR(80),
+      name              VARCHAR(255),
+      iban              VARCHAR(100),
+      current_balance   NUMERIC(14,2) NOT NULL DEFAULT 0,
+      bank_name         VARCHAR(255),
+      currency_code     VARCHAR(10) DEFAULT 'EUR',
+      raw_payload       JSONB NOT NULL,
+      created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (user_id, external_id)
+    )
+  `);
+}
+
 async function ensureQuipuSyncTables() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS quipu_contacts (
@@ -86,8 +107,10 @@ async function persistQuipuBootstrap(userId: string, settingId: string, bootstra
   contacts: any[];
   invoices: any[];
   numberingSeries: any[];
+  bankAccounts?: any[];
 }) {
   await ensureQuipuSyncTables();
+  await ensureQuipuBankAccountsTable();
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -151,6 +174,39 @@ async function persistQuipuBootstrap(userId: string, settingId: string, bootstra
           JSON.stringify(item),
         ],
       );
+    }
+
+    // Bank accounts (optional — not all Quipu plans expose this)
+    if (bootstrap.bankAccounts && bootstrap.bankAccounts.length > 0) {
+      await client.query(`DELETE FROM quipu_bank_accounts WHERE user_id = $1`, [userId]);
+      for (const item of bootstrap.bankAccounts) {
+        const balance = Number(
+          item?.attributes?.current_balance ?? item?.attributes?.balance ?? 0
+        );
+        await client.query(
+          `INSERT INTO quipu_bank_accounts
+             (user_id, quipu_setting_id, external_id, external_type, name, iban, current_balance, bank_name, currency_code, raw_payload)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+           ON CONFLICT (user_id, external_id) DO UPDATE
+             SET name = EXCLUDED.name, iban = EXCLUDED.iban,
+                 current_balance = EXCLUDED.current_balance,
+                 bank_name = EXCLUDED.bank_name,
+                 currency_code = EXCLUDED.currency_code,
+                 raw_payload = EXCLUDED.raw_payload,
+                 updated_at = NOW()`,
+          [
+            userId, settingId,
+            String(item?.id || ''),
+            String(item?.type || 'bank_accounts'),
+            String(item?.attributes?.name || ''),
+            String(item?.attributes?.iban || item?.attributes?.account_number || ''),
+            balance,
+            String(item?.attributes?.entity_bank_name || item?.attributes?.bank_name || ''),
+            String(item?.attributes?.currency_code || item?.attributes?.currency || 'EUR'),
+            JSON.stringify(item),
+          ],
+        );
+      }
     }
 
     await client.query('COMMIT');
@@ -321,6 +377,45 @@ export const syncQuipuBootstrap = async (req: any, res: Response) => {
     });
   } catch (error: any) {
     res.status(400).json({ success: false, error: error?.message || 'No se pudo sincronizar con Quipu.' });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────
+// SYNCED DATA (from local DB, no live API call needed)
+// ─────────────────────────────────────────────────────────────────
+
+export const getSyncedContacts = async (req: any, res: Response) => {
+  const userId = req.auth?.userId;
+  if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  try {
+    const result = await pool.query(
+      `SELECT external_id AS id, kind, contact_name AS name, tax_id, email,
+              raw_payload->>'phone' AS phone,
+              raw_payload->>'address' AS address,
+              raw_payload->>'country_code' AS country_code
+       FROM quipu_contacts WHERE user_id = $1 ORDER BY contact_name ASC`,
+      [userId],
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e?.message || 'Error al leer contactos sincronizados.' });
+  }
+};
+
+export const getSyncedBankAccounts = async (req: any, res: Response) => {
+  const userId = req.auth?.userId;
+  if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  try {
+    await ensureQuipuBankAccountsTable();
+    const result = await pool.query(
+      `SELECT external_id AS id, name, iban, current_balance AS balance,
+              bank_name, currency_code, updated_at
+       FROM quipu_bank_accounts WHERE user_id = $1 ORDER BY name ASC`,
+      [userId],
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (e: any) {
+    res.json({ success: true, data: [] }); // table may not exist yet
   }
 };
 

@@ -1097,8 +1097,13 @@ export default function Facturacion() {
         lastSyncAt: response?.data?.summary?.syncedAt || new Date().toISOString(),
         syncSummary: response?.data?.summary || null,
       }));
-      // Reload billing data so imported Quipu invoices appear immediately
+      // Reload billing data and synced Quipu tables
       await loadBilling();
+      setQuipuContacts([]);      // force reload on next tab visit
+      setQuipuBankAccounts([]);  // force reload on next tab visit
+      // Reload immediately if already on those tabs
+      await loadQuipuContacts();
+      await loadQuipuBankAccounts();
     } catch (error: any) {
       setErrorMsg(error?.message || "No se pudo sincronizar Quipu.");
     } finally {
@@ -1191,18 +1196,19 @@ export default function Facturacion() {
     if (!quipuStatus.connected) return;
     setLoadingQuipu(true); setQuipuError(null);
     try {
-      const res = await apiFetch("/api/quipu/contacts", { getToken });
+      // Use synced local DB — no live API call needed
+      const res = await apiFetch("/api/quipu/synced/contacts", { getToken });
       const rows: any[] = res?.data || [];
       setQuipuContacts(rows.map((r: any) => ({
         id: String(r.id),
-        kind: r.attributes?.kind || "client",
-        name: r.attributes?.name || r.attributes?.full_name || "Sin nombre",
-        fullName: r.attributes?.full_name || "",
-        taxId: r.attributes?.tax_id || "",
-        email: r.attributes?.email || "",
-        phone: r.attributes?.phone || "",
-        address: r.attributes?.address || "",
-        countryCode: r.attributes?.country_code || "ES",
+        kind: r.kind || "client",
+        name: r.name || "Sin nombre",
+        fullName: r.name || "",
+        taxId: r.tax_id || "",
+        email: r.email || "",
+        phone: r.phone || "",
+        address: r.address || "",
+        countryCode: r.country_code || "ES",
       })));
     } catch (e: any) { setQuipuError(e?.message || "Error al cargar contactos"); }
     finally { setLoadingQuipu(false); }
@@ -1212,17 +1218,17 @@ export default function Facturacion() {
     if (!quipuStatus.connected) return;
     setLoadingQuipu(true); setQuipuError(null);
     try {
-      const res = await apiFetch("/api/quipu/bank_accounts", { getToken });
+      // Use synced local DB — no live API call needed
+      const res = await apiFetch("/api/quipu/synced/bank_accounts", { getToken });
       const rows: any[] = res?.data || [];
       setQuipuBankAccounts(rows.map((r: any) => ({
         id: String(r.id),
-        name: r.attributes?.name || "Cuenta bancaria",
-        iban: r.attributes?.iban || r.attributes?.account_number || "",
-        // Quipu uses current_balance; fallback to balance
-        balance: Number(r.attributes?.current_balance ?? r.attributes?.balance ?? 0),
-        bankName: r.attributes?.entity_bank_name || r.attributes?.bank_name || "",
-        currency: r.attributes?.currency_code || r.attributes?.currency || "EUR",
-        updatedAt: r.attributes?.updated_at || r.attributes?.last_reconciled_at || "",
+        name: r.name || "Cuenta bancaria",
+        iban: r.iban || "",
+        balance: Number(r.balance ?? r.current_balance ?? 0),
+        bankName: r.bank_name || "",
+        currency: r.currency_code || "EUR",
+        updatedAt: r.updated_at || "",
       })));
       if (rows.length > 0 && !selectedBankAccountId) setSelectedBankAccountId(String(rows[0].id));
     } catch (e: any) { setQuipuError(e?.message || "Error al cargar cuentas bancarias"); }

@@ -156,22 +156,26 @@ export async function fetchQuipuBootstrap(settings: QuipuStoredSettings) {
     fetchQuipuPaginatedList<any>(settings, '/numbering_series'),
   ]);
 
-  return {
-    contacts,
-    invoices,
-    numberingSeries,
-  };
+  // Bank accounts may not be available in all Quipu plans — fail silently
+  let bankAccounts: any[] = [];
+  try {
+    bankAccounts = await fetchQuipuPaginatedList<any>(settings, '/bank_accounts');
+  } catch { /* not available */ }
+
+  return { contacts, invoices, numberingSeries, bankAccounts };
 }
 
 export function summarizeQuipuBootstrap(data: {
   contacts: any[];
   invoices: any[];
   numberingSeries: any[];
+  bankAccounts?: any[];
 }) {
   return {
     contacts: data.contacts.length,
     invoices: data.invoices.length,
     numberingSeries: data.numberingSeries.length,
+    bankAccounts: (data.bankAccounts || []).length,
     syncedAt: new Date().toISOString(),
   };
 }

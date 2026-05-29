@@ -5,6 +5,9 @@ import {
   getQuipuStatus,
   saveQuipuCredentials,
   syncQuipuBootstrap,
+  // Synced (from local DB)
+  getSyncedContacts,
+  getSyncedBankAccounts,
   // Contactos
   getQuipuContacts,
   createQuipuContact,
@@ -38,6 +41,10 @@ router.get('/status',      requireAuth, getQuipuStatus);
 router.post('/connect',    requireAuth, saveQuipuCredentials);
 router.post('/sync',       requireAuth, syncQuipuBootstrap);
 router.delete('/disconnect', requireAuth, disconnectQuipu);
+
+// ── Datos sincronizados (BD local, sin llamadas en vivo) ───────
+router.get('/synced/contacts',      requireAuth, getSyncedContacts);
+router.get('/synced/bank_accounts', requireAuth, getSyncedBankAccounts);
 
 // ── Contactos ──────────────────────────────────────────────────
 router.get('/contacts',         requireAuth, getQuipuContacts);
