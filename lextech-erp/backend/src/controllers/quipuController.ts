@@ -702,7 +702,7 @@ export const pushLocalFacturaToQuipu = async (req: any, res: Response) => {
 
   try {
     const facturaRes = await pool.query(
-      `SELECT ff.*, e.first_name, e.last_name, e.commercial_name
+      `SELECT ff.*, e.first_name, e.last_name, e.commercial_name, e.nif_cif
        FROM facturacion_facturas ff
        LEFT JOIN entities e ON e.id = ff.client_id
        WHERE ff.id = $1 AND ff.user_id = $2`,
@@ -713,61 +713,91 @@ export const pushLocalFacturaToQuipu = async (req: any, res: Response) => {
 
     if (f.quipu_id) return res.status(400).json({ success: false, error: 'Esta factura ya está en Quipu.' });
 
-    // Find or create contact in Quipu
+    // Get token once — reuse for all calls
+    const { accessToken } = await requestQuipuToken(settings);
+
+    // Find matching Quipu contact from already-synced local table (no extra live API call)
     let contactQuipuId: string | null = null;
     if (f.contacto) {
-      const contacts = await fetchQuipuPaginatedList<any>(settings, `/contactos?filter[kind]=client`);
-      const match = contacts.find((c: any) => {
-        const name = String(c?.attributes?.name || c?.attributes?.full_name || '').toLowerCase();
-        return name === f.contacto.toLowerCase();
-      });
-      if (match) {
-        contactQuipuId = String(match.id);
+      const localContact = await pool.query(
+        `SELECT external_id FROM quipu_contacts
+         WHERE user_id = $1 AND LOWER(contact_name) = LOWER($2) LIMIT 1`,
+        [userId, f.contacto],
+      );
+      if (localContact.rows.length > 0) {
+        contactQuipuId = localContact.rows[0].external_id;
       } else {
-        const newContact = await quipuOwnerFetch<any>(settings, '/contactos', {
-          method: 'POST',
-          body: JSON.stringify({
-            data: {
-              type: 'contacts',
-              attributes: { kind: 'client', name: f.contacto },
-            },
-          }),
-        });
-        contactQuipuId = String(newContact?.data?.id || '');
+        // Create contact in Quipu using shared token
+        try {
+          const newContact = await quipuOwnerFetch<any>(settings, '/contactos', {
+            method: 'POST',
+            body: JSON.stringify({
+              data: {
+                type: 'contacts',
+                attributes: {
+                  kind: 'client',
+                  name: f.contacto,
+                  ...(f.nif_cif ? { tax_id: f.nif_cif } : {}),
+                },
+              },
+            }),
+          }, accessToken);
+          contactQuipuId = String(newContact?.data?.id || '');
+        } catch { /* contact creation failed — proceed without contact */ }
       }
     }
 
-    const grossAmount = Number(f.total) / 1.21; // assume 21% IVA
+    // Build correct Quipu JSON:API invoice payload
+    // Quipu accepts total_amount directly (no items required for simple invoices)
+    const issueDate = f.fecha ? String(f.fecha).slice(0, 10) : new Date().toISOString().slice(0, 10);
+    const dueDate   = f.vencimiento ? String(f.vencimiento).slice(0, 10) : null;
+    const baseAmount = Number(f.total) / 1.21;
+
+    const attributes: any = {
+      kind:           'revenue',
+      number:         f.num || undefined,
+      issue_date:     issueDate,
+      due_date:       dueDate,
+      subject:        f.contacto || 'Servicios profesionales',
+      payment_method: f.forma_pago === 'transferencia' ? 'bank_transfer' :
+                      f.forma_pago === 'tarjeta'        ? 'credit_card'  :
+                      f.forma_pago === 'efectivo'       ? 'cash'         : 'bank_transfer',
+      // Line item embedded in attributes (Quipu simple format)
+      items_attributes: [{
+        concept:       f.contacto || 'Servicios profesionales',
+        unitary_amount: baseAmount.toFixed(2),
+        quantity:       '1',
+        vat_percent:    '21.0',
+        retention_percent: '0.0',
+      }],
+    };
+
+    const relationships: any = {};
+    if (contactQuipuId) {
+      relationships.contact = { data: { id: contactQuipuId, type: 'contacts' } };
+    }
+
+    // Use numbered series from sync if available
+    const seriesRow = await pool.query(
+      `SELECT external_id FROM quipu_numbering_series WHERE user_id = $1 LIMIT 1`,
+      [userId],
+    );
+    if (seriesRow.rows.length > 0) {
+      relationships.numbering_serie = { data: { id: seriesRow.rows[0].external_id, type: 'numbering_series' } };
+    }
 
     const payload: any = {
       data: {
         type: 'invoices',
-        attributes: {
-          kind: 'revenue',
-          number: f.num,
-          issue_date: f.fecha ? String(f.fecha).slice(0, 10) : new Date().toISOString().slice(0, 10),
-          due_date: f.vencimiento ? String(f.vencimiento).slice(0, 10) : null,
-          subject: f.contacto || 'Factura',
-          payment_method: f.forma_pago === 'transferencia' ? 'bank_transfer' : (f.forma_pago || 'bank_transfer'),
-          items_attributes: [
-            {
-              concept: f.contacto || 'Servicios profesionales',
-              quantity: 1,
-              unitary_amount: grossAmount.toFixed(2),
-              vat_percent: 21,
-            },
-          ],
-        },
-        relationships: contactQuipuId
-          ? { contact: { data: { id: contactQuipuId, type: 'contacts' } } }
-          : undefined,
+        attributes,
+        ...(Object.keys(relationships).length > 0 ? { relationships } : {}),
       },
     };
 
     const created = await quipuOwnerFetch<any>(settings, '/invoices', {
       method: 'POST',
       body: JSON.stringify(payload),
-    });
+    }, accessToken);
 
     const quipuId = String(created?.data?.id || '');
     if (quipuId) {
@@ -777,7 +807,7 @@ export const pushLocalFacturaToQuipu = async (req: any, res: Response) => {
       );
     }
 
-    await logActivityForReq(req, `Factura ${f.num} enviada a Quipu`, 'QUIPU', quipuId, f.contacto, 'CREATE');
+    await logActivityForReq(req, `Factura ${f.num} enviada a Quipu (id: ${quipuId})`, 'QUIPU', quipuId, f.contacto, 'CREATE');
     res.json({ success: true, data: { quipuId, quipuInvoice: created?.data } });
   } catch (e: any) {
     res.status(500).json({ success: false, error: e?.message || 'Error al enviar factura a Quipu.' });
