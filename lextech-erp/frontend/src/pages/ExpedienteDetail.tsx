@@ -37,6 +37,7 @@ import {
   CheckCircle2,
   Link2,
   Mail,
+  Send,
   Banknote,
   TrendingUp,
   TrendingDown,
@@ -150,7 +151,7 @@ const Indicador = ({
   </div>
 );
 
-type DetailTabKey = "perfil" | TabKey | "relacionados" | "actuacion" | "economico" | "agenda" | "cronologia";
+type DetailTabKey = "perfil" | TabKey | "relacionados" | "actuacion" | "economico" | "agenda" | "cronologia" | "correo";
 
 const DETAIL_TABS: { key: DetailTabKey; label: string; icon: any }[] = [
   { key: "perfil",      label: "Datos",                  icon: User },
@@ -162,6 +163,7 @@ const DETAIL_TABS: { key: DetailTabKey; label: string; icon: any }[] = [
   { key: "tareas",      label: "Tareas / Plazos",        icon: AlertTriangle },
   { key: "actuacion",   label: "Actuaciones",            icon: ClipboardList },
   { key: "adjuntos",    label: "Adjuntos",               icon: Paperclip },
+  { key: "correo",      label: "Correo",                 icon: Mail },
   { key: "historial",   label: "Historial expediente",   icon: Activity },
   { key: "cronologia",  label: "Cronología",             icon: Clock },
   { key: "agenda",      label: "Agenda",                 icon: Calendar },
@@ -3061,6 +3063,417 @@ function TabActuacion({
   );
 }
 
+// ── Tab Correo ────────────────────────────────────────────────────────────────
+function TabCorreoExpediente({
+  expedienteId,
+  expedienteRef,
+  locked = false,
+}: {
+  expedienteId: string;
+  expedienteRef: string;
+  locked?: boolean;
+}) {
+  const { getToken } = useAuth();
+
+  const [emails, setEmails] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [accounts, setAccounts] = useState<any[]>([]);
+
+  // Compose
+  const [showCompose, setShowCompose] = useState(false);
+  const [composeForm, setComposeForm] = useState({ account_id: "", to: "", cc: "", subject: "", body: "" });
+  const [sending, setSending] = useState(false);
+  const [composeError, setComposeError] = useState("");
+  const [showCc, setShowCc] = useState(false);
+
+  // Associate existing
+  const [showAssociate, setShowAssociate] = useState(false);
+  const [allEmails, setAllEmails] = useState<any[]>([]);
+  const [allEmailsLoading, setAllEmailsLoading] = useState(false);
+  const [assocSearch, setAssocSearch] = useState("");
+  const [linking, setLinking] = useState<string | null>(null);
+
+  // Viewer
+  const [viewEmail, setViewEmail] = useState<string | null>(null);
+  const [viewBody, setViewBody] = useState<string>("");
+  const [viewLoading, setViewLoading] = useState(false);
+
+  const authHdr = useCallback(async () => {
+    const token = await getToken({ skipCache: true });
+    return { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+  }, [getToken]);
+
+  const loadEmails = useCallback(async (silent = false) => {
+    try {
+      if (!silent) setLoading(true);
+      const headers = await authHdr();
+      const res = await fetch(`/api/expedientes/${expedienteId}/emails`, { headers });
+      const d = await safeJson(res);
+      if (res.ok) setEmails(d.data || []);
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }, [authHdr, expedienteId]);
+
+  const loadAccounts = useCallback(async () => {
+    try {
+      const headers = await authHdr();
+      const res = await fetch("/api/email/accounts", { headers });
+      const d = await safeJson(res);
+      if (res.ok) {
+        const accs = d.data || [];
+        setAccounts(accs);
+        if (accs.length) setComposeForm(f => ({ ...f, account_id: accs[0].id }));
+      }
+    } catch {}
+  }, [authHdr]);
+
+  useEffect(() => { loadEmails(); loadAccounts(); }, [loadEmails, loadAccounts]);
+
+  const handleSend = async () => {
+    if (!composeForm.to.trim() || !composeForm.subject.trim() || !composeForm.body.trim()) {
+      setComposeError("Para, asunto y cuerpo son obligatorios."); return;
+    }
+    setSending(true); setComposeError("");
+    try {
+      const headers = await authHdr();
+      const bodyHtml = composeForm.body.replace(/\n/g, "<br>");
+      const res = await fetch("/api/email/send", {
+        method: "POST", headers,
+        body: JSON.stringify({
+          account_id: composeForm.account_id || undefined,
+          to: composeForm.to,
+          cc: composeForm.cc || undefined,
+          subject: composeForm.subject,
+          html: bodyHtml,
+          text: composeForm.body,
+          expediente_id: expedienteId,
+        }),
+      });
+      const d = await safeJson(res);
+      if (!res.ok) { setComposeError(d.error || "Error al enviar"); return; }
+      setShowCompose(false);
+      setComposeForm(f => ({ ...f, to: "", cc: "", subject: "", body: "" }));
+      setShowCc(false);
+      await loadEmails(true);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const loadAllEmails = async () => {
+    setAllEmailsLoading(true);
+    try {
+      const headers = await authHdr();
+      const res = await fetch("/api/email/messages?limit=100", { headers });
+      const d = await safeJson(res);
+      if (res.ok) setAllEmails(d.data?.emails || []);
+    } finally {
+      setAllEmailsLoading(false);
+    }
+  };
+
+  const handleAssociate = async (emailId: string) => {
+    setLinking(emailId);
+    try {
+      const headers = await authHdr();
+      const res = await fetch(`/api/email/messages/${emailId}/link`, {
+        method: "PATCH", headers,
+        body: JSON.stringify({ expediente_id: expedienteId }),
+      });
+      if (res.ok) {
+        setAllEmails(prev => prev.filter(e => e.id !== emailId));
+        await loadEmails(true);
+      }
+    } finally {
+      setLinking(null);
+    }
+  };
+
+  const handleUnlink = async (emailId: string) => {
+    setLinking(emailId);
+    try {
+      const headers = await authHdr();
+      await fetch(`/api/email/messages/${emailId}/link`, {
+        method: "PATCH", headers,
+        body: JSON.stringify({ expediente_id: null }),
+      });
+      await loadEmails(true);
+    } finally {
+      setLinking(null);
+    }
+  };
+
+  const handleViewEmail = async (email: any) => {
+    if (viewEmail === email.id) { setViewEmail(null); setViewBody(""); return; }
+    setViewEmail(email.id); setViewLoading(true);
+    try {
+      const headers = await authHdr();
+      const res = await fetch(`/api/email/messages/${email.id}`, { headers });
+      const d = await safeJson(res);
+      if (res.ok) setViewBody(d.data?.body_html || d.data?.body_text || d.data?.snippet || "Sin contenido");
+    } finally {
+      setViewLoading(false);
+    }
+  };
+
+  const filteredAllEmails = assocSearch.trim()
+    ? allEmails.filter(e => {
+        const q = assocSearch.toLowerCase();
+        return (e.subject || "").toLowerCase().includes(q) ||
+               (e.from_email || "").toLowerCase().includes(q) ||
+               (e.snippet || "").toLowerCase().includes(q);
+      })
+    : allEmails.slice(0, 40);
+
+  const fmtEmailDate = (d: string) => {
+    if (!d) return "—";
+    const date = new Date(d);
+    const now = new Date();
+    const isToday = date.toDateString() === now.toDateString();
+    return isToday
+      ? date.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })
+      : date.toLocaleDateString("es-ES", { day: "2-digit", month: "short" });
+  };
+
+  const noAccounts = !loading && accounts.length === 0;
+
+  return (
+    <div className="space-y-4">
+      {locked && (
+        <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs font-semibold text-amber-800">
+          <AlertTriangle size={13} className="shrink-0" /> Expediente cerrado — solo lectura.
+        </div>
+      )}
+
+      {/* Cabecera */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-bold text-slate-800">Correos del expediente</h3>
+          <p className="text-xs text-slate-400 mt-0.5">{emails.length} correo{emails.length !== 1 ? "s" : ""} asociado{emails.length !== 1 ? "s" : ""}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button type="button"
+            onClick={() => { setShowAssociate(true); if (!allEmails.length) loadAllEmails(); }}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:border-slate-300 rounded-xl transition-all">
+            <Link2 size={12} /> Asociar correo existente
+          </button>
+          {!locked && (
+            <button type="button"
+              onClick={() => { setShowCompose(true); setComposeError(""); }}
+              disabled={noAccounts}
+              title={noAccounts ? "Configura una cuenta de correo primero" : undefined}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm transition-all disabled:opacity-50">
+              <Plus size={12} /> Redactar
+            </button>
+          )}
+        </div>
+      </div>
+
+      {noAccounts && (
+        <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs text-blue-800">
+          <Mail size={14} className="shrink-0 text-blue-400" />
+          <span>No hay ninguna cuenta de correo configurada. <Link to="/dashboard/correo" className="font-bold underline">Configurar en el módulo de Correo</Link></span>
+        </div>
+      )}
+
+      {/* Modal redactar */}
+      {showCompose && !locked && (
+        <div className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-sm flex items-end justify-end p-6">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg flex flex-col" style={{ maxHeight: "80vh" }}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-3 bg-slate-800 rounded-t-2xl">
+              <p className="text-sm font-bold text-white">Nuevo correo · {expedienteRef}</p>
+              <button type="button" onClick={() => setShowCompose(false)} className="text-slate-400 hover:text-white"><X size={16} /></button>
+            </div>
+            {/* Form */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {accounts.length > 1 && (
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Desde</label>
+                  <select value={composeForm.account_id} onChange={e => setComposeForm(f => ({ ...f, account_id: e.target.value }))}
+                    className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-red-400">
+                    {accounts.map(a => <option key={a.id} value={a.id}>{a.label} ({a.email})</option>)}
+                  </select>
+                </div>
+              )}
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Para *</label>
+                <input value={composeForm.to} onChange={e => setComposeForm(f => ({ ...f, to: e.target.value }))}
+                  placeholder="correo@ejemplo.com, otro@ejemplo.com"
+                  className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-red-400" />
+              </div>
+              {showCc && (
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">CC</label>
+                  <input value={composeForm.cc} onChange={e => setComposeForm(f => ({ ...f, cc: e.target.value }))}
+                    placeholder="cc@ejemplo.com"
+                    className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-red-400" />
+                </div>
+              )}
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Asunto *</label>
+                <input value={composeForm.subject} onChange={e => setComposeForm(f => ({ ...f, subject: e.target.value }))}
+                  placeholder={`RE: Expediente ${expedienteRef}`}
+                  className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-red-400" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Mensaje *</label>
+                <textarea value={composeForm.body} onChange={e => setComposeForm(f => ({ ...f, body: e.target.value }))}
+                  rows={8} placeholder="Escribe tu mensaje aquí..."
+                  className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-red-400 resize-none" />
+              </div>
+              {composeError && <p className="text-xs text-red-600 font-medium">{composeError}</p>}
+            </div>
+            {/* Footer */}
+            <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between">
+              <button type="button" onClick={() => setShowCc(v => !v)} className="text-xs text-slate-400 hover:text-slate-600">
+                {showCc ? "Ocultar CC" : "Añadir CC"}
+              </button>
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={() => setShowCompose(false)} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancelar</button>
+                <button type="button" onClick={handleSend} disabled={sending}
+                  className="px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-700 disabled:opacity-50 flex items-center gap-2">
+                  {sending ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />} Enviar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal asociar correo existente */}
+      {showAssociate && createPortal(
+        <div className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl flex flex-col" style={{ maxHeight: "80vh" }}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-900">Asociar correo al expediente</h3>
+              <button type="button" onClick={() => setShowAssociate(false)} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
+            </div>
+            <div className="p-4 border-b border-slate-100">
+              <div className="relative">
+                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input value={assocSearch} onChange={e => setAssocSearch(e.target.value)}
+                  placeholder="Buscar por asunto, remitente o extracto..."
+                  className="w-full pl-8 pr-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-1 focus:ring-red-400" />
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {allEmailsLoading ? (
+                <div className="flex items-center justify-center py-10 text-slate-400"><Loader2 size={18} className="animate-spin mr-2" /><span className="text-sm">Cargando correos...</span></div>
+              ) : filteredAllEmails.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 gap-2 text-slate-300">
+                  <Mail size={24} className="opacity-30" />
+                  <p className="text-sm font-medium">{assocSearch ? "Sin resultados" : "No hay correos disponibles"}</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-50">
+                  {filteredAllEmails.map(e => (
+                    <div key={e.id} className="flex items-start gap-3 px-5 py-3 hover:bg-slate-50 transition-colors">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-semibold text-slate-700 truncate">{e.from_name || e.from_email}</span>
+                          <span className="text-[10px] text-slate-400">{fmtEmailDate(e.sent_at)}</span>
+                          {e.expediente_id && e.expediente_id !== expedienteId && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-semibold">Vinculado a otro exp.</span>
+                          )}
+                        </div>
+                        <p className="text-sm text-slate-800 truncate mt-0.5">{e.subject || "(Sin asunto)"}</p>
+                        {e.snippet && <p className="text-xs text-slate-400 truncate mt-0.5">{e.snippet}</p>}
+                      </div>
+                      <button type="button"
+                        onClick={() => handleAssociate(e.id)}
+                        disabled={linking === e.id || e.expediente_id === expedienteId}
+                        className="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-all disabled:opacity-50">
+                        {linking === e.id ? <Loader2 size={11} className="animate-spin" /> : <Link2 size={11} />}
+                        {e.expediente_id === expedienteId ? "Ya asociado" : "Asociar"}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="px-5 py-3 border-t border-slate-100 flex justify-end">
+              <button type="button" onClick={() => setShowAssociate(false)} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50">Cerrar</button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Lista de correos */}
+      {loading ? (
+        <div className="flex items-center justify-center py-12 text-slate-400"><Loader2 size={18} className="animate-spin mr-2" /><span className="text-sm">Cargando correos...</span></div>
+      ) : emails.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-14 gap-3 text-slate-300">
+          <Mail size={32} className="opacity-20" />
+          <p className="text-sm font-medium">No hay correos asociados a este expediente</p>
+          <p className="text-xs">Redacta uno nuevo o asocia correos existentes con los botones de arriba</p>
+        </div>
+      ) : (
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+          <div className="divide-y divide-slate-50">
+            {emails.map(email => {
+              const isSent = email.folder?.toLowerCase().includes("sent") || email.folder === "Sent";
+              const isOpen = viewEmail === email.id;
+              return (
+                <div key={email.id}>
+                  <button type="button" onClick={() => handleViewEmail(email)}
+                    className={`w-full flex items-start gap-3 px-5 py-3.5 text-left hover:bg-slate-50 transition-colors ${!email.is_read && !isSent ? "bg-blue-50/30" : ""}`}>
+                    {/* Avatar / dirección */}
+                    <div className={`flex h-8 w-8 items-center justify-center rounded-xl text-[11px] font-bold shrink-0 mt-0.5 ${isSent ? "bg-red-100 text-red-600" : "bg-blue-100 text-blue-600"}`}>
+                      {isSent ? <Send size={13} /> : <Mail size={13} />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 justify-between">
+                        <span className={`text-sm truncate ${!email.is_read && !isSent ? "font-bold text-slate-900" : "font-medium text-slate-700"}`}>
+                          {isSent ? `Para: ${email.to_emails}` : (email.from_name || email.from_email)}
+                        </span>
+                        <span className="text-[10px] text-slate-400 shrink-0">{fmtEmailDate(email.sent_at)}</span>
+                      </div>
+                      <p className={`text-sm truncate mt-0.5 ${!email.is_read && !isSent ? "font-semibold text-slate-800" : "text-slate-600"}`}>
+                        {email.subject || "(Sin asunto)"}
+                      </p>
+                      {!isOpen && email.snippet && <p className="text-xs text-slate-400 truncate mt-0.5">{email.snippet}</p>}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {email.has_attachments && <Paperclip size={12} className="text-slate-400" />}
+                      <ChevronDown size={13} className={`text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                    </div>
+                  </button>
+
+                  {/* Cuerpo expandido */}
+                  {isOpen && (
+                    <div className="px-5 pb-4 border-t border-slate-50 bg-slate-50/40">
+                      <div className="flex items-center justify-between py-2 mb-2">
+                        <div className="text-[10px] text-slate-400 space-y-0.5">
+                          <p><span className="font-semibold">De:</span> {email.from_name ? `${email.from_name} <${email.from_email}>` : email.from_email}</p>
+                          <p><span className="font-semibold">Para:</span> {email.to_emails}</p>
+                          {email.cc_emails && <p><span className="font-semibold">CC:</span> {email.cc_emails}</p>}
+                        </div>
+                        <button type="button" onClick={() => handleUnlink(email.id)} disabled={linking === email.id}
+                          className="text-xs text-slate-400 hover:text-red-500 transition-colors flex items-center gap-1 disabled:opacity-50">
+                          {linking === email.id ? <Loader2 size={11} className="animate-spin" /> : <X size={11} />} Desasociar
+                        </button>
+                      </div>
+                      {viewLoading && viewEmail === email.id ? (
+                        <div className="flex items-center justify-center py-6 text-slate-400"><Loader2 size={16} className="animate-spin mr-2" />Cargando...</div>
+                      ) : (
+                        <div className="text-sm text-slate-700 leading-relaxed bg-white rounded-xl border border-slate-100 p-4 max-h-80 overflow-y-auto"
+                          dangerouslySetInnerHTML={{ __html: viewBody }} />
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Tab Cliente vinculado ──────────────────────────────────────────────────────
 function TabClienteVinculado({ exp, clientes, linkedClient, linkedClientDisplayName, linkedClientSummary, fallbackClientName, draftClientName, expedienteId, onPatch }: {
   exp: any; clientes: any[]; linkedClient: any; linkedClientDisplayName: string; linkedClientSummary: string[]; fallbackClientName: string; draftClientName: { first_name: string; last_name: string }; expedienteId: string; onPatch: (fields: Record<string, any>) => Promise<boolean>;
@@ -4718,6 +5131,14 @@ export default function ExpedienteDetail() {
                 loading={notifLoading}
                 getToken={getToken}
                 onRefresh={() => setNotificaciones(null)}
+                locked={exp?.estado === "cerrado"}
+              />
+            )}
+
+            {tab === "correo" && (
+              <TabCorreoExpediente
+                expedienteId={id!}
+                expedienteRef={exp.ref_expediente || `${exp.anio}/${exp.num_exp}`}
                 locked={exp?.estado === "cerrado"}
               />
             )}

@@ -21,6 +21,7 @@ import {
   getStats,
   getRecipientSuggestions,
   logGmailSent,
+  linkEmailToExpediente,
 } from '../controllers/emailController';
 
 const router = Router();
@@ -53,5 +54,8 @@ router.get('/drafts',             getDrafts);
 
 // ── Stats ────────────────────────────────────────────────────────────────────
 router.get('/stats',              getStats);
+
+// ── Asociar email a expediente ───────────────────────────────────────────────
+router.patch('/messages/:id/link', linkEmailToExpediente);
 
 export default router;

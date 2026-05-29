@@ -763,7 +763,7 @@ export async function deleteMessage(req: Request, res: Response) {
 export async function sendMail(req: Request, res: Response) {
   const uid = userId(req);
   if (!uid) return err(res, 'No autenticado', 401);
-  const { account_id, to, cc, bcc, subject, html, text, draft_id } = req.body;
+  const { account_id, to, cc, bcc, subject, html, text, draft_id, expediente_id } = req.body;
   let accountId = account_id as string | undefined;
 
   if (!to || !subject || !html) {
@@ -808,13 +808,14 @@ export async function sendMail(req: Request, res: Response) {
     // Save to sent
     await pool.query(
       `INSERT INTO emails (account_id, user_id, folder, from_email, from_name,
-        to_emails, cc_emails, subject, body_html, body_text, snippet, is_read, sent_at)
-       VALUES ($1,$2,'Sent',$3,$4,$5,$6,$7,$8,$9,$10,true,NOW())`,
+        to_emails, cc_emails, subject, body_html, body_text, snippet, is_read, sent_at, expediente_id)
+       VALUES ($1,$2,'Sent',$3,$4,$5,$6,$7,$8,$9,$10,true,NOW(),$11)`,
       [
         acc.id, uid, acc.email, acc.label,
         toList.join(', '), ccList.join(', '),
         subject, html, text || '',
         (text || html.replace(/<[^>]+>/g, '')).slice(0, 200),
+        expediente_id || null,
       ],
     );
 
@@ -840,6 +841,42 @@ export async function sendMail(req: Request, res: Response) {
 
     return ok(res, { sent: true });
   } catch (e: any) { return err(res, `Error al enviar: ${e.message}`); }
+}
+
+export async function getEmailsByExpediente(req: Request, res: Response) {
+  const uid = userId(req);
+  if (!uid) return err(res, 'No autenticado', 401);
+  const { id } = req.params;
+  try {
+    const { rows } = await pool.query(
+      `SELECT e.id, e.folder, e.from_email, e.from_name, e.to_emails, e.cc_emails,
+              e.subject, e.snippet, e.is_read, e.is_starred, e.has_attachments,
+              e.sent_at, e.account_id, e.expediente_id,
+              a.label AS account_label, a.email AS account_email
+       FROM emails e
+       JOIN email_accounts a ON a.id = e.account_id
+       WHERE e.user_id = $1 AND e.expediente_id = $2 AND e.is_draft = false
+       ORDER BY e.sent_at DESC NULLS LAST
+       LIMIT 200`,
+      [uid, id],
+    );
+    return ok(res, rows);
+  } catch (e: any) { return err(res, e.message); }
+}
+
+export async function linkEmailToExpediente(req: Request, res: Response) {
+  const uid = userId(req);
+  if (!uid) return err(res, 'No autenticado', 401);
+  const { id } = req.params;
+  const { expediente_id } = req.body;
+  try {
+    const result = await pool.query(
+      `UPDATE emails SET expediente_id = $1 WHERE id = $2 AND user_id = $3 RETURNING id`,
+      [expediente_id || null, id, uid],
+    );
+    if (!result.rows.length) return err(res, 'Email no encontrado', 404);
+    return ok(res, { linked: true });
+  } catch (e: any) { return err(res, e.message); }
 }
 
 export async function getRecipientSuggestions(req: Request, res: Response) {
