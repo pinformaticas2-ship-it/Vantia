@@ -1240,6 +1240,34 @@ export async function runMigrations(): Promise<void> {
       `);
     } catch (_e: any) {}
 
+    // ── Tabla expediente_apuntes (libro mayor / apuntes contables por expediente) ─
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS expediente_apuntes (
+        id              UUID          PRIMARY KEY DEFAULT uuid_generate_v4(),
+        expediente_id   UUID          NOT NULL REFERENCES expedientes(id) ON DELETE CASCADE,
+        concepto        VARCHAR(300)  NOT NULL,
+        tipo            VARCHAR(10)   NOT NULL DEFAULT 'cargo'
+                        CHECK (tipo IN ('cargo', 'abono')),
+        importe         NUMERIC(12,2) NOT NULL DEFAULT 0,
+        fecha           DATE          NOT NULL DEFAULT CURRENT_DATE,
+        notas           TEXT,
+        created_by      VARCHAR(150)  NOT NULL DEFAULT 'SYSTEM',
+        created_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+        updated_at      TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+      );
+    `);
+    for (const idx of [
+      `CREATE INDEX IF NOT EXISTS idx_exp_apuntes_expediente ON expediente_apuntes (expediente_id, fecha DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_exp_apuntes_tipo       ON expediente_apuntes (tipo)`,
+    ]) { try { await client.query(idx); } catch (_e: any) {} }
+    try {
+      await client.query(`
+        CREATE OR REPLACE TRIGGER trg_exp_apuntes_updated_at
+          BEFORE UPDATE ON expediente_apuntes
+          FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+      `);
+    } catch (_e: any) {}
+
     // VACUUM ANALYZE para mantener las estadísticas de consulta frescas
     try {
       await client.query(`ANALYZE entities;`);
