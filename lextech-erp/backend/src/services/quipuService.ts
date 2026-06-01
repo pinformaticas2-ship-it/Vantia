@@ -170,7 +170,7 @@ export async function fetchQuipuBootstrap(settings: QuipuStoredSettings) {
 
   // Sequential fetches to avoid hitting the 5 req/5s rate limit
   const contacts = await fetchQuipuPaginatedList<any>(
-    settings, '/contactos?filter[kind]=client', accessToken,
+    settings, '/contacts?filter[kind]=client', accessToken,
   );
   await sleep(1200);
 

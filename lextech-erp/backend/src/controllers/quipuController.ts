@@ -337,7 +337,7 @@ export async function pushFacturaToQuipuInternal(userId: string, facturaId: stri
       contactQuipuId = lc.rows[0].external_id;
     } else {
       try {
-        const nc = await quipuOwnerFetch<any>(settings, '/contactos', {
+        const nc = await quipuOwnerFetch<any>(settings, '/contacts', {
           method: 'POST',
           body: JSON.stringify({ data: { type: 'contacts', attributes: { kind: 'client', name: f.contacto, ...(f.nif_cif ? { tax_id: f.nif_cif } : {}) } } }),
         }, accessToken);
@@ -401,7 +401,7 @@ export const diagnoseQuipu = async (req: any, res: Response) => {
   }
 
   try {
-    const contacts = await quipuOwnerFetch<any>(settings, '/contactos?page[size]=1', undefined, token);
+    const contacts = await quipuOwnerFetch<any>(settings, '/contacts?page[size]=1', undefined, token);
     const total = contacts?.meta?.total_entries ?? contacts?.data?.length ?? '?';
     steps.push({ step: 'contacts', ok: true, detail: `total_entries=${total}` });
   } catch (e: any) {
@@ -601,7 +601,7 @@ export const getQuipuContacts = async (req: any, res: Response) => {
   if (!settings) return;
   try {
     const kind = req.query.kind || '';
-    const path = `/contactos${kind ? `?filter[kind]=${kind}` : ''}`;
+    const path = `/contacts${kind ? `?filter[kind]=${kind}` : ''}`;
     const data = await fetchQuipuPaginatedList(settings, path);
     res.json({ success: true, data });
   } catch (e: any) {
@@ -615,7 +615,7 @@ export const createQuipuContact = async (req: any, res: Response) => {
   const settings = await requireSettings(userId, res);
   if (!settings) return;
   try {
-    const data = await quipuOwnerFetch(settings, '/contactos', {
+    const data = await quipuOwnerFetch(settings, '/contacts', {
       method: 'POST',
       body: JSON.stringify({ data: { type: 'contacts', attributes: req.body } }),
     });
@@ -631,7 +631,7 @@ export const updateQuipuContact = async (req: any, res: Response) => {
   const settings = await requireSettings(userId, res);
   if (!settings) return;
   try {
-    const data = await quipuOwnerFetch(settings, `/contactos/${req.params.id}`, {
+    const data = await quipuOwnerFetch(settings, `/contacts/${req.params.id}`, {
       method: 'PATCH',
       body: JSON.stringify({ data: { type: 'contacts', id: req.params.id, attributes: req.body } }),
     });
@@ -647,7 +647,7 @@ export const deleteQuipuContact = async (req: any, res: Response) => {
   const settings = await requireSettings(userId, res);
   if (!settings) return;
   try {
-    await quipuOwnerFetch(settings, `/contactos/${req.params.id}`, { method: 'DELETE' });
+    await quipuOwnerFetch(settings, `/contacts/${req.params.id}`, { method: 'DELETE' });
     res.json({ success: true });
   } catch (e: any) {
     res.status(500).json({ success: false, error: e?.message || 'Error al eliminar contacto en Quipu.' });
@@ -889,7 +889,7 @@ export const pushLocalFacturaToQuipu = async (req: any, res: Response) => {
       } else {
         // Create contact in Quipu using shared token
         try {
-          const newContact = await quipuOwnerFetch<any>(settings, '/contactos', {
+          const newContact = await quipuOwnerFetch<any>(settings, '/contacts', {
             method: 'POST',
             body: JSON.stringify({
               data: {
