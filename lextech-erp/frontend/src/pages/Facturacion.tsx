@@ -1149,7 +1149,13 @@ export default function Facturacion() {
           const done = !s?.syncRunning;
           const changed = s?.lastSyncAt && s.lastSyncAt !== prevLastSyncAt;
           if (done && changed) { await loadBilling(); resolve(); return; }
-          if (done && s?.syncError) { setErrorMsg(`Quipu: ${s.syncError}`); resolve(); return; }
+          if (done && s?.syncError) {
+            // Only show rate-limit errors briefly to the user (not as a permanent banner)
+            const isRateLimit = s.syncError.includes('429') || s.syncError.toLowerCase().includes('rate limit');
+            if (!isRateLimit) setErrorMsg(`Quipu: ${s.syncError}`);
+            else console.warn('[Quipu polling] sync error (rate limit, not shown to user):', s.syncError);
+            resolve(); return;
+          }
           if (done) { resolve(); return; }
         } catch { /* ignore poll errors */ }
         if (Date.now() - start < maxWait) setTimeout(tick, interval);

@@ -178,40 +178,36 @@ export async function fetchQuipuPaginatedList<T = any>(
 export async function fetchQuipuBootstrap(settings: QuipuStoredSettings) {
   const { accessToken } = await requestQuipuToken(settings);
 
-  // All contacts (clients + suppliers), max 1000
-  const contacts = await fetchQuipuPaginatedList<any>(
-    settings, '/contacts', accessToken, 20,
-  );
-  await sleep(2000);
-
   const since = new Date();
   since.setFullYear(since.getFullYear() - 1);
   const sinceStr = since.toISOString().slice(0, 10);
 
-  // Income invoices (Ingresos) — last 12 months
-  const invoices = await fetchQuipuPaginatedList<any>(
-    settings, `/invoices?sort=-issued_at&filter[issued_at_gteq]=${sinceStr}`, accessToken, 10,
-  );
+  // Each endpoint fails silently — a 429 on one section never aborts the whole bootstrap
+  const safe = async (fn: () => Promise<any[]>): Promise<any[]> => {
+    try { return await fn(); } catch (e: any) {
+      console.warn('[Quipu] bootstrap endpoint failed (skipped):', e?.message?.slice(0, 80));
+      return [];
+    }
+  };
+
+  const contacts = await safe(() =>
+    fetchQuipuPaginatedList<any>(settings, '/contacts', accessToken, 20));
   await sleep(2000);
 
-  // Expense invoices (Gastos/Facturas recibidas) — last 12 months
-  let receivedInvoices: any[] = [];
-  try {
-    receivedInvoices = await fetchQuipuPaginatedList<any>(
-      settings, `/received_invoices?sort=-issued_at&filter[issued_at_gteq]=${sinceStr}`, accessToken, 10,
-    );
-  } catch { /* may not be available in all Quipu plans */ }
+  const invoices = await safe(() =>
+    fetchQuipuPaginatedList<any>(settings, `/invoices?sort=-issued_at&filter[issued_at_gteq]=${sinceStr}`, accessToken, 10));
   await sleep(2000);
 
-  const numberingSeries = await fetchQuipuPaginatedList<any>(
-    settings, '/numbering_series', accessToken,
-  );
+  const receivedInvoices = await safe(() =>
+    fetchQuipuPaginatedList<any>(settings, `/received_invoices?sort=-issued_at&filter[issued_at_gteq]=${sinceStr}`, accessToken, 10));
   await sleep(2000);
 
-  let bankAccounts: any[] = [];
-  try {
-    bankAccounts = await fetchQuipuPaginatedList<any>(settings, '/bank_accounts', accessToken);
-  } catch { /* treasury module may not be in this plan */ }
+  const numberingSeries = await safe(() =>
+    fetchQuipuPaginatedList<any>(settings, '/numbering_series', accessToken));
+  await sleep(2000);
+
+  const bankAccounts = await safe(() =>
+    fetchQuipuPaginatedList<any>(settings, '/bank_accounts', accessToken));
 
   return { contacts, invoices, receivedInvoices, numberingSeries, bankAccounts };
 }
