@@ -148,6 +148,8 @@ type QuipuStatus = {
     numberingSeries?: number;
     syncedAt?: string;
     importedToFacturacion?: number;
+    updatedInFacturacion?: number;
+    syncErrors?: number;
   } | null;
 };
 
@@ -894,6 +896,8 @@ export default function Facturacion() {
   const [editingContact, setEditingContact] = useState<QuipuContact | null>(null);
   const [savingContact, setSavingContact] = useState(false);
   const [chartType, setChartType] = useState<'bar' | 'line' | 'pie'>('bar');
+  const [isSilentSyncing, setIsSilentSyncing] = useState(false);
+  const silentSyncDoneRef = useRef(false);
 
   const TABS: { key: TabKey; label: string; icon?: React.ComponentType<any>; quipuOnly?: boolean }[] = [
     { key: "dashboard",     label: "Vista general" },
@@ -982,6 +986,26 @@ export default function Facturacion() {
     loadBilling();
     loadQuipuStatus();
   }, [loadBilling, loadQuipuStatus]);
+
+  // Auto-sync Quipu silently when connected and data is stale (>15 min)
+  useEffect(() => {
+    if (!quipuStatus.connected || silentSyncDoneRef.current) return;
+    const lastSync = quipuStatus.lastSyncAt ? new Date(quipuStatus.lastSyncAt).getTime() : 0;
+    if (Date.now() - lastSync <= 15 * 60 * 1000) return;
+    silentSyncDoneRef.current = true;
+    setIsSilentSyncing(true);
+    apiFetch("/api/quipu/sync", { method: "POST", getToken })
+      .then(res => {
+        setQuipuStatus(prev => ({
+          ...prev,
+          lastSyncAt: new Date().toISOString(),
+          syncSummary: res?.data?.summary || prev.syncSummary,
+        }));
+        return loadBilling();
+      })
+      .catch(() => {})
+      .finally(() => setIsSilentSyncing(false));
+  }, [quipuStatus.connected, quipuStatus.lastSyncAt]);
 
   // Close year/period menus when clicking outside
   useEffect(() => {
@@ -1396,13 +1420,16 @@ export default function Facturacion() {
           ) : (
             <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4">
               <div>
-                <p className="text-sm font-semibold text-emerald-800">Quipu conectado</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold text-emerald-800">Quipu conectado</p>
+                  {isSilentSyncing && <span className="flex items-center gap-1 text-[11px] text-emerald-600"><Loader2 size={11} className="animate-spin" /> sincronizando…</span>}
+                </div>
                 <p className="mt-0.5 text-xs text-emerald-700">
                   {quipuStatus.lastSyncAt ? `Última sincronización: ${new Date(quipuStatus.lastSyncAt).toLocaleString("es-ES")}` : "Sincronización pendiente"}
                 </p>
                 {quipuStatus.syncSummary && (
                   <p className="mt-1 text-xs text-emerald-700">
-                    Contactos: {quipuStatus.syncSummary.contacts || 0} · Facturas Quipu: {quipuStatus.syncSummary.invoices || 0} · Importadas al ERP: {quipuStatus.syncSummary.importedToFacturacion ?? quipuStatus.syncSummary.invoices ?? 0} · Series: {quipuStatus.syncSummary.numberingSeries || 0}
+                    Contactos: {quipuStatus.syncSummary.contacts || 0} · Facturas Quipu: {quipuStatus.syncSummary.invoices || 0} · Importadas: {quipuStatus.syncSummary.importedToFacturacion ?? 0} · Actualizadas: {quipuStatus.syncSummary.updatedInFacturacion ?? 0}
                   </p>
                 )}
               </div>

@@ -1,6 +1,9 @@
 import { Response } from 'express';
 import pool from '../config/database';
 import { logActivityForReq, resolveUserName } from './activityController';
+import { syncQuipuForUserInternal, pushFacturaToQuipuInternal } from './quipuController';
+
+const QUIPU_STALE_MS = 15 * 60 * 1000; // 15 minutes
 
 const explainBillingError = (error: any) => {
   const raw = String(error?.message || '');
@@ -149,6 +152,20 @@ export const getBillingBootstrap = async (req: any, res: Response) => {
       quipuBankAccountsRows = qba.rows;
     } catch { /* quipu tables may not exist yet */ }
 
+    // Auto-sync Quipu in background if data is stale (>15 min) or never synced
+    try {
+      const qs = await pool.query(`SELECT last_sync_at FROM quipu_settings WHERE user_id=$1 LIMIT 1`, [userId]);
+      if (qs.rows.length > 0) {
+        const lastSync = qs.rows[0].last_sync_at;
+        const stale = !lastSync || (Date.now() - new Date(lastSync).getTime()) > QUIPU_STALE_MS;
+        if (stale) {
+          syncQuipuForUserInternal(userId).catch(e =>
+            console.error('[AutoSync/bootstrap] user=%s err=%s', userId, e?.message),
+          );
+        }
+      }
+    } catch { /* quipu_settings may not exist */ }
+
     res.json({
       success: true,
       data: {
@@ -207,6 +224,17 @@ export const createFactura = async (req: any, res: Response) => {
       ],
     );
     await logActivityForReq(req, `Factura creada: ${sanitizeText(num)}`, 'FACTURACION_FACTURA', result.rows[0].id, sanitizeText(contacto) || undefined, 'CREATE');
+
+    // Auto-push to Quipu in background if connected
+    const newId = result.rows[0].id;
+    pool.query(`SELECT 1 FROM quipu_settings WHERE user_id=$1 LIMIT 1`, [userId]).then(qs => {
+      if (qs.rows.length > 0) {
+        pushFacturaToQuipuInternal(userId, newId).catch(e =>
+          console.error('[AutoPush/Quipu] factura=%s err=%s', newId, e?.message),
+        );
+      }
+    }).catch(() => {});
+
     res.status(201).json({ success: true, data: result.rows[0] });
   } catch (error: any) {
     res.status(500).json({ success: false, error: explainBillingError(error) });

@@ -19,6 +19,7 @@ import documentalRoutes     from './routes/documental';
 import clientInviteRoutes   from './routes/clientInvite';
 import facturacionRoutes    from './routes/facturacion';
 import quipuRoutes          from './routes/quipu';
+import { syncAllQuipuUsers } from './controllers/quipuController';
 import { clerkMiddleware } from '@clerk/express';
 import { runMigrations } from './config/migrations';
 import { startLocalFilesWatcher } from './watchers/localFilesWatcher';
@@ -232,5 +233,11 @@ runMigrations().then(() => {
     }
     // Registrar arranque en trazabilidad
     try { await logServerStart(); } catch { /**/ }
+
+    // Quipu auto-sync: run once after 30s (let DB settle), then every 30 min
+    setTimeout(() => {
+      syncAllQuipuUsers().catch(() => {});
+      setInterval(() => syncAllQuipuUsers().catch(() => {}), 30 * 60 * 1000);
+    }, 30_000);
   });
 });
