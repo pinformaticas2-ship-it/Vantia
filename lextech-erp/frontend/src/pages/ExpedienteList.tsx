@@ -1071,6 +1071,52 @@ function PrettyAssignSelect({
   );
 }
 
+function downloadCsvTemplate(type: "basica" | "completa") {
+  const SEP = ";";
+  const BOM = "﻿";
+
+  type TemplateRow = { header: string; s1: string; s2: string; s3: string };
+
+  const fields: TemplateRow[] = [
+    { header: "Referencia",              s1: "2026/001",                      s2: "2026/002",               s3: "2026/003" },
+    { header: "Número de procedimiento", s1: "123/2026",                      s2: "456/2026",               s3: "789/2026" },
+    { header: "Tipo de juzgado",         s1: "Juzgado de Primera Instancia",  s2: "Juzgado de lo Social",   s3: "Audiencia Provincial" },
+    { header: "Nº Juzgado",             s1: "1",                             s2: "3",                      s3: "2" },
+    { header: "Población",              s1: "Madrid",                        s2: "Barcelona",              s3: "Valencia" },
+    { header: "Tipo de procedimiento",  s1: "Procedimiento Ordinario",       s2: "Verbal",                 s3: "Monitorio" },
+    { header: "Cliente",                s1: "Juan García López",             s2: "Empresa S.L.",           s3: "María Fernández" },
+    { header: "Parte contraria",        s1: "Pedro Martínez",                s2: "Otra Empresa S.A.",      s3: "Carlos Ruiz" },
+    { header: "Fecha de alta",          s1: "01/01/2026",                    s2: "15/02/2026",             s3: "10/03/2026" },
+  ];
+
+  const extraFields: TemplateRow[] = [
+    { header: "Año",            s1: "2026",                               s2: "2026",                         s3: "2026" },
+    { header: "Descripción",    s1: "Reclamación de cantidad por impago", s2: "Despido improcedente",         s3: "Reclamación de herencia" },
+    { header: "Juzgado completo", s1: "",                                 s2: "",                             s3: "" },
+    { header: "Procurador",     s1: "Ana Sánchez Pérez",                  s2: "",                             s3: "Luis Torres" },
+    { header: "NIG",            s1: "28079-41-1-2026-0001234",            s2: "",                             s3: "" },
+    { header: "Estado",         s1: "abierto",                            s2: "abierto",                      s3: "abierto" },
+    { header: "Observaciones",  s1: "Asunto urgente",                     s2: "",                             s3: "Pendiente documentación" },
+  ];
+
+  const all = type === "basica" ? fields : [...fields, ...extraFields];
+  const header = all.map(f => f.header).join(SEP);
+  const row1   = all.map(f => f.s1).join(SEP);
+  const row2   = all.map(f => f.s2).join(SEP);
+  const row3   = all.map(f => f.s3).join(SEP);
+
+  const csv = BOM + [header, row1, row2, row3].join("\r\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `plantilla_expedientes_${type}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 function CsvImportView({
   fileName,
   onBack,
@@ -1079,6 +1125,9 @@ function CsvImportView({
   onSelectFile,
   onFileChange,
   inputRef,
+  clientes,
+  onSaveNew,
+  savingNew,
 }: {
   fileName: string | null;
   onBack: () => void;
@@ -1087,7 +1136,12 @@ function CsvImportView({
   onSelectFile: () => void;
   onFileChange: (file?: File | null) => void;
   inputRef: React.RefObject<HTMLInputElement>;
+  clientes: any[];
+  onSaveNew: (form: typeof EXP_EMPTY) => Promise<void>;
+  savingNew: boolean;
 }) {
+  const [showNewModal, setShowNewModal] = useState(false);
+
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       <input
@@ -1119,27 +1173,23 @@ function CsvImportView({
         </div>
       </div>
 
-      <div>
-        <h1 className="text-3xl font-black text-slate-900">Importar expedientes</h1>
-        <p className="mt-2 text-lg text-slate-500">Importa expedientes judiciales desde un archivo CSV</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-black text-slate-900">Importar expedientes</h1>
+          <p className="mt-2 text-lg text-slate-500">Importa expedientes judiciales desde un archivo CSV</p>
+        </div>
+        <button
+          onClick={() => setShowNewModal(true)}
+          className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-[#ab0433] px-4 py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[#92042c]"
+        >
+          <Plus size={15} /> Nuevo expediente
+        </button>
       </div>
 
       <div className="flex items-center justify-center gap-6 py-4">
-        <ImportStep
-          icon={Upload}
-          label="Subir archivo"
-          active
-          connector
-        />
-        <ImportStep
-          icon={SlidersHorizontal}
-          label="Configurar"
-          connector
-        />
-        <ImportStep
-          icon={Eye}
-          label="Revisar"
-        />
+        <ImportStep icon={Upload} label="Subir archivo" active connector />
+        <ImportStep icon={SlidersHorizontal} label="Configurar" connector />
+        <ImportStep icon={Eye} label="Revisar" />
       </div>
 
       <button
@@ -1152,8 +1202,48 @@ function CsvImportView({
         <p className="text-xl font-semibold text-slate-900">
           {fileName ? fileName : "Haz click para seleccionar o arrastra tu archivo CSV"}
         </p>
-        <p className="mt-3 text-sm text-slate-500">Maximo 10MB</p>
+        <p className="mt-3 text-sm text-slate-500">Máximo 10MB</p>
       </button>
+
+      {/* Plantillas descargables */}
+      <div className="rounded-[22px] border border-emerald-200 bg-emerald-50/60 p-5 shadow-sm">
+        <div className="mb-3 flex items-center gap-2">
+          <FileSpreadsheet size={16} className="text-emerald-600" />
+          <h2 className="text-base font-bold text-slate-900">Plantillas para Excel</h2>
+        </div>
+        <p className="text-sm text-slate-600 mb-4">
+          Descarga una plantilla, rellénala en Excel y súbela aquí. El archivo se abre directamente con Excel.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <button
+            onClick={() => downloadCsvTemplate("basica")}
+            className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-white px-4 py-3.5 text-left shadow-sm transition-all hover:border-emerald-400 hover:shadow-md"
+          >
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 mt-0.5">
+              <Download size={16} />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-slate-800">Plantilla básica</p>
+              <p className="text-xs text-slate-500 mt-0.5">Campos esenciales: referencia, juzgado, procedimiento, cliente, parte contraria</p>
+            </div>
+          </button>
+          <button
+            onClick={() => downloadCsvTemplate("completa")}
+            className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-white px-4 py-3.5 text-left shadow-sm transition-all hover:border-emerald-400 hover:shadow-md"
+          >
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 mt-0.5">
+              <FileSpreadsheet size={16} />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-slate-800">Plantilla completa</p>
+              <p className="text-xs text-slate-500 mt-0.5">Todos los campos: año, NIG, procurador, estado, observaciones y más</p>
+            </div>
+          </button>
+        </div>
+        <p className="mt-3 text-xs text-slate-400">
+          Los archivos CSV incluyen 3 filas de ejemplo. Borra esas filas antes de subir tus datos reales.
+        </p>
+      </div>
 
       <div className="rounded-[22px] border border-slate-200 bg-white/80 p-5 shadow-sm">
         <div className="mb-4 flex items-center gap-2">
@@ -1161,7 +1251,7 @@ function CsvImportView({
           <h2 className="text-xl font-bold text-slate-900">Formato esperado</h2>
         </div>
         <p className="text-base text-slate-600">
-          Tu archivo CSV debe contener las siguientes columnas obligatorias:
+          Tu archivo CSV debe contener las siguientes columnas (con separador <strong>;</strong> o <strong>,</strong>):
         </p>
         <ul className="mt-3 space-y-1.5 text-base text-slate-600">
           <li>• Referencia (ID del expediente)</li>
@@ -1175,6 +1265,16 @@ function CsvImportView({
           Las columnas se detectarán automáticamente y podrás ajustarlas en el siguiente paso.
         </p>
       </div>
+
+      {showNewModal && (
+        <ExpedienteModal
+          initial={EXP_EMPTY}
+          clientes={clientes}
+          onSave={async (form) => { await onSaveNew(form); setShowNewModal(false); }}
+          onClose={() => setShowNewModal(false)}
+          saving={savingNew}
+        />
+      )}
     </div>
   );
 }
@@ -4733,6 +4833,9 @@ export default function ExpedienteList() {
         onSelectFile={() => csvInputRef.current?.click()}
         onFileChange={(file) => handleCsvSelected(file)}
         inputRef={csvInputRef}
+        clientes={clientes}
+        onSaveNew={async (form) => { await handleSave(form); }}
+        savingNew={saving}
       />
     );
   }
