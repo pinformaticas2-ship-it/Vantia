@@ -430,28 +430,44 @@ export const createExpediente = async (req: any, res: Response) => {
 
   try {
     const yr = anio || new Date().getFullYear();
-    // Primer hueco disponible >= min_num configurado (rellena huecos al borrar)
-    const nextR = await pool.query(
-      `WITH cfg AS (
-          SELECT COALESCE(min_num, 1) AS min_n
-          FROM expediente_counter_config WHERE anio = $1
-       ),
-       bounds AS (
-          SELECT GREATEST(
-            COALESCE((SELECT MAX(num_exp) FROM expedientes WHERE anio = $1), 0),
-            COALESCE((SELECT min_n FROM cfg), 1) - 1
-          ) + 1 AS top_n,
-          COALESCE((SELECT min_n FROM cfg), 1) AS min_n
-       ),
-       seq AS (
-          SELECT generate_series((SELECT min_n FROM bounds), (SELECT top_n FROM bounds)) AS n
-       )
-       SELECT MIN(s.n) AS next
-       FROM seq s
-       WHERE s.n NOT IN (SELECT num_exp FROM expedientes WHERE anio = $1)`,
-      [yr]
+
+    // Leer config del contador para este año
+    const cfgR = await pool.query(
+      `SELECT min_num, auto_fill, override_next FROM expediente_counter_config WHERE anio = $1`, [yr]
     );
-    const numExp = nextR.rows[0].next;
+    const cfg = cfgR.rows[0] || { min_num: 1, auto_fill: true, override_next: null };
+    const minNum: number = cfg.min_num ?? 1;
+    const autoFill: boolean = cfg.auto_fill !== false;
+
+    let numExp: number;
+
+    if (cfg.override_next != null) {
+      // Usar el número específico configurado manualmente
+      numExp = cfg.override_next;
+      // Limpiar el override después de usarlo
+      await pool.query(
+        `UPDATE expediente_counter_config SET override_next = NULL WHERE anio = $1`, [yr]
+      );
+    } else if (autoFill) {
+      // Primer hueco disponible >= min_num (rellena huecos)
+      const nextR = await pool.query(
+        `WITH bounds AS (
+            SELECT GREATEST(COALESCE(MAX(num_exp), 0), $2 - 1) + 1 AS top_n FROM expedientes WHERE anio = $1
+         ),
+         seq AS (SELECT generate_series($2, (SELECT top_n FROM bounds)) AS n)
+         SELECT MIN(s.n) AS next FROM seq s
+         WHERE s.n NOT IN (SELECT num_exp FROM expedientes WHERE anio = $1)`,
+        [yr, minNum]
+      );
+      numExp = nextR.rows[0]?.next ?? minNum;
+    } else {
+      // Modo clásico: MAX + 1, respetando min_num
+      const maxR = await pool.query(
+        `SELECT GREATEST(COALESCE(MAX(num_exp), 0), $2 - 1) + 1 AS next FROM expedientes WHERE anio = $1`,
+        [yr, minNum]
+      );
+      numExp = maxR.rows[0]?.next ?? minNum;
+    }
 
     let nombre = cliente_nombre || null;
     if (cliente_id && !nombre) {
@@ -648,38 +664,51 @@ export const deleteExpediente = async (req: any, res: Response) => {
 
 export const getCounterConfig = async (req: any, res: Response) => {
   try {
-    const { rows: cfgRows } = await pool.query(`SELECT anio, min_num FROM expediente_counter_config ORDER BY anio DESC`);
+    const { rows: cfgRows } = await pool.query(
+      `SELECT anio, min_num, auto_fill, override_next FROM expediente_counter_config ORDER BY anio DESC`
+    );
     const currentYear = new Date().getFullYear();
     const years = Array.from(new Set([currentYear, currentYear - 1, ...cfgRows.map((r: any) => r.anio)])).sort((a, b) => b - a).slice(0, 5);
 
     const result = await Promise.all(years.map(async (yr) => {
       const cfg = cfgRows.find((r: any) => r.anio === yr);
-      const minNum = cfg?.min_num ?? 1;
+      const minNum: number = cfg?.min_num ?? 1;
+      const autoFill: boolean = cfg?.auto_fill !== false;
+      const overrideNext: number | null = cfg?.override_next ?? null;
 
       const { rows: usedRows } = await pool.query(
         `SELECT num_exp FROM expedientes WHERE anio = $1 ORDER BY num_exp`, [yr]
       );
       const used: number[] = usedRows.map((r: any) => r.num_exp);
 
-      // Calculate next using same gap-filling logic
-      const { rows: nextRows } = await pool.query(
-        `WITH bounds AS (
-            SELECT GREATEST(COALESCE(MAX(num_exp), 0), $2 - 1) + 1 AS top_n FROM expedientes WHERE anio = $1
-         ),
-         seq AS (SELECT generate_series($2, (SELECT top_n FROM bounds)) AS n)
-         SELECT MIN(s.n) AS next FROM seq s WHERE s.n NOT IN (SELECT num_exp FROM expedientes WHERE anio = $1)`,
-        [yr, minNum]
-      );
-      const nextNum: number = nextRows[0]?.next ?? minNum;
+      // Calcular próximo número según la misma lógica de createExpediente
+      let nextNum: number;
+      if (overrideNext != null) {
+        nextNum = overrideNext;
+      } else if (autoFill) {
+        const { rows: nextRows } = await pool.query(
+          `WITH bounds AS (SELECT GREATEST(COALESCE(MAX(num_exp), 0), $2 - 1) + 1 AS top_n FROM expedientes WHERE anio = $1),
+           seq AS (SELECT generate_series($2, (SELECT top_n FROM bounds)) AS n)
+           SELECT MIN(s.n) AS next FROM seq s WHERE s.n NOT IN (SELECT num_exp FROM expedientes WHERE anio = $1)`,
+          [yr, minNum]
+        );
+        nextNum = nextRows[0]?.next ?? minNum;
+      } else {
+        const { rows: maxRows } = await pool.query(
+          `SELECT GREATEST(COALESCE(MAX(num_exp), 0), $2 - 1) + 1 AS next FROM expedientes WHERE anio = $1`,
+          [yr, minNum]
+        );
+        nextNum = maxRows[0]?.next ?? minNum;
+      }
 
-      // Find gaps
+      // Huecos detectados
       const maxUsed = used.length ? Math.max(...used) : 0;
       const gaps: number[] = [];
       for (let i = minNum; i <= maxUsed; i++) {
         if (!used.includes(i)) gaps.push(i);
       }
 
-      return { anio: yr, min_num: minNum, used_count: used.length, next_num: nextNum, gaps };
+      return { anio: yr, min_num: minNum, auto_fill: autoFill, override_next: overrideNext, used_count: used.length, max_used: maxUsed, next_num: nextNum, gaps };
     }));
 
     return res.json({ success: true, data: result });
@@ -689,16 +718,20 @@ export const getCounterConfig = async (req: any, res: Response) => {
 };
 
 export const setCounterConfig = async (req: any, res: Response) => {
-  const { anio, min_num } = req.body;
+  const { anio, min_num, auto_fill, override_next } = req.body;
   const yr = Number(anio);
-  const mn = Number(min_num);
   if (!Number.isInteger(yr) || yr < 2000 || yr > 2100) return res.status(400).json({ error: 'Año inválido' });
+  const mn = Number(min_num ?? 1);
   if (!Number.isInteger(mn) || mn < 1) return res.status(400).json({ error: 'Número mínimo inválido (debe ser >= 1)' });
+  const af = auto_fill !== false;
+  const ov = override_next != null ? Number(override_next) : null;
+  if (ov !== null && (!Number.isInteger(ov) || ov < 1)) return res.status(400).json({ error: 'Número de override inválido' });
   try {
     await pool.query(
-      `INSERT INTO expediente_counter_config (anio, min_num) VALUES ($1, $2)
-       ON CONFLICT (anio) DO UPDATE SET min_num = EXCLUDED.min_num`,
-      [yr, mn]
+      `INSERT INTO expediente_counter_config (anio, min_num, auto_fill, override_next)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (anio) DO UPDATE SET min_num = EXCLUDED.min_num, auto_fill = EXCLUDED.auto_fill, override_next = EXCLUDED.override_next`,
+      [yr, mn, af, ov]
     );
     return res.json({ success: true });
   } catch (e: any) {
