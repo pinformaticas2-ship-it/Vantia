@@ -1791,6 +1791,64 @@ export default function Facturacion() {
                     </div>
                   </div>
 
+                  {/* ── Resumen financiero (layout exacto Quipu) ── */}
+                  {(() => {
+                    const ivaRep  = totalFacturado - totalFacturado / 1.21;
+                    const ivaSop  = gastosMensuales - gastosMensuales / 1.21;
+                    const ivaLiq  = ivaRep - ivaSop;
+                    const irpfRet = 0; // IRPF retenido (no calculable sin líneas de factura)
+                    const irpfDed = 0;
+                    const irpfLiq = irpfRet - irpfDed;
+                    return (
+                      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                        <div className="px-5 py-3 border-b border-slate-100 bg-slate-50">
+                          <p className="text-sm font-bold text-slate-700">Resumen financiero</p>
+                        </div>
+                        {/* Fila 1: Ingresos | Gastos */}
+                        <div className="grid grid-cols-2 border-b border-slate-100">
+                          <div className="px-6 py-4 border-r border-slate-100">
+                            <p className="text-xs text-slate-500 font-medium">Ingresos</p>
+                            <p className="mt-1 text-2xl font-black text-emerald-600">{fmtEur(totalFacturado)}</p>
+                          </div>
+                          <div className="px-6 py-4">
+                            <p className="text-xs text-slate-500 font-medium">Gastos</p>
+                            <p className="mt-1 text-2xl font-black text-red-500">{fmtEur(gastosMensuales)}</p>
+                          </div>
+                        </div>
+                        {/* Fila 2: IVA+IRPF desglosados */}
+                        <div className="grid grid-cols-4 border-b border-slate-100 text-xs">
+                          <div className="px-5 py-3 border-r border-slate-100">
+                            <p className="text-slate-400 font-medium">IVA</p>
+                            <p className="mt-0.5 font-semibold text-slate-700">{fmtEur(ivaRep)}</p>
+                          </div>
+                          <div className="px-5 py-3 border-r border-slate-100">
+                            <p className="text-slate-400 font-medium">IRPF</p>
+                            <p className="mt-0.5 font-semibold text-slate-700">{fmtEur(irpfRet)}</p>
+                          </div>
+                          <div className="px-5 py-3 border-r border-slate-100">
+                            <p className="text-slate-400 font-medium">IVA</p>
+                            <p className="mt-0.5 font-semibold text-slate-700">{fmtEur(ivaSop)}</p>
+                          </div>
+                          <div className="px-5 py-3">
+                            <p className="text-slate-400 font-medium">IRPF</p>
+                            <p className="mt-0.5 font-semibold text-slate-700">{fmtEur(irpfDed)}</p>
+                          </div>
+                        </div>
+                        {/* Fila 3: IVA a liquidar | IRPF a liquidar */}
+                        <div className="grid grid-cols-2 bg-slate-50/60 text-xs">
+                          <div className="px-5 py-3 border-r border-slate-100">
+                            <p className="text-slate-400 font-medium">IVA a liquidar</p>
+                            <p className={`mt-0.5 font-bold ${ivaLiq >= 0 ? "text-slate-700" : "text-red-600"}`}>{fmtEur(ivaLiq)}</p>
+                          </div>
+                          <div className="px-5 py-3">
+                            <p className="text-slate-400 font-medium">IRPF a liquidar</p>
+                            <p className={`mt-0.5 font-bold ${irpfLiq >= 0 ? "text-slate-700" : "text-red-600"}`}>{fmtEur(irpfLiq)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   {/* ── Ingresos y Gastos (gráfico barras tipo Quipu) ── */}
                   <OdooSection
                     title="Ingresos y Gastos"
@@ -1853,64 +1911,6 @@ export default function Facturacion() {
                   >
                     <ClientIncomeChart facturas={filteredFacturas} />
                   </OdooSection>
-
-                  {/* ── Resumen financiero (layout exacto Quipu) ── */}
-                  {(() => {
-                    const ivaRep  = totalFacturado - totalFacturado / 1.21;
-                    const ivaSop  = gastosMensuales - gastosMensuales / 1.21;
-                    const ivaLiq  = ivaRep - ivaSop;
-                    const irpfRet = 0; // IRPF retenido (no calculable sin líneas de factura)
-                    const irpfDed = 0;
-                    const irpfLiq = irpfRet - irpfDed;
-                    return (
-                      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                        <div className="px-5 py-3 border-b border-slate-100 bg-slate-50">
-                          <p className="text-sm font-bold text-slate-700">Resumen financiero</p>
-                        </div>
-                        {/* Fila 1: Ingresos | Gastos */}
-                        <div className="grid grid-cols-2 border-b border-slate-100">
-                          <div className="px-6 py-4 border-r border-slate-100">
-                            <p className="text-xs text-slate-500 font-medium">Ingresos</p>
-                            <p className="mt-1 text-2xl font-black text-emerald-600">{fmtEur(totalFacturado)}</p>
-                          </div>
-                          <div className="px-6 py-4">
-                            <p className="text-xs text-slate-500 font-medium">Gastos</p>
-                            <p className="mt-1 text-2xl font-black text-red-500">{fmtEur(gastosMensuales)}</p>
-                          </div>
-                        </div>
-                        {/* Fila 2: IVA+IRPF desglosados */}
-                        <div className="grid grid-cols-4 border-b border-slate-100 text-xs">
-                          <div className="px-5 py-3 border-r border-slate-100">
-                            <p className="text-slate-400 font-medium">IVA</p>
-                            <p className="mt-0.5 font-semibold text-slate-700">{fmtEur(ivaRep)}</p>
-                          </div>
-                          <div className="px-5 py-3 border-r border-slate-100">
-                            <p className="text-slate-400 font-medium">IRPF</p>
-                            <p className="mt-0.5 font-semibold text-slate-700">{fmtEur(irpfRet)}</p>
-                          </div>
-                          <div className="px-5 py-3 border-r border-slate-100">
-                            <p className="text-slate-400 font-medium">IVA</p>
-                            <p className="mt-0.5 font-semibold text-slate-700">{fmtEur(ivaSop)}</p>
-                          </div>
-                          <div className="px-5 py-3">
-                            <p className="text-slate-400 font-medium">IRPF</p>
-                            <p className="mt-0.5 font-semibold text-slate-700">{fmtEur(irpfDed)}</p>
-                          </div>
-                        </div>
-                        {/* Fila 3: IVA a liquidar | IRPF a liquidar */}
-                        <div className="grid grid-cols-2 bg-slate-50/60 text-xs">
-                          <div className="px-5 py-3 border-r border-slate-100">
-                            <p className="text-slate-400 font-medium">IVA a liquidar</p>
-                            <p className={`mt-0.5 font-bold ${ivaLiq >= 0 ? "text-slate-700" : "text-red-600"}`}>{fmtEur(ivaLiq)}</p>
-                          </div>
-                          <div className="px-5 py-3">
-                            <p className="text-slate-400 font-medium">IRPF a liquidar</p>
-                            <p className={`mt-0.5 font-bold ${irpfLiq >= 0 ? "text-slate-700" : "text-red-600"}`}>{fmtEur(irpfLiq)}</p>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })()}
 
                   {/* ── Cuentas bancarias en dashboard (Quipu style) ── */}
                   {quipuStatus.connected && (
