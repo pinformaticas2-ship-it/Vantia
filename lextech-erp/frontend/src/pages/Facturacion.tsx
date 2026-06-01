@@ -1791,6 +1791,69 @@ export default function Facturacion() {
                     </div>
                   </div>
 
+                  {/* ── Ingresos y Gastos (gráfico barras tipo Quipu) ── */}
+                  <OdooSection
+                    title="Ingresos y Gastos"
+                    action={
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center rounded-lg border border-slate-200 bg-white p-0.5">
+                          {([['bar', BarChart2], ['line', LineChart], ['pie', PieChart]] as const).map(([type, Icon]) => (
+                            <button
+                              key={type}
+                              onClick={() => setChartType(type)}
+                              className={`inline-flex h-6 w-6 items-center justify-center rounded-md transition-colors ${chartType === type ? 'bg-slate-100 text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}
+                            >
+                              <Icon size={12} />
+                            </button>
+                          ))}
+                        </div>
+                        <div className="relative" ref={yearMenuRef}>
+                          <button onClick={() => setShowYearMenu(v => !v)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                            {filterYear} <ChevronDown size={11} />
+                          </button>
+                          {showYearMenu && (
+                            <div className="absolute left-0 top-full z-30 mt-1 w-24 rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
+                              {availableYears.map(y => (
+                                <button key={y} onClick={() => { setFilterYear(y); setShowYearMenu(false); }} className={`flex w-full items-center gap-1.5 px-3 py-2 text-xs transition-colors ${filterYear === y ? "font-bold text-emerald-700" : "text-slate-600 hover:bg-slate-50"}`}>
+                                  {filterYear === y && "✓"} {y}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div className="relative" ref={periodMenuRef}>
+                          <button onClick={() => setShowPeriodMenu(v => !v)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                            {PERIOD_OPTIONS.find(o => o.value === filterPeriod)?.label ?? "Todo el año"} <ChevronDown size={11} />
+                          </button>
+                          {showPeriodMenu && (
+                            <div className="absolute right-0 top-full z-30 mt-1 w-40 rounded-xl border border-slate-200 bg-white py-1 shadow-xl max-h-60 overflow-y-auto">
+                              {PERIOD_OPTIONS.map(opt => (
+                                <button key={opt.value} onClick={() => { setFilterPeriod(opt.value); setShowPeriodMenu(false); }} className={`flex w-full items-center gap-1.5 px-3 py-2 text-xs transition-colors ${filterPeriod === opt.value ? "font-bold text-emerald-700" : "text-slate-600 hover:bg-slate-50"}`}>
+                                  {filterPeriod === opt.value && "✓"} {opt.label}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    }
+                  >
+                    <MonthlyBarChart
+                      facturas={filteredFacturas}
+                      gastos={filteredGastos}
+                      year={filterYear}
+                      chartType={chartType}
+                    />
+                  </OdooSection>
+
+                  {/* ── Análisis de ingresos por cliente (tipo Quipu) ── */}
+                  <OdooSection
+                    title="Análisis de ingresos"
+                    action={<span className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600">Clientes</span>}
+                  >
+                    <ClientIncomeChart facturas={filteredFacturas} />
+                  </OdooSection>
+
                   {/* ── Resumen financiero (layout exacto Quipu) ── */}
                   {(() => {
                     const ivaRep  = totalFacturado - totalFacturado / 1.21;
@@ -1962,69 +2025,6 @@ export default function Facturacion() {
                     <KpiCard label="Pagos pendientes" value={fmtEur(pagosPendientes)} sub={`${filterYear} · ${PERIOD_OPTIONS.find(o => o.value === filterPeriod)?.label ?? ""}`} color="slate" icon={Clock} />
                     <KpiCard label="Gastos del periodo" value={fmtEur(gastosMensuales)} sub="Control de costes" color="green" icon={TrendingDown} />
                   </div>
-
-                  {/* ── Ingresos y Gastos (gráfico barras tipo Quipu) ── */}
-                  <OdooSection
-                    title="Ingresos y Gastos"
-                    action={
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center rounded-lg border border-slate-200 bg-white p-0.5">
-                          {([['bar', BarChart2], ['line', LineChart], ['pie', PieChart]] as const).map(([type, Icon]) => (
-                            <button
-                              key={type}
-                              onClick={() => setChartType(type)}
-                              className={`inline-flex h-6 w-6 items-center justify-center rounded-md transition-colors ${chartType === type ? 'bg-slate-100 text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}
-                            >
-                              <Icon size={12} />
-                            </button>
-                          ))}
-                        </div>
-                        <div className="relative" ref={yearMenuRef}>
-                          <button onClick={() => setShowYearMenu(v => !v)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">
-                            {filterYear} <ChevronDown size={11} />
-                          </button>
-                          {showYearMenu && (
-                            <div className="absolute left-0 top-full z-30 mt-1 w-24 rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
-                              {availableYears.map(y => (
-                                <button key={y} onClick={() => { setFilterYear(y); setShowYearMenu(false); }} className={`flex w-full items-center gap-1.5 px-3 py-2 text-xs transition-colors ${filterYear === y ? "font-bold text-emerald-700" : "text-slate-600 hover:bg-slate-50"}`}>
-                                  {filterYear === y && "✓"} {y}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                        <div className="relative" ref={periodMenuRef}>
-                          <button onClick={() => setShowPeriodMenu(v => !v)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">
-                            {PERIOD_OPTIONS.find(o => o.value === filterPeriod)?.label ?? "Todo el año"} <ChevronDown size={11} />
-                          </button>
-                          {showPeriodMenu && (
-                            <div className="absolute right-0 top-full z-30 mt-1 w-40 rounded-xl border border-slate-200 bg-white py-1 shadow-xl max-h-60 overflow-y-auto">
-                              {PERIOD_OPTIONS.map(opt => (
-                                <button key={opt.value} onClick={() => { setFilterPeriod(opt.value); setShowPeriodMenu(false); }} className={`flex w-full items-center gap-1.5 px-3 py-2 text-xs transition-colors ${filterPeriod === opt.value ? "font-bold text-emerald-700" : "text-slate-600 hover:bg-slate-50"}`}>
-                                  {filterPeriod === opt.value && "✓"} {opt.label}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    }
-                  >
-                    <MonthlyBarChart
-                      facturas={filteredFacturas}
-                      gastos={filteredGastos}
-                      year={filterYear}
-                      chartType={chartType}
-                    />
-                  </OdooSection>
-
-                  {/* ── Análisis de ingresos por cliente (tipo Quipu) ── */}
-                  <OdooSection
-                    title="Análisis de ingresos"
-                    action={<span className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600">Clientes</span>}
-                  >
-                    <ClientIncomeChart facturas={filteredFacturas} />
-                  </OdooSection>
 
                   <TableShell title="Cobros pendientes de facturas" count={`${filteredCobrosPendientes.length} registros`} headers={["Número", "Cliente", "Expediente", "Vencimiento", "Pendiente", "Estado", ""]}>
                     {filteredCobrosPendientes.map((row) => (

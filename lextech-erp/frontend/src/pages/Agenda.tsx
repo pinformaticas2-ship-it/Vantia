@@ -830,6 +830,20 @@ function TimeGridView({
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // ── Drag-to-move state ───────────────────────────────────────────────────────
+  const [draggingId,    setDraggingId]    = useState<string | null>(null);
+  const [dragOverSlot,  setDragOverSlot]  = useState<{ dateStr: string; mins: number } | null>(null);
+  const dragOffsetMinsRef = useRef<number>(0); // minutes from top of event where user grabbed
+  const dragDurationRef   = useRef<number>(60); // duration of dragged event in minutes
+
+  const calcMinsFromMouseY = (e: React.DragEvent, colEl: HTMLDivElement): number => {
+    const scroll = scrollRef.current?.scrollTop ?? 0;
+    const containerTop = scrollRef.current?.getBoundingClientRect().top ?? 0;
+    const rawY = (e.clientY - containerTop) + scroll - dragOffsetMinsRef.current * (HOUR_HEIGHT / 60);
+    const totalMins = Math.max(0, Math.min((rawY / HOUR_HEIGHT) * 60, 24 * 60 - dragDurationRef.current));
+    return Math.round(totalMins / 15) * 15;
+  };
+
   // ── Resize de eventos ────────────────────────────────────────────────────────
   const resizingRef = useRef<{ id: string; startAt: string; endAt: string } | null>(null);
   const [resizingDisplay, setResizingDisplay] = useState<{ id: string; endAt: string } | null>(null);
@@ -1072,6 +1086,18 @@ function TimeGridView({
                     <div className="flex-1 border-t-2 border-red-500" />
                   </div>
                 )}
+                {/* Ghost de drop (preview) */}
+                {dragOverSlot?.dateStr === dateStr && draggingId && (() => {
+                  const ghostTopPx = (dragOverSlot.mins / 60) * HOUR_HEIGHT;
+                  const ghostH = Math.max((dragDurationRef.current / 60) * HOUR_HEIGHT - 2, 20);
+                  return (
+                    <div
+                      className="absolute left-1 right-1 rounded border-2 border-dashed border-white/70 bg-white/20 pointer-events-none"
+                      style={{ top: ghostTopPx, height: ghostH, zIndex: 25 }}
+                    />
+                  );
+                })()}
+
                 {/* Eventos LexTech con hora */}
                 {/* Ghost de drag en esta columna */}
                 {dragDisplay && dragDisplay.dateStr === dateStr && (() => {
