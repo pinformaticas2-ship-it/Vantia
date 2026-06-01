@@ -1618,57 +1618,17 @@ export default function Facturacion() {
 
               {/* ══ CUENTAS BANCARIAS ═══════════════════════════════════════════════ */}
               {tab === "bank_accounts" && (
-                <div className="space-y-4">
-                  {!quipuStatus.connected ? (
-                    <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-8 text-center text-sm text-amber-700">Conecta Quipu para ver cuentas bancarias.</div>
-                  ) : (
-                    <>
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm font-semibold text-slate-600">Cuentas conectadas a Quipu</p>
-                        <button onClick={loadQuipuBankAccounts} disabled={loadingQuipu} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50">
-                          <RefreshCw size={12} className={loadingQuipu ? "animate-spin" : ""} /> Actualizar
-                        </button>
-                      </div>
-                      {quipuError && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{quipuError}</div>}
-                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-                        {quipuBankAccounts.map(acc => (
-                          <button key={acc.id} onClick={() => setSelectedBankAccountId(acc.id)}
-                            className={`rounded-2xl border p-5 text-left transition-all ${selectedBankAccountId === acc.id ? "border-blue-300 bg-blue-50 shadow-sm" : "border-slate-200 bg-white hover:border-slate-300"}`}>
-                            <div className="flex items-center justify-between gap-3 mb-3">
-                              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100"><Building2 size={16} className="text-slate-500" /></div>
-                              <span className="text-xs font-semibold text-slate-400">{acc.currency || "EUR"}</span>
-                            </div>
-                            <p className="text-sm font-bold text-slate-800 truncate">{acc.name}</p>
-                            {acc.bankName && <p className="text-xs text-slate-500 mt-0.5">{acc.bankName}</p>}
-                            {acc.iban && <p className="text-[11px] font-mono text-slate-400 mt-1 truncate">{acc.iban}</p>}
-                            <p className={`mt-3 text-xl font-bold ${acc.balance >= 0 ? "text-emerald-600" : "text-red-600"}`}>{fmtEur(acc.balance)}</p>
-                            {acc.updatedAt && <p className="text-[10px] text-slate-400 mt-1">Actualizado {fmtDate(acc.updatedAt)}</p>}
-                          </button>
-                        ))}
-                        {loadingQuipu && !quipuBankAccounts.length && (
-                          <div className="col-span-3 flex items-center justify-center py-8 text-sm text-slate-400"><Loader2 size={16} className="animate-spin mr-2" />Cargando cuentas...</div>
-                        )}
-                      </div>
-                      {selectedBankAccountId && (
-                        <TableShell title="Movimientos bancarios" count={`${quipuTransactions.length} movimientos`} headers={["Fecha", "Descripción", "Importe", "Saldo tras mov.", "Tipo"]}>
-                          {loadingQuipu ? (
-                            <tr><td colSpan={5} className="px-5 py-8 text-center text-sm text-slate-400"><Loader2 size={16} className="inline animate-spin mr-2" />Cargando movimientos...</td></tr>
-                          ) : quipuTransactions.length === 0 ? (
-                            <tr><td colSpan={5} className="px-5 py-8 text-center text-sm text-slate-400">Sin movimientos registrados</td></tr>
-                          ) : quipuTransactions.map(tx => (
-                            <tr key={tx.id} className="transition-colors hover:bg-slate-50/60">
-                              <td className="px-5 py-3 text-sm text-slate-600">{fmtDate(tx.date)}</td>
-                              <td className="px-5 py-3 text-sm text-slate-700">{tx.description || "—"}</td>
-                              <td className={`px-5 py-3 text-sm font-bold ${tx.amount >= 0 ? "text-emerald-600" : "text-red-600"}`}>{tx.amount >= 0 ? "+" : ""}{fmtEur(tx.amount)}</td>
-                              <td className="px-5 py-3 text-sm font-semibold text-slate-800">{tx.balanceAfter != null ? fmtEur(tx.balanceAfter) : "—"}</td>
-                              <td className="px-5 py-3 text-xs text-slate-500">{tx.kind || "—"}</td>
-                            </tr>
-                          ))}
-                        </TableShell>
-                      )}
-                    </>
-                  )}
-                </div>
+                <BankAccountsTab
+                  connected={quipuStatus.connected}
+                  accounts={quipuBankAccounts}
+                  selectedId={selectedBankAccountId}
+                  transactions={quipuTransactions}
+                  loading={loadingQuipu}
+                  error={quipuError}
+                  lastSyncAt={quipuStatus.lastSyncAt}
+                  onSelectAccount={setSelectedBankAccountId}
+                  onRefresh={loadQuipuBankAccounts}
+                />
               )}
 
               {/* ══ COBROS ══════════════════════════════════════════════════════════ */}
@@ -2236,6 +2196,213 @@ export default function Facturacion() {
           onClose={() => { setShowContactEditor(false); setEditingContact(null); }}
           onSave={saveContact}
         />
+      )}
+    </div>
+  );
+}
+
+// ── BankAccountsTab ───────────────────────────────────────────
+function BankAccountsTab({
+  connected, accounts, selectedId, transactions, loading, error, lastSyncAt,
+  onSelectAccount, onRefresh,
+}: {
+  connected: boolean;
+  accounts: QuipuBankAccount[];
+  selectedId: string | null;
+  transactions: QuipuTransaction[];
+  loading: boolean;
+  error: string | null;
+  lastSyncAt?: string | null;
+  onSelectAccount: (id: string | null) => void;
+  onRefresh: () => void;
+}) {
+  const [txSearch, setTxSearch] = useState("");
+  const [txFromDate, setTxFromDate] = useState("");
+  const [txToDate, setTxToDate] = useState("");
+  const [txDirection, setTxDirection] = useState<"all"|"in"|"out">("all");
+  const [reviewed, setReviewed] = useState<Set<string>>(new Set());
+
+  const selectedAcc = accounts.find(a => a.id === selectedId) || null;
+  const ibanShort = selectedAcc?.iban ? `*${selectedAcc.iban.slice(-4)}` : "";
+
+  const filtered = transactions.filter(tx => {
+    if (txSearch && !tx.description?.toLowerCase().includes(txSearch.toLowerCase())) return false;
+    if (txFromDate && tx.date < txFromDate) return false;
+    if (txToDate && tx.date > txToDate) return false;
+    if (txDirection === "in" && tx.amount < 0) return false;
+    if (txDirection === "out" && tx.amount >= 0) return false;
+    return true;
+  });
+
+  const pendingCount = transactions.filter(tx => !reviewed.has(tx.id)).length;
+
+  if (!connected) {
+    return <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-8 text-center text-sm text-amber-700">Conecta Quipu para ver cuentas bancarias.</div>;
+  }
+
+  return (
+    <div className="space-y-4">
+      {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-base font-bold text-slate-800">Bancos</h3>
+        <button onClick={onRefresh} disabled={loading} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50">
+          <RefreshCw size={12} className={loading ? "animate-spin" : ""} /> Actualizar
+        </button>
+      </div>
+
+      {/* Account cards */}
+      {!selectedId ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {loading && !accounts.length ? (
+            <div className="col-span-3 flex items-center justify-center py-12 text-sm text-slate-400"><Loader2 size={16} className="animate-spin mr-2" />Cargando cuentas...</div>
+          ) : accounts.length === 0 ? (
+            <div className="col-span-3 rounded-2xl border border-slate-200 bg-white px-5 py-10 text-center text-sm text-slate-400">Sin cuentas bancarias sincronizadas. Sincroniza Quipu primero.</div>
+          ) : accounts.map(acc => (
+            <button key={acc.id} onClick={() => onSelectAccount(acc.id)}
+              className="rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm hover:border-blue-300 hover:shadow-md transition-all group">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 border border-blue-100">
+                  <Building2 size={18} className="text-blue-600" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-slate-800 truncate">{acc.name}</p>
+                  <p className="text-xs text-slate-500 truncate">
+                    {acc.bankName ? `${acc.bankName}${acc.iban ? ` *${acc.iban.slice(-4)}` : ""}` : acc.iban || ""}
+                  </p>
+                </div>
+              </div>
+              <p className={`text-2xl font-black ${acc.balance >= 0 ? "text-slate-900" : "text-red-600"}`}>
+                {fmtEur(acc.balance)}
+              </p>
+              <div className="mt-3 flex items-center justify-between">
+                <div>
+                  <p className="text-lg font-bold text-slate-700">{transactions.filter(t => !reviewed.has(t.id)).length || "—"}</p>
+                  <p className="text-[11px] text-slate-400">Movimientos por conciliar</p>
+                </div>
+                {lastSyncAt && (
+                  <p className="text-[11px] text-slate-400 text-right">Sincronizada: {new Date(lastSyncAt).toLocaleDateString("es-ES")}</p>
+                )}
+              </div>
+            </button>
+          ))}
+        </div>
+      ) : (
+        /* Transaction detail view */
+        <div className="space-y-4">
+          {/* Account header */}
+          <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white px-5 py-4">
+            <button onClick={() => onSelectAccount(null)} className="text-slate-400 hover:text-slate-700 transition-colors">
+              <X size={16} />
+            </button>
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 border border-blue-100 shrink-0">
+              <Building2 size={18} className="text-blue-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-slate-800">{selectedAcc?.name}</p>
+              <p className="text-xs text-slate-500">{selectedAcc?.bankName}{ibanShort ? ` ${ibanShort}` : ""}</p>
+            </div>
+            <div className="text-right shrink-0">
+              <p className={`text-xl font-black ${(selectedAcc?.balance ?? 0) >= 0 ? "text-slate-900" : "text-red-600"}`}>
+                {fmtEur(selectedAcc?.balance ?? 0)}
+              </p>
+              {lastSyncAt && <p className="text-[11px] text-slate-400">Última sincronización {new Date(lastSyncAt).toLocaleDateString("es-ES")}</p>}
+            </div>
+          </div>
+
+          {/* Filters */}
+          <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+            <select value={txDirection} onChange={e => setTxDirection(e.target.value as any)}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600">
+              <option value="all">Cualquier estado</option>
+              <option value="in">Entradas</option>
+              <option value="out">Salidas</option>
+            </select>
+            <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2">
+              <input type="date" value={txFromDate} onChange={e => setTxFromDate(e.target.value)}
+                className="text-xs text-slate-600 outline-none bg-transparent" />
+              <span className="text-slate-400 text-xs">–</span>
+              <input type="date" value={txToDate} onChange={e => setTxToDate(e.target.value)}
+                className="text-xs text-slate-600 outline-none bg-transparent" />
+            </div>
+            <div className="flex items-center gap-2 ml-auto">
+              <div className="relative">
+                <input value={txSearch} onChange={e => setTxSearch(e.target.value)}
+                  placeholder="Buscar por concepto..."
+                  className="rounded-lg border border-slate-200 bg-white pl-3 pr-8 py-2 text-xs text-slate-700 placeholder:text-slate-400 outline-none focus:border-blue-300 w-48" />
+                {txSearch && (
+                  <button onClick={() => setTxSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Transactions table */}
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-5 py-3">
+              <p className="text-xs text-slate-500">Mostrando {filtered.length} de {transactions.length} movimientos</p>
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
+                  {pendingCount} por conciliar
+                </span>
+              </div>
+            </div>
+            {loading ? (
+              <div className="flex items-center justify-center py-12 text-sm text-slate-400"><Loader2 size={16} className="animate-spin mr-2" />Cargando movimientos...</div>
+            ) : filtered.length === 0 ? (
+              <div className="py-12 text-center text-sm text-slate-400">No existen resultados para tu búsqueda.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-left">
+                  <thead className="border-b border-slate-100">
+                    <tr>
+                      {["Estado", "Movimientos bancarios", "Importe", "Saldo", "Acciones"].map(h => (
+                        <th key={h} className="px-5 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-400">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {filtered.map(tx => {
+                      const isReviewed = reviewed.has(tx.id);
+                      return (
+                        <tr key={tx.id} className="transition-colors hover:bg-slate-50/60">
+                          <td className="px-5 py-3">
+                            <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${isReviewed ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                              {isReviewed ? "Revisado" : "Pendiente"}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3">
+                            <p className="text-sm font-medium text-slate-700">{tx.description || "Sin descripción"}</p>
+                            <p className="text-[11px] text-slate-400 mt-0.5">{fmtDate(tx.date)}</p>
+                          </td>
+                          <td className={`px-5 py-3 text-sm font-bold ${tx.amount >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                            {tx.amount >= 0 ? "+" : ""}{fmtEur(tx.amount)}
+                          </td>
+                          <td className="px-5 py-3 text-sm font-semibold text-slate-800">
+                            {tx.balanceAfter != null ? fmtEur(tx.balanceAfter) : "—"}
+                          </td>
+                          <td className="px-5 py-3">
+                            <button onClick={() => setReviewed(prev => {
+                              const next = new Set(prev);
+                              if (next.has(tx.id)) next.delete(tx.id); else next.add(tx.id);
+                              return next;
+                            })}
+                              className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition-colors ${isReviewed ? "border-slate-200 text-slate-500 hover:bg-slate-50" : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"}`}>
+                              {isReviewed ? "Desmarcar" : "Marcar revisado"}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
