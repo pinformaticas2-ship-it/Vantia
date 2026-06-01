@@ -987,17 +987,20 @@ export default function Facturacion() {
     loadQuipuStatus();
   }, [loadBilling, loadQuipuStatus]);
 
-  // Auto-sync Quipu silently when connected and data is stale (>15 min)
+  // Auto-sync Quipu silently once per session when data is stale (>30 min)
   useEffect(() => {
     if (!quipuStatus.connected || silentSyncDoneRef.current) return;
     const lastSync = quipuStatus.lastSyncAt ? new Date(quipuStatus.lastSyncAt).getTime() : 0;
-    if (Date.now() - lastSync <= 15 * 60 * 1000) return;
+    if (Date.now() - lastSync <= 30 * 60 * 1000) return; // fresh enough
     silentSyncDoneRef.current = true;
     setIsSilentSyncing(true);
     (async () => {
       try {
         const res = await apiFetch("/api/quipu/sync", { method: "POST", getToken });
-        if (res?.success === false) throw new Error(res?.error || "Error desconocido en sync Quipu");
+        if (res?.success === false) {
+          console.warn("[AutoSync] Quipu sync failed:", res?.error);
+          return; // don't show error to user for background sync — just log it
+        }
         setQuipuStatus(prev => ({
           ...prev,
           lastSyncAt: new Date().toISOString(),
@@ -1005,7 +1008,7 @@ export default function Facturacion() {
         }));
         await loadBilling();
       } catch (e: any) {
-        setErrorMsg(`Quipu sync: ${e?.message || "Error desconocido"}`);
+        console.warn("[AutoSync] Quipu:", e?.message);
       } finally {
         setIsSilentSyncing(false);
       }

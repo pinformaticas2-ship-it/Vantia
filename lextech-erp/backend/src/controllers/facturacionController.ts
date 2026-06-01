@@ -152,20 +152,6 @@ export const getBillingBootstrap = async (req: any, res: Response) => {
       quipuBankAccountsRows = qba.rows;
     } catch { /* quipu tables may not exist yet */ }
 
-    // Auto-sync Quipu in background if data is stale (>15 min) or never synced
-    try {
-      const qs = await pool.query(`SELECT last_sync_at FROM quipu_settings WHERE user_id=$1 LIMIT 1`, [userId]);
-      if (qs.rows.length > 0) {
-        const lastSync = qs.rows[0].last_sync_at;
-        const stale = !lastSync || (Date.now() - new Date(lastSync).getTime()) > QUIPU_STALE_MS;
-        if (stale) {
-          syncQuipuForUserInternal(userId).catch(e =>
-            console.error('[AutoSync/bootstrap] user=%s err=%s', userId, e?.message),
-          );
-        }
-      }
-    } catch { /* quipu_settings may not exist */ }
-
     res.json({
       success: true,
       data: {

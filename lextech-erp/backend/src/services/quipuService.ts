@@ -101,8 +101,8 @@ export async function quipuApiFetch<T = any>(
   path: string,
   init?: RequestInit,
   preAuthToken?: string,
+  _retries = 2,
 ): Promise<T> {
-  // Reuse provided token; only request a new one if not given
   const accessToken = preAuthToken || await getValidToken(settings);
   const baseUrl = normalizeBaseUrl(settings.base_url);
   const headers = new Headers(init?.headers || {});
@@ -116,6 +116,14 @@ export async function quipuApiFetch<T = any>(
   }
 
   const response = await fetch(`${baseUrl}${path}`, { ...init, headers });
+
+  // Auto-retry on 429 (rate limit) — Quipu asks to wait 5 seconds
+  if (response.status === 429 && _retries > 0) {
+    console.log(`[Quipu] 429 rate limit on ${path}, waiting 6s (retries left: ${_retries - 1})`);
+    await sleep(6000);
+    return quipuApiFetch<T>(settings, path, init, accessToken, _retries - 1);
+  }
+
   return parseQuipuResponse(response);
 }
 
@@ -172,17 +180,17 @@ export async function fetchQuipuBootstrap(settings: QuipuStoredSettings) {
   const contacts = await fetchQuipuPaginatedList<any>(
     settings, '/contacts?filter[kind]=client', accessToken,
   );
-  await sleep(1200);
+  await sleep(2000);
 
   const invoices = await fetchQuipuPaginatedList<any>(
     settings, '/invoices?sort=-issued_at', accessToken,
   );
-  await sleep(1200);
+  await sleep(2000);
 
   const numberingSeries = await fetchQuipuPaginatedList<any>(
     settings, '/numbering_series', accessToken,
   );
-  await sleep(1200);
+  await sleep(2000);
 
   // Bank accounts — fail silently if not available in this Quipu plan
   let bankAccounts: any[] = [];
