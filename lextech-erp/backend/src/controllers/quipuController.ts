@@ -117,14 +117,18 @@ async function persistQuipuBootstrap(userId: string, settingId: string, bootstra
 
     await client.query(`DELETE FROM quipu_contacts WHERE user_id = $1`, [userId]);
     for (const item of bootstrap.contacts) {
+      const extId = String(item?.id || '');
+      if (!extId) continue;
       await client.query(
         `INSERT INTO quipu_contacts
            (user_id, quipu_setting_id, external_id, external_type, kind, contact_name, tax_id, email, raw_payload)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+         ON CONFLICT (user_id, external_id) DO UPDATE SET
+           kind=EXCLUDED.kind, contact_name=EXCLUDED.contact_name,
+           tax_id=EXCLUDED.tax_id, email=EXCLUDED.email,
+           raw_payload=EXCLUDED.raw_payload, updated_at=NOW()`,
         [
-          userId,
-          settingId,
-          String(item?.id || ''),
+          userId, settingId, extId,
           String(item?.type || 'contacts'),
           String(item?.attributes?.kind || 'client'),
           String(item?.attributes?.name || item?.attributes?.trade_name || ''),
@@ -137,14 +141,19 @@ async function persistQuipuBootstrap(userId: string, settingId: string, bootstra
 
     await client.query(`DELETE FROM quipu_invoices WHERE user_id = $1`, [userId]);
     for (const item of bootstrap.invoices) {
+      const extId = String(item?.id || '');
+      if (!extId) continue;
       await client.query(
         `INSERT INTO quipu_invoices
            (user_id, quipu_setting_id, external_id, external_type, contact_name, number, status, issue_date, due_date, total_amount, raw_payload)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+         ON CONFLICT (user_id, external_id) DO UPDATE SET
+           contact_name=EXCLUDED.contact_name, number=EXCLUDED.number,
+           status=EXCLUDED.status, issue_date=EXCLUDED.issue_date,
+           due_date=EXCLUDED.due_date, total_amount=EXCLUDED.total_amount,
+           raw_payload=EXCLUDED.raw_payload, updated_at=NOW()`,
         [
-          userId,
-          settingId,
-          String(item?.id || ''),
+          userId, settingId, extId,
           String(item?.type || 'invoices'),
           String(item?.attributes?.contact_name || item?.attributes?.recipient_name || ''),
           String(item?.attributes?.number || item?.attributes?.serial_number || ''),
@@ -159,14 +168,18 @@ async function persistQuipuBootstrap(userId: string, settingId: string, bootstra
 
     await client.query(`DELETE FROM quipu_numbering_series WHERE user_id = $1`, [userId]);
     for (const item of bootstrap.numberingSeries) {
+      const extId = String(item?.id || '');
+      if (!extId) continue;
       await client.query(
         `INSERT INTO quipu_numbering_series
            (user_id, quipu_setting_id, external_id, external_type, name, prefix, next_number, raw_payload)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+         ON CONFLICT (user_id, external_id) DO UPDATE SET
+           name=EXCLUDED.name, prefix=EXCLUDED.prefix,
+           next_number=EXCLUDED.next_number, raw_payload=EXCLUDED.raw_payload,
+           updated_at=NOW()`,
         [
-          userId,
-          settingId,
-          String(item?.id || ''),
+          userId, settingId, extId,
           String(item?.type || 'numbering_series'),
           String(item?.attributes?.name || ''),
           String(item?.attributes?.prefix || ''),
