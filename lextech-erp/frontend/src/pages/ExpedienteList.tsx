@@ -14,7 +14,7 @@ import {
   Bug, History, TrendingUp, UserMinus, Pencil, PenLine, Bookmark, BarChart2,
   AlignJustify, LayoutList, ListChecks, Upload, Eye, Settings2, SlidersHorizontal, Check, Search, CheckCircle2,
   Download, FileCode2, FileText, ArrowRight, ArrowLeft, ChevronsRight, ChevronsLeft,
-  Scale, Link2, Lock, Unlock,
+  Scale, Link2, Lock, Unlock, Hash,
 } from "lucide-react";
 import { AtajosButton } from "../components/AtajosSystem";
 import AdjuntosModal from "../components/AdjuntosModal";
@@ -3696,6 +3696,132 @@ function FilterRow({
 
 
 
+// ── Modal Configuración de Numeración ─────────────────────────
+function CounterConfigModal({ onClose, getToken }: { onClose: () => void; getToken: () => Promise<string | null> }) {
+  const [data, setData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState<number | null>(null);
+  const [inputs, setInputs] = useState<Record<number, string>>({});
+  const [errors, setErrors] = useState<Record<number, string>>({});
+  const [saved, setSaved] = useState<Record<number, boolean>>({});
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const token = await getToken();
+      const res = await fetch("/api/expedientes/counter-config", { headers: { Authorization: `Bearer ${token}` } });
+      const d = await res.json();
+      if (res.ok) {
+        setData(d.data || []);
+        const init: Record<number, string> = {};
+        for (const row of d.data || []) init[row.anio] = String(row.min_num);
+        setInputs(init);
+      }
+    } finally { setLoading(false); }
+  }, [getToken]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleSave = async (anio: number) => {
+    const val = Number(inputs[anio]);
+    if (!Number.isInteger(val) || val < 1) { setErrors(e => ({ ...e, [anio]: "Debe ser un número entero >= 1" })); return; }
+    setSaving(anio); setErrors(e => ({ ...e, [anio]: "" }));
+    try {
+      const token = await getToken();
+      const res = await fetch("/api/expedientes/counter-config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ anio, min_num: val }),
+      });
+      if (res.ok) {
+        setSaved(s => ({ ...s, [anio]: true }));
+        setTimeout(() => setSaved(s => ({ ...s, [anio]: false })), 2000);
+        await load();
+      }
+    } finally { setSaving(null); }
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-xl">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+          <div>
+            <h2 className="text-base font-bold text-slate-900 flex items-center gap-2"><Hash size={16} className="text-[#ab0433]" /> Configurar numeración de expedientes</h2>
+            <p className="text-xs text-slate-500 mt-0.5">El sistema rellena huecos automáticamente. Aquí puedes ajustar el número mínimo por año.</p>
+          </div>
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          {/* Explicación */}
+          <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs text-blue-800 space-y-1">
+            <p className="font-semibold">¿Cómo funciona?</p>
+            <p>Cuando creas un expediente, el sistema busca el <strong>primer número libre</strong> comenzando desde el mínimo configurado. Si borras el nº 4, el siguiente expediente tomará el 4.</p>
+            <p className="mt-1 text-blue-600">Cambia el "Número mínimo" si quieres que la serie empiece en un valor concreto (ej: 100).</p>
+          </div>
+
+          {loading ? (
+            <div className="flex items-center justify-center py-8 text-slate-400"><Loader2 size={18} className="animate-spin mr-2" />Cargando...</div>
+          ) : (
+            <div className="space-y-3">
+              {data.map(row => (
+                <div key={row.anio} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-bold text-slate-800">{row.anio}</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">{row.used_count} expediente{row.used_count !== 1 ? "s" : ""}</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-semibold">Próximo: {row.next_num}</span>
+                        {row.gaps.length > 0 && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                            {row.gaps.length} hueco{row.gaps.length !== 1 ? "s" : ""}: {row.gaps.slice(0, 5).join(", ")}{row.gaps.length > 5 ? "..." : ""}
+                          </span>
+                        )}
+                      </div>
+                      {row.gaps.length === 0 && row.used_count > 0 && (
+                        <p className="text-[10px] text-slate-400 mt-1">Sin huecos — la numeración es continua</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2">
+                    <div className="flex-1">
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Número mínimo</label>
+                      <input
+                        type="number" min="1" step="1"
+                        value={inputs[row.anio] ?? row.min_num}
+                        onChange={e => setInputs(v => ({ ...v, [row.anio]: e.target.value }))}
+                        className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-[#ab0433]"
+                      />
+                      {errors[row.anio] && <p className="text-xs text-red-500 mt-0.5">{errors[row.anio]}</p>}
+                    </div>
+                    <div className="mt-5">
+                      <button
+                        type="button"
+                        onClick={() => handleSave(row.anio)}
+                        disabled={saving === row.anio}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#ab0433] text-white text-xs font-bold hover:bg-[#92042c] disabled:opacity-50 transition-colors"
+                      >
+                        {saving === row.anio ? <Loader2 size={12} className="animate-spin" /> : saved[row.anio] ? <CheckCircle2 size={12} /> : null}
+                        {saved[row.anio] ? "Guardado" : "Aplicar"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="px-6 py-4 border-t border-slate-100 flex justify-end">
+          <button type="button" onClick={onClose} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50">Cerrar</button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 // ── Componente principal ───────────────────────────────────────
 export default function ExpedienteList() {
   const { getToken } = useAuth();
@@ -3873,6 +3999,9 @@ export default function ExpedienteList() {
   const [exportAvailableSelected, setExportAvailableSelected] = useState<string[]>([]);
   const [exportVisibleSelected, setExportVisibleSelected] = useState<string[]>([]);
   const [exportError, setExportError] = useState("");
+
+  // Modal contador
+  const [showCounterModal, setShowCounterModal] = useState(false);
 
   // Dropdowns click-based
   const [showOpciones, setShowOpciones] = useState(false);
@@ -5459,6 +5588,11 @@ export default function ExpedienteList() {
         />
       )}
 
+      {/* ── Modal configurar numeración ─────────────────────── */}
+      {showCounterModal && (
+        <CounterConfigModal onClose={() => setShowCounterModal(false)} getToken={() => getToken({ skipCache: true })} />
+      )}
+
       {/* ── Confirmar borrado ───────────────────────────────── */}
       {deleteId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
@@ -5821,6 +5955,16 @@ export default function ExpedienteList() {
                 <button onClick={() => alert("Crear Recall")}
                   className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
                   <Bell size={12} className="text-slate-400" /> Crear Recall
+                </button>
+
+                <div className="h-px bg-slate-100 my-1.5" />
+
+                {/* Configurar numeración */}
+                <button
+                  onClick={() => { setShowCounterModal(true); setShowOpciones(false); }}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors"
+                >
+                  <Hash size={12} className="text-slate-400" /> Configurar numeración
                 </button>
 
                 <div className="h-px bg-slate-100 my-1.5" />

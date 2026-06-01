@@ -1241,6 +1241,14 @@ export async function runMigrations(): Promise<void> {
       `);
     } catch (_e: any) {}
 
+    // ── Configuración de contadores de expedientes ─────────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS expediente_counter_config (
+        anio     INTEGER PRIMARY KEY,
+        min_num  INTEGER NOT NULL DEFAULT 1
+      );
+    `);
+
     // ── Tabla expediente_apuntes (libro mayor / apuntes contables por expediente) ─
     await client.query(`
       CREATE TABLE IF NOT EXISTS expediente_apuntes (

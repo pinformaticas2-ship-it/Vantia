@@ -15,6 +15,8 @@ import {
   updateExpediente,
   deleteExpediente,
   getExpedienteHistorial,
+  getCounterConfig,
+  setCounterConfig,
 } from '../controllers/expedientesController';
 import {
   listNotificaciones,
@@ -34,6 +36,8 @@ import noteRoutes from './noteRoutes';
 const router = Router();
 
 router.get('/stats',  requireAuth, getStats);
+router.get('/counter-config',   requireAuth, getCounterConfig);
+router.post('/counter-config',  requireAuth, setCounterConfig);
 router.get('/imports', requireAuth, getImportHistory);
 router.get('/imports/:id', requireAuth, getImportBatchDetail);
 router.use('/:id/notes', noteRoutes);
