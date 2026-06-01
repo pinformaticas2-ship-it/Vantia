@@ -449,6 +449,8 @@ export const getQuipuStatus = async (req: any, res: Response) => {
         quipuCompany: settings.quipu_company || null,
         quipuEmail: settings.quipu_email || null,
         hasAccessToken: Boolean(settings.access_token),
+        syncRunning: _syncRunning.has(userId),
+        syncError: _syncLastError.get(userId) || null,
       },
     });
   } catch (error: any) {
@@ -518,6 +520,12 @@ export const disconnectQuipu = async (req: any, res: Response) => {
   }
 };
 
+// Track in-progress syncs so the frontend can poll status
+const _syncRunning = new Set<string>();
+const _syncLastError = new Map<string, string>();
+
+export function isQuipuSyncRunning(userId: string) { return _syncRunning.has(userId); }
+
 export const syncQuipuBootstrap = async (req: any, res: Response) => {
   const userId = req.auth?.userId;
   if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
@@ -525,18 +533,29 @@ export const syncQuipuBootstrap = async (req: any, res: Response) => {
     const settings = await getStoredQuipuSettings(userId);
     if (!settings) return res.status(400).json({ success: false, error: 'Primero debes configurar Quipu.' });
 
-    const { imported, updated, errors, summary } = await syncQuipuForUserInternal(userId);
-    await logActivityForReq(req, 'Sincronización Quipu ejecutada', 'QUIPU', settings.id, undefined, 'UPDATE');
+    if (_syncRunning.has(userId)) {
+      return res.json({ success: true, data: { running: true, message: 'Sincronización ya en curso' } });
+    }
 
-    res.json({
-      success: true,
-      data: {
-        summary: { ...summary, importedToFacturacion: imported, updatedInFacturacion: updated },
-        syncErrors: errors,
-      },
-    });
+    // Return immediately — sync runs in background to avoid HTTP timeout
+    res.json({ success: true, data: { running: true, message: 'Sincronización iniciada' } });
+
+    _syncRunning.add(userId);
+    _syncLastError.delete(userId);
+
+    syncQuipuForUserInternal(userId)
+      .then(({ imported, updated }) => {
+        console.log(`[Quipu] sync done user=${userId} imported=${imported} updated=${updated}`);
+        logActivityForReq(req, 'Sincronización Quipu ejecutada', 'QUIPU', settings.id, undefined, 'UPDATE').catch(() => {});
+      })
+      .catch((e: any) => {
+        console.error(`[Quipu] sync error user=${userId}:`, e?.message);
+        _syncLastError.set(userId, e?.message || 'Error desconocido');
+      })
+      .finally(() => { _syncRunning.delete(userId); });
+
   } catch (error: any) {
-    res.status(400).json({ success: false, error: error?.message || 'No se pudo sincronizar con Quipu.' });
+    res.status(400).json({ success: false, error: error?.message || 'No se pudo iniciar la sincronización.' });
   }
 };
 

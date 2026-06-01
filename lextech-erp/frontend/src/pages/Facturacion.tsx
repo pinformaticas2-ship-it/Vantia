@@ -142,6 +142,8 @@ type QuipuStatus = {
   baseUrl?: string;
   ownerSlug?: string;
   lastSyncAt?: string | null;
+  syncRunning?: boolean;
+  syncError?: string | null;
   syncSummary?: {
     contacts?: number;
     invoices?: number;
@@ -991,28 +993,14 @@ export default function Facturacion() {
   useEffect(() => {
     if (!quipuStatus.connected || silentSyncDoneRef.current) return;
     const lastSync = quipuStatus.lastSyncAt ? new Date(quipuStatus.lastSyncAt).getTime() : 0;
-    if (Date.now() - lastSync <= 30 * 60 * 1000) return; // fresh enough
+    if (Date.now() - lastSync <= 30 * 60 * 1000) return;
     silentSyncDoneRef.current = true;
     setIsSilentSyncing(true);
-    (async () => {
-      try {
-        const res = await apiFetch("/api/quipu/sync", { method: "POST", getToken });
-        if (res?.success === false) {
-          console.warn("[AutoSync] Quipu sync failed:", res?.error);
-          return; // don't show error to user for background sync — just log it
-        }
-        setQuipuStatus(prev => ({
-          ...prev,
-          lastSyncAt: new Date().toISOString(),
-          syncSummary: res?.data?.summary || prev.syncSummary,
-        }));
-        await loadBilling();
-      } catch (e: any) {
-        console.warn("[AutoSync] Quipu:", e?.message);
-      } finally {
-        setIsSilentSyncing(false);
-      }
-    })();
+    const prevLastSyncAt = quipuStatus.lastSyncAt;
+    apiFetch("/api/quipu/sync", { method: "POST", getToken })
+      .then(() => pollQuipuStatus(prevLastSyncAt))
+      .catch((e: any) => console.warn("[AutoSync] Quipu:", e?.message))
+      .finally(() => setIsSilentSyncing(false));
   }, [quipuStatus.connected, quipuStatus.lastSyncAt]);
 
   // Close year/period menus when clicking outside
@@ -1148,23 +1136,43 @@ export default function Facturacion() {
     }
   };
 
+  const pollQuipuStatus = useCallback(async (prevLastSyncAt: string | null | undefined) => {
+    const maxWait = 120_000; // 2 min max
+    const start = Date.now();
+    const interval = 5_000;
+    return new Promise<void>((resolve) => {
+      const tick = async () => {
+        try {
+          const res = await apiFetch("/api/quipu/status", { getToken });
+          const s = res?.data;
+          if (s) setQuipuStatus((cur) => ({ ...cur, ...s }));
+          const done = !s?.syncRunning;
+          const changed = s?.lastSyncAt && s.lastSyncAt !== prevLastSyncAt;
+          if (done && changed) { await loadBilling(); resolve(); return; }
+          if (done && s?.syncError) { setErrorMsg(`Quipu: ${s.syncError}`); resolve(); return; }
+          if (done) { resolve(); return; }
+        } catch { /* ignore poll errors */ }
+        if (Date.now() - start < maxWait) setTimeout(tick, interval);
+        else resolve();
+      };
+      setTimeout(tick, interval);
+    });
+  }, [getToken, loadBilling]);
+
   const syncQuipu = async () => {
     setSaving(true);
     setErrorMsg(null);
     try {
-      const response = await apiFetch("/api/quipu/sync", { method: "POST", getToken });
-      setQuipuStatus((current) => ({
-        ...current,
-        connected: true,
-        lastSyncAt: response?.data?.summary?.syncedAt || new Date().toISOString(),
-        syncSummary: response?.data?.summary || null,
-      }));
-      // loadBilling now includes quipuContacts + quipuBankAccounts — one call gets everything
-      await loadBilling();
+      const prevLastSyncAt = quipuStatus.lastSyncAt;
+      await apiFetch("/api/quipu/sync", { method: "POST", getToken });
+      setQuipuStatus((cur) => ({ ...cur, syncRunning: true, syncError: null }));
+      setIsSilentSyncing(true);
+      await pollQuipuStatus(prevLastSyncAt);
     } catch (error: any) {
-      setErrorMsg(error?.message || "No se pudo sincronizar Quipu.");
+      setErrorMsg(error?.message || "No se pudo iniciar la sincronización con Quipu.");
     } finally {
       setSaving(false);
+      setIsSilentSyncing(false);
     }
   };
 
@@ -1433,7 +1441,11 @@ export default function Facturacion() {
                   {isSilentSyncing && <span className="flex items-center gap-1 text-[11px] text-emerald-600"><Loader2 size={11} className="animate-spin" /> sincronizando…</span>}
                 </div>
                 <p className="mt-0.5 text-xs text-emerald-700">
-                  {quipuStatus.lastSyncAt ? `Última sincronización: ${new Date(quipuStatus.lastSyncAt).toLocaleString("es-ES")}` : "Sincronización pendiente"}
+                  {quipuStatus.syncError
+                    ? <span className="text-red-600">{quipuStatus.syncError}</span>
+                    : quipuStatus.lastSyncAt
+                      ? `Última sincronización: ${new Date(quipuStatus.lastSyncAt).toLocaleString("es-ES")}`
+                      : "Sincronización pendiente"}
                 </p>
                 {quipuStatus.syncSummary && (
                   <p className="mt-1 text-xs text-emerald-700">
