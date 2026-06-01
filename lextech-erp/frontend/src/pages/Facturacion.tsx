@@ -994,17 +994,22 @@ export default function Facturacion() {
     if (Date.now() - lastSync <= 15 * 60 * 1000) return;
     silentSyncDoneRef.current = true;
     setIsSilentSyncing(true);
-    apiFetch("/api/quipu/sync", { method: "POST", getToken })
-      .then(res => {
+    (async () => {
+      try {
+        const res = await apiFetch("/api/quipu/sync", { method: "POST", getToken });
+        if (res?.success === false) throw new Error(res?.error || "Error desconocido en sync Quipu");
         setQuipuStatus(prev => ({
           ...prev,
           lastSyncAt: new Date().toISOString(),
           syncSummary: res?.data?.summary || prev.syncSummary,
         }));
-        return loadBilling();
-      })
-      .catch(() => {})
-      .finally(() => setIsSilentSyncing(false));
+        await loadBilling();
+      } catch (e: any) {
+        setErrorMsg(`Quipu sync: ${e?.message || "Error desconocido"}`);
+      } finally {
+        setIsSilentSyncing(false);
+      }
+    })();
   }, [quipuStatus.connected, quipuStatus.lastSyncAt]);
 
   // Close year/period menus when clicking outside

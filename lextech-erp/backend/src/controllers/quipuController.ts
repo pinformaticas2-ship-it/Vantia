@@ -220,12 +220,27 @@ async function persistQuipuBootstrap(userId: string, settingId: string, bootstra
 
 // ── Ensure quipu_id column + unique index exist in facturacion_facturas ──────
 async function ensureFacturasQuipuColumn() {
-  await pool.query(`ALTER TABLE facturacion_facturas ADD COLUMN IF NOT EXISTS quipu_id VARCHAR(255)`);
-  await pool.query(`
-    CREATE UNIQUE INDEX IF NOT EXISTS ux_facturacion_facturas_quipu_id
-    ON facturacion_facturas (user_id, quipu_id)
-    WHERE quipu_id IS NOT NULL
-  `);
+  try {
+    await pool.query(`ALTER TABLE facturacion_facturas ADD COLUMN IF NOT EXISTS quipu_id VARCHAR(255)`);
+  } catch (e: any) { console.warn('[Quipu] ADD COLUMN quipu_id (non-fatal):', e?.message); }
+  try {
+    // Remove duplicates first so the unique index can be created
+    await pool.query(`
+      DELETE FROM facturacion_facturas
+      WHERE quipu_id IS NOT NULL
+        AND id NOT IN (
+          SELECT DISTINCT ON (user_id, quipu_id) id
+          FROM facturacion_facturas
+          WHERE quipu_id IS NOT NULL
+          ORDER BY user_id, quipu_id, created_at DESC NULLS LAST
+        )
+    `);
+    await pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS ux_facturacion_facturas_quipu_id
+      ON facturacion_facturas (user_id, quipu_id)
+      WHERE quipu_id IS NOT NULL
+    `);
+  } catch (e: any) { console.warn('[Quipu] CREATE INDEX quipu_id (non-fatal):', e?.message); }
 }
 
 // ── Internal sync (no HTTP context) — usable from auto-sync and cron ─────────
@@ -357,6 +372,61 @@ export async function pushFacturaToQuipuInternal(userId: string, facturaId: stri
   }
   return quipuId || null;
 }
+
+// ── Diagnostic endpoint: tests each step without doing a full sync ────────────
+export const diagnoseQuipu = async (req: any, res: Response) => {
+  const userId = req.auth?.userId;
+  if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+
+  const steps: { step: string; ok: boolean; detail: string }[] = [];
+
+  let settings: any = null;
+  try {
+    settings = await getStoredQuipuSettings(userId);
+    steps.push({ step: 'settings', ok: !!settings, detail: settings ? `app_id=${String(settings.app_id || '').slice(0, 8)}… owner_slug=${settings.owner_slug} base_url=${settings.base_url}` : 'No hay configuración de Quipu' });
+  } catch (e: any) {
+    steps.push({ step: 'settings', ok: false, detail: e?.message });
+    return res.json({ success: false, steps });
+  }
+  if (!settings) return res.json({ success: false, steps });
+
+  let token: string | null = null;
+  try {
+    const t = await requestQuipuToken(settings);
+    token = t.accessToken;
+    steps.push({ step: 'auth', ok: true, detail: `Token OK (${token.length} chars, expires ${t.expiresAt.toISOString()})` });
+  } catch (e: any) {
+    steps.push({ step: 'auth', ok: false, detail: e?.message });
+    return res.json({ success: false, steps });
+  }
+
+  try {
+    const contacts = await quipuOwnerFetch<any>(settings, '/contactos?page[size]=1', undefined, token);
+    const total = contacts?.meta?.total_entries ?? contacts?.data?.length ?? '?';
+    steps.push({ step: 'contacts', ok: true, detail: `total_entries=${total}` });
+  } catch (e: any) {
+    steps.push({ step: 'contacts', ok: false, detail: e?.message });
+  }
+
+  try {
+    const invoices = await quipuOwnerFetch<any>(settings, '/invoices?page[size]=1&sort=-issued_at', undefined, token);
+    const total = invoices?.meta?.total_entries ?? invoices?.data?.length ?? '?';
+    steps.push({ step: 'invoices', ok: true, detail: `total_entries=${total}` });
+  } catch (e: any) {
+    steps.push({ step: 'invoices', ok: false, detail: e?.message });
+  }
+
+  try {
+    const r = await pool.query(
+      `SELECT COUNT(*) AS cnt FROM facturacion_facturas WHERE user_id=$1 AND quipu_id IS NOT NULL`, [userId],
+    );
+    steps.push({ step: 'db_imported', ok: true, detail: `${r.rows[0].cnt} facturas importadas de Quipu en el ERP` });
+  } catch (e: any) {
+    steps.push({ step: 'db_imported', ok: false, detail: e?.message });
+  }
+
+  res.json({ success: true, steps });
+};
 
 export const getQuipuStatus = async (req: any, res: Response) => {
   const userId = req.auth?.userId;

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth';
 import {
+  diagnoseQuipu,
   disconnectQuipu,
   getQuipuStatus,
   saveQuipuCredentials,
@@ -38,6 +39,7 @@ const router = Router();
 
 // ── Configuración ──────────────────────────────────────────────
 router.get('/status',      requireAuth, getQuipuStatus);
+router.get('/diagnose',    requireAuth, diagnoseQuipu);
 router.post('/connect',    requireAuth, saveQuipuCredentials);
 router.post('/sync',       requireAuth, syncQuipuBootstrap);
 router.delete('/disconnect', requireAuth, disconnectQuipu);
