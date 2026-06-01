@@ -49,7 +49,9 @@ async function parseQuipuResponse(response: Response) {
       parsed?.error_description ||
       parsed?.error ||
       parsed?.message ||
-      `Quipu respondió con ${response.status}: ${text?.slice(0, 200)}`;
+      (response.status === 404
+        ? `Recurso no encontrado en Quipu (404). Verifica que el owner_slug sea correcto (ve a getquipu.com, inicia sesión y mira la URL: getquipu.com/TU-SLUG/...). URL llamada: ${response.url}`
+        : `Quipu respondió con ${response.status}: ${text?.slice(0, 300)}`);
     throw new Error(String(detail));
   }
 
