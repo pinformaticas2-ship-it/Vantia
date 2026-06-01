@@ -3698,12 +3698,18 @@ function FilterRow({
 
 // ── Modal Configuración de Numeración ─────────────────────────
 function CounterConfigModal({ onClose, getToken }: { onClose: () => void; getToken: () => Promise<string | null> }) {
+  const currentYear = new Date().getFullYear();
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState<number | null>(null);
-  const [inputs, setInputs] = useState<Record<number, string>>({});
-  const [errors, setErrors] = useState<Record<number, string>>({});
-  const [saved, setSaved] = useState<Record<number, boolean>>({});
+  const [selectedAnio, setSelectedAnio] = useState<number>(currentYear);
+  const [saving, setSaving] = useState(false);
+  const [savedOk, setSavedOk] = useState(false);
+
+  const [autoFill,    setAutoFill]    = useState(true);
+  const [generalNum,  setGeneralNum]  = useState("1");
+  const [useOverride, setUseOverride] = useState(false);
+  const [overrideNum, setOverrideNum] = useState("");
+  const [formError,   setFormError]   = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -3711,110 +3717,204 @@ function CounterConfigModal({ onClose, getToken }: { onClose: () => void; getTok
       const token = await getToken();
       const res = await fetch("/api/expedientes/counter-config", { headers: { Authorization: `Bearer ${token}` } });
       const d = await res.json();
-      if (res.ok) {
-        setData(d.data || []);
-        const init: Record<number, string> = {};
-        for (const row of d.data || []) init[row.anio] = String(row.min_num);
-        setInputs(init);
-      }
+      if (res.ok) setData(d.data || []);
     } finally { setLoading(false); }
   }, [getToken]);
 
   useEffect(() => { load(); }, [load]);
 
-  const handleSave = async (anio: number) => {
-    const val = Number(inputs[anio]);
-    if (!Number.isInteger(val) || val < 1) { setErrors(e => ({ ...e, [anio]: "Debe ser un número entero >= 1" })); return; }
-    setSaving(anio); setErrors(e => ({ ...e, [anio]: "" }));
+  useEffect(() => {
+    const row = data.find(r => r.anio === selectedAnio);
+    if (row) {
+      setAutoFill(row.auto_fill !== false);
+      setGeneralNum(String(row.min_num ?? 1));
+      setUseOverride(row.override_next != null);
+      setOverrideNum(row.override_next != null ? String(row.override_next) : "");
+    } else {
+      setAutoFill(true); setGeneralNum("1"); setUseOverride(false); setOverrideNum("");
+    }
+    setFormError("");
+  }, [selectedAnio, data]);
+
+  const row = data.find(r => r.anio === selectedAnio);
+
+  const handleAccept = async () => {
+    setFormError("");
+    const mn = Number(generalNum);
+    if (!Number.isInteger(mn) || mn < 1) { setFormError("El número mínimo debe ser un entero >= 1"); return; }
+    if (useOverride) {
+      const ov = Number(overrideNum);
+      if (!Number.isInteger(ov) || ov < 1) { setFormError("El número específico debe ser un entero >= 1"); return; }
+    }
+    setSaving(true);
     try {
       const token = await getToken();
       const res = await fetch("/api/expedientes/counter-config", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ anio, min_num: val }),
+        body: JSON.stringify({
+          anio: selectedAnio, min_num: mn, auto_fill: autoFill,
+          override_next: useOverride ? Number(overrideNum) : null,
+        }),
       });
-      if (res.ok) {
-        setSaved(s => ({ ...s, [anio]: true }));
-        setTimeout(() => setSaved(s => ({ ...s, [anio]: false })), 2000);
-        await load();
-      }
-    } finally { setSaving(null); }
+      if (!res.ok) { const d = await res.json(); setFormError(d.error || "Error al guardar"); return; }
+      setSavedOk(true);
+      setTimeout(() => setSavedOk(false), 2500);
+      await load();
+    } finally { setSaving(false); }
   };
 
+  const years = data.length ? data.map(r => r.anio) : [currentYear];
+
   return createPortal(
-    <div className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-xl">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <div>
-            <h2 className="text-base font-bold text-slate-900 flex items-center gap-2"><Hash size={16} className="text-[#ab0433]" /> Configurar numeración de expedientes</h2>
-            <p className="text-xs text-slate-500 mt-0.5">El sistema rellena huecos automáticamente. Aquí puedes ajustar el número mínimo por año.</p>
+    <div className="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-[#f0f2f5] rounded-xl shadow-2xl border border-slate-400 w-full max-w-2xl overflow-hidden select-none">
+
+        {/* Barra de título */}
+        <div className="flex items-center justify-between bg-gradient-to-r from-[#3a6ea5] to-[#4a82c3] px-4 py-2.5">
+          <div className="flex items-center gap-2">
+            <Hash size={13} className="text-white/80" />
+            <span className="text-sm font-semibold text-white">Configuración — Contadores de Expedientes</span>
           </div>
-          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
+          <button type="button" onClick={onClose}
+            className="h-5 w-5 flex items-center justify-center bg-white/20 hover:bg-white/40 rounded text-white transition-colors">
+            <X size={11} />
+          </button>
         </div>
 
-        <div className="p-6 space-y-4">
-          {/* Explicación */}
-          <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs text-blue-800 space-y-1">
-            <p className="font-semibold">¿Cómo funciona?</p>
-            <p>Cuando creas un expediente, el sistema busca el <strong>primer número libre</strong> comenzando desde el mínimo configurado. Si borras el nº 4, el siguiente expediente tomará el 4.</p>
-            <p className="mt-1 text-blue-600">Cambia el "Número mínimo" si quieres que la serie empiece en un valor concreto (ej: 100).</p>
-          </div>
+        {/* Botones Aceptar / Cancelar */}
+        <div className="flex items-center gap-2 px-4 py-2 bg-[#e8edf3] border-b border-slate-300">
+          <button type="button" onClick={handleAccept} disabled={saving}
+            className="inline-flex items-center gap-1.5 px-5 py-1 bg-white border border-slate-400 rounded text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-sm disabled:opacity-50 transition-colors">
+            {saving ? <Loader2 size={11} className="animate-spin" /> : savedOk ? <CheckCircle2 size={11} className="text-emerald-600" /> : null}
+            {savedOk ? "Guardado ✓" : "Aceptar"}
+          </button>
+          <button type="button" onClick={onClose}
+            className="px-5 py-1 bg-white border border-slate-400 rounded text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-sm transition-colors">
+            Cancelar
+          </button>
+        </div>
 
-          {loading ? (
-            <div className="flex items-center justify-center py-8 text-slate-400"><Loader2 size={18} className="animate-spin mr-2" />Cargando...</div>
-          ) : (
-            <div className="space-y-3">
-              {data.map(row => (
-                <div key={row.anio} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-bold text-slate-800">{row.anio}</span>
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">{row.used_count} expediente{row.used_count !== 1 ? "s" : ""}</span>
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-semibold">Próximo: {row.next_num}</span>
-                        {row.gaps.length > 0 && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
-                            {row.gaps.length} hueco{row.gaps.length !== 1 ? "s" : ""}: {row.gaps.slice(0, 5).join(", ")}{row.gaps.length > 5 ? "..." : ""}
-                          </span>
-                        )}
-                      </div>
-                      {row.gaps.length === 0 && row.used_count > 0 && (
-                        <p className="text-[10px] text-slate-400 mt-1">Sin huecos — la numeración es continua</p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="mt-3 flex items-center gap-2">
-                    <div className="flex-1">
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Número mínimo</label>
-                      <input
-                        type="number" min="1" step="1"
-                        value={inputs[row.anio] ?? row.min_num}
-                        onChange={e => setInputs(v => ({ ...v, [row.anio]: e.target.value }))}
-                        className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-[#ab0433]"
-                      />
-                      {errors[row.anio] && <p className="text-xs text-red-500 mt-0.5">{errors[row.anio]}</p>}
-                    </div>
-                    <div className="mt-5">
-                      <button
-                        type="button"
-                        onClick={() => handleSave(row.anio)}
-                        disabled={saving === row.anio}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#ab0433] text-white text-xs font-bold hover:bg-[#92042c] disabled:opacity-50 transition-colors"
-                      >
-                        {saving === row.anio ? <Loader2 size={12} className="animate-spin" /> : saved[row.anio] ? <CheckCircle2 size={12} /> : null}
-                        {saved[row.anio] ? "Guardado" : "Aplicar"}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
+        {/* Cuerpo: panel izquierdo + contenido */}
+        <div className="flex" style={{ minHeight: 340 }}>
+
+          {/* Panel izquierdo */}
+          <div className="w-44 shrink-0 border-r border-slate-300 bg-[#dde4ee] flex flex-col">
+            <div className="px-3 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-300 bg-[#d0d9e8]">
+              Ejercicio
             </div>
-          )}
+            {loading ? (
+              <div className="flex items-center justify-center py-6"><Loader2 size={14} className="animate-spin text-slate-400" /></div>
+            ) : years.map(yr => (
+              <button key={yr} type="button" onClick={() => setSelectedAnio(yr)}
+                className={`text-left px-3 py-2.5 text-sm border-b border-slate-200 transition-colors ${
+                  selectedAnio === yr ? "bg-[#4a7fc1] text-white font-semibold" : "text-slate-700 hover:bg-[#c8d4e5]"
+                }`}>
+                {yr}
+              </button>
+            ))}
+          </div>
+
+          {/* Panel derecho */}
+          <div className="flex-1 bg-white p-5 space-y-4">
+            <div>
+              <p className="text-sm font-bold text-slate-800">Contadores</p>
+              <p className="text-xs text-slate-500 mt-1">
+                En este apartado se establece la numeración automática que se asignará a los nuevos expedientes del ejercicio <strong>{selectedAnio}</strong>.
+              </p>
+            </div>
+
+            <div className="border-t border-slate-200 pt-4 space-y-4">
+
+              {/* Stats del año */}
+              {row && (
+                <div className="flex flex-wrap gap-2">
+                  <span className="text-xs px-2 py-0.5 rounded border border-slate-200 bg-slate-50 text-slate-600">
+                    {row.used_count} expediente{row.used_count !== 1 ? "s" : ""} en {selectedAnio}
+                  </span>
+                  <span className="text-xs px-2 py-0.5 rounded border border-emerald-300 bg-emerald-50 text-emerald-700 font-semibold">
+                    Próximo: {row.next_num}
+                  </span>
+                  {row.gaps.length > 0 ? (
+                    <span className="text-xs px-2 py-0.5 rounded border border-amber-300 bg-amber-50 text-amber-700">
+                      {row.gaps.length} hueco{row.gaps.length !== 1 ? "s" : ""}: {row.gaps.slice(0, 6).join(", ")}{row.gaps.length > 6 ? "…" : ""}
+                    </span>
+                  ) : row.used_count > 0 ? (
+                    <span className="text-xs px-2 py-0.5 rounded border border-slate-200 bg-slate-50 text-slate-400">
+                      Sin huecos
+                    </span>
+                  ) : null}
+                </div>
+              )}
+
+              {/* Checkbox modo automático */}
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input type="checkbox" checked={autoFill} onChange={e => setAutoFill(e.target.checked)}
+                  className="mt-0.5 w-3.5 h-3.5 accent-[#4a7fc1] cursor-pointer shrink-0" />
+                <div>
+                  <span className="text-sm font-semibold text-slate-800">Calcular los Contadores de Forma Automática</span>
+                  <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                    (Marcando esta opción el contador busca el <strong>primer número libre</strong>, rellenando huecos si se han borrado expedientes)
+                  </p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Esta opción afecta al contador de expedientes de este ejercicio.</p>
+                </div>
+              </label>
+
+              {/* Contador de Expedientes */}
+              <div className="border border-slate-300 rounded p-4 space-y-3 bg-[#f8f9fb]">
+                <p className="text-xs font-bold text-[#3a6ea5] border-b border-slate-200 pb-1.5">Contador de Expedientes</p>
+
+                {/* General */}
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-2 cursor-pointer flex-1">
+                    <input type="radio" name={`mode-${selectedAnio}`} checked={!useOverride} onChange={() => setUseOverride(false)}
+                      className="w-3.5 h-3.5 accent-[#4a7fc1] shrink-0" />
+                    <span className="text-sm text-slate-700 w-36 select-none">General</span>
+                  </label>
+                  <input
+                    type="number" min="1" step="1"
+                    value={generalNum}
+                    onChange={e => setGeneralNum(e.target.value)}
+                    className="w-24 text-sm border border-slate-300 rounded px-2 py-1 bg-white text-right focus:outline-none focus:ring-1 focus:ring-[#4a7fc1] shadow-sm"
+                  />
+                </div>
+
+                {/* Número específico */}
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-2 cursor-pointer flex-1">
+                    <input type="radio" name={`mode-${selectedAnio}`} checked={useOverride} onChange={() => setUseOverride(true)}
+                      className="w-3.5 h-3.5 accent-[#4a7fc1] shrink-0" />
+                    <span className="text-sm text-slate-700 w-36 select-none">Número específico</span>
+                  </label>
+                  <input
+                    type="number" min="1" step="1"
+                    value={overrideNum}
+                    onChange={e => setOverrideNum(e.target.value)}
+                    disabled={!useOverride}
+                    placeholder="—"
+                    className="w-24 text-sm border border-slate-300 rounded px-2 py-1 bg-white text-right focus:outline-none focus:ring-1 focus:ring-[#4a7fc1] shadow-sm disabled:bg-slate-100 disabled:text-slate-400"
+                  />
+                </div>
+                {useOverride && (
+                  <p className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                    El próximo expediente usará este número exacto (uso único — después vuelve al modo automático).
+                  </p>
+                )}
+              </div>
+
+              {formError && (
+                <p className="text-xs text-red-600 font-medium flex items-center gap-1">
+                  <AlertCircle size={11} /> {formError}
+                </p>
+              )}
+            </div>
+          </div>
         </div>
 
-        <div className="px-6 py-4 border-t border-slate-100 flex justify-end">
-          <button type="button" onClick={onClose} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50">Cerrar</button>
+        {/* Pie */}
+        <div className="flex items-center justify-between px-4 py-1.5 bg-[#dce3ec] border-t border-slate-300 text-[10px] text-slate-500">
+          <span>Los cambios se aplican al siguiente expediente creado</span>
+          <span>VantIA ERP</span>
         </div>
       </div>
     </div>,

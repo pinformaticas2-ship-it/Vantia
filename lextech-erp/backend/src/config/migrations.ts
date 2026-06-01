@@ -1244,10 +1244,16 @@ export async function runMigrations(): Promise<void> {
     // ── Configuración de contadores de expedientes ─────────────────────────────
     await client.query(`
       CREATE TABLE IF NOT EXISTS expediente_counter_config (
-        anio     INTEGER PRIMARY KEY,
-        min_num  INTEGER NOT NULL DEFAULT 1
+        anio         INTEGER PRIMARY KEY,
+        min_num      INTEGER NOT NULL DEFAULT 1,
+        auto_fill    BOOLEAN NOT NULL DEFAULT TRUE,
+        override_next INTEGER
       );
     `);
+    for (const col of [
+      `ALTER TABLE expediente_counter_config ADD COLUMN IF NOT EXISTS auto_fill BOOLEAN NOT NULL DEFAULT TRUE`,
+      `ALTER TABLE expediente_counter_config ADD COLUMN IF NOT EXISTS override_next INTEGER`,
+    ]) { try { await client.query(col); } catch (_e: any) {} }
 
     // ── Tabla expediente_apuntes (libro mayor / apuntes contables por expediente) ─
     await client.query(`
