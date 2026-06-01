@@ -106,6 +106,7 @@ async function ensureQuipuSyncTables() {
 async function persistQuipuBootstrap(userId: string, settingId: string, bootstrap: {
   contacts: any[];
   invoices: any[];
+  receivedInvoices?: any[];
   numberingSeries: any[];
   bankAccounts?: any[];
 }) {
@@ -155,6 +156,32 @@ async function persistQuipuBootstrap(userId: string, settingId: string, bootstra
         [
           userId, settingId, extId,
           String(item?.type || 'invoices'),
+          String(item?.attributes?.contact_name || item?.attributes?.recipient_name || ''),
+          String(item?.attributes?.number || item?.attributes?.serial_number || ''),
+          String(item?.attributes?.status || ''),
+          item?.attributes?.issue_date || item?.attributes?.issued_at || null,
+          item?.attributes?.due_date || null,
+          Number(item?.attributes?.total_amount || item?.attributes?.total || 0),
+          JSON.stringify(item),
+        ],
+      );
+    }
+
+    // Also persist received invoices (gastos) in quipu_invoices with type 'received_invoices'
+    for (const item of (bootstrap.receivedInvoices || [])) {
+      const extId = `recv_${String(item?.id || '')}`;
+      if (!extId || extId === 'recv_') continue;
+      await client.query(
+        `INSERT INTO quipu_invoices
+           (user_id, quipu_setting_id, external_id, external_type, contact_name, number, status, issue_date, due_date, total_amount, raw_payload)
+         VALUES ($1,$2,$3,'received_invoices',$4,$5,$6,$7,$8,$9,$10)
+         ON CONFLICT (user_id, external_id) DO UPDATE SET
+           contact_name=EXCLUDED.contact_name, number=EXCLUDED.number,
+           status=EXCLUDED.status, issue_date=EXCLUDED.issue_date,
+           due_date=EXCLUDED.due_date, total_amount=EXCLUDED.total_amount,
+           raw_payload=EXCLUDED.raw_payload, updated_at=NOW()`,
+        [
+          userId, settingId, extId,
           String(item?.attributes?.contact_name || item?.attributes?.recipient_name || ''),
           String(item?.attributes?.number || item?.attributes?.serial_number || ''),
           String(item?.attributes?.status || ''),
@@ -231,29 +258,35 @@ async function persistQuipuBootstrap(userId: string, settingId: string, bootstra
   }
 }
 
-// ── Ensure quipu_id column + unique index exist in facturacion_facturas ──────
+// ── Ensure quipu_id columns + unique indexes on billing tables ───────────────
 async function ensureFacturasQuipuColumn() {
+  // facturacion_facturas
+  try { await pool.query(`ALTER TABLE facturacion_facturas ADD COLUMN IF NOT EXISTS quipu_id VARCHAR(255)`); }
+  catch (e: any) { console.warn('[Quipu] ADD COLUMN facturas.quipu_id:', e?.message); }
   try {
-    await pool.query(`ALTER TABLE facturacion_facturas ADD COLUMN IF NOT EXISTS quipu_id VARCHAR(255)`);
-  } catch (e: any) { console.warn('[Quipu] ADD COLUMN quipu_id (non-fatal):', e?.message); }
-  try {
-    // Remove duplicates first so the unique index can be created
     await pool.query(`
-      DELETE FROM facturacion_facturas
-      WHERE quipu_id IS NOT NULL
+      DELETE FROM facturacion_facturas WHERE quipu_id IS NOT NULL
         AND id NOT IN (
-          SELECT DISTINCT ON (user_id, quipu_id) id
-          FROM facturacion_facturas
-          WHERE quipu_id IS NOT NULL
-          ORDER BY user_id, quipu_id, created_at DESC NULLS LAST
-        )
-    `);
+          SELECT DISTINCT ON (user_id, quipu_id) id FROM facturacion_facturas
+          WHERE quipu_id IS NOT NULL ORDER BY user_id, quipu_id, created_at DESC NULLS LAST
+        )`);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS ux_facturacion_facturas_quipu_id
+      ON facturacion_facturas (user_id, quipu_id) WHERE quipu_id IS NOT NULL`);
+  } catch (e: any) { console.warn('[Quipu] INDEX facturas.quipu_id:', e?.message); }
+
+  // facturacion_gastos
+  try { await pool.query(`ALTER TABLE facturacion_gastos ADD COLUMN IF NOT EXISTS quipu_id VARCHAR(255)`); }
+  catch (e: any) { console.warn('[Quipu] ADD COLUMN gastos.quipu_id:', e?.message); }
+  try {
     await pool.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS ux_facturacion_facturas_quipu_id
-      ON facturacion_facturas (user_id, quipu_id)
-      WHERE quipu_id IS NOT NULL
-    `);
-  } catch (e: any) { console.warn('[Quipu] CREATE INDEX quipu_id (non-fatal):', e?.message); }
+      DELETE FROM facturacion_gastos WHERE quipu_id IS NOT NULL
+        AND id NOT IN (
+          SELECT DISTINCT ON (user_id, quipu_id) id FROM facturacion_gastos
+          WHERE quipu_id IS NOT NULL ORDER BY user_id, quipu_id, created_at DESC NULLS LAST
+        )`);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS ux_facturacion_gastos_quipu_id
+      ON facturacion_gastos (user_id, quipu_id) WHERE quipu_id IS NOT NULL`);
+  } catch (e: any) { console.warn('[Quipu] INDEX gastos.quipu_id:', e?.message); }
 }
 
 // ── Internal sync (no HTTP context) — usable from auto-sync and cron ─────────
@@ -269,8 +302,10 @@ export async function syncQuipuForUserInternal(userId: string): Promise<{
   await persistQuipuBootstrap(userId, settings.id, bootstrap);
 
   let imported = 0; let updated = 0;
+  let importedGastos = 0; let updatedGastos = 0;
   const errors: string[] = [];
 
+  // ── Income invoices → facturacion_facturas ────────────────────
   for (const item of bootstrap.invoices) {
     const quipuId = String(item?.id || '').trim();
     if (!quipuId) continue;
@@ -293,17 +328,49 @@ export async function syncQuipuForUserInternal(userId: string): Promise<{
       );
       if (r.rows[0]?.inserted) imported++; else updated++;
     } catch (e: any) {
-      errors.push(`${quipuId}: ${e?.message?.slice(0, 80)}`);
+      errors.push(`factura ${quipuId}: ${e?.message?.slice(0, 80)}`);
+    }
+  }
+
+  // ── Received invoices (Gastos) → facturacion_gastos ──────────
+  for (const item of (bootstrap.receivedInvoices || [])) {
+    const quipuId = String(item?.id || '').trim();
+    if (!quipuId) continue;
+    const num = String(item?.attributes?.number || item?.attributes?.serial_number || quipuId).trim();
+    const proveedor = String(item?.attributes?.contact_name || item?.attributes?.recipient_name || 'Proveedor').trim();
+    const fecha = item?.attributes?.issue_date || item?.attributes?.issued_at || new Date().toISOString().slice(0, 10);
+    const total = Number(item?.attributes?.total_amount || item?.attributes?.total || 0);
+    const estado = item?.attributes?.status === 'paid' ? 'contabilizado' : 'pendiente';
+    const cat = String(item?.attributes?.accounting_category || item?.attributes?.category || 'Quipu').trim();
+    try {
+      const r = await pool.query(
+        `INSERT INTO facturacion_gastos
+           (user_id, created_by, num, proveedor, fecha, total, categoria, estado,
+            area, responsable, deducible, quipu_id)
+         VALUES ($1,'Quipu Sync',$2,$3,$4,$5,$6,$7,'procesal','Quipu',true,$8)
+         ON CONFLICT (user_id, quipu_id) WHERE quipu_id IS NOT NULL
+         DO UPDATE SET proveedor=$3, fecha=$4, total=$5, estado=$7, updated_at=NOW()
+         RETURNING (xmax = 0) AS inserted`,
+        [userId, num, proveedor, fecha, total, cat, estado, quipuId],
+      );
+      if (r.rows[0]?.inserted) importedGastos++; else updatedGastos++;
+    } catch (e: any) {
+      errors.push(`gasto ${quipuId}: ${e?.message?.slice(0, 80)}`);
     }
   }
 
   await pool.query(
     `UPDATE quipu_settings SET last_sync_at=NOW(), sync_summary=$2, updated_at=NOW() WHERE user_id=$1`,
-    [userId, JSON.stringify({ ...summary, importedToFacturacion: imported, updatedInFacturacion: updated, syncErrors: errors.length })],
+    [userId, JSON.stringify({
+      ...summary,
+      importedToFacturacion: imported, updatedInFacturacion: updated,
+      importedGastos, updatedGastos,
+      syncErrors: errors.length,
+    })],
   );
 
   if (errors.length) console.warn(`[QuipuSync] user=${userId} errors=${errors.length}`, errors.slice(0, 3));
-  console.log(`[QuipuSync] user=${userId} imported=${imported} updated=${updated} errors=${errors.length}`);
+  console.log(`[QuipuSync] user=${userId} facturas=${imported}+${updated} gastos=${importedGastos}+${updatedGastos} errors=${errors.length}`);
   return { imported, updated, errors, summary };
 }
 

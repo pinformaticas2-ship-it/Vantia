@@ -178,19 +178,29 @@ export async function fetchQuipuPaginatedList<T = any>(
 export async function fetchQuipuBootstrap(settings: QuipuStoredSettings) {
   const { accessToken } = await requestQuipuToken(settings);
 
-  // Contacts (all pages, max 20 pages = up to 1000 contacts)
+  // All contacts (clients + suppliers), max 1000
   const contacts = await fetchQuipuPaginatedList<any>(
-    settings, '/contacts?filter[kind]=client', accessToken, 20,
+    settings, '/contacts', accessToken, 20,
   );
   await sleep(2000);
 
-  // Invoices: only last 12 months to limit request count
   const since = new Date();
   since.setFullYear(since.getFullYear() - 1);
   const sinceStr = since.toISOString().slice(0, 10);
+
+  // Income invoices (Ingresos) — last 12 months
   const invoices = await fetchQuipuPaginatedList<any>(
     settings, `/invoices?sort=-issued_at&filter[issued_at_gteq]=${sinceStr}`, accessToken, 10,
   );
+  await sleep(2000);
+
+  // Expense invoices (Gastos/Facturas recibidas) — last 12 months
+  let receivedInvoices: any[] = [];
+  try {
+    receivedInvoices = await fetchQuipuPaginatedList<any>(
+      settings, `/received_invoices?sort=-issued_at&filter[issued_at_gteq]=${sinceStr}`, accessToken, 10,
+    );
+  } catch { /* may not be available in all Quipu plans */ }
   await sleep(2000);
 
   const numberingSeries = await fetchQuipuPaginatedList<any>(
@@ -198,24 +208,25 @@ export async function fetchQuipuBootstrap(settings: QuipuStoredSettings) {
   );
   await sleep(2000);
 
-  // Bank accounts — fail silently if not available in this Quipu plan
   let bankAccounts: any[] = [];
   try {
     bankAccounts = await fetchQuipuPaginatedList<any>(settings, '/bank_accounts', accessToken);
   } catch { /* treasury module may not be in this plan */ }
 
-  return { contacts, invoices, numberingSeries, bankAccounts };
+  return { contacts, invoices, receivedInvoices, numberingSeries, bankAccounts };
 }
 
 export function summarizeQuipuBootstrap(data: {
   contacts: any[];
   invoices: any[];
+  receivedInvoices?: any[];
   numberingSeries: any[];
   bankAccounts?: any[];
 }) {
   return {
     contacts: data.contacts.length,
     invoices: data.invoices.length,
+    receivedInvoices: (data.receivedInvoices || []).length,
     numberingSeries: data.numberingSeries.length,
     bankAccounts: (data.bankAccounts || []).length,
     syncedAt: new Date().toISOString(),
