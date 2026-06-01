@@ -3699,44 +3699,57 @@ function FilterRow({
 // ── Modal Configuración de Numeración ─────────────────────────
 function CounterConfigModal({ onClose, getToken }: { onClose: () => void; getToken: () => Promise<string | null> }) {
   const currentYear = new Date().getFullYear();
-  const [data, setData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [years, setYears] = useState<number[]>([currentYear]);
+  const [yearsLoading, setYearsLoading] = useState(true);
   const [selectedAnio, setSelectedAnio] = useState<number>(currentYear);
-  const [saving, setSaving] = useState(false);
-  const [savedOk, setSavedOk] = useState(false);
+
+  // Datos del año seleccionado (cargados on demand)
+  const [yearData, setYearData] = useState<any | null>(null);
+  const [yearLoading, setYearLoading] = useState(false);
 
   const [autoFill,    setAutoFill]    = useState(true);
   const [generalNum,  setGeneralNum]  = useState("1");
   const [useOverride, setUseOverride] = useState(false);
   const [overrideNum, setOverrideNum] = useState("");
   const [formError,   setFormError]   = useState("");
+  const [saving, setSaving] = useState(false);
+  const [savedOk, setSavedOk] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const token = await getToken();
-      const res = await fetch("/api/expedientes/counter-config", { headers: { Authorization: `Bearer ${token}` } });
-      const d = await res.json();
-      if (res.ok) setData(d.data || []);
-    } finally { setLoading(false); }
+  // Carga rápida de la lista de años
+  useEffect(() => {
+    (async () => {
+      setYearsLoading(true);
+      try {
+        const token = await getToken();
+        const res = await fetch("/api/expedientes/counter-config", { headers: { Authorization: `Bearer ${token}` } });
+        const d = await res.json();
+        if (res.ok && d.data?.length) setYears(d.data);
+      } finally { setYearsLoading(false); }
+    })();
   }, [getToken]);
 
-  useEffect(() => { load(); }, [load]);
-
+  // Carga de datos del año seleccionado (lazy)
   useEffect(() => {
-    const row = data.find(r => r.anio === selectedAnio);
-    if (row) {
-      setAutoFill(row.auto_fill !== false);
-      setGeneralNum(String(row.min_num ?? 1));
-      setUseOverride(row.override_next != null);
-      setOverrideNum(row.override_next != null ? String(row.override_next) : "");
-    } else {
-      setAutoFill(true); setGeneralNum("1"); setUseOverride(false); setOverrideNum("");
-    }
+    setYearData(null);
     setFormError("");
-  }, [selectedAnio, data]);
-
-  const row = data.find(r => r.anio === selectedAnio);
+    setYearLoading(true);
+    (async () => {
+      try {
+        const token = await getToken();
+        const res = await fetch(`/api/expedientes/counter-config/${selectedAnio}`, { headers: { Authorization: `Bearer ${token}` } });
+        const d = await res.json();
+        if (res.ok && d.data) {
+          setYearData(d.data);
+          setAutoFill(d.data.auto_fill !== false);
+          setGeneralNum(String(d.data.min_num ?? 1));
+          setUseOverride(d.data.override_next != null);
+          setOverrideNum(d.data.override_next != null ? String(d.data.override_next) : "");
+        } else {
+          setAutoFill(true); setGeneralNum("1"); setUseOverride(false); setOverrideNum("");
+        }
+      } finally { setYearLoading(false); }
+    })();
+  }, [selectedAnio, getToken]);
 
   const handleAccept = async () => {
     setFormError("");
@@ -3752,169 +3765,170 @@ function CounterConfigModal({ onClose, getToken }: { onClose: () => void; getTok
       const res = await fetch("/api/expedientes/counter-config", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          anio: selectedAnio, min_num: mn, auto_fill: autoFill,
-          override_next: useOverride ? Number(overrideNum) : null,
-        }),
+        body: JSON.stringify({ anio: selectedAnio, min_num: mn, auto_fill: autoFill, override_next: useOverride ? Number(overrideNum) : null }),
       });
       if (!res.ok) { const d = await res.json(); setFormError(d.error || "Error al guardar"); return; }
       setSavedOk(true);
       setTimeout(() => setSavedOk(false), 2500);
-      await load();
+      // Refrescar datos del año
+      const token2 = await getToken();
+      const res2 = await fetch(`/api/expedientes/counter-config/${selectedAnio}`, { headers: { Authorization: `Bearer ${token2}` } });
+      const d2 = await res2.json();
+      if (res2.ok && d2.data) setYearData(d2.data);
     } finally { setSaving(false); }
   };
 
-  const years = data.length ? data.map(r => r.anio) : [currentYear];
-
   return createPortal(
-    <div className="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-[#f0f2f5] rounded-xl shadow-2xl border border-slate-400 w-full max-w-2xl overflow-hidden select-none">
+    <div className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl overflow-hidden">
 
-        {/* Barra de título */}
-        <div className="flex items-center justify-between bg-gradient-to-r from-[#3a6ea5] to-[#4a82c3] px-4 py-2.5">
-          <div className="flex items-center gap-2">
-            <Hash size={13} className="text-white/80" />
-            <span className="text-sm font-semibold text-white">Configuración — Contadores de Expedientes</span>
+        {/* Header VantIA */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+          <div className="flex items-center gap-2.5">
+            <div className="h-8 w-8 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
+              <Hash size={15} className="text-[#ab0433]" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-900">Configurar numeración</h2>
+              <p className="text-xs text-slate-400">Gestión de contadores de expedientes por ejercicio</p>
+            </div>
           </div>
-          <button type="button" onClick={onClose}
-            className="h-5 w-5 flex items-center justify-center bg-white/20 hover:bg-white/40 rounded text-white transition-colors">
-            <X size={11} />
-          </button>
-        </div>
-
-        {/* Botones Aceptar / Cancelar */}
-        <div className="flex items-center gap-2 px-4 py-2 bg-[#e8edf3] border-b border-slate-300">
-          <button type="button" onClick={handleAccept} disabled={saving}
-            className="inline-flex items-center gap-1.5 px-5 py-1 bg-white border border-slate-400 rounded text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-sm disabled:opacity-50 transition-colors">
-            {saving ? <Loader2 size={11} className="animate-spin" /> : savedOk ? <CheckCircle2 size={11} className="text-emerald-600" /> : null}
-            {savedOk ? "Guardado ✓" : "Aceptar"}
-          </button>
-          <button type="button" onClick={onClose}
-            className="px-5 py-1 bg-white border border-slate-400 rounded text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-sm transition-colors">
-            Cancelar
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
+            <X size={16} />
           </button>
         </div>
 
         {/* Cuerpo: panel izquierdo + contenido */}
-        <div className="flex" style={{ minHeight: 340 }}>
+        <div className="flex" style={{ minHeight: 360 }}>
 
-          {/* Panel izquierdo */}
-          <div className="w-44 shrink-0 border-r border-slate-300 bg-[#dde4ee] flex flex-col">
-            <div className="px-3 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-300 bg-[#d0d9e8]">
+          {/* Panel izquierdo — años */}
+          <div className="w-36 shrink-0 border-r border-slate-100 bg-slate-50 flex flex-col">
+            <div className="px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100">
               Ejercicio
             </div>
-            {loading ? (
-              <div className="flex items-center justify-center py-6"><Loader2 size={14} className="animate-spin text-slate-400" /></div>
+            {yearsLoading ? (
+              <div className="flex items-center justify-center py-6">
+                <Loader2 size={14} className="animate-spin text-slate-300" />
+              </div>
             ) : years.map(yr => (
               <button key={yr} type="button" onClick={() => setSelectedAnio(yr)}
-                className={`text-left px-3 py-2.5 text-sm border-b border-slate-200 transition-colors ${
-                  selectedAnio === yr ? "bg-[#4a7fc1] text-white font-semibold" : "text-slate-700 hover:bg-[#c8d4e5]"
+                className={`text-left px-4 py-3 text-sm font-semibold border-b border-slate-100 transition-colors ${
+                  selectedAnio === yr
+                    ? "bg-[#ab0433] text-white"
+                    : "text-slate-600 hover:bg-slate-100"
                 }`}>
                 {yr}
               </button>
             ))}
           </div>
 
-          {/* Panel derecho */}
-          <div className="flex-1 bg-white p-5 space-y-4">
+          {/* Panel derecho — configuración */}
+          <div className="flex-1 p-6 space-y-5">
             <div>
               <p className="text-sm font-bold text-slate-800">Contadores</p>
               <p className="text-xs text-slate-500 mt-1">
-                En este apartado se establece la numeración automática que se asignará a los nuevos expedientes del ejercicio <strong>{selectedAnio}</strong>.
+                Establece la numeración automática para los expedientes del ejercicio <strong>{selectedAnio}</strong>.
               </p>
             </div>
 
-            <div className="border-t border-slate-200 pt-4 space-y-4">
-
-              {/* Stats del año */}
-              {row && (
-                <div className="flex flex-wrap gap-2">
-                  <span className="text-xs px-2 py-0.5 rounded border border-slate-200 bg-slate-50 text-slate-600">
-                    {row.used_count} expediente{row.used_count !== 1 ? "s" : ""} en {selectedAnio}
-                  </span>
-                  <span className="text-xs px-2 py-0.5 rounded border border-emerald-300 bg-emerald-50 text-emerald-700 font-semibold">
-                    Próximo: {row.next_num}
-                  </span>
-                  {row.gaps.length > 0 ? (
-                    <span className="text-xs px-2 py-0.5 rounded border border-amber-300 bg-amber-50 text-amber-700">
-                      {row.gaps.length} hueco{row.gaps.length !== 1 ? "s" : ""}: {row.gaps.slice(0, 6).join(", ")}{row.gaps.length > 6 ? "…" : ""}
+            {yearLoading ? (
+              <div className="flex items-center gap-2 text-slate-400 py-4">
+                <Loader2 size={15} className="animate-spin" />
+                <span className="text-sm">Cargando...</span>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Stats del año */}
+                {yearData && (
+                  <div className="flex flex-wrap gap-2">
+                    <span className="text-xs px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 font-medium">
+                      {yearData.used_count} expediente{yearData.used_count !== 1 ? "s" : ""} en {selectedAnio}
                     </span>
-                  ) : row.used_count > 0 ? (
-                    <span className="text-xs px-2 py-0.5 rounded border border-slate-200 bg-slate-50 text-slate-400">
-                      Sin huecos
+                    <span className="text-xs px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">
+                      Próximo: {yearData.next_num}
                     </span>
-                  ) : null}
-                </div>
-              )}
+                    {yearData.gaps?.length > 0 ? (
+                      <span className="text-xs px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200">
+                        {yearData.gaps.length} hueco{yearData.gaps.length !== 1 ? "s" : ""}: {yearData.gaps.slice(0, 6).join(", ")}{yearData.gaps.length > 6 ? "…" : ""}
+                      </span>
+                    ) : yearData.used_count > 0 ? (
+                      <span className="text-xs px-2.5 py-1 rounded-lg bg-slate-50 text-slate-400 border border-slate-200">Sin huecos</span>
+                    ) : null}
+                  </div>
+                )}
 
-              {/* Checkbox modo automático */}
-              <label className="flex items-start gap-2.5 cursor-pointer">
-                <input type="checkbox" checked={autoFill} onChange={e => setAutoFill(e.target.checked)}
-                  className="mt-0.5 w-3.5 h-3.5 accent-[#4a7fc1] cursor-pointer shrink-0" />
-                <div>
-                  <span className="text-sm font-semibold text-slate-800">Calcular los Contadores de Forma Automática</span>
-                  <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
-                    (Marcando esta opción el contador busca el <strong>primer número libre</strong>, rellenando huecos si se han borrado expedientes)
-                  </p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">Esta opción afecta al contador de expedientes de este ejercicio.</p>
-                </div>
-              </label>
+                {/* Checkbox automático */}
+                <label className="flex items-start gap-3 cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 hover:bg-slate-100 transition-colors">
+                  <input type="checkbox" checked={autoFill} onChange={e => setAutoFill(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 accent-[#ab0433] cursor-pointer shrink-0" />
+                  <div>
+                    <span className="text-sm font-semibold text-slate-800">Calcular los Contadores de Forma Automática</span>
+                    <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
+                      (El contador busca el <strong>primer número libre</strong>, rellenando huecos si se han borrado expedientes)
+                    </p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Esta opción afecta al contador de expedientes de este ejercicio.</p>
+                  </div>
+                </label>
 
-              {/* Contador de Expedientes */}
-              <div className="border border-slate-300 rounded p-4 space-y-3 bg-[#f8f9fb]">
-                <p className="text-xs font-bold text-[#3a6ea5] border-b border-slate-200 pb-1.5">Contador de Expedientes</p>
-
-                {/* General */}
-                <div className="flex items-center gap-3">
-                  <label className="flex items-center gap-2 cursor-pointer flex-1">
-                    <input type="radio" name={`mode-${selectedAnio}`} checked={!useOverride} onChange={() => setUseOverride(false)}
-                      className="w-3.5 h-3.5 accent-[#4a7fc1] shrink-0" />
-                    <span className="text-sm text-slate-700 w-36 select-none">General</span>
-                  </label>
-                  <input
-                    type="number" min="1" step="1"
-                    value={generalNum}
-                    onChange={e => setGeneralNum(e.target.value)}
-                    className="w-24 text-sm border border-slate-300 rounded px-2 py-1 bg-white text-right focus:outline-none focus:ring-1 focus:ring-[#4a7fc1] shadow-sm"
-                  />
+                {/* Contador de Expedientes */}
+                <div className="rounded-xl border border-slate-200 overflow-hidden">
+                  <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100">
+                    <p className="text-[11px] font-bold text-[#ab0433] uppercase tracking-widest">Contador de Expedientes</p>
+                  </div>
+                  <div className="p-4 space-y-3">
+                    <div className="flex items-center gap-3">
+                      <label className="flex items-center gap-2.5 cursor-pointer flex-1">
+                        <input type="radio" name={`mode-${selectedAnio}`} checked={!useOverride} onChange={() => setUseOverride(false)}
+                          className="w-4 h-4 accent-[#ab0433]" />
+                        <span className="text-sm text-slate-700 font-medium">General</span>
+                      </label>
+                      <input type="number" min="1" step="1" value={generalNum}
+                        onChange={e => setGeneralNum(e.target.value)}
+                        className="w-24 text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-right focus:outline-none focus:ring-1 focus:ring-[#ab0433] shadow-sm" />
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <label className="flex items-center gap-2.5 cursor-pointer flex-1">
+                        <input type="radio" name={`mode-${selectedAnio}`} checked={useOverride} onChange={() => setUseOverride(true)}
+                          className="w-4 h-4 accent-[#ab0433]" />
+                        <span className="text-sm text-slate-700 font-medium">Número específico</span>
+                      </label>
+                      <input type="number" min="1" step="1" value={overrideNum}
+                        onChange={e => setOverrideNum(e.target.value)}
+                        disabled={!useOverride} placeholder="—"
+                        className="w-24 text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-right focus:outline-none focus:ring-1 focus:ring-[#ab0433] shadow-sm disabled:bg-slate-50 disabled:text-slate-300" />
+                    </div>
+                    {useOverride && (
+                      <p className="text-xs text-amber-700 bg-amber-50 rounded-lg border border-amber-200 px-3 py-2">
+                        El próximo expediente usará este número exacto (uso único — después vuelve al modo automático).
+                      </p>
+                    )}
+                  </div>
                 </div>
 
-                {/* Número específico */}
-                <div className="flex items-center gap-3">
-                  <label className="flex items-center gap-2 cursor-pointer flex-1">
-                    <input type="radio" name={`mode-${selectedAnio}`} checked={useOverride} onChange={() => setUseOverride(true)}
-                      className="w-3.5 h-3.5 accent-[#4a7fc1] shrink-0" />
-                    <span className="text-sm text-slate-700 w-36 select-none">Número específico</span>
-                  </label>
-                  <input
-                    type="number" min="1" step="1"
-                    value={overrideNum}
-                    onChange={e => setOverrideNum(e.target.value)}
-                    disabled={!useOverride}
-                    placeholder="—"
-                    className="w-24 text-sm border border-slate-300 rounded px-2 py-1 bg-white text-right focus:outline-none focus:ring-1 focus:ring-[#4a7fc1] shadow-sm disabled:bg-slate-100 disabled:text-slate-400"
-                  />
-                </div>
-                {useOverride && (
-                  <p className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
-                    El próximo expediente usará este número exacto (uso único — después vuelve al modo automático).
+                {formError && (
+                  <p className="text-xs text-red-600 font-medium flex items-center gap-1.5">
+                    <AlertCircle size={12} /> {formError}
                   </p>
                 )}
               </div>
-
-              {formError && (
-                <p className="text-xs text-red-600 font-medium flex items-center gap-1">
-                  <AlertCircle size={11} /> {formError}
-                </p>
-              )}
-            </div>
+            )}
           </div>
         </div>
 
-        {/* Pie */}
-        <div className="flex items-center justify-between px-4 py-1.5 bg-[#dce3ec] border-t border-slate-300 text-[10px] text-slate-500">
-          <span>Los cambios se aplican al siguiente expediente creado</span>
-          <span>VantIA ERP</span>
+        {/* Footer con botones */}
+        <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 bg-slate-50">
+          <p className="text-xs text-slate-400">Los cambios se aplican al siguiente expediente creado</p>
+          <div className="flex gap-2">
+            <button type="button" onClick={onClose}
+              className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors">
+              Cancelar
+            </button>
+            <button type="button" onClick={handleAccept} disabled={saving || yearLoading}
+              className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-[#ab0433] text-white text-sm font-bold hover:bg-[#92042c] disabled:opacity-50 transition-colors shadow-sm">
+              {saving ? <Loader2 size={13} className="animate-spin" /> : savedOk ? <CheckCircle2 size={13} /> : null}
+              {savedOk ? "Guardado" : "Aceptar"}
+            </button>
+          </div>
         </div>
       </div>
     </div>,

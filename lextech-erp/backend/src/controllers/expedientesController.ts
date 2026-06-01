@@ -662,56 +662,66 @@ export const deleteExpediente = async (req: any, res: Response) => {
   }
 };
 
+// Devuelve solo la lista de años disponibles (rápido)
 export const getCounterConfig = async (req: any, res: Response) => {
   try {
-    const { rows: cfgRows } = await pool.query(
-      `SELECT anio, min_num, auto_fill, override_next FROM expediente_counter_config ORDER BY anio DESC`
-    );
     const currentYear = new Date().getFullYear();
-    const years = Array.from(new Set([currentYear, currentYear - 1, ...cfgRows.map((r: any) => r.anio)])).sort((a, b) => b - a).slice(0, 5);
+    const { rows: cfgRows } = await pool.query(
+      `SELECT anio FROM expediente_counter_config ORDER BY anio DESC`
+    );
+    const { rows: expYears } = await pool.query(
+      `SELECT DISTINCT anio FROM expedientes ORDER BY anio DESC LIMIT 10`
+    );
+    const years = Array.from(
+      new Set([currentYear, ...cfgRows.map((r: any) => r.anio), ...expYears.map((r: any) => r.anio)])
+    ).sort((a, b) => b - a).slice(0, 6);
+    return res.json({ success: true, data: years });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+};
 
-    const result = await Promise.all(years.map(async (yr) => {
-      const cfg = cfgRows.find((r: any) => r.anio === yr);
-      const minNum: number = cfg?.min_num ?? 1;
-      const autoFill: boolean = cfg?.auto_fill !== false;
-      const overrideNext: number | null = cfg?.override_next ?? null;
+// Devuelve config + estadísticas de UN año concreto
+export const getCounterConfigYear = async (req: any, res: Response) => {
+  const yr = Number(req.params.anio);
+  if (!Number.isInteger(yr) || yr < 2000 || yr > 2100) return res.status(400).json({ error: 'Año inválido' });
+  try {
+    const { rows: cfgRows } = await pool.query(
+      `SELECT min_num, auto_fill, override_next FROM expediente_counter_config WHERE anio = $1`, [yr]
+    );
+    const cfg = cfgRows[0] || {};
+    const minNum: number = cfg.min_num ?? 1;
+    const autoFill: boolean = cfg.auto_fill !== false;
+    const overrideNext: number | null = cfg.override_next ?? null;
 
-      const { rows: usedRows } = await pool.query(
-        `SELECT num_exp FROM expedientes WHERE anio = $1 ORDER BY num_exp`, [yr]
-      );
-      const used: number[] = usedRows.map((r: any) => r.num_exp);
+    const { rows: usedRows } = await pool.query(
+      `SELECT num_exp FROM expedientes WHERE anio = $1 ORDER BY num_exp`, [yr]
+    );
+    const used: number[] = usedRows.map((r: any) => r.num_exp);
+    const maxUsed = used.length ? Math.max(...used) : 0;
 
-      // Calcular próximo número según la misma lógica de createExpediente
-      let nextNum: number;
-      if (overrideNext != null) {
-        nextNum = overrideNext;
-      } else if (autoFill) {
-        const { rows: nextRows } = await pool.query(
-          `WITH bounds AS (SELECT GREATEST(COALESCE(MAX(num_exp), 0), $2 - 1) + 1 AS top_n FROM expedientes WHERE anio = $1),
-           seq AS (SELECT generate_series($2, (SELECT top_n FROM bounds)) AS n)
-           SELECT MIN(s.n) AS next FROM seq s WHERE s.n NOT IN (SELECT num_exp FROM expedientes WHERE anio = $1)`,
-          [yr, minNum]
-        );
-        nextNum = nextRows[0]?.next ?? minNum;
-      } else {
-        const { rows: maxRows } = await pool.query(
-          `SELECT GREATEST(COALESCE(MAX(num_exp), 0), $2 - 1) + 1 AS next FROM expedientes WHERE anio = $1`,
-          [yr, minNum]
-        );
-        nextNum = maxRows[0]?.next ?? minNum;
+    let nextNum: number;
+    if (overrideNext != null) {
+      nextNum = overrideNext;
+    } else if (autoFill) {
+      // Primer hueco (limitado a max 9999 para evitar series gigantes)
+      const top = Math.min(maxUsed + 1, 9999);
+      const usedSet = new Set(used);
+      nextNum = minNum;
+      for (let i = minNum; i <= top + 1; i++) {
+        if (!usedSet.has(i)) { nextNum = i; break; }
       }
+    } else {
+      nextNum = Math.max(maxUsed + 1, minNum);
+    }
 
-      // Huecos detectados
-      const maxUsed = used.length ? Math.max(...used) : 0;
-      const gaps: number[] = [];
-      for (let i = minNum; i <= maxUsed; i++) {
-        if (!used.includes(i)) gaps.push(i);
-      }
+    const gaps: number[] = [];
+    const usedSet2 = new Set(used);
+    for (let i = minNum; i <= maxUsed && gaps.length < 20; i++) {
+      if (!usedSet2.has(i)) gaps.push(i);
+    }
 
-      return { anio: yr, min_num: minNum, auto_fill: autoFill, override_next: overrideNext, used_count: used.length, max_used: maxUsed, next_num: nextNum, gaps };
-    }));
-
-    return res.json({ success: true, data: result });
+    return res.json({ success: true, data: { anio: yr, min_num: minNum, auto_fill: autoFill, override_next: overrideNext, used_count: used.length, max_used: maxUsed, next_num: nextNum, gaps } });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }

@@ -16,6 +16,7 @@ import {
   deleteExpediente,
   getExpedienteHistorial,
   getCounterConfig,
+  getCounterConfigYear,
   setCounterConfig,
 } from '../controllers/expedientesController';
 import {
@@ -36,8 +37,9 @@ import noteRoutes from './noteRoutes';
 const router = Router();
 
 router.get('/stats',  requireAuth, getStats);
-router.get('/counter-config',   requireAuth, getCounterConfig);
-router.post('/counter-config',  requireAuth, setCounterConfig);
+router.get('/counter-config',        requireAuth, getCounterConfig);
+router.get('/counter-config/:anio',  requireAuth, getCounterConfigYear);
+router.post('/counter-config',       requireAuth, setCounterConfig);
 router.get('/imports', requireAuth, getImportHistory);
 router.get('/imports/:id', requireAuth, getImportBatchDetail);
 router.use('/:id/notes', noteRoutes);
