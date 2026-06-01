@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useAuth } from "@clerk/clerk-react";
 import {
   AlertCircle,
+  BarChart2,
   Banknote,
   Building2,
   CheckCircle2,
@@ -10,9 +11,11 @@ import {
   CreditCard,
   ExternalLink,
   FileSpreadsheet,
+  LineChart,
   Link as LinkIcon,
   Loader2,
   Pencil,
+  PieChart,
   Plus,
   RefreshCw,
   Save,
@@ -890,6 +893,7 @@ export default function Facturacion() {
   const [showContactEditor, setShowContactEditor] = useState(false);
   const [editingContact, setEditingContact] = useState<QuipuContact | null>(null);
   const [savingContact, setSavingContact] = useState(false);
+  const [chartType, setChartType] = useState<'bar' | 'line' | 'pie'>('bar');
 
   const TABS: { key: TabKey; label: string; icon?: React.ComponentType<any>; quipuOnly?: boolean }[] = [
     { key: "dashboard",     label: "Vista general" },
@@ -1964,6 +1968,17 @@ export default function Facturacion() {
                     title="Ingresos y Gastos"
                     action={
                       <div className="flex items-center gap-2">
+                        <div className="flex items-center rounded-lg border border-slate-200 bg-white p-0.5">
+                          {([['bar', BarChart2], ['line', LineChart], ['pie', PieChart]] as const).map(([type, Icon]) => (
+                            <button
+                              key={type}
+                              onClick={() => setChartType(type)}
+                              className={`inline-flex h-6 w-6 items-center justify-center rounded-md transition-colors ${chartType === type ? 'bg-slate-100 text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}
+                            >
+                              <Icon size={12} />
+                            </button>
+                          ))}
+                        </div>
                         <div className="relative" ref={yearMenuRef}>
                           <button onClick={() => setShowYearMenu(v => !v)} className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">
                             {filterYear} <ChevronDown size={11} />
@@ -1999,6 +2014,7 @@ export default function Facturacion() {
                       facturas={filteredFacturas}
                       gastos={filteredGastos}
                       year={filterYear}
+                      chartType={chartType}
                     />
                   </OdooSection>
 
@@ -2181,7 +2197,7 @@ export default function Facturacion() {
 // ── MonthlyBarChart (Ingresos y Gastos, tipo Quipu) ───────────
 const MONTH_LABELS = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 
-function MonthlyBarChart({ facturas, gastos, year }: { facturas: Factura[]; gastos: Gasto[]; year: number }) {
+function MonthlyBarChart({ facturas, gastos, year, chartType }: { facturas: Factura[]; gastos: Gasto[]; year: number; chartType: 'bar' | 'line' | 'pie' }) {
   const [tooltip, setTooltip] = useState<{ x: number; y: number; mes: string; ing: number; gas: number } | null>(null);
   const W = 600; const H = 160; const PAD_L = 36; const PAD_R = 8; const PAD_T = 10; const PAD_B = 30;
   const chartW = W - PAD_L - PAD_R;
@@ -2199,16 +2215,121 @@ function MonthlyBarChart({ facturas, gastos, year }: { facturas: Factura[]; gast
   const xCenter = (i: number) => PAD_L + (i + 0.5) * (chartW / 12);
   const curMonth = new Date().getMonth();
 
-  // Y axis labels
   const yTicks = [0, maxVal * 0.25, maxVal * 0.5, maxVal * 0.75, maxVal].map(v => ({
     v, label: v >= 1000 ? `${(v / 1000).toFixed(1)}K` : v.toFixed(0), y: toY(v),
   }));
 
+  const legend = (
+    <div className="mt-2 flex items-center justify-center gap-5">
+      <span className="flex items-center gap-1.5 text-xs text-slate-500"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-red-500" /> Gastos</span>
+      <span className="flex items-center gap-1.5 text-xs text-slate-500"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-emerald-500" /> Ingresos</span>
+    </div>
+  );
+
+  const tooltipEl = tooltip && (
+    <div className="pointer-events-none absolute z-10 rounded-xl bg-slate-900 px-3 py-2 text-xs text-white shadow-xl"
+      style={{ left: tooltip.x, top: 10, transform: "translateX(-50%)" }}>
+      <p className="font-bold mb-1">{tooltip.mes}</p>
+      <p className="text-emerald-400">Ingresos: {fmtEur(tooltip.ing)}</p>
+      <p className="text-red-400">Gastos: {fmtEur(tooltip.gas)}</p>
+    </div>
+  );
+
+  // ── Pie chart ──────────────────────────────────────────────────
+  if (chartType === 'pie') {
+    const totalIng = monthly.reduce((s, m) => s + m.ing, 0);
+    const totalGas = monthly.reduce((s, m) => s + m.gas, 0);
+    const total = totalIng + totalGas;
+
+    if (total === 0) {
+      return <p className="py-10 text-center text-sm text-slate-400">Sin datos para el periodo seleccionado.</p>;
+    }
+
+    const CX = 90; const CY = 90; const OR = 70; const IR = 40;
+    const polar = (angle: number, r: number) => ({
+      x: CX + r * Math.cos(angle - Math.PI / 2),
+      y: CY + r * Math.sin(angle - Math.PI / 2),
+    });
+    const arc = (sa: number, ea: number) => {
+      const os = polar(sa, OR); const oe = polar(ea, OR);
+      const ie = polar(ea, IR); const is_ = polar(sa, IR);
+      const lg = ea - sa > Math.PI ? 1 : 0;
+      return `M${os.x.toFixed(2)} ${os.y.toFixed(2)} A${OR} ${OR} 0 ${lg} 1 ${oe.x.toFixed(2)} ${oe.y.toFixed(2)} L${ie.x.toFixed(2)} ${ie.y.toFixed(2)} A${IR} ${IR} 0 ${lg} 0 ${is_.x.toFixed(2)} ${is_.y.toFixed(2)} Z`;
+    };
+    const ingAngle = (totalIng / total) * 2 * Math.PI;
+    const balance = totalIng - totalGas;
+
+    return (
+      <div className="flex items-center justify-center gap-10 py-2">
+        <svg viewBox="0 0 180 180" style={{ width: 180, height: 180 }}>
+          {totalIng > 0 && <path d={arc(0, ingAngle > 0 && ingAngle < 2 * Math.PI ? ingAngle : ingAngle - 0.001)} fill="#22c55e" />}
+          {totalGas > 0 && <path d={arc(ingAngle, 2 * Math.PI - 0.001)} fill="#ef4444" />}
+          <text x={CX} y={CY - 6} textAnchor="middle" fontSize={9} fill="#64748b">Balance</text>
+          <text x={CX} y={CY + 8} textAnchor="middle" fontSize={11} fill={balance >= 0 ? "#16a34a" : "#dc2626"} fontWeight="bold">
+            {balance >= 0 ? "+" : ""}{Math.abs(balance) >= 1000 ? `${(balance / 1000).toFixed(1)}K€` : `${balance.toFixed(0)}€`}
+          </text>
+        </svg>
+        <div className="space-y-4">
+          <div>
+            <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-sm bg-emerald-500 inline-block" /><span className="text-xs text-slate-500">Ingresos</span></div>
+            <p className="mt-1 text-base font-bold text-slate-800">{fmtEur(totalIng)}</p>
+            <p className="text-[11px] text-slate-400">{Math.round((totalIng / total) * 100)}% del total</p>
+          </div>
+          <div>
+            <div className="flex items-center gap-2"><span className="h-3 w-3 rounded-sm bg-red-500 inline-block" /><span className="text-xs text-slate-500">Gastos</span></div>
+            <p className="mt-1 text-base font-bold text-slate-800">{fmtEur(totalGas)}</p>
+            <p className="text-[11px] text-slate-400">{Math.round((totalGas / total) * 100)}% del total</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Line chart ─────────────────────────────────────────────────
+  if (chartType === 'line') {
+    const ingPts = monthly.map((m, i) => `${xCenter(i).toFixed(1)},${toY(m.ing).toFixed(1)}`).join(' ');
+    const gasPts = monthly.map((m, i) => `${xCenter(i).toFixed(1)},${toY(m.gas).toFixed(1)}`).join(' ');
+
+    return (
+      <div className="relative">
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 200 }} onMouseLeave={() => setTooltip(null)}>
+          {yTicks.map((t, i) => (
+            <g key={i}>
+              <line x1={PAD_L} x2={W - PAD_R} y1={t.y} y2={t.y} stroke="#e2e8f0" strokeWidth={0.5} />
+              <text x={PAD_L - 4} y={t.y + 3.5} fontSize={9} fill="#94a3b8" textAnchor="end">{t.label}</text>
+            </g>
+          ))}
+          <polyline points={ingPts} fill="none" stroke="#22c55e" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+          <polyline points={gasPts} fill="none" stroke="#ef4444" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+          {monthly.map((m, i) => {
+            const cx = xCenter(i);
+            return (
+              <g key={i} onMouseEnter={e => {
+                const svgEl = e.currentTarget.ownerSVGElement as SVGSVGElement;
+                const rect = svgEl.getBoundingClientRect();
+                setTooltip({ x: cx / (W / rect.width), y: 0, mes: m.label, ing: m.ing, gas: m.gas });
+              }}>
+                {m.ing > 0 && <circle cx={cx} cy={toY(m.ing)} r={3} fill="#22c55e" />}
+                {m.gas > 0 && <circle cx={cx} cy={toY(m.gas)} r={3} fill="#ef4444" />}
+                <rect x={cx - (chartW / 12) / 2} y={PAD_T} width={chartW / 12} height={chartH} fill="transparent" style={{ cursor: "pointer" }} />
+              </g>
+            );
+          })}
+          {monthly.map((m, i) => (
+            <text key={i} x={xCenter(i)} y={H - 8} fontSize={9} fill="#94a3b8" textAnchor="middle">{m.label}</text>
+          ))}
+        </svg>
+        {tooltipEl}
+        {legend}
+      </div>
+    );
+  }
+
+  // ── Bar chart (default) ────────────────────────────────────────
   return (
     <div className="relative">
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 200 }}
         onMouseLeave={() => setTooltip(null)}>
-        {/* Y grid */}
         {yTicks.map((t, i) => (
           <g key={i}>
             <line x1={PAD_L} x2={W - PAD_R} y1={t.y} y2={t.y} stroke="#e2e8f0" strokeWidth={0.5} />
@@ -2216,7 +2337,6 @@ function MonthlyBarChart({ facturas, gastos, year }: { facturas: Factura[]; gast
           </g>
         ))}
 
-        {/* Bars */}
         {monthly.map((m, i) => {
           const cx = xCenter(i);
           const isCurrent = i === curMonth && new Date().getFullYear() === year;
@@ -2230,39 +2350,21 @@ function MonthlyBarChart({ facturas, gastos, year }: { facturas: Factura[]; gast
                 const scale = W / rect.width;
                 setTooltip({ x: cx / scale, y: 0, mes: m.label, ing: m.ing, gas: m.gas });
               }}>
-              {/* Current month highlight */}
               {isCurrent && <rect x={cx - (chartW / 12) / 2} y={PAD_T} width={chartW / 12} height={chartH} fill="#f1f5f9" rx={2} />}
-              {/* Income bar (green) */}
               {m.ing > 0 && <rect x={cx - barW - 1} y={toY(m.ing)} width={barW} height={hIng} fill="#22c55e" rx={2} />}
-              {/* Expense bar (red) */}
               {m.gas > 0 && <rect x={cx + 1} y={toY(m.gas)} width={barW} height={hGas} fill="#ef4444" rx={2} />}
-              {/* Click area */}
               <rect x={cx - (chartW / 12) / 2} y={PAD_T} width={chartW / 12} height={chartH} fill="transparent" style={{ cursor: "pointer" }} />
             </g>
           );
         })}
 
-        {/* X labels */}
         {monthly.map((m, i) => (
           <text key={i} x={xCenter(i)} y={H - 8} fontSize={9} fill="#94a3b8" textAnchor="middle">{m.label}</text>
         ))}
       </svg>
 
-      {/* Tooltip */}
-      {tooltip && (
-        <div className="pointer-events-none absolute z-10 rounded-xl bg-slate-900 px-3 py-2 text-xs text-white shadow-xl"
-          style={{ left: tooltip.x, top: 10, transform: "translateX(-50%)" }}>
-          <p className="font-bold mb-1">{tooltip.mes}</p>
-          <p className="text-emerald-400">Ingresos: {fmtEur(tooltip.ing)}</p>
-          <p className="text-red-400">Gastos: {fmtEur(tooltip.gas)}</p>
-        </div>
-      )}
-
-      {/* Legend */}
-      <div className="mt-2 flex items-center justify-center gap-5">
-        <span className="flex items-center gap-1.5 text-xs text-slate-500"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-red-500" /> loss</span>
-        <span className="flex items-center gap-1.5 text-xs text-slate-500"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-emerald-500" /> profit</span>
-      </div>
+      {tooltipEl}
+      {legend}
     </div>
   );
 }
