@@ -864,6 +864,10 @@ export const getQuipuReceipts = async (req: any, res: Response) => {
     const data = await fetchQuipuPaginatedList(settings, '/receipts?sort=-settlement_date');
     res.json({ success: true, data });
   } catch (e: any) {
+    // 404 = endpoint not available in this Quipu plan → return empty list gracefully
+    if (e?.message?.includes('404') || e?.message?.includes('no encontrado')) {
+      return res.json({ success: true, data: [] });
+    }
     res.status(500).json({ success: false, error: e?.message || 'Error al obtener cobros de Quipu.' });
   }
 };
