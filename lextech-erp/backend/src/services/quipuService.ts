@@ -141,19 +141,22 @@ export async function fetchQuipuPaginatedList<T = any>(
   settings: QuipuStoredSettings,
   path: string,
   preAuthToken?: string,
+  maxPages = 20, // safety cap: never fetch more than 20 pages per endpoint
 ): Promise<T[]> {
   const results: T[] = [];
   let page = 1;
   let totalPages = 1;
 
-  // Get token once for all pages
   const token = preAuthToken || await getValidToken(settings);
+  // Request 50 items per page (halves the number of requests vs default 25)
+  const sep = path.includes('?') ? '&' : '?';
+  const pathWithSize = `${path}${sep}page[size]=50`;
 
-  while (page <= totalPages) {
-    const separator = path.includes('?') ? '&' : '?';
+  while (page <= totalPages && page <= maxPages) {
+    const pageSep = pathWithSize.includes('?') ? '&' : '?';
     const response = await quipuOwnerFetch<any>(
       settings,
-      `${path}${separator}page[number]=${page}`,
+      `${pathWithSize}${pageSep}page[number]=${page}`,
       undefined,
       token,
     );
@@ -164,8 +167,8 @@ export async function fetchQuipuPaginatedList<T = any>(
     totalPages = Math.max(Number(pagination.total_pages || 1), 1);
     page += 1;
 
-    // Respect 5 req / 5 sec limit
-    if (page <= totalPages) await sleep(1100);
+    // 1.5s between pages to stay safely under 5 req/5s limit
+    if (page <= totalPages && page <= maxPages) await sleep(1500);
   }
 
   return results;
@@ -173,17 +176,20 @@ export async function fetchQuipuPaginatedList<T = any>(
 
 // ── Bootstrap: ONE token, sequential fetches ─────────────────
 export async function fetchQuipuBootstrap(settings: QuipuStoredSettings) {
-  // Request token ONCE — all list calls share it
   const { accessToken } = await requestQuipuToken(settings);
 
-  // Sequential fetches to avoid hitting the 5 req/5s rate limit
+  // Contacts (all pages, max 20 pages = up to 1000 contacts)
   const contacts = await fetchQuipuPaginatedList<any>(
-    settings, '/contacts?filter[kind]=client', accessToken,
+    settings, '/contacts?filter[kind]=client', accessToken, 20,
   );
   await sleep(2000);
 
+  // Invoices: only last 12 months to limit request count
+  const since = new Date();
+  since.setFullYear(since.getFullYear() - 1);
+  const sinceStr = since.toISOString().slice(0, 10);
   const invoices = await fetchQuipuPaginatedList<any>(
-    settings, '/invoices?sort=-issued_at', accessToken,
+    settings, `/invoices?sort=-issued_at&filter[issued_at_gteq]=${sinceStr}`, accessToken, 10,
   );
   await sleep(2000);
 
