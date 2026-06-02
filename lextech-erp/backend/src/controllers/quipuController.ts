@@ -502,7 +502,19 @@ export const diagnoseQuipu = async (req: any, res: Response) => {
     const total = ba?.meta?.total_entries ?? ba?.data?.length ?? '?';
     steps.push({ step: 'bank_accounts', ok: true, detail: `total_entries=${total}` });
   } catch (e: any) {
-    steps.push({ step: 'bank_accounts', ok: false, detail: e?.message });
+    const is404 = e?.message?.includes('404');
+    steps.push({ step: 'bank_accounts', ok: false, detail: is404
+      ? 'No disponible vía API (404). El módulo Tesorería/Bancos de Quipu no expone banco vía API en este plan.'
+      : e?.message });
+  }
+
+  // Test received invoices (gastos) endpoint
+  try {
+    const ri = await quipuOwnerFetch<any>(settings, '/received_invoices?page[size]=1', undefined, token);
+    const total = ri?.meta?.total_entries ?? ri?.data?.length ?? '?';
+    steps.push({ step: 'received_invoices', ok: true, detail: `total_entries=${total}` });
+  } catch (e: any) {
+    steps.push({ step: 'received_invoices', ok: false, detail: e?.message });
   }
 
   try {

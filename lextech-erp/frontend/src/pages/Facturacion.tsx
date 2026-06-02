@@ -2264,7 +2264,11 @@ function BankAccountsTab({
           {loading && !accounts.length ? (
             <div className="col-span-3 flex items-center justify-center py-12 text-sm text-slate-400"><Loader2 size={16} className="animate-spin mr-2" />Cargando cuentas...</div>
           ) : accounts.length === 0 ? (
-            <div className="col-span-3 rounded-2xl border border-slate-200 bg-white px-5 py-10 text-center text-sm text-slate-400">Sin cuentas bancarias sincronizadas. Sincroniza Quipu primero.</div>
+            <div className="col-span-3 rounded-2xl border border-amber-100 bg-amber-50 px-6 py-8 text-center space-y-2">
+              <Building2 size={28} className="mx-auto text-amber-400" />
+              <p className="text-sm font-semibold text-amber-800">Cuentas bancarias no disponibles vía API</p>
+              <p className="text-xs text-amber-700 max-w-sm mx-auto">El módulo <strong>Tesorería/Bancos</strong> de Quipu no expone las cuentas conectadas por Open Banking en la API. Los datos de bancos deben gestionarse directamente en Quipu.</p>
+            </div>
           ) : accounts.map(acc => (
             <button key={acc.id} onClick={() => onSelectAccount(acc.id)}
               className="rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm hover:border-blue-300 hover:shadow-md transition-all group">
