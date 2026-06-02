@@ -23,6 +23,89 @@ function buildQuipuFilingNumber(num: any, serie?: any) {
     : cleanNum;
 }
 
+async function resolveQuipuContactId(
+  userId: string,
+  settings: any,
+  accessToken: string,
+  contactName: any,
+  options?: { nifCif?: any; email?: any },
+): Promise<string> {
+  const cleanContactName = sanitizeText(contactName);
+  const cleanTaxId = sanitizeText(options?.nifCif);
+  const cleanEmail = sanitizeText(options?.email);
+
+  if (!cleanContactName) {
+    throw new Error('La factura no tiene cliente informado para crear el contacto en Quipu.');
+  }
+
+  const localContact = await pool.query(
+    `SELECT external_id
+       FROM quipu_contacts
+      WHERE user_id = $1
+        AND (
+          LOWER(contact_name) = LOWER($2)
+          OR ($3 IS NOT NULL AND tax_id = $3)
+        )
+      ORDER BY CASE WHEN LOWER(contact_name) = LOWER($2) THEN 0 ELSE 1 END
+      LIMIT 1`,
+    [userId, cleanContactName, cleanTaxId],
+  );
+  if (localContact.rows.length > 0) {
+    return String(localContact.rows[0].external_id || '');
+  }
+
+  try {
+    const createdContact = await quipuOwnerFetch<any>(settings, '/contacts', {
+      method: 'POST',
+      body: JSON.stringify({
+        data: {
+          type: 'contacts',
+          attributes: {
+            kind: 'client',
+            name: cleanContactName,
+            ...(cleanTaxId ? { tax_id: cleanTaxId } : {}),
+            ...(cleanEmail ? { email: cleanEmail } : {}),
+          },
+        },
+      }),
+    }, accessToken);
+
+    const quipuContactId = String(createdContact?.data?.id || '').trim();
+    if (!quipuContactId) {
+      throw new Error('Quipu no devolvió el identificador del contacto.');
+    }
+
+    await pool.query(
+      `INSERT INTO quipu_contacts
+         (user_id, quipu_setting_id, external_id, external_type, kind, contact_name, tax_id, email, raw_payload)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+       ON CONFLICT (user_id, external_id) DO UPDATE
+       SET external_type = EXCLUDED.external_type,
+           kind = EXCLUDED.kind,
+           contact_name = EXCLUDED.contact_name,
+           tax_id = EXCLUDED.tax_id,
+           email = EXCLUDED.email,
+           raw_payload = EXCLUDED.raw_payload,
+           updated_at = NOW()`,
+      [
+        userId,
+        settings.id || null,
+        quipuContactId,
+        String(createdContact?.data?.type || 'contacts'),
+        'client',
+        cleanContactName,
+        cleanTaxId,
+        cleanEmail,
+        JSON.stringify(createdContact?.data || {}),
+      ],
+    );
+
+    return quipuContactId;
+  } catch (error: any) {
+    throw new Error(`No se pudo crear o localizar el contacto de Quipu para "${cleanContactName}": ${error?.message || 'error desconocido'}`);
+  }
+}
+
 async function getStoredQuipuSettings(userId: string) {
   const result = await pool.query(`SELECT * FROM quipu_settings WHERE user_id = $1 LIMIT 1`, [userId]);
   return result.rows[0] || null;
@@ -405,7 +488,7 @@ export async function pushFacturaToQuipuInternal(userId: string, facturaId: stri
   if (!settings) return null;
 
   const res = await pool.query(
-    `SELECT ff.*, e.nif_cif FROM facturacion_facturas ff
+    `SELECT ff.*, e.nif_cif, e.email FROM facturacion_facturas ff
      LEFT JOIN entities e ON e.id = ff.client_id
      WHERE ff.id=$1 AND ff.user_id=$2`,
     [facturaId, userId],
@@ -416,24 +499,10 @@ export async function pushFacturaToQuipuInternal(userId: string, facturaId: stri
 
   const { accessToken } = await requestQuipuToken(settings);
 
-  let contactQuipuId: string | null = null;
-  if (f.contacto) {
-    const lc = await pool.query(
-      `SELECT external_id FROM quipu_contacts WHERE user_id=$1 AND LOWER(contact_name)=LOWER($2) LIMIT 1`,
-      [userId, f.contacto],
-    );
-    if (lc.rows.length) {
-      contactQuipuId = lc.rows[0].external_id;
-    } else {
-      try {
-        const nc = await quipuOwnerFetch<any>(settings, '/contacts', {
-          method: 'POST',
-          body: JSON.stringify({ data: { type: 'contacts', attributes: { kind: 'client', name: f.contacto, ...(f.nif_cif ? { tax_id: f.nif_cif } : {}) } } }),
-        }, accessToken);
-        contactQuipuId = String(nc?.data?.id || '');
-      } catch { /* proceed without contact link */ }
-    }
-  }
+  const contactQuipuId = await resolveQuipuContactId(userId, settings, accessToken, f.contacto, {
+    nifCif: f.nif_cif,
+    email: f.email,
+  });
 
   const issueDate = f.fecha ? String(f.fecha).slice(0, 10) : new Date().toISOString().slice(0, 10);
   const baseAmount = Number(f.total) / 1.21;
@@ -1003,8 +1072,14 @@ export const pushLocalFacturaToQuipu = async (req: any, res: Response) => {
   const { id } = req.params;
 
   try {
+    const pushedQuipuId = await pushFacturaToQuipuInternal(userId, id);
+    if (!pushedQuipuId) {
+      return res.status(500).json({ success: false, error: 'No se pudo enviar la factura a Quipu.' });
+    }
+    return res.json({ success: true, data: { quipuId: pushedQuipuId } });
+
     const facturaRes = await pool.query(
-      `SELECT ff.*, e.first_name, e.last_name, e.commercial_name, e.nif_cif
+      `SELECT ff.*, e.first_name, e.last_name, e.commercial_name, e.nif_cif, e.email
        FROM facturacion_facturas ff
        LEFT JOIN entities e ON e.id = ff.client_id
        WHERE ff.id = $1 AND ff.user_id = $2`,

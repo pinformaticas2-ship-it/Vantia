@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
+import { Link } from "react-router-dom";
 import {
   AlertCircle,
   BarChart2,
@@ -378,6 +379,23 @@ function EstadoBadge({ estado }: { estado: string }) {
   return <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${map[estado] || "bg-slate-100 text-slate-600"}`}>{labels[estado] || estado}</span>;
 }
 
+function ClientRecordLink({ clientId, label }: { clientId?: string; label: string }) {
+  if (!clientId) {
+    return <span className="font-medium text-slate-700">{label}</span>;
+  }
+
+  return (
+    <Link
+      to={`/dashboard/clientes/${clientId}`}
+      className="inline-flex items-center gap-1 font-medium text-red-700 transition-colors hover:text-red-800 hover:underline"
+      title="Abrir ficha del cliente"
+    >
+      <span>{label}</span>
+      <ExternalLink size={12} />
+    </Link>
+  );
+}
+
 function KpiCard({ label, value, sub, color = "slate", icon: Icon }: { label: string; value: string; sub?: string; color?: string; icon: any }) {
   const colors: Record<string, string> = {
     slate: "bg-slate-100 text-slate-500",
@@ -690,7 +708,10 @@ function StructuredBillingEditorModal({
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                   <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Relación cliente-expediente</p>
                   <div className="mt-2 space-y-1 text-sm text-slate-600">
-                    <p><span className="font-semibold text-slate-800">Cliente:</span> {selectedClient?.label || "Sin seleccionar"}</p>
+                    <p>
+                      <span className="font-semibold text-slate-800">Cliente:</span>{" "}
+                      {selectedClient ? <ClientRecordLink clientId={selectedClient.id} label={selectedClient.label} /> : "Sin seleccionar"}
+                    </p>
                     <p><span className="font-semibold text-slate-800">Expediente:</span> {selectedExpediente?.label || "Sin seleccionar"}</p>
                   </div>
                 </div>
@@ -2044,7 +2065,9 @@ export default function Facturacion() {
                     {filteredCobrosPendientes.map((row) => (
                       <tr key={row.id} className="transition-colors hover:bg-slate-50/60">
                         <td className="px-5 py-3 text-sm font-semibold text-slate-800">{row.num}</td>
-                        <td className="px-5 py-3 text-sm text-slate-600">{row.contacto}</td>
+                        <td className="px-5 py-3 text-sm text-slate-600">
+                          <ClientRecordLink clientId={row.clientId} label={row.contacto} />
+                        </td>
                         <td className="px-5 py-3 text-sm text-slate-500">{row.expedienteRef || "Sin expediente"}</td>
                         <td className="px-5 py-3 text-sm text-slate-500">{fmtDate(row.vencimiento)}</td>
                         <td className="px-5 py-3 text-sm font-bold text-slate-900">{fmtEur(row.pendiente)}</td>
@@ -2071,7 +2094,7 @@ export default function Facturacion() {
                     <tr key={row.id} className="transition-colors hover:bg-slate-50/60">
                       <td className="px-5 py-3 text-sm font-semibold text-slate-800">{row.num}</td>
                       <td className="px-5 py-3 text-sm text-slate-600">
-                        <div className="font-medium text-slate-700">{row.contacto}</div>
+                        <ClientRecordLink clientId={row.clientId} label={row.contacto} />
                         <div className="text-xs text-slate-400">{row.responsable}</div>
                       </td>
                       <td className="px-5 py-3 text-sm text-slate-500">{row.expedienteRef || "Sin expediente"}</td>
@@ -2143,7 +2166,7 @@ export default function Facturacion() {
                     <tr key={row.id} className="transition-colors hover:bg-slate-50/60">
                       <td className="px-5 py-3 text-sm font-semibold text-slate-800">{row.num}</td>
                       <td className="px-5 py-3 text-sm text-slate-600">
-                        <div className="font-medium text-slate-700">{row.contacto}</div>
+                        <ClientRecordLink clientId={row.clientId} label={row.contacto} />
                         <div className="text-xs text-slate-400">{row.responsable}</div>
                       </td>
                       <td className="px-5 py-3 text-sm text-slate-500">{row.expedienteRef || "Sin expediente"}</td>
