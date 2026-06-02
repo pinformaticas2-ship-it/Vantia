@@ -44,7 +44,7 @@ async function resolveQuipuContactId(
       WHERE user_id = $1
         AND (
           LOWER(contact_name) = LOWER($2)
-          OR ($3 IS NOT NULL AND tax_id = $3)
+          OR ($3::text IS NOT NULL AND tax_id = $3::text)
         )
       ORDER BY CASE WHEN LOWER(contact_name) = LOWER($2) THEN 0 ELSE 1 END
       LIMIT 1`,
