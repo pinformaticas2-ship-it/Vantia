@@ -617,24 +617,35 @@ export async function pushFacturaToQuipuInternal(userId: string, facturaId: stri
   }, accessToken);
 
   const quipuId = String(created?.data?.id || '');
+  console.log(`[QuipuPush] create invoice factura=${facturaId} quipuId=${quipuId || 'n/a'} total=${extractQuipuInvoiceTotal(created)}`);
   if (quipuId && extractQuipuInvoiceTotal(created) <= 0) {
     const fallbackAttributes = buildQuipuInvoiceAttributes(f, { mode: 'items_only' });
+    console.warn(`[QuipuPush] zero-total after create for factura=${facturaId}; retrying PATCH mode=items_only`);
     created = await quipuOwnerFetch<any>(settings, `/invoices/${quipuId}`, {
       method: 'PATCH',
       body: JSON.stringify({ data: { type: 'invoices', id: quipuId, attributes: fallbackAttributes, ...(Object.keys(relationships).length ? { relationships } : {}) } }),
     }, accessToken);
+    console.log(`[QuipuPush] patch items_only factura=${facturaId} quipuId=${quipuId} total=${extractQuipuInvoiceTotal(created)}`);
   }
 
   if (quipuId && extractQuipuInvoiceTotal(created) <= 0) {
     const fallbackAttributes = buildQuipuInvoiceAttributes(f, { mode: 'items_attributes_only' });
+    console.warn(`[QuipuPush] still zero-total for factura=${facturaId}; retrying PATCH mode=items_attributes_only`);
     created = await quipuOwnerFetch<any>(settings, `/invoices/${quipuId}`, {
       method: 'PATCH',
       body: JSON.stringify({ data: { type: 'invoices', id: quipuId, attributes: fallbackAttributes, ...(Object.keys(relationships).length ? { relationships } : {}) } }),
     }, accessToken);
+    console.log(`[QuipuPush] patch items_attributes_only factura=${facturaId} quipuId=${quipuId} total=${extractQuipuInvoiceTotal(created)}`);
   }
 
   if (quipuId && extractQuipuInvoiceTotal(created) <= 0) {
-    throw new Error(`Quipu creó la factura ${quipuId} sin líneas o importe. Revisa el contacto y los datos fiscales antes de reenviar.`);
+    try {
+      await quipuOwnerFetch<any>(settings, `/invoices/${quipuId}`, { method: 'DELETE' }, accessToken);
+      console.warn(`[QuipuPush] deleted zero-total draft quipuId=${quipuId} for factura=${facturaId}`);
+    } catch (cleanupError: any) {
+      console.warn(`[QuipuPush] failed to delete zero-total draft quipuId=${quipuId}: ${cleanupError?.message}`);
+    }
+    throw new Error(`Quipu ignoró las líneas de la factura y la dejaba a 0,00. Se canceló el borrador en Quipu para evitar datos inválidos.`);
   }
 
   if (quipuId) {
