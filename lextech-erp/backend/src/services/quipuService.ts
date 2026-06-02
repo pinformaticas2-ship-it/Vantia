@@ -33,6 +33,27 @@ function buildOwnerPath(settings: QuipuStoredSettings, path: string): string {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+function formatQuipuError(error: any): string | null {
+  if (!error) return null;
+
+  const pointer = String(error?.source?.pointer || '').trim();
+  const pointerField = pointer
+    .replace(/^\/data\/attributes\//, '')
+    .replace(/^\/data\/relationships\//, '')
+    .replace(/\/data$/, '')
+    .trim();
+  const metaField = String(error?.meta?.attribute || error?.meta?.field || '').trim();
+  const field = pointerField || metaField;
+  const detail = String(error?.detail || '').trim();
+  const title = String(error?.title || '').trim();
+
+  if (field && detail) return `${field}: ${detail}`;
+  if (field && title) return `${field}: ${title}`;
+  if (detail) return detail;
+  if (title) return title;
+  return null;
+}
+
 async function parseQuipuResponse(response: Response) {
   const contentType = response.headers.get('content-type') || '';
   const text = await response.text();
@@ -44,8 +65,12 @@ async function parseQuipuResponse(response: Response) {
   }
 
   if (!response.ok) {
+    const apiErrors = Array.isArray(parsed?.errors) ? parsed.errors : [];
+    const formattedErrors = apiErrors
+      .map((error: any) => formatQuipuError(error))
+      .filter(Boolean);
     const detail =
-      parsed?.errors?.[0]?.detail ||
+      formattedErrors[0] ||
       parsed?.error_description ||
       parsed?.error ||
       parsed?.message ||
