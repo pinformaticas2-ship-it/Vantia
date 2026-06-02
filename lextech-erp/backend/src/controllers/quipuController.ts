@@ -14,6 +14,15 @@ const sanitizeText = (value: any) => {
   return text || null;
 };
 
+function buildQuipuFilingNumber(num: any, serie?: any) {
+  const cleanNum = sanitizeText(num);
+  const cleanSerie = sanitizeText(serie);
+  if (!cleanNum) return null;
+  return cleanSerie && !cleanNum.startsWith(`${cleanSerie}-`)
+    ? `${cleanSerie}-${cleanNum}`
+    : cleanNum;
+}
+
 async function getStoredQuipuSettings(userId: string) {
   const result = await pool.query(`SELECT * FROM quipu_settings WHERE user_id = $1 LIMIT 1`, [userId]);
   return result.rows[0] || null;
@@ -428,9 +437,11 @@ export async function pushFacturaToQuipuInternal(userId: string, facturaId: stri
 
   const issueDate = f.fecha ? String(f.fecha).slice(0, 10) : new Date().toISOString().slice(0, 10);
   const baseAmount = Number(f.total) / 1.21;
+  const filingNumber = buildQuipuFilingNumber(f.num, f.serie);
   const attributes: any = {
     kind: 'income',
     issue_date: issueDate,
+    ...(filingNumber ? { filing_number: filingNumber } : {}),
     due_date: f.vencimiento ? String(f.vencimiento).slice(0, 10) : undefined,
     subject: f.contacto || 'Servicios profesionales',
     payment_method: f.forma_pago === 'tarjeta' ? 'credit_card' : f.forma_pago === 'efectivo' ? 'cash' : 'bank_transfer',
@@ -439,7 +450,7 @@ export async function pushFacturaToQuipuInternal(userId: string, facturaId: stri
   const relationships: any = {};
   if (contactQuipuId) relationships.contact = { data: { id: contactQuipuId, type: 'contacts' } };
   const seriesRow = await pool.query(`SELECT external_id FROM quipu_numbering_series WHERE user_id=$1 LIMIT 1`, [userId]);
-  if (seriesRow.rows.length) relationships.numbering_serie = { data: { id: seriesRow.rows[0].external_id, type: 'numbering_series' } };
+  if (seriesRow.rows.length) relationships.numbering_series = { data: { id: seriesRow.rows[0].external_id, type: 'numbering_series' } };
 
   const created = await quipuOwnerFetch<any>(settings, '/invoices', {
     method: 'POST',
@@ -1043,10 +1054,12 @@ export const pushLocalFacturaToQuipu = async (req: any, res: Response) => {
     const issueDate = f.fecha ? String(f.fecha).slice(0, 10) : new Date().toISOString().slice(0, 10);
     const dueDate   = f.vencimiento ? String(f.vencimiento).slice(0, 10) : null;
     const baseAmount = Number(f.total) / 1.21;
+    const filingNumber = buildQuipuFilingNumber(f.num, f.serie);
 
     const attributes: any = {
       kind:           'income',
       issue_date:     issueDate,
+      ...(filingNumber ? { filing_number: filingNumber } : {}),
       due_date:       dueDate || undefined,
       subject:        f.contacto || 'Servicios profesionales',
       payment_method: f.forma_pago === 'tarjeta'  ? 'credit_card' :
@@ -1068,7 +1081,7 @@ export const pushLocalFacturaToQuipu = async (req: any, res: Response) => {
       `SELECT external_id FROM quipu_numbering_series WHERE user_id = $1 LIMIT 1`, [userId],
     );
     if (seriesRow.rows.length > 0) {
-      relationships.numbering_serie = { data: { id: seriesRow.rows[0].external_id, type: 'numbering_series' } };
+      relationships.numbering_series = { data: { id: seriesRow.rows[0].external_id, type: 'numbering_series' } };
     }
 
     const payload: any = {
