@@ -41,6 +41,9 @@ type QuipuContact = {
   email?: string;
   phone?: string;
   address?: string;
+  town?: string;
+  zipCode?: string;
+  country?: string;
   countryCode?: string;
 };
 
@@ -1300,6 +1303,9 @@ export default function Facturacion() {
         email: r.email || "",
         phone: r.phone || "",
         address: r.address || "",
+        town: r.town || "",
+        zipCode: r.zip_code || "",
+        country: r.country || "",
         countryCode: r.country_code || "ES",
       })));
     } catch (e: any) { setQuipuError(e?.message || "Error al cargar contactos"); }
@@ -1393,13 +1399,35 @@ export default function Facturacion() {
       if (editingContact?.id) {
         await apiFetch(`/api/quipu/contacts/${editingContact.id}`, {
           method: "PATCH",
-          body: JSON.stringify({ kind: attrs.kind, name: attrs.name, tax_id: attrs.taxId, email: attrs.email, phone: attrs.phone }),
+          body: JSON.stringify({
+            kind: attrs.kind,
+            name: attrs.name,
+            tax_id: attrs.taxId,
+            email: attrs.email,
+            phone: attrs.phone,
+            address: attrs.address,
+            town: attrs.town,
+            zip_code: attrs.zipCode,
+            country: attrs.country,
+            country_code: attrs.countryCode,
+          }),
           getToken,
         });
       } else {
         await apiFetch("/api/quipu/contacts", {
           method: "POST",
-          body: JSON.stringify({ kind: attrs.kind || "client", name: attrs.name, tax_id: attrs.taxId, email: attrs.email, phone: attrs.phone }),
+          body: JSON.stringify({
+            kind: attrs.kind || "client",
+            name: attrs.name,
+            tax_id: attrs.taxId,
+            email: attrs.email,
+            phone: attrs.phone,
+            address: attrs.address,
+            town: attrs.town,
+            zip_code: attrs.zipCode,
+            country: attrs.country,
+            country_code: attrs.countryCode,
+          }),
           getToken,
         });
       }
@@ -2885,6 +2913,10 @@ function ContactEditorModal({
     email: initial?.email || "",
     phone: initial?.phone || "",
     address: initial?.address || "",
+    town: initial?.town || "",
+    zipCode: initial?.zipCode || "",
+    country: initial?.country || "España",
+    countryCode: initial?.countryCode || "ES",
   });
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
   const lbl = "block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5";
@@ -2936,9 +2968,36 @@ function ContactEditorModal({
             <label className={lbl}>Dirección</label>
             <input value={form.address} onChange={e => set("address", e.target.value)} placeholder="Calle Mayor 1, Madrid" className={inp} />
           </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className={lbl}>Ciudad</label>
+              <input value={form.town} onChange={e => set("town", e.target.value)} placeholder="Madrid" className={inp} />
+            </div>
+            <div>
+              <label className={lbl}>Código postal</label>
+              <input value={form.zipCode} onChange={e => set("zipCode", e.target.value)} placeholder="28001" className={inp} />
+            </div>
+            <div>
+              <label className={lbl}>País</label>
+              <input value={form.country} onChange={e => set("country", e.target.value)} placeholder="España" className={inp} />
+            </div>
+          </div>
         </div>
         <div className="flex items-center gap-2 px-5 py-3.5 border-t border-slate-100 bg-slate-50">
-          <button onClick={() => form.name.trim() && onSave(form)} disabled={!form.name.trim() || saving}
+          <button
+            onClick={() => form.name.trim() && onSave({
+              ...form,
+              name: form.name.trim(),
+              taxId: form.taxId.trim(),
+              email: form.email.trim(),
+              phone: form.phone.trim(),
+              address: form.address.trim(),
+              town: form.town.trim(),
+              zipCode: form.zipCode.trim(),
+              country: form.country.trim(),
+              countryCode: form.countryCode.trim() || "ES",
+            })}
+            disabled={!form.name.trim() || saving}
             className="inline-flex items-center gap-2 px-5 py-2 text-sm font-bold text-white bg-red-700 hover:bg-red-800 disabled:opacity-40 rounded-xl active:scale-95 transition-all">
             {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
             {initial ? "Guardar cambios" : "Crear contacto"}

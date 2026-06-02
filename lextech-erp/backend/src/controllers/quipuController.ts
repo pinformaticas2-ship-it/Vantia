@@ -32,17 +32,64 @@ function normalizeCountry(country: any) {
   return { country: cleanCountry, countryCode };
 }
 
+function mapQuipuPaymentMethod(paymentMethod: any) {
+  const cleanPaymentMethod = String(paymentMethod || '').trim().toLowerCase();
+  if (cleanPaymentMethod === 'tarjeta') return 'credit_card';
+  if (cleanPaymentMethod === 'efectivo') return 'cash';
+  if (cleanPaymentMethod === 'domiciliacion') return 'direct_debit';
+  if (cleanPaymentMethod === 'bizum') return 'other';
+  return 'bank_transfer';
+}
+
+function buildQuipuInvoiceItems(factura: any) {
+  const totalAmount = Number(factura?.total || 0);
+  const concept = sanitizeText(factura?.contacto)
+    ? `Servicios jurídicos ${sanitizeText(factura?.contacto)}`
+    : 'Servicios profesionales';
+  const vatPercent = 21.0;
+  const retentionPercent = 0.0;
+  const baseAmount = totalAmount > 0 ? Number((totalAmount / (1 + vatPercent / 100)).toFixed(2)) : 0;
+
+  return {
+    totalAmount: Number(totalAmount.toFixed(2)),
+    items: [
+      {
+        type: 'book_entry_items',
+        attributes: {
+          concept,
+          unitary_amount: baseAmount.toFixed(2),
+          quantity: 1,
+          vat_percent: vatPercent,
+          retention_percent: retentionPercent,
+        },
+      },
+    ],
+  };
+}
+
 async function resolveQuipuContactId(
   userId: string,
   settings: any,
   accessToken: string,
   contactName: any,
-  options?: { nifCif?: any; email?: any; country?: any },
+  options?: {
+    nifCif?: any;
+    email?: any;
+    country?: any;
+    address?: any;
+    town?: any;
+    zipCode?: any;
+    phone?: any;
+  },
 ): Promise<string> {
   const cleanContactName = sanitizeText(contactName);
   const cleanTaxId = sanitizeText(options?.nifCif);
   const cleanEmail = sanitizeText(options?.email);
   const { country, countryCode } = normalizeCountry(options?.country);
+  const cleanAddress = sanitizeText(options?.address);
+  const cleanTown = sanitizeText(options?.town);
+  const cleanZipCode = sanitizeText(options?.zipCode);
+  const cleanPhone = sanitizeText(options?.phone);
 
   if (!cleanContactName) {
     throw new Error('La factura no tiene cliente informado para crear el contacto en Quipu.');
@@ -75,6 +122,10 @@ async function resolveQuipuContactId(
             name: cleanContactName,
             ...(cleanTaxId ? { tax_id: cleanTaxId } : {}),
             ...(cleanEmail ? { email: cleanEmail } : {}),
+            ...(cleanPhone ? { phone: cleanPhone } : {}),
+            ...(cleanAddress ? { address: cleanAddress } : {}),
+            ...(cleanTown ? { town: cleanTown } : {}),
+            ...(cleanZipCode ? { zip_code: cleanZipCode } : {}),
             country,
             ...(countryCode ? { country_code: countryCode } : {}),
           },
@@ -500,7 +551,8 @@ export async function pushFacturaToQuipuInternal(userId: string, facturaId: stri
   if (!settings) return null;
 
   const res = await pool.query(
-    `SELECT ff.*, e.nif_cif, e.email, e.address_country FROM facturacion_facturas ff
+    `SELECT ff.*, e.nif_cif, e.email, e.address_country, e.address_street, e.address_town, e.address_cp, e.phone_1, e.phone_mobile
+     FROM facturacion_facturas ff
      LEFT JOIN entities e ON e.id = ff.client_id
      WHERE ff.id=$1 AND ff.user_id=$2`,
     [facturaId, userId],
@@ -515,19 +567,25 @@ export async function pushFacturaToQuipuInternal(userId: string, facturaId: stri
     nifCif: f.nif_cif,
     email: f.email,
     country: f.address_country,
+    address: f.address_street,
+    town: f.address_town,
+    zipCode: f.address_cp,
+    phone: f.phone_mobile || f.phone_1,
   });
 
   const issueDate = f.fecha ? String(f.fecha).slice(0, 10) : new Date().toISOString().slice(0, 10);
-  const baseAmount = Number(f.total) / 1.21;
   const filingNumber = buildQuipuFilingNumber(f.num, f.serie);
+  const invoiceItems = buildQuipuInvoiceItems(f);
   const attributes: any = {
     kind: 'income',
     issue_date: issueDate,
     ...(filingNumber ? { filing_number: filingNumber } : {}),
     due_date: f.vencimiento ? String(f.vencimiento).slice(0, 10) : undefined,
-    subject: f.contacto || 'Servicios profesionales',
-    payment_method: f.forma_pago === 'tarjeta' ? 'credit_card' : f.forma_pago === 'efectivo' ? 'cash' : 'bank_transfer',
-    items_attributes: [{ concept: f.contacto || 'Servicios profesionales', unitary_amount: baseAmount.toFixed(2), quantity: 1, vat_percent: 21.0, retention_percent: 0.0 }],
+    subject: sanitizeText(f.contacto) ? `Factura ${filingNumber || f.num} · ${f.contacto}` : `Factura ${filingNumber || f.num || ''}`.trim(),
+    payment_method: mapQuipuPaymentMethod(f.forma_pago),
+    total_amount: invoiceItems.totalAmount.toFixed(2),
+    items: invoiceItems.items,
+    items_attributes: invoiceItems.items.map((item: any) => item.attributes),
   };
   const relationships: any = {};
   if (contactQuipuId) relationships.contact = { data: { id: contactQuipuId, type: 'contacts' } };
@@ -770,9 +828,12 @@ export const getSyncedContacts = async (req: any, res: Response) => {
   try {
     const result = await pool.query(
       `SELECT external_id AS id, kind, contact_name AS name, tax_id, email,
-              raw_payload->>'phone' AS phone,
-              raw_payload->>'address' AS address,
-              raw_payload->>'country_code' AS country_code
+              COALESCE(raw_payload->>'phone', raw_payload->'attributes'->>'phone') AS phone,
+              COALESCE(raw_payload->>'address', raw_payload->'attributes'->>'address') AS address,
+              COALESCE(raw_payload->>'town', raw_payload->'attributes'->>'town') AS town,
+              COALESCE(raw_payload->>'zip_code', raw_payload->'attributes'->>'zip_code') AS zip_code,
+              COALESCE(raw_payload->>'country', raw_payload->'attributes'->>'country') AS country,
+              COALESCE(raw_payload->>'country_code', raw_payload->'attributes'->>'country_code') AS country_code
        FROM quipu_contacts WHERE user_id = $1 ORDER BY contact_name ASC`,
       [userId],
     );
