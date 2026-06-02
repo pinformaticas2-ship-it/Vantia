@@ -429,11 +429,12 @@ export async function pushFacturaToQuipuInternal(userId: string, facturaId: stri
   const issueDate = f.fecha ? String(f.fecha).slice(0, 10) : new Date().toISOString().slice(0, 10);
   const baseAmount = Number(f.total) / 1.21;
   const attributes: any = {
-    kind: 'revenue', number: f.num || undefined, issue_date: issueDate,
-    due_date: f.vencimiento ? String(f.vencimiento).slice(0, 10) : null,
+    kind: 'income',
+    issue_date: issueDate,
+    due_date: f.vencimiento ? String(f.vencimiento).slice(0, 10) : undefined,
     subject: f.contacto || 'Servicios profesionales',
     payment_method: f.forma_pago === 'tarjeta' ? 'credit_card' : f.forma_pago === 'efectivo' ? 'cash' : 'bank_transfer',
-    items_attributes: [{ concept: f.contacto || 'Servicios profesionales', unitary_amount: baseAmount.toFixed(2), quantity: '1', vat_percent: '21.0', retention_percent: '0.0' }],
+    items_attributes: [{ concept: f.contacto || 'Servicios profesionales', unitary_amount: baseAmount.toFixed(2), quantity: 1, vat_percent: 21.0, retention_percent: 0.0 }],
   };
   const relationships: any = {};
   if (contactQuipuId) relationships.contact = { data: { id: contactQuipuId, type: 'contacts' } };
@@ -1044,21 +1045,18 @@ export const pushLocalFacturaToQuipu = async (req: any, res: Response) => {
     const baseAmount = Number(f.total) / 1.21;
 
     const attributes: any = {
-      kind:           'revenue',
-      number:         f.num || undefined,
+      kind:           'income',
       issue_date:     issueDate,
-      due_date:       dueDate,
+      due_date:       dueDate || undefined,
       subject:        f.contacto || 'Servicios profesionales',
-      payment_method: f.forma_pago === 'transferencia' ? 'bank_transfer' :
-                      f.forma_pago === 'tarjeta'        ? 'credit_card'  :
-                      f.forma_pago === 'efectivo'       ? 'cash'         : 'bank_transfer',
-      // Line item embedded in attributes (Quipu simple format)
+      payment_method: f.forma_pago === 'tarjeta'  ? 'credit_card' :
+                      f.forma_pago === 'efectivo' ? 'cash'        : 'bank_transfer',
       items_attributes: [{
-        concept:       f.contacto || 'Servicios profesionales',
-        unitary_amount: baseAmount.toFixed(2),
-        quantity:       '1',
-        vat_percent:    '21.0',
-        retention_percent: '0.0',
+        concept:          f.contacto || 'Servicios profesionales',
+        unitary_amount:   baseAmount.toFixed(2),
+        quantity:         1,
+        vat_percent:      21.0,
+        retention_percent: 0.0,
       }],
     };
 
@@ -1066,29 +1064,24 @@ export const pushLocalFacturaToQuipu = async (req: any, res: Response) => {
     if (contactQuipuId) {
       relationships.contact = { data: { id: contactQuipuId, type: 'contacts' } };
     }
-
-    // Use numbered series from sync if available
     const seriesRow = await pool.query(
-      `SELECT external_id FROM quipu_numbering_series WHERE user_id = $1 LIMIT 1`,
-      [userId],
+      `SELECT external_id FROM quipu_numbering_series WHERE user_id = $1 LIMIT 1`, [userId],
     );
     if (seriesRow.rows.length > 0) {
       relationships.numbering_serie = { data: { id: seriesRow.rows[0].external_id, type: 'numbering_series' } };
     }
 
     const payload: any = {
-      data: {
-        type: 'invoices',
-        attributes,
-        ...(Object.keys(relationships).length > 0 ? { relationships } : {}),
-      },
+      data: { type: 'invoices', attributes, ...(Object.keys(relationships).length ? { relationships } : {}) },
     };
 
+    console.log(`[QuipuPush] payload for factura ${id}:`, JSON.stringify(payload));
+
     const created = await quipuOwnerFetch<any>(settings, '/invoices', {
-      method: 'POST',
-      body: JSON.stringify(payload),
+      method: 'POST', body: JSON.stringify(payload),
     }, accessToken);
 
+    console.log(`[QuipuPush] Quipu response:`, JSON.stringify(created?.data?.id));
     const quipuId = String(created?.data?.id || '');
     if (quipuId) {
       await pool.query(
@@ -1100,6 +1093,7 @@ export const pushLocalFacturaToQuipu = async (req: any, res: Response) => {
     await logActivityForReq(req, `Factura ${f.num} enviada a Quipu (id: ${quipuId})`, 'QUIPU', quipuId, f.contacto, 'CREATE');
     res.json({ success: true, data: { quipuId, quipuInvoice: created?.data } });
   } catch (e: any) {
+    console.error('[QuipuPush] error:', e?.message);
     res.status(500).json({ success: false, error: e?.message || 'Error al enviar factura a Quipu.' });
   }
 };
