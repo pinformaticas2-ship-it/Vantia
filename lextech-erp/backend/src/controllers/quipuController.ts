@@ -67,6 +67,38 @@ function buildQuipuInvoiceItems(factura: any) {
   };
 }
 
+function extractQuipuInvoiceTotal(invoice: any) {
+  return Number(invoice?.data?.attributes?.total_amount || invoice?.data?.attributes?.total || invoice?.data?.total_amount || invoice?.data?.total || 0);
+}
+
+function buildQuipuInvoiceAttributes(factura: any, options?: { mode?: 'hybrid' | 'items_only' | 'items_attributes_only' }) {
+  const issueDate = factura?.fecha ? String(factura.fecha).slice(0, 10) : new Date().toISOString().slice(0, 10);
+  const filingNumber = buildQuipuFilingNumber(factura?.num, factura?.serie);
+  const invoiceItems = buildQuipuInvoiceItems(factura);
+  const mode = options?.mode || 'hybrid';
+
+  const attributes: any = {
+    kind: 'income',
+    issue_date: issueDate,
+    ...(filingNumber ? { filing_number: filingNumber } : {}),
+    due_date: factura?.vencimiento ? String(factura.vencimiento).slice(0, 10) : undefined,
+    subject: sanitizeText(factura?.contacto) ? `Factura ${filingNumber || factura?.num} · ${factura.contacto}` : `Factura ${filingNumber || factura?.num || ''}`.trim(),
+    payment_method: mapQuipuPaymentMethod(factura?.forma_pago),
+  };
+
+  if (mode !== 'items_only') {
+    attributes.items_attributes = invoiceItems.items.map((item: any) => item.attributes);
+  }
+  if (mode !== 'items_attributes_only') {
+    attributes.items = invoiceItems.items;
+  }
+  if (mode === 'hybrid') {
+    attributes.total_amount = invoiceItems.totalAmount.toFixed(2);
+  }
+
+  return attributes;
+}
+
 async function resolveQuipuContactId(
   userId: string,
   settings: any,
@@ -573,31 +605,38 @@ export async function pushFacturaToQuipuInternal(userId: string, facturaId: stri
     phone: f.phone_mobile || f.phone_1,
   });
 
-  const issueDate = f.fecha ? String(f.fecha).slice(0, 10) : new Date().toISOString().slice(0, 10);
-  const filingNumber = buildQuipuFilingNumber(f.num, f.serie);
-  const invoiceItems = buildQuipuInvoiceItems(f);
-  const attributes: any = {
-    kind: 'income',
-    issue_date: issueDate,
-    ...(filingNumber ? { filing_number: filingNumber } : {}),
-    due_date: f.vencimiento ? String(f.vencimiento).slice(0, 10) : undefined,
-    subject: sanitizeText(f.contacto) ? `Factura ${filingNumber || f.num} · ${f.contacto}` : `Factura ${filingNumber || f.num || ''}`.trim(),
-    payment_method: mapQuipuPaymentMethod(f.forma_pago),
-    total_amount: invoiceItems.totalAmount.toFixed(2),
-    items: invoiceItems.items,
-    items_attributes: invoiceItems.items.map((item: any) => item.attributes),
-  };
+  const attributes = buildQuipuInvoiceAttributes(f, { mode: 'hybrid' });
   const relationships: any = {};
   if (contactQuipuId) relationships.contact = { data: { id: contactQuipuId, type: 'contacts' } };
   const seriesRow = await pool.query(`SELECT external_id FROM quipu_numbering_series WHERE user_id=$1 LIMIT 1`, [userId]);
   if (seriesRow.rows.length) relationships.numbering_series = { data: { id: seriesRow.rows[0].external_id, type: 'numbering_series' } };
 
-  const created = await quipuOwnerFetch<any>(settings, '/invoices', {
+  let created = await quipuOwnerFetch<any>(settings, '/invoices', {
     method: 'POST',
     body: JSON.stringify({ data: { type: 'invoices', attributes, ...(Object.keys(relationships).length ? { relationships } : {}) } }),
   }, accessToken);
 
   const quipuId = String(created?.data?.id || '');
+  if (quipuId && extractQuipuInvoiceTotal(created) <= 0) {
+    const fallbackAttributes = buildQuipuInvoiceAttributes(f, { mode: 'items_only' });
+    created = await quipuOwnerFetch<any>(settings, `/invoices/${quipuId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ data: { type: 'invoices', id: quipuId, attributes: fallbackAttributes, ...(Object.keys(relationships).length ? { relationships } : {}) } }),
+    }, accessToken);
+  }
+
+  if (quipuId && extractQuipuInvoiceTotal(created) <= 0) {
+    const fallbackAttributes = buildQuipuInvoiceAttributes(f, { mode: 'items_attributes_only' });
+    created = await quipuOwnerFetch<any>(settings, `/invoices/${quipuId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ data: { type: 'invoices', id: quipuId, attributes: fallbackAttributes, ...(Object.keys(relationships).length ? { relationships } : {}) } }),
+    }, accessToken);
+  }
+
+  if (quipuId && extractQuipuInvoiceTotal(created) <= 0) {
+    throw new Error(`Quipu creó la factura ${quipuId} sin líneas o importe. Revisa el contacto y los datos fiscales antes de reenviar.`);
+  }
+
   if (quipuId) {
     await pool.query(`UPDATE facturacion_facturas SET quipu_id=$1, updated_at=NOW() WHERE id=$2 AND user_id=$3`, [quipuId, facturaId, userId]);
     console.log(`[QuipuPush] factura=${facturaId} quipuId=${quipuId}`);
