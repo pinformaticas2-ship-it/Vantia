@@ -152,6 +152,16 @@ function fixOcrDigitConfusions(value: string) {
     .replace(/Z/g, '2');
 }
 
+function fixOcrDateDigits(value: string) {
+  // Corrige confusiones OCR en posiciones donde se esperan dígitos
+  return value
+    .replace(/[OoQq]/g, '0')
+    .replace(/[Il|]/g, '1')
+    .replace(/[Ss]/g, '5')
+    .replace(/[Bb]/g, '8')
+    .replace(/[Zz]/g, '2');
+}
+
 function calculateDniLetter(number: string) {
   const letters = 'TRWAGMYFPDXBNJZSQVHLCKE';
   return letters[parseInt(number, 10) % 23];
@@ -190,7 +200,9 @@ function toIsoDate(day: string, month: string, year: string) {
 
 function parseDateCandidate(raw: string | null | undefined) {
   if (!raw) return null;
-  const compact = raw.replace(/\s+/g, '');
+  // Aplica corrección OCR antes de parsear
+  const fixed = fixOcrDateDigits(raw);
+  const compact = fixed.replace(/\s+/g, '');
 
   let match = compact.match(/^(\d{2})[\/.\-](\d{2})[\/.\-](\d{4})$/);
   if (match) return toIsoDate(match[1], match[2], match[3]);
@@ -326,21 +338,32 @@ function extractSpanishDniMrz(lines: string[]) {
 
 function extractDateCandidates(raw: string | null | undefined) {
   if (!raw) return [];
-  const normalized = normalizeWhitespace(raw);
+  // Aplicar corrección OCR antes de buscar fechas
+  const normalized = normalizeWhitespace(fixOcrDateDigits(raw));
   const values = new Set<string>();
 
+  // DD/MM/YYYY o DD.MM.YYYY o DD-MM-YYYY o DD MM YYYY
   for (const match of normalized.matchAll(/\b(\d{2})[\s\/.\-](\d{2})[\s\/.\-](\d{4})\b/g)) {
     const iso = toIsoDate(match[1], match[2], match[3]);
     if (iso) values.add(iso);
   }
 
+  // DDMMYYYY sin separadores
   for (const match of normalized.matchAll(/\b(\d{8})\b/g)) {
     const iso = parseDateCandidate(match[1]);
     if (iso) values.add(iso);
   }
 
+  // YYMMDD (formato MRZ)
   for (const match of normalized.matchAll(/\b(\d{6})\b/g)) {
     const iso = parseDateCandidate(match[1]);
+    if (iso) values.add(iso);
+  }
+
+  // Formato DNI español: dos dígitos separados por espacio → DD MM AAAA
+  // ej. "12 O5 1990" o "12 05 1990" o con espacios irregulares
+  for (const match of normalized.matchAll(/(\d{2})\s+(\d{2})\s+(\d{4})/g)) {
+    const iso = toIsoDate(match[1], match[2], match[3]);
     if (iso) values.add(iso);
   }
 
@@ -402,19 +425,50 @@ function pickLikelyBirthDate(candidates: string[]) {
 }
 
 function extractRightSideBirthDate(text: string) {
-  const directMatch =
-    text.match(/NACIMIENTO\s*[:\-]?\s*(\d{2}\s+\d{2}\s+\d{4})/) ||
-    text.match(/NACIMIENTO\s*[:\-]?\s*(\d{2}[\/.\-]\d{2}[\/.\-]\d{4})/);
+  // Aplica corrección OCR al texto completo antes de buscar
+  const fixedText = fixOcrDateDigits(text);
 
-  const directCandidate = parseDateCandidate(directMatch?.[1]);
-  if (isReasonableBirthDate(directCandidate)) return directCandidate;
+  // Variantes del label en el DNI español
+  const nacimientoLabels = [
+    'FECHA DE NACIMIENTO', 'NACIMIENTO', 'F NACIMIENTO',
+    'FECHA NAC', 'NACIMIENTO:', 'DATE OF BIRTH',
+  ];
 
-  const index = text.indexOf('NACIMIENTO');
-  if (index === -1) return null;
+  for (const label of nacimientoLabels) {
+    const idx = fixedText.indexOf(label);
+    if (idx === -1) continue;
 
-  const window = text.slice(index, Math.min(text.length, index + 80));
-  const nearbyDates = extractDateCandidates(window).filter(isReasonableBirthDate);
-  return pickLikelyBirthDate(nearbyDates);
+    // Ventana de búsqueda ampliada después del label
+    const window = fixedText.slice(idx, Math.min(fixedText.length, idx + 120));
+
+    // Intento 1: DD MM AAAA (formato más común en DNI español)
+    const m1 = window.match(/(\d{2})\s+(\d{2})\s+(\d{4})/);
+    if (m1) {
+      const iso = toIsoDate(m1[1], m1[2], m1[3]);
+      if (isReasonableBirthDate(iso)) return iso;
+    }
+
+    // Intento 2: DD/MM/AAAA o DD.MM.AAAA o DD-MM-AAAA
+    const m2 = window.match(/(\d{2})[\/.\-](\d{2})[\/.\-](\d{4})/);
+    if (m2) {
+      const iso = toIsoDate(m2[1], m2[2], m2[3]);
+      if (isReasonableBirthDate(iso)) return iso;
+    }
+
+    // Intento 3: 8 dígitos pegados DDMMYYYY
+    const m3 = window.match(/\b(\d{8})\b/);
+    if (m3) {
+      const iso = parseDateCandidate(m3[1]);
+      if (isReasonableBirthDate(iso)) return iso;
+    }
+
+    // Fallback: cualquier fecha en la ventana
+    const nearbyDates = extractDateCandidates(window).filter(isReasonableBirthDate);
+    const candidate = pickLikelyBirthDate(nearbyDates);
+    if (candidate) return candidate;
+  }
+
+  return null;
 }
 
 function extractMrzData(lines: string[]) {
@@ -477,14 +531,26 @@ function isSpanishPostalCode(raw: string | null | undefined) {
 }
 
 function parsePostalCode(text: string, options?: { strictSpanish?: boolean }) {
-  const candidates = Array.from(text.matchAll(/\b(\d{5})\b/g)).map((match) => match[1]);
+  // Aplica corrección OCR: dígitos que podrían ser letras mal leídas
+  const fixed = fixOcrDateDigits(text);
+
+  // Busca secuencias de exactamente 5 dígitos con fronteras flexibles
+  // Acepta: word boundary, espacio, inicio de línea, coma, guion
+  const strictCandidates = Array.from(fixed.matchAll(/(?<![0-9])(\d{5})(?![0-9])/g)).map(m => m[1]);
+  const allCandidates = Array.from(fixed.matchAll(/(\d{5})/g)).map(m => m[1]);
+
+  const candidates = strictCandidates.length ? strictCandidates : allCandidates;
   if (!candidates.length) return null;
 
   if (options?.strictSpanish) {
-    return candidates.find(isSpanishPostalCode) || null;
+    // Prioridad: CP válido español estricto
+    const validSpanish = candidates.find(isSpanishPostalCode);
+    if (validSpanish) return validSpanish;
+    // Fallback: primer candidato de 5 dígitos aunque no sea español validado
+    return candidates.find(c => /^\d{5}$/.test(c)) || null;
   }
 
-  return candidates[0] || null;
+  return candidates.find(isSpanishPostalCode) || candidates[0] || null;
 }
 
 const DNI_FIELD_LABELS = [
@@ -602,17 +668,42 @@ function parseDNIText(raw: string): DniScanData {
   const domicilioText = domicilioBlock.join(' ');
   const domicilioStreet = domicilioBlock[0] || null;
   const domicilioTail = domicilioBlock.slice(1).join(' ');
+
+  // Texto con corrección OCR para la búsqueda de fechas
+  const textFixed = fixOcrDateDigits(text);
+
   const birthDateCandidates = [
-    extractRightSideBirthDate(text),
-    ...getLabelDateCandidates(lines, ['FECHA DE NACIMIENTO', 'NACIMIENTO'], { maxLines: 2 }),
-    ...extractDateCandidates(text.match(/(?:FECHA DE NACIMIENTO|NACIMIENTO|BIRTH DATE)\s*[:\-]?\s*([0-9\/.\-\s]{8,20})/)?.[1]),
+    extractRightSideBirthDate(textFixed),
+    ...getLabelDateCandidates(
+      textFixed.split('\n').map(l => normalizeWhitespace(l)).filter(Boolean),
+      ['FECHA DE NACIMIENTO', 'NACIMIENTO', 'F NACIMIENTO', 'FECHA NAC'],
+      { maxLines: 3 }
+    ),
+    ...extractDateCandidates(textFixed.match(/(?:FECHA DE NACIMIENTO|NACIMIENTO|BIRTH DATE|F NACIMIENTO)\s*[:\-]?\s*([0-9\/.\-\s]{6,20})/)?.[1]),
+    // Fallback: buscar formato "DD MM AAAA" en todo el texto (formato estándar del DNI español)
+    ...(() => {
+      const vals: string[] = [];
+      for (const m of textFixed.matchAll(/(\d{2})\s+(\d{2})\s+((?:19|20)\d{2})/g)) {
+        const iso = toIsoDate(m[1], m[2], m[3]);
+        if (isReasonableBirthDate(iso) && iso) vals.push(iso);
+      }
+      return vals;
+    })(),
   ].filter(isReasonableBirthDate);
-  const fallbackBirthDates = extractDateCandidates(text)
+
+  const fallbackBirthDates = extractDateCandidates(textFixed)
     .filter(isReasonableBirthDate)
     .sort((a, b) => a.localeCompare(b));
-  const domicilioPostalCode =
+  // Buscar CP en el bloque de domicilio primero, luego en todo el texto
+  const cpFromDomicilio =
     parsePostalCode(domicilioTail, { strictSpanish: true }) ||
     parsePostalCode(domicilioText, { strictSpanish: true });
+  // Buscar directamente en el texto completo si no se encontró en domicilio
+  const cpFromFullText = parsePostalCode(text, { strictSpanish: true });
+  // Buscar con regex explícito para "CP XXXXX" o "C.P. XXXXX"
+  const cpLabelMatch = text.match(/(?:C\.?P\.?|COD\.?\s*POSTAL|CODIGO\s*POSTAL)[:\s]*(\d{5})/);
+  const cpFromLabel = cpLabelMatch ? (isSpanishPostalCode(fixOcrDateDigits(cpLabelMatch[1])) ? fixOcrDateDigits(cpLabelMatch[1]) : null) : null;
+  const domicilioPostalCode = cpFromLabel || cpFromDomicilio || cpFromFullText;
 
   const birthDate =
     pickLikelyBirthDate(birthDateCandidates) ||
@@ -723,7 +814,9 @@ Reglas:
 - Da prioridad máxima a detectar correctamente: first_name, last_name, document_type, gender y birth_date.
 - En el anverso del DNI español, la fecha de nacimiento suele estar en la parte derecha junto a la etiqueta "NACIMIENTO", normalmente en formato DD MM AAAA.
 - No confundas la fecha de nacimiento con "EMISION" ni con "VALIDEZ".
-- Si dudas entre dejar un campo vacío o inventarlo, déjalo vacío.
+- La fecha de nacimiento (birth_date) está en el ANVERSO del DNI, a la DERECHA, bajo la etiqueta "NACIMIENTO", en formato DD MM AAAA (día mes año separados por espacios). Devuélvela siempre en formato YYYY-MM-DD.
+- El código postal (address_cp) son exactamente 5 dígitos que aparecen en la dirección del REVERSO del DNI, antes del nombre del municipio. Ej: "03300 Orihuela". Es OBLIGATORIO extraerlo si aparece.
+- Si dudas entre dejar un campo vacío o inventarlo, déjalo vacío, EXCEPTO para birth_date y address_cp que debes intentar extraer siempre.
 - Las imágenes pueden venir giradas; interprétalas igualmente.
 
 Texto OCR auxiliar:
@@ -834,11 +927,11 @@ Reglas:
 - nif_cif sin espacios.
 - address_country y expedition_country pueden ser "España".
 - No inventes datos.
-- Da prioridad máxima a detectar correctamente: first_name, last_name, document_type, gender, birth_date y nif_cif.
-- En el anverso del DNI español, la fecha de nacimiento suele estar en la parte derecha junto a la etiqueta "NACIMIENTO", normalmente en formato DD MM AAAA.
-- No confundas la fecha de nacimiento con "EMISION" ni con "VALIDEZ".
+- Da prioridad máxima a detectar correctamente: first_name, last_name, document_type, gender, birth_date, nif_cif y address_cp.
+- En el anverso del DNI español, la fecha de nacimiento (birth_date) está en la parte DERECHA bajo la etiqueta "NACIMIENTO", en formato DD MM AAAA. Devuélvela en YYYY-MM-DD. NUNCA la confundas con "EMISION" ni "VALIDEZ".
+- El código postal (address_cp) son 5 dígitos en la dirección del reverso del DNI, antes del municipio. Ej: "03300 Orihuela" → address_cp = "03300".
 - Si ves MRZ o texto manuscrito útil, aprovéchalo.
-- Si dudas entre dejar un campo vacío o inventarlo, déjalo vacío.
+- Si dudas entre dejar un campo vacío o inventarlo, déjalo vacío, EXCEPTO birth_date y address_cp que debes extraer si son visibles.
 
 Texto OCR auxiliar:
 ---
