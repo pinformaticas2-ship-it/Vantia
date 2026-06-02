@@ -1283,6 +1283,24 @@ export async function runMigrations(): Promise<void> {
       `);
     } catch (_e: any) {}
 
+    // ── Cuentas bancarias manuales (independientes de Quipu) ───────────────────
+    try {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS billing_bank_accounts (
+          id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          user_id     VARCHAR(150) NOT NULL,
+          name        VARCHAR(255) NOT NULL,
+          bank_name   VARCHAR(255),
+          iban        VARCHAR(40),
+          balance     NUMERIC(14,2) NOT NULL DEFAULT 0,
+          currency    VARCHAR(10) NOT NULL DEFAULT 'EUR',
+          notes       TEXT,
+          created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+    } catch (_e: any) {}
+
     // VACUUM ANALYZE para mantener las estadísticas de consulta frescas
     try {
       await client.query(`ANALYZE entities;`);

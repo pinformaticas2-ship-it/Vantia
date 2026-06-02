@@ -453,3 +453,53 @@ export const deletePresupuesto = async (req: any, res: Response) => {
     res.status(500).json({ success: false, error: explainBillingError(error) });
   }
 };
+
+// ── Cuentas bancarias manuales ────────────────────────────────
+export const listBankAccounts = async (req: any, res: Response) => {
+  const userId = req.auth?.userId;
+  if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  try {
+    const result = await pool.query(
+      `SELECT * FROM billing_bank_accounts WHERE user_id=$1 ORDER BY name ASC`, [userId]);
+    res.json({ success: true, data: result.rows });
+  } catch (e: any) { res.status(500).json({ success: false, error: e?.message }); }
+};
+
+export const createBankAccount = async (req: any, res: Response) => {
+  const userId = req.auth?.userId;
+  if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  const { name, bank_name, iban, balance, currency, notes } = req.body;
+  if (!name) return res.status(400).json({ success: false, error: 'El nombre es obligatorio.' });
+  try {
+    const r = await pool.query(
+      `INSERT INTO billing_bank_accounts (user_id,name,bank_name,iban,balance,currency,notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [userId, name, bank_name||null, iban||null, Number(balance||0), currency||'EUR', notes||null]);
+    res.status(201).json({ success: true, data: r.rows[0] });
+  } catch (e: any) { res.status(500).json({ success: false, error: e?.message }); }
+};
+
+export const updateBankAccount = async (req: any, res: Response) => {
+  const userId = req.auth?.userId;
+  const { id } = req.params;
+  if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  const { name, bank_name, iban, balance, currency, notes } = req.body;
+  try {
+    const r = await pool.query(
+      `UPDATE billing_bank_accounts SET name=$3,bank_name=$4,iban=$5,balance=$6,currency=$7,notes=$8,updated_at=NOW()
+       WHERE id=$1 AND user_id=$2 RETURNING *`,
+      [id, userId, name, bank_name||null, iban||null, Number(balance||0), currency||'EUR', notes||null]);
+    if (!r.rowCount) return res.status(404).json({ success: false, error: 'Cuenta no encontrada.' });
+    res.json({ success: true, data: r.rows[0] });
+  } catch (e: any) { res.status(500).json({ success: false, error: e?.message }); }
+};
+
+export const deleteBankAccount = async (req: any, res: Response) => {
+  const userId = req.auth?.userId;
+  const { id } = req.params;
+  if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  try {
+    await pool.query(`DELETE FROM billing_bank_accounts WHERE id=$1 AND user_id=$2`, [id, userId]);
+    res.json({ success: true });
+  } catch (e: any) { res.status(500).json({ success: false, error: e?.message }); }
+};

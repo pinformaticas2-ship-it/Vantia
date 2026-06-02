@@ -1634,6 +1634,7 @@ export default function Facturacion() {
                   lastSyncAt={quipuStatus.lastSyncAt}
                   onSelectAccount={setSelectedBankAccountId}
                   onRefresh={loadQuipuBankAccounts}
+                  getToken={getToken}
                 />
               )}
 
@@ -2207,10 +2208,15 @@ export default function Facturacion() {
   );
 }
 
+type ManualBankAccount = {
+  id: string; name: string; bank_name?: string; iban?: string;
+  balance: number; currency: string; notes?: string;
+};
+
 // ── BankAccountsTab ───────────────────────────────────────────
 function BankAccountsTab({
   connected, accounts, selectedId, transactions, loading, error, lastSyncAt,
-  onSelectAccount, onRefresh,
+  onSelectAccount, onRefresh, getToken,
 }: {
   connected: boolean;
   accounts: QuipuBankAccount[];
@@ -2221,12 +2227,51 @@ function BankAccountsTab({
   lastSyncAt?: string | null;
   onSelectAccount: (id: string | null) => void;
   onRefresh: () => void;
+  getToken: (opts?: { skipCache?: boolean }) => Promise<string | null>;
 }) {
   const [txSearch, setTxSearch] = useState("");
   const [txFromDate, setTxFromDate] = useState("");
   const [txToDate, setTxToDate] = useState("");
   const [txDirection, setTxDirection] = useState<"all"|"in"|"out">("all");
   const [reviewed, setReviewed] = useState<Set<string>>(new Set());
+  const [manualAccounts, setManualAccounts] = useState<ManualBankAccount[]>([]);
+  const [showForm, setShowForm] = useState(false);
+  const [editingAcc, setEditingAcc] = useState<ManualBankAccount | null>(null);
+  const [form, setForm] = useState({ name: "", bank_name: "", iban: "", balance: "", currency: "EUR", notes: "" });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    apiFetch("/api/facturacion/bank-accounts", { getToken })
+      .then(r => setManualAccounts(r?.data || []))
+      .catch(() => {});
+  }, []);
+
+  const openForm = (acc?: ManualBankAccount) => {
+    setEditingAcc(acc || null);
+    setForm(acc ? { name: acc.name, bank_name: acc.bank_name||"", iban: acc.iban||"", balance: String(acc.balance), currency: acc.currency||"EUR", notes: acc.notes||"" } : { name:"", bank_name:"", iban:"", balance:"", currency:"EUR", notes:"" });
+    setShowForm(true);
+  };
+
+  const saveForm = async () => {
+    if (!form.name.trim()) return;
+    setSaving(true);
+    try {
+      const payload = { name: form.name, bank_name: form.bank_name||null, iban: form.iban||null, balance: Number(form.balance||0), currency: form.currency||"EUR", notes: form.notes||null };
+      if (editingAcc) {
+        const r = await apiFetch(`/api/facturacion/bank-accounts/${editingAcc.id}`, { method: "PUT", body: JSON.stringify(payload), getToken });
+        setManualAccounts(prev => prev.map(a => a.id === editingAcc.id ? r.data : a));
+      } else {
+        const r = await apiFetch("/api/facturacion/bank-accounts", { method: "POST", body: JSON.stringify(payload), getToken });
+        setManualAccounts(prev => [...prev, r.data]);
+      }
+      setShowForm(false);
+    } catch { /* ignore */ } finally { setSaving(false); }
+  };
+
+  const deleteAcc = async (id: string) => {
+    await apiFetch(`/api/facturacion/bank-accounts/${id}`, { method: "DELETE", getToken }).catch(() => {});
+    setManualAccounts(prev => prev.filter(a => a.id !== id));
+  };
 
   const selectedAcc = accounts.find(a => a.id === selectedId) || null;
   const ibanShort = selectedAcc?.iban ? `*${selectedAcc.iban.slice(-4)}` : "";
@@ -2258,18 +2303,80 @@ function BankAccountsTab({
         </button>
       </div>
 
+      {/* Add account modal */}
+      {showForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4">
+          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+              <h3 className="text-lg font-bold text-slate-900">{editingAcc ? "Editar cuenta" : "Nueva cuenta bancaria"}</h3>
+              <button onClick={() => setShowForm(false)} className="rounded-xl border border-slate-200 p-2 hover:bg-slate-50"><X size={16} /></button>
+            </div>
+            <div className="space-y-4 px-6 py-5">
+              <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">Nombre *</span>
+                <input value={form.name} onChange={e => setForm(f => ({...f, name: e.target.value}))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" placeholder="Ej: Cuenta corriente Sabadell" /></label>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">Banco</span>
+                  <input value={form.bank_name} onChange={e => setForm(f => ({...f, bank_name: e.target.value}))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" placeholder="Sabadell" /></label>
+                <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">IBAN</span>
+                  <input value={form.iban} onChange={e => setForm(f => ({...f, iban: e.target.value}))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-mono" placeholder="ES12 1234..." /></label>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">Saldo (€)</span>
+                  <input type="number" step="0.01" value={form.balance} onChange={e => setForm(f => ({...f, balance: e.target.value}))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" /></label>
+                <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">Divisa</span>
+                  <select value={form.currency} onChange={e => setForm(f => ({...f, currency: e.target.value}))} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm">
+                    <option>EUR</option><option>USD</option><option>GBP</option></select></label>
+              </div>
+              <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">Notas</span>
+                <input value={form.notes} onChange={e => setForm(f => ({...f, notes: e.target.value}))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" /></label>
+            </div>
+            <div className="flex justify-end gap-3 border-t border-slate-100 px-6 py-4">
+              <button onClick={() => setShowForm(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancelar</button>
+              <button onClick={saveForm} disabled={saving || !form.name.trim()} className="inline-flex items-center gap-2 rounded-xl bg-red-700 px-4 py-2 text-sm font-bold text-white hover:bg-red-800 disabled:opacity-50">
+                {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Guardar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Account cards */}
       {!selectedId ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {loading && !accounts.length ? (
-            <div className="col-span-3 flex items-center justify-center py-12 text-sm text-slate-400"><Loader2 size={16} className="animate-spin mr-2" />Cargando cuentas...</div>
-          ) : accounts.length === 0 ? (
-            <div className="col-span-3 rounded-2xl border border-amber-100 bg-amber-50 px-6 py-8 text-center space-y-2">
-              <Building2 size={28} className="mx-auto text-amber-400" />
-              <p className="text-sm font-semibold text-amber-800">Cuentas bancarias no disponibles vía API</p>
-              <p className="text-xs text-amber-700 max-w-sm mx-auto">El módulo <strong>Tesorería/Bancos</strong> de Quipu no expone las cuentas conectadas por Open Banking en la API. Los datos de bancos deben gestionarse directamente en Quipu.</p>
+          {/* Manual accounts */}
+          {manualAccounts.map(acc => (
+            <div key={acc.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-start justify-between gap-2 mb-4">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 border border-slate-200 shrink-0">
+                    <Building2 size={18} className="text-slate-500" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-slate-800 truncate">{acc.name}</p>
+                    <p className="text-xs text-slate-500 truncate">{acc.bank_name ? `${acc.bank_name}${acc.iban ? ` *${acc.iban.slice(-4)}` : ""}` : acc.iban || "Cuenta manual"}</p>
+                  </div>
+                </div>
+                <div className="flex gap-1 shrink-0">
+                  <button onClick={() => openForm(acc)} className="rounded-lg border border-slate-200 p-1.5 hover:bg-slate-50"><Pencil size={12} className="text-slate-500" /></button>
+                  <button onClick={() => deleteAcc(acc.id)} className="rounded-lg border border-red-200 p-1.5 hover:bg-red-50"><Trash2 size={12} className="text-red-500" /></button>
+                </div>
+              </div>
+              <p className={`text-2xl font-black ${acc.balance >= 0 ? "text-slate-900" : "text-red-600"}`}>{fmtEur(acc.balance)}</p>
+              <p className="text-[11px] text-slate-400 mt-2">{acc.currency} · Introducida manualmente</p>
             </div>
-          ) : accounts.map(acc => (
+          ))}
+
+          {/* Add account button */}
+          <button onClick={() => openForm()} className="rounded-2xl border-2 border-dashed border-slate-300 bg-white p-5 text-center hover:border-blue-300 hover:bg-blue-50 transition-colors group min-h-[140px] flex flex-col items-center justify-center">
+            <Plus size={24} className="text-slate-400 group-hover:text-blue-500 mb-2" />
+            <p className="text-sm font-semibold text-slate-500 group-hover:text-blue-600">Añadir cuenta bancaria</p>
+            <p className="text-xs text-slate-400 mt-1">Introduce el saldo manualmente</p>
+          </button>
+
+          {loading ? (
+            <div className="flex items-center justify-center py-8 text-sm text-slate-400"><Loader2 size={16} className="animate-spin mr-2" />Cargando...</div>
+          ) : null}
+          {accounts.map(acc => (
             <button key={acc.id} onClick={() => onSelectAccount(acc.id)}
               className="rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm hover:border-blue-300 hover:shadow-md transition-all group">
               <div className="flex items-center gap-3 mb-4">
