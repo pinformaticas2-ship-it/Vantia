@@ -23,16 +23,26 @@ function buildQuipuFilingNumber(num: any, serie?: any) {
     : cleanNum;
 }
 
+function normalizeCountry(country: any) {
+  const cleanCountry = sanitizeText(country) || 'España';
+  const lowerCountry = cleanCountry.toLowerCase();
+  const countryCode = lowerCountry === 'españa' || lowerCountry === 'espana' || lowerCountry === 'spain'
+    ? 'ES'
+    : undefined;
+  return { country: cleanCountry, countryCode };
+}
+
 async function resolveQuipuContactId(
   userId: string,
   settings: any,
   accessToken: string,
   contactName: any,
-  options?: { nifCif?: any; email?: any },
+  options?: { nifCif?: any; email?: any; country?: any },
 ): Promise<string> {
   const cleanContactName = sanitizeText(contactName);
   const cleanTaxId = sanitizeText(options?.nifCif);
   const cleanEmail = sanitizeText(options?.email);
+  const { country, countryCode } = normalizeCountry(options?.country);
 
   if (!cleanContactName) {
     throw new Error('La factura no tiene cliente informado para crear el contacto en Quipu.');
@@ -65,6 +75,8 @@ async function resolveQuipuContactId(
             name: cleanContactName,
             ...(cleanTaxId ? { tax_id: cleanTaxId } : {}),
             ...(cleanEmail ? { email: cleanEmail } : {}),
+            country,
+            ...(countryCode ? { country_code: countryCode } : {}),
           },
         },
       }),
@@ -488,7 +500,7 @@ export async function pushFacturaToQuipuInternal(userId: string, facturaId: stri
   if (!settings) return null;
 
   const res = await pool.query(
-    `SELECT ff.*, e.nif_cif, e.email FROM facturacion_facturas ff
+    `SELECT ff.*, e.nif_cif, e.email, e.address_country FROM facturacion_facturas ff
      LEFT JOIN entities e ON e.id = ff.client_id
      WHERE ff.id=$1 AND ff.user_id=$2`,
     [facturaId, userId],
@@ -502,6 +514,7 @@ export async function pushFacturaToQuipuInternal(userId: string, facturaId: stri
   const contactQuipuId = await resolveQuipuContactId(userId, settings, accessToken, f.contacto, {
     nifCif: f.nif_cif,
     email: f.email,
+    country: f.address_country,
   });
 
   const issueDate = f.fecha ? String(f.fecha).slice(0, 10) : new Date().toISOString().slice(0, 10);
