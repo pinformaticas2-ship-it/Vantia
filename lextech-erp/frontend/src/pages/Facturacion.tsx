@@ -1522,7 +1522,7 @@ export default function Facturacion() {
             </div>
 
             <div className="space-y-5 bg-slate-50/70 p-5">
-              <OdooSection
+              {(["dashboard","facturas","gastos","presupuestos"] as TabKey[]).includes(tab) && <OdooSection
                 title="Criterios de facturación"
                 subtitle="Busca por cliente, expediente, número, proveedor o responsable y refina por área, estado, serie y cobro."
                 action={
@@ -1575,7 +1575,7 @@ export default function Facturacion() {
                     <button key={serie} onClick={() => setFilterSerie(serie)} className={`rounded-full px-3 py-1.5 text-[11px] font-bold ${filterSerie === serie ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>{serie}</button>
                   ))}
                 </div>
-              </OdooSection>
+              </OdooSection>}
 
               {/* ══ CONTACTOS ══════════════════════════════════════════════════════ */}
               {tab === "contacts" && (

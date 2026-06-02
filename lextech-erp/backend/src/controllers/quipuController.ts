@@ -496,11 +496,26 @@ export const diagnoseQuipu = async (req: any, res: Response) => {
     steps.push({ step: 'invoices', ok: false, detail: e?.message });
   }
 
+  // Test bank accounts endpoint
+  try {
+    const ba = await quipuOwnerFetch<any>(settings, '/bank_accounts?page[size]=1', undefined, token);
+    const total = ba?.meta?.total_entries ?? ba?.data?.length ?? '?';
+    steps.push({ step: 'bank_accounts', ok: true, detail: `total_entries=${total}` });
+  } catch (e: any) {
+    steps.push({ step: 'bank_accounts', ok: false, detail: e?.message });
+  }
+
   try {
     const r = await pool.query(
       `SELECT COUNT(*) AS cnt FROM facturacion_facturas WHERE user_id=$1 AND quipu_id IS NOT NULL`, [userId],
     );
-    steps.push({ step: 'db_imported', ok: true, detail: `${r.rows[0].cnt} facturas importadas de Quipu en el ERP` });
+    const g = await pool.query(
+      `SELECT COUNT(*) AS cnt FROM facturacion_gastos WHERE user_id=$1 AND quipu_id IS NOT NULL`, [userId],
+    ).catch(() => ({ rows: [{ cnt: 'n/a' }] }));
+    const ba = await pool.query(
+      `SELECT COUNT(*) AS cnt FROM quipu_bank_accounts WHERE user_id=$1`, [userId],
+    ).catch(() => ({ rows: [{ cnt: 'n/a' }] }));
+    steps.push({ step: 'db_imported', ok: true, detail: `facturas=${r.rows[0].cnt} gastos=${g.rows[0].cnt} bank_accounts=${ba.rows[0].cnt}` });
   } catch (e: any) {
     steps.push({ step: 'db_imported', ok: false, detail: e?.message });
   }
