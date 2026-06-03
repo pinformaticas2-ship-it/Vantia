@@ -488,6 +488,32 @@ function ActionIconButton({ title, tone = "slate", onClick, children }: { title:
   );
 }
 
+class BillingErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; message: string }> {
+  state = { hasError: false, message: "" };
+
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true, message: error?.message || "Error inesperado en Facturación." };
+  }
+
+  componentDidCatch(error: any) {
+    console.error("[Facturacion] render error:", error);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-[60vh] rounded-3xl border border-red-200 bg-red-50 p-6 text-red-900">
+          <h2 className="text-lg font-bold">La pantalla de facturación encontró un error</h2>
+          <p className="mt-2 text-sm">{this.state.message}</p>
+          <p className="mt-2 text-sm">Recarga la página. Si vuelve a pasar, dime el texto exacto que aparece aquí.</p>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 function SimpleBarChart({ data }: { data: { mes: string; emitido: number; cobrado: number }[] }) {
   const max = Math.max(...data.flatMap((item) => [item.emitido, item.cobrado]), 1);
   return (
@@ -882,7 +908,7 @@ function QuipuConnectModal({
   );
 }
 
-export default function Facturacion() {
+function FacturacionContent() {
   const { getToken } = useAuth();
   const [tab, setTab] = useState<TabKey>("dashboard");
   const [filterYear,   setFilterYear]   = useState<number>(new Date().getFullYear());
@@ -2256,6 +2282,14 @@ export default function Facturacion() {
         />
       )}
     </div>
+  );
+}
+
+export default function Facturacion() {
+  return (
+    <BillingErrorBoundary>
+      <FacturacionContent />
+    </BillingErrorBoundary>
   );
 }
 
