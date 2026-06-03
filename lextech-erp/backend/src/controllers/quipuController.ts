@@ -112,6 +112,29 @@ function buildQuipuInvoiceAttributes(factura: any, options?: { mode?: 'official_
   return attributes;
 }
 
+function buildQuipuLegacyInvoicePayload(
+  factura: any,
+  contactQuipuId: string,
+  numberingSeriesId?: string | null,
+) {
+  const issueDate = factura?.fecha ? String(factura.fecha).slice(0, 10) : new Date().toISOString().slice(0, 10);
+  const filingNumber = buildQuipuFilingNumber(factura?.num, factura?.serie);
+  const invoiceItems = buildQuipuInvoiceItems(factura);
+
+  return {
+    payment_method: mapQuipuPaymentMethod(factura?.forma_pago),
+    issue_date: issueDate,
+    due_date: factura?.vencimiento ? String(factura.vencimiento).slice(0, 10) : undefined,
+    subject: sanitizeText(factura?.contacto) ? `Factura ${filingNumber || factura?.num} · ${factura.contacto}` : `Factura ${filingNumber || factura?.num || ''}`.trim(),
+    filing_number: filingNumber || undefined,
+    contact_id: contactQuipuId || undefined,
+    contactID: contactQuipuId || undefined,
+    numbering_series_id: numberingSeriesId || undefined,
+    numberingSeriesID: numberingSeriesId || undefined,
+    items: invoiceItems.officialItems,
+  };
+}
+
 function summarizeQuipuInvoiceResponse(invoice: any) {
   const attrs = invoice?.data?.attributes || {};
   return {
@@ -649,11 +672,12 @@ export async function pushFacturaToQuipuInternal(userId: string, facturaId: stri
     phone: f.phone_mobile || f.phone_1,
   });
 
-  const attributes = buildQuipuInvoiceAttributes(f, { mode: 'hybrid' });
+  const attributes = buildQuipuInvoiceAttributes(f, { mode: 'official_items' });
   const relationships: any = {};
   if (contactQuipuId) relationships.contact = { data: { id: contactQuipuId, type: 'contacts' } };
   const seriesRow = await pool.query(`SELECT external_id FROM quipu_numbering_series WHERE user_id=$1 LIMIT 1`, [userId]);
-  if (seriesRow.rows.length) relationships.numbering_series = { data: { id: seriesRow.rows[0].external_id, type: 'numbering_series' } };
+  const numberingSeriesId = seriesRow.rows.length ? String(seriesRow.rows[0].external_id || '') : null;
+  if (numberingSeriesId) relationships.numbering_series = { data: { id: numberingSeriesId, type: 'numbering_series' } };
 
   const createPayload = { data: { type: 'invoices', attributes, ...(Object.keys(relationships).length ? { relationships } : {}) } };
   const attemptSummaries: string[] = [];
@@ -699,6 +723,39 @@ export async function pushFacturaToQuipuInternal(userId: string, facturaId: stri
   }
 
   if (quipuId && extractQuipuInvoiceTotal(inspectedInvoice) <= 0) {
+    try {
+      await quipuOwnerFetch<any>(settings, `/invoices/${quipuId}`, { method: 'DELETE' }, accessToken);
+      console.warn(`[QuipuPush] deleted zero-total draft before legacy retry quipuId=${quipuId} for factura=${facturaId}`);
+    } catch (cleanupError: any) {
+      console.warn(`[QuipuPush] failed to delete zero-total draft before legacy retry quipuId=${quipuId}: ${cleanupError?.message}`);
+    }
+
+    const legacyPayload = buildQuipuLegacyInvoicePayload(f, contactQuipuId, numberingSeriesId);
+    console.warn(`[QuipuPush] retrying legacy create payload for factura=${facturaId}`);
+    console.log(`[QuipuPush] create payload legacy factura=${facturaId}: ${JSON.stringify(legacyPayload)}`);
+    created = await quipuOwnerFetch<any>(settings, '/invoices', {
+      method: 'POST',
+      body: JSON.stringify(legacyPayload),
+    }, accessToken);
+
+    const legacyQuipuId = String(created?.data?.id || '');
+    if (legacyQuipuId) {
+      inspectedInvoice = (await fetchQuipuInvoiceDetail(settings, accessToken, legacyQuipuId)) || created;
+      console.log(`[QuipuPush] create response legacy factura=${facturaId}: ${JSON.stringify(summarizeQuipuInvoiceResponse(inspectedInvoice))}`);
+      attemptSummaries.push(formatQuipuInvoiceAttempt('create_legacy', inspectedInvoice));
+      if (extractQuipuInvoiceTotal(inspectedInvoice) > 0) {
+        await pool.query(`UPDATE facturacion_facturas SET quipu_id=$1, updated_at=NOW() WHERE id=$2 AND user_id=$3`, [legacyQuipuId, facturaId, userId]);
+        console.log(`[QuipuPush] factura=${facturaId} quipuId=${legacyQuipuId} legacy-ok`);
+        return legacyQuipuId;
+      }
+      try {
+        await quipuOwnerFetch<any>(settings, `/invoices/${legacyQuipuId}`, { method: 'DELETE' }, accessToken);
+        console.warn(`[QuipuPush] deleted zero-total legacy draft quipuId=${legacyQuipuId} for factura=${facturaId}`);
+      } catch (cleanupError: any) {
+        console.warn(`[QuipuPush] failed to delete zero-total legacy draft quipuId=${legacyQuipuId}: ${cleanupError?.message}`);
+      }
+    }
+
     try {
       await quipuOwnerFetch<any>(settings, `/invoices/${quipuId}`, { method: 'DELETE' }, accessToken);
       console.warn(`[QuipuPush] deleted zero-total draft quipuId=${quipuId} for factura=${facturaId}`);
