@@ -133,6 +133,16 @@ function formatQuipuInvoiceAttempt(label: string, invoice: any) {
   return `${label}[id=${summary.id || 'n/a'}, total=${summary.total_amount ?? summary.total ?? 'n/a'}, items=${summary.items_count ?? 'n/a'}, status=${summary.status || 'n/a'}]`;
 }
 
+async function fetchQuipuInvoiceDetail(settings: any, accessToken: string, quipuId: string) {
+  if (!quipuId) return null;
+  try {
+    return await quipuOwnerFetch<any>(settings, `/invoices/${quipuId}?include=items,contact,numbering_series`, undefined, accessToken);
+  } catch (error: any) {
+    console.warn(`[QuipuPush] failed to fetch detail for quipuId=${quipuId}: ${error?.message}`);
+    return null;
+  }
+}
+
 async function resolveQuipuContactId(
   userId: string,
   settings: any,
@@ -654,10 +664,11 @@ export async function pushFacturaToQuipuInternal(userId: string, facturaId: stri
   }, accessToken);
 
   const quipuId = String(created?.data?.id || '');
-  console.log(`[QuipuPush] create invoice factura=${facturaId} quipuId=${quipuId || 'n/a'} total=${extractQuipuInvoiceTotal(created)}`);
-  console.log(`[QuipuPush] create response factura=${facturaId}: ${JSON.stringify(summarizeQuipuInvoiceResponse(created))}`);
-  attemptSummaries.push(formatQuipuInvoiceAttempt('create', created));
-  if (quipuId && extractQuipuInvoiceTotal(created) <= 0) {
+  let inspectedInvoice = quipuId ? (await fetchQuipuInvoiceDetail(settings, accessToken, quipuId)) || created : created;
+  console.log(`[QuipuPush] create invoice factura=${facturaId} quipuId=${quipuId || 'n/a'} total=${extractQuipuInvoiceTotal(inspectedInvoice)}`);
+  console.log(`[QuipuPush] create response factura=${facturaId}: ${JSON.stringify(summarizeQuipuInvoiceResponse(inspectedInvoice))}`);
+  attemptSummaries.push(formatQuipuInvoiceAttempt('create', inspectedInvoice));
+  if (quipuId && extractQuipuInvoiceTotal(inspectedInvoice) <= 0) {
     const fallbackAttributes = buildQuipuInvoiceAttributes(f, { mode: 'items_only' });
     console.warn(`[QuipuPush] zero-total after create for factura=${facturaId}; retrying PATCH mode=items_only`);
     const patchPayload = { data: { type: 'invoices', id: quipuId, attributes: fallbackAttributes, ...(Object.keys(relationships).length ? { relationships } : {}) } };
@@ -666,12 +677,13 @@ export async function pushFacturaToQuipuInternal(userId: string, facturaId: stri
       method: 'PATCH',
       body: JSON.stringify(patchPayload),
     }, accessToken);
-    console.log(`[QuipuPush] patch items_only factura=${facturaId} quipuId=${quipuId} total=${extractQuipuInvoiceTotal(created)}`);
-    console.log(`[QuipuPush] patch response mode=items_only factura=${facturaId}: ${JSON.stringify(summarizeQuipuInvoiceResponse(created))}`);
-    attemptSummaries.push(formatQuipuInvoiceAttempt('patch_items_only', created));
+    inspectedInvoice = (await fetchQuipuInvoiceDetail(settings, accessToken, quipuId)) || created;
+    console.log(`[QuipuPush] patch items_only factura=${facturaId} quipuId=${quipuId} total=${extractQuipuInvoiceTotal(inspectedInvoice)}`);
+    console.log(`[QuipuPush] patch response mode=items_only factura=${facturaId}: ${JSON.stringify(summarizeQuipuInvoiceResponse(inspectedInvoice))}`);
+    attemptSummaries.push(formatQuipuInvoiceAttempt('patch_items_only', inspectedInvoice));
   }
 
-  if (quipuId && extractQuipuInvoiceTotal(created) <= 0) {
+  if (quipuId && extractQuipuInvoiceTotal(inspectedInvoice) <= 0) {
     const fallbackAttributes = buildQuipuInvoiceAttributes(f, { mode: 'items_attributes_only' });
     console.warn(`[QuipuPush] still zero-total for factura=${facturaId}; retrying PATCH mode=items_attributes_only`);
     const patchPayload = { data: { type: 'invoices', id: quipuId, attributes: fallbackAttributes, ...(Object.keys(relationships).length ? { relationships } : {}) } };
@@ -680,12 +692,13 @@ export async function pushFacturaToQuipuInternal(userId: string, facturaId: stri
       method: 'PATCH',
       body: JSON.stringify(patchPayload),
     }, accessToken);
-    console.log(`[QuipuPush] patch items_attributes_only factura=${facturaId} quipuId=${quipuId} total=${extractQuipuInvoiceTotal(created)}`);
-    console.log(`[QuipuPush] patch response mode=items_attributes_only factura=${facturaId}: ${JSON.stringify(summarizeQuipuInvoiceResponse(created))}`);
-    attemptSummaries.push(formatQuipuInvoiceAttempt('patch_items_attributes_only', created));
+    inspectedInvoice = (await fetchQuipuInvoiceDetail(settings, accessToken, quipuId)) || created;
+    console.log(`[QuipuPush] patch items_attributes_only factura=${facturaId} quipuId=${quipuId} total=${extractQuipuInvoiceTotal(inspectedInvoice)}`);
+    console.log(`[QuipuPush] patch response mode=items_attributes_only factura=${facturaId}: ${JSON.stringify(summarizeQuipuInvoiceResponse(inspectedInvoice))}`);
+    attemptSummaries.push(formatQuipuInvoiceAttempt('patch_items_attributes_only', inspectedInvoice));
   }
 
-  if (quipuId && extractQuipuInvoiceTotal(created) <= 0) {
+  if (quipuId && extractQuipuInvoiceTotal(inspectedInvoice) <= 0) {
     try {
       await quipuOwnerFetch<any>(settings, `/invoices/${quipuId}`, { method: 'DELETE' }, accessToken);
       console.warn(`[QuipuPush] deleted zero-total draft quipuId=${quipuId} for factura=${facturaId}`);
