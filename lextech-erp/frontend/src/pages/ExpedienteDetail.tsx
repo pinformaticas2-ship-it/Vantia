@@ -43,9 +43,12 @@ import {
   TrendingDown,
   BadgeEuro,
   ChevronRight,
+  Copy,
+  ClipboardPaste,
 } from "lucide-react";
 import { safeJson, resolveApiUrl } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
+import { usePasteFiles, setErpClipboard } from "../lib/usePasteFiles";
 import {
   TIPOS,
   ESTADOS,
@@ -1634,6 +1637,33 @@ function ActuacionAdjuntosPanel({ taskId, locked = false }: { taskId: string; lo
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const openingMessageTimer = useRef<number | null>(null);
+  const [pasteToastAct, setPasteToastAct] = useState<string | null>(null);
+  const pasteToastActTimer = useRef<number | null>(null);
+
+  const showPasteToastAct = useCallback((msg: string) => {
+    setPasteToastAct(msg);
+    if (pasteToastActTimer.current) window.clearTimeout(pasteToastActTimer.current);
+    pasteToastActTimer.current = window.setTimeout(() => setPasteToastAct(null), 3000);
+  }, []);
+
+  const copyActFileToClipboard = useCallback(async (file: any) => {
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/tasks/${taskId}/files/${file.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const blob = await res.blob();
+      if (file.mimetype?.startsWith("image/") && typeof ClipboardItem !== "undefined") {
+        try { await navigator.clipboard.write([new ClipboardItem({ [file.mimetype]: blob })]); } catch (_) {}
+      }
+      setErpClipboard({ blob, name: file.original_name, type: file.mimetype || "application/octet-stream" });
+      showPasteToastAct(`📋 Copiado: ${file.original_name}`);
+    } catch (_) {}
+  }, [taskId, getToken, showPasteToastAct]);
+
+  // ref para el handler de paste (se actualiza en cada render con las funciones correctas)
+  const pasteActHandlerRef = useRef<((files: File[]) => void) | null>(null);
 
   useEffect(() => {
     return () => {
@@ -1909,6 +1939,18 @@ function ActuacionAdjuntosPanel({ taskId, locked = false }: { taskId: string; lo
     if (fileList?.length) uploadFiles(fileList);
   };
 
+  // Actualizar el ref en cada render con las funciones correctas
+  pasteActHandlerRef.current = (pasted: File[]) => {
+    if (locked) return;
+    showPasteToastAct(`Pegando ${pasted.length} archivo${pasted.length > 1 ? "s" : ""}…`);
+    if (pasted.length === 1) openMetadataForUpload(pasted[0]);
+    else handleFolderImport(pasted as unknown as FileList);
+  };
+
+  // Hook de pegado — usa el ref para siempre tener las últimas funciones
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  usePasteFiles(useCallback((files: File[]) => pasteActHandlerRef.current?.(files), []), !locked);
+
   const handleSaveMetadata = async () => {
     if (!editingFile) return;
     if (editingFile.id === "PENDING_UPLOAD") {
@@ -2016,6 +2058,12 @@ function ActuacionAdjuntosPanel({ taskId, locked = false }: { taskId: string; lo
 
   return (
     <div className="space-y-4">
+      {/* Toast de pegado */}
+      {pasteToastAct && (
+        <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-800">
+          <ClipboardPaste size={13} className="shrink-0" /> {pasteToastAct}
+        </div>
+      )}
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3 flex-wrap">
@@ -2094,6 +2142,7 @@ function ActuacionAdjuntosPanel({ taskId, locked = false }: { taskId: string; lo
               <Upload size={22} className="mx-auto mb-3 text-slate-300" />
               <p className="text-sm font-semibold text-slate-700">Arrastra archivos aqui</p>
               <p className="mt-1 text-xs text-slate-400">PDF, Word, Excel, imagenes — max. 50 MB</p>
+              {!locked && <p className="mt-1 text-[10px] text-slate-300 flex items-center justify-center gap-1"><ClipboardPaste size={10} /> Ctrl+V para pegar</p>}
             </div>
           ) : (
             <table className={`w-full text-left transition-colors ${isDragOver ? "ring-2 ring-inset ring-red-300" : ""}`}>
@@ -2169,6 +2218,10 @@ function ActuacionAdjuntosPanel({ taskId, locked = false }: { taskId: string; lo
                           <button type="button" onClick={() => handleDownload(file.id, file.original_name)} title="Descargar"
                             className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
                             <Download size={13} />
+                          </button>
+                          <button type="button" onClick={() => copyActFileToClipboard(file)} title="Copiar al portapapeles"
+                            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                            <Copy size={13} />
                           </button>
                           {!locked && (<>
                           <button type="button"
