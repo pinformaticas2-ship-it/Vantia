@@ -4,10 +4,11 @@ import { useAuth } from "@clerk/clerk-react";
 import {
   Upload, FolderOpen, FilePlus2, Sparkles, Loader2,
   Eye, Download, Trash2, Edit3, ExternalLink, FileText,
-  ChevronDown, ChevronRight, X, Search,
+  ChevronDown, ChevronRight, X, Search, Copy, ClipboardPaste,
 } from "lucide-react";
 import { safeJson, resolveApiUrl } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
+import { usePasteFiles, setErpClipboard, getErpClipboard } from "../lib/usePasteFiles";
 
 function fileIcon(mime: string, name: string) {
   const n = name.toLowerCase();
@@ -113,6 +114,44 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false, loc
   const openingMessageTimer = useRef<number | null>(null);
   // Vista previa de Word
   const [wordPreview, setWordPreview] = useState<{ id: string; name: string; mime: string } | null>(null);
+  const [pasteToast, setPasteToast]   = useState<string | null>(null);
+  const pasteToastTimer = useRef<number | null>(null);
+
+  // ── Copiar archivo al portapapeles del ERP ───────────────────────────────────
+  const copyFileToClipboard = useCallback(async (file: any) => {
+    try {
+      const token = await getToken({ skipCache: true });
+      const url = resolveApiUrl(`/api/files/${entityId}/${file.id}/download`);
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) return;
+      const blob = await res.blob();
+      // Intentar portapapeles nativo para imágenes (funciona en Chrome/Edge)
+      if (file.mimetype?.startsWith("image/") && typeof ClipboardItem !== "undefined") {
+        try {
+          await navigator.clipboard.write([new ClipboardItem({ [file.mimetype]: blob })]);
+        } catch (_) { /* ignorar si no tiene permisos */ }
+      }
+      // Siempre guardar también en portapapeles interno del ERP
+      setErpClipboard({ blob, name: file.original_name, type: file.mimetype || "application/octet-stream" });
+      showPasteToast(`📋 Copiado: ${file.original_name}`);
+    } catch (_) {}
+  }, [entityId, getToken]);
+
+  const showPasteToast = useCallback((msg: string) => {
+    setPasteToast(msg);
+    if (pasteToastTimer.current) window.clearTimeout(pasteToastTimer.current);
+    pasteToastTimer.current = window.setTimeout(() => { setPasteToast(null); }, 3000);
+  }, []);
+
+  // ── Pegar archivos desde el portapapeles del sistema o del ERP ──────────────
+  usePasteFiles(
+    useCallback((pasted: File[]) => {
+      if (locked) return;
+      showPasteToast(`Pegando ${pasted.length} archivo${pasted.length > 1 ? "s" : ""}…`);
+      enqueueFiles(pasted);
+    }, [locked, showPasteToast, enqueueFiles]),
+    !locked,
+  );
 
   const revokePreviewEntry = useCallback((fileId: string) => {
     const cached = previewCache.current.get(fileId);
@@ -728,6 +767,12 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false, loc
 
   return (
     <div className="space-y-4">
+      {/* Toast de pegado */}
+      {pasteToast && (
+        <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-800 animate-in fade-in slide-in-from-top-2 duration-200">
+          <ClipboardPaste size={13} className="shrink-0" /> {pasteToast}
+        </div>
+      )}
       {/* Barra de acciones */}
       <div className="flex flex-wrap gap-2 justify-between items-center">
         <p className="text-sm text-slate-500">
@@ -793,7 +838,8 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false, loc
           ? <><Loader2 size={26} className="text-red-500 animate-spin" /><p className="text-sm font-medium text-red-600">Subiendo archivos…</p></>
           : <><Upload size={26} className={isDragOver ? "text-red-500" : "text-slate-400"} />
               <p className={`text-sm font-medium ${isDragOver ? "text-red-600" : "text-slate-500"}`}>Arrastra archivos o carpetas aquí</p>
-              <p className="text-xs text-slate-400">PDF, Word, Excel, imágenes — máx. 50 MB por archivo</p></>
+              <p className="text-xs text-slate-400">PDF, Word, Excel, imágenes — máx. 50 MB por archivo</p>
+              {!locked && <p className="text-[10px] text-slate-300 flex items-center gap-1"><ClipboardPaste size={10} /> Ctrl+V para pegar desde el portapapeles</p>}</>
         }
       </div>
 
@@ -906,6 +952,14 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false, loc
                                 <Eye size={14} />
                               </button>
                             )}
+                            {/* Copiar al portapapeles */}
+                            <button
+                              title="Copiar al portapapeles (luego Ctrl+V para pegar en otra zona)"
+                              className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                              onClick={(e) => { e.stopPropagation(); copyFileToClipboard(f); }}
+                            >
+                              <Copy size={14} />
+                            </button>
                             {/* Editar metadatos */}
                             {!locked && (
                             <button
