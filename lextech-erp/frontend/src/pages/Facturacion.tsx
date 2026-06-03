@@ -251,8 +251,24 @@ const PAYMENT_LABELS: Record<PaymentMethod, string> = {
 const fmtEur = (n: number) =>
   n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
 
-const fmtDate = (s: string) =>
-  s ? new Date(s).toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—";
+const parseValidDate = (value: string | null | undefined) => {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+  const date = new Date(raw);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const fmtDate = (s: string | null | undefined) => {
+  const date = parseValidDate(s);
+  return date
+    ? date.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" })
+    : "—";
+};
+
+const fmtDateTime = (s: string | null | undefined) => {
+  const date = parseValidDate(s);
+  return date ? date.toLocaleString("es-ES") : "—";
+};
 
 const buildExpedienteRef = (row: {
   anio?: number | null;
@@ -1525,7 +1541,7 @@ function FacturacionContent() {
                   {quipuStatus.syncError
                     ? <span className="text-red-600">{quipuStatus.syncError}</span>
                     : quipuStatus.lastSyncAt
-                      ? `Última sincronización: ${new Date(quipuStatus.lastSyncAt).toLocaleString("es-ES")}`
+                      ? `Última sincronización: ${fmtDateTime(quipuStatus.lastSyncAt)}`
                       : "Sincronización pendiente"}
                 </p>
                 {quipuStatus.syncSummary && (
@@ -1760,7 +1776,7 @@ function FacturacionContent() {
                           <div>
                             <p className="text-sm font-semibold text-emerald-800">Quipu conectado</p>
                             <p className="text-xs text-emerald-700 mt-0.5">
-                              {quipuStatus.lastSyncAt ? `Última sincronización: ${new Date(quipuStatus.lastSyncAt).toLocaleString("es-ES")}` : "Sin sincronizar aún"}
+                              {quipuStatus.lastSyncAt ? `Última sincronización: ${fmtDateTime(quipuStatus.lastSyncAt)}` : "Sin sincronizar aún"}
                             </p>
                           </div>
                         </div>
@@ -2484,7 +2500,7 @@ function BankAccountsTab({
                   <p className="text-[11px] text-slate-400">Movimientos por conciliar</p>
                 </div>
                 {lastSyncAt && (
-                  <p className="text-[11px] text-slate-400 text-right">Sincronizada: {new Date(lastSyncAt).toLocaleDateString("es-ES")}</p>
+                  <p className="text-[11px] text-slate-400 text-right">Sincronizada: {fmtDate(lastSyncAt)}</p>
                 )}
               </div>
             </button>
@@ -2509,7 +2525,7 @@ function BankAccountsTab({
               <p className={`text-xl font-black ${(selectedAcc?.balance ?? 0) >= 0 ? "text-slate-900" : "text-red-600"}`}>
                 {fmtEur(selectedAcc?.balance ?? 0)}
               </p>
-              {lastSyncAt && <p className="text-[11px] text-slate-400">Última sincronización {new Date(lastSyncAt).toLocaleDateString("es-ES")}</p>}
+              {lastSyncAt && <p className="text-[11px] text-slate-400">Última sincronización {fmtDate(lastSyncAt)}</p>}
             </div>
           </div>
 
