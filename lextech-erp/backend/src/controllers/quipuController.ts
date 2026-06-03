@@ -273,6 +273,15 @@ async function getStoredQuipuSettings(userId: string) {
   return result.rows[0] || null;
 }
 
+function normalizeOwnerSlugInput(value: any): string {
+  const raw = sanitizeText(value);
+  if (!raw) return '';
+  const withoutQuery = raw.split('?')[0].split('#')[0].trim();
+  const fromUrl = withoutQuery.match(/^https?:\/\/[^/]+\/([^/]+)/i);
+  const candidate = fromUrl ? fromUrl[1] : withoutQuery;
+  return candidate.replace(/^\/+|\/+$/g, '');
+}
+
 function mapQuipuStatus(status: string): string {
   const s = String(status || '').toLowerCase();
   if (s === 'paid') return 'cobrada';
@@ -888,13 +897,14 @@ export const saveQuipuCredentials = async (req: any, res: Response) => {
   const userId = req.auth?.userId;
   if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
 
-  const appId = sanitizeText(req.body?.appId);
-  const appSecret = sanitizeText(req.body?.appSecret);
+  const existingSettings = await getStoredQuipuSettings(userId);
+  const appId = sanitizeText(req.body?.appId) || existingSettings?.app_id || '';
+  const appSecret = sanitizeText(req.body?.appSecret) || existingSettings?.app_secret || '';
   const baseUrl = sanitizeText(req.body?.baseUrl) || 'https://getquipu.com';
-  const ownerSlug = sanitizeText(req.body?.ownerSlug);
+  const ownerSlug = normalizeOwnerSlugInput(req.body?.ownerSlug);
 
   if (!appId || !appSecret || !ownerSlug) {
-    return res.status(400).json({ success: false, error: 'App ID, App Secret y owner_slug son obligatorios.' });
+    return res.status(400).json({ success: false, error: 'App ID, App Secret y owner_slug son obligatorios. Si ya había conexión, puedes dejar App ID y App Secret vacíos, pero el owner_slug sí debe informarse.' });
   }
 
   try {

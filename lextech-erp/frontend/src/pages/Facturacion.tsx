@@ -866,14 +866,20 @@ function StructuredBillingEditorModal({
 function QuipuConnectModal({
   onClose,
   onSave,
+  initialBaseUrl,
+  initialOwnerSlug,
+  alreadyConnected,
 }: {
   onClose: () => void;
   onSave: (payload: { appId: string; appSecret: string; baseUrl: string; ownerSlug: string }) => void;
+  initialBaseUrl?: string;
+  initialOwnerSlug?: string;
+  alreadyConnected?: boolean;
 }) {
   const [appId, setAppId] = useState("");
   const [appSecret, setAppSecret] = useState("");
-  const [baseUrl, setBaseUrl] = useState("https://getquipu.com");
-  const [ownerSlug, setOwnerSlug] = useState("");
+  const [baseUrl, setBaseUrl] = useState(initialBaseUrl || "https://getquipu.com");
+  const [ownerSlug, setOwnerSlug] = useState(initialOwnerSlug || "");
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4">
@@ -890,11 +896,11 @@ function QuipuConnectModal({
         <div className="grid grid-cols-1 gap-4 px-6 py-6">
           <label className="space-y-2">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">App ID</span>
-            <input value={appId} onChange={(e) => setAppId(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+            <input value={appId} onChange={(e) => setAppId(e.target.value)} placeholder={alreadyConnected ? "Dejalo vacio para conservar el actual" : ""} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
           </label>
           <label className="space-y-2">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">App Secret</span>
-            <input value={appSecret} onChange={(e) => setAppSecret(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+            <input value={appSecret} onChange={(e) => setAppSecret(e.target.value)} placeholder={alreadyConnected ? "Dejalo vacio para conservar el actual" : ""} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
           </label>
           <label className="space-y-2">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Base URL</span>
@@ -1544,6 +1550,11 @@ function FacturacionContent() {
                       ? `Última sincronización: ${fmtDateTime(quipuStatus.lastSyncAt)}`
                       : "Sincronización pendiente"}
                 </p>
+                {quipuStatus.ownerSlug && (
+                  <p className="mt-1 text-xs text-emerald-700">
+                    Owner slug activo: <span className="font-semibold">{quipuStatus.ownerSlug}</span>
+                  </p>
+                )}
                 {quipuStatus.syncSummary && (
                   <p className="mt-1 text-xs text-emerald-700">
                     Contactos: {quipuStatus.syncSummary.contacts || 0} · Facturas Quipu: {quipuStatus.syncSummary.invoices || 0} · Importadas: {quipuStatus.syncSummary.importedToFacturacion ?? 0} · Actualizadas: {quipuStatus.syncSummary.updatedInFacturacion ?? 0}
@@ -1551,6 +1562,9 @@ function FacturacionContent() {
                 )}
               </div>
               <div className="flex items-center gap-2">
+                <button onClick={() => setShowQuipuModal(true)} disabled={saving} className="inline-flex items-center gap-2 rounded-xl border border-emerald-300 bg-white px-4 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60">
+                  <ExternalLink size={13} /> Editar conexion
+                </button>
                 <button onClick={syncQuipu} disabled={saving} className="inline-flex items-center gap-2 rounded-xl border border-emerald-300 bg-white px-4 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60">
                   <RefreshCw size={13} className={saving ? "animate-spin" : ""} /> Sincronizar
                 </button>
@@ -2285,6 +2299,9 @@ function FacturacionContent() {
         <QuipuConnectModal
           onClose={() => setShowQuipuModal(false)}
           onSave={saveQuipuCredentials}
+          initialBaseUrl={quipuStatus.baseUrl}
+          initialOwnerSlug={quipuStatus.ownerSlug}
+          alreadyConnected={quipuStatus.connected}
         />
       )}
 
