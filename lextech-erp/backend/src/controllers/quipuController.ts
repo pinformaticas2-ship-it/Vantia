@@ -52,7 +52,15 @@ function buildQuipuInvoiceItems(factura: any) {
 
   return {
     totalAmount: Number(totalAmount.toFixed(2)),
-    items: [
+    officialItems: [
+      {
+        product: concept,
+        cost: baseAmount.toFixed(2),
+        quantity: 1,
+        vat_per: vatPercent,
+      },
+    ],
+    jsonApiItems: [
       {
         type: 'book_entry_items',
         attributes: {
@@ -71,11 +79,11 @@ function extractQuipuInvoiceTotal(invoice: any) {
   return Number(invoice?.data?.attributes?.total_amount || invoice?.data?.attributes?.total || invoice?.data?.total_amount || invoice?.data?.total || 0);
 }
 
-function buildQuipuInvoiceAttributes(factura: any, options?: { mode?: 'hybrid' | 'items_only' | 'items_attributes_only' }) {
+function buildQuipuInvoiceAttributes(factura: any, options?: { mode?: 'official_items' | 'hybrid' | 'items_only' | 'items_attributes_only' }) {
   const issueDate = factura?.fecha ? String(factura.fecha).slice(0, 10) : new Date().toISOString().slice(0, 10);
   const filingNumber = buildQuipuFilingNumber(factura?.num, factura?.serie);
   const invoiceItems = buildQuipuInvoiceItems(factura);
-  const mode = options?.mode || 'hybrid';
+  const mode = options?.mode || 'official_items';
 
   const attributes: any = {
     kind: 'income',
@@ -86,11 +94,16 @@ function buildQuipuInvoiceAttributes(factura: any, options?: { mode?: 'hybrid' |
     payment_method: mapQuipuPaymentMethod(factura?.forma_pago),
   };
 
+  if (mode === 'official_items') {
+    attributes.items = invoiceItems.officialItems;
+    return attributes;
+  }
+
   if (mode !== 'items_only') {
-    attributes.items_attributes = invoiceItems.items.map((item: any) => item.attributes);
+    attributes.items_attributes = invoiceItems.jsonApiItems.map((item: any) => item.attributes);
   }
   if (mode !== 'items_attributes_only') {
-    attributes.items = invoiceItems.items;
+    attributes.items = invoiceItems.jsonApiItems;
   }
   if (mode === 'hybrid') {
     attributes.total_amount = invoiceItems.totalAmount.toFixed(2);
