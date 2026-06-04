@@ -4,7 +4,7 @@ import { useAuth } from "@clerk/clerk-react";
 import {
   Upload, FolderOpen, FilePlus2, Sparkles, Loader2,
   Eye, Download, Trash2, Edit3, ExternalLink, FileText,
-  ChevronDown, ChevronRight, X, Search, Copy, ClipboardPaste,
+  ChevronDown, ChevronRight, X, Search, Copy, Clipboard,
 } from "lucide-react";
 import { safeJson, resolveApiUrl } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
@@ -770,7 +770,7 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false, loc
       {/* Toast de pegado */}
       {pasteToast && (
         <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-800 animate-in fade-in slide-in-from-top-2 duration-200">
-          <ClipboardPaste size={13} className="shrink-0" /> {pasteToast}
+          <Clipboard size={13} className="shrink-0" /> {pasteToast}
         </div>
       )}
       {/* Barra de acciones */}
@@ -839,7 +839,7 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false, loc
           : <><Upload size={26} className={isDragOver ? "text-red-500" : "text-slate-400"} />
               <p className={`text-sm font-medium ${isDragOver ? "text-red-600" : "text-slate-500"}`}>Arrastra archivos o carpetas aquí</p>
               <p className="text-xs text-slate-400">PDF, Word, Excel, imágenes — máx. 50 MB por archivo</p>
-              {!locked && <p className="text-[10px] text-slate-300 flex items-center gap-1"><ClipboardPaste size={10} /> Ctrl+V para pegar desde el portapapeles</p>}</>
+              {!locked && <p className="text-[10px] text-slate-300 flex items-center gap-1"><Clipboard size={10} /> Ctrl+V para pegar desde el portapapeles</p>}</>
         }
       </div>
 
@@ -944,22 +944,22 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false, loc
                             : <span className="text-slate-300">—</span>}
                         </td>
                         <td className="px-4 py-3">
-                          <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
-                            {/* Vista previa — no se toca */}
-                            {canOpenPreview && (
-                              <button onClick={() => openPreview(f)} title="Vista previa"
-                                className="p-1.5 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors">
-                                <Eye size={14} />
-                              </button>
-                            )}
-                            {/* Copiar al portapapeles */}
+                          <div className="flex items-center gap-1 justify-end">
+                            {/* Copiar al portapapeles del ERP */}
                             <button
-                              title="Copiar al portapapeles (luego Ctrl+V para pegar en otra zona)"
+                              title="Copiar al portapapeles del ERP (luego Ctrl+V en otra zona de adjuntos)"
                               className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                               onClick={(e) => { e.stopPropagation(); copyFileToClipboard(f); }}
                             >
                               <Copy size={14} />
                             </button>
+                            {/* Vista previa */}
+                            {canOpenPreview && (
+                              <button onClick={() => openPreview(f)} title="Vista previa"
+                                className="p-1.5 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Eye size={14} />
+                              </button>
+                            )}
                             {/* Editar metadatos */}
                             {!locked && (
                             <button

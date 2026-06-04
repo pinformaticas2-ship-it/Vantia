@@ -100,17 +100,16 @@ class SmtpSession {
 
   private onData(chunk: Buffer) {
     this.buffer += chunk.toString();
-    const idx = this.buffer.indexOf('\r\n');
-    if (idx !== -1) {
-      // collect multi-line responses (xxx-)
-      const fullResp = this.buffer.slice(0, idx);
+    // Loop: a single data event may contain multiple lines (common with EHLO responses).
+    // Skip intermediate multi-line segments (xxx-...) and resolve on the final line (xxx ...).
+    while (true) {
+      const idx = this.buffer.indexOf('\r\n');
+      if (idx === -1) break;
+      const line = this.buffer.slice(0, idx);
       this.buffer = this.buffer.slice(idx + 2);
-      // If multi-line (e.g. "250-xxx\r\n250 xxx"), keep reading
-      if (/^\d{3}-/.test(fullResp)) {
-        // still more lines; wait
-        return;
-      }
-      this.resolve(fullResp);
+      if (/^\d{3}-/.test(line)) continue; // intermediate multi-line, keep consuming
+      this.resolve(line);
+      break;
     }
   }
 
@@ -148,6 +147,35 @@ class SmtpSession {
       }
       this.socket.on('error', onError);
     });
+  }
+
+  async test_auth(): Promise<void> {
+    await this.expect([220]);
+    this.send(`EHLO lextech`);
+    await this.expect([250]);
+
+    if (!this.cfg.secure) {
+      this.send('STARTTLS');
+      await this.expect([220]);
+      await new Promise<void>((res, rej) => {
+        const tlsSock = tls.connect({ socket: this.socket as net.Socket, rejectUnauthorized: false }, res);
+        tlsSock.on('error', rej);
+        this.socket = tlsSock;
+        this.socket.on('data', (c: Buffer) => this.onData(c));
+      });
+      this.send(`EHLO lextech`);
+      await this.expect([250]);
+    }
+
+    this.send('AUTH LOGIN');
+    await this.expect([334]);
+    this.send(b64(this.cfg.user));
+    await this.expect([334]);
+    this.send(b64(this.cfg.password));
+    await this.expect([235]);
+
+    this.send('QUIT');
+    this.socket.destroy();
   }
 
   async send_email(msg: MailMessage): Promise<void> {
@@ -214,9 +242,9 @@ export async function sendEmail(cfg: SmtpConfig, msg: MailMessage): Promise<void
   await session.send_email(msg);
 }
 
-/** Test only connection + auth — no email sent */
+/** Test connection + full auth handshake — no email sent */
 export async function testSmtpConnection(cfg: SmtpConfig): Promise<void> {
   const session = new SmtpSession(cfg);
   await session.connect();
-  // (session will be GC'd — socket will close)
+  await session.test_auth();
 }
