@@ -803,10 +803,7 @@ export async function sendMail(req: Request, res: Response) {
       subject, html, text,
     };
 
-    await Promise.race([
-      sendEmail(smtpCfg, mailMsg),
-      new Promise<never>((_, rej) => setTimeout(() => rej(new Error('SMTP command timeout')), 30_000)),
-    ]);
+    await sendEmail(smtpCfg, mailMsg);
 
     // Save to sent
     await pool.query(
