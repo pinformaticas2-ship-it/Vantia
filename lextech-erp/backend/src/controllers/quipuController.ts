@@ -276,24 +276,28 @@ async function getStoredQuipuSettings(userId: string) {
   return result.rows[0] || null;
 }
 
-async function getPreferredQuipuNumerationId(userId: string): Promise<string | null> {
+async function getPreferredQuipuNumerationId(userId: string, preferredPrefix?: string | null): Promise<string | null> {
+  const cleanPrefix = String(preferredPrefix || '').trim().toLowerCase();
   const result = await pool.query(
     `SELECT external_id
        FROM quipu_numbering_series
       WHERE user_id = $1
       ORDER BY
         CASE
-          WHEN LOWER(COALESCE(name, '')) LIKE '%documentos existentes%' THEN 0
-          WHEN LOWER(COALESCE(name, '')) LIKE '%documento existente%' THEN 1
-          WHEN LOWER(COALESCE(name, '')) LIKE '%historic%' THEN 2
-          WHEN LOWER(COALESCE(raw_payload::text, '')) LIKE '%documentos existentes%' THEN 3
-          WHEN LOWER(COALESCE(raw_payload::text, '')) LIKE '%documento existente%' THEN 4
-          WHEN LOWER(COALESCE(raw_payload::text, '')) LIKE '%historic%' THEN 5
-          ELSE 10
+          WHEN $2 <> '' AND LOWER(COALESCE(prefix, '')) = $2 AND LOWER(COALESCE(raw_payload::text, '')) LIKE '%documentos existentes%' THEN 0
+          WHEN $2 <> '' AND LOWER(COALESCE(prefix, '')) = $2 AND LOWER(COALESCE(raw_payload::text, '')) LIKE '%documento existente%' THEN 1
+          WHEN $2 <> '' AND LOWER(COALESCE(prefix, '')) = $2 THEN 2
+          WHEN LOWER(COALESCE(name, '')) LIKE '%documentos existentes%' THEN 3
+          WHEN LOWER(COALESCE(name, '')) LIKE '%documento existente%' THEN 4
+          WHEN LOWER(COALESCE(name, '')) LIKE '%historic%' THEN 5
+          WHEN LOWER(COALESCE(raw_payload::text, '')) LIKE '%documentos existentes%' THEN 6
+          WHEN LOWER(COALESCE(raw_payload::text, '')) LIKE '%documento existente%' THEN 7
+          WHEN LOWER(COALESCE(raw_payload::text, '')) LIKE '%historic%' THEN 8
+          ELSE 20
         END,
         id ASC
       LIMIT 1`,
-    [userId],
+    [userId, cleanPrefix],
   );
   return result.rows.length ? String(result.rows[0].external_id || '') : null;
 }
@@ -757,7 +761,7 @@ export async function pushFacturaToQuipuInternal(userId: string, facturaId: stri
   });
 
   const attributes = buildQuipuInvoiceAttributes(f, { mode: 'hybrid' });
-  const numberingSeriesId = await getPreferredQuipuNumerationId(userId);
+  const numberingSeriesId = await getPreferredQuipuNumerationId(userId, f.serie);
   const relationships = buildQuipuInvoiceManualRelationships(f, contactQuipuId, numberingSeriesId);
 
   const payload = { data: { type: 'invoices', attributes, ...(Object.keys(relationships).length ? { relationships } : {}) } };
