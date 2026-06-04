@@ -89,13 +89,11 @@ function buildQuipuInvoiceAttributes(factura: any, options?: { mode?: 'hybrid' }
   const issueDate = formatQuipuDate(factura?.fecha) || new Date().toISOString().slice(0, 10);
   const filingNumber = buildQuipuFilingNumber(factura?.num, factura?.serie);
   const mode = options?.mode || 'hybrid';
-  const dueDate = formatQuipuDate(factura?.vencimiento) || undefined;
 
   const attributes: any = {
     kind: 'income',
     issue_date: issueDate,
     ...(filingNumber ? { filing_number: filingNumber } : {}),
-    ...(dueDate ? { due_dates: [{ value: dueDate }] } : {}),
     subject: sanitizeText(factura?.contacto) ? `Factura ${filingNumber || factura?.num} · ${factura.contacto}` : `Factura ${filingNumber || factura?.num || ''}`.trim(),
     payment_method: mapQuipuPaymentMethod(factura?.forma_pago),
   };
