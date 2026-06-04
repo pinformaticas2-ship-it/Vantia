@@ -285,8 +285,11 @@ export async function createAccount(req: Request, res: Response) {
       user: String(username),
       password: String(password),
     };
+    let smtpWarning: string | null = null;
     await withTimeout(testSmtpConnection(smtpCfg), 20000, 'SMTP').catch((e) => {
-      throw new Error(explainMailConnectionError(e, 'smtp'));
+      // SMTP test failure is non-fatal: save the account anyway so the user
+      // can still receive email via IMAP. The warning is returned to the UI.
+      smtpWarning = explainMailConnectionError(e, 'smtp');
     });
 
     const enc = encryptPassword(password);
@@ -301,7 +304,7 @@ export async function createAccount(req: Request, res: Response) {
       [uid, label, email, imap_host, inPort, Boolean(imap_secure),
        smtp_host, Number(smtp_port), Boolean(smtp_secure), username, enc, proto],
     );
-    return ok(res, rows[0]);
+    return ok(res, { ...rows[0], smtp_warning: smtpWarning });
   } catch (e: any) { return err(res, e.message); }
 }
 

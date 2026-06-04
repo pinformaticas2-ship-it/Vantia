@@ -1932,6 +1932,9 @@ function ImapForm({
       if (!res.ok || !data?.success || !data?.data) {
         throw new Error(data?.error || 'No se pudo guardar la cuenta de correo.');
       }
+      if (data.data.smtp_warning) {
+        setError(`Cuenta guardada, pero hay un problema con el envío (SMTP): ${data.data.smtp_warning} Podrás recibir correo, pero revisa la configuración SMTP para poder enviar.`);
+      }
       await onSaved(data.data as ImapAccount);
     } catch (e: any) { setError(e.message); }
     finally { setSaving(false); }
