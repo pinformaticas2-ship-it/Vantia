@@ -2162,6 +2162,453 @@ function MailboxLockedState({
   );
 }
 
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+interface EmailSignature { id: string; name: string; html: string; isDefault?: boolean; }
+interface EmailTemplate  { id: string; name: string; subject: string; html: string; }
+interface RecipientGroup { id: string; name: string; emails: string[]; }
+
+const SIG_KEY   = 'lextech-email-signatures-v1';
+const TPL_KEY   = 'lextech-email-templates-v1';
+const GRP_KEY   = 'lextech-email-groups-v1';
+
+const loadLS = <T,>(key: string, fallback: T): T => {
+  try { return JSON.parse(localStorage.getItem(key) || '') || fallback; } catch { return fallback; }
+};
+const saveLS = (key: string, value: unknown) => localStorage.setItem(key, JSON.stringify(value));
+
+// ─── Ribbon Bar ───────────────────────────────────────────────────────────────
+
+type RibbonTab = 'inicio' | 'herramientas' | 'configuracion';
+
+interface RibbonBtn {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  danger?: boolean;
+  title?: string;
+}
+
+function RibbonButton({ icon, label, onClick, disabled, danger }: RibbonBtn) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`flex flex-col items-center gap-0.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors min-w-[52px]
+        ${disabled ? 'opacity-40 cursor-not-allowed text-gray-400' :
+          danger ? 'text-red-600 hover:bg-red-50' :
+          'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}`}
+    >
+      <span className="flex-shrink-0">{icon}</span>
+      <span className="leading-tight text-center">{label}</span>
+    </button>
+  );
+}
+
+function RibbonSep() {
+  return <div className="w-px h-10 bg-gray-200 mx-1 self-center" />;
+}
+
+interface RibbonBarProps {
+  activeTab: RibbonTab;
+  onTabChange: (t: RibbonTab) => void;
+  selectedEmail: unknown;
+  hasActiveMailbox: boolean;
+  selectedFolder: string;
+  onCompose: () => void;
+  onReply: () => void;
+  onReplyAll: () => void;
+  onForward: () => void;
+  onDelete: () => void;
+  onPrint: () => void;
+  onSync: () => void;
+  onSearch: () => void;
+  onEmptyTrash: () => void;
+  onShowAccounts: () => void;
+  onShowSignatures: () => void;
+  onShowTemplates: () => void;
+  onShowGroups: () => void;
+}
+
+function RibbonBar({
+  activeTab, onTabChange, selectedEmail, hasActiveMailbox,
+  onCompose, onReply, onReplyAll, onForward, onDelete, onPrint, onSync,
+  onSearch, onEmptyTrash, onShowAccounts, onShowSignatures, onShowTemplates, onShowGroups,
+}: RibbonBarProps) {
+  const hasEmail = !!selectedEmail;
+  const isTrash  = false;
+
+  return (
+    <div className="flex-shrink-0 border-b border-gray-200 bg-white select-none">
+      {/* Tabs */}
+      <div className="flex items-center gap-0 px-2 pt-1 border-b border-gray-100">
+        {(['inicio', 'herramientas', 'configuracion'] as RibbonTab[]).map(tab => (
+          <button
+            key={tab}
+            onClick={() => onTabChange(tab)}
+            className={`px-4 py-1.5 text-xs font-semibold rounded-t-md capitalize transition-colors
+              ${activeTab === tab
+                ? 'bg-indigo-600 text-white'
+                : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100'}`}
+          >
+            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {/* Buttons */}
+      <div className="flex items-center gap-0.5 px-3 py-1.5 overflow-x-auto">
+        {activeTab === 'inicio' && (<>
+          <RibbonButton icon={<Edit3 size={16}/>} label="Nuevo" onClick={onCompose} disabled={!hasActiveMailbox}/>
+          <RibbonSep/>
+          <RibbonButton icon={<Trash2 size={16}/>} label="Eliminar" onClick={onDelete} disabled={!hasEmail} danger/>
+          <RibbonSep/>
+          <RibbonButton icon={<Reply size={16}/>}   label="Responder"       onClick={onReply}    disabled={!hasEmail}/>
+          <RibbonButton icon={<ReplyAll size={16}/>} label="Resp. Todos"    onClick={onReplyAll} disabled={!hasEmail}/>
+          <RibbonButton icon={<Forward size={16}/>}  label="Reenviar"       onClick={onForward}  disabled={!hasEmail}/>
+          <RibbonSep/>
+          <RibbonButton icon={<RefreshCw size={16}/>} label="Enviar y Recibir" onClick={onSync} disabled={!hasActiveMailbox}/>
+          <RibbonSep/>
+          <RibbonButton icon={<Search size={16}/>}  label="Buscador"  onClick={onSearch} disabled={!hasActiveMailbox}/>
+          <RibbonButton icon={<Eye size={16}/>}      label="Vista Previa" onClick={() => {}} disabled={!hasEmail}/>
+          <RibbonSep/>
+          <RibbonButton icon={<Inbox size={16}/>}   label="Imprimir"  onClick={onPrint}  disabled={!hasEmail}/>
+        </>)}
+
+        {activeTab === 'herramientas' && (<>
+          <RibbonButton icon={<Plus size={16}/>}    label="Alta"           onClick={onCompose}     disabled={!hasActiveMailbox}/>
+          <RibbonSep/>
+          <RibbonButton icon={<RefreshCw size={16}/>} label="Enviar y Recibir" onClick={onSync}   disabled={!hasActiveMailbox}/>
+          <RibbonSep/>
+          <RibbonButton icon={<Trash2 size={16}/>}  label="Vaciar Eliminados" onClick={onEmptyTrash} danger disabled={!hasActiveMailbox}/>
+        </>)}
+
+        {activeTab === 'configuracion' && (<>
+          <RibbonButton icon={<AtSign size={16}/>}  label="Cuentas"          onClick={onShowAccounts}/>
+          <RibbonSep/>
+          <RibbonButton icon={<FileText size={16}/>} label="Plantillas"      onClick={onShowTemplates}/>
+          <RibbonButton icon={<Edit3 size={16}/>}   label="Firmas"           onClick={onShowSignatures}/>
+          <RibbonSep/>
+          <RibbonButton icon={<Filter size={16}/>}  label="Reglas"           onClick={() => {}} disabled/>
+          <RibbonSep/>
+          <RibbonButton icon={<Tag size={16}/>}     label="Destinatarios"    onClick={() => {}} disabled/>
+          <RibbonButton icon={<Shield size={16}/>}  label="Grupos"           onClick={onShowGroups}/>
+        </>)}
+      </div>
+    </div>
+  );
+}
+
+// ─── Signatures Panel ─────────────────────────────────────────────────────────
+
+function SignaturesPanel({ onClose, onSelect }: { onClose: () => void; onSelect?: (sig: EmailSignature) => void }) {
+  const [sigs, setSigs] = useState<EmailSignature[]>(() => loadLS(SIG_KEY, []));
+  const [editing, setEditing] = useState<EmailSignature | null>(null);
+
+  const save = (sig: EmailSignature) => {
+    const updated = sigs.some(s => s.id === sig.id)
+      ? sigs.map(s => s.id === sig.id ? sig : s)
+      : [...sigs, sig];
+    setSigs(updated);
+    saveLS(SIG_KEY, updated);
+    setEditing(null);
+  };
+
+  const del = (id: string) => {
+    const updated = sigs.filter(s => s.id !== id);
+    setSigs(updated);
+    saveLS(SIG_KEY, updated);
+  };
+
+  const setDefault = (id: string) => {
+    const updated = sigs.map(s => ({ ...s, isDefault: s.id === id }));
+    setSigs(updated);
+    saveLS(SIG_KEY, updated);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col" style={{ maxHeight: '85vh' }}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h3 className="font-semibold text-gray-900 flex items-center gap-2"><Edit3 size={18}/> Firmas</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700"><X size={20}/></button>
+        </div>
+
+        {editing ? (
+          <SignatureEditor
+            initial={editing}
+            onSave={save}
+            onCancel={() => setEditing(null)}
+          />
+        ) : (
+          <div className="flex-1 overflow-y-auto p-6 space-y-3">
+            {sigs.length === 0 && (
+              <p className="text-sm text-gray-400 text-center py-8">No hay firmas. Crea una nueva.</p>
+            )}
+            {sigs.map(sig => (
+              <div key={sig.id} className="border border-gray-200 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-medium text-sm text-gray-800">{sig.name}</span>
+                  <div className="flex items-center gap-2">
+                    {sig.isDefault && <span className="text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full">Predeterminada</span>}
+                    {!sig.isDefault && <button onClick={() => setDefault(sig.id)} className="text-xs text-gray-400 hover:text-indigo-600">Usar por defecto</button>}
+                    {onSelect && <button onClick={() => { onSelect(sig); onClose(); }} className="text-xs text-indigo-600 hover:underline">Insertar</button>}
+                    <button onClick={() => setEditing(sig)} className="text-gray-400 hover:text-gray-700"><Edit3 size={14}/></button>
+                    <button onClick={() => del(sig.id)} className="text-red-400 hover:text-red-600"><Trash2 size={14}/></button>
+                  </div>
+                </div>
+                <div className="text-xs text-gray-500 border border-gray-100 rounded-lg p-2 max-h-20 overflow-hidden" dangerouslySetInnerHTML={{ __html: sig.html }}/>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!editing && (
+          <div className="px-6 py-4 border-t border-gray-100">
+            <button
+              onClick={() => setEditing({ id: crypto.randomUUID(), name: '', html: '' })}
+              className="flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-800 font-medium"
+            >
+              <Plus size={16}/> Nueva firma
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SignatureEditor({ initial, onSave, onCancel }: { initial: EmailSignature; onSave: (s: EmailSignature) => void; onCancel: () => void }) {
+  const [name, setName] = useState(initial.name);
+  const [html, setHtml] = useState(initial.html);
+  return (
+    <div className="flex-1 p-6 flex flex-col gap-4 overflow-y-auto">
+      <div>
+        <label className="block text-xs font-medium text-gray-500 mb-1">Nombre de la firma</label>
+        <input value={name} onChange={e => setName(e.target.value)} placeholder="Ej. Firma profesional"
+          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"/>
+      </div>
+      <div className="flex-1">
+        <label className="block text-xs font-medium text-gray-500 mb-1">Contenido (HTML)</label>
+        <textarea value={html} onChange={e => setHtml(e.target.value)} rows={8}
+          placeholder="<p>Nombre Apellido<br/>Cargo · Empresa<br/>Teléfono</p>"
+          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"/>
+        {html && (
+          <div className="mt-2 border border-gray-100 rounded-lg p-3 text-sm" dangerouslySetInnerHTML={{ __html: html }}/>
+        )}
+      </div>
+      <div className="flex gap-2 justify-end">
+        <button onClick={onCancel} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Cancelar</button>
+        <button onClick={() => onSave({ ...initial, name, html })} disabled={!name.trim()}
+          className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50">Guardar</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Templates Panel ──────────────────────────────────────────────────────────
+
+function TemplatesPanel({ onClose, onApply }: { onClose: () => void; onApply?: (t: EmailTemplate) => void }) {
+  const [tpls, setTpls] = useState<EmailTemplate[]>(() => loadLS(TPL_KEY, []));
+  const [editing, setEditing] = useState<EmailTemplate | null>(null);
+
+  const save = (tpl: EmailTemplate) => {
+    const updated = tpls.some(t => t.id === tpl.id)
+      ? tpls.map(t => t.id === tpl.id ? tpl : t)
+      : [...tpls, tpl];
+    setTpls(updated);
+    saveLS(TPL_KEY, updated);
+    setEditing(null);
+  };
+
+  const del = (id: string) => {
+    const updated = tpls.filter(t => t.id !== id);
+    setTpls(updated);
+    saveLS(TPL_KEY, updated);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col" style={{ maxHeight: '85vh' }}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h3 className="font-semibold text-gray-900 flex items-center gap-2"><FileText size={18}/> Plantillas de correo</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700"><X size={20}/></button>
+        </div>
+
+        {editing ? (
+          <TemplateEditor initial={editing} onSave={save} onCancel={() => setEditing(null)}/>
+        ) : (
+          <div className="flex-1 overflow-y-auto p-6 space-y-3">
+            {tpls.length === 0 && (
+              <p className="text-sm text-gray-400 text-center py-8">No hay plantillas. Crea una nueva.</p>
+            )}
+            {tpls.map(tpl => (
+              <div key={tpl.id} className="border border-gray-200 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-medium text-sm text-gray-800">{tpl.name}</span>
+                  <div className="flex items-center gap-2">
+                    {onApply && (
+                      <button onClick={() => { onApply(tpl); onClose(); }}
+                        className="text-xs bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full hover:bg-indigo-100">
+                        Usar plantilla
+                      </button>
+                    )}
+                    <button onClick={() => setEditing(tpl)} className="text-gray-400 hover:text-gray-700"><Edit3 size={14}/></button>
+                    <button onClick={() => del(tpl.id)} className="text-red-400 hover:text-red-600"><Trash2 size={14}/></button>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-400 mb-2">Asunto: {tpl.subject}</p>
+                <div className="text-xs text-gray-500 border border-gray-100 rounded-lg p-2 max-h-16 overflow-hidden" dangerouslySetInnerHTML={{ __html: tpl.html }}/>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!editing && (
+          <div className="px-6 py-4 border-t border-gray-100">
+            <button
+              onClick={() => setEditing({ id: crypto.randomUUID(), name: '', subject: '', html: '' })}
+              className="flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-800 font-medium"
+            >
+              <Plus size={16}/> Nueva plantilla
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TemplateEditor({ initial, onSave, onCancel }: { initial: EmailTemplate; onSave: (t: EmailTemplate) => void; onCancel: () => void }) {
+  const [name, setName]       = useState(initial.name);
+  const [subject, setSubject] = useState(initial.subject);
+  const [html, setHtml]       = useState(initial.html);
+  return (
+    <div className="flex-1 p-6 flex flex-col gap-4 overflow-y-auto">
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Nombre de la plantilla</label>
+          <input value={name} onChange={e => setName(e.target.value)} placeholder="Ej. Primer contacto cliente"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"/>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Asunto predeterminado</label>
+          <input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Ej. Bienvenida al despacho"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"/>
+        </div>
+      </div>
+      <div className="flex-1">
+        <label className="block text-xs font-medium text-gray-500 mb-1">Cuerpo del correo (HTML)</label>
+        <textarea value={html} onChange={e => setHtml(e.target.value)} rows={10}
+          placeholder="<p>Estimado/a cliente,</p><p>...</p>"
+          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"/>
+      </div>
+      <div className="flex gap-2 justify-end">
+        <button onClick={onCancel} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Cancelar</button>
+        <button onClick={() => onSave({ ...initial, name, subject, html })} disabled={!name.trim()}
+          className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50">Guardar</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Recipient Groups Panel ───────────────────────────────────────────────────
+
+function RecipientGroupsPanel({ onClose }: { onClose: () => void }) {
+  const [groups, setGroups] = useState<RecipientGroup[]>(() => loadLS(GRP_KEY, []));
+  const [editing, setEditing] = useState<RecipientGroup | null>(null);
+
+  const save = (grp: RecipientGroup) => {
+    const updated = groups.some(g => g.id === grp.id)
+      ? groups.map(g => g.id === grp.id ? grp : g)
+      : [...groups, grp];
+    setGroups(updated);
+    saveLS(GRP_KEY, updated);
+    setEditing(null);
+  };
+
+  const del = (id: string) => {
+    const updated = groups.filter(g => g.id !== id);
+    setGroups(updated);
+    saveLS(GRP_KEY, updated);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col" style={{ maxHeight: '85vh' }}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h3 className="font-semibold text-gray-900 flex items-center gap-2"><Shield size={18}/> Grupos de destinatarios</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700"><X size={20}/></button>
+        </div>
+
+        {editing ? (
+          <GroupEditor initial={editing} onSave={save} onCancel={() => setEditing(null)}/>
+        ) : (
+          <div className="flex-1 overflow-y-auto p-6 space-y-3">
+            {groups.length === 0 && (
+              <p className="text-sm text-gray-400 text-center py-8">No hay grupos. Crea uno nuevo.</p>
+            )}
+            {groups.map(grp => (
+              <div key={grp.id} className="border border-gray-200 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-medium text-sm text-gray-800">{grp.name}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-400">{grp.emails.length} destinatario{grp.emails.length !== 1 ? 's' : ''}</span>
+                    <button onClick={() => setEditing(grp)} className="text-gray-400 hover:text-gray-700"><Edit3 size={14}/></button>
+                    <button onClick={() => del(grp.id)} className="text-red-400 hover:text-red-600"><Trash2 size={14}/></button>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-400 truncate">{grp.emails.join(', ')}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!editing && (
+          <div className="px-6 py-4 border-t border-gray-100">
+            <button
+              onClick={() => setEditing({ id: crypto.randomUUID(), name: '', emails: [] })}
+              className="flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-800 font-medium"
+            >
+              <Plus size={16}/> Nuevo grupo
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function GroupEditor({ initial, onSave, onCancel }: { initial: RecipientGroup; onSave: (g: RecipientGroup) => void; onCancel: () => void }) {
+  const [name, setName]    = useState(initial.name);
+  const [raw, setRaw]      = useState(initial.emails.join('\n'));
+  return (
+    <div className="flex-1 p-6 flex flex-col gap-4 overflow-y-auto">
+      <div>
+        <label className="block text-xs font-medium text-gray-500 mb-1">Nombre del grupo</label>
+        <input value={name} onChange={e => setName(e.target.value)} placeholder="Ej. Equipo jurídico"
+          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"/>
+      </div>
+      <div className="flex-1">
+        <label className="block text-xs font-medium text-gray-500 mb-1">Emails (uno por línea)</label>
+        <textarea value={raw} onChange={e => setRaw(e.target.value)} rows={10}
+          placeholder="cliente@empresa.com&#10;socio@despacho.es"
+          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"/>
+        <p className="text-xs text-gray-400 mt-1">{raw.split('\n').filter(l => l.trim()).length} dirección(es)</p>
+      </div>
+      <div className="flex gap-2 justify-end">
+        <button onClick={onCancel} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Cancelar</button>
+        <button
+          onClick={() => onSave({ ...initial, name, emails: raw.split('\n').map(l => l.trim()).filter(Boolean) })}
+          disabled={!name.trim()}
+          className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+        >Guardar</button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Email Component ─────────────────────────────────────────────────────
 
 export default function Email() {
@@ -2240,6 +2687,10 @@ export default function Email() {
   const [deletingLabel, setDeletingLabel] = useState(false);
   const [pendingDeleteAccount, setPendingDeleteAccount] = useState<PendingDeleteAccount | null>(null);
   const [showConnectModal, setShowConnectModal] = useState(false);
+  const [ribbonTab, setRibbonTab]               = useState<RibbonTab>('inicio');
+  const [showSignatures, setShowSignatures]     = useState(false);
+  const [showTemplates, setShowTemplates]       = useState(false);
+  const [showGroups, setShowGroups]             = useState(false);
   const pendingOpenEmailId = searchParams.get('openEmail');
   const selectedEmailRef = useRef<ParsedEmail | null>(null);
   const emailRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -2946,6 +3397,26 @@ export default function Email() {
     }).catch(() => {});
   }, [gmail]);
 
+  const emptyTrashAction = useCallback(async () => {
+    if (!hasActiveMailbox) return;
+    const confirmed = window.confirm('¿Vaciar la papelera? Se eliminarán permanentemente todos los mensajes eliminados.');
+    if (!confirmed) return;
+    if (activeProvider === 'imap' && currentImapAccount) {
+      await authFetch(`${API}/email/trash?account_id=${currentImapAccount.id}`, { method: 'DELETE' }).catch(() => {});
+    } else if (activeProvider === 'gmail' && gmail) {
+      // Gmail: vaciar usando batch trash - mover todos a trash y purgar
+      const trashEmails = emails.filter(e => e.folder === 'TRASH' || e.source === 'gmail');
+      await Promise.all(trashEmails.map(e => gmail.trash(e.id).catch(() => {}))).catch(() => {});
+    }
+    if (selectedFolder === 'TRASH') {
+      setEmails([]);
+      setSelectedEmail(null);
+    }
+  }, [activeProvider, authFetch, currentImapAccount, emails, gmail, hasActiveMailbox, selectedFolder]);
+
+  const handleRibbonDelete   = useCallback(() => { if (selectedEmail) deleteEmail(selectedEmail.id); }, [deleteEmail, selectedEmail]);
+  const handleRibbonPrint    = useCallback(() => { window.print(); }, []);
+
   const createUserLabel = useCallback(async (rawName?: string) => {
     if (!gmail) return;
     const name = typeof rawName === 'string' ? rawName.trim() : '';
@@ -3191,8 +3662,33 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
   return (
     // 73px = dashboard header (h-18 = 72px + 1px border-b)
     <div
-      className="flex bg-gray-50 overflow-hidden"
+      className="flex flex-col bg-gray-50 overflow-hidden"
       style={{ fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif", height: 'calc(100vh - 73px)' }}>
+
+      {/* ── Ribbon ── */}
+      <RibbonBar
+        activeTab={ribbonTab}
+        onTabChange={setRibbonTab}
+        selectedEmail={selectedEmail}
+        hasActiveMailbox={hasActiveMailbox}
+        selectedFolder={selectedFolder}
+        onCompose={() => startCompose()}
+        onReply={() => selectedEmail && replyTo(selectedEmail, false)}
+        onReplyAll={() => selectedEmail && replyTo(selectedEmail, true)}
+        onForward={() => selectedEmail && forwardEmail(selectedEmail)}
+        onDelete={handleRibbonDelete}
+        onPrint={handleRibbonPrint}
+        onSync={handleSync}
+        onSearch={() => { setRibbonTab('inicio'); document.querySelector<HTMLInputElement>('input[placeholder*="uscar"]')?.focus(); }}
+        onEmptyTrash={emptyTrashAction}
+        onShowAccounts={() => setShowConnectModal(true)}
+        onShowSignatures={() => setShowSignatures(true)}
+        onShowTemplates={() => setShowTemplates(true)}
+        onShowGroups={() => setShowGroups(true)}
+      />
+
+      {/* ── Three-panel layout ── */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
 
       {/* ── Sidebar ── */}
       <div className="hidden lg:flex flex-col flex-shrink-0 h-full" style={{ width: 240 }}>
@@ -3599,6 +4095,17 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
           </div>
         </div>
       )}
+
+      </div>{/* end three-panel layout */}
+
+      {/* ── Signatures Panel ── */}
+      {showSignatures && <SignaturesPanel onClose={() => setShowSignatures(false)}/>}
+
+      {/* ── Templates Panel ── */}
+      {showTemplates && <TemplatesPanel onClose={() => setShowTemplates(false)}/>}
+
+      {/* ── Recipient Groups Panel ── */}
+      {showGroups && <RecipientGroupsPanel onClose={() => setShowGroups(false)}/>}
 
       {/* ── Connect Account Modal ── */}
       {showConnectModal && (

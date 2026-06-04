@@ -761,6 +761,26 @@ export async function deleteMessage(req: Request, res: Response) {
   } catch (e: any) { return err(res, e.message); }
 }
 
+// ── Vaciar papelera ───────────────────────────────────────────────────────────
+
+export async function emptyTrash(req: Request, res: Response) {
+  const uid = userId(req);
+  if (!uid) return err(res, 'No autenticado', 401);
+  const accountId = req.query.account_id as string | undefined;
+
+  try {
+    const params: any[] = [uid];
+    const accCond = accountId ? `AND account_id=$2` : '';
+    if (accountId) params.push(accountId);
+
+    const { rowCount } = await pool.query(
+      `DELETE FROM emails WHERE user_id=$1 ${accCond} AND folder='Trash'`,
+      params,
+    );
+    return ok(res, { deleted: rowCount ?? 0 });
+  } catch (e: any) { return err(res, e.message); }
+}
+
 // ── Enviar ────────────────────────────────────────────────────────────────────
 
 export async function sendMail(req: Request, res: Response) {
