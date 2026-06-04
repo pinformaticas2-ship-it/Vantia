@@ -1870,7 +1870,7 @@ function ImapForm({
     imap_secure: preset?.imap_secure ?? true,
     smtp_host:   preset?.smtp_host  || '',
     smtp_port:   preset?.smtp_port  ?? 587,
-    smtp_secure: preset?.smtp_secure ?? false,
+    smtp_secure: preset?.smtp_secure ?? (preset?.smtp_port === 465),
     username:    preset?.email    || defaultEmail  || '',
     password:    '',
   });
@@ -1926,7 +1926,7 @@ function ImapForm({
       const res = await fetch(`${API}/email/accounts`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, protocol }),
+        body: JSON.stringify({ ...form, smtp_secure: form.smtp_port === 465, protocol }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.success || !data?.data) {
@@ -2053,7 +2053,10 @@ function ImapForm({
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Puerto SMTP</label>
-                  <input value={form.smtp_port} onChange={e => set('smtp_port', Number(e.target.value))}
+                  <input value={form.smtp_port} onChange={e => {
+                    const port = Number(e.target.value);
+                    setForm(f => ({ ...f, smtp_port: port, smtp_secure: port === 465 }));
+                  }}
                     type="number" placeholder="587"
                     className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                 </div>
