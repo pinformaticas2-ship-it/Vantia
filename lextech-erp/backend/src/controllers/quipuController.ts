@@ -711,99 +711,43 @@ export async function pushFacturaToQuipuInternal(userId: string, facturaId: stri
     phone: f.phone_mobile || f.phone_1,
   });
 
-  const attributes = buildQuipuInvoiceAttributes(f, { mode: 'official_items' });
+  const issueDate = f.fecha ? String(f.fecha).slice(0, 10) : new Date().toISOString().slice(0, 10);
+  const baseAmount = Number(f.total) / 1.21;
+  const filingNumber = buildQuipuFilingNumber(f.num, f.serie);
+  const attributes: any = {
+    kind: 'income',
+    issue_date: issueDate,
+    ...(filingNumber ? { filing_number: filingNumber } : {}),
+    due_date: f.vencimiento ? String(f.vencimiento).slice(0, 10) : undefined,
+    subject: f.contacto || 'Servicios profesionales',
+    payment_method: f.forma_pago === 'tarjeta' ? 'credit_card' : f.forma_pago === 'efectivo' ? 'cash' : 'bank_transfer',
+    items_attributes: [
+      {
+        concept: f.contacto || 'Servicios profesionales',
+        unitary_amount: baseAmount.toFixed(2),
+        quantity: 1,
+        vat_percent: 21.0,
+        retention_percent: 0.0,
+      },
+    ],
+  };
   const relationships: any = {};
-  if (contactQuipuId) relationships.contact = { data: { id: contactQuipuId, type: 'contacts' } };
+  if (contactQuipuId) {
+    relationships.contact = { data: { id: contactQuipuId, type: 'contacts' } };
+  }
   const seriesRow = await pool.query(`SELECT external_id FROM quipu_numbering_series WHERE user_id=$1 LIMIT 1`, [userId]);
-  const numberingSeriesId = seriesRow.rows.length ? String(seriesRow.rows[0].external_id || '') : null;
-  if (numberingSeriesId) relationships.numbering_series = { data: { id: numberingSeriesId, type: 'numbering_series' } };
+  if (seriesRow.rows.length) {
+    relationships.numbering_series = { data: { id: seriesRow.rows[0].external_id, type: 'numbering_series' } };
+  }
 
-  const createPayload = { data: { type: 'invoices', attributes, ...(Object.keys(relationships).length ? { relationships } : {}) } };
-  const attemptSummaries: string[] = [];
-  console.log(`[QuipuPush] create payload factura=${facturaId}: ${JSON.stringify(createPayload)}`);
-  let created = await quipuOwnerFetch<any>(settings, '/invoices', {
+  const payload = { data: { type: 'invoices', attributes, ...(Object.keys(relationships).length ? { relationships } : {}) } };
+  console.log(`[QuipuPush] restored payload factura=${facturaId}: ${JSON.stringify(payload)}`);
+  const created = await quipuOwnerFetch<any>(settings, '/invoices', {
     method: 'POST',
-    body: JSON.stringify(createPayload),
+    body: JSON.stringify(payload),
   }, accessToken);
 
   const quipuId = String(created?.data?.id || '');
-  let inspectedInvoice = quipuId ? (await fetchQuipuInvoiceDetail(settings, accessToken, quipuId)) || created : created;
-  console.log(`[QuipuPush] create invoice factura=${facturaId} quipuId=${quipuId || 'n/a'} total=${extractQuipuInvoiceTotal(inspectedInvoice)}`);
-  console.log(`[QuipuPush] create response factura=${facturaId}: ${JSON.stringify(summarizeQuipuInvoiceResponse(inspectedInvoice))}`);
-  attemptSummaries.push(formatQuipuInvoiceAttempt('create', inspectedInvoice));
-  if (quipuId && extractQuipuInvoiceTotal(inspectedInvoice) <= 0) {
-    const fallbackAttributes = buildQuipuInvoiceAttributes(f, { mode: 'items_only' });
-    console.warn(`[QuipuPush] zero-total after create for factura=${facturaId}; retrying PATCH mode=items_only`);
-    const patchPayload = { data: { type: 'invoices', id: quipuId, attributes: fallbackAttributes, ...(Object.keys(relationships).length ? { relationships } : {}) } };
-    console.log(`[QuipuPush] patch payload mode=items_only factura=${facturaId}: ${JSON.stringify(patchPayload)}`);
-    created = await quipuOwnerFetch<any>(settings, `/invoices/${quipuId}`, {
-      method: 'PATCH',
-      body: JSON.stringify(patchPayload),
-    }, accessToken);
-    inspectedInvoice = (await fetchQuipuInvoiceDetail(settings, accessToken, quipuId)) || created;
-    console.log(`[QuipuPush] patch items_only factura=${facturaId} quipuId=${quipuId} total=${extractQuipuInvoiceTotal(inspectedInvoice)}`);
-    console.log(`[QuipuPush] patch response mode=items_only factura=${facturaId}: ${JSON.stringify(summarizeQuipuInvoiceResponse(inspectedInvoice))}`);
-    attemptSummaries.push(formatQuipuInvoiceAttempt('patch_items_only', inspectedInvoice));
-  }
-
-  if (quipuId && extractQuipuInvoiceTotal(inspectedInvoice) <= 0) {
-    const fallbackAttributes = buildQuipuInvoiceAttributes(f, { mode: 'items_attributes_only' });
-    console.warn(`[QuipuPush] still zero-total for factura=${facturaId}; retrying PATCH mode=items_attributes_only`);
-    const patchPayload = { data: { type: 'invoices', id: quipuId, attributes: fallbackAttributes, ...(Object.keys(relationships).length ? { relationships } : {}) } };
-    console.log(`[QuipuPush] patch payload mode=items_attributes_only factura=${facturaId}: ${JSON.stringify(patchPayload)}`);
-    created = await quipuOwnerFetch<any>(settings, `/invoices/${quipuId}`, {
-      method: 'PATCH',
-      body: JSON.stringify(patchPayload),
-    }, accessToken);
-    inspectedInvoice = (await fetchQuipuInvoiceDetail(settings, accessToken, quipuId)) || created;
-    console.log(`[QuipuPush] patch items_attributes_only factura=${facturaId} quipuId=${quipuId} total=${extractQuipuInvoiceTotal(inspectedInvoice)}`);
-    console.log(`[QuipuPush] patch response mode=items_attributes_only factura=${facturaId}: ${JSON.stringify(summarizeQuipuInvoiceResponse(inspectedInvoice))}`);
-    attemptSummaries.push(formatQuipuInvoiceAttempt('patch_items_attributes_only', inspectedInvoice));
-  }
-
-  if (quipuId && extractQuipuInvoiceTotal(inspectedInvoice) <= 0) {
-    try {
-      await quipuOwnerFetch<any>(settings, `/invoices/${quipuId}`, { method: 'DELETE' }, accessToken);
-      console.warn(`[QuipuPush] deleted zero-total draft before legacy retry quipuId=${quipuId} for factura=${facturaId}`);
-    } catch (cleanupError: any) {
-      console.warn(`[QuipuPush] failed to delete zero-total draft before legacy retry quipuId=${quipuId}: ${cleanupError?.message}`);
-    }
-
-    const legacyPayload = buildQuipuLegacyInvoicePayload(f, contactQuipuId, numberingSeriesId);
-    console.warn(`[QuipuPush] retrying legacy create payload for factura=${facturaId}`);
-    console.log(`[QuipuPush] create payload legacy factura=${facturaId}: ${JSON.stringify(legacyPayload)}`);
-    created = await quipuOwnerFetch<any>(settings, '/invoices', {
-      method: 'POST',
-      body: JSON.stringify(legacyPayload),
-    }, accessToken);
-
-    const legacyQuipuId = String(created?.data?.id || '');
-    if (legacyQuipuId) {
-      inspectedInvoice = (await fetchQuipuInvoiceDetail(settings, accessToken, legacyQuipuId)) || created;
-      console.log(`[QuipuPush] create response legacy factura=${facturaId}: ${JSON.stringify(summarizeQuipuInvoiceResponse(inspectedInvoice))}`);
-      attemptSummaries.push(formatQuipuInvoiceAttempt('create_legacy', inspectedInvoice));
-      if (extractQuipuInvoiceTotal(inspectedInvoice) > 0) {
-        await pool.query(`UPDATE facturacion_facturas SET quipu_id=$1, updated_at=NOW() WHERE id=$2 AND user_id=$3`, [legacyQuipuId, facturaId, userId]);
-        console.log(`[QuipuPush] factura=${facturaId} quipuId=${legacyQuipuId} legacy-ok`);
-        return legacyQuipuId;
-      }
-      try {
-        await quipuOwnerFetch<any>(settings, `/invoices/${legacyQuipuId}`, { method: 'DELETE' }, accessToken);
-        console.warn(`[QuipuPush] deleted zero-total legacy draft quipuId=${legacyQuipuId} for factura=${facturaId}`);
-      } catch (cleanupError: any) {
-        console.warn(`[QuipuPush] failed to delete zero-total legacy draft quipuId=${legacyQuipuId}: ${cleanupError?.message}`);
-      }
-    }
-
-    try {
-      await quipuOwnerFetch<any>(settings, `/invoices/${quipuId}`, { method: 'DELETE' }, accessToken);
-      console.warn(`[QuipuPush] deleted zero-total draft quipuId=${quipuId} for factura=${facturaId}`);
-    } catch (cleanupError: any) {
-      console.warn(`[QuipuPush] failed to delete zero-total draft quipuId=${quipuId}: ${cleanupError?.message}`);
-    }
-    throw new Error(`Quipu ignoró las líneas de la factura y la dejaba a 0,00. Se canceló el borrador en Quipu para evitar datos inválidos. Diagnóstico: ${attemptSummaries.join(' | ')}`);
-  }
-
   if (quipuId) {
     await pool.query(`UPDATE facturacion_facturas SET quipu_id=$1, updated_at=NOW() WHERE id=$2 AND user_id=$3`, [quipuId, facturaId, userId]);
     console.log(`[QuipuPush] factura=${facturaId} quipuId=${quipuId}`);
