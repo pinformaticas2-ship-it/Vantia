@@ -25,8 +25,18 @@ function normalizeOwnerSlug(ownerSlug?: string | null): string {
   return slug;
 }
 
-function buildOwnerPath(settings: QuipuStoredSettings, path: string): string {
-  const ownerSlug = normalizeOwnerSlug(settings.owner_slug);
+function ownerSlugCandidates(ownerSlug?: string | null): string[] {
+  const normalized = normalizeOwnerSlug(ownerSlug);
+  const withoutDashboardPrefix = normalized.replace(/^d\//i, '');
+  const candidates = [
+    normalized,
+    withoutDashboardPrefix,
+    `d/${withoutDashboardPrefix}`,
+  ];
+  return Array.from(new Set(candidates.map((slug) => slug.replace(/^\/+|\/+$/g, '')).filter(Boolean)));
+}
+
+function buildOwnerPathForSlug(ownerSlug: string, path: string): string {
   const cleanPath = String(path || '').trim();
   return `/${ownerSlug}${cleanPath.startsWith('/') ? cleanPath : `/${cleanPath}`}`;
 }
@@ -158,7 +168,23 @@ export async function quipuOwnerFetch<T = any>(
   init?: RequestInit,
   preAuthToken?: string,
 ): Promise<T> {
-  return quipuApiFetch<T>(settings, buildOwnerPath(settings, path), init, preAuthToken);
+  const candidates = ownerSlugCandidates(settings.owner_slug);
+  const triedPaths: string[] = [];
+  let lastError: any = null;
+
+  for (const candidate of candidates) {
+    const ownerPath = buildOwnerPathForSlug(candidate, path);
+    triedPaths.push(ownerPath);
+    try {
+      return await quipuApiFetch<T>(settings, ownerPath, init, preAuthToken);
+    } catch (error: any) {
+      lastError = error;
+      if (!String(error?.message || '').includes('404')) throw error;
+    }
+  }
+
+  const attempts = triedPaths.map((item) => `${normalizeBaseUrl(settings.base_url)}${item}`).join(' | ');
+  throw new Error(`${lastError?.message || 'Recurso no encontrado en Quipu.'} Intentos probados: ${attempts}`);
 }
 
 // ── Paginated list — token shared across pages ────────────────
