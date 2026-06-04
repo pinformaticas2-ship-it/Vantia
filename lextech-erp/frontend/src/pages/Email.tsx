@@ -3398,13 +3398,12 @@ export default function Email() {
   }, [gmail]);
 
   const emptyTrashAction = useCallback(async () => {
-    if (!hasActiveMailbox) return;
+    if (activeProvider === 'none') return;
     const confirmed = window.confirm('¿Vaciar la papelera? Se eliminarán permanentemente todos los mensajes eliminados.');
     if (!confirmed) return;
     if (activeProvider === 'imap' && currentImapAccount) {
       await authFetch(`${API}/email/trash?account_id=${currentImapAccount.id}`, { method: 'DELETE' }).catch(() => {});
     } else if (activeProvider === 'gmail' && gmail) {
-      // Gmail: vaciar usando batch trash - mover todos a trash y purgar
       const trashEmails = emails.filter(e => e.folder === 'TRASH' || e.source === 'gmail');
       await Promise.all(trashEmails.map(e => gmail.trash(e.id).catch(() => {}))).catch(() => {});
     }
@@ -3412,7 +3411,7 @@ export default function Email() {
       setEmails([]);
       setSelectedEmail(null);
     }
-  }, [activeProvider, authFetch, currentImapAccount, emails, gmail, hasActiveMailbox, selectedFolder]);
+  }, [activeProvider, authFetch, currentImapAccount, emails, gmail, selectedFolder]);
 
   const handleRibbonDelete   = useCallback(() => { if (selectedEmail) deleteEmail(selectedEmail.id); }, [deleteEmail, selectedEmail]);
   const handleRibbonPrint    = useCallback(() => { window.print(); }, []);
