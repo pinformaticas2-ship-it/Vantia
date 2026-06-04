@@ -81,7 +81,7 @@ function buildQuipuInvoiceAttributes(factura: any, options?: { mode?: 'hybrid' }
     kind: 'income',
     issue_date: issueDate,
     ...(filingNumber ? { filing_number: filingNumber } : {}),
-    ...(dueDate ? { due_dates: [dueDate] } : {}),
+    ...(dueDate ? { due_dates: [{ value: dueDate }] } : {}),
     subject: sanitizeText(factura?.contacto) ? `Factura ${filingNumber || factura?.num} · ${factura.contacto}` : `Factura ${filingNumber || factura?.num || ''}`.trim(),
     payment_method: mapQuipuPaymentMethod(factura?.forma_pago),
   };
