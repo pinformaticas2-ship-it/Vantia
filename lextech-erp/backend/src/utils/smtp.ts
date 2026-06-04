@@ -79,38 +79,61 @@ function buildMimeMessage(msg: MailMessage): string {
 
 // ── Motor SMTP ────────────────────────────────────────────────────────────────
 
+const CMD_TIMEOUT = 20_000;
+
 class SmtpSession {
   private socket!: net.Socket | tls.TLSSocket;
-  private buffer = '';
-  private resolve!: (v: string) => void;
-  private reject!: (e: Error) => void;
+  private rawBuffer = '';
+
+  // Line queue: handles the race where data arrives before waitLine() is called
+  private lineQueue: string[] = [];
+  private pendingResolve: ((v: string) => void) | null = null;
+  private pendingReject:  ((e: Error)  => void) | null = null;
 
   constructor(private cfg: SmtpConfig) {}
 
-  private waitLine(): Promise<string> {
+  private onData(chunk: Buffer) {
+    this.rawBuffer += chunk.toString();
+    // Consume all complete lines from the buffer
+    while (true) {
+      const idx = this.rawBuffer.indexOf('\r\n');
+      if (idx === -1) break;
+      const line = this.rawBuffer.slice(0, idx);
+      this.rawBuffer = this.rawBuffer.slice(idx + 2);
+      // Skip intermediate multi-line segments (e.g. "250-AUTH LOGIN")
+      if (/^\d{3}-/.test(line)) continue;
+      // Deliver the final response line
+      if (this.pendingResolve) {
+        const resolve = this.pendingResolve;
+        this.pendingResolve = null;
+        this.pendingReject  = null;
+        resolve(line);
+      } else {
+        this.lineQueue.push(line);
+      }
+      break;
+    }
+  }
+
+  private waitLine(timeoutMs = CMD_TIMEOUT): Promise<string> {
+    // If a line arrived before we started waiting, return it immediately
+    if (this.lineQueue.length > 0) {
+      return Promise.resolve(this.lineQueue.shift()!);
+    }
     return new Promise((res, rej) => {
-      this.resolve = res;
-      this.reject  = rej;
+      const t = setTimeout(() => {
+        this.pendingResolve = null;
+        this.pendingReject  = null;
+        rej(new Error('SMTP command timeout'));
+      }, timeoutMs);
+
+      this.pendingResolve = (v) => { clearTimeout(t); res(v); };
+      this.pendingReject  = (e) => { clearTimeout(t); rej(e); };
     });
   }
 
   private send(cmd: string) {
     this.socket.write(cmd + '\r\n');
-  }
-
-  private onData(chunk: Buffer) {
-    this.buffer += chunk.toString();
-    // Loop: a single data event may contain multiple lines (common with EHLO responses).
-    // Skip intermediate multi-line segments (xxx-...) and resolve on the final line (xxx ...).
-    while (true) {
-      const idx = this.buffer.indexOf('\r\n');
-      if (idx === -1) break;
-      const line = this.buffer.slice(0, idx);
-      this.buffer = this.buffer.slice(idx + 2);
-      if (/^\d{3}-/.test(line)) continue; // intermediate multi-line, keep consuming
-      this.resolve(line);
-      break;
-    }
   }
 
   private async expect(codes: number[]): Promise<string> {
@@ -130,8 +153,16 @@ class SmtpSession {
 
       const onReady = () => {
         clearTimeout(t);
-        this.socket.on('data', (c: Buffer) => this.onData(c));
-        this.socket.on('error', (e: Error) => { try { this.reject(e); } catch {} });
+        this.socket.removeListener('error', onError);
+        this.socket.on('data',  (c: Buffer) => this.onData(c));
+        this.socket.on('error', (e: Error)  => {
+          if (this.pendingReject) {
+            const rej = this.pendingReject;
+            this.pendingResolve = null;
+            this.pendingReject  = null;
+            rej(e);
+          }
+        });
         resolve();
       };
 
@@ -149,7 +180,29 @@ class SmtpSession {
     });
   }
 
-  async test_auth(): Promise<void> {
+  private async upgradeToTls(): Promise<void> {
+    await new Promise<void>((res, rej) => {
+      // Remove old data listener before wrapping
+      this.socket.removeAllListeners('data');
+      const tlsSock = tls.connect(
+        { socket: this.socket as net.Socket, rejectUnauthorized: false },
+        res,
+      );
+      tlsSock.on('error', rej);
+      this.socket = tlsSock;
+      this.socket.on('data',  (c: Buffer) => this.onData(c));
+      this.socket.on('error', (e: Error)  => {
+        if (this.pendingReject) {
+          const rej2 = this.pendingReject;
+          this.pendingResolve = null;
+          this.pendingReject  = null;
+          rej2(e);
+        }
+      });
+    });
+  }
+
+  private async doHandshake(): Promise<void> {
     await this.expect([220]);
     this.send(`EHLO lextech`);
     await this.expect([250]);
@@ -157,15 +210,14 @@ class SmtpSession {
     if (!this.cfg.secure) {
       this.send('STARTTLS');
       await this.expect([220]);
-      await new Promise<void>((res, rej) => {
-        const tlsSock = tls.connect({ socket: this.socket as net.Socket, rejectUnauthorized: false }, res);
-        tlsSock.on('error', rej);
-        this.socket = tlsSock;
-        this.socket.on('data', (c: Buffer) => this.onData(c));
-      });
+      await this.upgradeToTls();
       this.send(`EHLO lextech`);
       await this.expect([250]);
     }
+  }
+
+  async test_auth(): Promise<void> {
+    await this.doHandshake();
 
     this.send('AUTH LOGIN');
     await this.expect([334]);
@@ -179,31 +231,7 @@ class SmtpSession {
   }
 
   async send_email(msg: MailMessage): Promise<void> {
-    // Greeting
-    await this.expect([220]);
-
-    // EHLO
-    this.send(`EHLO lextech`);
-    await this.expect([250]);
-
-    // STARTTLS upgrade si no es secure
-    if (!this.cfg.secure) {
-      this.send('STARTTLS');
-      await this.expect([220]);
-      // Upgrade socket to TLS
-      await new Promise<void>((res, rej) => {
-        const tlsSock = tls.connect({
-          socket: this.socket as net.Socket,
-          rejectUnauthorized: false,
-        }, res);
-        tlsSock.on('error', rej);
-        this.socket = tlsSock;
-        this.socket.on('data', (c: Buffer) => this.onData(c));
-      });
-      // Re-EHLO after STARTTLS
-      this.send(`EHLO lextech`);
-      await this.expect([250]);
-    }
+    await this.doHandshake();
 
     // AUTH LOGIN
     this.send('AUTH LOGIN');
