@@ -298,6 +298,26 @@ async function getPreferredQuipuNumerationId(userId: string): Promise<string | n
   return result.rows.length ? String(result.rows[0].external_id || '') : null;
 }
 
+async function summarizeQuipuNumerations(userId: string): Promise<string> {
+  const result = await pool.query(
+    `SELECT external_id, COALESCE(name, '') AS name, COALESCE(prefix, '') AS prefix
+       FROM quipu_numbering_series
+      WHERE user_id = $1
+      ORDER BY name ASC, prefix ASC, external_id ASC
+      LIMIT 12`,
+    [userId],
+  );
+  if (!result.rows.length) return 'Sin series sincronizadas en local';
+  return result.rows
+    .map((row: any) => {
+      const name = String(row.name || '').trim() || 'Sin nombre';
+      const prefix = String(row.prefix || '').trim();
+      const externalId = String(row.external_id || '').trim();
+      return `${name}${prefix ? ` [${prefix}]` : ''}${externalId ? ` {${externalId}}` : ''}`;
+    })
+    .join(' | ');
+}
+
 async function diagnoseQuipuEndpoints(settings: any, token?: string | null) {
   const checks = [
     { key: 'contacts', path: '/contacts?page[size]=1' },
@@ -1442,6 +1462,14 @@ export const pushLocalFacturaToQuipu = async (req: any, res: Response) => {
   } catch (e: any) {
     console.error('[QuipuPush] error:', e?.message);
     let errorMessage = e?.message || 'Error al enviar factura a Quipu.';
+    if (String(errorMessage).includes('numeration:')) {
+      try {
+        const numerations = await summarizeQuipuNumerations(userId);
+        errorMessage = `${errorMessage} Series disponibles en Quipu sincronizadas: ${numerations}`;
+      } catch (numerationError: any) {
+        errorMessage = `${errorMessage} No se pudieron resumir las series: ${numerationError?.message || 'error'}`;
+      }
+    }
     if (String(errorMessage).includes('404')) {
       try {
         const token = await requestQuipuToken(settings);
