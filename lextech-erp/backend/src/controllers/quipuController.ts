@@ -766,10 +766,16 @@ export async function pushFacturaToQuipuInternal(userId: string, facturaId: stri
 
   const payload = { data: { type: 'invoices', attributes, ...(Object.keys(relationships).length ? { relationships } : {}) } };
   console.log(`[QuipuPush] manual payload factura=${facturaId}: ${JSON.stringify(payload)}`);
-  const created = await quipuOwnerFetch<any>(settings, '/invoices', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  }, accessToken);
+  let created: any;
+  try {
+    created = await quipuOwnerFetch<any>(settings, '/invoices', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }, accessToken);
+  } catch (error: any) {
+    const numerationDebug = numberingSeriesId || 'sin-serie';
+    throw new Error(`${error?.message || 'Error creando factura en Quipu.'} Payload debug: ${JSON.stringify({ numerationId: numerationDebug, serieLocal: f.serie || null, filingNumber: attributes?.filing_number || null, dueDates: attributes?.due_dates || null, relationships: payload.data.relationships || null, attributes: payload.data.attributes || null })}`);
+  }
 
   const quipuId = String(created?.data?.id || '');
   if (quipuId) {
