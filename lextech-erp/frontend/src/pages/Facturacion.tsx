@@ -1089,7 +1089,10 @@ function FacturacionContent() {
     const allYears = new Set<number>();
     [...facturas.map(f => f.fecha), ...gastos.map(g => g.fecha), ...presupuestos.map(p => p.fecha)]
       .filter(Boolean)
-      .forEach(d => { const y = new Date(d).getFullYear(); if (!isNaN(y)) allYears.add(y); });
+      .forEach(d => {
+        const date = parseValidDate(d);
+        if (date) allYears.add(date.getFullYear());
+      });
     const cur = new Date().getFullYear();
     allYears.add(cur);
     allYears.add(cur + 1);
@@ -1163,7 +1166,8 @@ function FacturacionContent() {
     const monthFormatter = new Intl.DateTimeFormat("es-ES", { month: "short" });
     const buckets = new Map<string, { mes: string; emitido: number; cobrado: number; sort: string }>();
     filteredFacturas.forEach((factura) => {
-      const date = new Date(factura.fecha);
+      const date = parseValidDate(factura.fecha);
+      if (!date) return;
       const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
       const current = buckets.get(key) || { mes: monthFormatter.format(date).replace(".", ""), emitido: 0, cobrado: 0, sort: key };
       current.emitido += factura.total;
@@ -2654,8 +2658,14 @@ function MonthlyBarChart({ facturas, gastos, year, chartType }: { facturas: Fact
   const barW   = Math.floor(chartW / 12 * 0.4);
 
   const monthly = MONTH_LABELS.map((label, mi) => {
-    const ing = facturas.filter(f => { const d = new Date(f.fecha); return d.getFullYear() === year && d.getMonth() === mi; }).reduce((s, f) => s + f.total, 0);
-    const gas = gastos.filter(g => { const d = new Date(g.fecha); return d.getFullYear() === year && d.getMonth() === mi; }).reduce((s, g) => s + g.total, 0);
+    const ing = facturas.filter(f => {
+      const d = parseValidDate(f.fecha);
+      return !!d && d.getFullYear() === year && d.getMonth() === mi;
+    }).reduce((s, f) => s + f.total, 0);
+    const gas = gastos.filter(g => {
+      const d = parseValidDate(g.fecha);
+      return !!d && d.getFullYear() === year && d.getMonth() === mi;
+    }).reduce((s, g) => s + g.total, 0);
     return { label, ing, gas };
   });
 
