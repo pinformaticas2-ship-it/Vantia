@@ -100,10 +100,6 @@ function buildQuipuInvoiceAttributes(factura: any, options?: { mode?: 'hybrid' }
     payment_method: mapQuipuPaymentMethod(factura?.forma_pago),
   };
 
-  if (mode === 'hybrid') {
-    attributes.total_amount = Number(factura?.total || 0).toFixed(2);
-  }
-
   return attributes;
 }
 
