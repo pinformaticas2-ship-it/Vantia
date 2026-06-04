@@ -2190,24 +2190,36 @@ interface RibbonBtn {
   title?: string;
 }
 
+const TAB_LABELS: Record<RibbonTab, string> = {
+  inicio: 'Inicio',
+  herramientas: 'Herramientas',
+  configuracion: 'Configuración',
+};
+
 function RibbonButton({ icon, label, onClick, disabled, danger }: RibbonBtn) {
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`flex flex-col items-center gap-0.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors min-w-[52px]
-        ${disabled ? 'opacity-40 cursor-not-allowed text-gray-400' :
-          danger ? 'text-red-600 hover:bg-red-50' :
-          'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}`}
+      title={label}
+      className={`group flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-xl text-[11px] font-medium transition-all min-w-[58px] border border-transparent
+        ${disabled
+          ? 'opacity-35 cursor-not-allowed text-gray-400'
+          : danger
+            ? 'text-red-500 hover:bg-red-50 hover:border-red-100 hover:text-red-600 active:scale-95'
+            : 'text-gray-500 hover:bg-gray-50 hover:border-gray-200 hover:text-gray-800 active:scale-95'
+        }`}
     >
-      <span className="flex-shrink-0">{icon}</span>
-      <span className="leading-tight text-center">{label}</span>
+      <span className={`flex-shrink-0 transition-transform ${disabled ? '' : 'group-hover:scale-110'}`}>
+        {icon}
+      </span>
+      <span className="leading-tight text-center whitespace-nowrap">{label}</span>
     </button>
   );
 }
 
 function RibbonSep() {
-  return <div className="w-px h-10 bg-gray-200 mx-1 self-center" />;
+  return <div className="w-px bg-gray-200 mx-1.5 self-stretch my-2 rounded-full" />;
 }
 
 interface RibbonBarProps {
@@ -2237,63 +2249,64 @@ function RibbonBar({
   onSearch, onEmptyTrash, onShowAccounts, onShowSignatures, onShowTemplates, onShowGroups,
 }: RibbonBarProps) {
   const hasEmail = !!selectedEmail;
-  const isTrash  = false;
 
   return (
-    <div className="flex-shrink-0 border-b border-gray-200 bg-white select-none">
-      {/* Tabs */}
-      <div className="flex items-center gap-0 px-2 pt-1 border-b border-gray-100">
-        {(['inicio', 'herramientas', 'configuracion'] as RibbonTab[]).map(tab => (
+    <div className="flex-shrink-0 bg-white border-b border-gray-200 shadow-sm select-none">
+      {/* Tab strip */}
+      <div className="flex items-end gap-0 px-3 pt-1.5">
+        {(Object.keys(TAB_LABELS) as RibbonTab[]).map(tab => (
           <button
             key={tab}
             onClick={() => onTabChange(tab)}
-            className={`px-4 py-1.5 text-xs font-semibold rounded-t-md capitalize transition-colors
+            className={`relative px-4 py-1.5 text-[11px] font-semibold rounded-t-lg transition-all
               ${activeTab === tab
-                ? 'bg-indigo-600 text-white'
-                : 'text-gray-500 hover:text-gray-800 hover:bg-gray-100'}`}
+                ? 'text-indigo-700 bg-indigo-50 border border-b-0 border-indigo-200 -mb-px z-10'
+                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}
           >
-            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            {TAB_LABELS[tab]}
           </button>
         ))}
+        {/* Decorative bottom line that "connects" to the active tab */}
+        <div className="flex-1 border-b border-gray-200 mb-0 self-end" />
       </div>
 
-      {/* Buttons */}
-      <div className="flex items-center gap-0.5 px-3 py-1.5 overflow-x-auto">
+      {/* Button toolbar */}
+      <div className="flex items-stretch gap-0 px-3 py-1.5 overflow-x-auto">
         {activeTab === 'inicio' && (<>
-          <RibbonButton icon={<Edit3 size={16}/>} label="Nuevo" onClick={onCompose} disabled={!hasActiveMailbox}/>
+          <RibbonButton icon={<Edit3 size={17}/>}     label="Nuevo"           onClick={onCompose}  disabled={!hasActiveMailbox}/>
           <RibbonSep/>
-          <RibbonButton icon={<Trash2 size={16}/>} label="Eliminar" onClick={onDelete} disabled={!hasEmail} danger/>
+          <RibbonButton icon={<Trash2 size={17}/>}    label="Eliminar"        onClick={onDelete}   disabled={!hasEmail} danger/>
           <RibbonSep/>
-          <RibbonButton icon={<Reply size={16}/>}   label="Responder"       onClick={onReply}    disabled={!hasEmail}/>
-          <RibbonButton icon={<ReplyAll size={16}/>} label="Resp. Todos"    onClick={onReplyAll} disabled={!hasEmail}/>
-          <RibbonButton icon={<Forward size={16}/>}  label="Reenviar"       onClick={onForward}  disabled={!hasEmail}/>
+          <RibbonButton icon={<Reply size={17}/>}     label="Responder"       onClick={onReply}    disabled={!hasEmail}/>
+          <RibbonButton icon={<ReplyAll size={17}/>}  label="Resp. Todos"     onClick={onReplyAll} disabled={!hasEmail}/>
+          <RibbonButton icon={<Forward size={17}/>}   label="Reenviar"        onClick={onForward}  disabled={!hasEmail}/>
           <RibbonSep/>
-          <RibbonButton icon={<RefreshCw size={16}/>} label="Enviar y Recibir" onClick={onSync} disabled={!hasActiveMailbox}/>
+          <RibbonButton icon={<RefreshCw size={17}/>} label="Enviar y Recibir" onClick={onSync}   disabled={!hasActiveMailbox}/>
           <RibbonSep/>
-          <RibbonButton icon={<Search size={16}/>}  label="Buscador"  onClick={onSearch} disabled={!hasActiveMailbox}/>
-          <RibbonButton icon={<Eye size={16}/>}      label="Vista Previa" onClick={() => {}} disabled={!hasEmail}/>
+          <RibbonButton icon={<Search size={17}/>}    label="Buscador"        onClick={onSearch}   disabled={!hasActiveMailbox}/>
+          <RibbonButton icon={<Eye size={17}/>}       label="Vista Previa"    onClick={() => {}}   disabled={!hasEmail}/>
           <RibbonSep/>
-          <RibbonButton icon={<Inbox size={16}/>}   label="Imprimir"  onClick={onPrint}  disabled={!hasEmail}/>
+          <RibbonButton icon={<Inbox size={17}/>}     label="Imprimir"        onClick={onPrint}    disabled={!hasEmail}/>
         </>)}
 
         {activeTab === 'herramientas' && (<>
-          <RibbonButton icon={<Plus size={16}/>}    label="Alta"           onClick={onCompose}     disabled={!hasActiveMailbox}/>
+          <RibbonButton icon={<Plus size={17}/>}      label="Alta"             onClick={onCompose}     disabled={!hasActiveMailbox}/>
           <RibbonSep/>
-          <RibbonButton icon={<RefreshCw size={16}/>} label="Enviar y Recibir" onClick={onSync}   disabled={!hasActiveMailbox}/>
+          <RibbonButton icon={<RefreshCw size={17}/>} label="Enviar y Recibir" onClick={onSync}       disabled={!hasActiveMailbox}/>
           <RibbonSep/>
-          <RibbonButton icon={<Trash2 size={16}/>}  label="Vaciar Eliminados" onClick={onEmptyTrash} danger disabled={!hasActiveMailbox}/>
+          <RibbonButton icon={<Trash2 size={17}/>}   label="Vaciar Eliminados" onClick={onEmptyTrash} disabled={!hasActiveMailbox} danger/>
         </>)}
 
         {activeTab === 'configuracion' && (<>
-          <RibbonButton icon={<AtSign size={16}/>}  label="Cuentas"          onClick={onShowAccounts}/>
+          <RibbonButton icon={<AtSign size={17}/>}   label="Cuentas"          onClick={onShowAccounts}/>
           <RibbonSep/>
-          <RibbonButton icon={<FileText size={16}/>} label="Plantillas"      onClick={onShowTemplates}/>
-          <RibbonButton icon={<Edit3 size={16}/>}   label="Firmas"           onClick={onShowSignatures}/>
+          <RibbonButton icon={<FileText size={17}/>} label="Plantillas"       onClick={onShowTemplates}/>
+          <RibbonButton icon={<Edit3 size={17}/>}    label="Firmas"           onClick={onShowSignatures}/>
           <RibbonSep/>
-          <RibbonButton icon={<Filter size={16}/>}  label="Reglas"           onClick={() => {}} disabled/>
+          <RibbonButton icon={<Filter size={17}/>}   label="Reglas"           onClick={() => {}} disabled/>
           <RibbonSep/>
-          <RibbonButton icon={<Tag size={16}/>}     label="Destinatarios"    onClick={() => {}} disabled/>
-          <RibbonButton icon={<Shield size={16}/>}  label="Grupos"           onClick={onShowGroups}/>
+          <RibbonButton icon={<Tag size={17}/>}      label="Destinatarios"    onClick={() => {}} disabled/>
+          <RibbonButton icon={<Shield size={17}/>}   label="Grupos"           onClick={onShowGroups}/>
         </>)}
       </div>
     </div>
