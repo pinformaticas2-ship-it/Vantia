@@ -22,6 +22,7 @@ import {
   getRecipientSuggestions,
   logGmailSent,
   linkEmailToExpediente,
+  emptyTrash,
 } from '../controllers/emailController';
 
 const router = Router();
@@ -54,6 +55,9 @@ router.get('/drafts',             getDrafts);
 
 // ── Stats ────────────────────────────────────────────────────────────────────
 router.get('/stats',              getStats);
+
+// ── Papelera ──────────────────────────────────────────────────────────────────
+router.delete('/trash',           emptyTrash);
 
 // ── Asociar email a expediente ───────────────────────────────────────────────
 router.patch('/messages/:id/link', linkEmailToExpediente);
