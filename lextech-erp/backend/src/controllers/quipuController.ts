@@ -14,6 +14,20 @@ const sanitizeText = (value: any) => {
   return text || null;
 };
 
+function formatQuipuDate(value: any): string | null {
+  if (!value) return null;
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null;
+    return value.toISOString().slice(0, 10);
+  }
+  const raw = String(value).trim();
+  if (!raw) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toISOString().slice(0, 10);
+}
+
 function buildQuipuFilingNumber(num: any, serie?: any) {
   const cleanNum = sanitizeText(num);
   const cleanSerie = sanitizeText(serie);
@@ -72,10 +86,10 @@ function extractQuipuInvoiceTotal(invoice: any) {
 }
 
 function buildQuipuInvoiceAttributes(factura: any, options?: { mode?: 'hybrid' }) {
-  const issueDate = factura?.fecha ? String(factura.fecha).slice(0, 10) : new Date().toISOString().slice(0, 10);
+  const issueDate = formatQuipuDate(factura?.fecha) || new Date().toISOString().slice(0, 10);
   const filingNumber = buildQuipuFilingNumber(factura?.num, factura?.serie);
   const mode = options?.mode || 'hybrid';
-  const dueDate = factura?.vencimiento ? String(factura.vencimiento).slice(0, 10) : undefined;
+  const dueDate = formatQuipuDate(factura?.vencimiento) || undefined;
 
   const attributes: any = {
     kind: 'income',
