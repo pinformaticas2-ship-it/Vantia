@@ -749,6 +749,51 @@ export async function pushFacturaToQuipuInternal(userId: string, facturaId: stri
 
   const quipuId = String(created?.data?.id || '');
   if (quipuId) {
+    try {
+      let detail = await fetchQuipuInvoiceDetail(settings, accessToken, quipuId);
+      let total = extractQuipuInvoiceTotal(detail);
+
+      if (total <= 0) {
+        const patchOfficialItems = {
+          data: {
+            type: 'invoices',
+            id: quipuId,
+            attributes: buildQuipuInvoiceAttributes(f, { mode: 'official_items' }),
+            ...(Object.keys(relationships).length ? { relationships } : {}),
+          },
+        };
+        console.log(`[QuipuPush] best-effort patch official_items factura=${facturaId}: ${JSON.stringify(patchOfficialItems)}`);
+        await quipuOwnerFetch<any>(settings, `/invoices/${quipuId}`, {
+          method: 'PATCH',
+          body: JSON.stringify(patchOfficialItems),
+        }, accessToken);
+        detail = await fetchQuipuInvoiceDetail(settings, accessToken, quipuId);
+        total = extractQuipuInvoiceTotal(detail);
+      }
+
+      if (total <= 0) {
+        const patchItemsAttributes = {
+          data: {
+            type: 'invoices',
+            id: quipuId,
+            attributes: buildQuipuInvoiceAttributes(f, { mode: 'items_attributes_only' }),
+            ...(Object.keys(relationships).length ? { relationships } : {}),
+          },
+        };
+        console.log(`[QuipuPush] best-effort patch items_attributes_only factura=${facturaId}: ${JSON.stringify(patchItemsAttributes)}`);
+        await quipuOwnerFetch<any>(settings, `/invoices/${quipuId}`, {
+          method: 'PATCH',
+          body: JSON.stringify(patchItemsAttributes),
+        }, accessToken);
+        detail = await fetchQuipuInvoiceDetail(settings, accessToken, quipuId);
+        total = extractQuipuInvoiceTotal(detail);
+      }
+
+      console.log(`[QuipuPush] post-create total factura=${facturaId} quipuId=${quipuId} total=${total}`);
+    } catch (patchError: any) {
+      console.warn(`[QuipuPush] best-effort amount patch failed factura=${facturaId} quipuId=${quipuId}: ${patchError?.message}`);
+    }
+
     await pool.query(`UPDATE facturacion_facturas SET quipu_id=$1, updated_at=NOW() WHERE id=$2 AND user_id=$3`, [quipuId, facturaId, userId]);
     console.log(`[QuipuPush] factura=${facturaId} quipuId=${quipuId}`);
   }
