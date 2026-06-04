@@ -137,7 +137,6 @@ export async function quipuApiFetch<T = any>(
   init?: RequestInit,
   preAuthToken?: string,
   _retries = 2,
-  _contentTypeAttempt = 0,
 ): Promise<T> {
   const accessToken = preAuthToken || await getValidToken(settings);
   const baseUrl = normalizeBaseUrl(settings.base_url);
@@ -159,23 +158,7 @@ export async function quipuApiFetch<T = any>(
   if (response.status === 429 && _retries > 0) {
     console.log(`[Quipu] 429 rate limit on ${path}, waiting 6s (retries left: ${_retries - 1})`);
     await sleep(6000);
-    return quipuApiFetch<T>(settings, path, init, accessToken, _retries - 1, _contentTypeAttempt);
-  }
-
-  if (response.status === 404 && hasBody && (method === 'POST' || method === 'PATCH') && _contentTypeAttempt < 2) {
-    const fallbackContentTypes = ['application/json', 'application/vnd.api+json'];
-    const nextContentType = fallbackContentTypes[_contentTypeAttempt];
-    const retriedHeaders = new Headers(init?.headers || {});
-    retriedHeaders.set('Content-Type', nextContentType);
-    console.warn(`[Quipu] 404 on ${method} ${path}; retrying with Content-Type ${nextContentType}`);
-    return quipuApiFetch<T>(
-      settings,
-      path,
-      { ...init, headers: retriedHeaders },
-      accessToken,
-      _retries,
-      _contentTypeAttempt + 1,
-    );
+    return quipuApiFetch<T>(settings, path, init, accessToken, _retries - 1);
   }
 
   try {
