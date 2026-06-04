@@ -273,6 +273,36 @@ async function getStoredQuipuSettings(userId: string) {
   return result.rows[0] || null;
 }
 
+async function diagnoseQuipuEndpoints(settings: any, token?: string | null) {
+  const checks = [
+    { key: 'contacts', path: '/contacts?page[size]=1' },
+    { key: 'invoices', path: '/invoices?page[size]=1&sort=-issued_at' },
+    { key: 'company', path: '/company' },
+    { key: 'numbering_series', path: '/numbering_series?page[size]=1' },
+  ];
+
+  const results: Array<{ key: string; ok: boolean; detail: string }> = [];
+
+  for (const check of checks) {
+    try {
+      const response = await quipuOwnerFetch<any>(settings, check.path, undefined, token || undefined);
+      const total =
+        response?.meta?.total_entries ??
+        response?.meta?.pagination_info?.total_results ??
+        (Array.isArray(response?.data) ? response.data.length : response?.data?.id || 'ok');
+      results.push({ key: check.key, ok: true, detail: String(total) });
+    } catch (error: any) {
+      results.push({ key: check.key, ok: false, detail: String(error?.message || 'error') });
+    }
+  }
+
+  return results;
+}
+
+function summarizeQuipuEndpointDiagnosis(results: Array<{ key: string; ok: boolean; detail: string }>): string {
+  return results.map((item) => `${item.key}=${item.ok ? 'ok' : 'fail'}(${item.detail})`).join(' | ');
+}
+
 function normalizeOwnerSlugInput(value: any): string {
   const raw = sanitizeText(value);
   if (!raw) return '';
@@ -909,6 +939,13 @@ export const saveQuipuCredentials = async (req: any, res: Response) => {
 
   try {
     const token = await requestQuipuToken({ app_id: appId, app_secret: appSecret, base_url: baseUrl, owner_slug: ownerSlug });
+    const endpointDiagnosis = await diagnoseQuipuEndpoints({ app_id: appId, app_secret: appSecret, base_url: baseUrl, owner_slug: ownerSlug }, token.accessToken);
+    const contactsOk = endpointDiagnosis.find((item) => item.key === 'contacts')?.ok;
+    const companyOk = endpointDiagnosis.find((item) => item.key === 'company')?.ok;
+    const invoicesOk = endpointDiagnosis.find((item) => item.key === 'invoices')?.ok;
+    if (!invoicesOk && (contactsOk || companyOk)) {
+      throw new Error(`La autenticacion con Quipu es valida, pero el recurso de facturas no responde para esta cuenta/configuracion. Diagnostico: ${summarizeQuipuEndpointDiagnosis(endpointDiagnosis)}`);
+    }
     const userName = await resolveUserName(userId);
     const result = await pool.query(
       `INSERT INTO quipu_settings
@@ -1433,6 +1470,16 @@ export const pushLocalFacturaToQuipu = async (req: any, res: Response) => {
     res.json({ success: true, data: { quipuId, quipuInvoice: created?.data } });
   } catch (e: any) {
     console.error('[QuipuPush] error:', e?.message);
-    res.status(500).json({ success: false, error: e?.message || 'Error al enviar factura a Quipu.' });
+    let errorMessage = e?.message || 'Error al enviar factura a Quipu.';
+    if (String(errorMessage).includes('404')) {
+      try {
+        const token = await requestQuipuToken(settings);
+        const endpointDiagnosis = await diagnoseQuipuEndpoints(settings, token.accessToken);
+        errorMessage = `${errorMessage} Diagnostico: ${summarizeQuipuEndpointDiagnosis(endpointDiagnosis)}`;
+      } catch (diagnosisError: any) {
+        errorMessage = `${errorMessage} Diagnostico adicional fallido: ${diagnosisError?.message || 'error'}`;
+      }
+    }
+    res.status(500).json({ success: false, error: errorMessage });
   }
 };
