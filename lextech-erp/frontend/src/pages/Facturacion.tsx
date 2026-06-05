@@ -82,6 +82,7 @@ type BillingFormType = "factura" | "gasto" | "presupuesto";
 
 type Factura = {
   id: string;
+  quipuId?: string;
   num: string;
   contacto: string;
   clientId: string;
@@ -161,6 +162,7 @@ type QuipuStatus = {
 
 type RawFactura = {
   id: string;
+  quipu_id?: string | null;
   num: string;
   contacto: string;
   client_id?: string | null;
@@ -283,6 +285,7 @@ const buildExpedienteRef = (row: {
 
 const mapFacturaFromApi = (row: RawFactura): Factura => ({
   id: row.id,
+  quipuId: row.quipu_id || "",
   num: row.num,
   contacto: row.contacto,
   clientId: row.client_id || "",
@@ -966,6 +969,7 @@ function FacturacionContent() {
   const [loadingQuipu, setLoadingQuipu] = useState(false);
   const [quipuError, setQuipuError] = useState<string | null>(null);
   const [pushingToQuipuId, setPushingToQuipuId] = useState<string | null>(null);
+  const [openingQuipuPdfId, setOpeningQuipuPdfId] = useState<string | null>(null);
   const [showContactEditor, setShowContactEditor] = useState(false);
   const [editingContact, setEditingContact] = useState<QuipuContact | null>(null);
   const [savingContact, setSavingContact] = useState(false);
@@ -1444,6 +1448,25 @@ function FacturacionContent() {
     } catch (e: any) { setErrorMsg(e?.message || "Error al enviar factura a Quipu."); }
     finally { setPushingToQuipuId(null); }
   }, [getToken, loadBilling]);
+
+  const openQuipuInvoicePdf = useCallback(async (factura: Factura) => {
+    if (!factura.quipuId) return;
+    setOpeningQuipuPdfId(factura.id);
+    setErrorMsg(null);
+    try {
+      const response = await apiFetch(`/api/quipu/invoices/${factura.quipuId}`, { getToken });
+      const attributes = response?.data?.data?.attributes || response?.data?.attributes || {};
+      const pdfUrl = attributes?.ephemeral_open_download_pdf_url || attributes?.download_pdf_url || "";
+      if (!pdfUrl) {
+        throw new Error("Quipu no devolvio una URL de PDF para esta factura.");
+      }
+      window.open(String(pdfUrl), "_blank", "noopener,noreferrer");
+    } catch (error: any) {
+      setErrorMsg(error?.message || "No se pudo abrir el PDF de Quipu.");
+    } finally {
+      setOpeningQuipuPdfId(null);
+    }
+  }, [getToken]);
 
   const saveContact = async (attrs: Partial<QuipuContact>) => {
     setSavingContact(true);
@@ -2193,17 +2216,24 @@ function FacturacionContent() {
                       <td className="px-5 py-3"><EstadoBadge estado={row.estado} /></td>
                       <td className="px-5 py-3">
                         <div className="flex justify-end gap-2">
-                          {quipuStatus.connected && !(row as any).quipu_id && (
+                          {quipuStatus.connected && !row.quipuId && (
                             <ActionIconButton title="Enviar a Quipu" onClick={() => pushToQuipu(row.id)}>
                               {pushingToQuipuId === row.id
                                 ? <Loader2 size={13} className="animate-spin" />
                                 : <Upload size={13} />}
                             </ActionIconButton>
                           )}
-                          {(row as any).quipu_id && (
-                            <span title="Ya en Quipu" className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-200 text-emerald-500">
-                              <CheckCircle2 size={13} />
-                            </span>
+                          {row.quipuId && (
+                            <>
+                              <span title="Ya en Quipu" className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-200 text-emerald-500">
+                                <CheckCircle2 size={13} />
+                              </span>
+                              <ActionIconButton title="Abrir PDF de Quipu" onClick={() => openQuipuInvoicePdf(row)}>
+                                {openingQuipuPdfId === row.id
+                                  ? <Loader2 size={13} className="animate-spin" />
+                                  : <ExternalLink size={13} />}
+                              </ActionIconButton>
+                            </>
                           )}
                           <ActionIconButton title="Editar factura" onClick={() => openEditor("factura", row)}>
                             <Pencil size={14} />
