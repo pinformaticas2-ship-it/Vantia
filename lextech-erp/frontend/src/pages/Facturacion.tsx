@@ -1455,8 +1455,21 @@ function FacturacionContent() {
     setErrorMsg(null);
     try {
       const response = await apiFetch(`/api/quipu/invoices/${factura.quipuId}`, { getToken });
-      const attributes = response?.data?.data?.attributes || response?.data?.attributes || {};
-      const pdfUrl = attributes?.ephemeral_open_download_pdf_url || attributes?.download_pdf_url || "";
+      const invoiceData = response?.data?.data || response?.data || {};
+      const attributes = invoiceData?.attributes || {};
+      const links = invoiceData?.links || {};
+      const included = Array.isArray(response?.data?.included) ? response.data.included : Array.isArray(invoiceData?.included) ? invoiceData.included : [];
+      const includedPdfUrl = included
+        .map((item: any) => item?.attributes?.ephemeral_open_download_pdf_url || item?.attributes?.download_pdf_url || "")
+        .find(Boolean);
+      const pdfUrl =
+        attributes?.ephemeral_open_download_pdf_url ||
+        attributes?.download_pdf_url ||
+        links?.ephemeral_open_download_pdf_url ||
+        links?.download_pdf_url ||
+        links?.pdf ||
+        includedPdfUrl ||
+        "";
       if (!pdfUrl) {
         throw new Error("Quipu no devolvio una URL de PDF para esta factura.");
       }
