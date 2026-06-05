@@ -1470,7 +1470,22 @@ function FacturacionContent() {
         links?.pdf ||
         includedPdfUrl ||
         "";
+      const normalizedBaseUrl = String(quipuStatus.baseUrl || "https://getquipu.com").replace(/\/+$/, "");
+      const normalizedOwnerSlug = String(quipuStatus.ownerSlug || "").trim().replace(/^\/+|\/+$/g, "");
+      const quipuInvoiceUrl =
+        normalizedOwnerSlug
+          ? Array.from(new Set([
+              normalizedOwnerSlug.startsWith("d/")
+                ? `${normalizedBaseUrl}/${normalizedOwnerSlug}/invoices/${factura.quipuId}`
+                : `${normalizedBaseUrl}/d/${normalizedOwnerSlug}/invoices/${factura.quipuId}`,
+              `${normalizedBaseUrl}/${normalizedOwnerSlug}/invoices/${factura.quipuId}`,
+            ])).find(Boolean) || ""
+          : "";
       if (!pdfUrl) {
+        if (quipuInvoiceUrl) {
+          window.open(quipuInvoiceUrl, "_blank", "noopener,noreferrer");
+          return;
+        }
         throw new Error("Quipu no devolvio una URL de PDF para esta factura.");
       }
       window.open(String(pdfUrl), "_blank", "noopener,noreferrer");
@@ -1479,7 +1494,7 @@ function FacturacionContent() {
     } finally {
       setOpeningQuipuPdfId(null);
     }
-  }, [getToken]);
+  }, [getToken, quipuStatus.baseUrl, quipuStatus.ownerSlug]);
 
   const saveContact = async (attrs: Partial<QuipuContact>) => {
     setSavingContact(true);
