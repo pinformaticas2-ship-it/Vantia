@@ -1572,7 +1572,7 @@ function FacturacionContent() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[radial-gradient(circle_at_top_right,rgba(248,113,113,0.08),transparent_24%),linear-gradient(180deg,#f8fafc_0%,#f1f5f9_100%)]">
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto" style={{ scrollbarGutter: "stable" }}>
         <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-6">
           {errorMsg && (
             <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
@@ -2216,7 +2216,7 @@ function FacturacionContent() {
                       filteredCobrosPendientes.length > pendingInvoicesPreviewCount ? (
                         <button
                           onClick={() => setShowAllPendingInvoices((current) => !current)}
-                          className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50"
+                          className="min-w-[9.5rem] rounded-xl border border-slate-200 bg-white px-4 py-2 text-center text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50"
                         >
                           {showAllPendingInvoices ? "Ver menos" : `Ver todos (${filteredCobrosPendientes.length})`}
                         </button>
