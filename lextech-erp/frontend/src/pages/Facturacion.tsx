@@ -28,6 +28,8 @@ import {
   X,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
+import { UndoToast } from "../components/UndoToast";
+import { useUndoDelete } from "../lib/useUndoDelete";
 
 type FilterPeriod = "year" | "q1" | "q2" | "q3" | "q4" | "jan" | "feb" | "mar" | "apr" | "may" | "jun" | "jul" | "aug" | "sep" | "oct" | "nov" | "dec";
 type TabKey = "dashboard" | "facturas" | "gastos" | "presupuestos" | "contacts" | "bank_accounts" | "receipts" | "config";
@@ -211,6 +213,11 @@ type RawPresupuesto = {
   area: BillingArea;
   responsable?: string | null;
   iguala?: boolean | null;
+};
+
+type PendingFacturaDelete = {
+  factura: Factura;
+  index: number;
 };
 
 const PERIOD_OPTIONS: { value: FilterPeriod; label: string; group?: "quarter" | "month" }[] = [
@@ -986,6 +993,19 @@ function FacturacionContent() {
   const [isSilentSyncing, setIsSilentSyncing] = useState(false);
   const silentSyncDoneRef = useRef(false);
 
+  const deleteFacturaPermanently = useCallback(async (id: string) => {
+    await apiFetch(`/api/facturacion/facturas/${id}`, { method: "DELETE", getToken });
+  }, [getToken]);
+
+  const {
+    pending: pendingFacturaDelete,
+    startDelete: startFacturaDelete,
+    undo: undoFacturaDelete,
+    dismiss: dismissFacturaDelete,
+  } = useUndoDelete<PendingFacturaDelete>({
+    onDelete: deleteFacturaPermanently,
+  });
+
   const TABS: { key: TabKey; label: string; icon?: React.ComponentType<any>; quipuOnly?: boolean }[] = [
     { key: "dashboard",     label: "Vista general" },
     { key: "facturas",      label: "Facturas" },
@@ -1344,21 +1364,37 @@ function FacturacionContent() {
 
   const removeRecord = async (type: BillingFormType, id: string) => {
     setErrorMsg(null);
+    if (type === "factura") {
+      const factura = facturas.find((item) => item.id === id);
+      if (!factura) return;
+      const index = facturas.findIndex((item) => item.id === id);
+      setFacturas((current) => current.filter((item) => item.id !== id));
+      startFacturaDelete(id, { factura, index });
+      return;
+    }
     try {
       const basePath =
-        type === "factura"
-          ? "/api/facturacion/facturas"
-          : type === "gasto"
+        type === "gasto"
             ? "/api/facturacion/gastos"
             : "/api/facturacion/presupuestos";
       await apiFetch(`${basePath}/${id}`, { method: "DELETE", getToken });
-      if (type === "factura") setFacturas((current) => current.filter((item) => item.id !== id));
       if (type === "gasto") setGastos((current) => current.filter((item) => item.id !== id));
       if (type === "presupuesto") setPresupuestos((current) => current.filter((item) => item.id !== id));
     } catch (error: any) {
       setErrorMsg(error?.message || "No se pudo eliminar el registro.");
     }
   };
+
+  const handleUndoFacturaDelete = useCallback(() => {
+    const pending = undoFacturaDelete();
+    if (!pending) return;
+    setFacturas((current) => {
+      const next = [...current];
+      const insertIndex = Math.max(0, Math.min(pending.index, next.length));
+      next.splice(insertIndex, 0, pending.factura);
+      return next;
+    });
+  }, [undoFacturaDelete]);
 
   // ── Quipu live loaders ───────────────────────────────────────
 
@@ -2396,6 +2432,15 @@ function FacturacionContent() {
           saving={savingContact}
           onClose={() => { setShowContactEditor(false); setEditingContact(null); }}
           onSave={saveContact}
+        />
+      )}
+
+      {pendingFacturaDelete && (
+        <UndoToast
+          message={`Factura ${pendingFacturaDelete.item.factura.num} eliminada`}
+          startedAt={pendingFacturaDelete.startedAt}
+          onUndo={handleUndoFacturaDelete}
+          onDismiss={dismissFacturaDelete}
         />
       )}
     </div>
