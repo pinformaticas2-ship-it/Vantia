@@ -408,6 +408,49 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false, loc
     }
   };
 
+  // ── Adjuntar todos los archivos de la cola sin preguntar ────────
+  const uploadAllFiles = async () => {
+    const firstFile = pendingUploadFile.current;
+    if (!firstFile) return;
+    const allFiles = [firstFile, ...uploadQueue];
+    setSavingMetadata(true);
+    setUploadQueue([]);
+    setUploadQueueTotal(0);
+    pendingUploadFile.current = null;
+    try {
+      const token = await getToken({ skipCache: true });
+      for (let i = 0; i < allFiles.length; i++) {
+        const file = allFiles[i];
+        const fd = new FormData();
+        fd.append('files', file);
+        const res = await fetch(`/api/files/${entityId}`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: fd,
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const fileId = data.data?.[0]?.id;
+          if (fileId) {
+            // Primer archivo: usa los metadatos del modal; el resto: nombre automático + mismo tipo
+            const docName = i === 0 ? (editDocName.trim() || null) : null;
+            await fetch(`/api/files/${entityId}/${fileId}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+              body: JSON.stringify({ document_name: docName, attachment_type: editAttachmentType }),
+            });
+          }
+          window.dispatchEvent(new CustomEvent('historial-changed'));
+        }
+      }
+      await loadFiles();
+    } catch (_e) {}
+    finally {
+      setSavingMetadata(false);
+      setEditingFile(null);
+    }
+  };
+
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault(); setIsDragOver(false);
     const items = e.dataTransfer.items;
@@ -1526,38 +1569,51 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false, loc
             </div>
 
             {/* Footer */}
-            <div className="flex gap-2 px-6 py-4 border-t border-slate-100 bg-slate-50">
-              <button
-                onClick={() => {
-                  setEditingFile(null);
-                  if (editingFile.id === 'PENDING_UPLOAD') {
-                    setUploadQueue([]); setUploadQueueTotal(0); pendingUploadFile.current = null;
-                  }
-                }}
-                className="flex-1 px-4 py-2 text-sm font-medium text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-100 transition-colors"
-              >
-                {editingFile.id === 'PENDING_UPLOAD' && uploadQueueTotal > 1 ? 'Cancelar todo' : 'Cancelar'}
-              </button>
-              <button
-                onClick={() => {
-                  if (editingFile.id === 'NEW_BLANK') createBlankDoc();
-                  else if (editingFile.id === 'PENDING_TEMPLATE') downloadDocPlantTemplate();
-                  else if (editingFile.id === 'PENDING_UPLOAD') uploadSingleFile();
-                  else saveFileMetadata();
-                }}
-                disabled={savingMetadata || (editingFile.id !== 'PENDING_UPLOAD' && !editDocName.trim())}
-                className="flex-1 px-4 py-2 text-sm font-bold text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
-              >
-                {savingMetadata
-                  ? 'Subiendo...'
-                  : editingFile.id === 'NEW_BLANK'
-                  ? 'Crear'
-                  : editingFile.id === 'PENDING_TEMPLATE'
-                  ? 'Usar'
-                  : editingFile.id === 'PENDING_UPLOAD'
-                  ? (uploadQueue.length > 0 ? `Adjuntar (${uploadQueueTotal - uploadQueue.length}/${uploadQueueTotal})` : 'Adjuntar')
-                  : 'Guardar'}
-              </button>
+            <div className="flex flex-col gap-2 px-6 py-4 border-t border-slate-100 bg-slate-50">
+              {/* Botón "Adjuntar todos" — solo aparece cuando hay más archivos en cola */}
+              {editingFile.id === 'PENDING_UPLOAD' && uploadQueue.length > 0 && (
+                <button
+                  onClick={uploadAllFiles}
+                  disabled={savingMetadata}
+                  className="w-full px-4 py-2.5 text-sm font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                >
+                  {savingMetadata ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                  Adjuntar todos ({uploadQueue.length + 1} archivos) — tipo: {editAttachmentType}
+                </button>
+              )}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setEditingFile(null);
+                    if (editingFile.id === 'PENDING_UPLOAD') {
+                      setUploadQueue([]); setUploadQueueTotal(0); pendingUploadFile.current = null;
+                    }
+                  }}
+                  className="flex-1 px-4 py-2 text-sm font-medium text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-100 transition-colors"
+                >
+                  {editingFile.id === 'PENDING_UPLOAD' && uploadQueueTotal > 1 ? 'Cancelar todo' : 'Cancelar'}
+                </button>
+                <button
+                  onClick={() => {
+                    if (editingFile.id === 'NEW_BLANK') createBlankDoc();
+                    else if (editingFile.id === 'PENDING_TEMPLATE') downloadDocPlantTemplate();
+                    else if (editingFile.id === 'PENDING_UPLOAD') uploadSingleFile();
+                    else saveFileMetadata();
+                  }}
+                  disabled={savingMetadata || (editingFile.id !== 'PENDING_UPLOAD' && !editDocName.trim())}
+                  className="flex-1 px-4 py-2 text-sm font-bold text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
+                >
+                  {savingMetadata
+                    ? 'Subiendo...'
+                    : editingFile.id === 'NEW_BLANK'
+                    ? 'Crear'
+                    : editingFile.id === 'PENDING_TEMPLATE'
+                    ? 'Usar'
+                    : editingFile.id === 'PENDING_UPLOAD'
+                    ? (uploadQueue.length > 0 ? `Solo este (${uploadQueueTotal - uploadQueue.length}/${uploadQueueTotal})` : 'Adjuntar')
+                    : 'Guardar'}
+                </button>
+              </div>
             </div>
           </div>
         </div>,
