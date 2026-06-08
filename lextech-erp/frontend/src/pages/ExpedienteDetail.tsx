@@ -945,7 +945,7 @@ function TabNotas({
       )}
 
       {confirmDeleteId && (
-        <div className="fixed inset-0 z-50 bg-slate-950/40 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-transparent flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm p-5 space-y-4">
             <div className="space-y-1">
               <h4 className="text-base font-bold text-slate-900">Eliminar nota</h4>
@@ -2476,7 +2476,7 @@ function ActuacionAdjuntosPanel({ taskId, locked = false }: { taskId: string; lo
 
       {/* Modal editar metadatos */}
       {editingFile && typeof document !== "undefined" && createPortal(
-        <div className="fixed inset-0 z-[160] flex items-center justify-center bg-slate-950/40 p-4" onClick={() => setEditingFile(null)}>
+        <div className="fixed inset-0 z-[160] flex items-center justify-center bg-transparent p-4" onClick={() => setEditingFile(null)}>
           <div className="w-full max-w-lg rounded-2xl bg-white border border-slate-200 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="px-5 py-4 border-b border-slate-100">
               <h4 className="text-base font-bold text-slate-900">{editingFile.id === "PENDING_UPLOAD" ? "Preparar adjunto" : "Editar adjunto"}</h4>
@@ -2509,7 +2509,7 @@ function ActuacionAdjuntosPanel({ taskId, locked = false }: { taskId: string; lo
 
       {/* Modal plantillas */}
       {showTemplates && typeof document !== "undefined" && createPortal(
-        <div className="fixed inset-0 z-[155] flex items-center justify-center bg-slate-950/40 p-4" onClick={() => setShowTemplates(false)}>
+        <div className="fixed inset-0 z-[155] flex items-center justify-center bg-transparent p-4" onClick={() => setShowTemplates(false)}>
           <div className="w-full max-w-5xl rounded-3xl bg-white border border-slate-200 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <div>
@@ -2574,7 +2574,7 @@ function ActuacionAdjuntosPanel({ taskId, locked = false }: { taskId: string; lo
       )}
 
       {confirmDeleteFileId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm mx-4 p-6">
             <div className="flex items-start gap-3 mb-4">
               <div className="p-2 bg-red-100 rounded-xl shrink-0">
@@ -2651,7 +2651,7 @@ function ActuacionModal({
   ].filter(Boolean).join("\n");
 
   return createPortal(
-    <div className="fixed inset-0 z-[140] flex items-center justify-center bg-slate-950/45 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[140] flex items-center justify-center bg-transparent p-4" onClick={onClose}>
       <div
         className="w-full max-w-[1500px] flex flex-col overflow-hidden rounded-3xl bg-white border border-slate-200 shadow-2xl"
         style={{ height: "92vh" }}
@@ -3339,7 +3339,7 @@ function TabCorreoExpediente({
 
       {/* Modal redactar */}
       {showCompose && !locked && (
-        <div className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-sm flex items-end justify-end p-6">
+        <div className="fixed inset-0 z-50 bg-transparent flex items-end justify-end p-6">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg flex flex-col" style={{ maxHeight: "80vh" }}>
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-3 bg-slate-800 rounded-t-2xl">
@@ -3404,7 +3404,7 @@ function TabCorreoExpediente({
 
       {/* Modal asociar correo existente */}
       {showAssociate && createPortal(
-        <div className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-transparent flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl flex flex-col" style={{ maxHeight: "80vh" }}>
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
               <h3 className="text-base font-bold text-slate-900">Asociar correo al expediente</h3>
@@ -3985,7 +3985,7 @@ function TabApuntesEconomicos({ expedienteId, locked = false }: { expedienteId: 
       </div>
 
       {confirmDeleteId && (
-        <div className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-transparent flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm p-5 space-y-4">
             <h4 className="text-base font-bold text-slate-900">Eliminar apunte</h4>
             <p className="text-sm text-slate-500">¿Seguro que quieres eliminar este apunte? Esta acción no se puede deshacer.</p>
@@ -4229,7 +4229,7 @@ function TabExpedientesRelacionados({
 
       {showModal && typeof document !== "undefined" && createPortal(
         <div
-          className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/40 px-4"
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-transparent px-4"
           onClick={() => setShowModal(false)}
         >
           <div

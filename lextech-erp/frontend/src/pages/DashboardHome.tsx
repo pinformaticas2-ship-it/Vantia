@@ -101,6 +101,18 @@ const ALL_WIDGETS = [
   { id:"actividad",   label:"Actividad reciente",  desc:"Últimas acciones realizadas en el ERP",              icon:"⚡" },
   { id:"expedientes", label:"Resumen expedientes", desc:"Acceso rápido a expedientes abiertos",               icon:"📁" },
   { id:"facturacion", label:"Resumen facturación", desc:"Totales facturados, cobrados y pendientes",          icon:"💶" },
+  { id:"module_dashboard",    label:"MÃ³dulo Dashboard",     desc:"Acceso directo al panel principal",               icon:"ðŸ§­" },
+  { id:"module_expedientes",  label:"MÃ³dulo Expedientes",   desc:"Acceso directo a la gestiÃ³n de expedientes",     icon:"ðŸ—‚ï¸" },
+  { id:"module_clientes",     label:"MÃ³dulo Clientes",      desc:"Acceso directo a la base de clientes",           icon:"ðŸ‘¥" },
+  { id:"module_trazabilidad", label:"MÃ³dulo Trazabilidad",  desc:"Acceso directo a actividad y auditorÃ­a",        icon:"ðŸ•µï¸" },
+  { id:"module_agenda",       label:"MÃ³dulo Agenda",        desc:"Acceso directo a citas y calendario",            icon:"ðŸ—“ï¸" },
+  { id:"module_chat",         label:"MÃ³dulo Chat",          desc:"Acceso directo al chat interno",                 icon:"ðŸ’¬" },
+  { id:"module_whatsapp",     label:"MÃ³dulo WhatsApp",      desc:"Acceso directo a la comunicaciÃ³n con clientes", icon:"ðŸ“±" },
+  { id:"module_correo",       label:"MÃ³dulo Correo",        desc:"Acceso directo al gestor de correo",            icon:"âœ‰ï¸" },
+  { id:"module_documental",   label:"MÃ³dulo Documental",    desc:"Acceso directo a CENDOJ, BOE y Lexnet",         icon:"ðŸ“š" },
+  { id:"module_plaud-ia",     label:"MÃ³dulo Plaud IA",      desc:"Acceso directo a grabaciÃ³n y transcripciÃ³n",   icon:"ðŸŽ¤" },
+  { id:"module_chat-ia",      label:"MÃ³dulo Chat IA",       desc:"Acceso directo al asistente IA",                icon:"âœ¨" },
+  { id:"module_config",       label:"MÃ³dulo ConfiguraciÃ³n", desc:"Acceso directo a ajustes del sistema",          icon:"âš™ï¸" },
 ];
 const DASHBOARD_MODULES = [
   { id: "dashboard", label: "Dashboard", desc: "Panel general del despacho", to: "/dashboard", icon: LayoutGrid, tone: "bg-slate-100 text-slate-600" },
@@ -121,7 +133,12 @@ const DASHBOARD_MODULES = [
 const STORAGE_KEY = "dashboard_visible_widgets";
 const ORDER_KEY   = "dashboard_widget_order";
 const DEFAULT_VISIBLE = ["agenda", "tareas", "actividad"];
-const DEFAULT_ORDER   = ["agenda", "tareas", "facturacion", "actividad", "expedientes"];
+const DEFAULT_ORDER   = [
+  "agenda", "tareas", "facturacion", "actividad", "expedientes",
+  "module_dashboard", "module_expedientes", "module_clientes", "module_trazabilidad",
+  "module_agenda", "module_chat", "module_whatsapp", "module_correo",
+  "module_documental", "module_plaud-ia", "module_chat-ia", "module_config",
+];
 function loadVisible(): string[]  { try { const r = localStorage.getItem(STORAGE_KEY); if (r) return JSON.parse(r); } catch {/**/} return DEFAULT_VISIBLE; }
 function loadOrder(): string[]    { try { const r = localStorage.getItem(ORDER_KEY);   if (r) return JSON.parse(r); } catch {/**/} return DEFAULT_ORDER; }
 
@@ -129,7 +146,7 @@ function WidgetPickerModal({ visible, onClose, onSave }: { visible: string[]; on
   const [sel, setSel] = useState<string[]>(visible);
   const toggle = (id: string) => setSel(cur => cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id]);
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent p-4">
       <div className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
           <div>
@@ -371,7 +388,10 @@ export default function DashboardHome() {
   }
   function goTo(path: string) { if (!wasDragging.current) navigate(path); }
 
-  const orderedVisible = widgetOrder.filter(id => visibleWidgets.includes(id));
+  const orderedVisible = [
+    ...widgetOrder.filter(id => visibleWidgets.includes(id)),
+    ...visibleWidgets.filter(id => !widgetOrder.includes(id)),
+  ];
 
   // ── Billing calcs ─────────────────────────────────────────────────────────
   const billingCalc = (() => {
@@ -398,6 +418,32 @@ export default function DashboardHome() {
 
   // ── Widget renderers ──────────────────────────────────────────────────────
   function renderWidget(id: string, handle: ReactNode) {
+    if (id.startsWith("module_")) {
+      const moduleId = id.replace("module_", "");
+      const module = DASHBOARD_MODULES.find((item) => item.id === moduleId);
+      if (!module) return null;
+      const Icon = module.icon;
+      return (
+        <div onClick={() => goTo(module.to)} className="cursor-pointer group bg-white rounded-2xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition-all">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${module.tone}`}>
+                <Icon size={18} />
+              </span>
+              <div>
+                <p className="text-sm font-bold text-slate-900">{module.label}</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">{module.desc}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              {handle}
+              <ChevronRight size={14} className="text-slate-300 group-hover:text-red-500 transition-colors" />
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     switch (id) {
 
       case "agenda": return (
@@ -713,7 +759,7 @@ export default function DashboardHome() {
         </DndContext>
       )}
 
-      <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+      {false && <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-400">Mapa del ERP</p>
@@ -745,7 +791,7 @@ export default function DashboardHome() {
             );
           })}
         </div>
-      </section>
+      </section>}
 
       {showWidgetPicker && (
         <WidgetPickerModal visible={visibleWidgets} onClose={() => setShowWidgetPicker(false)} onSave={saveVisible} />

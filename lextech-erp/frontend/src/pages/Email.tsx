@@ -1094,7 +1094,7 @@ function ConnectAccountModal({
     </svg>
   );
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40" onClick={onClose}>
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-transparent" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
           <h2 className="text-base font-bold text-gray-900">Conectar cuenta de correo</h2>
@@ -2076,7 +2076,7 @@ function ImapForm({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div>
@@ -2476,7 +2476,7 @@ function SignaturesPanel({ onClose, onSelect }: { onClose: () => void; onSelect?
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent p-4">
       <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col" style={{ maxHeight: '85vh' }}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <h3 className="font-semibold text-gray-900 flex items-center gap-2"><Edit3 size={18}/> Firmas</h3>
@@ -2577,7 +2577,7 @@ function TemplatesPanel({ onClose, onApply }: { onClose: () => void; onApply?: (
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent p-4">
       <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col" style={{ maxHeight: '85vh' }}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <h3 className="font-semibold text-gray-900 flex items-center gap-2"><FileText size={18}/> Plantillas de correo</h3>
@@ -2683,7 +2683,7 @@ function RecipientGroupsPanel({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent p-4">
       <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col" style={{ maxHeight: '85vh' }}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <h3 className="font-semibold text-gray-900 flex items-center gap-2"><Shield size={18}/> Grupos de destinatarios</h3>
@@ -4104,7 +4104,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
       )}
 
       {labelModalOpen && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/35 p-4">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-transparent p-4">
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -4182,7 +4182,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
       )}
 
       {pendingDeleteLabel && (
-        <div className="fixed inset-0 z-[71] flex items-center justify-center bg-slate-950/35 p-4">
+        <div className="fixed inset-0 z-[71] flex items-center justify-center bg-transparent p-4">
           <div className="w-full max-w-md rounded-[28px] border border-slate-200 bg-white shadow-[0_40px_80px_rgba(15,23,42,0.22)] overflow-hidden">
             <div className="px-6 pt-6 pb-4 bg-gradient-to-br from-white via-white to-red-50/40 border-b border-slate-100">
               <div className="flex items-center gap-3">
@@ -4225,7 +4225,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
       )}
 
       {pendingDeleteAccount && (
-        <div className="fixed inset-0 z-[71] flex items-center justify-center bg-slate-950/35 p-4">
+        <div className="fixed inset-0 z-[71] flex items-center justify-center bg-transparent p-4">
           <div className="w-full max-w-md rounded-[28px] border border-slate-200 bg-white shadow-[0_40px_80px_rgba(15,23,42,0.22)] overflow-hidden">
             <div className="px-6 pt-6 pb-4 bg-gradient-to-br from-white via-white to-red-50/40 border-b border-slate-100">
               <div className="flex items-center gap-3">

@@ -5264,7 +5264,7 @@ export default function ExpedienteList() {
 
       {showRelacionarModal && selectedExp && typeof document !== "undefined" && createPortal(
         <div
-          className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/40 px-4"
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-transparent px-4"
           onClick={() => setShowRelacionarModal(false)}
         >
           <div
@@ -5409,7 +5409,7 @@ export default function ExpedienteList() {
       )}
 
       {showExportModal && typeof document !== "undefined" && createPortal(
-        <div className="fixed inset-0 z-[125] flex items-center justify-center bg-slate-950/40 p-3 sm:p-4 animate-in fade-in duration-200" onClick={() => setShowExportModal(false)}>
+        <div className="fixed inset-0 z-[125] flex items-center justify-center bg-transparent p-3 sm:p-4 animate-in fade-in duration-200" onClick={() => setShowExportModal(false)}>
           <div className="flex h-[min(860px,calc(100vh-24px))] w-full max-w-[min(1380px,calc(100vw-24px))] flex-col rounded-3xl border border-slate-200 bg-white shadow-2xl overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-2 duration-200" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-5 py-3">
               <div>
@@ -5566,7 +5566,7 @@ export default function ExpedienteList() {
       )}
 
       {showExportTemplateEditor && typeof document !== "undefined" && createPortal(
-        <div className="fixed inset-0 z-[126] flex items-center justify-center bg-slate-950/40 px-4 animate-in fade-in duration-200" onClick={() => setShowExportTemplateEditor(false)}>
+        <div className="fixed inset-0 z-[126] flex items-center justify-center bg-transparent px-4 animate-in fade-in duration-200" onClick={() => setShowExportTemplateEditor(false)}>
           <div className="w-full max-w-5xl rounded-3xl border border-slate-200 bg-white shadow-2xl overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-2 duration-200" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
               <h3 className="text-lg font-bold text-slate-900">{exportEditorMode === "create" ? "Nueva plantilla de exportación" : "Modificar plantilla de exportación"}</h3>
@@ -5723,7 +5723,7 @@ export default function ExpedienteList() {
 
       {/* ── Confirmar borrado ───────────────────────────────── */}
       {deleteId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm mx-4 p-6">
             <div className="flex items-start gap-3 mb-4">
               <div className="p-2 bg-red-100 rounded-xl shrink-0">
@@ -6542,7 +6542,7 @@ export default function ExpedienteList() {
 
           {/* ── Confirmar borrado masivo ── */}
           {bulkDeleteConfirm && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent">
               <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm mx-4 p-6">
                 <div className="flex items-start gap-3 mb-4">
                   <div className="p-2 bg-red-100 rounded-xl shrink-0">

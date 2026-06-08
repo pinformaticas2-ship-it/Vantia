@@ -746,7 +746,7 @@ function StructuredBillingEditorModal({
   const subtitle = isFactura ? "factura" : isGasto ? "gasto" : "presupuesto";
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/35 p-4">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-transparent p-4">
       <div className="flex min-h-full items-center justify-center">
       <div className="my-auto w-full max-w-5xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
@@ -1383,7 +1383,7 @@ function QuipuConnectModal({
   const [ownerSlug, setOwnerSlug] = useState(initialOwnerSlug || "");
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/35 p-4">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-transparent p-4">
       <div className="flex min-h-full items-center justify-center">
       <div className="my-auto w-full max-w-2xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
@@ -3095,7 +3095,7 @@ function BankAccountsTab({
 
       {/* Add account modal */}
       {showForm && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/35 p-4">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-transparent p-4">
           <div className="flex min-h-full items-center justify-center">
           <div className="my-auto w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
@@ -3670,7 +3670,7 @@ function ContactEditorModal({
   const inp = "w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 outline-none focus:border-slate-300 focus:bg-white transition-colors";
 
   return (
-    <div className="fixed inset-0 z-[200] overflow-y-auto bg-slate-950/30 px-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[200] overflow-y-auto bg-transparent px-4" onClick={onClose}>
       <div className="flex min-h-full items-center justify-center">
       <div className="my-auto w-full max-w-md rounded-3xl border border-slate-200 bg-white overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-slate-100">

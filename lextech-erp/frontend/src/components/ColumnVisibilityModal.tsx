@@ -98,7 +98,7 @@ export default function ColumnVisibilityModal({
   );
 
   return createPortal(
-    <div className="fixed inset-0 z-[140] flex items-center justify-center bg-slate-950/35 p-5">
+    <div className="fixed inset-0 z-[140] flex items-center justify-center bg-transparent p-5">
       <div className="w-full max-w-6xl overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl shadow-slate-900/15">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
           <div>
