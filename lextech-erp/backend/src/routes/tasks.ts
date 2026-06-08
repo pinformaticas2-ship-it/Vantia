@@ -12,6 +12,7 @@ import {
   patchTaskEstado,
   deleteTask,
   getIndicators,
+  getExpedienteIndicators,
   getEtapas,
   createEtapa,
   listTaskFiles,
@@ -62,7 +63,8 @@ router.get('/etapas',               requireAuth, getEtapas);
 router.post('/etapas',              requireAuth, createEtapa);
 
 router.get('/me',                   requireAuth, getMyTasks);
-router.get('/indicators/:clientId', requireAuth, getIndicators);
+router.get('/indicators/expediente/:expedienteId', requireAuth, getExpedienteIndicators);
+router.get('/indicators/:clientId',               requireAuth, getIndicators);
 router.get('/client/:clientId',     requireAuth, getTasks);
 router.post('/client/:clientId',    requireAuth, createTask);
 router.get('/:id/files',            requireAuth, listTaskFiles);

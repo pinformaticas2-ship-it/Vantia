@@ -1213,6 +1213,93 @@ export const getIndicators = async (req: any, res: Response) => {
   }
 };
 
+// ── GET /api/tasks/indicators/expediente/:expedienteId ──────────
+export const getExpedienteIndicators = async (req: any, res: Response) => {
+  const { expedienteId } = req.params;
+  try {
+    const [tasksQ, filesQ, notesQ, actQ, expQ, apuntesQ] = await Promise.all([
+      pool.query(
+        `SELECT
+          COUNT(*)                                                           AS total_tareas,
+          COUNT(*) FILTER (WHERE estado != 'completada')                     AS tareas_pendientes,
+          COUNT(*) FILTER (WHERE estado = 'urgente')                         AS tareas_urgentes,
+          COUNT(*) FILTER (WHERE estado != 'completada' AND plazo < NOW())   AS tareas_vencidas,
+          COUNT(*) FILTER (WHERE estado = 'completada')                      AS tareas_completadas
+         FROM client_tasks WHERE expediente_id = $1`,
+        [expedienteId],
+      ),
+      pool.query(
+        `SELECT COUNT(*) AS total_archivos FROM client_files WHERE client_id = $1`,
+        [expedienteId],
+      ),
+      pool.query(
+        `SELECT COUNT(*) AS total_notas FROM notes WHERE expediente_id = $1`,
+        [expedienteId],
+      ),
+      pool.query(
+        `SELECT MAX(created_at) AS ultima_actuacion, COUNT(*)::int AS total_actuaciones
+         FROM activity_log WHERE entity_id = $1 AND entity_type = 'EXPEDIENTE'`,
+        [expedienteId],
+      ),
+      pool.query(
+        `SELECT e.anio, e.num_exp, e.descripcion, e.estado, e.fecha_apertura,
+                e.etapa, e.tipo, e.cliente_id,
+                ent.first_name, ent.last_name, ent.commercial_name
+         FROM expedientes e
+         LEFT JOIN entities ent ON ent.id = e.cliente_id
+         WHERE e.id = $1`,
+        [expedienteId],
+      ),
+      pool.query(
+        `SELECT
+          COALESCE(SUM(importe) FILTER (WHERE tipo='cobro'),   0) AS total_cobrado,
+          COALESCE(SUM(importe) FILTER (WHERE tipo='cargo'),   0) AS total_cargos,
+          COALESCE(SUM(importe) FILTER (WHERE tipo='abono'),   0) AS total_abonos
+         FROM expediente_apuntes WHERE expediente_id = $1`,
+        [expedienteId],
+      ),
+    ]);
+
+    const t    = tasksQ.rows[0];
+    const exp  = expQ.rows[0];
+    const ap   = apuntesQ.rows[0];
+    const ultimaAct = actQ.rows[0]?.ultima_actuacion;
+    const diasSinActuacion = ultimaAct
+      ? Math.floor((Date.now() - new Date(ultimaAct).getTime()) / 86400000)
+      : null;
+    const diasDesdeApertura = exp?.fecha_apertura
+      ? Math.floor((Date.now() - new Date(exp.fecha_apertura).getTime()) / 86400000)
+      : null;
+
+    const clienteNombre = exp
+      ? (exp.commercial_name || [exp.first_name, exp.last_name].filter(Boolean).join(' ') || '—')
+      : '—';
+
+    res.json({
+      data: {
+        total_tareas:       Number(t.total_tareas),
+        tareas_pendientes:  Number(t.tareas_pendientes),
+        tareas_urgentes:    Number(t.tareas_urgentes),
+        tareas_vencidas:    Number(t.tareas_vencidas),
+        tareas_completadas: Number(t.tareas_completadas),
+        total_archivos:     Number(filesQ.rows[0].total_archivos),
+        total_notas:        Number(notesQ.rows[0].total_notas),
+        total_actuaciones:  Number(actQ.rows[0]?.total_actuaciones ?? 0),
+        dias_sin_actuacion: diasSinActuacion,
+        dias_desde_apertura: diasDesdeApertura,
+        estado:             exp?.estado || '—',
+        etapa:              exp?.etapa  || '—',
+        cliente_nombre:     clienteNombre,
+        total_cobrado:      Number(ap?.total_cobrado ?? 0),
+        total_cargos:       Number(ap?.total_cargos  ?? 0),
+        saldo:              Number(ap?.total_cargos ?? 0) - Number(ap?.total_cobrado ?? 0),
+      }
+    });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+};
+
 // ── GET /api/tasks/etapas ── lista de etapas disponibles ───────
 export const getEtapas = async (_req: any, res: Response) => {
   try {

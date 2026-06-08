@@ -4385,6 +4385,94 @@ function initialsFromName(name?: string | null) {
   return parts.map((part) => part[0]?.toUpperCase() || "").join("") || "CL";
 }
 
+// ── Panel lateral de indicadores del expediente ───────────────
+function PanelIndicadoresExpediente({ expedienteId, onTabChange }: { expedienteId: string; onTabChange: (tab: string) => void }) {
+  const { getToken } = useAuth();
+  const [ind, setInd] = useState<any>(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!expedienteId) return;
+    (async () => {
+      try {
+        const token = await getToken({ skipCache: true });
+        const res = await fetch(`/api/tasks/indicators/expediente/${expedienteId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await safeJson(res);
+        if (res.ok) setInd(data.data);
+        else setError(data.error || 'Error');
+      } catch { setError('Error de conexión'); }
+    })();
+  }, [expedienteId, getToken]);
+
+  const fmt = (v: number | null | undefined, suffix = '') =>
+    v == null ? '—' : `${v}${suffix}`;
+  const fmtMoney = (v: number | null | undefined) =>
+    v == null ? '—' : new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v);
+
+  return (
+    <aside className="w-52 shrink-0">
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden sticky top-6">
+        <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100">
+          <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Indicadores</h3>
+        </div>
+        {error ? (
+          <p className="px-4 py-3 text-xs text-red-400">{error}</p>
+        ) : !ind ? (
+          <div className="px-4 py-4 flex justify-center">
+            <div className="h-4 w-4 border-2 border-slate-200 border-t-slate-400 rounded-full animate-spin" />
+          </div>
+        ) : (
+          <div className="px-4 py-3 space-y-0">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Tareas</p>
+            <Indicador label="Total tareas"    value={fmt(ind.total_tareas)} />
+            <Indicador label="Pendientes"      value={fmt(ind.tareas_pendientes)}
+              color={ind.tareas_pendientes > 0 ? 'text-amber-600' : 'text-slate-700'} />
+            <Indicador label="Urgentes"        value={fmt(ind.tareas_urgentes)}
+              color={ind.tareas_urgentes > 0 ? 'text-red-600' : 'text-slate-700'} />
+            <Indicador label="Vencidas"        value={fmt(ind.tareas_vencidas)}
+              color={ind.tareas_vencidas > 0 ? 'text-red-600' : 'text-slate-700'} />
+            <Indicador label="Completadas"     value={fmt(ind.tareas_completadas)}
+              color={ind.tareas_completadas > 0 ? 'text-emerald-600' : 'text-slate-700'} />
+
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-3 mb-1">Documentación</p>
+            <Indicador label="Archivos" value={fmt(ind.total_archivos)} />
+            <Indicador label="Notas"    value={fmt(ind.total_notas)} />
+
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-3 mb-1">Actividad</p>
+            <Indicador label="Actuaciones"      value={fmt(ind.total_actuaciones)}
+              color={ind.total_actuaciones > 0 ? 'text-blue-600' : 'text-slate-700'} />
+            <Indicador label="Días sin actuac." value={fmt(ind.dias_sin_actuacion, ' días')}
+              color={ind.dias_sin_actuacion != null && ind.dias_sin_actuacion > 30 ? 'text-amber-600' : 'text-slate-700'} />
+            <Indicador label="Días abierto"     value={fmt(ind.dias_desde_apertura, ' días')} />
+
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-3 mb-1">Expediente</p>
+            <Indicador label="Estado"   value={ind.estado || '—'}
+              color={ind.estado === 'Activo' ? 'text-emerald-600' : ind.estado === 'Cerrado' ? 'text-slate-400' : 'text-slate-700'} />
+            <Indicador label="Etapa"    value={ind.etapa || '—'} />
+            <Indicador label="Cobrado"  value={fmtMoney(ind.total_cobrado)} color="text-emerald-600" />
+            <Indicador label="Saldo"    value={fmtMoney(ind.saldo)}
+              color={ind.saldo > 0 ? 'text-amber-600' : ind.saldo < 0 ? 'text-emerald-600' : 'text-slate-700'} />
+          </div>
+        )}
+
+        <div className="px-4 pb-4 space-y-2 border-t border-slate-100 pt-3 mt-1">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Acciones</p>
+          <button onClick={() => onTabChange('tareas')}
+            className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors">
+            ⚠️ Ver tareas
+          </button>
+          <button onClick={() => onTabChange('adjuntos')}
+            className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors">
+            📎 Adjuntos
+          </button>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
 export default function ExpedienteDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -5331,22 +5419,12 @@ export default function ExpedienteDetail() {
         </div>
       </div>
 
-      <aside className="w-52 shrink-0 space-y-4">
-        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden sticky top-6">
-          <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100">
-            <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Indicadores</h3>
-          </div>
-          <div className="px-4 py-3">
-            <Indicador label="Días sin actuaciones" value="0 días" />
-            <Indicador label="Total cobrado" value="0 €" color="text-emerald-600" />
-            <Indicador label="Imp. cobros pdtes." value="0 €" color="text-amber-600" />
-            <Indicador label="Total prov. recibidas" value="0 €" color="text-slate-600" />
-            <Indicador label="Nº exptes relac." value="0" color="text-blue-600" />
-            <Indicador label="Saldo total exp." value="0 €" />
-            <Indicador label="Pdte. facturar" value="0 €" color="text-red-600" />
-          </div>
-        </div>
-      </aside>
+      {id && (
+        <PanelIndicadoresExpediente
+          expedienteId={id}
+          onTabChange={(t) => setTab(t as any)}
+        />
+      )}
     </div>
   );
 }
