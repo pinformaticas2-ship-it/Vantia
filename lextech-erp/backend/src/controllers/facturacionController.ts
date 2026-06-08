@@ -7,6 +7,12 @@ const QUIPU_STALE_MS = 15 * 60 * 1000; // 15 minutes
 
 const explainBillingError = (error: any) => {
   const raw = String(error?.message || '');
+  if (raw.startsWith('Ya existe una factura con el numero ')) {
+    return raw;
+  }
+  if (raw.includes('ux_facturacion_facturas_user_serie_num')) {
+    return 'No se puede repetir el numero de factura dentro de la misma serie.';
+  }
   if (raw.includes('invalid input syntax for type numeric')) {
     return 'No se pudo guardar el registro porque el importe no tiene un formato válido.';
   }
@@ -28,6 +34,39 @@ const sanitizeAmount = (value: any) => {
   if (value === '' || value === null || value === undefined) return null;
   const num = Number(value);
   return Number.isFinite(num) ? num : null;
+};
+
+const buildFacturaDisplayNumber = (num: any, serie?: any) => {
+  const cleanNum = sanitizeText(num);
+  const cleanSerie = sanitizeText(serie);
+  if (!cleanNum) return 'sin numero';
+  return cleanSerie ? `${cleanSerie}-${cleanNum}` : cleanNum;
+};
+
+const ensureFacturaNumberAvailable = async (
+  userId: string,
+  num: any,
+  serie: any,
+  excludeId?: string | null,
+) => {
+  const cleanNum = sanitizeText(num);
+  const cleanSerie = sanitizeText(serie) || 'HON';
+  if (!cleanNum) return;
+
+  const duplicated = await pool.query(
+    `SELECT id
+       FROM facturacion_facturas
+      WHERE user_id = $1
+        AND LOWER(num) = LOWER($2)
+        AND LOWER(COALESCE(serie, '')) = LOWER($3)
+        AND ($4::uuid IS NULL OR id <> $4::uuid)
+      LIMIT 1`,
+    [userId, cleanNum, cleanSerie, excludeId || null],
+  );
+
+  if (duplicated.rows.length > 0) {
+    throw new Error(`Ya existe una factura con el numero ${buildFacturaDisplayNumber(cleanNum, cleanSerie)}. No se puede repetir.`);
+  }
 };
 
 const mapQuipuStatusToErp = (status: string): string => {
@@ -186,6 +225,7 @@ export const createFactura = async (req: any, res: Response) => {
   }
 
   try {
+    await ensureFacturaNumberAvailable(userId, num, serie);
     const result = await pool.query(
       `INSERT INTO facturacion_facturas
          (user_id, created_by, num, contacto, fecha, vencimiento, total, estado, area, responsable, forma_pago, serie, tipo_cliente, client_id, expediente_id)
@@ -237,6 +277,7 @@ export const updateFactura = async (req: any, res: Response) => {
   } = req.body;
 
   try {
+    await ensureFacturaNumberAvailable(userId, num, serie, id);
     const result = await pool.query(
       `UPDATE facturacion_facturas
        SET num = $3,
