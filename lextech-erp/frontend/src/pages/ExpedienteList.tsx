@@ -5830,56 +5830,33 @@ export default function ExpedienteList() {
               disabled={!selected}
               items={[
                 {
-                  label: "Nuevo",
+                  label: "Nuevo correo",
                   icon: Mail,
                   onClick: () => {
                     if (!selectedExp) return;
-                    const subject = encodeURIComponent(`Expediente ${selectedExp.anio}/${selectedExp.num_exp} - ${selectedExp.descripcion || ""}`);
-                    window.open(`mailto:?subject=${subject}`);
+                    const params = new URLSearchParams({
+                      compose: '1',
+                      subject: `Expediente ${selectedExp.anio}/${selectedExp.num_exp} - ${selectedExp.descripcion || ''}`,
+                      ...(selectedExp.cliente_email ? { to: selectedExp.cliente_email } : {}),
+                      expediente_id: selectedExp.id,
+                    });
+                    navigate(`/dashboard/correo?${params.toString()}`);
                   },
                 },
                 {
-                  label: "Con Plantilla",
+                  label: "Con plantilla",
                   icon: FileText,
                   onClick: () => {
                     if (!selectedExp) return;
-                    const subject = encodeURIComponent(`Plantilla - Expediente ${selectedExp.anio}/${selectedExp.num_exp}`);
-                    const body = encodeURIComponent(`Hola,\n\nTe escribo en relación con el expediente ${selectedExp.ref_expediente || `${selectedExp.anio}/${selectedExp.num_exp}`}.\n`);
-                    window.open(`mailto:?subject=${subject}&body=${body}`);
-                  },
-                },
-                { divider: true, label: "" },
-                {
-                  label: "Con Adjuntos",
-                  icon: Paperclip,
-                  children: [
-                    {
-                      label: "Nuevo",
-                      icon: Mail,
-                      onClick: () => {
-                        if (!selectedExp) return;
-                        const subject = encodeURIComponent(`Expediente ${selectedExp.anio}/${selectedExp.num_exp} - con adjuntos`);
-                        window.open(`mailto:?subject=${subject}`);
-                      },
-                    },
-                    {
-                      label: "Con Plantilla",
-                      icon: FileText,
-                      onClick: () => {
-                        if (!selectedExp) return;
-                        const subject = encodeURIComponent(`Plantilla con adjuntos - Expediente ${selectedExp.anio}/${selectedExp.num_exp}`);
-                        window.open(`mailto:?subject=${subject}`);
-                      },
-                    },
-                  ],
-                },
-                {
-                  label: "Correo Corporativo",
-                  icon: ExternalLink,
-                  onClick: () => {
-                    if (!selectedExp) return;
-                    const subject = encodeURIComponent(`Expediente ${selectedExp.anio}/${selectedExp.num_exp}`);
-                    window.open(`https://mail.google.com/mail/?view=cm&su=${subject}`, "_blank");
+                    const ref = selectedExp.ref_propia || `${selectedExp.anio}/${selectedExp.num_exp}`;
+                    const params = new URLSearchParams({
+                      compose: '1',
+                      subject: `Expediente ${selectedExp.anio}/${selectedExp.num_exp} - ${selectedExp.descripcion || ''}`,
+                      body: `Estimado/a cliente,\n\nNos ponemos en contacto con usted en relación con el expediente ${ref}.\n\nQuedamos a su disposición para cualquier consulta.`,
+                      ...(selectedExp.cliente_email ? { to: selectedExp.cliente_email } : {}),
+                      expediente_id: selectedExp.id,
+                    });
+                    navigate(`/dashboard/correo?${params.toString()}`);
                   },
                 },
                 {

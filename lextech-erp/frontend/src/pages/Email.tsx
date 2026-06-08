@@ -2704,7 +2704,11 @@ export default function Email() {
   const [showSignatures, setShowSignatures]     = useState(false);
   const [showTemplates, setShowTemplates]       = useState(false);
   const [showGroups, setShowGroups]             = useState(false);
-  const pendingOpenEmailId = searchParams.get('openEmail');
+  const pendingOpenEmailId  = searchParams.get('openEmail');
+  const pendingComposeTo    = searchParams.get('to');
+  const pendingComposeSubj  = searchParams.get('subject');
+  const pendingComposeBody  = searchParams.get('body');
+  const pendingExpedienteId = searchParams.get('expediente_id');
   const selectedEmailRef = useRef<ParsedEmail | null>(null);
   const emailRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const refreshInFlightRef = useRef(false);
@@ -3572,6 +3576,22 @@ export default function Email() {
     }
     setCompose({ to: '', cc: '', bcc: '', subject: '', body: '', ...data });
   };
+
+  // Abrir compose automáticamente si llegamos desde otro módulo con ?compose=1
+  useEffect(() => {
+    if (!searchParams.get('compose')) return;
+    if (activeProvider === 'none') return; // esperar a que cargue una cuenta
+    startCompose({
+      to:      pendingComposeTo    ?? '',
+      subject: pendingComposeSubj  ?? '',
+      body:    pendingComposeBody  ? `<p>${pendingComposeBody}</p>` : '',
+    });
+    // Limpiar params de la URL sin recargar
+    const next = new URLSearchParams(searchParams);
+    ['compose', 'to', 'subject', 'body', 'expediente_id'].forEach(k => next.delete(k));
+    setSearchParams(next, { replace: true });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeProvider]);
 
   const handleCloseCompose = (draft?: ComposeData) => {
     if (draft) {

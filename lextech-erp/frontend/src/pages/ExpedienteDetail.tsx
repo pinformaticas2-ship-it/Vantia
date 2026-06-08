@@ -1578,10 +1578,12 @@ function isPdfAct(mime: string, name: string) {
 }
 function isWordAct(mime: string, name: string) { const n = (name || "").toLowerCase(); return mime?.includes("word") || mime?.includes("officedocument.wordprocessingml") || n.endsWith(".doc") || n.endsWith(".docx"); }
 function isExcelAct(mime: string, name: string) { const n = (name || "").toLowerCase(); return mime?.includes("excel") || mime?.includes("spreadsheetml") || n.endsWith(".xlsx") || n.endsWith(".xls") || n.endsWith(".csv"); }
-function openMailDraft(subject: string, body?: string) {
-  const params = new URLSearchParams({ subject });
+function openMailDraft(subject: string, body?: string, extra?: { to?: string; expediente_id?: string }) {
+  const params = new URLSearchParams({ compose: '1', subject });
   if (body?.trim()) params.set("body", body);
-  window.open(`mailto:?${params.toString()}`);
+  if (extra?.to) params.set("to", extra.to);
+  if (extra?.expediente_id) params.set("expediente_id", extra.expediente_id);
+  window.location.href = `/dashboard/correo?${params.toString()}`;
 }
 
 function launchOfficeUrl(url: string) {
@@ -2609,6 +2611,8 @@ function ActuacionModal({
   onSave,
   saving,
   clienteId,
+  expedienteId,
+  clienteEmail,
   form,
   setForm,
   selectedActuacion,
@@ -2619,6 +2623,8 @@ function ActuacionModal({
   onSave: () => void;
   saving: boolean;
   clienteId?: string | null;
+  expedienteId?: string | null;
+  clienteEmail?: string | null;
   form: TareaForm;
   setForm: React.Dispatch<React.SetStateAction<TareaForm>>;
   selectedActuacion: any | null;
@@ -2662,7 +2668,7 @@ function ActuacionModal({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => openMailDraft(mailSubject, mailBody)}
+              onClick={() => openMailDraft(mailSubject, mailBody, { to: clienteEmail ?? undefined, expediente_id: expedienteId ?? undefined })}
               className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-slate-600 rounded-xl border border-slate-200 hover:bg-slate-50"
             >
               <Mail size={14} />
@@ -3107,6 +3113,7 @@ function TabActuacion({
         onSave={handleSaveActuacion}
         saving={saving}
         clienteId={clienteId}
+        expedienteId={expedienteId}
         form={form}
         setForm={setForm}
         selectedActuacion={selectedActuacion}
