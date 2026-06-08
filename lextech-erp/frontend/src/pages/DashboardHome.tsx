@@ -130,6 +130,33 @@ const DASHBOARD_MODULES = [
   { id: "chat-ia", label: "Chat IA", desc: "Asistente transversal del despacho", to: "/dashboard/chat-ia", icon: Sparkles, tone: "bg-fuchsia-100 text-fuchsia-700" },
   { id: "config", label: "Configuración", desc: "Ajustes y personalización", to: "/dashboard/config", icon: Settings, tone: "bg-slate-200 text-slate-700" },
 ];
+const FUNCTIONAL_MODULE_PICKER_ITEMS = [
+  { id: "module_dashboard", label: "Modulo Dashboard", desc: "Acceso directo al panel principal", icon: "D" },
+  { id: "module_expedientes", label: "Modulo Expedientes", desc: "Acceso directo a la gestion de expedientes", icon: "E" },
+  { id: "module_clientes", label: "Modulo Clientes", desc: "Acceso directo a la base de clientes", icon: "C" },
+  { id: "module_trazabilidad", label: "Modulo Trazabilidad", desc: "Acceso directo a actividad y auditoria", icon: "T" },
+  { id: "module_agenda", label: "Modulo Agenda", desc: "Acceso directo a citas y calendario", icon: "A" },
+  { id: "module_tareas", label: "Modulo Tareas", desc: "Acceso directo a pendientes y plazos", icon: "Ta" },
+  { id: "module_chat", label: "Modulo Chat", desc: "Acceso directo al chat interno", icon: "Ch" },
+  { id: "module_whatsapp", label: "Modulo WhatsApp", desc: "Acceso directo a la comunicacion con clientes", icon: "W" },
+  { id: "module_correo", label: "Modulo Correo", desc: "Acceso directo al gestor de correo", icon: "Co" },
+  { id: "module_documental", label: "Modulo Documental", desc: "Acceso directo a CENDOJ, BOE y Lexnet", icon: "Do" },
+  { id: "module_facturacion", label: "Modulo Facturacion", desc: "Acceso directo a cobros, gastos y Quipu", icon: "F" },
+];
+const FUNCTIONAL_MODULE_WIDGET_IDS = new Set(FUNCTIONAL_MODULE_PICKER_ITEMS.map((item) => item.id));
+const FUNCTIONAL_MODULE_ROUTES: Record<string, { label: string; desc: string; to: string; icon: any; tone: string }> = {
+  module_dashboard: { label: "Dashboard", desc: "Panel general del despacho", to: "/dashboard", icon: LayoutGrid, tone: "bg-slate-100 text-slate-600" },
+  module_expedientes: { label: "Expedientes", desc: "Gestion de asuntos y casos", to: "/dashboard/expedientes", icon: Briefcase, tone: "bg-blue-100 text-blue-600" },
+  module_clientes: { label: "Clientes", desc: "Base de datos del despacho", to: "/dashboard/clientes", icon: Users, tone: "bg-emerald-100 text-emerald-600" },
+  module_trazabilidad: { label: "Trazabilidad", desc: "Actividad y auditoria interna", to: "/dashboard/trazabilidad", icon: History, tone: "bg-amber-100 text-amber-700" },
+  module_agenda: { label: "Agenda", desc: "Citas, vistas y calendario", to: "/dashboard/agenda", icon: Calendar, tone: "bg-cyan-100 text-cyan-700" },
+  module_tareas: { label: "Tareas", desc: "Pendientes y plazos del usuario", to: "/dashboard/tareas", icon: CheckCircle2, tone: "bg-lime-100 text-lime-700" },
+  module_chat: { label: "Chat", desc: "Mensajeria interna del equipo", to: "/dashboard/chat", icon: MessageSquare, tone: "bg-violet-100 text-violet-700" },
+  module_whatsapp: { label: "WhatsApp", desc: "Comunicacion con clientes", to: "/dashboard/whatsapp", icon: MessageCircle, tone: "bg-green-100 text-green-700" },
+  module_correo: { label: "Correo", desc: "Bandeja y redaccion de emails", to: "/dashboard/correo", icon: Mail, tone: "bg-rose-100 text-rose-700" },
+  module_documental: { label: "Documental", desc: "CENDOJ, BOE y Lexnet", to: "/dashboard/documental", icon: Library, tone: "bg-indigo-100 text-indigo-700" },
+  module_facturacion: { label: "Facturacion", desc: "Cobros, gastos y Quipu", to: "/dashboard/facturacion", icon: Receipt, tone: "bg-orange-100 text-orange-700" },
+};
 const STORAGE_KEY = "dashboard_visible_widgets";
 const ORDER_KEY   = "dashboard_widget_order";
 const DEFAULT_VISIBLE = ["agenda", "tareas", "actividad"];
@@ -137,7 +164,7 @@ const DEFAULT_ORDER   = [
   "agenda", "tareas", "facturacion", "actividad", "expedientes",
   "module_dashboard", "module_expedientes", "module_clientes", "module_trazabilidad",
   "module_agenda", "module_chat", "module_whatsapp", "module_correo",
-  "module_documental", "module_plaud-ia", "module_chat-ia", "module_config",
+  "module_documental", "module_facturacion",
 ];
 function loadVisible(): string[]  { try { const r = localStorage.getItem(STORAGE_KEY); if (r) return JSON.parse(r); } catch {/**/} return DEFAULT_VISIBLE; }
 function loadOrder(): string[]    { try { const r = localStorage.getItem(ORDER_KEY);   if (r) return JSON.parse(r); } catch {/**/} return DEFAULT_ORDER; }
@@ -145,6 +172,10 @@ function loadOrder(): string[]    { try { const r = localStorage.getItem(ORDER_K
 function WidgetPickerModal({ visible, onClose, onSave }: { visible: string[]; onClose: () => void; onSave: (ids: string[]) => void }) {
   const [sel, setSel] = useState<string[]>(visible);
   const toggle = (id: string) => setSel(cur => cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id]);
+  const pickerItems = [
+    ...ALL_WIDGETS.filter((item) => !item.id.startsWith("module_")),
+    ...FUNCTIONAL_MODULE_PICKER_ITEMS,
+  ];
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent p-4">
       <div className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
@@ -156,7 +187,7 @@ function WidgetPickerModal({ visible, onClose, onSave }: { visible: string[]; on
           <button onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-400 hover:bg-slate-50"><X size={16} /></button>
         </div>
         <div className="divide-y divide-slate-50 px-4 py-3">
-          {ALL_WIDGETS.map(w => (
+          {pickerItems.map(w => (
             <label key={w.id} className="flex cursor-pointer items-center gap-4 rounded-2xl px-3 py-3.5 hover:bg-slate-50 transition-colors">
               <span className="text-xl shrink-0">{w.icon}</span>
               <div className="flex-1 min-w-0">
@@ -391,7 +422,7 @@ export default function DashboardHome() {
   const orderedVisible = [
     ...widgetOrder.filter(id => visibleWidgets.includes(id)),
     ...visibleWidgets.filter(id => !widgetOrder.includes(id)),
-  ];
+  ].filter((id) => !id.startsWith("module_") || FUNCTIONAL_MODULE_WIDGET_IDS.has(id));
 
   // ── Billing calcs ─────────────────────────────────────────────────────────
   const billingCalc = (() => {
@@ -419,8 +450,7 @@ export default function DashboardHome() {
   // ── Widget renderers ──────────────────────────────────────────────────────
   function renderWidget(id: string, handle: ReactNode) {
     if (id.startsWith("module_")) {
-      const moduleId = id.replace("module_", "");
-      const module = DASHBOARD_MODULES.find((item) => item.id === moduleId);
+      const module = FUNCTIONAL_MODULE_ROUTES[id];
       if (!module) return null;
       const Icon = module.icon;
       return (
