@@ -934,7 +934,7 @@ function FacturaWorkspacePage({
     clientId: initialValues?.clientId ?? "",
     expedienteId: initialValues?.expedienteId ?? "",
     fecha: initialValues?.fecha ?? new Date().toISOString().slice(0, 10),
-    vencimiento: initialValues?.vencimiento ?? new Date().toISOString().slice(0, 10),
+    vencimiento: initialValues?.vencimiento ?? (() => { const d = new Date(); d.setDate(d.getDate() + 30); return d.toISOString().slice(0, 10); })(),
     total: String(initialValues?.total ?? ""),
     estado: initialValues?.estado ?? "pendiente",
     area: initialValues?.area ?? "procesal",
@@ -959,6 +959,11 @@ function FacturaWorkspacePage({
   const selectedClient = useMemo(() => clients.find((item) => item.id === form.clientId) || null, [clients, form.clientId]);
   const selectedExpediente = useMemo(() => expedientes.find((item) => item.id === form.expedienteId) || null, [expedientes, form.expedienteId]);
   const canSubmit = Boolean(form.num.trim() && form.clientId && form.contacto.trim() && Number(form.total) > 0);
+  const missingFields = [
+    !form.num.trim() && "número de factura",
+    !form.clientId && "cliente",
+    !(Number(form.total) > 0) && "importe total",
+  ].filter(Boolean) as string[];
   const displayNumber = form.serie.trim() ? `${form.serie.trim()}-${form.num.trim() || "..."}` : form.num.trim() || "Borrador";
   const baseUnitariaNum = Number(form.baseUnitaria || 0);
   const cantidadNum = Number(form.cantidad || 0);
@@ -971,6 +976,18 @@ function FacturaWorkspacePage({
   const ivaImporte = baseTrasDescuento * (Math.max(ivaPctNum, 0) / 100);
   const irpfImporte = baseTrasDescuento * (Math.max(irpfPctNum, 0) / 100);
   const totalLineaCalculado = baseTrasDescuento + ivaImporte - irpfImporte;
+
+  const lastAutoTotalRef = useRef<string>("");
+  useEffect(() => {
+    if (totalLineaCalculado > 0) {
+      const newTotal = totalLineaCalculado.toFixed(2);
+      if (form.total === "" || form.total === "0" || form.total === lastAutoTotalRef.current) {
+        lastAutoTotalRef.current = newTotal;
+        setField("total", newTotal);
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [totalLineaCalculado]);
 
   const setClient = (clientId: string) => {
     const client = clients.find((item) => item.id === clientId) || null;
@@ -1112,13 +1129,15 @@ function FacturaWorkspacePage({
               <label className="space-y-2">
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Total</span>
                 <input type="number" min="0" step="0.01" value={form.total} onChange={(e) => setField("total", e.target.value)} className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
-                <button
-                  type="button"
-                  onClick={() => setField("total", totalLineaCalculado > 0 ? totalLineaCalculado.toFixed(2) : "")}
-                  className="text-left text-xs font-semibold text-red-700 transition-colors hover:text-red-800"
-                >
-                  Usar total calculado de la línea: {fmtEur(totalLineaCalculado)}
-                </button>
+                {totalLineaCalculado > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => { lastAutoTotalRef.current = totalLineaCalculado.toFixed(2); setField("total", totalLineaCalculado.toFixed(2)); }}
+                    className="text-left text-xs font-semibold text-sky-600 transition-colors hover:text-sky-800"
+                  >
+                    Usar total calculado de la línea: {fmtEur(totalLineaCalculado)}
+                  </button>
+                )}
               </label>
               <label className="space-y-2">
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Forma de pago</span>
@@ -1182,7 +1201,7 @@ function FacturaWorkspacePage({
                     <input
                       type="number"
                       min="0"
-                      step="1"
+                      step="0.01"
                       value={form.cantidad}
                       onChange={(e) => setField("cantidad", e.target.value)}
                       className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
@@ -1235,9 +1254,9 @@ function FacturaWorkspacePage({
                     <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">IRPF</p>
                     <p className="mt-1 text-sm font-bold text-slate-900">{fmtEur(irpfImporte)}</p>
                   </div>
-                  <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-red-500">Total línea</p>
-                    <p className="mt-1 text-sm font-bold text-red-700">{fmtEur(totalLineaCalculado)}</p>
+                  <div className={`rounded-xl border px-3 py-3 ${totalLineaCalculado > 0 ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-slate-50"}`}>
+                    <p className={`text-[11px] font-semibold uppercase tracking-wider ${totalLineaCalculado > 0 ? "text-emerald-600" : "text-slate-400"}`}>Total línea</p>
+                    <p className={`mt-1 text-sm font-bold ${totalLineaCalculado > 0 ? "text-emerald-700" : "text-slate-500"}`}>{fmtEur(totalLineaCalculado)}</p>
                   </div>
                 </div>
               </div>
@@ -1295,7 +1314,7 @@ function FacturaWorkspacePage({
                 <ul className="mt-2 space-y-1">
                   <li>Cliente: {selectedClient?.label || "Pendiente"}</li>
                   <li>Expediente: {selectedExpediente?.label || "Pendiente"}</li>
-                  <li>Estado: {form.estado}</li>
+                  <li>Estado: {form.estado.charAt(0).toUpperCase() + form.estado.slice(1)}</li>
                   <li>Responsable: {form.responsable || "Pendiente"}</li>
                 </ul>
               </div>
@@ -1309,6 +1328,11 @@ function FacturaWorkspacePage({
           </section>
 
           <div className="flex flex-col gap-3 rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_8px_30px_rgba(15,23,42,0.04)]">
+            {!canSubmit && missingFields.length > 0 && (
+              <p className="text-xs text-amber-600">
+                Falta: {missingFields.join(", ")}.
+              </p>
+            )}
             <button
               onClick={submit}
               disabled={!canSubmit || saving}
