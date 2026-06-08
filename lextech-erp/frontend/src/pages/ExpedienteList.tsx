@@ -6422,19 +6422,10 @@ export default function ExpedienteList() {
                         </div>
                       )}
                     </div>
-                    <button
-                      onClick={() => handleBulkChangeState('archivado')}
-                      disabled={bulkStateLoading}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors disabled:opacity-50"
-                      title="Cambia el estado de los expedientes seleccionados a Archivado"
-                    >
-                      <UserMinus size={12} />
-                      Dar de baja {selectedIds.size > 1 ? `(${selectedIds.size})` : ''}
-                    </button>
                     <button onClick={() => setBulkDeleteConfirm(true)}
                       className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors">
                       <Trash2 size={12} />
-                      Eliminar {selectedIds.size}
+                      Dar de baja {selectedIds.size}
                     </button>
                     <button onClick={deselectAll}
                       className="ml-auto flex items-center gap-1 px-2.5 py-1.5 text-xs text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
@@ -6529,13 +6520,13 @@ export default function ExpedienteList() {
                     <AlertTriangle size={18} className="text-red-600" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-900 text-sm">¿Eliminar {selectedIds.size} expediente{selectedIds.size !== 1 ? "s" : ""}?</h3>
-                    <p className="text-xs text-slate-500 mt-1">Esta acción no se puede deshacer.</p>
+                    <h3 className="font-bold text-slate-900 text-sm">¿Dar de baja {selectedIds.size} expediente{selectedIds.size !== 1 ? "s" : ""}?</h3>
+                    <p className="text-xs text-slate-500 mt-1">Se eliminarán permanentemente. Esta acción no se puede deshacer.</p>
                   </div>
                 </div>
                 <div className="flex gap-2 justify-end">
                   <button onClick={() => setBulkDeleteConfirm(false)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
-                  <button onClick={handleBulkDelete} className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg active:scale-95">Eliminar todos</button>
+                  <button onClick={handleBulkDelete} className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg active:scale-95">Dar de baja</button>
                 </div>
               </div>
             </div>
