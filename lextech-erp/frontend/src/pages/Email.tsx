@@ -593,8 +593,51 @@ function ComposeWindow({
   const [attachments, setAttachments] = useState<ComposeAttachment[]>([]);
   const [suggestions, setSuggestions] = useState<RecipientSuggestion[]>([]);
   const [recipientField, setRecipientField] = useState<'to' | 'cc' | 'bcc' | null>(null);
-  const bodyRef = useRef<HTMLDivElement>(null);
+  const [showSigMenu, setShowSigMenu]  = useState(false);
+  const [showTplMenu, setShowTplMenu]  = useState(false);
+  const bodyRef      = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const sigMenuRef   = useRef<HTMLDivElement>(null);
+  const tplMenuRef   = useRef<HTMLDivElement>(null);
+
+  // Firmas y plantillas desde localStorage
+  const signatures = loadLS<EmailSignature[]>(SIG_KEY, []);
+  const templates  = loadLS<EmailTemplate[]>(TPL_KEY, []);
+
+  // Insertar firma en el cuerpo
+  const insertSignature = (sig: EmailSignature) => {
+    if (!bodyRef.current) return;
+    const sep = '<br/><br/><hr style="border:none;border-top:1px solid #e5e7eb;margin:8px 0"/>';
+    bodyRef.current.innerHTML = (bodyRef.current.innerHTML || '') + sep + sig.html;
+    setShowSigMenu(false);
+  };
+
+  // Aplicar plantilla (reemplaza asunto y cuerpo)
+  const applyTemplate = (tpl: EmailTemplate) => {
+    if (tpl.subject) setSubject(tpl.subject);
+    if (bodyRef.current && tpl.html) bodyRef.current.innerHTML = tpl.html;
+    setShowTplMenu(false);
+  };
+
+  // Auto-insertar firma predeterminada al abrir (solo si no hay body previo)
+  useEffect(() => {
+    const defaultSig = signatures.find(s => s.isDefault);
+    if (defaultSig && bodyRef.current && !data.body) {
+      const sep = '<br/><br/><hr style="border:none;border-top:1px solid #e5e7eb;margin:8px 0"/>';
+      bodyRef.current.innerHTML = sep + defaultSig.html;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Cerrar menús al hacer clic fuera
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (sigMenuRef.current && !sigMenuRef.current.contains(e.target as Node)) setShowSigMenu(false);
+      if (tplMenuRef.current && !tplMenuRef.current.contains(e.target as Node)) setShowTplMenu(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   const buildDraftPayload = useCallback((): ComposeData | null => {
     const body = bodyRef.current?.innerHTML || data.body || '';
@@ -611,7 +654,7 @@ function ComposeWindow({
     };
   }, [bcc, cc, data.body, data.draftId, data.replyToId, subject, to]);
 
-  // Initialize contenteditable body
+  // Initialize contenteditable body (body from data takes priority over auto-signature)
   useEffect(() => {
     if (bodyRef.current && data.body) {
       bodyRef.current.innerHTML = data.body;
@@ -870,33 +913,77 @@ function ComposeWindow({
           )}
 
           {/* Toolbar */}
-          <div className="flex items-center gap-2 px-4 py-3 border-t border-gray-100">
+          <div className="flex items-center gap-1 px-4 py-3 border-t border-gray-100 flex-wrap">
             <button
               onClick={handleSend} disabled={sending}
-              className="flex items-center gap-2 bg-[#ab0433] hover:bg-[#8f022a] text-white text-sm font-medium px-5 py-2 rounded-full transition-colors disabled:opacity-60">
+              className="flex items-center gap-2 bg-[#ab0433] hover:bg-[#8f022a] text-white text-sm font-medium px-4 py-2 rounded-full transition-colors disabled:opacity-60 mr-1">
               {sending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
               Enviar
             </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              className="hidden"
-              onChange={(event) => {
-                handleFilesSelected(event.target.files).catch((e: Error) => setError(e.message));
-                event.target.value = '';
-              }}
+
+            {/* Adjuntar */}
+            <input ref={fileInputRef} type="file" multiple className="hidden"
+              onChange={(event) => { handleFilesSelected(event.target.files).catch((e: Error) => setError(e.message)); event.target.value = ''; }}
             />
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="p-2 text-gray-400 hover:text-[#ab0433] hover:bg-red-50 rounded-full">
+            <button type="button" onClick={() => fileInputRef.current?.click()}
+              title="Adjuntar archivo"
+              className="p-2 text-gray-400 hover:text-[#ab0433] hover:bg-red-50 rounded-full transition-colors">
               <Paperclip size={16} />
             </button>
+
+            {/* Firma */}
+            <div className="relative" ref={sigMenuRef}>
+              <button
+                type="button"
+                title="Insertar firma"
+                onClick={() => { setShowSigMenu(v => !v); setShowTplMenu(false); }}
+                className={`flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-lg transition-colors ${showSigMenu ? 'bg-indigo-50 text-indigo-700' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'}`}>
+                <Edit3 size={14} /> Firma
+              </button>
+              {showSigMenu && (
+                <div className="absolute bottom-full mb-1 left-0 bg-white border border-gray-200 rounded-xl shadow-xl z-50 min-w-[180px] overflow-hidden">
+                  {signatures.length === 0 ? (
+                    <p className="px-3 py-2.5 text-xs text-gray-400">No hay firmas creadas.<br/>Ve a Configuración → Firmas.</p>
+                  ) : signatures.map(sig => (
+                    <button key={sig.id} onClick={() => insertSignature(sig)}
+                      className="w-full flex items-center gap-2 px-3 py-2.5 text-left text-xs hover:bg-indigo-50 transition-colors border-b border-gray-50 last:border-0">
+                      <Edit3 size={12} className="text-indigo-400 shrink-0" />
+                      <span className="truncate font-medium text-gray-700">{sig.name}</span>
+                      {sig.isDefault && <span className="ml-auto text-[10px] text-indigo-500 shrink-0">★ Por defecto</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Plantilla */}
+            <div className="relative" ref={tplMenuRef}>
+              <button
+                type="button"
+                title="Aplicar plantilla de correo"
+                onClick={() => { setShowTplMenu(v => !v); setShowSigMenu(false); }}
+                className={`flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-lg transition-colors ${showTplMenu ? 'bg-indigo-50 text-indigo-700' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'}`}>
+                <FileText size={14} /> Plantilla
+              </button>
+              {showTplMenu && (
+                <div className="absolute bottom-full mb-1 left-0 bg-white border border-gray-200 rounded-xl shadow-xl z-50 min-w-[200px] overflow-hidden">
+                  {templates.length === 0 ? (
+                    <p className="px-3 py-2.5 text-xs text-gray-400">No hay plantillas creadas.<br/>Ve a Configuración → Plantillas.</p>
+                  ) : templates.map(tpl => (
+                    <button key={tpl.id} onClick={() => applyTemplate(tpl)}
+                      className="w-full flex flex-col items-start px-3 py-2.5 text-left text-xs hover:bg-indigo-50 transition-colors border-b border-gray-50 last:border-0">
+                      <span className="font-medium text-gray-700 truncate w-full">{tpl.name}</span>
+                      {tpl.subject && <span className="text-gray-400 truncate w-full">Asunto: {tpl.subject}</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="flex-1" />
-            <button
-              onClick={() => onClose()}
-              className="p-2 text-gray-400 hover:text-red-500 hover:bg-gray-100 rounded-full">
+            <button onClick={() => onClose()}
+              title="Guardar borrador y cerrar"
+              className="p-2 text-gray-400 hover:text-red-500 hover:bg-gray-100 rounded-full transition-colors">
               <Trash2 size={16} />
             </button>
           </div>
