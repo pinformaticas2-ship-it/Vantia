@@ -571,6 +571,7 @@ function Avatar({
 
 function ComposeWindow({
   data, fromEmail, fromName, gmail, accountId, getToken, onClose, onSent,
+  autoOpenTemplates, autoOpenAttachments,
 }: {
   data: ComposeData;
   fromEmail: string;
@@ -580,6 +581,8 @@ function ComposeWindow({
   getToken: () => Promise<string>;
   onClose: (draft?: ComposeData) => void;
   onSent: (draftId?: string) => void;
+  autoOpenTemplates?: boolean;
+  autoOpenAttachments?: boolean;
 }) {
   const [to, setTo]         = useState(data.to);
   const [cc, setCc]         = useState(data.cc);
@@ -638,6 +641,13 @@ function ComposeWindow({
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  // Auto-abrir plantillas / adjuntos según los parámetros de navegación
+  useEffect(() => {
+    if (autoOpenTemplates) setTimeout(() => setShowTplMenu(true), 300);
+    if (autoOpenAttachments) setTimeout(() => fileInputRef.current?.click(), 400);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const buildDraftPayload = useCallback((): ComposeData | null => {
@@ -2829,11 +2839,13 @@ export default function Email() {
   const [showSignatures, setShowSignatures]     = useState(false);
   const [showTemplates, setShowTemplates]       = useState(false);
   const [showGroups, setShowGroups]             = useState(false);
-  const pendingOpenEmailId  = searchParams.get('openEmail');
-  const pendingComposeTo    = searchParams.get('to');
-  const pendingComposeSubj  = searchParams.get('subject');
-  const pendingComposeBody  = searchParams.get('body');
-  const pendingExpedienteId = searchParams.get('expediente_id');
+  const pendingOpenEmailId    = searchParams.get('openEmail');
+  const pendingComposeTo      = searchParams.get('to');
+  const pendingComposeSubj    = searchParams.get('subject');
+  const pendingComposeBody    = searchParams.get('body');
+  const pendingExpedienteId   = searchParams.get('expediente_id');
+  const pendingOpenTemplates  = searchParams.get('open_templates') === '1';
+  const pendingOpenAttachments= searchParams.get('open_attachments') === '1';
   const selectedEmailRef = useRef<ParsedEmail | null>(null);
   const emailRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const refreshInFlightRef = useRef(false);
@@ -4086,6 +4098,8 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
           getToken={tokenGetter}
           onClose={handleCloseCompose}
           onSent={handleComposeSent}
+          autoOpenTemplates={pendingOpenTemplates}
+          autoOpenAttachments={pendingOpenAttachments}
         />
       )}
 

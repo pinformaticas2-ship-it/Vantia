@@ -5830,7 +5830,7 @@ export default function ExpedienteList() {
               disabled={!selected}
               items={[
                 {
-                  label: "Nuevo correo",
+                  label: "Nuevo",
                   icon: Mail,
                   onClick: () => {
                     if (!selectedExp) return;
@@ -5844,21 +5844,59 @@ export default function ExpedienteList() {
                   },
                 },
                 {
-                  label: "Con plantilla",
+                  label: "Con Plantilla",
                   icon: FileText,
                   onClick: () => {
                     if (!selectedExp) return;
-                    const ref = selectedExp.ref_propia || `${selectedExp.anio}/${selectedExp.num_exp}`;
                     const params = new URLSearchParams({
                       compose: '1',
                       subject: `Expediente ${selectedExp.anio}/${selectedExp.num_exp} - ${selectedExp.descripcion || ''}`,
-                      body: `Estimado/a cliente,\n\nNos ponemos en contacto con usted en relación con el expediente ${ref}.\n\nQuedamos a su disposición para cualquier consulta.`,
                       ...(selectedExp.cliente_email ? { to: selectedExp.cliente_email } : {}),
                       expediente_id: selectedExp.id,
+                      open_templates: '1',
                     });
                     navigate(`/dashboard/correo?${params.toString()}`);
                   },
                 },
+                { divider: true, label: '' },
+                {
+                  label: "Con Adjuntos",
+                  icon: Paperclip,
+                  children: [
+                    {
+                      label: "Nuevo",
+                      icon: Mail,
+                      onClick: () => {
+                        if (!selectedExp) return;
+                        const params = new URLSearchParams({
+                          compose: '1',
+                          subject: `Expediente ${selectedExp.anio}/${selectedExp.num_exp} - ${selectedExp.descripcion || ''} (con adjuntos)`,
+                          ...(selectedExp.cliente_email ? { to: selectedExp.cliente_email } : {}),
+                          expediente_id: selectedExp.id,
+                          open_attachments: '1',
+                        });
+                        navigate(`/dashboard/correo?${params.toString()}`);
+                      },
+                    },
+                    {
+                      label: "Con Plantilla",
+                      icon: FileText,
+                      onClick: () => {
+                        if (!selectedExp) return;
+                        const params = new URLSearchParams({
+                          compose: '1',
+                          subject: `Expediente ${selectedExp.anio}/${selectedExp.num_exp} - ${selectedExp.descripcion || ''}`,
+                          ...(selectedExp.cliente_email ? { to: selectedExp.cliente_email } : {}),
+                          expediente_id: selectedExp.id,
+                          open_templates: '1',
+                          open_attachments: '1',
+                        });
+                        navigate(`/dashboard/correo?${params.toString()}`);
+                      },
+                    },
+                  ],
+                },
+                { divider: true, label: '' },
                 {
                   label: "MN Sign",
                   icon: Pencil,
