@@ -54,6 +54,8 @@ export default function App() {
             <Route path="correo" element={<Email />} />
             <Route path="documental" element={<Documental />} />
             <Route path="facturacion" element={<Facturacion />} />
+            <Route path="facturacion/facturas/nueva" element={<Facturacion />} />
+            <Route path="facturacion/facturas/:facturaId/editar" element={<Facturacion />} />
             <Route path="plaud-ia" element={<ModuloEnCarga nombre="Plaud IA" />} />
             <Route path="chat-ia" element={<ModuloEnCarga nombre="Chat IA" />} />
             <Route path="config" element={<ModuloEnCarga nombre="Configuración" />} />

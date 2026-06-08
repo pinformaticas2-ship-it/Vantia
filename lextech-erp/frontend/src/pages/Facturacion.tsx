@@ -3,6 +3,7 @@ import { useAuth } from "@clerk/clerk-react";
 import { Link } from "react-router-dom";
 import {
   AlertCircle,
+  ArrowLeft,
   BarChart2,
   Banknote,
   Building2,
@@ -30,6 +31,7 @@ import {
 import { apiFetch } from "../lib/api";
 import { UndoToast } from "../components/UndoToast";
 import { useUndoDelete } from "../lib/useUndoDelete";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 type FilterPeriod = "year" | "q1" | "q2" | "q3" | "q4" | "jan" | "feb" | "mar" | "apr" | "may" | "jun" | "jul" | "aug" | "sep" | "oct" | "nov" | "dec";
 type TabKey = "dashboard" | "facturas" | "gastos" | "presupuestos" | "contacts" | "bank_accounts" | "receipts" | "config";
@@ -878,6 +880,268 @@ function StructuredBillingEditorModal({
   );
 }
 
+function FacturaWorkspacePage({
+  initialValues,
+  clients,
+  expedientes,
+  saving,
+  onBack,
+  onSave,
+}: {
+  initialValues?: any;
+  clients: BillingClientOption[];
+  expedientes: BillingExpedienteOption[];
+  saving: boolean;
+  onBack: () => void;
+  onSave: (payload: any) => Promise<void> | void;
+}) {
+  const [form, setForm] = useState({
+    num: initialValues?.num ?? "",
+    contacto: initialValues?.contacto ?? "",
+    clientId: initialValues?.clientId ?? "",
+    expedienteId: initialValues?.expedienteId ?? "",
+    fecha: initialValues?.fecha ?? new Date().toISOString().slice(0, 10),
+    vencimiento: initialValues?.vencimiento ?? new Date().toISOString().slice(0, 10),
+    total: String(initialValues?.total ?? ""),
+    estado: initialValues?.estado ?? "pendiente",
+    area: initialValues?.area ?? "procesal",
+    responsable: initialValues?.responsable ?? "Despacho",
+    formaPago: initialValues?.formaPago ?? "transferencia",
+    serie: initialValues?.serie ?? "HON",
+    tipoCliente: initialValues?.tipoCliente ?? "empresa",
+  });
+
+  const setField = (field: string, value: any) => setForm((current) => ({ ...current, [field]: value }));
+  const expedientesForClient = useMemo(
+    () => (form.clientId ? expedientes.filter((item) => item.clientId === form.clientId) : expedientes),
+    [expedientes, form.clientId],
+  );
+  const selectedClient = useMemo(() => clients.find((item) => item.id === form.clientId) || null, [clients, form.clientId]);
+  const selectedExpediente = useMemo(() => expedientes.find((item) => item.id === form.expedienteId) || null, [expedientes, form.expedienteId]);
+  const canSubmit = Boolean(form.num.trim() && form.clientId && form.contacto.trim() && Number(form.total) > 0);
+  const displayNumber = form.serie.trim() ? `${form.serie.trim()}-${form.num.trim() || "..."}` : form.num.trim() || "Borrador";
+
+  const setClient = (clientId: string) => {
+    const client = clients.find((item) => item.id === clientId) || null;
+    setForm((current) => ({
+      ...current,
+      clientId,
+      contacto: client?.label || "",
+      expedienteId: current.expedienteId && expedientes.some((exp) => exp.id === current.expedienteId && exp.clientId === clientId) ? current.expedienteId : "",
+    }));
+  };
+
+  const setExpediente = (expedienteId: string) => {
+    const expediente = expedientes.find((item) => item.id === expedienteId) || null;
+    const client = clients.find((item) => item.id === expediente?.clientId) || null;
+    setForm((current) => ({
+      ...current,
+      expedienteId,
+      clientId: expediente?.clientId || current.clientId,
+      contacto: client?.label || current.contacto,
+    }));
+  };
+
+  const submit = async () => {
+    const total = Number(form.total);
+    if (!form.num.trim() || !Number.isFinite(total) || total <= 0) return;
+    if (!form.contacto.trim() || !form.clientId) return;
+    await onSave({
+      ...form,
+      total,
+      num: form.num.trim(),
+      contacto: form.contacto.trim(),
+      responsable: form.responsable.trim(),
+    });
+  };
+
+  return (
+    <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <button onClick={onBack} className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 transition-colors hover:text-slate-800">
+            <ArrowLeft size={15} /> Volver a facturación
+          </button>
+          <h1 className="mt-4 text-4xl font-bold tracking-tight text-slate-900">
+            {initialValues?.id ? "Editar factura de ingreso" : "Nueva factura de ingreso"}
+          </h1>
+          <p className="mt-2 max-w-3xl text-sm text-slate-500">
+            Crea la factura en una pantalla completa, manteniendo la relación con el cliente del despacho, su expediente y los datos de cobro internos del ERP.
+          </p>
+        </div>
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-right">
+          <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-emerald-600">Borrador</p>
+          <p className="mt-1 text-lg font-bold text-emerald-900">{displayNumber}</p>
+        </div>
+      </div>
+
+      <div className="rounded-3xl border border-sky-200 bg-sky-50 px-5 py-4 text-sm text-sky-700">
+        La factura se guarda primero en Vantia. Si Quipu está conectado, después podrás enviarla o dejar que el flujo automático haga la sincronización.
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.45fr)_360px]">
+        <div className="space-y-6">
+          <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.04)]">
+            <div className="border-b border-slate-100 px-6 py-5">
+              <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">Datos principales</p>
+              <h2 className="mt-2 text-xl font-bold text-slate-900">Cliente, expediente y numeración</h2>
+            </div>
+            <div className="space-y-5 px-6 py-6">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <label className="space-y-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Cliente del despacho</span>
+                  <select value={form.clientId} onChange={(e) => setClient(e.target.value)} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm">
+                    <option value="">Selecciona un cliente</option>
+                    {clients.map((client) => (
+                      <option key={client.id} value={client.id}>
+                        {client.label} · {client.totalExpedientes} expediente{client.totalExpedientes === 1 ? "" : "s"}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="space-y-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Expediente asociado</span>
+                  <select value={form.expedienteId} onChange={(e) => setExpediente(e.target.value)} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm">
+                    <option value="">Selecciona un expediente</option>
+                    {expedientesForClient.map((expediente) => (
+                      <option key={expediente.id} value={expediente.id}>
+                        {expediente.label} · {expediente.description || expediente.clientLabel}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <label className="space-y-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Serie</span>
+                  <input value={form.serie} onChange={(e) => setField("serie", e.target.value)} className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Número</span>
+                  <input value={form.num} onChange={(e) => setField("num", e.target.value)} className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Fecha de emisión</span>
+                  <input type="date" value={form.fecha} onChange={(e) => setField("fecha", e.target.value)} className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Vencimiento</span>
+                  <input type="date" value={form.vencimiento} onChange={(e) => setField("vencimiento", e.target.value)} className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
+                </label>
+              </div>
+
+              <div className="rounded-3xl border border-slate-200 bg-slate-50 px-5 py-4">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Relación cliente-expediente</p>
+                <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500">Cliente</p>
+                    <p className="mt-1 text-sm text-slate-700">
+                      {selectedClient ? <ClientRecordLink clientId={selectedClient.id} label={selectedClient.label} /> : "Sin seleccionar"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500">Expediente</p>
+                    <p className="mt-1 text-sm text-slate-700">{selectedExpediente?.label || "Sin seleccionar"}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.04)]">
+            <div className="border-b border-slate-100 px-6 py-5">
+              <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">Cobro y organización</p>
+              <h2 className="mt-2 text-xl font-bold text-slate-900">Importe, forma de pago y seguimiento interno</h2>
+            </div>
+            <div className="grid grid-cols-1 gap-4 px-6 py-6 md:grid-cols-2 xl:grid-cols-3">
+              <label className="space-y-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Total</span>
+                <input type="number" min="0" step="0.01" value={form.total} onChange={(e) => setField("total", e.target.value)} className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
+              </label>
+              <label className="space-y-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Forma de pago</span>
+                <select value={form.formaPago} onChange={(e) => setField("formaPago", e.target.value)} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm">
+                  {Object.entries(PAYMENT_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+                </select>
+              </label>
+              <label className="space-y-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Responsable</span>
+                <input value={form.responsable} onChange={(e) => setField("responsable", e.target.value)} className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
+              </label>
+              <label className="space-y-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Área jurídica</span>
+                <select value={form.area} onChange={(e) => setField("area", e.target.value)} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm">
+                  {Object.entries(AREA_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+                </select>
+              </label>
+              <label className="space-y-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Estado</span>
+                <select value={form.estado} onChange={(e) => setField("estado", e.target.value)} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm">
+                  {[
+                    ["pendiente", "Pendiente"],
+                    ["enviada", "Enviada"],
+                    ["vencida", "Vencida"],
+                    ["cobrada", "Cobrada"],
+                  ].map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                </select>
+              </label>
+            </div>
+          </section>
+        </div>
+
+        <aside className="space-y-6 xl:sticky xl:top-6 xl:self-start">
+          <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.04)]">
+            <div className="border-b border-slate-100 px-5 py-4">
+              <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">Vista rápida</p>
+            </div>
+            <div className="space-y-4 px-5 py-5">
+              <div className="rounded-2xl bg-slate-900 px-4 py-4 text-white">
+                <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-300">Factura</p>
+                <p className="mt-2 text-2xl font-bold">{displayNumber}</p>
+                <p className="mt-1 text-sm text-slate-300">{selectedClient?.label || "Sin cliente asignado"}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="rounded-2xl border border-slate-200 px-4 py-3">
+                  <p className="text-xs font-semibold text-slate-400">Total</p>
+                  <p className="mt-1 font-bold text-slate-900">{fmtEur(Number(form.total || 0))}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 px-4 py-3">
+                  <p className="text-xs font-semibold text-slate-400">Cobro</p>
+                  <p className="mt-1 font-bold text-slate-900">{PAYMENT_LABELS[form.formaPago]}</p>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
+                <p className="font-semibold text-slate-800">Resumen listo para ERP</p>
+                <ul className="mt-2 space-y-1">
+                  <li>Cliente: {selectedClient?.label || "Pendiente"}</li>
+                  <li>Expediente: {selectedExpediente?.label || "Pendiente"}</li>
+                  <li>Estado: {form.estado}</li>
+                  <li>Responsable: {form.responsable || "Pendiente"}</li>
+                </ul>
+              </div>
+            </div>
+          </section>
+
+          <div className="flex flex-col gap-3 rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_8px_30px_rgba(15,23,42,0.04)]">
+            <button
+              onClick={submit}
+              disabled={!canSubmit || saving}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-red-700 px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+              {initialValues?.id ? "Guardar cambios" : "Crear factura"}
+            </button>
+            <button onClick={onBack} className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50">
+              Cancelar
+            </button>
+          </div>
+        </aside>
+      </div>
+    </div>
+  );
+}
+
 function QuipuConnectModal({
   onClose,
   onSave,
@@ -949,6 +1213,9 @@ function QuipuConnectModal({
 
 function FacturacionContent() {
   const { getToken } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { facturaId } = useParams<{ facturaId?: string }>();
   const pendingInvoicesPreviewCount = 12;
   const [tab, setTab] = useState<TabKey>("dashboard");
   const [filterYear,   setFilterYear]   = useState<number>(new Date().getFullYear());
@@ -992,6 +1259,9 @@ function FacturacionContent() {
   const [chartType, setChartType] = useState<'bar' | 'line' | 'pie'>('bar');
   const [isSilentSyncing, setIsSilentSyncing] = useState(false);
   const silentSyncDoneRef = useRef(false);
+  const isFacturaCreatePage = location.pathname.endsWith("/facturas/nueva");
+  const isFacturaEditPage = /\/dashboard\/facturacion\/facturas\/[^/]+\/editar$/.test(location.pathname);
+  const facturaRouteMode = isFacturaCreatePage ? "create" : isFacturaEditPage ? "edit" : null;
 
   const deleteFacturaPermanently = useCallback(async (id: string) => {
     await apiFetch(`/api/facturacion/facturas/${id}`, { method: "DELETE", getToken });
@@ -1191,6 +1461,10 @@ function FacturacionContent() {
   }, [search, matchesDateFilter, filterResponsable, filterArea, filterEstado, filterFormaPago, filterSerie]);
 
   const filteredFacturas = useMemo(() => facturas.filter(matchesCommonFilters), [facturas, matchesCommonFilters]);
+  const facturaRouteRecord = useMemo(
+    () => (facturaRouteMode === "edit" ? facturas.find((item) => item.id === facturaId) || null : null),
+    [facturaId, facturaRouteMode, facturas],
+  );
   const filteredCobrosPendientes = useMemo(() => cobrosPendientes.filter(matchesCommonFilters), [cobrosPendientes, matchesCommonFilters]);
   const visibleCobrosPendientes = useMemo(
     () => (showAllPendingInvoices ? filteredCobrosPendientes : filteredCobrosPendientes.slice(0, pendingInvoicesPreviewCount)),
@@ -1228,6 +1502,10 @@ function FacturacionContent() {
   }, [filteredGastos]);
 
   const openEditor = (type: BillingFormType, record?: any) => {
+    if (type === "factura") {
+      navigate(record?.id ? `/dashboard/facturacion/facturas/${record.id}/editar` : "/dashboard/facturacion/facturas/nueva");
+      return;
+    }
     setEditorType(type);
     setEditorRecord(record ?? null);
   };
@@ -1236,6 +1514,10 @@ function FacturacionContent() {
     setEditorType(null);
     setEditorRecord(null);
   };
+
+  const closeFacturaWorkspace = useCallback(() => {
+    navigate("/dashboard/facturacion");
+  }, [navigate]);
 
   const resolveExpedienteRef = useCallback((expedienteId: string) => {
     return expedientes.find((item) => item.id === expedienteId)?.label || "";
@@ -1314,25 +1596,24 @@ function FacturacionContent() {
     }
   };
 
-  const saveRecord = async (payload: any) => {
-    if (!editorType) return;
+  const saveBillingRecord = useCallback(async (type: BillingFormType, payload: any, existingRecord?: any) => {
     setSaving(true);
     setErrorMsg(null);
     try {
-      const isEditing = Boolean(editorRecord?.id);
+      const isEditing = Boolean(existingRecord?.id);
       const basePath =
-        editorType === "factura"
+        type === "factura"
           ? "/api/facturacion/facturas"
-          : editorType === "gasto"
+          : type === "gasto"
             ? "/api/facturacion/gastos"
             : "/api/facturacion/presupuestos";
-      const response = await apiFetch(isEditing ? `${basePath}/${editorRecord.id}` : basePath, {
+      const response = await apiFetch(isEditing ? `${basePath}/${existingRecord.id}` : basePath, {
         method: isEditing ? "PUT" : "POST",
-        body: JSON.stringify(buildPayloadForApi(editorType, payload)),
+        body: JSON.stringify(buildPayloadForApi(type, payload)),
         getToken,
       });
       const saved = response?.data;
-      if (editorType === "factura") {
+      if (type === "factura") {
         const next = {
           ...mapFacturaFromApi(saved),
           expedienteRef: buildExpedienteRef(saved) || resolveExpedienteRef(payload.expedienteId),
@@ -1341,9 +1622,11 @@ function FacturacionContent() {
           contacto: saved?.contacto || payload.contacto,
         };
         setFacturas((current) => (isEditing ? current.map((item) => (item.id === next.id ? next : item)) : [next, ...current]));
-      } else if (editorType === "gasto") {
+        return next;
+      } else if (type === "gasto") {
         const next = mapGastoFromApi(saved);
         setGastos((current) => (isEditing ? current.map((item) => (item.id === next.id ? next : item)) : [next, ...current]));
+        return next;
       } else {
         const next = {
           ...mapPresupuestoFromApi(saved),
@@ -1353,14 +1636,26 @@ function FacturacionContent() {
           contacto: saved?.contacto || payload.contacto,
         };
         setPresupuestos((current) => (isEditing ? current.map((item) => (item.id === next.id ? next : item)) : [next, ...current]));
+        return next;
       }
-      closeEditor();
     } catch (error: any) {
       setErrorMsg(error?.message || "No se pudo guardar el registro.");
+      throw error;
     } finally {
       setSaving(false);
     }
+  }, [getToken, resolveExpedienteRef]);
+
+  const saveRecord = async (payload: any) => {
+    if (!editorType) return;
+    await saveBillingRecord(editorType, payload, editorRecord);
+    closeEditor();
   };
+
+  const saveFacturaWorkspace = useCallback(async (payload: any) => {
+    await saveBillingRecord("factura", payload, facturaRouteRecord);
+    navigate("/dashboard/facturacion");
+  }, [facturaRouteRecord, navigate, saveBillingRecord]);
 
   const removeRecord = async (type: BillingFormType, id: string) => {
     setErrorMsg(null);
@@ -1674,6 +1969,31 @@ function FacturacionContent() {
             </div>
           )}
 
+          {facturaRouteMode ? (
+            loading ? (
+              <div className="flex items-center gap-3 rounded-3xl border border-slate-200 bg-white px-6 py-6 shadow-[0_20px_80px_rgba(15,23,42,0.06)]">
+                <Loader2 size={16} className="animate-spin text-slate-500" />
+                <p className="text-sm text-slate-600">Preparando la pantalla de factura…</p>
+              </div>
+            ) : facturaRouteMode === "edit" && !facturaRouteRecord ? (
+              <div className="rounded-3xl border border-slate-200 bg-white px-6 py-8 shadow-[0_20px_80px_rgba(15,23,42,0.06)]">
+                <p className="text-lg font-bold text-slate-900">No encontramos esa factura</p>
+                <p className="mt-2 text-sm text-slate-500">Puede que haya sido borrada o que el enlace ya no sea válido.</p>
+                <button onClick={closeFacturaWorkspace} className="mt-5 inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">
+                  <ArrowLeft size={14} /> Volver
+                </button>
+              </div>
+            ) : (
+              <FacturaWorkspacePage
+                initialValues={facturaRouteRecord ?? undefined}
+                clients={clientes}
+                expedientes={expedientes}
+                saving={saving}
+                onBack={closeFacturaWorkspace}
+                onSave={saveFacturaWorkspace}
+              />
+            )
+          ) : (
           <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_20px_80px_rgba(15,23,42,0.06)]">
             <div className="border-b border-slate-200 bg-[linear-gradient(135deg,#f8fafc_0%,#ffffff_45%,#f8fafc_100%)] px-6 py-6">
               <div className="flex flex-wrap items-start justify-between gap-4">
@@ -2394,6 +2714,7 @@ function FacturacionContent() {
               )}
             </div>
           </div>
+          )}
 
           {loading && (
             <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm text-slate-600">
