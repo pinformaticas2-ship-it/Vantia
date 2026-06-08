@@ -14,7 +14,8 @@ import {
   Reply, ReplyAll, Forward, Paperclip, Loader2, CheckCircle2,
   MoreVertical, AlertCircle, Eye, EyeOff,
   ChevronLeft, Edit3, Tag, Wifi, Zap, Pin, FolderPlus, RotateCcw, Folder, Archive,
-  AtSign, Shield, Filter, LogIn, type LucideIcon,
+  AtSign, Shield, Filter, LogIn, Maximize2, Minimize2, Bold, Italic, Underline,
+  AlignLeft, AlignCenter, AlignRight, List, type LucideIcon,
 } from 'lucide-react';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -778,29 +779,37 @@ function ComposeWindow({
     );
   }
 
+  const isFullscreen = !minimized;
+
   return (
-    <div
-      className={`fixed bottom-0 right-6 z-50 bg-white rounded-t-2xl shadow-2xl border border-gray-200 transition-all duration-200 ${minimized ? 'h-12 w-72' : 'w-[560px]'}`}
-      style={{ maxHeight: minimized ? 48 : '85vh' }}>
+    <div className={`fixed z-50 bg-white shadow-2xl border border-gray-200 flex flex-col transition-all duration-200
+      ${minimized
+        ? 'bottom-0 right-6 w-80 h-12 rounded-t-2xl'
+        : 'inset-4 rounded-2xl'
+      }`}>
       {/* Header */}
       <div
-        className="flex items-center justify-between px-4 py-3 bg-gray-800 rounded-t-2xl cursor-pointer select-none"
-        onClick={() => setMinimized(m => !m)}>
-        <span className="text-white text-sm font-medium truncate pr-2">
+        className={`flex items-center justify-between px-4 py-3 select-none flex-shrink-0 ${minimized ? 'bg-gray-800 rounded-t-2xl cursor-pointer' : 'bg-gray-800 rounded-t-2xl'}`}
+        onClick={() => minimized && setMinimized(false)}>
+        <span className="text-white text-sm font-semibold truncate pr-2">
           {subject || 'Nuevo mensaje'}
         </span>
         <div className="flex items-center gap-2 text-gray-300">
-          <ChevronDown size={16} className={`transition-transform ${minimized ? 'rotate-180' : ''}`} />
+          <button onClick={e => { e.stopPropagation(); setMinimized(m => !m); }}
+            className="hover:text-white transition-colors p-0.5 rounded"
+            title={minimized ? 'Expandir' : 'Minimizar'}>
+            {minimized ? <Maximize2 size={14}/> : <Minimize2 size={14}/>}
+          </button>
           <button
             onClick={e => { e.stopPropagation(); onClose(buildDraftPayload() || undefined); }}
-            className="hover:text-white transition-colors">
+            className="hover:text-white transition-colors p-0.5 rounded" title="Cerrar">
             <X size={16} />
           </button>
         </div>
       </div>
 
       {!minimized && (
-        <div className="flex flex-col" style={{ maxHeight: 'calc(85vh - 48px)' }}>
+        <div className="flex flex-col flex-1 min-h-0">
           {/* From */}
           <div className="border-b border-gray-100 px-4 py-1.5">
             <div className="flex items-center gap-2">
@@ -874,14 +883,43 @@ function ComposeWindow({
               className="w-full text-sm outline-none py-2 placeholder-gray-300" />
           </div>
 
+          {/* Formatting toolbar */}
+          <div className="flex items-center gap-0.5 px-3 py-1.5 border-b border-gray-100 bg-gray-50 flex-wrap">
+            {[
+              { icon: <Bold size={13}/>,          cmd: 'bold',          title: 'Negrita (Ctrl+B)' },
+              { icon: <Italic size={13}/>,        cmd: 'italic',        title: 'Cursiva (Ctrl+I)' },
+              { icon: <Underline size={13}/>,     cmd: 'underline',     title: 'Subrayado (Ctrl+U)' },
+            ].map(({ icon, cmd, title }) => (
+              <button key={cmd} type="button" title={title} onMouseDown={e => { e.preventDefault(); document.execCommand(cmd); }}
+                className="p-1.5 rounded hover:bg-gray-200 text-gray-600 transition-colors">{icon}</button>
+            ))}
+            <div className="w-px h-4 bg-gray-200 mx-1"/>
+            {[
+              { icon: <AlignLeft size={13}/>,   cmd: 'justifyLeft',   title: 'Alinear izquierda' },
+              { icon: <AlignCenter size={13}/>, cmd: 'justifyCenter', title: 'Centrar' },
+              { icon: <AlignRight size={13}/>,  cmd: 'justifyRight',  title: 'Alinear derecha' },
+            ].map(({ icon, cmd, title }) => (
+              <button key={cmd} type="button" title={title} onMouseDown={e => { e.preventDefault(); document.execCommand(cmd); }}
+                className="p-1.5 rounded hover:bg-gray-200 text-gray-600 transition-colors">{icon}</button>
+            ))}
+            <div className="w-px h-4 bg-gray-200 mx-1"/>
+            <button type="button" title="Lista" onMouseDown={e => { e.preventDefault(); document.execCommand('insertUnorderedList'); }}
+              className="p-1.5 rounded hover:bg-gray-200 text-gray-600 transition-colors"><List size={13}/></button>
+            <div className="w-px h-4 bg-gray-200 mx-1"/>
+            <select onMouseDown={e => e.stopPropagation()} onChange={e => document.execCommand('fontSize', false, e.target.value)}
+              className="text-xs text-gray-600 bg-transparent border-0 outline-none cursor-pointer px-1">
+              {[1,2,3,4,5,6].map(s => <option key={s} value={s}>{[8,10,12,14,16,18][s-1]}pt</option>)}
+            </select>
+          </div>
+
           {/* Body */}
-          <div className="flex-1 overflow-auto px-4 py-3" style={{ minHeight: 140 }}>
+          <div className="flex-1 overflow-auto px-5 py-3">
             <div
               ref={bodyRef}
               contentEditable
               suppressContentEditableWarning
-              className="outline-none text-sm text-gray-800 leading-relaxed"
-              style={{ fontFamily: 'inherit', minHeight: 120 }}
+              className="outline-none text-sm text-gray-800 leading-relaxed h-full"
+              style={{ fontFamily: 'Arial, sans-serif', minHeight: 200 }}
             />
           </div>
 
