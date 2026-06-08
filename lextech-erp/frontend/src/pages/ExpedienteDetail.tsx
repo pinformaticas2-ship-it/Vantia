@@ -1578,12 +1578,106 @@ function isPdfAct(mime: string, name: string) {
 }
 function isWordAct(mime: string, name: string) { const n = (name || "").toLowerCase(); return mime?.includes("word") || mime?.includes("officedocument.wordprocessingml") || n.endsWith(".doc") || n.endsWith(".docx"); }
 function isExcelAct(mime: string, name: string) { const n = (name || "").toLowerCase(); return mime?.includes("excel") || mime?.includes("spreadsheetml") || n.endsWith(".xlsx") || n.endsWith(".xls") || n.endsWith(".csv"); }
-function openMailDraft(subject: string, body?: string, extra?: { to?: string; expediente_id?: string }) {
+function openMailDraft(subject: string, body?: string, extra?: { to?: string; expediente_id?: string; open_templates?: boolean; open_attachments?: boolean }) {
   const params = new URLSearchParams({ compose: '1', subject });
   if (body?.trim()) params.set("body", body);
   if (extra?.to) params.set("to", extra.to);
   if (extra?.expediente_id) params.set("expediente_id", extra.expediente_id);
+  if (extra?.open_templates) params.set("open_templates", "1");
+  if (extra?.open_attachments) params.set("open_attachments", "1");
   window.location.href = `/dashboard/correo?${params.toString()}`;
+}
+
+function MailDropdownBtn({
+  mainLabel,
+  mainIcon: MainIcon,
+  onMain,
+  mailSubject,
+  mailBody,
+  mailTo,
+  expedienteId,
+  disabled,
+  size = "sm",
+  variant = "outline",
+}: {
+  mainLabel: string;
+  mainIcon: any;
+  onMain: () => void;
+  mailSubject: string;
+  mailBody?: string;
+  mailTo?: string;
+  expedienteId?: string;
+  disabled?: boolean;
+  size?: "xs" | "sm";
+  variant?: "outline" | "primary";
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const send = (opts?: { open_templates?: boolean; open_attachments?: boolean }) => {
+    setOpen(false);
+    openMailDraft(mailSubject, mailBody, { to: mailTo, expediente_id: expedienteId, ...opts });
+  };
+
+  const isXs = size === "xs";
+  const isPrimary = variant === "primary";
+  const mainCls = isPrimary
+    ? "text-white bg-red-600 hover:bg-red-700 border-red-600"
+    : "text-slate-600 bg-white hover:bg-slate-50 border-slate-200 hover:border-slate-300";
+  const chevCls = isPrimary
+    ? "text-white bg-red-600 hover:bg-red-700 border-red-600 border-l-red-500"
+    : "text-slate-500 bg-white hover:bg-slate-100 border-slate-200";
+
+  return (
+    <div className="relative inline-flex" ref={ref}>
+      <button
+        type="button"
+        onClick={() => { onMain(); setOpen(false); }}
+        disabled={disabled}
+        className={`inline-flex items-center gap-1.5 ${isXs ? "px-3 py-1.5 text-xs" : "px-3 py-2 text-xs"} ${isPrimary ? "font-bold" : "font-semibold"} ${mainCls} border ${isXs ? "rounded-l-lg" : "rounded-l-xl"} transition-colors disabled:opacity-50`}
+      >
+        <MainIcon size={isXs ? 12 : 13} /> {mainLabel}
+      </button>
+      <button
+        type="button"
+        onClick={() => !disabled && setOpen(o => !o)}
+        disabled={disabled}
+        className={`inline-flex items-center ${isXs ? "px-1.5 py-1.5" : "px-1.5 py-2"} ${chevCls} border border-l-0 ${isXs ? "rounded-r-lg" : "rounded-r-xl"} transition-colors disabled:opacity-50`}
+      >
+        <ChevronDown size={10} />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full z-[9999] mt-1.5 min-w-[210px] rounded-2xl border border-slate-200 bg-white py-1.5 shadow-2xl shadow-slate-300/40">
+          <button type="button" onClick={() => send()}
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-700">
+            <Mail size={12} className="shrink-0 text-slate-400" /> Enviar correo
+          </button>
+          <div className="my-1 h-px bg-slate-100" />
+          <button type="button" onClick={() => send({ open_templates: true })}
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-700">
+            <Sparkles size={12} className="shrink-0 text-slate-400" /> Con Plantilla
+          </button>
+          <button type="button" onClick={() => send({ open_attachments: true })}
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-700">
+            <Paperclip size={12} className="shrink-0 text-slate-400" /> Con Adjuntos
+          </button>
+          <button type="button" onClick={() => send({ open_templates: true, open_attachments: true })}
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-700">
+            <Mail size={12} className="shrink-0 text-slate-400" /> Con Plantilla y Adjuntos
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function launchOfficeUrl(url: string) {
@@ -2058,6 +2152,14 @@ function ActuacionAdjuntosPanel({ taskId, locked = false }: { taskId: string; lo
     );
   }, [files, query]);
 
+  const _mailActiveFile = preview ? files.find((item) => item.id === preview.fileId) : null;
+  const _mailSubjectAct = _mailActiveFile
+    ? `Adjunto de actuación: ${_mailActiveFile.document_name || _mailActiveFile.original_name}`
+    : "Adjuntos de la actuación";
+  const _mailBodyAct = _mailActiveFile
+    ? `Hola,\n\nTe escribo en relación con el adjunto "${_mailActiveFile.document_name || _mailActiveFile.original_name}" asociado a esta actuación.\n\nTipo: ${_mailActiveFile.attachment_type || "Sin clasificar"}\nFecha: ${_mailActiveFile.created_at ? new Date(_mailActiveFile.created_at).toLocaleDateString("es-ES") : "Sin fecha"}\n\nRevisa el expediente para consultar o compartir el archivo correspondiente.`
+    : "Hola,\n\nTe escribo en relación con los adjuntos asociados a esta actuación.\n\nPuedes revisar los documentos directamente desde el expediente en el ERP.";
+
   return (
     <div className="space-y-4">
       {/* Toast de pegado */}
@@ -2081,22 +2183,14 @@ function ActuacionAdjuntosPanel({ taskId, locked = false }: { taskId: string; lo
           </div>
         </div>
         <div className="flex items-center gap-1.5 flex-wrap">
-          <button
-            type="button"
-            onClick={() => {
-              const activeFile = preview ? files.find((item) => item.id === preview.fileId) : null;
-              const subject = activeFile
-                ? `Adjunto de actuación: ${activeFile.document_name || activeFile.original_name}`
-                : "Adjuntos de la actuación";
-              const body = activeFile
-                ? `Hola,\n\nTe escribo en relación con el adjunto "${activeFile.document_name || activeFile.original_name}" asociado a esta actuación.\n\nTipo: ${activeFile.attachment_type || "Sin clasificar"}\nFecha: ${activeFile.created_at ? new Date(activeFile.created_at).toLocaleDateString("es-ES") : "Sin fecha"}\n\nRevisa el expediente para consultar o compartir el archivo correspondiente.`
-                : "Hola,\n\nTe escribo en relación con los adjuntos asociados a esta actuación.\n\nPuedes revisar los documentos directamente desde el expediente en el ERP.";
-              openMailDraft(subject, body);
-            }}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:border-slate-300 rounded-lg transition-colors"
-          >
-            <Mail size={12} /> Enviar correo
-          </button>
+          <MailDropdownBtn
+            mainLabel="Enviar correo"
+            mainIcon={Mail}
+            onMain={() => openMailDraft(_mailSubjectAct, _mailBodyAct)}
+            mailSubject={_mailSubjectAct}
+            mailBody={_mailBodyAct}
+            size="xs"
+          />
           {!locked && (
             <>
               <button type="button" onClick={() => folderInputRef.current?.click()}
@@ -2666,14 +2760,15 @@ function ActuacionModal({
             </h3>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => openMailDraft(mailSubject, mailBody, { to: clienteEmail ?? undefined, expediente_id: expedienteId ?? undefined })}
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-slate-600 rounded-xl border border-slate-200 hover:bg-slate-50"
-            >
-              <Mail size={14} />
-              Enviar correo
-            </button>
+            <MailDropdownBtn
+              mainLabel="Enviar correo"
+              mainIcon={Mail}
+              onMain={() => openMailDraft(mailSubject, mailBody, { to: clienteEmail ?? undefined, expediente_id: expedienteId ?? undefined })}
+              mailSubject={mailSubject}
+              mailBody={mailBody}
+              mailTo={clienteEmail ?? undefined}
+              expedienteId={expedienteId ?? undefined}
+            />
             <button type="button" onClick={onClose}
               className="px-4 py-2 text-sm font-semibold text-slate-600 rounded-xl border border-slate-200 hover:bg-slate-50">
               Cancelar
@@ -3319,13 +3414,15 @@ function TabCorreoExpediente({
             <Link2 size={12} /> Asociar correo existente
           </button>
           {!locked && (
-            <button type="button"
-              onClick={() => { setShowCompose(true); setComposeError(""); }}
+            <MailDropdownBtn
+              mainLabel="Redactar"
+              mainIcon={Plus}
+              onMain={() => { setShowCompose(true); setComposeError(""); }}
+              mailSubject={`RE: Expediente ${expedienteRef}`}
+              expedienteId={expedienteId}
               disabled={noAccounts}
-              title={noAccounts ? "Configura una cuenta de correo primero" : undefined}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm transition-all disabled:opacity-50">
-              <Plus size={12} /> Redactar
-            </button>
+              variant="primary"
+            />
           )}
         </div>
       </div>
