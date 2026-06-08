@@ -584,11 +584,13 @@ function TableShell({
   count,
   headers,
   children,
+  headerAction,
 }: {
   title: string;
   count: string;
   headers: string[];
   children: React.ReactNode;
+  headerAction?: React.ReactNode;
 }) {
   return (
     <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.04)]">
@@ -597,6 +599,7 @@ function TableShell({
           <h3 className="text-sm font-bold text-slate-700">{title}</h3>
           <p className="mt-0.5 text-xs text-slate-400">{count}</p>
         </div>
+        {headerAction ? <div className="shrink-0">{headerAction}</div> : null}
       </div>
       <div className="overflow-x-auto">
         <table className="min-w-full text-left">
@@ -2205,8 +2208,21 @@ function FacturacionContent() {
                     <KpiCard label="Gastos del periodo" value={fmtEur(gastosMensuales)} sub="Control de costes" color="green" icon={TrendingDown} />
                   </div>
 
-                  <div className="space-y-3">
-                  <TableShell title="Cobros pendientes de facturas" count={`${filteredCobrosPendientes.length} registros`} headers={["Número", "Cliente", "Expediente", "Vencimiento", "Pendiente", "Estado", ""]}>
+                  <TableShell
+                    title="Cobros pendientes de facturas"
+                    count={`${filteredCobrosPendientes.length} registros`}
+                    headers={["Número", "Cliente", "Expediente", "Vencimiento", "Pendiente", "Estado", ""]}
+                    headerAction={
+                      filteredCobrosPendientes.length > pendingInvoicesPreviewCount ? (
+                        <button
+                          onClick={() => setShowAllPendingInvoices((current) => !current)}
+                          className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50"
+                        >
+                          {showAllPendingInvoices ? "Ver menos" : `Ver todos (${filteredCobrosPendientes.length})`}
+                        </button>
+                      ) : null
+                    }
+                  >
                     {visibleCobrosPendientes.map((row) => (
                       <tr key={row.id} className="transition-colors hover:bg-slate-50/60">
                         <td className="px-5 py-3 text-sm font-semibold text-slate-800">{row.num}</td>
@@ -2230,17 +2246,6 @@ function FacturacionContent() {
                       </tr>
                     ))}
                   </TableShell>
-                  {filteredCobrosPendientes.length > pendingInvoicesPreviewCount && (
-                    <div className="flex justify-end">
-                      <button
-                        onClick={() => setShowAllPendingInvoices((current) => !current)}
-                        className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50"
-                      >
-                        {showAllPendingInvoices ? "Ver menos" : `Ver todos (${filteredCobrosPendientes.length})`}
-                      </button>
-                    </div>
-                  )}
-                  </div>
                 </>
               )}
 
