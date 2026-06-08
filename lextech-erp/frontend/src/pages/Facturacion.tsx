@@ -701,8 +701,9 @@ function StructuredBillingEditorModal({
   const subtitle = isFactura ? "factura" : isGasto ? "gasto" : "presupuesto";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4">
-      <div className="w-full max-w-5xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/35 p-4">
+      <div className="flex min-h-full items-center justify-center">
+      <div className="my-auto w-full max-w-5xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-400">Facturación</p>
@@ -862,6 +863,7 @@ function StructuredBillingEditorModal({
           </button>
         </div>
       </div>
+      </div>
     </div>
   );
 }
@@ -885,8 +887,9 @@ function QuipuConnectModal({
   const [ownerSlug, setOwnerSlug] = useState(initialOwnerSlug || "");
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4">
-      <div className="w-full max-w-2xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/35 p-4">
+      <div className="flex min-h-full items-center justify-center">
+      <div className="my-auto w-full max-w-2xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-400">Integración</p>
@@ -929,12 +932,14 @@ function QuipuConnectModal({
           </button>
         </div>
       </div>
+      </div>
     </div>
   );
 }
 
 function FacturacionContent() {
   const { getToken } = useAuth();
+  const pendingInvoicesPreviewCount = 12;
   const [tab, setTab] = useState<TabKey>("dashboard");
   const [filterYear,   setFilterYear]   = useState<number>(new Date().getFullYear());
   const [filterPeriod, setFilterPeriod] = useState<FilterPeriod>("year");
@@ -970,6 +975,7 @@ function FacturacionContent() {
   const [quipuError, setQuipuError] = useState<string | null>(null);
   const [pushingToQuipuId, setPushingToQuipuId] = useState<string | null>(null);
   const [openingQuipuPdfId, setOpeningQuipuPdfId] = useState<string | null>(null);
+  const [showAllPendingInvoices, setShowAllPendingInvoices] = useState(false);
   const [showContactEditor, setShowContactEditor] = useState(false);
   const [editingContact, setEditingContact] = useState<QuipuContact | null>(null);
   const [savingContact, setSavingContact] = useState(false);
@@ -1163,6 +1169,16 @@ function FacturacionContent() {
 
   const filteredFacturas = useMemo(() => facturas.filter(matchesCommonFilters), [facturas, matchesCommonFilters]);
   const filteredCobrosPendientes = useMemo(() => cobrosPendientes.filter(matchesCommonFilters), [cobrosPendientes, matchesCommonFilters]);
+  const visibleCobrosPendientes = useMemo(
+    () => (showAllPendingInvoices ? filteredCobrosPendientes : filteredCobrosPendientes.slice(0, pendingInvoicesPreviewCount)),
+    [filteredCobrosPendientes, showAllPendingInvoices],
+  );
+
+  useEffect(() => {
+    if (filteredCobrosPendientes.length <= pendingInvoicesPreviewCount && showAllPendingInvoices) {
+      setShowAllPendingInvoices(false);
+    }
+  }, [filteredCobrosPendientes.length, pendingInvoicesPreviewCount, showAllPendingInvoices]);
   const filteredGastos = useMemo(() => gastos.filter(matchesCommonFilters), [gastos, matchesCommonFilters]);
   const filteredPresupuestos = useMemo(() => presupuestos.filter(matchesCommonFilters), [presupuestos, matchesCommonFilters]);
 
@@ -2189,8 +2205,9 @@ function FacturacionContent() {
                     <KpiCard label="Gastos del periodo" value={fmtEur(gastosMensuales)} sub="Control de costes" color="green" icon={TrendingDown} />
                   </div>
 
+                  <div className="space-y-3">
                   <TableShell title="Cobros pendientes de facturas" count={`${filteredCobrosPendientes.length} registros`} headers={["Número", "Cliente", "Expediente", "Vencimiento", "Pendiente", "Estado", ""]}>
-                    {filteredCobrosPendientes.map((row) => (
+                    {visibleCobrosPendientes.map((row) => (
                       <tr key={row.id} className="transition-colors hover:bg-slate-50/60">
                         <td className="px-5 py-3 text-sm font-semibold text-slate-800">{row.num}</td>
                         <td className="px-5 py-3 text-sm text-slate-600">
@@ -2213,6 +2230,17 @@ function FacturacionContent() {
                       </tr>
                     ))}
                   </TableShell>
+                  {filteredCobrosPendientes.length > pendingInvoicesPreviewCount && (
+                    <div className="flex justify-end">
+                      <button
+                        onClick={() => setShowAllPendingInvoices((current) => !current)}
+                        className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50"
+                      >
+                        {showAllPendingInvoices ? "Ver menos" : `Ver todos (${filteredCobrosPendientes.length})`}
+                      </button>
+                    </div>
+                  )}
+                  </div>
                 </>
               )}
 
@@ -2474,8 +2502,9 @@ function BankAccountsTab({
 
       {/* Add account modal */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4">
-          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/35 p-4">
+          <div className="flex min-h-full items-center justify-center">
+          <div className="my-auto w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
               <h3 className="text-lg font-bold text-slate-900">{editingAcc ? "Editar cuenta" : "Nueva cuenta bancaria"}</h3>
               <button onClick={() => setShowForm(false)} className="rounded-xl border border-slate-200 p-2 hover:bg-slate-50"><X size={16} /></button>
@@ -2505,6 +2534,7 @@ function BankAccountsTab({
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Guardar
               </button>
             </div>
+          </div>
           </div>
         </div>
       )}
@@ -3047,8 +3077,9 @@ function ContactEditorModal({
   const inp = "w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 outline-none focus:border-slate-300 focus:bg-white transition-colors";
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/30 px-4" onClick={onClose}>
-      <div className="w-full max-w-md rounded-3xl bg-white border border-slate-200 shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[200] overflow-y-auto bg-slate-950/30 px-4" onClick={onClose}>
+      <div className="flex min-h-full items-center justify-center">
+      <div className="my-auto w-full max-w-md rounded-3xl border border-slate-200 bg-white overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-slate-100">
           <div className="flex items-center gap-3">
             <div className="h-9 w-9 rounded-xl bg-blue-100 flex items-center justify-center"><Users size={15} className="text-blue-600" /></div>
@@ -3128,6 +3159,7 @@ function ContactEditorModal({
           </button>
           <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 rounded-xl transition-colors">Cancelar</button>
         </div>
+      </div>
       </div>
     </div>
   );
