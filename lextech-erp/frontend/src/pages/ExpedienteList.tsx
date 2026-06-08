@@ -361,8 +361,22 @@ function buildExpedientePayload(row: CsvPreviewRow, mappings: CsvFieldMapping[])
   const parsedYear = Number.parseInt(anioRaw, 10);
   const today = new Date().toISOString().slice(0, 10);
 
+  // Si la referencia tiene el patrón "YYYY/NNN", extraer año y número de expediente
+  let numExpFromRef: number | null = null;
+  let anioFromRef: number | null = null;
+  if (referencia) {
+    const m = referencia.trim().match(/^(\d{4})[\/\-](\d+)$/);
+    if (m) {
+      anioFromRef = Number.parseInt(m[1], 10);
+      numExpFromRef = Number.parseInt(m[2], 10);
+    }
+  }
+
+  const finalAnio = anioFromRef ?? (Number.isFinite(parsedYear) ? parsedYear : new Date().getFullYear());
+
   return {
-    anio: Number.isFinite(parsedYear) ? parsedYear : new Date().getFullYear(),
+    anio: finalAnio,
+    num_exp: numExpFromRef ?? undefined,
     ref_propia: referencia || null,
     descripcion,
     tipo: inferExpedienteTipo(tipoProcedimiento),

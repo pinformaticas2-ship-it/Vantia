@@ -421,7 +421,7 @@ export const removeRelatedExpediente = async (req: any, res: Response) => {
 
 export const createExpediente = async (req: any, res: Response) => {
   const {
-    anio, ref_propia, ref_expediente, descripcion, tipo, cliente_id, cliente_nombre,
+    anio, num_exp: numExpFromBody, ref_propia, ref_expediente, descripcion, tipo, cliente_id, cliente_nombre,
     contrario, procurador, juzgado, tipo_proc, num_autos, nig,
     estado, observaciones, fecha_inicio, fecha_cierre, importe,
     tipos_asunto, cuantia_principal, intereses, costas, cuantia_total,
@@ -431,7 +431,10 @@ export const createExpediente = async (req: any, res: Response) => {
   try {
     const yr = anio || new Date().getFullYear();
 
-    // Leer config del contador para este año
+    // Si el cliente envía num_exp explícito (p.ej. extraído de "2026/001"), lo usamos directamente
+    const numExpFixed = numExpFromBody != null ? Number(numExpFromBody) : null;
+
+    // Leer config del contador para este año (solo necesario si no hay num_exp fijo)
     const cfgR = await pool.query(
       `SELECT min_num, auto_fill, override_next FROM expediente_counter_config WHERE anio = $1`, [yr]
     );
@@ -441,7 +444,10 @@ export const createExpediente = async (req: any, res: Response) => {
 
     let numExp: number;
 
-    if (cfg.override_next != null) {
+    if (numExpFixed && Number.isFinite(numExpFixed) && numExpFixed > 0) {
+      // El cliente proporcionó un num_exp explícito (importación CSV con referencia "YYYY/NNN")
+      numExp = numExpFixed;
+    } else if (cfg.override_next != null) {
       // Usar el número específico configurado manualmente
       numExp = cfg.override_next;
       // Limpiar el override después de usarlo
