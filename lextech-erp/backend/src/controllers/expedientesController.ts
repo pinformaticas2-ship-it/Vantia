@@ -470,12 +470,38 @@ export const createExpediente = async (req: any, res: Response) => {
     }
 
     let nombre = cliente_nombre || null;
-    if (cliente_id && !nombre) {
+    let resolvedClienteId = cliente_id || null;
+
+    if (resolvedClienteId && !nombre) {
       const cr = await pool.query(
         `SELECT first_name || COALESCE(' ' || last_name, '') AS n FROM entities WHERE id = $1`,
-        [cliente_id]
+        [resolvedClienteId]
       );
       nombre = cr.rows[0]?.n || null;
+    } else if (!resolvedClienteId && nombre) {
+      // Sin cliente_id pero con nombre: buscar primero por coincidencia exacta
+      const searchName = nombre.trim();
+      const found = await pool.query(
+        `SELECT id FROM entities
+          WHERE TRIM(COALESCE(commercial_name,'')) ILIKE $1
+             OR TRIM(COALESCE(first_name,'') || COALESCE(' ' || last_name,'')) ILIKE $1
+          LIMIT 1`,
+        [searchName]
+      );
+      if (found.rows.length) {
+        resolvedClienteId = found.rows[0].id;
+      } else {
+        // No existe → crear cliente mínimo sin DNI (para importaciones CSV)
+        const parts = searchName.split(/\s+/);
+        const newClient = await pool.query(
+          `INSERT INTO entities
+             (type, first_name, last_name, nif_cif, client_status, date_alta, created_by)
+           VALUES ('CLIENTE', $1, $2, 'S/N', 'Alta', CURRENT_DATE, $3)
+           RETURNING id`,
+          [parts[0] || searchName, parts.slice(1).join(' ') || null, reqUserName(req)]
+        );
+        resolvedClienteId = newClient.rows[0].id;
+      }
     }
 
     // Retry loop: si otro proceso insertan el mismo num_exp concurrentemente (race condition
@@ -524,7 +550,7 @@ export const createExpediente = async (req: any, res: Response) => {
             yr, numExp,
             nullableText(ref_propia), nullableText(ref_expediente),
             nullableText(descripcion), tipo || 'judicial',
-            cliente_id || null, nombre,
+            resolvedClienteId, nombre,
             nullableText(contrario), nullableText(procurador),
             nullableText(juzgado), nullableText(tipo_proc),
             nullableText(num_autos), nullableText(nig),
