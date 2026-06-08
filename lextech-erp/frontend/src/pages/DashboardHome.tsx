@@ -7,7 +7,7 @@ import {
   ChevronDown, FileSpreadsheet, ClipboardList,
   ScanLine, ExternalLink, MoreHorizontal, LayoutGrid, X, GripVertical,
   Briefcase, Users, History, MessageSquare, MessageCircle, Mail, Library,
-  Receipt, Mic, Sparkles, Settings,
+  Receipt,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { safeJson } from "../lib/api";
@@ -96,26 +96,18 @@ function fmtTime(s: string) { return new Date(s).toLocaleTimeString("es-ES", { h
 
 // ── Widget picker ─────────────────────────────────────────────────────────────
 const ALL_WIDGETS = [
-  { id:"agenda",      label:"Próximas citas",     desc:"Eventos de tu agenda de hoy y los próximos días",    icon:"📅" },
-  { id:"tareas",      label:"Tareas y plazos",     desc:"Contador de tareas vencidas, urgentes y pendientes", icon:"✅" },
-  { id:"actividad",   label:"Actividad reciente",  desc:"Últimas acciones realizadas en el ERP",              icon:"⚡" },
-  { id:"expedientes", label:"Resumen expedientes", desc:"Acceso rápido a expedientes abiertos",               icon:"📁" },
-  { id:"facturacion", label:"Resumen facturación", desc:"Totales facturados, cobrados y pendientes",          icon:"💶" },
-  { id:"module_dashboard",    label:"MÃ³dulo Dashboard",     desc:"Acceso directo al panel principal",               icon:"ðŸ§­" },
-  { id:"module_expedientes",  label:"MÃ³dulo Expedientes",   desc:"Acceso directo a la gestiÃ³n de expedientes",     icon:"ðŸ—‚ï¸" },
-  { id:"module_clientes",     label:"MÃ³dulo Clientes",      desc:"Acceso directo a la base de clientes",           icon:"ðŸ‘¥" },
-  { id:"module_trazabilidad", label:"MÃ³dulo Trazabilidad",  desc:"Acceso directo a actividad y auditorÃ­a",        icon:"ðŸ•µï¸" },
-  { id:"module_agenda",       label:"MÃ³dulo Agenda",        desc:"Acceso directo a citas y calendario",            icon:"ðŸ—“ï¸" },
-  { id:"module_chat",         label:"MÃ³dulo Chat",          desc:"Acceso directo al chat interno",                 icon:"ðŸ’¬" },
-  { id:"module_whatsapp",     label:"MÃ³dulo WhatsApp",      desc:"Acceso directo a la comunicaciÃ³n con clientes", icon:"ðŸ“±" },
-  { id:"module_correo",       label:"MÃ³dulo Correo",        desc:"Acceso directo al gestor de correo",            icon:"âœ‰ï¸" },
-  { id:"module_documental",   label:"MÃ³dulo Documental",    desc:"Acceso directo a CENDOJ, BOE y Lexnet",         icon:"ðŸ“š" },
-  { id:"module_plaud-ia",     label:"MÃ³dulo Plaud IA",      desc:"Acceso directo a grabaciÃ³n y transcripciÃ³n",   icon:"ðŸŽ¤" },
-  { id:"module_chat-ia",      label:"MÃ³dulo Chat IA",       desc:"Acceso directo al asistente IA",                icon:"âœ¨" },
-  { id:"module_config",       label:"MÃ³dulo ConfiguraciÃ³n", desc:"Acceso directo a ajustes del sistema",          icon:"âš™ï¸" },
+  { id:"agenda",      label:"Agenda",         desc:"Próximas citas, vistas y calendario inmediato",        icon:"📅" },
+  { id:"tareas",      label:"Tareas",         desc:"Urgentes, vencidas y pendientes del usuario",          icon:"✅" },
+  { id:"actividad",   label:"Trazabilidad",   desc:"Últimos movimientos y auditoría del ERP",              icon:"🕵️" },
+  { id:"expedientes", label:"Expedientes",    desc:"Estado general de asuntos y casos abiertos",           icon:"📁" },
+  { id:"clientes",    label:"Clientes",       desc:"Base activa del despacho y datos de contacto",         icon:"👥" },
+  { id:"chat",        label:"Chat interno",   desc:"Canales, mensajes pendientes y conversación reciente", icon:"💬" },
+  { id:"whatsapp",    label:"WhatsApp",       desc:"Estado del canal y mensajes programados",              icon:"📱" },
+  { id:"correo",      label:"Correo",         desc:"Bandeja, no leídos y borradores del despacho",         icon:"✉️" },
+  { id:"documental",  label:"Documental",     desc:"BOE, CENDOJ y estado de proveedores jurídicos",        icon:"📚" },
+  { id:"facturacion", label:"Facturación",    desc:"Totales facturados, cobrados y pendientes",            icon:"💶" },
 ];
 const DASHBOARD_MODULES = [
-  { id: "dashboard", label: "Dashboard", desc: "Panel general del despacho", to: "/dashboard", icon: LayoutGrid, tone: "bg-slate-100 text-slate-600" },
   { id: "expedientes", label: "Expedientes", desc: "Gestión de asuntos y casos", to: "/dashboard/expedientes", icon: Briefcase, tone: "bg-blue-100 text-blue-600" },
   { id: "clientes", label: "Clientes", desc: "Base de datos del despacho", to: "/dashboard/clientes", icon: Users, tone: "bg-emerald-100 text-emerald-600" },
   { id: "trazabilidad", label: "Trazabilidad", desc: "Actividad y auditoría interna", to: "/dashboard/trazabilidad", icon: History, tone: "bg-amber-100 text-amber-700" },
@@ -126,56 +118,37 @@ const DASHBOARD_MODULES = [
   { id: "correo", label: "Correo", desc: "Bandeja y redacción de emails", to: "/dashboard/correo", icon: Mail, tone: "bg-rose-100 text-rose-700" },
   { id: "documental", label: "Documental", desc: "CENDOJ, BOE y Lexnet", to: "/dashboard/documental", icon: Library, tone: "bg-indigo-100 text-indigo-700" },
   { id: "facturacion", label: "Facturación", desc: "Cobros, gastos y Quipu", to: "/dashboard/facturacion", icon: Receipt, tone: "bg-orange-100 text-orange-700" },
-  { id: "plaud-ia", label: "Plaud IA", desc: "Grabación y transcripción", to: "/dashboard/plaud-ia", icon: Mic, tone: "bg-teal-100 text-teal-700" },
-  { id: "chat-ia", label: "Chat IA", desc: "Asistente transversal del despacho", to: "/dashboard/chat-ia", icon: Sparkles, tone: "bg-fuchsia-100 text-fuchsia-700" },
-  { id: "config", label: "Configuración", desc: "Ajustes y personalización", to: "/dashboard/config", icon: Settings, tone: "bg-slate-200 text-slate-700" },
 ];
-const FUNCTIONAL_MODULE_PICKER_ITEMS = [
-  { id: "module_dashboard", label: "Modulo Dashboard", desc: "Acceso directo al panel principal", icon: "D" },
-  { id: "module_expedientes", label: "Modulo Expedientes", desc: "Acceso directo a la gestion de expedientes", icon: "E" },
-  { id: "module_clientes", label: "Modulo Clientes", desc: "Acceso directo a la base de clientes", icon: "C" },
-  { id: "module_trazabilidad", label: "Modulo Trazabilidad", desc: "Acceso directo a actividad y auditoria", icon: "T" },
-  { id: "module_agenda", label: "Modulo Agenda", desc: "Acceso directo a citas y calendario", icon: "A" },
-  { id: "module_tareas", label: "Modulo Tareas", desc: "Acceso directo a pendientes y plazos", icon: "Ta" },
-  { id: "module_chat", label: "Modulo Chat", desc: "Acceso directo al chat interno", icon: "Ch" },
-  { id: "module_whatsapp", label: "Modulo WhatsApp", desc: "Acceso directo a la comunicacion con clientes", icon: "W" },
-  { id: "module_correo", label: "Modulo Correo", desc: "Acceso directo al gestor de correo", icon: "Co" },
-  { id: "module_documental", label: "Modulo Documental", desc: "Acceso directo a CENDOJ, BOE y Lexnet", icon: "Do" },
-  { id: "module_facturacion", label: "Modulo Facturacion", desc: "Acceso directo a cobros, gastos y Quipu", icon: "F" },
-];
-const FUNCTIONAL_MODULE_WIDGET_IDS = new Set(FUNCTIONAL_MODULE_PICKER_ITEMS.map((item) => item.id));
-const FUNCTIONAL_MODULE_ROUTES: Record<string, { label: string; desc: string; to: string; icon: any; tone: string }> = {
-  module_dashboard: { label: "Dashboard", desc: "Panel general del despacho", to: "/dashboard", icon: LayoutGrid, tone: "bg-slate-100 text-slate-600" },
-  module_expedientes: { label: "Expedientes", desc: "Gestion de asuntos y casos", to: "/dashboard/expedientes", icon: Briefcase, tone: "bg-blue-100 text-blue-600" },
-  module_clientes: { label: "Clientes", desc: "Base de datos del despacho", to: "/dashboard/clientes", icon: Users, tone: "bg-emerald-100 text-emerald-600" },
-  module_trazabilidad: { label: "Trazabilidad", desc: "Actividad y auditoria interna", to: "/dashboard/trazabilidad", icon: History, tone: "bg-amber-100 text-amber-700" },
-  module_agenda: { label: "Agenda", desc: "Citas, vistas y calendario", to: "/dashboard/agenda", icon: Calendar, tone: "bg-cyan-100 text-cyan-700" },
-  module_tareas: { label: "Tareas", desc: "Pendientes y plazos del usuario", to: "/dashboard/tareas", icon: CheckCircle2, tone: "bg-lime-100 text-lime-700" },
-  module_chat: { label: "Chat", desc: "Mensajeria interna del equipo", to: "/dashboard/chat", icon: MessageSquare, tone: "bg-violet-100 text-violet-700" },
-  module_whatsapp: { label: "WhatsApp", desc: "Comunicacion con clientes", to: "/dashboard/whatsapp", icon: MessageCircle, tone: "bg-green-100 text-green-700" },
-  module_correo: { label: "Correo", desc: "Bandeja y redaccion de emails", to: "/dashboard/correo", icon: Mail, tone: "bg-rose-100 text-rose-700" },
-  module_documental: { label: "Documental", desc: "CENDOJ, BOE y Lexnet", to: "/dashboard/documental", icon: Library, tone: "bg-indigo-100 text-indigo-700" },
-  module_facturacion: { label: "Facturacion", desc: "Cobros, gastos y Quipu", to: "/dashboard/facturacion", icon: Receipt, tone: "bg-orange-100 text-orange-700" },
-};
 const STORAGE_KEY = "dashboard_visible_widgets";
 const ORDER_KEY   = "dashboard_widget_order";
 const DEFAULT_VISIBLE = ["agenda", "tareas", "actividad"];
 const DEFAULT_ORDER   = [
-  "agenda", "tareas", "facturacion", "actividad", "expedientes",
-  "module_dashboard", "module_expedientes", "module_clientes", "module_trazabilidad",
-  "module_agenda", "module_chat", "module_whatsapp", "module_correo",
-  "module_documental", "module_facturacion",
+  "agenda", "tareas", "actividad", "expedientes", "clientes",
+  "chat", "whatsapp", "correo", "documental", "facturacion",
 ];
-function loadVisible(): string[]  { try { const r = localStorage.getItem(STORAGE_KEY); if (r) return JSON.parse(r); } catch {/**/} return DEFAULT_VISIBLE; }
-function loadOrder(): string[]    { try { const r = localStorage.getItem(ORDER_KEY);   if (r) return JSON.parse(r); } catch {/**/} return DEFAULT_ORDER; }
+const VALID_WIDGET_IDS = new Set(ALL_WIDGETS.map((widget) => widget.id));
+function sanitizeWidgetIds(ids: string[], fallback: string[]) {
+  const filtered = ids.filter((id, index) => VALID_WIDGET_IDS.has(id) && ids.indexOf(id) === index);
+  return filtered.length ? filtered : fallback;
+}
+function loadVisible(): string[]  {
+  try {
+    const r = localStorage.getItem(STORAGE_KEY);
+    if (r) return sanitizeWidgetIds(JSON.parse(r), DEFAULT_VISIBLE);
+  } catch {/**/}
+  return DEFAULT_VISIBLE;
+}
+function loadOrder(): string[]    {
+  try {
+    const r = localStorage.getItem(ORDER_KEY);
+    if (r) return sanitizeWidgetIds(JSON.parse(r), DEFAULT_ORDER);
+  } catch {/**/}
+  return DEFAULT_ORDER;
+}
 
 function WidgetPickerModal({ visible, onClose, onSave }: { visible: string[]; onClose: () => void; onSave: (ids: string[]) => void }) {
   const [sel, setSel] = useState<string[]>(visible);
   const toggle = (id: string) => setSel(cur => cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id]);
-  const pickerItems = [
-    ...ALL_WIDGETS.filter((item) => !item.id.startsWith("module_")),
-    ...FUNCTIONAL_MODULE_PICKER_ITEMS,
-  ];
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent p-4">
       <div className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
@@ -187,7 +160,7 @@ function WidgetPickerModal({ visible, onClose, onSave }: { visible: string[]; on
           <button onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-400 hover:bg-slate-50"><X size={16} /></button>
         </div>
         <div className="divide-y divide-slate-50 px-4 py-3">
-          {pickerItems.map(w => (
+          {ALL_WIDGETS.map(w => (
             <label key={w.id} className="flex cursor-pointer items-center gap-4 rounded-2xl px-3 py-3.5 hover:bg-slate-50 transition-colors">
               <span className="text-xl shrink-0">{w.icon}</span>
               <div className="flex-1 min-w-0">
@@ -354,6 +327,13 @@ export default function DashboardHome() {
   const [agendaLoading, setAgendaLoading] = useState(true);
   const [taskStats,     setTaskStats]     = useState({ vencidas:0, proximas:0, urgentes:0, pendientes:0, completadas:0 });
   const [billingRaw,    setBillingRaw]    = useState<{ facturas: any[]; gastos: any[] } | null>(null);
+  const [activityTotal, setActivityTotal] = useState(0);
+  const [expStats,      setExpStats]      = useState({ total: 0, abiertos: 0, este_anio: 0, archivados: 0 });
+  const [clientStats,   setClientStats]   = useState({ total: 0, activos: 0, conEmail: 0, conTelefono: 0 });
+  const [chatStats,     setChatStats]     = useState({ canales: 0, noLeidos: 0, directos: 0, conActividad: 0 });
+  const [waStats,       setWaStats]       = useState({ configurado: false, webhook: false, programados: 0, origen: "Sin configurar" });
+  const [emailStats,    setEmailStats]    = useState({ cuentas: 0, inbox: 0, unread: 0, drafts: 0 });
+  const [docStats,      setDocStats]      = useState({ providers: 0, activos: 0, highlights: 0, lexnet: false });
 
   // Billing period state
   const thisYear = new Date().getFullYear();
@@ -365,16 +345,43 @@ export default function DashboardHome() {
     if (!silent) { setActLoading(true); setAgendaLoading(true); }
     try {
       const token = await getToken({ skipCache: true });
-      const [actRes, agendaRes, tasksRes, billingRes] = await Promise.all([
-        fetch("/api/activity/me?limit=10",   { headers: { Authorization: `Bearer ${token}` } }),
-        fetch("/api/agenda/upcoming?limit=3", { headers: { Authorization: `Bearer ${token}` } }),
-        fetch("/api/tasks/me",               { headers: { Authorization: `Bearer ${token}` } }),
-        fetch("/api/facturacion/bootstrap",  { headers: { Authorization: `Bearer ${token}` } }),
+      const headers = { Authorization: `Bearer ${token}` };
+      const [
+        actRes, agendaRes, tasksRes, billingRes,
+        expRes, clientsRes, chatRes, chatUnreadRes,
+        waStatusRes, waSchedulesRes, emailStatsRes, emailAccountsRes,
+        docProvidersRes, docHighlightsRes,
+      ] = await Promise.all([
+        fetch("/api/activity/me?limit=10",        { headers }),
+        fetch("/api/agenda/upcoming?limit=3",     { headers }),
+        fetch("/api/tasks/me",                    { headers }),
+        fetch("/api/facturacion/bootstrap",       { headers }),
+        fetch("/api/expedientes/stats",           { headers }),
+        fetch("/api/entities?limit=500",          { headers }),
+        fetch("/api/chat/canales",                { headers }),
+        fetch("/api/chat/unread",                 { headers }),
+        fetch("/api/whatsapp/status",             { headers }),
+        fetch("/api/whatsapp/schedules",          { headers }),
+        fetch("/api/email/stats",                 { headers }),
+        fetch("/api/email/accounts",              { headers }),
+        fetch("/api/documental/providers",        { headers }),
+        fetch("/api/documental/cendoj/highlights",{ headers }),
       ]);
-      const [actData, agendaData, tasksData, billingData] = await Promise.all([
+      const [
+        actData, agendaData, tasksData, billingData,
+        expData, clientsData, chatData, chatUnreadData,
+        waStatusData, waSchedulesData, emailStatsData, emailAccountsData,
+        docProvidersData, docHighlightsData,
+      ] = await Promise.all([
         safeJson(actRes), safeJson(agendaRes), safeJson(tasksRes), safeJson(billingRes),
+        safeJson(expRes), safeJson(clientsRes), safeJson(chatRes), safeJson(chatUnreadRes),
+        safeJson(waStatusRes), safeJson(waSchedulesRes), safeJson(emailStatsRes), safeJson(emailAccountsRes),
+        safeJson(docProvidersRes), safeJson(docHighlightsRes),
       ]);
-      if (actRes.ok)    setActivity(actData.data || []);
+      if (actRes.ok) {
+        setActivity(actData.data || []);
+        setActivityTotal(Number(actData.total || (actData.data || []).length || 0));
+      }
       if (agendaRes.ok) setAgendaEvents(agendaData.data || []);
       if (tasksRes.ok) {
         const tasks: any[] = tasksData.data || [];
@@ -392,12 +399,75 @@ export default function DashboardHome() {
         const d = billingData.data || billingData;
         setBillingRaw({ facturas: d.facturas || [], gastos: d.gastos || [] });
       }
+      if (expRes.ok) {
+        const d = expData.data || {};
+        setExpStats({
+          total: Number(d.total || 0),
+          abiertos: Number(d.abiertos || 0),
+          este_anio: Number(d.este_anio || 0),
+          archivados: Number(d.archivados || 0),
+        });
+      }
+      if (clientsRes.ok) {
+        const rows: any[] = clientsData.data || [];
+        setClientStats({
+          total: Number(clientsData.count || rows.length || 0),
+          activos: rows.filter((row) => String(row.client_status || "").toLowerCase() !== "baja").length,
+          conEmail: rows.filter((row) => Boolean(String(row.email || "").trim())).length,
+          conTelefono: rows.filter((row) => Boolean(String(row.phone_1 || row.phone_mobile || "").trim())).length,
+        });
+      }
+      if (chatRes.ok || chatUnreadRes.ok) {
+        const canales: any[] = chatData.data || [];
+        const unreadRows: any[] = chatUnreadData.data || [];
+        setChatStats({
+          canales: canales.length,
+          noLeidos: unreadRows.reduce((sum, row) => sum + Number(row.no_leidos || 0), 0),
+          directos: canales.filter((row) => row.tipo === "dm").length,
+          conActividad: canales.filter((row) => Boolean(row.ultimo_mensaje_at)).length,
+        });
+      }
+      if (waStatusRes.ok || waSchedulesRes.ok) {
+        const status = waStatusData.data || {};
+        const schedules: any[] = waSchedulesData.data || [];
+        setWaStats({
+          configurado: Boolean(status.configured),
+          webhook: Boolean(status.webhookBaseUrlConfigured),
+          programados: schedules.length,
+          origen: status.configSource === "database" ? "Configurado" : status.configSource === "environment" ? "Entorno" : "Sin configurar",
+        });
+      }
+      if (emailStatsRes.ok || emailAccountsRes.ok) {
+        const stats = emailStatsData.data || {};
+        const accounts: any[] = emailAccountsData.data || [];
+        setEmailStats({
+          cuentas: accounts.length,
+          inbox: Number(stats.inbox || 0),
+          unread: Number(stats.unread || 0),
+          drafts: Number(stats.drafts || 0),
+        });
+      }
+      if (docProvidersRes.ok || docHighlightsRes.ok) {
+        const providers = docProvidersData.data || {};
+        const providerValues = Object.values(providers) as any[];
+        const highlights: any[] = docHighlightsData.data?.highlights || [];
+        setDocStats({
+          providers: providerValues.length,
+          activos: providerValues.filter((provider) => provider?.status === "available" || provider?.status === "prepared" || provider?.configured).length,
+          highlights: highlights.length,
+          lexnet: Boolean((providers as any).lexnet?.configured),
+        });
+      }
     } catch {/* */} finally {
       if (!silent) { setActLoading(false); setAgendaLoading(false); }
     }
   }, [getToken]);
 
-  const saveVisible = (ids: string[]) => { localStorage.setItem(STORAGE_KEY, JSON.stringify(ids)); setVisibleWidgets(ids); };
+  const saveVisible = (ids: string[]) => {
+    const next = sanitizeWidgetIds(ids, DEFAULT_VISIBLE);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    setVisibleWidgets(next);
+  };
 
   useEffect(() => { fetchData(); }, [fetchData]);
   useAutoRefresh(() => fetchData(true), { intervalMs: 20_000 });
@@ -422,7 +492,7 @@ export default function DashboardHome() {
   const orderedVisible = [
     ...widgetOrder.filter(id => visibleWidgets.includes(id)),
     ...visibleWidgets.filter(id => !widgetOrder.includes(id)),
-  ].filter((id) => !id.startsWith("module_") || FUNCTIONAL_MODULE_WIDGET_IDS.has(id));
+  ];
 
   // ── Billing calcs ─────────────────────────────────────────────────────────
   const billingCalc = (() => {
@@ -449,31 +519,6 @@ export default function DashboardHome() {
 
   // ── Widget renderers ──────────────────────────────────────────────────────
   function renderWidget(id: string, handle: ReactNode) {
-    if (id.startsWith("module_")) {
-      const module = FUNCTIONAL_MODULE_ROUTES[id];
-      if (!module) return null;
-      const Icon = module.icon;
-      return (
-        <div onClick={() => goTo(module.to)} className="cursor-pointer group bg-white rounded-2xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition-all">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-start gap-3">
-              <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${module.tone}`}>
-                <Icon size={18} />
-              </span>
-              <div>
-                <p className="text-sm font-bold text-slate-900">{module.label}</p>
-                <p className="mt-1 text-xs leading-5 text-slate-500">{module.desc}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-1">
-              {handle}
-              <ChevronRight size={14} className="text-slate-300 group-hover:text-red-500 transition-colors" />
-            </div>
-          </div>
-        </div>
-      );
-    }
-
     switch (id) {
 
       case "agenda": return (
@@ -565,19 +610,34 @@ export default function DashboardHome() {
       );
 
       case "actividad": return (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div onClick={() => goTo("/dashboard/trazabilidad")} className="cursor-pointer group bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all">
           <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
             <h3 className="font-bold text-slate-800 flex items-center gap-2 text-sm">
-              <RefreshCw size={13} className="text-slate-400" /> Actividad reciente
+              <RefreshCw size={13} className="text-slate-400" /> 🕵️ Trazabilidad
             </h3>
-            {handle}
+            <div className="flex items-center gap-1">
+              {handle}
+              <ChevronRight size={14} className="text-slate-300 group-hover:text-red-500 transition-colors" />
+            </div>
           </div>
           {actLoading ? (
             <div className="flex justify-center py-8"><Loader2 size={16} className="animate-spin text-slate-300" /></div>
           ) : activity.length === 0 ? (
             <p className="text-xs text-slate-400 text-center py-8">Sin actividad reciente</p>
           ) : (
-            <ul className="divide-y divide-slate-50 max-h-56 overflow-y-auto">
+            <>
+            <div className="grid grid-cols-2 border-b border-slate-100">
+              <div className="px-5 py-4 border-r border-slate-100">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Movimientos</p>
+                <p className="mt-1 text-3xl font-black text-slate-800">{activityTotal}</p>
+              </div>
+              <div className="px-5 py-4">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Ultimo registro</p>
+                <p className="mt-1 text-sm font-bold text-slate-800">{activity[0]?.created_at ? timeAgo(activity[0].created_at) : "Sin datos"}</p>
+                <p className="mt-1 text-[10px] text-slate-400 truncate">{activity[0]?.action_type || "Actividad"}</p>
+              </div>
+            </div>
+            <ul className="divide-y divide-slate-50 max-h-44 overflow-y-auto">
               {activity.slice(0,10).map((item:any, i:number) => (
                 <li key={i} className="flex items-start gap-3 px-5 py-3 hover:bg-slate-50 transition-colors">
                   <span className="text-base mt-0.5 shrink-0">{actionIcon(item.action_type||"")}</span>
@@ -588,6 +648,7 @@ export default function DashboardHome() {
                 </li>
               ))}
             </ul>
+            </>
           )}
         </div>
       );
@@ -602,6 +663,158 @@ export default function DashboardHome() {
             </div>
           </div>
           <p className="text-xs text-slate-500">Accede a todos tus expedientes abiertos y activos desde aquí.</p>
+        </div>
+      );
+
+      case "clientes": return (
+        <div onClick={() => goTo("/dashboard/clientes")} className="cursor-pointer group bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all">
+          <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+            <span className="font-bold text-slate-800 text-sm flex items-center gap-2">👥 Clientes</span>
+            <div className="flex items-center gap-1">
+              {handle}
+              <ChevronRight size={14} className="text-slate-300 group-hover:text-red-500 transition-colors" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-px bg-slate-100">
+            <div className="bg-white px-5 py-4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Fichas</p>
+              <p className="mt-1 text-3xl font-black text-slate-800">{clientStats.total}</p>
+            </div>
+            <div className="bg-white px-5 py-4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-500">Activos</p>
+              <p className="mt-1 text-3xl font-black text-emerald-600">{clientStats.activos}</p>
+            </div>
+            <div className="bg-white px-5 py-4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Con email</p>
+              <p className="mt-1 text-2xl font-black text-slate-700">{clientStats.conEmail}</p>
+            </div>
+            <div className="bg-white px-5 py-4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Con teléfono</p>
+              <p className="mt-1 text-2xl font-black text-slate-700">{clientStats.conTelefono}</p>
+            </div>
+          </div>
+        </div>
+      );
+
+      case "chat": return (
+        <div onClick={() => goTo("/dashboard/chat")} className="cursor-pointer group bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all">
+          <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+            <span className="font-bold text-slate-800 text-sm flex items-center gap-2">💬 Chat interno</span>
+            <div className="flex items-center gap-1">
+              {handle}
+              <ChevronRight size={14} className="text-slate-300 group-hover:text-red-500 transition-colors" />
+            </div>
+          </div>
+          <div className="grid grid-cols-3">
+            <div className="px-5 py-4 border-r border-slate-100">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Canales</p>
+              <p className="mt-1 text-3xl font-black text-slate-800">{chatStats.canales}</p>
+            </div>
+            <div className="px-5 py-4 border-r border-slate-100 bg-violet-50/50">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-violet-500">No leídos</p>
+              <p className="mt-1 text-3xl font-black text-violet-700">{chatStats.noLeidos}</p>
+            </div>
+            <div className="px-5 py-4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">DM</p>
+              <p className="mt-1 text-3xl font-black text-slate-700">{chatStats.directos}</p>
+            </div>
+          </div>
+        </div>
+      );
+
+      case "whatsapp": return (
+        <div onClick={() => goTo("/dashboard/whatsapp")} className="cursor-pointer group bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all">
+          <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+            <span className="font-bold text-slate-800 text-sm flex items-center gap-2">📱 WhatsApp</span>
+            <div className="flex items-center gap-1">
+              {handle}
+              <ChevronRight size={14} className="text-slate-300 group-hover:text-red-500 transition-colors" />
+            </div>
+          </div>
+          <div className="px-5 py-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Estado</p>
+                <p className={`mt-1 text-sm font-black ${waStats.configurado ? "text-emerald-600" : "text-slate-500"}`}>
+                  {waStats.configurado ? "Configurado" : "Pendiente"}
+                </p>
+              </div>
+              <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${waStats.webhook ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"}`}>
+                {waStats.webhook ? "Webhook listo" : "Webhook pendiente"}
+              </span>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="rounded-2xl bg-slate-50 px-4 py-3">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Programados</p>
+                <p className="mt-1 text-2xl font-black text-slate-800">{waStats.programados}</p>
+              </div>
+              <div className="rounded-2xl bg-slate-50 px-4 py-3">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Origen</p>
+                <p className="mt-1 text-sm font-black text-slate-700">{waStats.origen}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+
+      case "correo": return (
+        <div onClick={() => goTo("/dashboard/correo")} className="cursor-pointer group bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all">
+          <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+            <span className="font-bold text-slate-800 text-sm flex items-center gap-2">✉️ Correo</span>
+            <div className="flex items-center gap-1">
+              {handle}
+              <ChevronRight size={14} className="text-slate-300 group-hover:text-red-500 transition-colors" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-px bg-slate-100">
+            <div className="bg-white px-5 py-4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">No leídos</p>
+              <p className="mt-1 text-3xl font-black text-slate-800">{emailStats.unread}</p>
+            </div>
+            <div className="bg-white px-5 py-4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Borradores</p>
+              <p className="mt-1 text-3xl font-black text-slate-700">{emailStats.drafts}</p>
+            </div>
+            <div className="bg-white px-5 py-4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Inbox</p>
+              <p className="mt-1 text-2xl font-black text-slate-700">{emailStats.inbox}</p>
+            </div>
+            <div className="bg-white px-5 py-4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Cuentas</p>
+              <p className="mt-1 text-2xl font-black text-slate-700">{emailStats.cuentas}</p>
+            </div>
+          </div>
+        </div>
+      );
+
+      case "documental": return (
+        <div onClick={() => goTo("/dashboard/documental")} className="cursor-pointer group bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all">
+          <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+            <span className="font-bold text-slate-800 text-sm flex items-center gap-2">📚 Documental</span>
+            <div className="flex items-center gap-1">
+              {handle}
+              <ChevronRight size={14} className="text-slate-300 group-hover:text-red-500 transition-colors" />
+            </div>
+          </div>
+          <div className="px-5 py-4">
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Fuentes</p>
+                <p className="mt-1 text-3xl font-black text-slate-800">{docStats.providers}</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Activas</p>
+                <p className="mt-1 text-3xl font-black text-emerald-600">{docStats.activos}</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Destacados</p>
+                <p className="mt-1 text-3xl font-black text-slate-700">{docStats.highlights}</p>
+              </div>
+            </div>
+            <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-xs text-slate-500">
+              LexNET: <span className={`font-bold ${docStats.lexnet ? "text-emerald-600" : "text-amber-600"}`}>{docStats.lexnet ? "preparado" : "pendiente"}</span>
+            </div>
+          </div>
         </div>
       );
 
