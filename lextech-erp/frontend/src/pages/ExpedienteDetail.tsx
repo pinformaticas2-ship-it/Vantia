@@ -3241,6 +3241,12 @@ function TabCorreoExpediente({
   const [composeError, setComposeError] = useState("");
   const [showCc, setShowCc] = useState(false);
 
+  // Adjuntos del expediente
+  const [composeAttachments, setComposeAttachments] = useState<Array<{id: string; name: string; type: string; size: number; dataBase64?: string; loading?: boolean}>>([]);
+  const [showFilePicker, setShowFilePicker] = useState(false);
+  const [pickerFiles, setPickerFiles] = useState<any[]>([]);
+  const [pickerLoading, setPickerLoading] = useState(false);
+
   // Associate existing
   const [showAssociate, setShowAssociate] = useState(false);
   const [allEmails, setAllEmails] = useState<any[]>([]);
@@ -3285,6 +3291,42 @@ function TabCorreoExpediente({
 
   useEffect(() => { loadEmails(); loadAccounts(); }, [loadEmails, loadAccounts]);
 
+  const openFilePicker = async () => {
+    setShowFilePicker(true);
+    if (pickerFiles.length) return;
+    setPickerLoading(true);
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/files/${expedienteId}`, { headers: { Authorization: `Bearer ${token}` } });
+      const d = await safeJson(res);
+      if (res.ok) setPickerFiles(d.data || []);
+    } catch {}
+    finally { setPickerLoading(false); }
+  };
+
+  const toggleFileAttachment = async (file: any) => {
+    const already = composeAttachments.find(a => a.id === file.id);
+    if (already) { setComposeAttachments(prev => prev.filter(a => a.id !== file.id)); return; }
+    const entry = { id: file.id, name: file.document_name || file.original_name, type: file.mimetype || "application/octet-stream", size: file.size || 0, loading: true };
+    setComposeAttachments(prev => [...prev, entry]);
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/files/${expedienteId}/${file.id}/download`, { headers: { Authorization: `Bearer ${token}` } });
+      const blob = await res.blob();
+      await new Promise<void>(resolve => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const dataUrl = reader.result as string;
+          setComposeAttachments(prev => prev.map(a => a.id === file.id ? { ...a, dataBase64: dataUrl.split(',')[1], loading: false } : a));
+          resolve();
+        };
+        reader.readAsDataURL(blob);
+      });
+    } catch {
+      setComposeAttachments(prev => prev.filter(a => a.id !== file.id));
+    }
+  };
+
   const handleSend = async () => {
     if (!composeForm.to.trim() || !composeForm.subject.trim() || !composeForm.body.trim()) {
       setComposeError("Para, asunto y cuerpo son obligatorios."); return;
@@ -3293,6 +3335,7 @@ function TabCorreoExpediente({
     try {
       const headers = await authHdr();
       const bodyHtml = composeForm.body.replace(/\n/g, "<br>");
+      const readyAttachments = composeAttachments.filter(a => a.dataBase64 && !a.loading);
       const res = await fetch("/api/email/send", {
         method: "POST", headers,
         body: JSON.stringify({
@@ -3303,12 +3346,14 @@ function TabCorreoExpediente({
           html: bodyHtml,
           text: composeForm.body,
           expediente_id: expedienteId,
+          attachments: readyAttachments.length ? readyAttachments.map(a => ({ filename: a.name, contentType: a.type, content: a.dataBase64 })) : undefined,
         }),
       });
       const d = await safeJson(res);
       if (!res.ok) { setComposeError(d.error || "Error al enviar"); return; }
       setShowCompose(false);
       setComposeForm(f => ({ ...f, to: "", cc: "", subject: "", body: "" }));
+      setComposeAttachments([]);
       setShowCc(false);
       await loadEmails(true);
     } finally {
@@ -3441,7 +3486,7 @@ function TabCorreoExpediente({
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-3 bg-slate-800 rounded-t-2xl">
               <p className="text-sm font-bold text-white">Nuevo correo · {expedienteRef}</p>
-              <button type="button" onClick={() => setShowCompose(false)} className="text-slate-400 hover:text-white"><X size={16} /></button>
+              <button type="button" onClick={() => { setShowCompose(false); setComposeAttachments([]); setShowFilePicker(false); }} className="text-slate-400 hover:text-white"><X size={16} /></button>
             </div>
             {/* Form */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -3480,16 +3525,34 @@ function TabCorreoExpediente({
                   rows={8} placeholder="Escribe tu mensaje aquí..."
                   className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-red-400 resize-none" />
               </div>
+              {/* Adjuntos seleccionados */}
+              {composeAttachments.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {composeAttachments.map(att => (
+                    <div key={att.id} className="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 rounded-lg text-xs text-slate-700">
+                      {att.loading ? <Loader2 size={10} className="animate-spin text-slate-400" /> : <Paperclip size={10} className="text-slate-400" />}
+                      <span className="max-w-[160px] truncate">{att.name}</span>
+                      <button type="button" onClick={() => setComposeAttachments(prev => prev.filter(a => a.id !== att.id))} className="ml-0.5 text-slate-400 hover:text-red-500"><X size={10} /></button>
+                    </div>
+                  ))}
+                </div>
+              )}
               {composeError && <p className="text-xs text-red-600 font-medium">{composeError}</p>}
             </div>
             {/* Footer */}
-            <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between">
-              <button type="button" onClick={() => setShowCc(v => !v)} className="text-xs text-slate-400 hover:text-slate-600">
-                {showCc ? "Ocultar CC" : "Añadir CC"}
-              </button>
+            <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
               <div className="flex items-center gap-2">
-                <button type="button" onClick={() => setShowCompose(false)} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancelar</button>
-                <button type="button" onClick={handleSend} disabled={sending}
+                <button type="button" onClick={() => setShowCc(v => !v)} className="text-xs text-slate-400 hover:text-slate-600">
+                  {showCc ? "Ocultar CC" : "Añadir CC"}
+                </button>
+                <button type="button" onClick={openFilePicker}
+                  className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-red-600 hover:bg-red-50 px-2 py-1 rounded-lg transition-colors">
+                  <Paperclip size={11} /> Adjuntar del expediente
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={() => { setShowCompose(false); setComposeAttachments([]); setShowFilePicker(false); }} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancelar</button>
+                <button type="button" onClick={handleSend} disabled={sending || composeAttachments.some(a => a.loading)}
                   className="px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-700 disabled:opacity-50 flex items-center gap-2">
                   {sending ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />} Enviar
                 </button>
@@ -3497,6 +3560,59 @@ function TabCorreoExpediente({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal picker de adjuntos del expediente */}
+      {showFilePicker && createPortal(
+        <div className="fixed inset-0 z-[60] bg-slate-950/40 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowFilePicker(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md flex flex-col" style={{ maxHeight: "70vh" }} onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Adjuntar archivos del expediente</h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">Selecciona los archivos a incluir en el correo</p>
+              </div>
+              <button type="button" onClick={() => setShowFilePicker(false)} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {pickerLoading ? (
+                <div className="flex items-center justify-center py-10 text-slate-400"><Loader2 size={18} className="animate-spin mr-2" /><span className="text-sm">Cargando archivos...</span></div>
+              ) : pickerFiles.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 gap-2 text-slate-300">
+                  <Paperclip size={24} className="opacity-30" />
+                  <p className="text-sm">No hay archivos en este expediente</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {pickerFiles.map(file => {
+                    const selected = composeAttachments.some(a => a.id === file.id);
+                    const name = file.document_name || file.original_name || "Archivo";
+                    return (
+                      <button key={file.id} type="button" onClick={() => toggleFileAttachment(file)}
+                        className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors ${selected ? "bg-red-50" : "hover:bg-slate-50"}`}>
+                        <div className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${selected ? "bg-red-600 border-red-600" : "border-slate-300"}`}>
+                          {selected && <Check size={11} className="text-white" />}
+                        </div>
+                        <Paperclip size={13} className="shrink-0 text-slate-400" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium text-slate-800 truncate">{name}</p>
+                          <p className="text-[10px] text-slate-400">{file.attachment_type || "Sin clasificar"}{file.size ? ` · ${(file.size / 1024).toFixed(0)} KB` : ""}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between">
+              <span className="text-xs text-slate-400">{composeAttachments.length} archivo{composeAttachments.length !== 1 ? "s" : ""} seleccionado{composeAttachments.length !== 1 ? "s" : ""}</span>
+              <button type="button" onClick={() => setShowFilePicker(false)}
+                className="px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-700">
+                Listo
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
 
       {/* Modal asociar correo existente */}
