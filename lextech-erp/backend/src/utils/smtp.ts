@@ -13,6 +13,12 @@ export interface SmtpConfig {
   password: string;
 }
 
+export interface MailAttachment {
+  filename: string;
+  contentType: string;
+  content: string; // base64
+}
+
 export interface MailMessage {
   from:    string;
   fromName?: string;
@@ -24,6 +30,7 @@ export interface MailMessage {
   text?:   string;
   replyTo?: string;
   messageId?: string;
+  attachments?: MailAttachment[];
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -37,19 +44,36 @@ function encodeHeader(value: string): string {
 }
 
 function buildMimeMessage(msg: MailMessage): string {
-  const boundary = `----=_LexTech_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-  const msgId    = msg.messageId || `<${Date.now()}.${Math.random().toString(36).slice(2)}@lextech>`;
-  const date     = new Date().toUTCString();
+  const altBoundary  = `----=_Alt_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  const mixBoundary  = `----=_Mix_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  const msgId        = msg.messageId || `<${Date.now()}.${Math.random().toString(36).slice(2)}@lextech>`;
+  const date         = new Date().toUTCString();
+  const hasAttach    = (msg.attachments?.length ?? 0) > 0;
 
   const fromFull = msg.fromName
     ? `${encodeHeader(msg.fromName)} <${msg.from}>`
     : msg.from;
   const toLine   = msg.to.join(', ');
   const ccLine   = msg.cc?.join(', ') || '';
-
   const textPart = msg.text || msg.html.replace(/<[^>]+>/g, '');
 
-  const lines: string[] = [
+  const altPart = [
+    `--${altBoundary}`,
+    `Content-Type: text/plain; charset=UTF-8`,
+    `Content-Transfer-Encoding: base64`,
+    ``,
+    b64u(textPart),
+    ``,
+    `--${altBoundary}`,
+    `Content-Type: text/html; charset=UTF-8`,
+    `Content-Transfer-Encoding: base64`,
+    ``,
+    b64u(msg.html),
+    ``,
+    `--${altBoundary}--`,
+  ].join('\r\n');
+
+  const headers = [
     `From: ${fromFull}`,
     `To: ${toLine}`,
     ccLine ? `CC: ${ccLine}` : '',
@@ -57,24 +81,40 @@ function buildMimeMessage(msg: MailMessage): string {
     `Date: ${date}`,
     `Message-ID: ${msgId}`,
     `MIME-Version: 1.0`,
-    `Content-Type: multipart/alternative; boundary="${boundary}"`,
-    ``,
-    `--${boundary}`,
-    `Content-Type: text/plain; charset=UTF-8`,
-    `Content-Transfer-Encoding: base64`,
-    ``,
-    b64u(textPart),
-    ``,
-    `--${boundary}`,
-    `Content-Type: text/html; charset=UTF-8`,
-    `Content-Transfer-Encoding: base64`,
-    ``,
-    b64u(msg.html),
-    ``,
-    `--${boundary}--`,
-  ];
+  ].filter(Boolean);
 
-  return lines.filter(l => l !== null).join('\r\n');
+  if (!hasAttach) {
+    return [
+      ...headers,
+      `Content-Type: multipart/alternative; boundary="${altBoundary}"`,
+      ``,
+      altPart,
+    ].join('\r\n');
+  }
+
+  // multipart/mixed wrapping alternative + attachments
+  const attachParts = (msg.attachments || []).map(att => [
+    `--${mixBoundary}`,
+    `Content-Type: ${att.contentType}; name="${encodeHeader(att.filename)}"`,
+    `Content-Transfer-Encoding: base64`,
+    `Content-Disposition: attachment; filename="${encodeHeader(att.filename)}"`,
+    ``,
+    att.content,
+    ``,
+  ].join('\r\n')).join('');
+
+  return [
+    ...headers,
+    `Content-Type: multipart/mixed; boundary="${mixBoundary}"`,
+    ``,
+    `--${mixBoundary}`,
+    `Content-Type: multipart/alternative; boundary="${altBoundary}"`,
+    ``,
+    altPart,
+    ``,
+    attachParts,
+    `--${mixBoundary}--`,
+  ].join('\r\n');
 }
 
 // ── Motor SMTP ────────────────────────────────────────────────────────────────

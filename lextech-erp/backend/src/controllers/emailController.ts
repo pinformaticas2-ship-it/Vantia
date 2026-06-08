@@ -783,7 +783,7 @@ export async function emptyTrash(req: Request, res: Response) {
 export async function sendMail(req: Request, res: Response) {
   const uid = userId(req);
   if (!uid) return err(res, 'No autenticado', 401);
-  const { account_id, to, cc, bcc, subject, html, text, draft_id, expediente_id } = req.body;
+  const { account_id, to, cc, bcc, subject, html, text, draft_id, expediente_id, attachments } = req.body;
   let accountId = account_id as string | undefined;
 
   if (!to || !subject || !html) {
@@ -821,6 +821,7 @@ export async function sendMail(req: Request, res: Response) {
       from: acc.email, fromName: acc.label,
       to: toList, cc: ccList, bcc: bccList,
       subject, html, text,
+      attachments: Array.isArray(attachments) && attachments.length ? attachments : undefined,
     };
 
     await sendEmail(smtpCfg, mailMsg);
