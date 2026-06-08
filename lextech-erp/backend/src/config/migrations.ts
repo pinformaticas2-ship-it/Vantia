@@ -1018,6 +1018,12 @@ export async function runMigrations(): Promise<void> {
         WHERE quipu_id IS NOT NULL
       `);
     } catch (_e: any) {}
+    try {
+      await client.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_facturacion_facturas_user_serie_num
+        ON facturacion_facturas (user_id, LOWER(COALESCE(serie, '')), LOWER(num))
+      `);
+    } catch (_e: any) {}
     for (const idx of [
       `CREATE INDEX IF NOT EXISTS idx_facturacion_facturas_user_fecha ON facturacion_facturas (user_id, fecha DESC)`,
       `CREATE INDEX IF NOT EXISTS idx_facturacion_facturas_estado ON facturacion_facturas (estado)`,
