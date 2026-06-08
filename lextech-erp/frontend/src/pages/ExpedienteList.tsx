@@ -6422,6 +6422,15 @@ export default function ExpedienteList() {
                         </div>
                       )}
                     </div>
+                    <button
+                      onClick={() => handleBulkChangeState('archivado')}
+                      disabled={bulkStateLoading}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors disabled:opacity-50"
+                      title="Cambia el estado de los expedientes seleccionados a Archivado"
+                    >
+                      <UserMinus size={12} />
+                      Dar de baja {selectedIds.size > 1 ? `(${selectedIds.size})` : ''}
+                    </button>
                     <button onClick={() => setBulkDeleteConfirm(true)}
                       className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors">
                       <Trash2 size={12} />
