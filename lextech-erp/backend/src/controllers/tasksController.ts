@@ -1242,7 +1242,7 @@ export const getExpedienteIndicators = async (req: any, res: Response) => {
         [expedienteId],
       ),
       pool.query(
-        `SELECT e.anio, e.num_exp, e.descripcion, e.estado, e.fecha_apertura,
+        `SELECT e.anio, e.num_exp, e.descripcion, e.estado, e.fecha_inicio,
                 e.etapa, e.tipo, e.cliente_id,
                 ent.first_name, ent.last_name, ent.commercial_name
          FROM expedientes e
@@ -1267,8 +1267,8 @@ export const getExpedienteIndicators = async (req: any, res: Response) => {
     const diasSinActuacion = ultimaAct
       ? Math.floor((Date.now() - new Date(ultimaAct).getTime()) / 86400000)
       : null;
-    const diasDesdeApertura = exp?.fecha_apertura
-      ? Math.floor((Date.now() - new Date(exp.fecha_apertura).getTime()) / 86400000)
+    const diasDesdeApertura = exp?.fecha_inicio
+      ? Math.floor((Date.now() - new Date(exp.fecha_inicio).getTime()) / 86400000)
       : null;
 
     const clienteNombre = exp
