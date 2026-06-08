@@ -177,6 +177,91 @@ async function fetchQuipuInvoiceDetail(settings: any, accessToken: string, quipu
   }
 }
 
+function extractQuipuInvoiceNumber(invoice: any): string {
+  return String(
+    invoice?.data?.attributes?.number ||
+    invoice?.data?.attributes?.serial_number ||
+    invoice?.attributes?.number ||
+    invoice?.attributes?.serial_number ||
+    invoice?.id ||
+    '',
+  ).trim();
+}
+
+async function findQuipuInvoiceByFilingNumber(
+  settings: any,
+  accessToken: string,
+  filingNumber?: string | null,
+): Promise<any | null> {
+  const cleanFilingNumber = sanitizeText(filingNumber);
+  if (!cleanFilingNumber) return null;
+
+  const invoices = await fetchQuipuPaginatedList<any>(
+    settings,
+    `/invoices?filter[q]=${encodeURIComponent(cleanFilingNumber)}&include=items,contact,numbering_series`,
+    accessToken,
+    3,
+  );
+
+  const exactMatch = invoices.find((item: any) => extractQuipuInvoiceNumber(item).toLowerCase() === cleanFilingNumber.toLowerCase());
+  if (exactMatch) return exactMatch;
+
+  return invoices.find((item: any) => extractQuipuInvoiceNumber(item).toLowerCase().includes(cleanFilingNumber.toLowerCase())) || null;
+}
+
+async function resolveExistingQuipuInvoiceOnDuplicate(
+  userId: string,
+  settings: any,
+  accessToken: string,
+  facturaId: string,
+  factura: any,
+  filingNumber?: string | null,
+): Promise<string | null> {
+  const cleanFilingNumber = sanitizeText(filingNumber);
+  if (!cleanFilingNumber) return null;
+
+  const existingInvoice = await findQuipuInvoiceByFilingNumber(settings, accessToken, cleanFilingNumber);
+  const existingQuipuId = String(existingInvoice?.id || existingInvoice?.data?.id || '').trim();
+  if (!existingQuipuId) return null;
+
+  const localConflict = await pool.query(
+    `SELECT id, num, serie, contacto, quipu_id
+       FROM facturacion_facturas
+      WHERE user_id = $1
+        AND id <> $2
+        AND quipu_id = $3
+      LIMIT 1`,
+    [userId, facturaId, existingQuipuId],
+  );
+  if (localConflict.rows.length > 0) {
+    const conflict = localConflict.rows[0];
+    throw new Error(`Quipu ya tiene la factura ${cleanFilingNumber} y ya est\xE1 vinculada en tu ERP con la factura local ${conflict.serie ? `${conflict.serie}-` : ''}${conflict.num}.`);
+  }
+
+  const remoteIssueDate = formatQuipuDate(existingInvoice?.attributes?.issue_date || existingInvoice?.data?.attributes?.issue_date);
+  const localIssueDate = formatQuipuDate(factura?.fecha);
+  if (remoteIssueDate && localIssueDate && remoteIssueDate !== localIssueDate) {
+    throw new Error(`Quipu ya tiene la factura ${cleanFilingNumber}, pero la fecha no coincide con la local (${remoteIssueDate} frente a ${localIssueDate}).`);
+  }
+
+  const remoteTotal = Number(existingInvoice?.attributes?.total_amount || existingInvoice?.data?.attributes?.total_amount || 0);
+  const localTotal = Number(factura?.total || 0);
+  if (remoteTotal > 0 && localTotal > 0 && Math.abs(remoteTotal - localTotal) > 0.02) {
+    throw new Error(`Quipu ya tiene la factura ${cleanFilingNumber}, pero el total no coincide con la local (${remoteTotal.toFixed(2)} frente a ${localTotal.toFixed(2)}).`);
+  }
+
+  await pool.query(
+    `UPDATE facturacion_facturas
+        SET quipu_id = $1,
+            updated_at = NOW()
+      WHERE id = $2
+        AND user_id = $3`,
+    [existingQuipuId, facturaId, userId],
+  );
+
+  return existingQuipuId;
+}
+
 async function resolveQuipuContactId(
   userId: string,
   settings: any,
@@ -781,6 +866,13 @@ export async function pushFacturaToQuipuInternal(userId: string, facturaId: stri
       body: JSON.stringify(payload),
     }, accessToken);
   } catch (error: any) {
+    if (String(error?.message || '').includes('filing_number: Ya existe un documento con el mismo n')) {
+      const linkedQuipuId = await resolveExistingQuipuInvoiceOnDuplicate(userId, settings, accessToken, facturaId, f, attributes?.filing_number);
+      if (linkedQuipuId) {
+        console.log(`[QuipuPush] factura=${facturaId} vinculada a factura Quipu existente quipuId=${linkedQuipuId}`);
+        return linkedQuipuId;
+      }
+    }
     const numerationDebug = numberingSeriesId || 'sin-serie';
     throw new Error(`${error?.message || 'Error creando factura en Quipu.'} Payload debug: ${JSON.stringify({ numerationId: numerationDebug, serieLocal: f.serie || null, filingNumber: attributes?.filing_number || null, dueDates: attributes?.due_dates || null, relationships: payload.data.relationships || null, attributes: payload.data.attributes || null })}`);
   }

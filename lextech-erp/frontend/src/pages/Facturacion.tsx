@@ -1470,23 +1470,12 @@ function FacturacionContent() {
         links?.pdf ||
         includedPdfUrl ||
         "";
-      const normalizedBaseUrl = String(quipuStatus.baseUrl || "https://getquipu.com").replace(/\/+$/, "");
-      const normalizedOwnerSlug = String(quipuStatus.ownerSlug || "").trim().replace(/^\/+|\/+$/g, "");
-      const quipuInvoiceUrl =
-        normalizedOwnerSlug
-          ? Array.from(new Set([
-              normalizedOwnerSlug.startsWith("d/")
-                ? `${normalizedBaseUrl}/${normalizedOwnerSlug}/invoices/${factura.quipuId}`
-                : `${normalizedBaseUrl}/d/${normalizedOwnerSlug}/invoices/${factura.quipuId}`,
-              `${normalizedBaseUrl}/${normalizedOwnerSlug}/invoices/${factura.quipuId}`,
-            ])).find(Boolean) || ""
-          : "";
+      const stage = String(attributes?.stage || attributes?.status || "").trim().toLowerCase();
       if (!pdfUrl) {
-        if (quipuInvoiceUrl) {
-          window.open(quipuInvoiceUrl, "_blank", "noopener,noreferrer");
-          return;
+        if (stage === "draft" || stage === "borrador") {
+          throw new Error("Quipu no devuelve PDF para esta factura porque sigue en borrador.");
         }
-        throw new Error("Quipu no devolvio una URL de PDF para esta factura.");
+        throw new Error("Quipu no devolvio una URL de PDF para esta factura desde la API.");
       }
       window.open(String(pdfUrl), "_blank", "noopener,noreferrer");
     } catch (error: any) {
