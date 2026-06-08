@@ -6,6 +6,8 @@ import {
   ChevronRight, Calendar, MapPin, Video, Phone,
   ChevronDown, FileSpreadsheet, ClipboardList,
   ScanLine, ExternalLink, MoreHorizontal, LayoutGrid, X, GripVertical,
+  Briefcase, Users, History, MessageSquare, MessageCircle, Mail, Library,
+  Receipt, Mic, Sparkles, Settings,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { safeJson } from "../lib/api";
@@ -99,6 +101,22 @@ const ALL_WIDGETS = [
   { id:"actividad",   label:"Actividad reciente",  desc:"Últimas acciones realizadas en el ERP",              icon:"⚡" },
   { id:"expedientes", label:"Resumen expedientes", desc:"Acceso rápido a expedientes abiertos",               icon:"📁" },
   { id:"facturacion", label:"Resumen facturación", desc:"Totales facturados, cobrados y pendientes",          icon:"💶" },
+];
+const DASHBOARD_MODULES = [
+  { id: "dashboard", label: "Dashboard", desc: "Panel general del despacho", to: "/dashboard", icon: LayoutGrid, tone: "bg-slate-100 text-slate-600" },
+  { id: "expedientes", label: "Expedientes", desc: "Gestión de asuntos y casos", to: "/dashboard/expedientes", icon: Briefcase, tone: "bg-blue-100 text-blue-600" },
+  { id: "clientes", label: "Clientes", desc: "Base de datos del despacho", to: "/dashboard/clientes", icon: Users, tone: "bg-emerald-100 text-emerald-600" },
+  { id: "trazabilidad", label: "Trazabilidad", desc: "Actividad y auditoría interna", to: "/dashboard/trazabilidad", icon: History, tone: "bg-amber-100 text-amber-700" },
+  { id: "agenda", label: "Agenda", desc: "Citas, vistas y calendario", to: "/dashboard/agenda", icon: Calendar, tone: "bg-cyan-100 text-cyan-700" },
+  { id: "tareas", label: "Tareas", desc: "Pendientes y plazos del usuario", to: "/dashboard/tareas", icon: CheckCircle2, tone: "bg-lime-100 text-lime-700" },
+  { id: "chat", label: "Chat", desc: "Mensajería interna del equipo", to: "/dashboard/chat", icon: MessageSquare, tone: "bg-violet-100 text-violet-700" },
+  { id: "whatsapp", label: "WhatsApp", desc: "Comunicación con clientes", to: "/dashboard/whatsapp", icon: MessageCircle, tone: "bg-green-100 text-green-700" },
+  { id: "correo", label: "Correo", desc: "Bandeja y redacción de emails", to: "/dashboard/correo", icon: Mail, tone: "bg-rose-100 text-rose-700" },
+  { id: "documental", label: "Documental", desc: "CENDOJ, BOE y Lexnet", to: "/dashboard/documental", icon: Library, tone: "bg-indigo-100 text-indigo-700" },
+  { id: "facturacion", label: "Facturación", desc: "Cobros, gastos y Quipu", to: "/dashboard/facturacion", icon: Receipt, tone: "bg-orange-100 text-orange-700" },
+  { id: "plaud-ia", label: "Plaud IA", desc: "Grabación y transcripción", to: "/dashboard/plaud-ia", icon: Mic, tone: "bg-teal-100 text-teal-700" },
+  { id: "chat-ia", label: "Chat IA", desc: "Asistente transversal del despacho", to: "/dashboard/chat-ia", icon: Sparkles, tone: "bg-fuchsia-100 text-fuchsia-700" },
+  { id: "config", label: "Configuración", desc: "Ajustes y personalización", to: "/dashboard/config", icon: Settings, tone: "bg-slate-200 text-slate-700" },
 ];
 const STORAGE_KEY = "dashboard_visible_widgets";
 const ORDER_KEY   = "dashboard_widget_order";
@@ -694,6 +712,40 @@ export default function DashboardHome() {
           </SortableContext>
         </DndContext>
       )}
+
+      <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-400">Mapa del ERP</p>
+            <h2 className="mt-1 text-xl font-bold text-slate-900">Todos los módulos disponibles</h2>
+          </div>
+          <p className="text-sm text-slate-400">Accesos directos a todos los módulos del sistema.</p>
+        </div>
+
+        <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {DASHBOARD_MODULES.map((module) => {
+            const Icon = module.icon;
+            return (
+              <button
+                key={module.id}
+                onClick={() => navigate(module.to)}
+                className="group flex items-start gap-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-left transition-all hover:-translate-y-0.5 hover:border-slate-300 hover:bg-white hover:shadow-sm"
+              >
+                <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${module.tone}`}>
+                  <Icon size={18} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-bold text-slate-900">{module.label}</span>
+                    <ChevronRight size={15} className="text-slate-300 transition-colors group-hover:text-slate-500" />
+                  </span>
+                  <span className="mt-1 block text-xs leading-5 text-slate-500">{module.desc}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
 
       {showWidgetPicker && (
         <WidgetPickerModal visible={visibleWidgets} onClose={() => setShowWidgetPicker(false)} onSave={saveVisible} />
