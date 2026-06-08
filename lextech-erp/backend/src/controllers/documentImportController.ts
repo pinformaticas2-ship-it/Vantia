@@ -1225,11 +1225,6 @@ async function createExpediente(
   userName_: string,
 ): Promise<{ id: string; anio: number; num_exp: number }> {
   const yr = data.anio || new Date().getFullYear();
-  const { rows: maxR } = await pool.query(
-    `SELECT COALESCE(MAX(num_exp), 0) + 1 AS next FROM expedientes WHERE anio = $1`,
-    [yr],
-  );
-  const numExp = maxR[0].next;
 
   let clienteNombre = data.cliente_nombre || null;
   if (data.cliente_id && !clienteNombre) {
@@ -1240,55 +1235,33 @@ async function createExpediente(
     clienteNombre = cr.rows[0]?.n || null;
   }
 
-  // INSERT con upsert: si ya existe el mismo año+número, actualiza en lugar de fallar
-  const { rows } = await pool.query(
-    `INSERT INTO expedientes
-       (anio, num_exp, ref_propia, ref_expediente, descripcion, tipo,
-        cliente_id, cliente_nombre, contrario, procurador, juzgado,
-        tipo_proc, num_autos, nig, estado, observaciones,
-        fecha_inicio, fecha_cierre, importe,
-        tipos_asunto, cuantia_principal, intereses, costas, cuantia_total,
-        indeterminado, etapa, persona_contacto, contacto, centro, color,
-        demandantes, demandados, fecha_notificacion,
-        created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34)
-     ON CONFLICT (anio, num_exp) DO UPDATE SET
-       ref_propia        = COALESCE(EXCLUDED.ref_propia,        expedientes.ref_propia),
-       ref_expediente    = COALESCE(EXCLUDED.ref_expediente,    expedientes.ref_expediente),
-       descripcion       = COALESCE(EXCLUDED.descripcion,       expedientes.descripcion),
-       tipo              = EXCLUDED.tipo,
-       cliente_id        = COALESCE(EXCLUDED.cliente_id,        expedientes.cliente_id),
-       cliente_nombre    = COALESCE(EXCLUDED.cliente_nombre,    expedientes.cliente_nombre),
-       contrario         = COALESCE(EXCLUDED.contrario,         expedientes.contrario),
-       procurador        = COALESCE(EXCLUDED.procurador,        expedientes.procurador),
-       juzgado           = COALESCE(EXCLUDED.juzgado,           expedientes.juzgado),
-       tipo_proc         = COALESCE(EXCLUDED.tipo_proc,         expedientes.tipo_proc),
-       num_autos         = COALESCE(EXCLUDED.num_autos,         expedientes.num_autos),
-       nig               = COALESCE(EXCLUDED.nig,               expedientes.nig),
-       estado            = EXCLUDED.estado,
-       observaciones     = COALESCE(EXCLUDED.observaciones,     expedientes.observaciones),
-       fecha_inicio      = COALESCE(EXCLUDED.fecha_inicio,      expedientes.fecha_inicio),
-       fecha_cierre      = COALESCE(EXCLUDED.fecha_cierre,      expedientes.fecha_cierre),
-       importe           = COALESCE(EXCLUDED.importe,           expedientes.importe),
-       tipos_asunto      = COALESCE(EXCLUDED.tipos_asunto,      expedientes.tipos_asunto),
-       cuantia_principal = COALESCE(EXCLUDED.cuantia_principal, expedientes.cuantia_principal),
-       intereses         = COALESCE(EXCLUDED.intereses,         expedientes.intereses),
-       costas            = COALESCE(EXCLUDED.costas,            expedientes.costas),
-       cuantia_total     = COALESCE(EXCLUDED.cuantia_total,     expedientes.cuantia_total),
-       indeterminado     = EXCLUDED.indeterminado,
-       etapa             = COALESCE(EXCLUDED.etapa,             expedientes.etapa),
-       persona_contacto  = COALESCE(EXCLUDED.persona_contacto,  expedientes.persona_contacto),
-       contacto          = COALESCE(EXCLUDED.contacto,          expedientes.contacto),
-       centro            = COALESCE(EXCLUDED.centro,            expedientes.centro),
-       color             = COALESCE(EXCLUDED.color,             expedientes.color),
-       demandantes       = COALESCE(EXCLUDED.demandantes,       expedientes.demandantes),
-       demandados        = COALESCE(EXCLUDED.demandados,        expedientes.demandados),
-       fecha_notificacion= COALESCE(EXCLUDED.fecha_notificacion,expedientes.fecha_notificacion),
-       updated_at        = NOW()
-     RETURNING id, anio, num_exp`,
-    [
-      yr, numExp,
-      data.ref_propia?.trim() || null,
+  // Retry loop: si hay race condition (otro proceso tomó el mismo num_exp),
+  // recalculamos y reintentamos hasta 10 veces.
+  let rows: any[] = [];
+  let attempts = 0;
+  while (attempts < 10) {
+    attempts++;
+    const maxR = await pool.query(
+      `SELECT COALESCE(MAX(num_exp), 0) + 1 AS next FROM expedientes WHERE anio = $1`, [yr]
+    );
+    const numExp = maxR.rows[0].next;
+
+    try {
+      const result = await pool.query(
+        `INSERT INTO expedientes
+           (anio, num_exp, ref_propia, ref_expediente, descripcion, tipo,
+            cliente_id, cliente_nombre, contrario, procurador, juzgado,
+            tipo_proc, num_autos, nig, estado, observaciones,
+            fecha_inicio, fecha_cierre, importe,
+            tipos_asunto, cuantia_principal, intereses, costas, cuantia_total,
+            indeterminado, etapa, persona_contacto, contacto, centro, color,
+            demandantes, demandados, fecha_notificacion,
+            created_by)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34)
+         RETURNING id, anio, num_exp`,
+        [
+          yr, numExp,
+          data.ref_propia?.trim() || null,
       data.ref_expediente?.trim() || null,
       data.descripcion?.trim() || 'Expediente importado desde documento',
       data.tipo || 'judicial',
@@ -1320,8 +1293,15 @@ async function createExpediente(
       data.demandados ? JSON.stringify(data.demandados) : null,
       data.fecha_notificacion || null,
       userName_,
-    ],
-  );
+        ],
+      );
+      rows = result.rows;
+      break; // éxito — salir del loop
+    } catch (insertErr: any) {
+      if (insertErr?.code === '23505' && attempts < 10) continue; // race condition — reintentar
+      throw insertErr;
+    }
+  }
 
   const expediente = rows[0];
 
@@ -1349,7 +1329,6 @@ async function createExpediente(
       ],
     );
   } catch (updateErr: any) {
-    // Las columnas aún no existen en BD — no es fatal, el expediente ya fue creado
     console.warn('[createExpediente] No se pudieron guardar campos de abogados/procuradores:', String(updateErr?.message || updateErr));
   }
 

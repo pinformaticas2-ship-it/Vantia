@@ -478,43 +478,81 @@ export const createExpediente = async (req: any, res: Response) => {
       nombre = cr.rows[0]?.n || null;
     }
 
-    const r = await pool.query(
-      `INSERT INTO expedientes
-         (anio, num_exp, ref_propia, ref_expediente, descripcion, tipo,
-          cliente_id, cliente_nombre, contrario, procurador, juzgado,
-          tipo_proc, num_autos, nig, estado, observaciones,
-          fecha_inicio, fecha_cierre, importe,
-          tipos_asunto, cuantia_principal, intereses, costas, cuantia_total,
-          indeterminado, etapa, persona_contacto, contacto, centro, color,
-          created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31)
-       RETURNING *`,
-      [
-        yr, numExp,
-        nullableText(ref_propia), nullableText(ref_expediente),
-        nullableText(descripcion), tipo || 'judicial',
-        cliente_id || null, nombre,
-        nullableText(contrario), nullableText(procurador),
-        nullableText(juzgado), nullableText(tipo_proc),
-        nullableText(num_autos), nullableText(nig),
-        estado || 'abierto',
-        nullableText(observaciones),
-        fecha_inicio || null, fecha_cierre || null,
-        nullableNumeric(importe),
-        nullableText(tipos_asunto),
-        nullableNumeric(cuantia_principal),
-        nullableNumeric(intereses),
-        nullableNumeric(costas),
-        nullableNumeric(cuantia_total),
-        indeterminado === true || indeterminado === 'true',
-        nullableText(etapa),
-        nullableText(persona_contacto),
-        nullableText(contacto),
-        nullableText(centro),
-        nullableText(color) || 'ninguno',
-        reqUserName(req),
-      ]
-    );
+    // Retry loop: si otro proceso insertan el mismo num_exp concurrentemente (race condition
+    // durante importación CSV masiva), recalculamos num_exp y reintentamos hasta 10 veces.
+    let r: any = null;
+    let attempts = 0;
+    while (!r && attempts < 10) {
+      attempts++;
+      if (attempts > 1) {
+        // Recalcular num_exp tras colisión
+        if (cfg.override_next != null) {
+          numExp = cfg.override_next;
+        } else if (autoFill) {
+          const nextR2 = await pool.query(
+            `WITH bounds AS (
+                SELECT GREATEST(COALESCE(MAX(num_exp), 0), $2 - 1) + 1 AS top_n FROM expedientes WHERE anio = $1
+             ),
+             seq AS (SELECT generate_series($2, (SELECT top_n FROM bounds)) AS n)
+             SELECT MIN(s.n) AS next FROM seq s
+             WHERE s.n NOT IN (SELECT num_exp FROM expedientes WHERE anio = $1)`,
+            [yr, minNum]
+          );
+          numExp = nextR2.rows[0]?.next ?? minNum;
+        } else {
+          const maxR2 = await pool.query(
+            `SELECT GREATEST(COALESCE(MAX(num_exp), 0), $2 - 1) + 1 AS next FROM expedientes WHERE anio = $1`,
+            [yr, minNum]
+          );
+          numExp = maxR2.rows[0]?.next ?? minNum;
+        }
+      }
+
+      try {
+        r = await pool.query(
+          `INSERT INTO expedientes
+             (anio, num_exp, ref_propia, ref_expediente, descripcion, tipo,
+              cliente_id, cliente_nombre, contrario, procurador, juzgado,
+              tipo_proc, num_autos, nig, estado, observaciones,
+              fecha_inicio, fecha_cierre, importe,
+              tipos_asunto, cuantia_principal, intereses, costas, cuantia_total,
+              indeterminado, etapa, persona_contacto, contacto, centro, color,
+              created_by)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31)
+           RETURNING *`,
+          [
+            yr, numExp,
+            nullableText(ref_propia), nullableText(ref_expediente),
+            nullableText(descripcion), tipo || 'judicial',
+            cliente_id || null, nombre,
+            nullableText(contrario), nullableText(procurador),
+            nullableText(juzgado), nullableText(tipo_proc),
+            nullableText(num_autos), nullableText(nig),
+            estado || 'abierto',
+            nullableText(observaciones),
+            fecha_inicio || null, fecha_cierre || null,
+            nullableNumeric(importe),
+            nullableText(tipos_asunto),
+            nullableNumeric(cuantia_principal),
+            nullableNumeric(intereses),
+            nullableNumeric(costas),
+            nullableNumeric(cuantia_total),
+            indeterminado === true || indeterminado === 'true',
+            nullableText(etapa),
+            nullableText(persona_contacto),
+            nullableText(contacto),
+            nullableText(centro),
+            nullableText(color) || 'ninguno',
+            reqUserName(req),
+          ]
+        );
+      } catch (insertErr: any) {
+        // 23505 = unique_violation — race condition, reintentar con nuevo num_exp
+        if (insertErr?.code === '23505' && attempts < 10) { r = null; continue; }
+        throw insertErr;
+      }
+    }
+
     logActivityForReq(req, `Expediente creado: ${yr}/${numExp} - ${descripcion || ''}`, 'EXPEDIENTE', r.rows[0].id);
     res.status(201).json({ data: r.rows[0] });
   } catch (e: any) {
