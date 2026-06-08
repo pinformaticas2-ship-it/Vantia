@@ -14,9 +14,12 @@ import { useEffect, useRef, useCallback } from "react";
 export interface ErpClipEntry { blob: Blob; name: string; type: string }
 let erpClip: ErpClipEntry | null = null;
 
-export function setErpClipboard(entry: ErpClipEntry) { erpClip = entry; }
+function dispatchClipChange() {
+  window.dispatchEvent(new CustomEvent('erp-clipboard-changed', { detail: erpClip }));
+}
+export function setErpClipboard(entry: ErpClipEntry) { erpClip = entry; dispatchClipChange(); }
 export function getErpClipboard(): ErpClipEntry | null { return erpClip; }
-export function clearErpClipboard() { erpClip = null; }
+export function clearErpClipboard() { erpClip = null; dispatchClipChange(); }
 
 // ── Deduplicación: timestamp para evitar doble procesado ─────────────────────
 let lastPasteTs = 0;
@@ -77,9 +80,9 @@ export function usePasteFiles(
     }
 
     // Portapapeles interno del ERP (si no hay archivos del sistema)
+    // No se borra el clipboard para que se pueda pegar en múltiples sitios
     if (files.length === 0 && erpClip) {
       files.push(new File([erpClip.blob], erpClip.name, { type: erpClip.type }));
-      erpClip = null;
     }
 
     if (files.length === 0) return;

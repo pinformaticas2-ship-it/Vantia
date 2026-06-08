@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { safeJson, resolveApiUrl } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
-import { usePasteFiles, setErpClipboard, getErpClipboard } from "../lib/usePasteFiles";
+import { usePasteFiles, setErpClipboard, getErpClipboard, clearErpClipboard } from "../lib/usePasteFiles";
 
 function fileIcon(mime: string, name: string) {
   const n = name.toLowerCase();
@@ -116,6 +116,14 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false, loc
   const [wordPreview, setWordPreview] = useState<{ id: string; name: string; mime: string } | null>(null);
   const [pasteToast, setPasteToast]   = useState<string | null>(null);
   const pasteToastTimer = useRef<number | null>(null);
+  // Estado reactivo del portapapeles ERP — se actualiza al copiar/limpiar desde cualquier panel
+  const [erpClip, setErpClipState] = useState(() => getErpClipboard());
+
+  useEffect(() => {
+    const handler = (e: Event) => setErpClipState((e as CustomEvent).detail ?? null);
+    window.addEventListener('erp-clipboard-changed', handler);
+    return () => window.removeEventListener('erp-clipboard-changed', handler);
+  }, []);
 
   // ── Copiar archivo al portapapeles del ERP ───────────────────────────────────
   const copyFileToClipboard = useCallback(async (file: any) => {
@@ -125,13 +133,9 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false, loc
       const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) return;
       const blob = await res.blob();
-      // Intentar portapapeles nativo para imágenes (funciona en Chrome/Edge)
       if (file.mimetype?.startsWith("image/") && typeof ClipboardItem !== "undefined") {
-        try {
-          await navigator.clipboard.write([new ClipboardItem({ [file.mimetype]: blob })]);
-        } catch (_) { /* ignorar si no tiene permisos */ }
+        try { await navigator.clipboard.write([new ClipboardItem({ [file.mimetype]: blob })]); } catch (_) {}
       }
-      // Siempre guardar también en portapapeles interno del ERP
       setErpClipboard({ blob, name: file.original_name, type: file.mimetype || "application/octet-stream" });
       showPasteToast(`📋 Copiado: ${file.original_name}`);
     } catch (_) {}
@@ -361,6 +365,14 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false, loc
     const [first, ...rest] = arr;
     openNextUploadModal(first, rest, arr.length);
   }, [openNextUploadModal]);
+
+  // ── Pegar desde el portapapeles interno del ERP ──────────────
+  const pasteFromErpClipboard = useCallback(() => {
+    const clip = getErpClipboard();
+    if (!clip || locked) return;
+    showPasteToast(`📋 Pegando: ${clip.name}`);
+    enqueueFiles([new File([clip.blob], clip.name, { type: clip.type })]);
+  }, [locked, showPasteToast, enqueueFiles]);
 
   // ── Subir UN archivo con nombre y tipo ya confirmados ────────
   const uploadSingleFile = async () => {
@@ -778,9 +790,29 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false, loc
       )}
       {/* Barra de acciones */}
       <div className="flex flex-wrap gap-2 justify-between items-center">
-        <p className="text-sm text-slate-500">
-          {loadingFiles ? "Cargando…" : `${files.length} ${files.length === 1 ? "archivo" : "archivos"}`}
-        </p>
+        <div className="flex items-center gap-3">
+          <p className="text-sm text-slate-500">
+            {loadingFiles ? "Cargando…" : `${files.length} ${files.length === 1 ? "archivo" : "archivos"}`}
+          </p>
+          {/* Indicador de portapapeles ERP — visible mientras haya algo copiado */}
+          {erpClip && !locked && (
+            <button
+              onClick={pasteFromErpClipboard}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 rounded-xl transition-all animate-in fade-in duration-200"
+              title={`Pegar "${erpClip.name}" aquí`}
+            >
+              <Clipboard size={12} />
+              Pegar "{erpClip.name.length > 24 ? erpClip.name.slice(0, 22) + '…' : erpClip.name}"
+              <button
+                onClick={(e) => { e.stopPropagation(); clearErpClipboard(); }}
+                className="ml-1 text-blue-400 hover:text-blue-700 rounded"
+                title="Limpiar portapapeles"
+              >
+                <X size={11} />
+              </button>
+            </button>
+          )}
+        </div>
         <div className="flex flex-wrap gap-2">
           {/* Importar carpeta */}
           <button
@@ -842,7 +874,15 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false, loc
           : <><Upload size={26} className={isDragOver ? "text-red-500" : "text-slate-400"} />
               <p className={`text-sm font-medium ${isDragOver ? "text-red-600" : "text-slate-500"}`}>Arrastra archivos o carpetas aquí</p>
               <p className="text-xs text-slate-400">PDF, Word, Excel, imágenes — máx. 50 MB por archivo</p>
-              {!locked && <p className="text-[10px] text-slate-300 flex items-center gap-1"><Clipboard size={10} /> Ctrl+V para pegar desde el portapapeles</p>}</>
+              {!locked && (
+                <p className="text-[10px] text-slate-300 flex items-center gap-1">
+                  <Clipboard size={10} />
+                  {erpClip
+                    ? <><span className="text-blue-400 font-semibold">Ctrl+V</span> para pegar "{erpClip.name.length > 30 ? erpClip.name.slice(0, 28) + '…' : erpClip.name}"</>
+                    : 'Ctrl+V para pegar — usa el botón copiar en cualquier archivo'
+                  }
+                </p>
+              )}</>
         }
       </div>
 
@@ -948,14 +988,6 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false, loc
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1 justify-end">
-                            {/* Copiar al portapapeles del ERP */}
-                            <button
-                              title="Copiar al portapapeles del ERP (luego Ctrl+V en otra zona de adjuntos)"
-                              className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                              onClick={(e) => { e.stopPropagation(); copyFileToClipboard(f); }}
-                            >
-                              <Copy size={14} />
-                            </button>
                             {/* Vista previa */}
                             {canOpenPreview && (
                               <button onClick={() => openPreview(f)} title="Vista previa"
@@ -963,6 +995,18 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false, loc
                                 <Eye size={14} />
                               </button>
                             )}
+                            {/* Copiar al portapapeles del ERP — siempre visible */}
+                            <button
+                              title="Copiar archivo (Ctrl+V para pegar en cualquier zona de adjuntos)"
+                              className={`p-1.5 rounded-lg transition-colors ${
+                                erpClip?.name === f.original_name
+                                  ? 'text-blue-600 bg-blue-50'
+                                  : 'text-slate-400 hover:text-blue-600 hover:bg-blue-50'
+                              }`}
+                              onClick={(e) => { e.stopPropagation(); copyFileToClipboard(f); }}
+                            >
+                              <Copy size={14} />
+                            </button>
                             {/* Editar metadatos */}
                             {!locked && (
                             <button
