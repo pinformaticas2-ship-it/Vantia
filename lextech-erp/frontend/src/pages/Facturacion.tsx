@@ -101,6 +101,8 @@ type Factura = {
   formaPago: PaymentMethod;
   serie: string;
   tipoCliente: "empresa" | "particular";
+  concepto: string;
+  notas: string;
 };
 
 type Gasto = {
@@ -184,6 +186,8 @@ type RawFactura = {
   forma_pago?: PaymentMethod | null;
   serie?: string | null;
   tipo_cliente?: Factura["tipoCliente"] | null;
+  concepto?: string | null;
+  notas?: string | null;
 };
 
 type RawGasto = {
@@ -309,6 +313,8 @@ const mapFacturaFromApi = (row: RawFactura): Factura => ({
   formaPago: row.forma_pago || "transferencia",
   serie: row.serie || "HON",
   tipoCliente: row.tipo_cliente || "empresa",
+  concepto: row.concepto || "",
+  notas: row.notas || "",
 });
 
 const mapGastoFromApi = (row: RawGasto): Gasto => ({
@@ -355,6 +361,8 @@ const buildPayloadForApi = (type: BillingFormType, payload: any) => {
       tipoCliente: payload.tipoCliente,
       clientId: payload.clientId,
       expedienteId: payload.expedienteId,
+      concepto: payload.concepto,
+      notas: payload.notas,
     };
   }
 
@@ -909,6 +917,8 @@ function FacturaWorkspacePage({
     formaPago: initialValues?.formaPago ?? "transferencia",
     serie: initialValues?.serie ?? "HON",
     tipoCliente: initialValues?.tipoCliente ?? "empresa",
+    concepto: initialValues?.concepto ?? "",
+    notas: initialValues?.notas ?? "INGRESAR EN EL SIGUIENTE NÚMERO DE CUENTA:    ES53 0081 1428 2100 0115 3516\nINDICAR EN EL CONCEPTO NUESTRA REFERENCIA:",
   });
 
   const setField = (field: string, value: any) => setForm((current) => ({ ...current, [field]: value }));
@@ -952,6 +962,8 @@ function FacturaWorkspacePage({
       num: form.num.trim(),
       contacto: form.contacto.trim(),
       responsable: form.responsable.trim(),
+      concepto: form.concepto.trim(),
+      notas: form.notas.trim(),
     });
   };
 
@@ -1088,6 +1100,33 @@ function FacturaWorkspacePage({
               </label>
             </div>
           </section>
+          <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.04)]">
+            <div className="border-b border-slate-100 px-6 py-5">
+              <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">Contenido de la factura</p>
+              <h2 className="mt-2 text-xl font-bold text-slate-900">Concepto principal y notas visibles</h2>
+            </div>
+            <div className="space-y-5 px-6 py-6">
+              <label className="space-y-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Concepto</span>
+                <input
+                  value={form.concepto}
+                  onChange={(e) => setField("concepto", e.target.value)}
+                  placeholder="Ej. Honorarios por asistencia letrada, redacción de escrito o seguimiento de expediente"
+                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm"
+                />
+              </label>
+              <label className="space-y-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Notas</span>
+                <textarea
+                  value={form.notas}
+                  onChange={(e) => setField("notas", e.target.value)}
+                  rows={5}
+                  placeholder="Observaciones para el cliente, instrucciones de pago o aclaraciones internas visibles en la factura."
+                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm"
+                />
+              </label>
+            </div>
+          </section>
         </div>
 
         <aside className="space-y-6 xl:sticky xl:top-6 xl:self-start">
@@ -1119,6 +1158,12 @@ function FacturaWorkspacePage({
                   <li>Estado: {form.estado}</li>
                   <li>Responsable: {form.responsable || "Pendiente"}</li>
                 </ul>
+              </div>
+              <div className="rounded-2xl border border-slate-200 px-4 py-4 text-sm text-slate-600">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Concepto actual</p>
+                <p className="mt-2 text-sm text-slate-800">{form.concepto.trim() || "Pendiente de definir"}</p>
+                <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-slate-400">Notas</p>
+                <p className="mt-2 whitespace-pre-line text-sm text-slate-800">{form.notas.trim() || "Sin notas adicionales"}</p>
               </div>
             </div>
           </section>

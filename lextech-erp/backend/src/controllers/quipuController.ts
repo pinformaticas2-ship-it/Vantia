@@ -57,9 +57,11 @@ function mapQuipuPaymentMethod(paymentMethod: any) {
 
 function buildQuipuInvoiceItems(factura: any) {
   const totalAmount = Number(factura?.total || 0);
-  const concept = sanitizeText(factura?.contacto)
-    ? `Servicios jurídicos ${sanitizeText(factura?.contacto)}`
-    : 'Servicios profesionales';
+  const concept = sanitizeText(factura?.concepto) || (
+    sanitizeText(factura?.contacto)
+      ? `Servicios jurídicos ${sanitizeText(factura?.contacto)}`
+      : 'Servicios profesionales'
+  );
   const vatPercent = 21.0;
   const retentionPercent = 0.0;
   const baseAmount = totalAmount > 0 ? Number((totalAmount / (1 + vatPercent / 100)).toFixed(2)) : 0;
@@ -96,6 +98,7 @@ function buildQuipuInvoiceAttributes(factura: any, options?: { mode?: 'hybrid' }
     ...(filingNumber ? { filing_number: filingNumber } : {}),
     subject: sanitizeText(factura?.contacto) ? `Factura ${filingNumber || factura?.num} · ${factura.contacto}` : `Factura ${filingNumber || factura?.num || ''}`.trim(),
     payment_method: mapQuipuPaymentMethod(factura?.forma_pago),
+    ...(sanitizeText(factura?.notas) ? { notes: sanitizeText(factura?.notas) } : {}),
   };
 
   return attributes;

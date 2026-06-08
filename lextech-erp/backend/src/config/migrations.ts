@@ -1008,6 +1008,8 @@ export async function runMigrations(): Promise<void> {
       `ALTER TABLE facturacion_facturas ADD COLUMN IF NOT EXISTS client_id UUID REFERENCES entities(id) ON DELETE SET NULL`,
       `ALTER TABLE facturacion_facturas ADD COLUMN IF NOT EXISTS expediente_id UUID REFERENCES expedientes(id) ON DELETE SET NULL`,
       `ALTER TABLE facturacion_facturas ADD COLUMN IF NOT EXISTS quipu_id VARCHAR(255)`,
+      `ALTER TABLE facturacion_facturas ADD COLUMN IF NOT EXISTS concepto VARCHAR(300)`,
+      `ALTER TABLE facturacion_facturas ADD COLUMN IF NOT EXISTS notas TEXT`,
       `ALTER TABLE facturacion_presupuestos ADD COLUMN IF NOT EXISTS client_id UUID REFERENCES entities(id) ON DELETE SET NULL`,
       `ALTER TABLE facturacion_presupuestos ADD COLUMN IF NOT EXISTS expediente_id UUID REFERENCES expedientes(id) ON DELETE SET NULL`,
     ]) { try { await client.query(col); } catch (_e: any) {} }

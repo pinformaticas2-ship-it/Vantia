@@ -214,7 +214,7 @@ export const createFactura = async (req: any, res: Response) => {
   const userName = await resolveUserName(userId);
   const {
     num, contacto, fecha, vencimiento, total, estado, area, responsable,
-    formaPago, serie, tipoCliente, clientId, expedienteId,
+    formaPago, serie, tipoCliente, clientId, expedienteId, concepto, notas,
   } = req.body;
 
   if (!sanitizeText(num) || !sanitizeText(contacto) || sanitizeAmount(total) === null) {
@@ -228,8 +228,8 @@ export const createFactura = async (req: any, res: Response) => {
     await ensureFacturaNumberAvailable(userId, num, serie);
     const result = await pool.query(
       `INSERT INTO facturacion_facturas
-         (user_id, created_by, num, contacto, fecha, vencimiento, total, estado, area, responsable, forma_pago, serie, tipo_cliente, client_id, expediente_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+         (user_id, created_by, num, contacto, fecha, vencimiento, total, estado, area, responsable, forma_pago, serie, tipo_cliente, client_id, expediente_id, concepto, notas)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
        RETURNING *`,
       [
         userId,
@@ -247,6 +247,8 @@ export const createFactura = async (req: any, res: Response) => {
         sanitizeText(tipoCliente) || 'empresa',
         sanitizeText(clientId),
         sanitizeText(expedienteId),
+        sanitizeText(concepto),
+        sanitizeText(notas),
       ],
     );
     await logActivityForReq(req, `Factura creada: ${sanitizeText(num)}`, 'FACTURACION_FACTURA', result.rows[0].id, sanitizeText(contacto) || undefined, 'CREATE');
@@ -273,7 +275,7 @@ export const updateFactura = async (req: any, res: Response) => {
   if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
   const {
     num, contacto, fecha, vencimiento, total, estado, area, responsable,
-    formaPago, serie, tipoCliente, clientId, expedienteId,
+    formaPago, serie, tipoCliente, clientId, expedienteId, concepto, notas,
   } = req.body;
 
   try {
@@ -293,6 +295,8 @@ export const updateFactura = async (req: any, res: Response) => {
            tipo_cliente = $13,
            client_id = $14,
            expediente_id = $15,
+           concepto = $16,
+           notas = $17,
            updated_at = NOW()
        WHERE id = $1 AND user_id = $2
        RETURNING *`,
@@ -312,6 +316,8 @@ export const updateFactura = async (req: any, res: Response) => {
         sanitizeText(tipoCliente),
         sanitizeText(clientId),
         sanitizeText(expedienteId),
+        sanitizeText(concepto),
+        sanitizeText(notas),
       ],
     );
     if (!result.rowCount) return res.status(404).json({ success: false, error: 'Factura no encontrada.' });
