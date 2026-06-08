@@ -103,6 +103,11 @@ type Factura = {
   tipoCliente: "empresa" | "particular";
   concepto: string;
   notas: string;
+  baseUnitaria: number;
+  cantidad: number;
+  descuentoPct: number;
+  ivaPct: number;
+  irpfPct: number;
 };
 
 type Gasto = {
@@ -188,6 +193,11 @@ type RawFactura = {
   tipo_cliente?: Factura["tipoCliente"] | null;
   concepto?: string | null;
   notas?: string | null;
+  base_unitaria?: number | string | null;
+  cantidad?: number | string | null;
+  descuento_pct?: number | string | null;
+  iva_pct?: number | string | null;
+  irpf_pct?: number | string | null;
 };
 
 type RawGasto = {
@@ -315,6 +325,11 @@ const mapFacturaFromApi = (row: RawFactura): Factura => ({
   tipoCliente: row.tipo_cliente || "empresa",
   concepto: row.concepto || "",
   notas: row.notas || "",
+  baseUnitaria: Number(row.base_unitaria || 0),
+  cantidad: Number(row.cantidad || 1),
+  descuentoPct: Number(row.descuento_pct || 0),
+  ivaPct: Number(row.iva_pct || 21),
+  irpfPct: Number(row.irpf_pct || 0),
 });
 
 const mapGastoFromApi = (row: RawGasto): Gasto => ({
@@ -363,6 +378,11 @@ const buildPayloadForApi = (type: BillingFormType, payload: any) => {
       expedienteId: payload.expedienteId,
       concepto: payload.concepto,
       notas: payload.notas,
+      baseUnitaria: payload.baseUnitaria,
+      cantidad: payload.cantidad,
+      descuentoPct: payload.descuentoPct,
+      ivaPct: payload.ivaPct,
+      irpfPct: payload.irpfPct,
     };
   }
 
@@ -671,6 +691,11 @@ function StructuredBillingEditorModal({
     cat: initialValues?.cat ?? "Suministros",
     deducible: Boolean(initialValues?.deducible ?? true),
     iguala: Boolean(initialValues?.iguala ?? false),
+    baseUnitaria: String(initialValues?.baseUnitaria ?? ""),
+    cantidad: String(initialValues?.cantidad ?? 1),
+    descuentoPct: String(initialValues?.descuentoPct ?? 0),
+    ivaPct: String(initialValues?.ivaPct ?? 21),
+    irpfPct: String(initialValues?.irpfPct ?? 0),
   });
 
   const setField = (field: string, value: any) => setForm((current) => ({ ...current, [field]: value }));
@@ -918,6 +943,11 @@ function FacturaWorkspacePage({
     serie: initialValues?.serie ?? "HON",
     tipoCliente: initialValues?.tipoCliente ?? "empresa",
     concepto: initialValues?.concepto ?? "",
+    baseUnitaria: String(initialValues?.baseUnitaria ?? ""),
+    cantidad: String(initialValues?.cantidad ?? 1),
+    descuentoPct: String(initialValues?.descuentoPct ?? 0),
+    ivaPct: String(initialValues?.ivaPct ?? 21),
+    irpfPct: String(initialValues?.irpfPct ?? 0),
     notas: initialValues?.notas ?? "INGRESAR EN EL SIGUIENTE NÚMERO DE CUENTA:    ES53 0081 1428 2100 0115 3516\nINDICAR EN EL CONCEPTO NUESTRA REFERENCIA:",
   });
 
@@ -930,6 +960,17 @@ function FacturaWorkspacePage({
   const selectedExpediente = useMemo(() => expedientes.find((item) => item.id === form.expedienteId) || null, [expedientes, form.expedienteId]);
   const canSubmit = Boolean(form.num.trim() && form.clientId && form.contacto.trim() && Number(form.total) > 0);
   const displayNumber = form.serie.trim() ? `${form.serie.trim()}-${form.num.trim() || "..."}` : form.num.trim() || "Borrador";
+  const baseUnitariaNum = Number(form.baseUnitaria || 0);
+  const cantidadNum = Number(form.cantidad || 0);
+  const descuentoPctNum = Number(form.descuentoPct || 0);
+  const ivaPctNum = Number(form.ivaPct || 0);
+  const irpfPctNum = Number(form.irpfPct || 0);
+  const subtotalLinea = Math.max(baseUnitariaNum, 0) * Math.max(cantidadNum, 0);
+  const descuentoImporte = subtotalLinea * (Math.max(descuentoPctNum, 0) / 100);
+  const baseTrasDescuento = Math.max(subtotalLinea - descuentoImporte, 0);
+  const ivaImporte = baseTrasDescuento * (Math.max(ivaPctNum, 0) / 100);
+  const irpfImporte = baseTrasDescuento * (Math.max(irpfPctNum, 0) / 100);
+  const totalLineaCalculado = baseTrasDescuento + ivaImporte - irpfImporte;
 
   const setClient = (clientId: string) => {
     const client = clients.find((item) => item.id === clientId) || null;
@@ -964,12 +1005,17 @@ function FacturaWorkspacePage({
       responsable: form.responsable.trim(),
       concepto: form.concepto.trim(),
       notas: form.notas.trim(),
+      baseUnitaria: Number(form.baseUnitaria || 0),
+      cantidad: Number(form.cantidad || 1),
+      descuentoPct: Number(form.descuentoPct || 0),
+      ivaPct: Number(form.ivaPct || 21),
+      irpfPct: Number(form.irpfPct || 0),
     });
   };
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <div>
         <div>
           <button onClick={onBack} className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 transition-colors hover:text-slate-800">
             <ArrowLeft size={15} /> Volver a facturación
@@ -980,10 +1026,6 @@ function FacturaWorkspacePage({
           <p className="mt-2 max-w-3xl text-sm text-slate-500">
             Crea la factura en una pantalla completa, manteniendo la relación con el cliente del despacho, su expediente y los datos de cobro internos del ERP.
           </p>
-        </div>
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-right">
-          <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-emerald-600">Borrador</p>
-          <p className="mt-1 text-lg font-bold text-emerald-900">{displayNumber}</p>
         </div>
       </div>
 
@@ -1070,6 +1112,13 @@ function FacturaWorkspacePage({
               <label className="space-y-2">
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Total</span>
                 <input type="number" min="0" step="0.01" value={form.total} onChange={(e) => setField("total", e.target.value)} className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
+                <button
+                  type="button"
+                  onClick={() => setField("total", totalLineaCalculado > 0 ? totalLineaCalculado.toFixed(2) : "")}
+                  className="text-left text-xs font-semibold text-red-700 transition-colors hover:text-red-800"
+                >
+                  Usar total calculado de la línea: {fmtEur(totalLineaCalculado)}
+                </button>
               </label>
               <label className="space-y-2">
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Forma de pago</span>
@@ -1115,6 +1164,83 @@ function FacturaWorkspacePage({
                   className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm"
                 />
               </label>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+                  <label className="space-y-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Base unitaria</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={form.baseUnitaria}
+                      onChange={(e) => setField("baseUnitaria", e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
+                    />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Cantidad</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={form.cantidad}
+                      onChange={(e) => setField("cantidad", e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
+                    />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Dto. %</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={form.descuentoPct}
+                      onChange={(e) => setField("descuentoPct", e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
+                    />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">IVA %</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={form.ivaPct}
+                      onChange={(e) => setField("ivaPct", e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
+                    />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">IRPF %</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={form.irpfPct}
+                      onChange={(e) => setField("irpfPct", e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
+                    />
+                  </label>
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+                  <div className="rounded-xl border border-slate-200 bg-white px-3 py-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Base</p>
+                    <p className="mt-1 text-sm font-bold text-slate-900">{fmtEur(baseTrasDescuento)}</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-white px-3 py-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">IVA</p>
+                    <p className="mt-1 text-sm font-bold text-slate-900">{fmtEur(ivaImporte)}</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-white px-3 py-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">IRPF</p>
+                    <p className="mt-1 text-sm font-bold text-slate-900">{fmtEur(irpfImporte)}</p>
+                  </div>
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-red-500">Total línea</p>
+                    <p className="mt-1 text-sm font-bold text-red-700">{fmtEur(totalLineaCalculado)}</p>
+                  </div>
+                </div>
+              </div>
               <label className="space-y-2">
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Notas</span>
                 <textarea
@@ -1148,6 +1274,20 @@ function FacturaWorkspacePage({
                 <div className="rounded-2xl border border-slate-200 px-4 py-3">
                   <p className="text-xs font-semibold text-slate-400">Cobro</p>
                   <p className="mt-1 font-bold text-slate-900">{PAYMENT_LABELS[form.formaPago]}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3 text-sm">
+                <div className="rounded-2xl border border-slate-200 px-4 py-3">
+                  <p className="text-xs font-semibold text-slate-400">Base</p>
+                  <p className="mt-1 font-bold text-slate-900">{fmtEur(baseTrasDescuento)}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 px-4 py-3">
+                  <p className="text-xs font-semibold text-slate-400">IVA</p>
+                  <p className="mt-1 font-bold text-slate-900">{fmtEur(ivaImporte)}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 px-4 py-3">
+                  <p className="text-xs font-semibold text-slate-400">IRPF</p>
+                  <p className="mt-1 font-bold text-slate-900">{fmtEur(irpfImporte)}</p>
                 </div>
               </div>
               <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">

@@ -36,6 +36,12 @@ const sanitizeAmount = (value: any) => {
   return Number.isFinite(num) ? num : null;
 };
 
+const sanitizeOptionalAmount = (value: any, fallback: number | null = null) => {
+  if (value === '' || value === null || value === undefined) return fallback;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : fallback;
+};
+
 const buildFacturaDisplayNumber = (num: any, serie?: any) => {
   const cleanNum = sanitizeText(num);
   const cleanSerie = sanitizeText(serie);
@@ -215,6 +221,7 @@ export const createFactura = async (req: any, res: Response) => {
   const {
     num, contacto, fecha, vencimiento, total, estado, area, responsable,
     formaPago, serie, tipoCliente, clientId, expedienteId, concepto, notas,
+    baseUnitaria, cantidad, descuentoPct, ivaPct, irpfPct,
   } = req.body;
 
   if (!sanitizeText(num) || !sanitizeText(contacto) || sanitizeAmount(total) === null) {
@@ -228,8 +235,8 @@ export const createFactura = async (req: any, res: Response) => {
     await ensureFacturaNumberAvailable(userId, num, serie);
     const result = await pool.query(
       `INSERT INTO facturacion_facturas
-         (user_id, created_by, num, contacto, fecha, vencimiento, total, estado, area, responsable, forma_pago, serie, tipo_cliente, client_id, expediente_id, concepto, notas)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+         (user_id, created_by, num, contacto, fecha, vencimiento, total, estado, area, responsable, forma_pago, serie, tipo_cliente, client_id, expediente_id, concepto, notas, base_unitaria, cantidad, descuento_pct, iva_pct, irpf_pct)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
        RETURNING *`,
       [
         userId,
@@ -249,6 +256,11 @@ export const createFactura = async (req: any, res: Response) => {
         sanitizeText(expedienteId),
         sanitizeText(concepto),
         sanitizeText(notas),
+        sanitizeOptionalAmount(baseUnitaria),
+        sanitizeOptionalAmount(cantidad, 1),
+        sanitizeOptionalAmount(descuentoPct, 0),
+        sanitizeOptionalAmount(ivaPct, 21),
+        sanitizeOptionalAmount(irpfPct, 0),
       ],
     );
     await logActivityForReq(req, `Factura creada: ${sanitizeText(num)}`, 'FACTURACION_FACTURA', result.rows[0].id, sanitizeText(contacto) || undefined, 'CREATE');
@@ -276,6 +288,7 @@ export const updateFactura = async (req: any, res: Response) => {
   const {
     num, contacto, fecha, vencimiento, total, estado, area, responsable,
     formaPago, serie, tipoCliente, clientId, expedienteId, concepto, notas,
+    baseUnitaria, cantidad, descuentoPct, ivaPct, irpfPct,
   } = req.body;
 
   try {
@@ -297,6 +310,11 @@ export const updateFactura = async (req: any, res: Response) => {
            expediente_id = $15,
            concepto = $16,
            notas = $17,
+           base_unitaria = $18,
+           cantidad = $19,
+           descuento_pct = $20,
+           iva_pct = $21,
+           irpf_pct = $22,
            updated_at = NOW()
        WHERE id = $1 AND user_id = $2
        RETURNING *`,
@@ -318,6 +336,11 @@ export const updateFactura = async (req: any, res: Response) => {
         sanitizeText(expedienteId),
         sanitizeText(concepto),
         sanitizeText(notas),
+        sanitizeOptionalAmount(baseUnitaria),
+        sanitizeOptionalAmount(cantidad, 1),
+        sanitizeOptionalAmount(descuentoPct, 0),
+        sanitizeOptionalAmount(ivaPct, 21),
+        sanitizeOptionalAmount(irpfPct, 0),
       ],
     );
     if (!result.rowCount) return res.status(404).json({ success: false, error: 'Factura no encontrada.' });

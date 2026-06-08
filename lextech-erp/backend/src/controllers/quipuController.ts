@@ -62,9 +62,19 @@ function buildQuipuInvoiceItems(factura: any) {
       ? `Servicios jurídicos ${sanitizeText(factura?.contacto)}`
       : 'Servicios profesionales'
   );
-  const vatPercent = 21.0;
-  const retentionPercent = 0.0;
-  const baseAmount = totalAmount > 0 ? Number((totalAmount / (1 + vatPercent / 100)).toFixed(2)) : 0;
+  const quantity = Number(factura?.cantidad || 1) > 0 ? Number(factura?.cantidad || 1) : 1;
+  const vatPercent = Number(factura?.iva_pct ?? factura?.ivaPct ?? 21);
+  const retentionPercent = Number(factura?.irpf_pct ?? factura?.irpfPct ?? 0);
+  const discountPercent = Number(factura?.descuento_pct ?? factura?.descuentoPct ?? 0);
+  const providedBase = Number(factura?.base_unitaria ?? factura?.baseUnitaria ?? 0);
+  const normalizedVat = Number.isFinite(vatPercent) ? vatPercent : 21.0;
+  const normalizedRetention = Number.isFinite(retentionPercent) ? retentionPercent : 0.0;
+  const normalizedDiscount = Number.isFinite(discountPercent) ? discountPercent : 0.0;
+  const baseAmount = providedBase > 0
+    ? providedBase
+    : totalAmount > 0
+      ? Number((totalAmount / quantity / (1 + normalizedVat / 100)).toFixed(2))
+      : 0;
 
   return {
     totalAmount: Number(totalAmount.toFixed(2)),
@@ -74,9 +84,10 @@ function buildQuipuInvoiceItems(factura: any) {
         attributes: {
           concept,
           unitary_amount: baseAmount.toFixed(2),
-          quantity: 1,
-          vat_percent: vatPercent,
-          retention_percent: retentionPercent,
+          quantity,
+          vat_percent: normalizedVat,
+          retention_percent: normalizedRetention,
+          discount_percent: normalizedDiscount,
         },
       },
     ],
@@ -1520,7 +1531,13 @@ export const pushLocalFacturaToQuipu = async (req: any, res: Response) => {
     // Quipu accepts total_amount directly (no items required for simple invoices)
     const issueDate = f.fecha ? String(f.fecha).slice(0, 10) : new Date().toISOString().slice(0, 10);
     const dueDate   = f.vencimiento ? String(f.vencimiento).slice(0, 10) : null;
-    const baseAmount = Number(f.total) / 1.21;
+    const quantity = Number(f.cantidad || 1) > 0 ? Number(f.cantidad || 1) : 1;
+    const vatPercent = Number(f.iva_pct ?? f.ivaPct ?? 21);
+    const retentionPercent = Number(f.irpf_pct ?? f.irpfPct ?? 0);
+    const discountPercent = Number(f.descuento_pct ?? f.descuentoPct ?? 0);
+    const baseAmount = Number(f.base_unitaria ?? f.baseUnitaria ?? 0) > 0
+      ? Number(f.base_unitaria ?? f.baseUnitaria ?? 0)
+      : Number(f.total) / quantity / 1.21;
     const filingNumber = buildQuipuFilingNumber(f.num, f.serie);
 
     const attributes: any = {
@@ -1531,12 +1548,14 @@ export const pushLocalFacturaToQuipu = async (req: any, res: Response) => {
       subject:        f.contacto || 'Servicios profesionales',
       payment_method: f.forma_pago === 'tarjeta'  ? 'credit_card' :
                       f.forma_pago === 'efectivo' ? 'cash'        : 'bank_transfer',
+      ...(sanitizeText(f.notas) ? { notes: sanitizeText(f.notas) } : {}),
       items_attributes: [{
-        concept:          f.contacto || 'Servicios profesionales',
+        concept:          sanitizeText(f.concepto) || f.contacto || 'Servicios profesionales',
         unitary_amount:   baseAmount.toFixed(2),
-        quantity:         1,
-        vat_percent:      21.0,
-        retention_percent: 0.0,
+        quantity,
+        vat_percent:      Number.isFinite(vatPercent) ? vatPercent : 21.0,
+        retention_percent: Number.isFinite(retentionPercent) ? retentionPercent : 0.0,
+        discount_percent: Number.isFinite(discountPercent) ? discountPercent : 0.0,
       }],
     };
 
