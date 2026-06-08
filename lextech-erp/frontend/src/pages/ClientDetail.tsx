@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { safeJson, resolveApiUrl } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
+import { FilesTabPanel } from "../components/FilesTabPanel";
 import { EtapaSelect } from "../components/EtapaSelect";
 import BackButton from "../components/BackButton";
 
@@ -1854,7 +1855,13 @@ function isExcelFile(mime: string, name: string) {
 }
 
 // ── Tab: Adjuntos ─────────────────────────────────────────────
+// Delegates entirely to the shared FilesTabPanel component so all features
+// (copy/paste, bulk upload, templates, etc.) are available in both modules.
 function TabAdjuntos({ clientId, client }: { clientId: string; client: any }) {
+  return <FilesTabPanel entityId={clientId} entity={client} />;
+}
+
+function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }) {
   const { getToken } = useAuth();
 
   const [files, setFiles]           = useState<any[]>([]);

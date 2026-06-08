@@ -246,8 +246,10 @@ export const uploadFiles = async (req: any, res: Response) => {
     const inserted: any[] = [];
     const clientDir = ensureClientDir(clientId);
     for (const file of files) {
-      // Extraer solo el nombre del archivo si viene de una carpeta anidada (ej: "carpeta/archivo.txt" -> "archivo.txt")
-      const baseFileName = path.basename(file.originalname);
+      // Multer recibe el nombre en Latin-1 (comportamiento por defecto del navegador en FormData).
+      // Hay que recodificarlo a UTF-8 para que los acentos y caracteres especiales se guarden correctamente.
+      const decodedName = Buffer.from(file.originalname, 'latin1').toString('utf8');
+      const baseFileName = path.basename(decodedName);
       const result = await pool.query(
         `INSERT INTO client_files (client_id, original_name, stored_name, mimetype, size_bytes, created_by)
          VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,

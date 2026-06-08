@@ -348,13 +348,14 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false, loc
   useAutoRefresh(() => loadFiles(true), { intervalMs: 45_000, enabled: !!entityId });
 
   // ── Abrir modal para el primer archivo de la cola ────────────
-  const openNextUploadModal = useCallback((file: File, queue: File[], total: number) => {
+  // keepType: true = conserva el tipo elegido en el archivo anterior (para clasificar toda la cola igual)
+  const openNextUploadModal = useCallback((file: File, queue: File[], total: number, keepType = false) => {
     pendingUploadFile.current = file;
     setUploadQueue(queue);
     setUploadQueueTotal(total);
     const baseName = file.name.replace(/\.[^/.]+$/, '');
     setEditDocName(baseName);
-    setEditAttachmentType('Sin clasificar');
+    if (!keepType) setEditAttachmentType('Sin clasificar');
     setEditingFile({ id: 'PENDING_UPLOAD', document_name: baseName, attachment_type: 'Sin clasificar' });
   }, []);
 
@@ -410,10 +411,10 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false, loc
       setSavingMetadata(false);
       setEditingFile(null);
       pendingUploadFile.current = null;
-      // Procesar siguiente archivo de la cola
+      // Procesar siguiente archivo de la cola, conservando el tipo seleccionado
       if (uploadQueue.length > 0) {
         const [next, ...rest] = uploadQueue;
-        openNextUploadModal(next, rest, uploadQueueTotal);
+        openNextUploadModal(next, rest, uploadQueueTotal, true);
       } else {
         setUploadQueueTotal(0);
       }
