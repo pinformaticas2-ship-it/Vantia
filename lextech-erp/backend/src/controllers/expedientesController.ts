@@ -492,11 +492,12 @@ export const createExpediente = async (req: any, res: Response) => {
         resolvedClienteId = found.rows[0].id;
       } else {
         // No existe → crear cliente mínimo sin DNI (para importaciones CSV)
+        // nif_cif tiene UNIQUE constraint, usamos un placeholder único por registro
         const parts = searchName.split(/\s+/);
         const newClient = await pool.query(
           `INSERT INTO entities
              (type, first_name, last_name, nif_cif, client_status, date_alta, created_by)
-           VALUES ('CLIENTE', $1, $2, 'S/N', 'Alta', CURRENT_DATE, $3)
+           VALUES ('CLIENTE', $1, $2, 'IMP-' || LEFT(gen_random_uuid()::text, 8), 'Alta', CURRENT_DATE, $3)
            RETURNING id`,
           [parts[0] || searchName, parts.slice(1).join(' ') || null, reqUserName(req)]
         );
