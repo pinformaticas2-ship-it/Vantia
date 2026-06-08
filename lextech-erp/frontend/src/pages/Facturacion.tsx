@@ -952,6 +952,9 @@ function FacturaWorkspacePage({
   });
 
   const setField = (field: string, value: any) => setForm((current) => ({ ...current, [field]: value }));
+  const blockInvalidKeys = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (["+", "e", "E"].includes(e.key)) e.preventDefault();
+  };
   const expedientesForClient = useMemo(
     () => (form.clientId ? expedientes.filter((item) => item.clientId === form.clientId) : expedientes),
     [expedientes, form.clientId],
@@ -1128,7 +1131,7 @@ function FacturaWorkspacePage({
             <div className="grid grid-cols-1 gap-4 px-6 py-6 md:grid-cols-2 xl:grid-cols-3">
               <label className="space-y-2">
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Total</span>
-                <input type="number" min="0" step="0.01" value={form.total} onChange={(e) => setField("total", e.target.value)} className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
+                <input type="number" min="0" max="9999999.99" step="0.01" onKeyDown={blockInvalidKeys} value={form.total} onChange={(e) => setField("total", e.target.value)} className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm" />
                 {totalLineaCalculado > 0 && (
                   <button
                     type="button"
@@ -1190,7 +1193,9 @@ function FacturaWorkspacePage({
                     <input
                       type="number"
                       min="0"
+                      max="9999999.99"
                       step="0.01"
+                      onKeyDown={blockInvalidKeys}
                       value={form.baseUnitaria}
                       onChange={(e) => setField("baseUnitaria", e.target.value)}
                       className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
@@ -1201,7 +1206,9 @@ function FacturaWorkspacePage({
                     <input
                       type="number"
                       min="0"
+                      max="9999"
                       step="0.01"
+                      onKeyDown={blockInvalidKeys}
                       value={form.cantidad}
                       onChange={(e) => setField("cantidad", e.target.value)}
                       className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
@@ -1212,7 +1219,9 @@ function FacturaWorkspacePage({
                     <input
                       type="number"
                       min="0"
+                      max="100"
                       step="0.01"
+                      onKeyDown={blockInvalidKeys}
                       value={form.descuentoPct}
                       onChange={(e) => setField("descuentoPct", e.target.value)}
                       className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
@@ -1223,7 +1232,9 @@ function FacturaWorkspacePage({
                     <input
                       type="number"
                       min="0"
+                      max="100"
                       step="0.01"
+                      onKeyDown={blockInvalidKeys}
                       value={form.ivaPct}
                       onChange={(e) => setField("ivaPct", e.target.value)}
                       className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
@@ -1234,7 +1245,9 @@ function FacturaWorkspacePage({
                     <input
                       type="number"
                       min="0"
+                      max="100"
                       step="0.01"
+                      onKeyDown={blockInvalidKeys}
                       value={form.irpfPct}
                       onChange={(e) => setField("irpfPct", e.target.value)}
                       className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
@@ -1242,21 +1255,21 @@ function FacturaWorkspacePage({
                   </label>
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-                  <div className="rounded-xl border border-slate-200 bg-white px-3 py-3">
+                  <div className="min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-3">
                     <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Base</p>
-                    <p className="mt-1 text-sm font-bold text-slate-900">{fmtEur(baseTrasDescuento)}</p>
+                    <p className="mt-1 truncate text-sm font-bold text-slate-900">{fmtEur(baseTrasDescuento)}</p>
                   </div>
-                  <div className="rounded-xl border border-slate-200 bg-white px-3 py-3">
+                  <div className="min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-3">
                     <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">IVA</p>
-                    <p className="mt-1 text-sm font-bold text-slate-900">{fmtEur(ivaImporte)}</p>
+                    <p className="mt-1 truncate text-sm font-bold text-slate-900">{fmtEur(ivaImporte)}</p>
                   </div>
-                  <div className="rounded-xl border border-slate-200 bg-white px-3 py-3">
+                  <div className="min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-3">
                     <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">IRPF</p>
-                    <p className="mt-1 text-sm font-bold text-slate-900">{fmtEur(irpfImporte)}</p>
+                    <p className="mt-1 truncate text-sm font-bold text-slate-900">{fmtEur(irpfImporte)}</p>
                   </div>
-                  <div className={`rounded-xl border px-3 py-3 ${totalLineaCalculado > 0 ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-slate-50"}`}>
+                  <div className={`min-w-0 rounded-xl border px-3 py-3 ${totalLineaCalculado > 0 ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-slate-50"}`}>
                     <p className={`text-[11px] font-semibold uppercase tracking-wider ${totalLineaCalculado > 0 ? "text-emerald-600" : "text-slate-400"}`}>Total línea</p>
-                    <p className={`mt-1 text-sm font-bold ${totalLineaCalculado > 0 ? "text-emerald-700" : "text-slate-500"}`}>{fmtEur(totalLineaCalculado)}</p>
+                    <p className={`mt-1 truncate text-sm font-bold ${totalLineaCalculado > 0 ? "text-emerald-700" : "text-slate-500"}`}>{fmtEur(totalLineaCalculado)}</p>
                   </div>
                 </div>
               </div>
@@ -1286,27 +1299,27 @@ function FacturaWorkspacePage({
                 <p className="mt-1 text-sm text-slate-300">{selectedClient?.label || "Sin cliente asignado"}</p>
               </div>
               <div className="grid grid-cols-2 gap-3 text-sm">
-                <div className="rounded-2xl border border-slate-200 px-4 py-3">
+                <div className="min-w-0 rounded-2xl border border-slate-200 px-4 py-3">
                   <p className="text-xs font-semibold text-slate-400">Total</p>
-                  <p className="mt-1 font-bold text-slate-900">{fmtEur(Number(form.total || 0))}</p>
+                  <p className="mt-1 truncate font-bold text-slate-900">{fmtEur(Number(form.total || 0))}</p>
                 </div>
-                <div className="rounded-2xl border border-slate-200 px-4 py-3">
+                <div className="min-w-0 rounded-2xl border border-slate-200 px-4 py-3">
                   <p className="text-xs font-semibold text-slate-400">Cobro</p>
-                  <p className="mt-1 font-bold text-slate-900">{PAYMENT_LABELS[form.formaPago]}</p>
+                  <p className="mt-1 truncate font-bold text-slate-900">{PAYMENT_LABELS[form.formaPago]}</p>
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-3 text-sm">
-                <div className="rounded-2xl border border-slate-200 px-4 py-3">
+                <div className="min-w-0 rounded-2xl border border-slate-200 px-4 py-3">
                   <p className="text-xs font-semibold text-slate-400">Base</p>
-                  <p className="mt-1 font-bold text-slate-900">{fmtEur(baseTrasDescuento)}</p>
+                  <p className="mt-1 truncate font-bold text-slate-900">{fmtEur(baseTrasDescuento)}</p>
                 </div>
-                <div className="rounded-2xl border border-slate-200 px-4 py-3">
+                <div className="min-w-0 rounded-2xl border border-slate-200 px-4 py-3">
                   <p className="text-xs font-semibold text-slate-400">IVA</p>
-                  <p className="mt-1 font-bold text-slate-900">{fmtEur(ivaImporte)}</p>
+                  <p className="mt-1 truncate font-bold text-slate-900">{fmtEur(ivaImporte)}</p>
                 </div>
-                <div className="rounded-2xl border border-slate-200 px-4 py-3">
+                <div className="min-w-0 rounded-2xl border border-slate-200 px-4 py-3">
                   <p className="text-xs font-semibold text-slate-400">IRPF</p>
-                  <p className="mt-1 font-bold text-slate-900">{fmtEur(irpfImporte)}</p>
+                  <p className="mt-1 truncate font-bold text-slate-900">{fmtEur(irpfImporte)}</p>
                 </div>
               </div>
               <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600">
