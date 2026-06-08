@@ -144,12 +144,15 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false, loc
   }, []);
 
   // ── Pegar archivos desde el portapapeles del sistema o del ERP ──────────────
+  // usePasteFiles stores the callback in a ref internally, so no useCallback needed here.
+  // Using useCallback with enqueueFiles in deps would cause a temporal dead zone crash
+  // because enqueueFiles is declared further down in the component.
   usePasteFiles(
-    useCallback((pasted: File[]) => {
+    (pasted: File[]) => {
       if (locked) return;
       showPasteToast(`Pegando ${pasted.length} archivo${pasted.length > 1 ? "s" : ""}…`);
       enqueueFiles(pasted);
-    }, [locked, showPasteToast, enqueueFiles]),
+    },
     !locked,
   );
 
