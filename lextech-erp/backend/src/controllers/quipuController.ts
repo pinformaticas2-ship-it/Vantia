@@ -170,7 +170,7 @@ function formatQuipuInvoiceAttempt(label: string, invoice: any) {
 async function fetchQuipuInvoiceDetail(settings: any, accessToken: string, quipuId: string) {
   if (!quipuId) return null;
   try {
-    return await quipuOwnerFetch<any>(settings, `/invoices/${quipuId}?include=items,contact,numbering_series`, undefined, accessToken);
+    return await quipuOwnerFetch<any>(settings, `/invoices/${quipuId}?include=items,contact`, undefined, accessToken);
   } catch (error: any) {
     console.warn(`[QuipuPush] failed to fetch detail for quipuId=${quipuId}: ${error?.message}`);
     return null;
@@ -198,7 +198,7 @@ async function findQuipuInvoiceByFilingNumber(
 
   const invoices = await fetchQuipuPaginatedList<any>(
     settings,
-    `/invoices?filter[q]=${encodeURIComponent(cleanFilingNumber)}&include=items,contact,numbering_series`,
+    `/invoices?filter[q]=${encodeURIComponent(cleanFilingNumber)}&include=items,contact`,
     accessToken,
     3,
   );
@@ -1279,7 +1279,7 @@ export const getQuipuInvoiceDetail = async (req: any, res: Response) => {
   const settings = await requireSettings(userId, res);
   if (!settings) return;
   try {
-    const data = await quipuOwnerFetch(settings, `/invoices/${req.params.id}?include=items,contact,numbering_series`);
+    const data = await quipuOwnerFetch(settings, `/invoices/${req.params.id}?include=items,contact`);
     res.json({ success: true, data });
   } catch (e: any) {
     res.status(500).json({ success: false, error: e?.message || 'Error al obtener factura de Quipu.' });
