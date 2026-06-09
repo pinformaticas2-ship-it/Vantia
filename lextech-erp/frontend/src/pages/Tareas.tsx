@@ -1,4 +1,4 @@
-﻿import React, {
+import React, {
   useEffect, useState, useCallback, useMemo, useRef,
 } from "react";
 import { useAuth } from "@clerk/clerk-react";
@@ -6,8 +6,13 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   CheckCircle2, Circle, AlertTriangle, Clock, Plus, X,
   Loader2, Search, Filter, Trash2, Edit3, Flag,
-  Briefcase, Users, Calendar, ChevronRight, MoreHorizontal, GripVertical,
+  Briefcase, Users, Calendar, MoreHorizontal, GripVertical,
+  ArrowUpDown, ChevronDown, ChevronUp, ZoomIn, ZoomOut,
 } from "lucide-react";
+import {
+  DndContext, DragOverlay, useDraggable, useDroppable,
+} from "@dnd-kit/core";
+import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
 import { safeJson } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
 import { createPortal } from "react-dom";
@@ -74,7 +79,6 @@ function daysUntil(plazo: string | null): number | null {
   if (!plazo) return null;
   return Math.ceil((new Date(plazo).setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / 86400000);
 }
-
 const clientName = (t: Task) => t.client_name_resolved || t.client_name || "—";
 type TaskView = "list" | "kanban" | "gantt";
 
@@ -140,45 +144,26 @@ function TaskModal({
           <span className="font-bold text-slate-800 text-sm">{task ? "Editar tarea" : "Nueva tarea"}</span>
           <BackButton onClick={onClose} />
         </div>
-
         {errorMsg && (
           <div className="px-5 py-2 bg-red-50 border-b border-red-100 text-xs text-red-700 font-medium">{errorMsg}</div>
         )}
-
         <form onSubmit={handleSubmit} className="p-5 space-y-3.5 overflow-y-auto max-h-[72vh]">
-          {/* Cliente */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">Cliente <span className="text-red-500">*</span></label>
-            <select
-              value={clientId}
-              onChange={e => setClientId(e.target.value)}
-              required
-              disabled={!!task || clientsLoading}
-              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-red-400 bg-white disabled:opacity-60"
-            >
+            <select value={clientId} onChange={e => setClientId(e.target.value)} required disabled={!!task || clientsLoading}
+              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-red-400 bg-white disabled:opacity-60">
               <option value="">— Selecciona un cliente —</option>
               {clientsLoading && <option value="">— Cargando clientes… —</option>}
               {clientsError && !clientsLoading && <option value="">— No se pudieron cargar los clientes —</option>}
               {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
-            {clientsError && !clientsLoading && (
-              <p className="mt-1 text-[11px] font-medium text-amber-600">{clientsError}</p>
-            )}
+            {clientsError && !clientsLoading && <p className="mt-1 text-[11px] font-medium text-amber-600">{clientsError}</p>}
           </div>
-
-          {/* Título */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">Título <span className="text-red-500">*</span></label>
-            <input
-              value={form.titulo}
-              onChange={e => set("titulo", e.target.value)}
-              required
-              placeholder="Descripción breve de la tarea…"
-              className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-red-400"
-            />
+            <input value={form.titulo} onChange={e => set("titulo", e.target.value)} required placeholder="Descripción breve de la tarea…"
+              className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-red-400" />
           </div>
-
-          {/* Tipo + Prioridad */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Tipo</label>
@@ -197,8 +182,6 @@ function TaskModal({
               </select>
             </div>
           </div>
-
-          {/* Estado + Plazo */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Estado</label>
@@ -215,38 +198,27 @@ function TaskModal({
                 className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400" />
             </div>
           </div>
-
-          {/* Expediente ref */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">Ref. Expediente</label>
-            <input value={form.expediente} onChange={e => set("expediente", e.target.value)}
-              placeholder="Ej: EXP/2024/001"
+            <input value={form.expediente} onChange={e => set("expediente", e.target.value)} placeholder="Ej: EXP/2024/001"
               className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-red-400" />
           </div>
-
-          {/* Juzgado + Nº Proc */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Juzgado / Tribunal</label>
-              <input value={form.juzgado} onChange={e => set("juzgado", e.target.value)}
-                placeholder="Juzgado nº…"
+              <input value={form.juzgado} onChange={e => set("juzgado", e.target.value)} placeholder="Juzgado nº…"
                 className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-red-400" />
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Nº Procedimiento</label>
-              <input value={form.num_proc} onChange={e => set("num_proc", e.target.value)}
-                placeholder="123/2024"
+              <input value={form.num_proc} onChange={e => set("num_proc", e.target.value)} placeholder="123/2024"
                 className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-red-400" />
             </div>
           </div>
-
-          {/* Etapa */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">🏷️ Etapa</label>
             <EtapaSelect value={form.etapa} onChange={v => set("etapa", v)} getToken={getToken} />
           </div>
-
-          {/* Fecha aviso + Importe */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">🔔 Fecha de aviso</label>
@@ -256,31 +228,23 @@ function TaskModal({
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">💶 Importe (€)</label>
-              <input type="number" step="0.01" min="0" value={form.importe}
-                onChange={e => set("importe", e.target.value)}
-                placeholder="0,00"
+              <input type="number" step="0.01" min="0" value={form.importe} onChange={e => set("importe", e.target.value)} placeholder="0,00"
                 className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400" />
               <p className="text-[10px] text-slate-400 mt-0.5">Honorarios, tasas, pagos...</p>
             </div>
           </div>
-
-          {/* Descripción */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">Instrucciones / Contexto</label>
-            <textarea value={form.descripcion} onChange={e => set("descripcion", e.target.value)}
-              rows={2} placeholder="Descripción o contexto adicional…"
+            <textarea value={form.descripcion} onChange={e => set("descripcion", e.target.value)} rows={2}
+              placeholder="Descripción o contexto adicional…"
               className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-red-400 resize-none" />
           </div>
-
-          {/* Notas internas */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">📝 Notas internas</label>
-            <textarea value={form.notas} onChange={e => set("notas", e.target.value)}
-              rows={2} placeholder="Observaciones internas del letrado…"
+            <textarea value={form.notas} onChange={e => set("notas", e.target.value)} rows={2}
+              placeholder="Observaciones internas del letrado…"
               className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-red-400 resize-none" />
           </div>
-
-          {/* Botones */}
           <div className="flex items-center justify-between pt-2 border-t border-slate-100">
             {task ? (
               <button type="button" onClick={() => onDelete(task.id)} disabled={saving}
@@ -305,11 +269,9 @@ function TaskModal({
   );
 }
 
-// ── Componente tarjeta de tarea ───────────────────────────────────────────────
-function TaskCard({
-  task,
-  onToggle,
-  onEdit,
+// ── Vista Lista – fila estilo ClickUp ─────────────────────────────────────────
+function TaskRow({
+  task, onToggle, onEdit,
 }: {
   task: Task;
   onToggle: (id: string, newEstado: string) => void;
@@ -317,158 +279,225 @@ function TaskCard({
 }) {
   const navigate = useNavigate();
   const overdue  = isOverdue(task.plazo, task.estado);
+  const done     = task.estado === "completada";
+  const tipoConf = TIPO_CONFIG[task.tipo] || TIPO_CONFIG.otro;
+  const prioConf = PRIO_CONFIG[task.prioridad] || PRIO_CONFIG.media;
+  const days     = daysUntil(task.plazo);
+
+  return (
+    <div
+      className={`group grid items-center gap-3 px-4 py-3 border-b border-slate-100 last:border-0 transition-colors
+        ${overdue && !done ? "bg-red-50/30 hover:bg-red-50/60" : "hover:bg-slate-50/70"}
+        ${done ? "opacity-55" : ""}
+      `}
+      style={{ gridTemplateColumns: "22px 6px 1fr 120px 130px 80px 32px" }}
+    >
+      {/* Completar */}
+      <button
+        onClick={e => { e.stopPropagation(); onToggle(task.id, done ? "pendiente" : "completada"); }}
+        className="flex items-center justify-center shrink-0 transition-colors text-slate-300 hover:text-emerald-500"
+      >
+        {done ? <CheckCircle2 size={17} className="text-emerald-500" /> : <Circle size={17} />}
+      </button>
+
+      {/* Prioridad barra */}
+      <div className={`h-5 w-1.5 rounded-full shrink-0 ${prioConf.bar}`} />
+
+      {/* Título + meta */}
+      <button onClick={() => onEdit(task)} className="text-left min-w-0">
+        <div className={`text-[13.5px] font-semibold leading-5 truncate ${done ? "line-through text-slate-400" : "text-slate-800"}`}>
+          {task.titulo}
+        </div>
+        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+          <button
+            onClickCapture={e => { e.stopPropagation(); task.client_id && navigate(`/dashboard/clientes/${task.client_id}`); }}
+            className="text-[10px] font-semibold text-blue-600 hover:underline"
+          >
+            {clientName(task)}
+          </button>
+          {(task.expediente || task.expediente_id) && (
+            <button
+              onClickCapture={e => { e.stopPropagation(); task.expediente_id && navigate(`/dashboard/expedientes/${task.expediente_id}`); }}
+              className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-violet-500 hover:underline"
+            >
+              <Briefcase size={8} /> {task.expediente || "Expediente"}
+            </button>
+          )}
+          {(task as any).etapa && (
+            <span className="text-[10px] font-bold text-indigo-600">🏷 {(task as any).etapa}</span>
+          )}
+          {(task as any).notas && (
+            <span className="text-[10px] text-amber-600 truncate max-w-[160px]">📝 {(task as any).notas}</span>
+          )}
+        </div>
+      </button>
+
+      {/* Tipo */}
+      <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full truncate text-center ${tipoConf.color}`}>
+        {tipoConf.label}
+      </span>
+
+      {/* Fecha límite */}
+      <div className={`text-xs font-medium flex items-center gap-1 ${
+        overdue && !done ? "text-red-600 font-bold" : days !== null && days <= 3 && !done ? "text-amber-600 font-bold" : "text-slate-500"
+      }`}>
+        {overdue && !done && <AlertTriangle size={10} />}
+        <span>{task.plazo ? fmtDate(task.plazo) : "—"}</span>
+        {days !== null && !overdue && !done && days <= 7 && (
+          <span className="text-slate-400 text-[10px]">{days === 0 ? "· hoy" : `· ${days}d`}</span>
+        )}
+      </div>
+
+      {/* Estado badge */}
+      <span className={`text-[10px] font-bold px-2 py-1 rounded-full text-center border ${
+        done ? "bg-emerald-50 text-emerald-600 border-emerald-200" :
+        task.estado === "urgente" ? "bg-red-50 text-red-600 border-red-200" :
+        "bg-amber-50 text-amber-600 border-amber-200"
+      }`}>
+        {ESTADO_CONFIG[task.estado]?.label}
+      </span>
+
+      {/* Acción editar */}
+      <button
+        onClick={() => onEdit(task)}
+        className="opacity-0 group-hover:opacity-100 h-7 w-7 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all shrink-0"
+      >
+        <Edit3 size={12} />
+      </button>
+    </div>
+  );
+}
+
+// ── Kanban – tarjeta visual (sin hooks) ───────────────────────────────────────
+function KanbanCardContent({
+  task, onToggle, onEdit, isDragging = false,
+}: {
+  task: Task;
+  onToggle: (id: string, newEstado: string) => void;
+  onEdit: (t: Task) => void;
+  isDragging?: boolean;
+}) {
+  const overdue  = isOverdue(task.plazo, task.estado);
   const days     = daysUntil(task.plazo);
   const tipoConf = TIPO_CONFIG[task.tipo] || TIPO_CONFIG.otro;
   const prioConf = PRIO_CONFIG[task.prioridad] || PRIO_CONFIG.media;
   const done     = task.estado === "completada";
 
   return (
-    <div className={`bg-white rounded-xl border transition-all group ${
-      task.estado === "urgente" ? "border-red-200 shadow-sm shadow-red-100"
-      : done ? "border-slate-100 opacity-60"
-      : "border-slate-200 hover:shadow-sm"
-    }`}>
-      <div className="flex items-start gap-3 px-4 py-3">
-        {/* Prioridad bar */}
-        <div className={`w-0.5 self-stretch rounded-full shrink-0 ${prioConf.bar}`} />
-
-        {/* Checkbox */}
+    <div className={`rounded-2xl border bg-white px-4 py-3.5 shadow-[0_6px_18px_rgba(15,23,42,0.07)] transition-all
+      ${overdue ? "border-red-200" : "border-slate-200"}
+      ${isDragging ? "shadow-2xl rotate-1 scale-105 ring-2 ring-indigo-300" : "hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(15,23,42,0.09)]"}
+    `}>
+      <div className="flex items-start gap-3">
         <button
-          onClick={() => onToggle(task.id, done ? "pendiente" : "completada")}
+          onClick={e => { e.stopPropagation(); onToggle(task.id, done ? "pendiente" : "completada"); }}
           className="mt-0.5 shrink-0 text-slate-400 hover:text-emerald-500 transition-colors"
-          title={done ? "Marcar pendiente" : "Marcar completada"}
         >
-          {done
-            ? <CheckCircle2 size={18} className="text-emerald-500" />
-            : <Circle size={18} />
-          }
+          {done ? <CheckCircle2 size={18} className="text-emerald-500" /> : <Circle size={18} />}
         </button>
-
-        {/* Contenido */}
-        <div className="flex-1 min-w-0">
-          <p className={`text-sm font-semibold leading-tight ${done ? "line-through text-slate-400" : "text-slate-800"}`}>
-            {task.titulo}
-          </p>
-
-          {task.descripcion && (
-            <p className="text-xs text-slate-400 mt-0.5 truncate">{task.descripcion}</p>
-          )}
-
-          <div className="flex flex-wrap items-center gap-2 mt-1.5">
-            {/* Cliente */}
-            <button
-              onClick={() => task.client_id && navigate(`/dashboard/clientes/${task.client_id}`)}
-              className="flex items-center gap-1 text-[10px] text-blue-600 hover:text-blue-800 font-semibold"
-            >
-              <Users size={9} /> {clientName(task)}
-            </button>
-
-            {/* Expediente */}
-            {(task.expediente || task.expediente_id) && (
-              <button
-                onClick={() => task.expediente_id && navigate(`/dashboard/expedientes/${task.expediente_id}`)}
-                className={`flex items-center gap-1 text-[10px] font-semibold ${task.expediente_id ? "text-violet-600 hover:text-violet-800" : "text-slate-400"}`}
-              >
-                <Briefcase size={9} /> {task.expediente || "Expediente"}
-              </button>
-            )}
-
-            {/* Tipo badge */}
-            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${tipoConf.color}`}>
-              {tipoConf.label}
-            </span>
-
-            {/* Fecha límite */}
-            {task.plazo && (
-              <span className={`flex items-center gap-0.5 text-[10px] font-semibold ${
-                overdue ? "text-red-600" : days !== null && days <= 3 ? "text-amber-600" : "text-slate-500"
-              }`}>
-                <Clock size={9} />
-                {overdue ? "VENCIDA · " : ""}
-                {fmtDate(task.plazo)}
-                {days !== null && !overdue && days <= 7 && (
-                  <span className="ml-0.5">· {days === 0 ? "hoy" : `${days}d`}</span>
-                )}
-              </span>
-            )}
-
-            {/* Estado urgente */}
-            {task.estado === "urgente" && (
-              <span className="flex items-center gap-0.5 text-[10px] font-bold text-red-600">
-                <Flag size={9} /> Urgente
-              </span>
-            )}
-
-            {/* Fecha aviso */}
-            {(task as any).fecha_aviso && (
-              <span className={`flex items-center gap-0.5 text-[10px] font-semibold ${
-                new Date((task as any).fecha_aviso) < new Date() && !done ? "text-amber-600" : "text-slate-400"
-              }`}>
-                🔔 {fmtDate((task as any).fecha_aviso)}
-              </span>
-            )}
-
-            {/* Importe */}
-            {(task as any).importe != null && Number((task as any).importe) > 0 && (
-              <span className="flex items-center gap-0.5 text-[10px] font-semibold text-emerald-600">
-                💶 {Number((task as any).importe).toLocaleString('es-ES', { minimumFractionDigits: 2 })} €
-              </span>
-            )}
-
-            {/* Etapa */}
-            {(task as any).etapa && (
-              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
-                🏷️ {(task as any).etapa}
-              </span>
-            )}
-          </div>
-
-          {/* Notas internas */}
-          {(task as any).notas && !done && (
-            <div className="mt-1.5 px-2 py-1 bg-amber-50 border border-amber-100 rounded-lg text-[10px] text-amber-800 leading-relaxed">
-              <span className="font-bold">📝 </span>{(task as any).notas}
+        <div className="min-w-0 flex-1">
+          <button onClick={() => onEdit(task)} className="text-left w-full">
+            <div className={`text-[15px] leading-5 font-bold ${done ? "line-through text-slate-400" : "text-slate-800"}`}>
+              {task.titulo}
             </div>
+          </button>
+          {task.descripcion && (
+            <p className="mt-1 text-xs text-slate-500 line-clamp-2">{task.descripcion}</p>
           )}
         </div>
-
-        {/* Editar */}
         <button
           onClick={() => onEdit(task)}
-          className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-300 hover:text-slate-600 hover:bg-slate-100 transition-all shrink-0"
+          className="shrink-0 h-8 w-8 rounded-xl border border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition-colors flex items-center justify-center"
         >
           <Edit3 size={13} />
         </button>
+      </div>
+
+      <div className="mt-3 flex items-center gap-2 flex-wrap">
+        <span className={`h-2.5 w-2.5 rounded-full ${prioConf.bar}`} />
+        <span className={`text-[10px] font-extrabold px-2 py-1 rounded-full ${tipoConf.color}`}>{tipoConf.label}</span>
+        <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-slate-100 text-slate-600">{PRIO_CONFIG[task.prioridad]?.label || "Media"}</span>
+        {task.estado === "urgente" && (
+          <span className="text-[10px] font-extrabold px-2 py-1 rounded-full bg-red-50 text-red-600">Urgente</span>
+        )}
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
+        <div className="rounded-xl border border-slate-100 bg-slate-50 px-2.5 py-2">
+          <div className="flex items-center gap-1 text-slate-400 font-bold uppercase tracking-[0.16em] text-[9px]">
+            <Users size={10} /> Cliente
+          </div>
+          <div className="mt-1 font-semibold text-slate-700 truncate">{clientName(task)}</div>
+        </div>
+        <div className="rounded-xl border border-slate-100 bg-slate-50 px-2.5 py-2">
+          <div className="flex items-center gap-1 text-slate-400 font-bold uppercase tracking-[0.16em] text-[9px]">
+            <Calendar size={10} /> Límite
+          </div>
+          <div className={`mt-1 font-semibold truncate ${overdue ? "text-red-600" : "text-slate-700"}`}>
+            {task.plazo ? fmtDate(task.plazo) : "Sin fecha"}
+            {days !== null && !overdue && (
+              <span className="ml-1 text-slate-400">{days === 0 ? "· hoy" : `· ${days}d`}</span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {(task.expediente || task.juzgado) && (
+        <div className="mt-3 flex items-center gap-2 flex-wrap text-[11px] text-slate-500">
+          {task.expediente && <span className="inline-flex items-center gap-1"><Briefcase size={10} /> {task.expediente}</span>}
+          {task.juzgado && <span className="inline-flex items-center gap-1"><Flag size={10} /> {task.juzgado}</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Kanban – tarjeta arrastrable ──────────────────────────────────────────────
+function KanbanCard({
+  task, onToggle, onEdit,
+}: {
+  task: Task;
+  onToggle: (id: string, newEstado: string) => void;
+  onEdit: (t: Task) => void;
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: task.id,
+    data: { task },
+  });
+
+  return (
+    <div ref={setNodeRef} style={{ opacity: isDragging ? 0.25 : 1 }}>
+      <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing">
+        <KanbanCardContent task={task} onToggle={onToggle} onEdit={onEdit} isDragging={false} />
       </div>
     </div>
   );
 }
 
-// ── Página principal ──────────────────────────────────────────────────────────
+// ── Kanban – columna con drop zone ────────────────────────────────────────────
 function KanbanLane({
-  title,
-  tone,
-  tasks,
-  onToggle,
-  onEdit,
+  id, title, tone, tasks, onToggle, onEdit, onAddNew,
 }: {
+  id: string;
   title: string;
   tone: string;
   tasks: Task[];
   onToggle: (id: string, newEstado: string) => void;
   onEdit: (t: Task) => void;
+  onAddNew: () => void;
 }) {
-  const laneMeta = useMemo(() => {
-    const overdueCount = tasks.filter((task) => isOverdue(task.plazo, task.estado)).length;
-    const urgentCount = tasks.filter((task) => task.estado === "urgente").length;
-    return { overdueCount, urgentCount };
-  }, [tasks]);
+  const { setNodeRef, isOver } = useDroppable({ id });
+
+  const overdueCount = useMemo(() => tasks.filter(t => isOverdue(t.plazo, t.estado)).length, [tasks]);
 
   return (
-    <div className="min-w-[340px] max-w-[380px] flex-1 rounded-[24px] border border-slate-200/90 bg-white shadow-[0_12px_36px_rgba(15,23,42,0.06)] overflow-hidden">
+    <div className={`min-w-[340px] max-w-[380px] flex-1 rounded-[24px] border bg-white shadow-[0_12px_36px_rgba(15,23,42,0.06)] overflow-hidden transition-all
+      ${isOver ? "border-indigo-400 shadow-[0_0_0_3px_rgba(99,102,241,0.2)]" : "border-slate-200/90"}
+    `}>
       <div className={`px-4 py-3.5 border-b ${tone}`}>
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
-            <GripVertical size={14} className="opacity-50" />
+            <GripVertical size={14} className="opacity-40" />
             <span className="text-sm font-extrabold tracking-tight truncate">{title}</span>
             <span className="px-2 py-0.5 rounded-full bg-white/90 text-[11px] font-extrabold border border-current/10">{tasks.length}</span>
           </div>
@@ -476,148 +505,124 @@ function KanbanLane({
             <MoreHorizontal size={14} />
           </button>
         </div>
-        <div className="mt-2 flex items-center gap-2 flex-wrap text-[10px] font-bold uppercase tracking-[0.18em] opacity-75">
-          <span>{laneMeta.overdueCount} vencidas</span>
-          <span className="h-1 w-1 rounded-full bg-current/40" />
-          <span>{laneMeta.urgentCount} urgentes</span>
-        </div>
-      </div>
-      <div className="p-3 min-h-[420px] bg-[linear-gradient(180deg,#fbfcff_0%,#f8fafc_100%)] space-y-3">
-        {tasks.length === 0 ? (
-          <div className="min-h-[220px] rounded-2xl border-2 border-dashed border-slate-200 flex items-center justify-center text-xs font-medium text-slate-400 bg-white/80">
-            Sin tareas
+        {overdueCount > 0 && (
+          <div className="mt-1.5 flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.18em] opacity-75">
+            <AlertTriangle size={9} />
+            <span>{overdueCount} vencidas</span>
           </div>
-        ) : tasks.map((task) => {
-          const overdue = isOverdue(task.plazo, task.estado);
-          const days = daysUntil(task.plazo);
-          const tipoConf = TIPO_CONFIG[task.tipo] || TIPO_CONFIG.otro;
-          const prioConf = PRIO_CONFIG[task.prioridad] || PRIO_CONFIG.media;
-          const done = task.estado === "completada";
+        )}
+      </div>
 
-          return (
-            <div
-              key={task.id}
-              className={`rounded-2xl border bg-white px-4 py-3.5 shadow-[0_6px_18px_rgba(15,23,42,0.05)] transition-all hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(15,23,42,0.08)] ${
-                overdue ? "border-red-200" : "border-slate-200"
-              }`}
-            >
-              <div className="flex items-start gap-3">
-                <button
-                  onClick={() => onToggle(task.id, done ? "pendiente" : "completada")}
-                  className="mt-0.5 shrink-0 text-slate-400 hover:text-emerald-500 transition-colors"
-                  title={done ? "Marcar pendiente" : "Marcar completada"}
-                >
-                  {done ? <CheckCircle2 size={18} className="text-emerald-500" /> : <Circle size={18} />}
-                </button>
-                <div className="min-w-0 flex-1">
-                  <button onClick={() => onEdit(task)} className="text-left w-full">
-                    <div className={`text-[15px] leading-5 font-bold ${done ? "line-through text-slate-400" : "text-slate-800"}`}>
-                      {task.titulo}
-                    </div>
-                  </button>
-                  {task.descripcion && (
-                    <p className="mt-1 text-xs text-slate-500 line-clamp-2">{task.descripcion}</p>
-                  )}
-                </div>
-                <button
-                  onClick={() => onEdit(task)}
-                  className="shrink-0 h-8 w-8 rounded-xl border border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition-colors"
-                >
-                  <Edit3 size={13} className="mx-auto" />
-                </button>
-              </div>
-
-              <div className="mt-3 flex items-center gap-2 flex-wrap">
-                <span className={`h-2.5 w-2.5 rounded-full ${prioConf.bar}`} />
-                <span className={`text-[10px] font-extrabold px-2 py-1 rounded-full ${tipoConf.color}`}>{tipoConf.label}</span>
-                <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-slate-100 text-slate-600">{PRIO_CONFIG[task.prioridad]?.label || "Media"}</span>
-                {task.estado === "urgente" && (
-                  <span className="text-[10px] font-extrabold px-2 py-1 rounded-full bg-red-50 text-red-600">Urgente</span>
-                )}
-              </div>
-
-              <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
-                <div className="rounded-xl border border-slate-100 bg-slate-50 px-2.5 py-2">
-                  <div className="flex items-center gap-1 text-slate-400 font-bold uppercase tracking-[0.16em] text-[9px]">
-                    <Users size={10} /> Cliente
-                  </div>
-                  <div className="mt-1 font-semibold text-slate-700 truncate">{clientName(task)}</div>
-                </div>
-                <div className="rounded-xl border border-slate-100 bg-slate-50 px-2.5 py-2">
-                  <div className="flex items-center gap-1 text-slate-400 font-bold uppercase tracking-[0.16em] text-[9px]">
-                    <Calendar size={10} /> Límite
-                  </div>
-                  <div className={`mt-1 font-semibold truncate ${overdue ? "text-red-600" : "text-slate-700"}`}>
-                    {task.plazo ? fmtDate(task.plazo) : "Sin fecha"}
-                    {days !== null && !overdue && (
-                      <span className="ml-1 text-slate-400">{days === 0 ? "· hoy" : `· ${days}d`}</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {(task.expediente || task.juzgado || task.num_proc) && (
-                <div className="mt-3 flex items-center gap-2 flex-wrap text-[11px] text-slate-500">
-                  {task.expediente && (
-                    <span className="inline-flex items-center gap-1">
-                      <Briefcase size={10} /> {task.expediente}
-                    </span>
-                  )}
-                  {task.juzgado && (
-                    <span className="inline-flex items-center gap-1">
-                      <Flag size={10} /> {task.juzgado}
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
-        <button className="w-full rounded-2xl border border-dashed border-slate-200 bg-white/70 py-3 text-sm font-bold text-slate-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50/60 transition-colors">
-          + Añadir tarea
+      <div
+        ref={setNodeRef}
+        className={`p-3 min-h-[440px] space-y-3 transition-colors ${isOver ? "bg-indigo-50/40" : "bg-[linear-gradient(180deg,#fbfcff_0%,#f8fafc_100%)]"}`}
+      >
+        {tasks.length === 0 ? (
+          <div className={`min-h-[200px] rounded-2xl border-2 border-dashed flex items-center justify-center text-xs font-medium transition-colors
+            ${isOver ? "border-indigo-300 bg-indigo-50/60 text-indigo-500" : "border-slate-200 text-slate-400 bg-white/80"}
+          `}>
+            {isOver ? "Soltar aquí" : "Sin tareas"}
+          </div>
+        ) : (
+          tasks.map(task => (
+            <KanbanCard key={task.id} task={task} onToggle={onToggle} onEdit={onEdit} />
+          ))
+        )}
+        <button
+          onClick={onAddNew}
+          className="w-full rounded-2xl border border-dashed border-slate-200 bg-white/70 py-3 text-sm font-bold text-slate-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50/60 transition-colors flex items-center justify-center gap-1.5"
+        >
+          <Plus size={13} /> Añadir tarea
         </button>
       </div>
     </div>
   );
 }
 
+// ── Gantt ─────────────────────────────────────────────────────────────────────
 function GanttBoard({
-  tasks,
-  onEdit,
+  tasks, onEdit, onUpdatePlazo,
 }: {
   tasks: Task[];
   onEdit: (t: Task) => void;
+  onUpdatePlazo: (id: string, plazo: string) => void;
 }) {
+  const [dayWidth, setDayWidth] = useState(44);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [dragging, setDragging] = useState<{
+    taskId: string;
+    startClientX: number;
+    originalPlazo: Date;
+    deltaDays: number;
+  } | null>(null);
+
   const ganttData = useMemo(() => {
     const list = tasks
-      .filter((task) => !!task.plazo)
-      .map((task) => {
-        const end = new Date(task.plazo as string);
-        const sourceStart = task.created_at || task.updated_at || task.plazo || new Date().toISOString();
-        const parsedStart = new Date(sourceStart);
-        const start = parsedStart.getTime() <= end.getTime()
-          ? parsedStart
-          : new Date(end.getTime() - 86400000 * 3);
-        return { task, start, end };
+      .filter(t => !!t.plazo)
+      .map(t => {
+        const end  = new Date(t.plazo as string);
+        const src  = t.created_at || t.updated_at || t.plazo || new Date().toISOString();
+        const parsed = new Date(src);
+        const start  = parsed.getTime() <= end.getTime() ? parsed : new Date(end.getTime() - 86400000 * 3);
+        return { task: t, start, end };
       })
       .sort((a, b) => a.start.getTime() - b.start.getTime());
 
     if (!list.length) return null;
 
-    const minStart = new Date(Math.min(...list.map((item) => item.start.getTime())));
-    const maxEnd = new Date(Math.max(...list.map((item) => item.end.getTime())));
-    minStart.setHours(0, 0, 0, 0);
-    maxEnd.setHours(0, 0, 0, 0);
+    const minStart = new Date(Math.min(...list.map(i => i.start.getTime())));
+    const maxEnd   = new Date(Math.max(...list.map(i => i.end.getTime())));
+    minStart.setHours(0,0,0,0);
+    maxEnd.setHours(0,0,0,0);
+
+    // Pad 7 days before/after for comfortable dragging
+    minStart.setDate(minStart.getDate() - 7);
+    maxEnd.setDate(maxEnd.getDate() + 14);
 
     const totalDays = Math.max(1, Math.ceil((maxEnd.getTime() - minStart.getTime()) / 86400000) + 1);
-    const dates = Array.from({ length: totalDays }, (_, index) => {
-      const date = new Date(minStart);
-      date.setDate(minStart.getDate() + index);
-      return date;
+    const dates = Array.from({ length: totalDays }, (_, i) => {
+      const d = new Date(minStart);
+      d.setDate(minStart.getDate() + i);
+      return d;
     });
 
     return { list, minStart, dates, totalDays };
   }, [tasks]);
+
+  // Scroll to today on mount and on "Hoy" click
+  const scrollToToday = useCallback(() => {
+    if (!scrollRef.current || !ganttData) return;
+    const now = new Date();
+    now.setHours(0,0,0,0);
+    const todayOffset = Math.floor((now.getTime() - ganttData.minStart.getTime()) / 86400000);
+    const targetLeft = Math.max(0, todayOffset * dayWidth - scrollRef.current.clientWidth / 3);
+    scrollRef.current.scrollTo({ left: targetLeft, behavior: "smooth" });
+  }, [ganttData, dayWidth]);
+
+  useEffect(() => { scrollToToday(); }, [scrollToToday]);
+
+  // Drag event handlers
+  useEffect(() => {
+    if (!dragging) return;
+    const onMove = (e: MouseEvent) => {
+      const deltaDays = Math.round((e.clientX - dragging.startClientX) / dayWidth);
+      setDragging(d => d ? { ...d, deltaDays } : null);
+    };
+    const onUp = () => {
+      if (dragging.deltaDays !== 0) {
+        const newPlazo = new Date(dragging.originalPlazo);
+        newPlazo.setDate(newPlazo.getDate() + dragging.deltaDays);
+        onUpdatePlazo(dragging.taskId, newPlazo.toISOString().slice(0, 10));
+      }
+      setDragging(null);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    return () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+  }, [dragging, dayWidth, onUpdatePlazo]);
 
   if (!ganttData) {
     return (
@@ -628,113 +633,205 @@ function GanttBoard({
   }
 
   const { list, minStart, dates, totalDays } = ganttData;
-  const dayWidth = 44;
+
   const weekHeaders = dates.reduce<Array<{ label: string; span: number; key: string }>>((acc, date) => {
-    const week = `${date.getFullYear()}-${Math.ceil((((date.getTime() - new Date(date.getFullYear(), 0, 1).getTime()) / 86400000) + new Date(date.getFullYear(), 0, 1).getDay() + 1) / 7)}`;
-    const label = `W${Math.ceil((((date.getTime() - new Date(date.getFullYear(), 0, 1).getTime()) / 86400000) + new Date(date.getFullYear(), 0, 1).getDay() + 1) / 7)} · ${date.toLocaleDateString("es-ES", { month: "short", day: "numeric" })}`;
+    const weekNum = Math.ceil((((date.getTime() - new Date(date.getFullYear(), 0, 1).getTime()) / 86400000) + new Date(date.getFullYear(), 0, 1).getDay() + 1) / 7);
+    const week = `${date.getFullYear()}-${weekNum}`;
+    const label = `W${weekNum} · ${date.toLocaleDateString("es-ES", { month: "short", day: "numeric" })}`;
     const last = acc[acc.length - 1];
-    if (last?.key === week) {
-      last.span += 1;
-    } else {
-      acc.push({ key: week, label, span: 1 });
-    }
+    if (last?.key === week) last.span += 1;
+    else acc.push({ key: week, label, span: 1 });
     return acc;
   }, []);
-  const todayOffset = Math.floor((new Date(new Date().setHours(0, 0, 0, 0)).getTime() - minStart.getTime()) / 86400000);
+
+  const todayOffset = Math.floor((new Date(new Date().setHours(0,0,0,0)).getTime() - minStart.getTime()) / 86400000);
 
   return (
-    <div className="rounded-[24px] border border-slate-200 bg-white overflow-hidden shadow-[0_18px_42px_rgba(15,23,42,0.06)]">
+    <div
+      className="rounded-[24px] border border-slate-200 bg-white overflow-hidden shadow-[0_18px_42px_rgba(15,23,42,0.06)]"
+      style={{ userSelect: dragging ? "none" : undefined } as React.CSSProperties}
+    >
+      {/* Header toolbar */}
       <div className="px-4 py-3.5 border-b border-slate-200 bg-slate-50 flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-extrabold text-slate-800">Cronograma</span>
           <span className="px-2.5 py-1 rounded-full bg-white border border-slate-200 text-[11px] font-bold text-slate-500">{list.length} tareas</span>
-          <span className="px-2.5 py-1 rounded-full bg-violet-50 border border-violet-200 text-[11px] font-bold text-violet-600">Vista semanal</span>
+          <span className="px-2.5 py-1 rounded-full bg-violet-50 border border-violet-200 text-[11px] font-bold text-violet-600">
+            {dayWidth >= 56 ? "Vista detallada" : dayWidth <= 30 ? "Vista amplia" : "Vista semanal"}
+          </span>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <button className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 bg-white">Hoy</button>
-          <button className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 bg-white">Semana</button>
-          <button className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 bg-white">Ajuste automático</button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={scrollToToday}
+            className="px-3 py-1.5 rounded-xl border border-indigo-200 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-colors"
+          >
+            Hoy
+          </button>
+          <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl px-1 py-1">
+            <button
+              onClick={() => setDayWidth(w => Math.max(20, w - 10))}
+              className="h-6 w-6 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors"
+              title="Alejar"
+            >
+              <ZoomOut size={13} />
+            </button>
+            <span className="text-[11px] font-bold text-slate-500 w-8 text-center">{dayWidth}px</span>
+            <button
+              onClick={() => setDayWidth(w => Math.min(80, w + 10))}
+              className="h-6 w-6 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors"
+              title="Acercar"
+            >
+              <ZoomIn size={13} />
+            </button>
+          </div>
         </div>
       </div>
-      <div className="overflow-auto">
-        <div className="min-w-[1280px]">
-          <div className="grid border-b border-slate-200 bg-slate-50 sticky top-0 z-10" style={{ gridTemplateColumns: `380px repeat(${totalDays}, minmax(${dayWidth}px, 1fr))` }}>
-            <div className="px-5 py-3 text-xs font-bold uppercase tracking-[0.24em] text-slate-500 border-r border-slate-200 row-span-2 flex items-center">Nombre</div>
+
+      <div ref={scrollRef} className="overflow-auto">
+        <div style={{ minWidth: `${380 + totalDays * dayWidth}px` }}>
+
+          {/* Header fechas */}
+          <div
+            className="grid border-b border-slate-200 bg-slate-50/80 sticky top-0 z-10"
+            style={{ gridTemplateColumns: `380px repeat(${totalDays}, ${dayWidth}px)` }}
+          >
+            <div className="px-5 py-3 text-xs font-bold uppercase tracking-[0.24em] text-slate-500 border-r border-slate-200 row-span-2 flex items-center">
+              Nombre
+            </div>
+            {/* Week row */}
             <div className="col-span-full" style={{ gridColumn: `2 / span ${totalDays}` }}>
-              <div className="grid" style={{ gridTemplateColumns: `repeat(${totalDays}, minmax(${dayWidth}px, 1fr))` }}>
-                {weekHeaders.map((week) => (
-                  <div
-                    key={week.key}
-                    className="px-3 py-2 text-[11px] font-bold text-slate-600 border-r border-slate-200 bg-white/70"
-                    style={{ gridColumn: `span ${week.span}` }}
-                  >
-                    {week.label}
+              <div className="grid" style={{ gridTemplateColumns: `repeat(${totalDays}, ${dayWidth}px)` }}>
+                {weekHeaders.map(w => (
+                  <div key={w.key} className="px-2 py-1.5 text-[11px] font-bold text-slate-600 border-r border-slate-200 bg-white/70 truncate"
+                    style={{ gridColumn: `span ${w.span}` }}>
+                    {w.label}
                   </div>
                 ))}
               </div>
             </div>
-            {dates.map((date) => (
-              <div key={date.toISOString()} className="px-1 py-2 text-center border-r border-slate-100 bg-slate-50">
-                <div className="text-[11px] font-bold text-slate-700">{date.toLocaleDateString("es-ES", { day: "2-digit" })}</div>
-                <div className="text-[9px] text-slate-400 uppercase">{date.toLocaleDateString("es-ES", { weekday: "short" })}</div>
-              </div>
-            ))}
+            {/* Day row */}
+            {dates.map((date, i) => {
+              const isToday = i === todayOffset;
+              const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+              return (
+                <div key={date.toISOString()}
+                  className={`py-1.5 text-center border-r border-slate-100 ${isWeekend ? "bg-slate-100/60" : ""} ${isToday ? "bg-indigo-50" : ""}`}
+                >
+                  <div className={`text-[11px] font-bold ${isToday ? "text-indigo-600" : "text-slate-700"}`}>
+                    {date.toLocaleDateString("es-ES", { day: "2-digit" })}
+                  </div>
+                  {dayWidth >= 36 && (
+                    <div className={`text-[9px] uppercase ${isToday ? "text-indigo-400" : "text-slate-400"}`}>
+                      {date.toLocaleDateString("es-ES", { weekday: "short" })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
+          {/* Task rows */}
           {list.map(({ task, start, end }) => {
             const startOffset = Math.max(0, Math.floor((start.getTime() - minStart.getTime()) / 86400000));
-            const span = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / 86400000) + 1);
-            const tipoConf = TIPO_CONFIG[task.tipo] || TIPO_CONFIG.otro;
-            const overdue = isOverdue(task.plazo, task.estado);
-            const barTone = task.estado === "completada"
-              ? "bg-emerald-500/85"
+            const baseSpan   = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / 86400000) + 1);
+            const tipoConf   = TIPO_CONFIG[task.tipo] || TIPO_CONFIG.otro;
+            const overdue    = isOverdue(task.plazo, task.estado);
+            const barTone    = task.estado === "completada"
+              ? "bg-emerald-500/90"
               : task.estado === "urgente" || overdue
-                ? "bg-red-500/85"
-                : "bg-indigo-500/85";
+                ? "bg-red-500/90"
+                : "bg-indigo-500/90";
+
+            const isDraggingThis = dragging?.taskId === task.id;
+            const deltaDays = isDraggingThis ? dragging!.deltaDays : 0;
+
+            // For dragging: we visually shift the end of the bar
+            const visualSpan = Math.max(1, baseSpan + deltaDays);
+            const newPlazoDate = isDraggingThis && deltaDays !== 0
+              ? new Date(dragging!.originalPlazo.getTime() + deltaDays * 86400000)
+              : null;
 
             return (
-              <div key={task.id} className="grid border-b border-slate-100 hover:bg-slate-50/70 transition-colors" style={{ gridTemplateColumns: `380px repeat(${totalDays}, minmax(${dayWidth}px, 1fr))` }}>
+              <div key={task.id}
+                className="grid border-b border-slate-100 hover:bg-slate-50/50 transition-colors"
+                style={{ gridTemplateColumns: `380px repeat(${totalDays}, ${dayWidth}px)` }}
+              >
+                {/* Name column */}
                 <button onClick={() => onEdit(task)} className="px-5 py-3 text-left border-r border-slate-200 hover:bg-white">
                   <div className="flex items-start gap-3">
-                    <span className={`mt-1 h-3 w-3 rounded-full ${barTone}`} />
+                    <span className={`mt-1 h-3 w-3 rounded-full shrink-0 ${barTone}`} />
                     <div className="min-w-0 flex-1">
-                      <div className="text-[15px] font-bold text-slate-800 truncate">{task.titulo}</div>
+                      <div className="text-[14px] font-bold text-slate-800 truncate">{task.titulo}</div>
                       <div className="mt-1 flex items-center gap-2 flex-wrap">
-                        <span className="text-[10px] font-semibold text-blue-600">{clientName(task)}</span>
+                        <span className="text-[10px] font-semibold text-blue-600 truncate">{clientName(task)}</span>
                         <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${tipoConf.color}`}>{tipoConf.label}</span>
                         <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">{PRIO_CONFIG[task.prioridad]?.label || "Media"}</span>
                       </div>
                     </div>
                   </div>
                 </button>
+
+                {/* Timeline column */}
                 <div className="relative" style={{ gridColumn: `2 / span ${totalDays}` }}>
-                  <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${totalDays}, minmax(${dayWidth}px, 1fr))` }}>
-                    {dates.map((date, index) => (
-                      <div
-                        key={`${task.id}-${date.toISOString()}`}
-                        className={`border-r border-slate-100 ${date.getDay() === 0 || date.getDay() === 6 ? "bg-slate-50/70" : ""} ${index === todayOffset ? "border-l border-l-red-300" : ""}`}
+                  {/* Background grid */}
+                  <div className="absolute inset-0 grid pointer-events-none"
+                    style={{ gridTemplateColumns: `repeat(${totalDays}, ${dayWidth}px)` }}>
+                    {dates.map((date, i) => (
+                      <div key={i}
+                        className={`border-r border-slate-100 ${date.getDay() === 0 || date.getDay() === 6 ? "bg-slate-50/60" : ""} ${i === todayOffset ? "bg-indigo-50/40" : ""}`}
                       />
                     ))}
                   </div>
-                  <div className="relative min-h-[72px]">
-                    {todayOffset >= 0 && todayOffset < totalDays && (
-                      <div
-                        className="absolute top-0 bottom-0 w-px bg-red-400/80 z-[1]"
-                        style={{ left: `${todayOffset * dayWidth + dayWidth / 2}px` }}
-                      />
-                    )}
-                    <button
-                      onClick={() => onEdit(task)}
-                      className={`absolute top-1/2 -translate-y-1/2 h-11 rounded-2xl px-3.5 text-left text-white shadow-[0_8px_22px_rgba(15,23,42,0.18)] ${barTone}`}
+
+                  {/* Today line */}
+                  {todayOffset >= 0 && todayOffset < totalDays && (
+                    <div className="absolute top-0 bottom-0 w-[2px] bg-indigo-400/70 z-[1] pointer-events-none"
+                      style={{ left: `${todayOffset * dayWidth + dayWidth / 2}px` }} />
+                  )}
+
+                  <div className="relative min-h-[68px]">
+                    {/* Task bar */}
+                    <div
+                      onMouseDown={task.plazo ? e => {
+                        e.preventDefault();
+                        setDragging({
+                          taskId: task.id,
+                          startClientX: e.clientX,
+                          originalPlazo: new Date(task.plazo!),
+                          deltaDays: 0,
+                        });
+                      } : undefined}
+                      onClick={() => !isDraggingThis && onEdit(task)}
+                      className={`absolute top-1/2 -translate-y-1/2 h-10 rounded-xl px-3 flex items-center gap-2 text-white shadow-md
+                        ${barTone}
+                        ${task.plazo ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"}
+                        ${isDraggingThis ? "shadow-2xl z-20 ring-2 ring-white/40 scale-y-110" : ""}
+                      `}
                       style={{
-                        left: `${startOffset * dayWidth + 6}px`,
-                        width: `${Math.max(span * dayWidth - 12, dayWidth - 12)}px`,
+                        left: `${startOffset * dayWidth + 4}px`,
+                        width: `${Math.max(visualSpan * dayWidth - 8, dayWidth - 8)}px`,
+                        transition: isDraggingThis ? "none" : "width 0.15s ease",
                       }}
                       title={`${task.titulo} · ${fmtDate(task.plazo)}`}
                     >
-                      <div className="text-xs font-extrabold truncate">{task.titulo}</div>
-                      <div className="text-[10px] text-white/85 truncate">{fmtDate(task.plazo)}</div>
-                    </button>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[11px] font-extrabold truncate">{task.titulo}</div>
+                        {newPlazoDate ? (
+                          <div className="text-[10px] text-white/90 font-bold">
+                            {deltaDays > 0 ? "+" : ""}{deltaDays}d → {fmtDate(newPlazoDate.toISOString())}
+                          </div>
+                        ) : (
+                          <div className="text-[10px] text-white/75 truncate">{fmtDate(task.plazo)}</div>
+                        )}
+                      </div>
+                      {/* Resize handle hint */}
+                      {dayWidth >= 40 && (
+                        <div className="flex gap-0.5 shrink-0 opacity-60">
+                          <div className="w-0.5 h-4 bg-white/70 rounded" />
+                          <div className="w-0.5 h-4 bg-white/70 rounded" />
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -746,6 +843,7 @@ function GanttBoard({
   );
 }
 
+// ── Página principal ──────────────────────────────────────────────────────────
 export default function Tareas() {
   const { getToken } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -756,13 +854,21 @@ export default function Tareas() {
   const [clientsError, setClientsError] = useState<string | null>(null);
 
   // Filtros
-  const [tab,         setTab]         = useState<"todas" | "plazos">("todas");
+  const [tab,          setTab]          = useState<"todas" | "plazos">("todas");
   const [filterEstado, setFilterEstado] = useState("");
   const [filterTipo,   setFilterTipo]   = useState("");
   const [filterPrio,   setFilterPrio]   = useState("");
   const [search,       setSearch]       = useState("");
   const [showFilters,  setShowFilters]  = useState(false);
   const [view,         setView]         = useState<TaskView>("list");
+
+  // Lista – ordenación y secciones
+  const [listSortBy,  setListSortBy]  = useState<"none" | "plazo" | "titulo" | "prioridad">("none");
+  const [listSortDir, setListSortDir] = useState<"asc" | "desc">("asc");
+  const [showCompletadas, setShowCompletadas] = useState(false);
+
+  // Kanban – drag state
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
 
   // Modal
   const [showModal, setShowModal] = useState(false);
@@ -774,81 +880,50 @@ export default function Tareas() {
   const prefillHandledRef = useRef("");
 
   const fetchClients = useCallback(async () => {
-    setClientsLoading(true);
-    setClientsError(null);
+    setClientsLoading(true); setClientsError(null);
     try {
       const token = await getToken({ skipCache: true });
-      const clientsRes = await fetch("/api/entities?limit=500", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const clientsData = await safeJson(clientsRes);
-      if (!clientsRes.ok) {
-        setClientsError(clientsData?.error || "No se pudieron cargar los clientes");
-        return;
-      }
-      const mapped = (clientsData.data || []).map((c: any) => ({
+      const res = await fetch("/api/entities?limit=500", { headers: { Authorization: `Bearer ${token}` } });
+      const data = await safeJson(res);
+      if (!res.ok) { setClientsError(data?.error || "No se pudieron cargar los clientes"); return; }
+      const mapped = (data.data || []).map((c: any) => ({
         id: c.id,
-        name:
-          c.commercial_name ||
-          `${c.first_name || ""} ${c.last_name || ""}`.trim() ||
-          c.nif_cif ||
-          c.internal_number ||
-          c.id,
+        name: c.commercial_name || `${c.first_name || ""} ${c.last_name || ""}`.trim() || c.nif_cif || c.internal_number || c.id,
       }));
       setClients(mapped);
-      if (mapped.length === 0) {
-        setClientsError("No hay clientes disponibles para asignar a la tarea");
-      }
-    } catch (_e) {
-      setClientsError("Error de conexión al cargar clientes");
-    } finally {
-      setClientsLoading(false);
-    }
+      if (mapped.length === 0) setClientsError("No hay clientes disponibles");
+    } catch (_e) { setClientsError("Error de conexión al cargar clientes"); }
+    finally { setClientsLoading(false); }
   }, [getToken]);
 
   const fetchTasks = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
       const token = await getToken({ skipCache: true });
-      const tasksRes = await fetch("/api/tasks/me", { headers: { Authorization: `Bearer ${token}` } });
-      const tasksData = await safeJson(tasksRes);
-      if (tasksRes.ok)   setTasks(tasksData.data || []);
+      const res = await fetch("/api/tasks/me", { headers: { Authorization: `Bearer ${token}` } });
+      const data = await safeJson(res);
+      if (res.ok) setTasks(data.data || []);
     } catch (_e) {}
     finally { if (!silent) setLoading(false); }
   }, [getToken]);
 
-  useEffect(() => {
-    fetchTasks();
-    fetchClients();
-  }, [fetchTasks, fetchClients]);
+  useEffect(() => { fetchTasks(); fetchClients(); }, [fetchTasks, fetchClients]);
   useAutoRefresh(() => fetchTasks(true), { intervalMs: 30_000 });
 
   useEffect(() => {
     const tabParam = searchParams.get("tab");
-    if (tabParam === "plazos" || tabParam === "todas") {
-      setTab(tabParam);
-    }
-
+    if (tabParam === "plazos" || tabParam === "todas") setTab(tabParam);
     if (searchParams.get("open") !== "new") return;
-
     const signature = searchParams.toString();
     if (prefillHandledRef.current === signature) return;
     prefillHandledRef.current = signature;
-
-    setEditTask(null);
-    setErrorMsg(null);
+    setEditTask(null); setErrorMsg(null);
     setModalInitialClientId(searchParams.get("clientId") || "");
-    setModalInitialForm({
-      ...emptyForm(),
-      tipo: searchParams.get("tipo") || "otro",
-    });
+    setModalInitialForm({ ...emptyForm(), tipo: searchParams.get("tipo") || "otro" });
     setShowModal(true);
     if (clients.length === 0) fetchClients();
-
     const nextParams = new URLSearchParams(searchParams);
-    nextParams.delete("open");
-    nextParams.delete("clientId");
-    nextParams.delete("tipo");
+    nextParams.delete("open"); nextParams.delete("clientId"); nextParams.delete("tipo");
     setSearchParams(nextParams, { replace: true });
   }, [searchParams, setSearchParams, clients.length, fetchClients]);
 
@@ -857,17 +932,42 @@ export default function Tareas() {
     let list = tasks;
     if (tab === "plazos") list = list.filter(t => !!t.plazo);
     if (filterEstado) list = list.filter(t => t.estado === filterEstado);
-    if (filterTipo)   list = list.filter(t => t.tipo   === filterTipo);
+    if (filterTipo)   list = list.filter(t => t.tipo === filterTipo);
     if (filterPrio)   list = list.filter(t => t.prioridad === filterPrio);
     const q = search.trim().toLowerCase();
     if (q) list = list.filter(t =>
       (t.titulo || "").toLowerCase().includes(q) ||
-      (clientName(t)).toLowerCase().includes(q) ||
+      clientName(t).toLowerCase().includes(q) ||
       (t.expediente || "").toLowerCase().includes(q) ||
       (t.descripcion || "").toLowerCase().includes(q)
     );
     return list;
   }, [tasks, tab, filterEstado, filterTipo, filterPrio, search]);
+
+  // Ordenación lista
+  const listTasks = useMemo(() => {
+    let list = [...filtered];
+    if (listSortBy === "plazo") {
+      list.sort((a, b) => {
+        if (!a.plazo && !b.plazo) return 0;
+        if (!a.plazo) return 1;
+        if (!b.plazo) return -1;
+        const d = new Date(a.plazo).getTime() - new Date(b.plazo).getTime();
+        return listSortDir === "asc" ? d : -d;
+      });
+    } else if (listSortBy === "titulo") {
+      list.sort((a, b) => { const d = a.titulo.localeCompare(b.titulo, "es"); return listSortDir === "asc" ? d : -d; });
+    } else if (listSortBy === "prioridad") {
+      const ord: Record<string, number> = { alta: 0, media: 1, baja: 2 };
+      list.sort((a, b) => { const d = (ord[a.prioridad] ?? 1) - (ord[b.prioridad] ?? 1); return listSortDir === "asc" ? d : -d; });
+    }
+    return list;
+  }, [filtered, listSortBy, listSortDir]);
+
+  const toggleSort = (col: typeof listSortBy) => {
+    if (listSortBy === col) setListSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setListSortBy(col); setListSortDir("asc"); }
+  };
 
   // Stats
   const stats = useMemo(() => ({
@@ -879,25 +979,58 @@ export default function Tareas() {
 
   const hasFilter = !!(filterEstado || filterTipo || filterPrio || search);
 
-  // Cambiar estado rápido
-  const handleToggle = async (id: string, newEstado: string) => {
-    const token = await getToken({ skipCache: true });
-    await fetch(`/api/tasks/${id}/estado`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ estado: newEstado }),
-    });
-    fetchTasks(true);
-  };
+  // Cambiar estado (optimistic)
+  const handleToggle = useCallback(async (id: string, newEstado: string) => {
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, estado: newEstado as Task["estado"] } : t));
+    try {
+      const token = await getToken({ skipCache: true });
+      await fetch(`/api/tasks/${id}/estado`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ estado: newEstado }),
+      });
+    } catch (_e) { fetchTasks(true); }
+  }, [getToken, fetchTasks]);
+
+  // Actualizar fecha límite desde Gantt (optimistic)
+  const handleUpdatePlazo = useCallback(async (id: string, plazo: string) => {
+    const task = tasks.find(t => t.id === id);
+    if (!task) return;
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, plazo } : t));
+    try {
+      const token = await getToken({ skipCache: true });
+      await fetch(`/api/tasks/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          titulo: task.titulo,
+          descripcion: task.descripcion || "",
+          plazo,
+          estado: task.estado,
+          prioridad: task.prioridad,
+          tipo: task.tipo,
+          expediente: task.expediente || "",
+          juzgado: task.juzgado || "",
+          num_proc: task.num_proc || "",
+          importe: (task as any).importe || "",
+          notas: (task as any).notas || "",
+          etapa: (task as any).etapa || "",
+          fecha_aviso: (task as any).fecha_aviso ? (task as any).fecha_aviso.slice(0, 10) : "",
+        }),
+      });
+    } catch (_e) {
+      setTasks(prev => prev.map(t => t.id === id ? { ...t, plazo: task.plazo } : t));
+    }
+  }, [getToken, tasks]);
 
   // Guardar tarea (create / update)
   const handleSave = async (clientId: string, data: TaskFormData) => {
     setSaving(true); setErrorMsg(null);
     try {
-      const token = await getToken({ skipCache: true });
+      const token  = await getToken({ skipCache: true });
       const url    = editTask ? `/api/tasks/${editTask.id}` : `/api/tasks/client/${clientId}`;
       const method = editTask ? "PUT" : "POST";
-      const res = await fetch(url, {
+      const res    = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(data),
@@ -910,7 +1043,6 @@ export default function Tareas() {
     finally { setSaving(false); }
   };
 
-  // Eliminar tarea
   const handleDelete = async (id: string) => {
     setSaving(true);
     try {
@@ -922,26 +1054,39 @@ export default function Tareas() {
     finally { setSaving(false); }
   };
 
-  const openNew  = () => {
-    setEditTask(null);
-    setErrorMsg(null);
-    setModalInitialClientId("");
-    setModalInitialForm(null);
+  const openNew = () => {
+    setEditTask(null); setErrorMsg(null); setModalInitialClientId(""); setModalInitialForm(null);
     setShowModal(true);
     if (clients.length === 0) fetchClients();
   };
   const openEdit = (t: Task) => {
-    setEditTask(t);
-    setErrorMsg(null);
-    setModalInitialClientId("");
-    setModalInitialForm(null);
+    setEditTask(t); setErrorMsg(null); setModalInitialClientId(""); setModalInitialForm(null);
     setShowModal(true);
   };
 
+  // Kanban drag handlers
+  const activeDragTask = useMemo(() => tasks.find(t => t.id === activeDragId) ?? null, [tasks, activeDragId]);
+
+  const handleKanbanDragStart = (event: DragStartEvent) => {
+    setActiveDragId(event.active.id as string);
+  };
+  const handleKanbanDragEnd = (event: DragEndEvent) => {
+    setActiveDragId(null);
+    const { active, over } = event;
+    if (!over) return;
+    const taskId      = active.id as string;
+    const targetEstado = over.id as string;
+    if (!["pendiente", "urgente", "completada"].includes(targetEstado)) return;
+    const task = tasks.find(t => t.id === taskId);
+    if (!task || task.estado === targetEstado) return;
+    handleToggle(taskId, targetEstado);
+  };
+
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4 animate-in fade-in duration-500">
 
-      {/* ── Cabecera ─────────────────────────────────────────── */}
+      {/* Cabecera */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="h-9 w-9 bg-red-50 rounded-xl flex items-center justify-center">
@@ -954,19 +1099,19 @@ export default function Tareas() {
         </div>
         <button
           onClick={openNew}
-          className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm"
+          className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm transition-colors"
         >
           <Plus size={13} /> Nueva tarea
         </button>
       </div>
 
-      {/* ── Stats ─────────────────────────────────────────────── */}
+      {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "Vencidas",   val: stats.vencidas,   cls: "text-red-600",     bg: "bg-red-50 border-red-100"     },
-          { label: "Urgentes",   val: stats.urgentes,   cls: "text-orange-600",  bg: "bg-orange-50 border-orange-100"},
-          { label: "Pendientes", val: stats.pendientes, cls: "text-amber-600",   bg: "bg-amber-50 border-amber-100"  },
-          { label: "Completadas",val: stats.completadas,cls: "text-emerald-600", bg: "bg-emerald-50 border-emerald-100"},
+          { label: "Vencidas",    val: stats.vencidas,    cls: "text-red-600",     bg: "bg-red-50 border-red-100"      },
+          { label: "Urgentes",    val: stats.urgentes,    cls: "text-orange-600",  bg: "bg-orange-50 border-orange-100"},
+          { label: "Pendientes",  val: stats.pendientes,  cls: "text-amber-600",   bg: "bg-amber-50 border-amber-100"  },
+          { label: "Completadas", val: stats.completadas, cls: "text-emerald-600", bg: "bg-emerald-50 border-emerald-100"},
         ].map(s => (
           <div key={s.label} className={`rounded-xl border px-4 py-3 ${s.bg}`}>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{s.label}</p>
@@ -975,19 +1120,13 @@ export default function Tareas() {
         ))}
       </div>
 
-      {/* ── Tabs + Filtros ────────────────────────────────────── */}
+      {/* Tabs + Vista + Búsqueda */}
       <div className="flex items-center gap-2 flex-wrap">
-        {/* Tabs */}
         {(["todas", "plazos"] as const).map(t => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
+          <button key={t} onClick={() => setTab(t)}
             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-colors ${
-              tab === t
-                ? "bg-slate-800 text-white border-slate-800"
-                : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-            }`}
-          >
+              tab === t ? "bg-slate-800 text-white border-slate-800" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+            }`}>
             {t === "todas" ? "Todas" : "Solo con plazo"}
           </button>
         ))}
@@ -997,16 +1136,11 @@ export default function Tareas() {
             { key: "list", label: "Lista" },
             { key: "kanban", label: "Kanban" },
             { key: "gantt", label: "Gantt" },
-          ] as const).map((option) => (
-            <button
-              key={option.key}
-              onClick={() => setView(option.key)}
+          ] as const).map(option => (
+            <button key={option.key} onClick={() => setView(option.key)}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                view === option.key
-                  ? "bg-slate-800 text-white"
-                  : "text-slate-500 hover:bg-slate-50"
-              }`}
-            >
+                view === option.key ? "bg-slate-800 text-white" : "text-slate-500 hover:bg-slate-50"
+              }`}>
               {option.label}
             </button>
           ))}
@@ -1014,27 +1148,21 @@ export default function Tareas() {
 
         <div className="flex-1" />
 
-        {/* Búsqueda */}
         <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-1.5">
           <Search size={12} className="text-slate-400 shrink-0" />
           <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
+            value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Buscar tarea o cliente…"
             className="bg-transparent text-xs text-slate-700 placeholder-slate-300 focus:outline-none w-40"
           />
           {search && <button onClick={() => setSearch("")}><X size={11} className="text-slate-400" /></button>}
         </div>
 
-        {/* Filtrar */}
         <button
           onClick={() => setShowFilters(v => !v)}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors ${
-            showFilters || hasFilter
-              ? "bg-red-50 border-red-200 text-red-700"
-              : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-          }`}
-        >
+            showFilters || hasFilter ? "bg-red-50 border-red-200 text-red-700" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+          }`}>
           <Filter size={11} /> Filtrar
           {hasFilter && <span className="h-1.5 w-1.5 rounded-full bg-red-500" />}
         </button>
@@ -1074,7 +1202,7 @@ export default function Tareas() {
         </div>
       )}
 
-      {/* ── Lista de tareas ───────────────────────────────────── */}
+      {/* Contenido principal */}
       {loading ? (
         <div className="flex justify-center py-16">
           <Loader2 size={24} className="animate-spin text-slate-300" />
@@ -1092,51 +1220,133 @@ export default function Tareas() {
           )}
         </div>
       ) : view === "list" ? (
-        <div className="space-y-2">
-          {/* Vencidas al top */}
-          {filtered.some(t => isOverdue(t.plazo, t.estado)) && (
-            <>
-              <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest px-1 flex items-center gap-1">
-                <AlertTriangle size={10} /> Vencidas
-              </p>
-              {filtered.filter(t => isOverdue(t.plazo, t.estado)).map(t => (
-                <TaskCard key={t.id} task={t} onToggle={handleToggle} onEdit={openEdit} />
-              ))}
-              {filtered.some(t => !isOverdue(t.plazo, t.estado)) && (
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1 pt-2">Resto</p>
+        // ── Lista ClickUp-style ──────────────────────────────────────────────
+        (() => {
+          const overdueTasks    = listTasks.filter(t => isOverdue(t.plazo, t.estado));
+          const activeTasks     = listTasks.filter(t => !isOverdue(t.plazo, t.estado) && t.estado !== "completada");
+          const completedTasks  = listTasks.filter(t => t.estado === "completada");
+
+          const SortBtn = ({ col, label }: { col: typeof listSortBy; label: string }) => (
+            <button onClick={() => toggleSort(col)}
+              className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 hover:text-slate-700 transition-colors">
+              {label}
+              <ArrowUpDown size={9} className={listSortBy === col ? "text-red-500" : ""} />
+              {listSortBy === col && (
+                <span className="text-red-500">{listSortDir === "asc" ? "↑" : "↓"}</span>
               )}
-            </>
-          )}
-          {filtered.filter(t => !isOverdue(t.plazo, t.estado)).map(t => (
-            <TaskCard key={t.id} task={t} onToggle={handleToggle} onEdit={openEdit} />
-          ))}
-        </div>
+            </button>
+          );
+
+          return (
+            <div className="rounded-[20px] border border-slate-200 bg-white overflow-hidden shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
+              {/* Cabecera columnas */}
+              <div
+                className="grid items-center gap-3 px-4 py-2 bg-slate-50 border-b border-slate-200 sticky top-0 z-10"
+                style={{ gridTemplateColumns: "22px 6px 1fr 120px 130px 80px 32px" }}
+              >
+                <div />
+                <div />
+                <SortBtn col="titulo" label="Tarea" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Tipo</span>
+                <SortBtn col="plazo" label="Fecha límite" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Estado</span>
+                <div />
+              </div>
+
+              {/* Grupo Vencidas */}
+              {overdueTasks.length > 0 && (
+                <>
+                  <div className="flex items-center gap-2 px-4 py-2 bg-red-50 border-b border-red-100">
+                    <AlertTriangle size={11} className="text-red-500 shrink-0" />
+                    <span className="text-[10px] font-extrabold uppercase tracking-widest text-red-600">
+                      Vencidas · {overdueTasks.length}
+                    </span>
+                  </div>
+                  {overdueTasks.map(t => <TaskRow key={t.id} task={t} onToggle={handleToggle} onEdit={openEdit} />)}
+                </>
+              )}
+
+              {/* Grupo Activas */}
+              {activeTasks.length > 0 && (
+                <>
+                  {overdueTasks.length > 0 && (
+                    <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border-b border-slate-100">
+                      <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500">
+                        Activas · {activeTasks.length}
+                      </span>
+                    </div>
+                  )}
+                  {activeTasks.map(t => <TaskRow key={t.id} task={t} onToggle={handleToggle} onEdit={openEdit} />)}
+                </>
+              )}
+
+              {/* Grupo Completadas (colapsable) */}
+              {completedTasks.length > 0 && (
+                <>
+                  <button
+                    onClick={() => setShowCompletadas(v => !v)}
+                    className="w-full flex items-center gap-2 px-4 py-2 bg-emerald-50 border-y border-emerald-100 hover:bg-emerald-100/60 transition-colors"
+                  >
+                    <CheckCircle2 size={11} className="text-emerald-500 shrink-0" />
+                    <span className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-600 flex-1 text-left">
+                      Completadas · {completedTasks.length}
+                    </span>
+                    {showCompletadas ? <ChevronUp size={13} className="text-emerald-500" /> : <ChevronDown size={13} className="text-emerald-500" />}
+                  </button>
+                  {showCompletadas && completedTasks.map(t => (
+                    <TaskRow key={t.id} task={t} onToggle={handleToggle} onEdit={openEdit} />
+                  ))}
+                </>
+              )}
+            </div>
+          );
+        })()
       ) : view === "kanban" ? (
-        <div className="flex gap-4 overflow-x-auto pb-2">
-          <KanbanLane
-            title="Pendientes"
-            tone="bg-amber-50 text-amber-700"
-            tasks={filtered.filter((task) => task.estado === "pendiente")}
-            onToggle={handleToggle}
-            onEdit={openEdit}
-          />
-          <KanbanLane
-            title="Urgentes"
-            tone="bg-red-50 text-red-700"
-            tasks={filtered.filter((task) => task.estado === "urgente")}
-            onToggle={handleToggle}
-            onEdit={openEdit}
-          />
-          <KanbanLane
-            title="Completadas"
-            tone="bg-emerald-50 text-emerald-700"
-            tasks={filtered.filter((task) => task.estado === "completada")}
-            onToggle={handleToggle}
-            onEdit={openEdit}
-          />
-        </div>
+        // ── Kanban con drag & drop ───────────────────────────────────────────
+        <DndContext onDragStart={handleKanbanDragStart} onDragEnd={handleKanbanDragEnd}>
+          <div className="flex gap-4 overflow-x-auto pb-2">
+            <KanbanLane
+              id="pendiente"
+              title="Pendientes"
+              tone="bg-amber-50 text-amber-700"
+              tasks={filtered.filter(t => t.estado === "pendiente")}
+              onToggle={handleToggle}
+              onEdit={openEdit}
+              onAddNew={openNew}
+            />
+            <KanbanLane
+              id="urgente"
+              title="Urgentes"
+              tone="bg-red-50 text-red-700"
+              tasks={filtered.filter(t => t.estado === "urgente")}
+              onToggle={handleToggle}
+              onEdit={openEdit}
+              onAddNew={openNew}
+            />
+            <KanbanLane
+              id="completada"
+              title="Completadas"
+              tone="bg-emerald-50 text-emerald-700"
+              tasks={filtered.filter(t => t.estado === "completada")}
+              onToggle={handleToggle}
+              onEdit={openEdit}
+              onAddNew={openNew}
+            />
+          </div>
+          <DragOverlay dropAnimation={{ duration: 180, easing: "ease" }}>
+            {activeDragTask ? (
+              <KanbanCardContent
+                task={activeDragTask}
+                onToggle={handleToggle}
+                onEdit={openEdit}
+                isDragging
+              />
+            ) : null}
+          </DragOverlay>
+        </DndContext>
       ) : (
-        <GanttBoard tasks={filtered} onEdit={openEdit} />
+        // ── Gantt con drag ───────────────────────────────────────────────────
+        <GanttBoard tasks={filtered} onEdit={openEdit} onUpdatePlazo={handleUpdatePlazo} />
       )}
 
       {/* Modal */}
