@@ -150,33 +150,37 @@ function WidgetPickerModal({ visible, onClose, onSave }: { visible: string[]; on
   const [sel, setSel] = useState<string[]>(visible);
   const toggle = (id: string) => setSel(cur => cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id]);
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent p-4">
-      <div className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-transparent px-4 py-6">
+      <div className="mx-auto my-4 flex w-full max-w-lg flex-col overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_30px_80px_-25px_rgba(15,23,42,0.35)] max-h-[calc(100vh-2rem)]">
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-400">Dashboard</p>
             <h3 className="mt-0.5 text-xl font-bold text-slate-900">Elegir elementos</h3>
+            <p className="mt-1 text-sm text-slate-500">Activa solo los widgets que quieras ver en tu panel principal.</p>
           </div>
           <button onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-400 hover:bg-slate-50"><X size={16} /></button>
         </div>
-        <div className="divide-y divide-slate-50 px-4 py-3">
+        <div className="space-y-2 overflow-y-auto px-4 py-4">
           {ALL_WIDGETS.map(w => (
-            <label key={w.id} className="flex cursor-pointer items-center gap-4 rounded-2xl px-3 py-3.5 hover:bg-slate-50 transition-colors">
-              <span className="text-xl shrink-0">{w.icon}</span>
+            <label key={w.id} className={`flex cursor-pointer items-center gap-4 rounded-2xl border px-4 py-3.5 transition-all ${sel.includes(w.id) ? "border-red-200 bg-red-50/40 shadow-sm" : "border-slate-100 hover:border-slate-200 hover:bg-slate-50/70"}`}>
+              <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-xl ring-1 ${sel.includes(w.id) ? "bg-red-50 text-red-600 ring-red-100" : "bg-slate-50 text-slate-600 ring-slate-100"}`}>{w.icon}</span>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-slate-800">{w.label}</p>
-                <p className="text-xs text-slate-400 mt-0.5">{w.desc}</p>
+                <p className="mt-0.5 text-xs leading-5 text-slate-500">{w.desc}</p>
               </div>
-              <div className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${sel.includes(w.id) ? "bg-red-600" : "bg-slate-200"}`}>
+              <div className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${sel.includes(w.id) ? "bg-red-600" : "bg-slate-200"}`}>
                 <input type="checkbox" className="sr-only" checked={sel.includes(w.id)} onChange={() => toggle(w.id)} />
-                <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${sel.includes(w.id) ? "translate-x-4" : "translate-x-0.5"}`} />
+                <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${sel.includes(w.id) ? "translate-x-5" : "translate-x-0.5"}`} />
               </div>
             </label>
           ))}
         </div>
-        <div className="flex items-center justify-end gap-3 border-t border-slate-100 px-6 py-4">
-          <button onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancelar</button>
-          <button onClick={() => { onSave(sel); onClose(); }} className="rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700">Guardar</button>
+        <div className="flex items-center justify-between border-t border-slate-100 px-6 py-4">
+          <p className="text-xs font-medium text-slate-400">{sel.length} widgets visibles</p>
+          <div className="flex items-center gap-3">
+            <button onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancelar</button>
+            <button onClick={() => { onSave(sel); onClose(); }} className="rounded-xl bg-red-600 px-5 py-2 text-sm font-bold text-white hover:bg-red-700">Guardar</button>
+          </div>
         </div>
       </div>
     </div>
