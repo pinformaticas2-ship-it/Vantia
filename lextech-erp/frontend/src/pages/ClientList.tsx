@@ -1,4 +1,8 @@
 ﻿import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import {
+  fetchSharedTemplates, createSharedTemplate as apiCreateTpl,
+  updateSharedTemplate as apiUpdateTpl, deleteSharedTemplate as apiDeleteTpl,
+} from '../lib/sharedTemplates';
 import { createPortal } from "react-dom";
 import { useAuth } from "@clerk/clerk-react";
 import { Link, useNavigate } from "react-router-dom";
@@ -313,7 +317,6 @@ const CLIENT_ROW_COLOR_STYLES: Record<string, {
   },
 };
 
-const CLIENT_EXPORT_STORAGE_KEY = "client-export-templates-v1";
 
 const CLIENT_EXPORT_FIELDS: ClientExportFieldDef[] = [
   { id: "internal_number", label: "Nº", getValue: (row) => row.internal_number != null ? String(row.internal_number) : "" },
@@ -389,24 +392,6 @@ const CLIENT_LIST_EXPORT_FIELD_BY_COLUMN: Record<ClientListColumnKey, string> = 
 
 function getClientExportFieldLabel(fieldId: string) {
   return CLIENT_EXPORT_FIELDS.find((field) => field.id === fieldId)?.label || fieldId;
-}
-
-function loadStoredClientExportTemplates(): ExportTemplate[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(CLIENT_EXPORT_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((item) => item && item.id && item.name && Array.isArray(item.fields));
-  } catch {
-    return [];
-  }
-}
-
-function saveStoredClientExportTemplates(templates: ExportTemplate[]) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(CLIENT_EXPORT_STORAGE_KEY, JSON.stringify(templates));
 }
 
 function escapeXml(value: string) {
@@ -1138,7 +1123,7 @@ export default function ClientList() {
   const [showExportModal, setShowExportModal] = useState(false);
   const [showExportTemplateEditor, setShowExportTemplateEditor] = useState(false);
   const [exportEditorMode, setExportEditorMode] = useState<"create" | "edit">("create");
-  const [customExportTemplates, setCustomExportTemplates] = useState<ExportTemplate[]>(() => loadStoredClientExportTemplates());
+  const [customExportTemplates, setCustomExportTemplates] = useState<ExportTemplate[]>([]);
   const [selectedExportTemplateId, setSelectedExportTemplateId] = useState<string>("default-client-excel");
   const [selectedExportFormat, setSelectedExportFormat] = useState<ExportFormat>("excel");
   const [exportTemplateName, setExportTemplateName] = useState("");
@@ -1181,9 +1166,17 @@ export default function ClientList() {
     { id: nextId++, field: "any", value: "" },
   ]);
 
+  // Cargar plantillas de exportación compartidas desde la BD
   useEffect(() => {
-    saveStoredClientExportTemplates(customExportTemplates);
-  }, [customExportTemplates]);
+    fetchSharedTemplates('client_export', getToken).then(rows => {
+      setCustomExportTemplates(rows.map(r => ({
+        id: r.id,
+        name: r.name,
+        format: ((r.data as any).format || 'excel') as ExportFormat,
+        fields: (r.data as any).fields || [],
+      })));
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!exportTemplates.some((template) => template.id === selectedExportTemplateId)) {
@@ -1261,16 +1254,6 @@ export default function ClientList() {
     const pctBaja = total > 0 ? ((bajas / total) * 100).toFixed(2) : "0,00";
     return { total, activos, bajas, pctBaja };
   }, [clients]);
-
-  useEffect(() => {
-    saveStoredClientExportTemplates(customExportTemplates);
-  }, [customExportTemplates]);
-
-  useEffect(() => {
-    if (!exportTemplates.some((template) => template.id === selectedExportTemplateId)) {
-      setSelectedExportTemplateId(defaultClientExportTemplate.id);
-    }
-  }, [exportTemplates, selectedExportTemplateId, defaultClientExportTemplate.id]);
 
   // ── Ordenación ─────────────────────────────────────────────
   const handleSort = (k: SortKey) => {
@@ -1478,7 +1461,7 @@ export default function ClientList() {
     setExportVisibleSelected([]);
   };
 
-  const saveExportTemplate = () => {
+  const saveExportTemplate = async () => {
     if (!exportVisibleFields.length) {
       setExportError("Selecciona al menos una columna para la plantilla.");
       return;
@@ -1494,32 +1477,33 @@ export default function ClientList() {
     }
 
     if (exportEditorMode === "edit") {
-      setCustomExportTemplates((prev) =>
-        prev.map((template) =>
-          template.id === selectedExportTemplate.id
-            ? { ...template, name: trimmedName, format: selectedExportFormat, fields: exportVisibleFields }
-            : template
-        )
-      );
-      setSelectedExportTemplateId(selectedExportTemplate.id);
+      const updated = await apiUpdateTpl(selectedExportTemplate.id, trimmedName, { format: selectedExportFormat, fields: exportVisibleFields }, getToken);
+      if (updated) {
+        setCustomExportTemplates((prev) =>
+          prev.map((t) => t.id === selectedExportTemplate.id
+            ? { ...t, name: trimmedName, format: selectedExportFormat, fields: exportVisibleFields }
+            : t
+          )
+        );
+        setSelectedExportTemplateId(selectedExportTemplate.id);
+      }
     } else {
-      const template: ExportTemplate = {
-        id: crypto.randomUUID(),
-        name: trimmedName,
-        format: selectedExportFormat,
-        fields: exportVisibleFields,
-      };
-      setCustomExportTemplates((prev) => [...prev, template]);
-      setSelectedExportTemplateId(template.id);
+      const created = await apiCreateTpl('client_export', trimmedName, { format: selectedExportFormat, fields: exportVisibleFields }, getToken);
+      if (created) {
+        const template: ExportTemplate = { id: created.id, name: created.name, format: selectedExportFormat, fields: exportVisibleFields };
+        setCustomExportTemplates((prev) => [...prev, template]);
+        setSelectedExportTemplateId(created.id);
+      }
     }
 
     setShowExportTemplateEditor(false);
     setExportError("");
   };
 
-  const deleteSelectedTemplate = () => {
+  const deleteSelectedTemplate = async () => {
     if (selectedExportTemplate.builtIn) return;
-    setCustomExportTemplates((prev) => prev.filter((template) => template.id !== selectedExportTemplate.id));
+    await apiDeleteTpl(selectedExportTemplate.id, getToken);
+    setCustomExportTemplates((prev) => prev.filter((t) => t.id !== selectedExportTemplate.id));
     setSelectedExportTemplateId(defaultClientExportTemplate.id);
   };
 
@@ -1717,7 +1701,7 @@ export default function ClientList() {
               </div>
               <div className="flex flex-wrap items-center gap-2 justify-end">
                 <button type="button" onClick={openCreateExportTemplate} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-medium text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm">Alta</button>
-                <button type="button" onClick={deleteSelectedTemplate} disabled={selectedExportTemplate.builtIn} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-medium text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-40">Baja</button>
+                <button type="button" onClick={() => void deleteSelectedTemplate()} disabled={selectedExportTemplate.builtIn} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-medium text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-40">Baja</button>
                 <button type="button" onClick={openEditExportTemplate} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-medium text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm">Modificar</button>
                 <button type="button" onClick={() => setShowExportModal(false)} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-medium text-slate-600 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm">Cancelar</button>
                 <button type="button" onClick={runExport} className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-all hover:-translate-y-0.5 hover:bg-red-700 hover:shadow-lg">
@@ -1916,7 +1900,7 @@ export default function ClientList() {
 
             <div className="mt-6 flex items-center justify-end gap-3">
               <button type="button" onClick={() => setShowExportTemplateEditor(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Cancelar</button>
-              <button type="button" onClick={saveExportTemplate} className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700">Guardar plantilla</button>
+              <button type="button" onClick={() => void saveExportTemplate()} className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700">Guardar plantilla</button>
             </div>
           </div>
         </div>

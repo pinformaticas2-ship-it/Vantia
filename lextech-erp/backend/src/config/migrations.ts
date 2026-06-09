@@ -1314,6 +1314,25 @@ export async function runMigrations(): Promise<void> {
       `);
     } catch (_e: any) {}
 
+    // ── Plantillas compartidas del despacho ────────────────────────────────────
+    try {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS shared_templates (
+          id          UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+          type        VARCHAR(50)  NOT NULL,
+          name        VARCHAR(255) NOT NULL,
+          data        JSONB        NOT NULL DEFAULT '{}',
+          is_default  BOOLEAN      NOT NULL DEFAULT FALSE,
+          created_by  VARCHAR(150),
+          created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+          updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+        )
+      `);
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_shared_templates_type ON shared_templates(type)
+      `);
+    } catch (_e: any) {}
+
     // VACUUM ANALYZE para mantener las estadísticas de consulta frescas
     try {
       await client.query(`ANALYZE entities;`);

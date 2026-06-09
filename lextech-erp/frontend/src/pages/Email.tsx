@@ -9,6 +9,11 @@ import React, {
 import { useSearchParams } from 'react-router-dom';
 import { useAuth, useUser } from '@clerk/clerk-react';
 import {
+  fetchSharedTemplates, createSharedTemplate as apiCreateTpl,
+  updateSharedTemplate as apiUpdateTpl, deleteSharedTemplate as apiDeleteTpl,
+  setDefaultSharedTemplate as apiSetDefault,
+} from '../lib/sharedTemplates';
+import {
   Inbox, Star, Send, FileText, Trash2, RefreshCw, Plus,
   Search, ChevronDown, X, Mail, MailOpen,
   Reply, ReplyAll, Forward, Paperclip, Loader2, CheckCircle2,
@@ -604,9 +609,18 @@ function ComposeWindow({
   const sigMenuRef   = useRef<HTMLDivElement>(null);
   const tplMenuRef   = useRef<HTMLDivElement>(null);
 
-  // Firmas y plantillas desde localStorage
-  const signatures = loadLS<EmailSignature[]>(SIG_KEY, []);
-  const templates  = loadLS<EmailTemplate[]>(TPL_KEY, []);
+  // Firmas y plantillas desde la BD compartida
+  const [signatures, setSignatures] = useState<EmailSignature[]>([]);
+  const [templates,  setTemplates]  = useState<EmailTemplate[]>([]);
+
+  useEffect(() => {
+    fetchSharedTemplates('email_signature', getToken).then(rows =>
+      setSignatures(rows.map(r => ({ id: r.id, name: r.name, html: (r.data as any).html || '', isDefault: r.is_default })))
+    );
+    fetchSharedTemplates('email_template', getToken).then(rows =>
+      setTemplates(rows.map(r => ({ id: r.id, name: r.name, subject: (r.data as any).subject || '', html: (r.data as any).html || '' })))
+    );
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Insertar firma en el cuerpo
   const insertSignature = (sig: EmailSignature) => {
@@ -2453,29 +2467,38 @@ function RibbonBar({
 
 // ─── Signatures Panel ─────────────────────────────────────────────────────────
 
-function SignaturesPanel({ onClose, onSelect }: { onClose: () => void; onSelect?: (sig: EmailSignature) => void }) {
-  const [sigs, setSigs] = useState<EmailSignature[]>(() => loadLS(SIG_KEY, []));
+function SignaturesPanel({ onClose, onSelect, getToken }: { onClose: () => void; onSelect?: (sig: EmailSignature) => void; getToken: (o?: { skipCache?: boolean }) => Promise<string | null> }) {
+  const [sigs, setSigs]     = useState<EmailSignature[]>([]);
+  const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<EmailSignature | null>(null);
 
-  const save = (sig: EmailSignature) => {
-    const updated = sigs.some(s => s.id === sig.id)
-      ? sigs.map(s => s.id === sig.id ? sig : s)
-      : [...sigs, sig];
-    setSigs(updated);
-    saveLS(SIG_KEY, updated);
+  useEffect(() => {
+    fetchSharedTemplates('email_signature', getToken).then(rows => {
+      setSigs(rows.map(r => ({ id: r.id, name: r.name, html: (r.data as any).html || '', isDefault: r.is_default })));
+      setLoading(false);
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const save = async (sig: EmailSignature) => {
+    const data = { html: sig.html };
+    if (sigs.some(s => s.id === sig.id)) {
+      const updated = await apiUpdateTpl(sig.id, sig.name, data, getToken);
+      if (updated) setSigs(prev => prev.map(s => s.id === sig.id ? { ...sig } : s));
+    } else {
+      const created = await apiCreateTpl('email_signature', sig.name, data, getToken);
+      if (created) setSigs(prev => [...prev, { id: created.id, name: created.name, html: (created.data as any).html || '', isDefault: created.is_default }]);
+    }
     setEditing(null);
   };
 
-  const del = (id: string) => {
-    const updated = sigs.filter(s => s.id !== id);
-    setSigs(updated);
-    saveLS(SIG_KEY, updated);
+  const del = async (id: string) => {
+    await apiDeleteTpl(id, getToken);
+    setSigs(prev => prev.filter(s => s.id !== id));
   };
 
-  const setDefault = (id: string) => {
-    const updated = sigs.map(s => ({ ...s, isDefault: s.id === id }));
-    setSigs(updated);
-    saveLS(SIG_KEY, updated);
+  const setDefault = async (id: string) => {
+    await apiSetDefault(id, getToken);
+    setSigs(prev => prev.map(s => ({ ...s, isDefault: s.id === id })));
   };
 
   return (
@@ -2494,7 +2517,8 @@ function SignaturesPanel({ onClose, onSelect }: { onClose: () => void; onSelect?
           />
         ) : (
           <div className="flex-1 overflow-y-auto p-6 space-y-3">
-            {sigs.length === 0 && (
+            {loading && <p className="text-sm text-gray-400 text-center py-8">Cargando…</p>}
+            {!loading && sigs.length === 0 && (
               <p className="text-sm text-gray-400 text-center py-8">No hay firmas. Crea una nueva.</p>
             )}
             {sigs.map(sig => (
@@ -2560,23 +2584,33 @@ function SignatureEditor({ initial, onSave, onCancel }: { initial: EmailSignatur
 
 // ─── Templates Panel ──────────────────────────────────────────────────────────
 
-function TemplatesPanel({ onClose, onApply }: { onClose: () => void; onApply?: (t: EmailTemplate) => void }) {
-  const [tpls, setTpls] = useState<EmailTemplate[]>(() => loadLS(TPL_KEY, []));
+function TemplatesPanel({ onClose, onApply, getToken }: { onClose: () => void; onApply?: (t: EmailTemplate) => void; getToken: (o?: { skipCache?: boolean }) => Promise<string | null> }) {
+  const [tpls, setTpls]     = useState<EmailTemplate[]>([]);
+  const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<EmailTemplate | null>(null);
 
-  const save = (tpl: EmailTemplate) => {
-    const updated = tpls.some(t => t.id === tpl.id)
-      ? tpls.map(t => t.id === tpl.id ? tpl : t)
-      : [...tpls, tpl];
-    setTpls(updated);
-    saveLS(TPL_KEY, updated);
+  useEffect(() => {
+    fetchSharedTemplates('email_template', getToken).then(rows => {
+      setTpls(rows.map(r => ({ id: r.id, name: r.name, subject: (r.data as any).subject || '', html: (r.data as any).html || '' })));
+      setLoading(false);
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const save = async (tpl: EmailTemplate) => {
+    const data = { subject: tpl.subject, html: tpl.html };
+    if (tpls.some(t => t.id === tpl.id)) {
+      const updated = await apiUpdateTpl(tpl.id, tpl.name, data, getToken);
+      if (updated) setTpls(prev => prev.map(t => t.id === tpl.id ? { ...tpl } : t));
+    } else {
+      const created = await apiCreateTpl('email_template', tpl.name, data, getToken);
+      if (created) setTpls(prev => [...prev, { id: created.id, name: created.name, subject: (created.data as any).subject || '', html: (created.data as any).html || '' }]);
+    }
     setEditing(null);
   };
 
-  const del = (id: string) => {
-    const updated = tpls.filter(t => t.id !== id);
-    setTpls(updated);
-    saveLS(TPL_KEY, updated);
+  const del = async (id: string) => {
+    await apiDeleteTpl(id, getToken);
+    setTpls(prev => prev.filter(t => t.id !== id));
   };
 
   return (
@@ -2591,7 +2625,8 @@ function TemplatesPanel({ onClose, onApply }: { onClose: () => void; onApply?: (
           <TemplateEditor initial={editing} onSave={save} onCancel={() => setEditing(null)}/>
         ) : (
           <div className="flex-1 overflow-y-auto p-6 space-y-3">
-            {tpls.length === 0 && (
+            {loading && <p className="text-sm text-gray-400 text-center py-8">Cargando…</p>}
+            {!loading && tpls.length === 0 && (
               <p className="text-sm text-gray-400 text-center py-8">No hay plantillas. Crea una nueva.</p>
             )}
             {tpls.map(tpl => (
@@ -2666,23 +2701,33 @@ function TemplateEditor({ initial, onSave, onCancel }: { initial: EmailTemplate;
 
 // ─── Recipient Groups Panel ───────────────────────────────────────────────────
 
-function RecipientGroupsPanel({ onClose }: { onClose: () => void }) {
-  const [groups, setGroups] = useState<RecipientGroup[]>(() => loadLS(GRP_KEY, []));
+function RecipientGroupsPanel({ onClose, getToken }: { onClose: () => void; getToken: (o?: { skipCache?: boolean }) => Promise<string | null> }) {
+  const [groups, setGroups] = useState<RecipientGroup[]>([]);
+  const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<RecipientGroup | null>(null);
 
-  const save = (grp: RecipientGroup) => {
-    const updated = groups.some(g => g.id === grp.id)
-      ? groups.map(g => g.id === grp.id ? grp : g)
-      : [...groups, grp];
-    setGroups(updated);
-    saveLS(GRP_KEY, updated);
+  useEffect(() => {
+    fetchSharedTemplates('email_group', getToken).then(rows => {
+      setGroups(rows.map(r => ({ id: r.id, name: r.name, emails: (r.data as any).emails || [] })));
+      setLoading(false);
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const save = async (grp: RecipientGroup) => {
+    const data = { emails: grp.emails };
+    if (groups.some(g => g.id === grp.id)) {
+      const updated = await apiUpdateTpl(grp.id, grp.name, data, getToken);
+      if (updated) setGroups(prev => prev.map(g => g.id === grp.id ? { ...grp } : g));
+    } else {
+      const created = await apiCreateTpl('email_group', grp.name, data, getToken);
+      if (created) setGroups(prev => [...prev, { id: created.id, name: created.name, emails: (created.data as any).emails || [] }]);
+    }
     setEditing(null);
   };
 
-  const del = (id: string) => {
-    const updated = groups.filter(g => g.id !== id);
-    setGroups(updated);
-    saveLS(GRP_KEY, updated);
+  const del = async (id: string) => {
+    await apiDeleteTpl(id, getToken);
+    setGroups(prev => prev.filter(g => g.id !== id));
   };
 
   return (
@@ -2697,7 +2742,8 @@ function RecipientGroupsPanel({ onClose }: { onClose: () => void }) {
           <GroupEditor initial={editing} onSave={save} onCancel={() => setEditing(null)}/>
         ) : (
           <div className="flex-1 overflow-y-auto p-6 space-y-3">
-            {groups.length === 0 && (
+            {loading && <p className="text-sm text-gray-400 text-center py-8">Cargando…</p>}
+            {!loading && groups.length === 0 && (
               <p className="text-sm text-gray-400 text-center py-8">No hay grupos. Crea uno nuevo.</p>
             )}
             {groups.map(grp => (
@@ -4315,13 +4361,13 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
       </div>{/* end three-panel layout */}
 
       {/* ── Signatures Panel ── */}
-      {showSignatures && <SignaturesPanel onClose={() => setShowSignatures(false)}/>}
+      {showSignatures && <SignaturesPanel onClose={() => setShowSignatures(false)} getToken={getToken}/>}
 
       {/* ── Templates Panel ── */}
-      {showTemplates && <TemplatesPanel onClose={() => setShowTemplates(false)}/>}
+      {showTemplates && <TemplatesPanel onClose={() => setShowTemplates(false)} getToken={getToken}/>}
 
       {/* ── Recipient Groups Panel ── */}
-      {showGroups && <RecipientGroupsPanel onClose={() => setShowGroups(false)}/>}
+      {showGroups && <RecipientGroupsPanel onClose={() => setShowGroups(false)} getToken={getToken}/>}
 
       {/* ── Connect Account Modal ── */}
       {showConnectModal && (
