@@ -151,18 +151,16 @@ function WidgetPickerModal({ visible, onClose, onSave }: { visible: string[]; on
   const toggle = (id: string) => setSel(cur => cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id]);
 
   useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
-    const previousHtmlOverflow = document.documentElement.style.overflow;
-    document.body.style.overflow = "hidden";
-    document.documentElement.style.overflow = "hidden";
+    const scrollEl = document.getElementById("dashboard-content") as HTMLElement | null;
+    const prevScroll = scrollEl?.style.overflow ?? "";
+    if (scrollEl) scrollEl.style.overflow = "hidden";
     return () => {
-      document.body.style.overflow = previousOverflow;
-      document.documentElement.style.overflow = previousHtmlOverflow;
+      if (scrollEl) scrollEl.style.overflow = prevScroll;
     };
   }, []);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-transparent p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-slate-900/40 p-4">
       <div className="flex max-h-[85vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
         <div className="shrink-0 flex items-center justify-between border-b border-slate-200 px-5 py-4">
           <div>
@@ -171,7 +169,7 @@ function WidgetPickerModal({ visible, onClose, onSave }: { visible: string[]; on
           </div>
           <button onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50"><X size={16} /></button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-3">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-3">
           {ALL_WIDGETS.map(w => (
             <label key={w.id} className="flex cursor-pointer items-center gap-4 border-b border-slate-100 py-3 last:border-b-0">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-xl">{w.icon}</span>
