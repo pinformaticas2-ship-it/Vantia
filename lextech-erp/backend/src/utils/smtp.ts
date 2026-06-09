@@ -38,6 +38,7 @@ function makeTransport(cfg: SmtpConfig) {
     connectionTimeout: 15_000,
     greetingTimeout: 10_000,
     socketTimeout: 20_000,
+    family: 4, // force IPv4 — IPv6 may be unreachable on some hosting environments
   });
 }
 
