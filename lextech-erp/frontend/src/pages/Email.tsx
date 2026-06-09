@@ -1571,10 +1571,11 @@ function Sidebar({
 // ─── Email List Item ──────────────────────────────────────────────────────────
 
 function EmailItem({
-  email, selected, onClick, onStar,
+  email, selected, onClick, onDoubleClick, onStar,
 }: {
   email: ParsedEmail; selected: boolean;
   onClick: () => void;
+  onDoubleClick: () => void;
   onStar: (e: React.MouseEvent) => void;
 }) {
   const [hovered, setHovered] = useState(false);
@@ -1583,6 +1584,7 @@ function EmailItem({
     <a
       href={`/dashboard/correo?openEmail=${encodeURIComponent(email.id)}`}
       onClick={(e) => { e.preventDefault(); onClick(); }}
+      onDoubleClick={(e) => { e.preventDefault(); onDoubleClick(); }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       className={`flex items-start gap-3 px-4 py-3 cursor-pointer border-b border-gray-100 transition-colors ${
@@ -2811,6 +2813,7 @@ export default function Email() {
   const [selectedFolder, setSelectedFolder] = useState<FolderKey>('INBOX');
   const [emails, setEmails]             = useState<ParsedEmail[]>([]);
   const [selectedEmail, setSelectedEmail] = useState<ParsedEmail | null>(null);
+  const [fullscreenEmail, setFullscreenEmail] = useState<ParsedEmail | null>(null);
   const [compose, setCompose]           = useState<ComposeData | null>(null);
   const [showImapForm, setShowImapForm] = useState(false);
   const [imapPreset, setImapPreset] = useState<Partial<{
@@ -4034,6 +4037,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
                     email={email}
                     selected={selectedEmail?.id === email.id}
                     onClick={() => openEmail(email)}
+                    onDoubleClick={() => { void openEmail(email); setFullscreenEmail(email); }}
                     onStar={e => toggleStar(email.id, email.isStarred, e)}
                   />
                 ))}
@@ -4087,6 +4091,37 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
           )}
         </div>
       </div>
+
+      {/* ── Fullscreen Email Viewer ── */}
+      {fullscreenEmail && (
+        <div className="fixed inset-0 z-50 bg-white flex flex-col">
+          <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 bg-gray-50 flex-shrink-0">
+            <span className="text-sm text-gray-500 truncate max-w-[calc(100%-3rem)]">{fullscreenEmail.subject}</span>
+            <button
+              onClick={() => setFullscreenEmail(null)}
+              className="p-1.5 rounded hover:bg-gray-200 transition-colors text-gray-500 hover:text-gray-800 flex-shrink-0"
+              title="Cerrar pantalla completa">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+          <div className="flex-1 overflow-auto">
+            <EmailReader
+              email={fullscreenEmail}
+              onReply={() => { replyTo(fullscreenEmail); setFullscreenEmail(null); }}
+              onReplyAll={() => { replyTo(fullscreenEmail, true); setFullscreenEmail(null); }}
+              onForward={() => { forwardEmail(fullscreenEmail); setFullscreenEmail(null); }}
+              onDelete={() => { deleteEmail(fullscreenEmail.id); setFullscreenEmail(null); }}
+              onStar={() => toggleStar(fullscreenEmail.id, fullscreenEmail.isStarred)}
+              onBack={() => setFullscreenEmail(null)}
+              onPin={() => togglePinned(fullscreenEmail)}
+              onRestore={fullscreenEmail.labelIds.includes('TRASH') ? () => restoreEmail(fullscreenEmail) : undefined}
+              onAssignLabel={(labelId) => assignEmailToLabel(fullscreenEmail, labelId)}
+              onCreateLabel={createUserLabel}
+              userLabels={gmailLabels.filter((label) => label.type === 'user')}
+            />
+          </div>
+        </div>
+      )}
 
       {/* ── Compose Window ── */}
       {compose && (
