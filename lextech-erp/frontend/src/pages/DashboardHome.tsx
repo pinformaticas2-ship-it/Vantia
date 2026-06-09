@@ -149,17 +149,29 @@ function loadOrder(): string[]    {
 function WidgetPickerModal({ visible, onClose, onSave }: { visible: string[]; onClose: () => void; onSave: (ids: string[]) => void }) {
   const [sel, setSel] = useState<string[]>(visible);
   const toggle = (id: string) => setSel(cur => cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id]);
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+    };
+  }, []);
+
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-transparent p-4">
-      <div className="mx-auto flex w-full max-w-xl flex-col rounded-2xl border border-slate-200 bg-white shadow-xl max-h-[85vh]">
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-transparent p-4">
+      <div className="flex max-h-[85vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
+        <div className="shrink-0 flex items-center justify-between border-b border-slate-200 px-5 py-4">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-400">Dashboard</p>
             <h3 className="mt-1 text-xl font-bold text-slate-900">Elegir elementos</h3>
           </div>
           <button onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50"><X size={16} /></button>
         </div>
-        <div className="overflow-y-auto px-5 py-3">
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-3">
           {ALL_WIDGETS.map(w => (
             <label key={w.id} className="flex cursor-pointer items-center gap-4 border-b border-slate-100 py-3 last:border-b-0">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-xl">{w.icon}</span>
@@ -174,7 +186,7 @@ function WidgetPickerModal({ visible, onClose, onSave }: { visible: string[]; on
             </label>
           ))}
         </div>
-        <div className="flex items-center justify-end gap-3 border-t border-slate-200 px-5 py-4">
+        <div className="shrink-0 flex items-center justify-end gap-3 border-t border-slate-200 px-5 py-4">
           <button onClick={onClose} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancelar</button>
           <button onClick={() => { onSave(sel); onClose(); }} className="rounded-lg bg-red-600 px-5 py-2 text-sm font-bold text-white hover:bg-red-700">Guardar</button>
         </div>
