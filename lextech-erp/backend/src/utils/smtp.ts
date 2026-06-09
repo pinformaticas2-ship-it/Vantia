@@ -38,8 +38,9 @@ function makeTransport(cfg: SmtpConfig) {
     connectionTimeout: 15_000,
     greetingTimeout: 10_000,
     socketTimeout: 20_000,
-    family: 4, // force IPv4 — IPv6 may be unreachable on some hosting environments
-  });
+    family: 4,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
 }
 
 export async function sendEmail(cfg: SmtpConfig, msg: MailMessage): Promise<void> {
