@@ -2844,6 +2844,7 @@ export default function Email() {
   const [showTemplates, setShowTemplates]       = useState(false);
   const [showGroups, setShowGroups]             = useState(false);
   const pendingOpenEmailId    = searchParams.get('openEmail');
+  const pendingReply          = searchParams.get('reply');
   const pendingComposeTo      = searchParams.get('to');
   const pendingComposeSubj    = searchParams.get('subject');
   const pendingComposeBody    = searchParams.get('body');
@@ -3473,9 +3474,12 @@ export default function Email() {
     // Si el email ya está en la lista (IMAP o Gmail), abrirlo directamente
     const existing = emails.find((email) => email.id === pendingOpenEmailId);
     if (existing) {
-      void openEmail(existing);
+      void openEmail(existing).then(() => {
+        if (pendingReply) replyTo(existing, false);
+      });
       const next = new URLSearchParams(searchParams);
       next.delete('openEmail');
+      next.delete('reply');
       setSearchParams(next, { replace: true });
       return;
     }
@@ -3505,7 +3509,8 @@ export default function Email() {
     return () => {
       cancelled = true;
     };
-  }, [emails, gmail, openEmail, pendingOpenEmailId, searchParams, setSearchParams]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [emails, gmail, openEmail, pendingOpenEmailId, pendingReply, searchParams, setSearchParams]);
 
   // ── Star ──────────────────────────────────────────────────────────────────
   const toggleStar = useCallback((id: string, starred: boolean, e?: React.MouseEvent) => {

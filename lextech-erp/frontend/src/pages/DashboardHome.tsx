@@ -876,7 +876,7 @@ export default function DashboardHome() {
                       </button>
                       <button
                         className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-                        onClick={() => { setOpenMenuEmailId(null); navigate(`/dashboard/correo?openEmail=${msg.id}`); }}
+                        onClick={() => { setOpenMenuEmailId(null); navigate(`/dashboard/correo?openEmail=${msg.id}&reply=1`); }}
                       >
                         <Reply size={13} className="text-slate-400" /> Responder
                       </button>
