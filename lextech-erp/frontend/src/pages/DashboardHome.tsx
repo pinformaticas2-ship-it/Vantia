@@ -96,16 +96,13 @@ function fmtTime(s: string) { return new Date(s).toLocaleTimeString("es-ES", { h
 
 // ── Widget picker ─────────────────────────────────────────────────────────────
 const ALL_WIDGETS = [
-  { id:"agenda",      label:"Agenda",         desc:"Próximas citas, vistas y calendario inmediato",        icon:"📅" },
-  { id:"tareas",      label:"Tareas",         desc:"Urgentes, vencidas y pendientes del usuario",          icon:"✅" },
-  { id:"actividad",   label:"Trazabilidad",   desc:"Últimos movimientos y auditoría del ERP",              icon:"🕵️" },
-  { id:"expedientes", label:"Expedientes",    desc:"Estado general de asuntos y casos abiertos",           icon:"📁" },
-  { id:"clientes",    label:"Clientes",       desc:"Base activa del despacho y datos de contacto",         icon:"👥" },
-  { id:"chat",        label:"Chat interno",   desc:"Canales, mensajes pendientes y conversación reciente", icon:"💬" },
-  { id:"whatsapp",    label:"WhatsApp",       desc:"Estado del canal y mensajes programados",              icon:"📱" },
-  { id:"correo",      label:"Correo",         desc:"Bandeja, no leídos y borradores del despacho",         icon:"✉️" },
-  { id:"documental",  label:"Documental",     desc:"BOE, CENDOJ y estado de proveedores jurídicos",        icon:"📚" },
-  { id:"facturacion", label:"Facturación",    desc:"Totales facturados, cobrados y pendientes",            icon:"💶" },
+  { id:"agenda",      label:"Agenda",            desc:"Próximas citas, vistas y calendario inmediato",        icon:"📅" },
+  { id:"tareas",      label:"Tareas",            desc:"Urgentes, vencidas y pendientes del usuario",          icon:"✅" },
+  { id:"actividad",   label:"Actividad reciente", desc:"Tus últimas acciones en el ERP",                      icon:"⚡" },
+  { id:"chat",        label:"Chat interno",      desc:"Canales, mensajes pendientes y conversación reciente", icon:"💬" },
+  { id:"whatsapp",    label:"WhatsApp",          desc:"Estado del canal y mensajes programados",              icon:"📱" },
+  { id:"correo",      label:"Correo",            desc:"No leídos y últimos mensajes de tu bandeja",           icon:"✉️" },
+  { id:"facturacion", label:"Facturación",       desc:"Totales facturados, cobrados y pendientes",            icon:"💶" },
 ];
 const DASHBOARD_MODULES = [
   { id: "expedientes", label: "Expedientes", desc: "Gestión de asuntos y casos", to: "/dashboard/expedientes", icon: Briefcase, tone: "bg-blue-100 text-blue-600" },
@@ -123,8 +120,8 @@ const STORAGE_KEY = "dashboard_visible_widgets";
 const ORDER_KEY   = "dashboard_widget_order";
 const DEFAULT_VISIBLE = ["agenda", "tareas", "actividad"];
 const DEFAULT_ORDER   = [
-  "agenda", "tareas", "actividad", "expedientes", "clientes",
-  "chat", "whatsapp", "correo", "documental", "facturacion",
+  "agenda", "tareas", "actividad",
+  "chat", "whatsapp", "correo", "facturacion",
 ];
 const VALID_WIDGET_IDS = new Set(ALL_WIDGETS.map((widget) => widget.id));
 function sanitizeWidgetIds(ids: string[], fallback: string[]) {
@@ -151,19 +148,17 @@ function WidgetPickerModal({ visible, onClose, onSave }: { visible: string[]; on
   const toggle = (id: string) => setSel(cur => cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id]);
 
   useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
-    const previousHtmlOverflow = document.documentElement.style.overflow;
-    document.body.style.overflow = "hidden";
-    document.documentElement.style.overflow = "hidden";
+    const scrollEl = document.getElementById("dashboard-content") as HTMLElement | null;
+    const prevScroll = scrollEl?.style.overflow ?? "";
+    if (scrollEl) scrollEl.style.overflow = "hidden";
     return () => {
-      document.body.style.overflow = previousOverflow;
-      document.documentElement.style.overflow = previousHtmlOverflow;
+      if (scrollEl) scrollEl.style.overflow = prevScroll;
     };
   }, []);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-transparent p-4">
-      <div className="flex max-h-[85vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-transparent px-4 pb-8 pt-[10vh]">
+      <div className="flex max-h-[76vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
         <div className="shrink-0 flex items-center justify-between border-b border-slate-200 px-5 py-4">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-400">Dashboard</p>
@@ -171,7 +166,7 @@ function WidgetPickerModal({ visible, onClose, onSave }: { visible: string[]; on
           </div>
           <button onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50"><X size={16} /></button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-3">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-3">
           {ALL_WIDGETS.map(w => (
             <label key={w.id} className="flex cursor-pointer items-center gap-4 border-b border-slate-100 py-3 last:border-b-0">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-xl">{w.icon}</span>
@@ -345,6 +340,10 @@ export default function DashboardHome() {
   const [chatStats,     setChatStats]     = useState({ canales: 0, noLeidos: 0, directos: 0, conActividad: 0 });
   const [waStats,       setWaStats]       = useState({ configurado: false, webhook: false, programados: 0, origen: "Sin configurar" });
   const [emailStats,    setEmailStats]    = useState({ cuentas: 0, inbox: 0, unread: 0, drafts: 0 });
+  const [emailAccounts,    setEmailAccounts]    = useState<any[]>([]);
+  const [emailMessages,    setEmailMessages]    = useState<any[]>([]);
+  const [emailMsgLoading,  setEmailMsgLoading]  = useState(false);
+  const [selectedEmailAccountId, setSelectedEmailAccountId] = useState<string>("");
   const [docStats,      setDocStats]      = useState({ providers: 0, activos: 0, highlights: 0, lexnet: false });
 
   // Billing period state
@@ -362,7 +361,7 @@ export default function DashboardHome() {
         actRes, agendaRes, tasksRes, billingRes,
         expRes, clientsRes, chatRes, chatUnreadRes,
         waStatusRes, waSchedulesRes, emailStatsRes, emailAccountsRes,
-        docProvidersRes, docHighlightsRes,
+        docProvidersRes, docHighlightsRes, emailMsgsRes,
       ] = await Promise.all([
         fetch("/api/activity/me?limit=10",        { headers }),
         fetch("/api/agenda/upcoming?limit=3",     { headers }),
@@ -378,17 +377,18 @@ export default function DashboardHome() {
         fetch("/api/email/accounts",              { headers }),
         fetch("/api/documental/providers",        { headers }),
         fetch("/api/documental/cendoj/highlights",{ headers }),
+        fetch("/api/email/messages?folder=INBOX&limit=5", { headers }),
       ]);
       const [
         actData, agendaData, tasksData, billingData,
         expData, clientsData, chatData, chatUnreadData,
         waStatusData, waSchedulesData, emailStatsData, emailAccountsData,
-        docProvidersData, docHighlightsData,
+        docProvidersData, docHighlightsData, emailMsgsData,
       ] = await Promise.all([
         safeJson(actRes), safeJson(agendaRes), safeJson(tasksRes), safeJson(billingRes),
         safeJson(expRes), safeJson(clientsRes), safeJson(chatRes), safeJson(chatUnreadRes),
         safeJson(waStatusRes), safeJson(waSchedulesRes), safeJson(emailStatsRes), safeJson(emailAccountsRes),
-        safeJson(docProvidersRes), safeJson(docHighlightsRes),
+        safeJson(docProvidersRes), safeJson(docHighlightsRes), safeJson(emailMsgsRes),
       ]);
       if (actRes.ok) {
         setActivity(actData.data || []);
@@ -458,6 +458,13 @@ export default function DashboardHome() {
           unread: Number(stats.unread || 0),
           drafts: Number(stats.drafts || 0),
         });
+        setEmailAccounts(accounts);
+        if (!silent && accounts.length > 0) {
+          setSelectedEmailAccountId(prev => prev || accounts[0].id);
+        }
+      }
+      if (emailMsgsRes.ok) {
+        setEmailMessages(emailMsgsData.data?.emails || emailMsgsData.data || []);
       }
       if (docProvidersRes.ok || docHighlightsRes.ok) {
         const providers = docProvidersData.data || {};
@@ -480,6 +487,19 @@ export default function DashboardHome() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
     setVisibleWidgets(next);
   };
+
+  const fetchEmailMessages = useCallback(async (accountId: string) => {
+    setEmailMsgLoading(true);
+    try {
+      const token = await getToken({ skipCache: true });
+      const url = `/api/email/messages?folder=INBOX&limit=5${accountId ? `&account_id=${accountId}` : ""}`;
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      const d = await safeJson(res);
+      if (res.ok) setEmailMessages(d.data?.emails || d.data || []);
+    } catch {/* */} finally {
+      setEmailMsgLoading(false);
+    }
+  }, [getToken]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
   useAutoRefresh(() => fetchData(true), { intervalMs: 20_000 });
@@ -625,7 +645,7 @@ export default function DashboardHome() {
         <div onClick={() => goTo("/dashboard/trazabilidad")} className="cursor-pointer group bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all">
           <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
             <h3 className="font-bold text-slate-800 flex items-center gap-2 text-sm">
-              <RefreshCw size={13} className="text-slate-400" /> 🕵️ Trazabilidad
+              <RefreshCw size={13} className="text-slate-400" /> ⚡ Actividad reciente
             </h3>
             <div className="flex items-center gap-1">
               {handle}
@@ -770,32 +790,53 @@ export default function DashboardHome() {
       );
 
       case "correo": return (
-        <div onClick={() => goTo("/dashboard/correo")} className="cursor-pointer group bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all">
-          <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-            <span className="font-bold text-slate-800 text-sm flex items-center gap-2">✉️ Correo</span>
-            <div className="flex items-center gap-1">
-              {handle}
-              <ChevronRight size={14} className="text-slate-300 group-hover:text-red-500 transition-colors" />
+        <div className="group bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all">
+          <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="font-bold text-slate-800 text-sm shrink-0">✉️ Correo</span>
+              {emailStats.unread > 0 && (
+                <span className="shrink-0 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white leading-none">
+                  {emailStats.unread}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {emailAccounts.length > 0 && (
+                <select
+                  value={selectedEmailAccountId}
+                  onChange={(e) => { setSelectedEmailAccountId(e.target.value); fetchEmailMessages(e.target.value); }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="max-w-[140px] rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] text-slate-600 focus:outline-none focus:ring-1 focus:ring-red-400"
+                >
+                  {emailAccounts.map((acc: any) => (
+                    <option key={acc.id} value={acc.id}>{acc.username || acc.email || acc.name || "Cuenta"}</option>
+                  ))}
+                </select>
+              )}
+              <div className="flex items-center gap-1">
+                {handle}
+                <ChevronRight size={14} onClick={() => goTo("/dashboard/correo")} className="cursor-pointer text-slate-300 group-hover:text-red-500 transition-colors" />
+              </div>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-px bg-slate-100">
-            <div className="bg-white px-5 py-4">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">No leídos</p>
-              <p className="mt-1 text-3xl font-black text-slate-800">{emailStats.unread}</p>
-            </div>
-            <div className="bg-white px-5 py-4">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Borradores</p>
-              <p className="mt-1 text-3xl font-black text-slate-700">{emailStats.drafts}</p>
-            </div>
-            <div className="bg-white px-5 py-4">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Inbox</p>
-              <p className="mt-1 text-2xl font-black text-slate-700">{emailStats.inbox}</p>
-            </div>
-            <div className="bg-white px-5 py-4">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Cuentas</p>
-              <p className="mt-1 text-2xl font-black text-slate-700">{emailStats.cuentas}</p>
-            </div>
-          </div>
+          {emailMsgLoading ? (
+            <div className="flex justify-center py-8"><Loader2 size={16} className="animate-spin text-slate-300" /></div>
+          ) : emailMessages.length === 0 ? (
+            <p className="py-8 text-center text-xs text-slate-400">Sin mensajes recientes</p>
+          ) : (
+            <ul className="divide-y divide-slate-50">
+              {emailMessages.slice(0, 5).map((msg: any, i: number) => (
+                <li key={i} onClick={() => goTo("/dashboard/correo")} className="flex cursor-pointer items-start gap-3 px-4 py-3 hover:bg-slate-50 transition-colors">
+                  <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${msg.is_read ? "bg-slate-200" : "bg-blue-500"}`} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-semibold text-slate-800">{msg.from_name || msg.from_email || "Desconocido"}</p>
+                    <p className="truncate text-xs text-slate-500">{msg.subject || "(Sin asunto)"}</p>
+                  </div>
+                  <span className="shrink-0 text-[10px] text-slate-400">{msg.sent_at ? timeAgo(msg.sent_at) : ""}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       );
 

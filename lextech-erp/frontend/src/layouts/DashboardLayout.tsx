@@ -894,7 +894,7 @@ export default function DashboardLayout() {
         </header>
 
         {/* Contenido */}
-        <div className="relative z-10 flex-1 overflow-y-auto">
+        <div id="dashboard-content" className="relative z-10 flex-1 overflow-y-auto">
           <div
             key={location.pathname}
             className={
