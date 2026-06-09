@@ -160,8 +160,8 @@ function WidgetPickerModal({ visible, onClose, onSave }: { visible: string[]; on
   }, []);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-hidden bg-transparent pt-[10vh]">
-      <div className="flex max-h-[78vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-transparent px-4 pb-8 pt-[10vh]">
+      <div className="flex max-h-[76vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
         <div className="shrink-0 flex items-center justify-between border-b border-slate-200 px-5 py-4">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-400">Dashboard</p>
