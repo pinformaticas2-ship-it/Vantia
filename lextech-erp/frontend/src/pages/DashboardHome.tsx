@@ -801,20 +801,17 @@ export default function DashboardHome() {
               )}
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              {emailAccounts.length > 1 && (
+              {emailAccounts.length > 0 && (
                 <select
                   value={selectedEmailAccountId}
                   onChange={(e) => { setSelectedEmailAccountId(e.target.value); fetchEmailMessages(e.target.value); }}
                   onClick={(e) => e.stopPropagation()}
-                  className="max-w-[120px] truncate rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] text-slate-600"
+                  className="max-w-[140px] rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] text-slate-600 focus:outline-none focus:ring-1 focus:ring-red-400"
                 >
                   {emailAccounts.map((acc: any) => (
                     <option key={acc.id} value={acc.id}>{acc.username || acc.email || acc.name || "Cuenta"}</option>
                   ))}
                 </select>
-              )}
-              {emailAccounts.length === 1 && (
-                <span className="max-w-[100px] truncate text-[10px] text-slate-400">{emailAccounts[0]?.username || emailAccounts[0]?.email || ""}</span>
               )}
               <div className="flex items-center gap-1">
                 {handle}
