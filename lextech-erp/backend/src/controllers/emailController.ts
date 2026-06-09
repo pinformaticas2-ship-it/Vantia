@@ -470,7 +470,11 @@ export async function syncAccount(req: Request, res: Response) {
         host: acc.imap_host, port: acc.imap_port, secure: acc.imap_secure,
         user: acc.username, password,
       };
-      const messages = await syncInbox(imapCfg, folder, limit);
+      // Use last_sync_at so IMAP SEARCH SINCE skips already-synced messages.
+      // Fall back to 7 days ago on first-ever sync.
+      const sinceFallback = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const sinceDate: Date = acc.last_sync_at ? new Date(acc.last_sync_at) : sinceFallback;
+      const messages = await syncInbox(imapCfg, folder, limit, sinceDate);
       synced = messages.length;
 
       for (const msg of messages) {

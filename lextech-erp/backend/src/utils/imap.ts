@@ -202,9 +202,17 @@ export class ImapClient {
         pass: this.cfg.password,
       },
       logger: false,
+      tls: { rejectUnauthorized: false },
+      connectionTimeout: 15_000,
+      socketTimeout: 20_000,
+      greetingTimeout: 10_000,
     });
 
-    await this.client.connect();
+    const connectPromise = this.client.connect();
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('IMAP connect timeout (15s)')), 15_000)
+    );
+    await Promise.race([connectPromise, timeoutPromise]);
   }
 
   async login(): Promise<void> {
@@ -300,16 +308,30 @@ export class ImapClient {
     const client = this.ensureClient();
     const exists = Number(client.mailbox?.exists || 0);
     if (!exists) return [];
-
-    const start = 1;
-    const end = exists;
     const uids: number[] = [];
-
-    const fetchCriteria = criteria.toUpperCase() === 'ALL' ? `${start}:${end}` : `${start}:${end}`;
-    for await (const message of client.fetch(fetchCriteria, { uid: true }, { uid: false })) {
+    for await (const message of client.fetch(`${Math.max(1, exists - 499)}:*`, { uid: true }, { uid: false })) {
       if (message?.uid) uids.push(Number(message.uid));
     }
+    return uids;
+  }
 
+  async searchUidsSince(since: Date): Promise<number[]> {
+    const client = this.ensureClient();
+    const uids: number[] = [];
+    try {
+      const found = await client.search({ since }, { uid: true });
+      if (Array.isArray(found)) {
+        for (const u of found) uids.push(Number(u));
+      }
+    } catch {
+      // Fallback: fetch the last 100 by sequence if SEARCH fails
+      const exists = Number(client.mailbox?.exists || 0);
+      if (exists > 0) {
+        for await (const msg of client.fetch(`${Math.max(1, exists - 99)}:*`, { uid: true }, { uid: false })) {
+          if (msg?.uid) uids.push(Number(msg.uid));
+        }
+      }
+    }
     return uids;
   }
 
@@ -412,6 +434,7 @@ export async function syncInbox(
   cfg: ImapConfig,
   folder = 'INBOX',
   maxMessages = 50,
+  since?: Date,
 ): Promise<ImapMessage[]> {
   const client = new ImapClient(cfg);
 
@@ -422,11 +445,19 @@ export async function syncInbox(
 
     if (!selected.exists) return [];
 
-    const uids = await client.searchUids('ALL');
-    const recent = uids.slice(-maxMessages).reverse();
-    if (!recent.length) return [];
+    let uids: number[];
+    if (since) {
+      uids = await client.searchUidsSince(since);
+      // Still cap at maxMessages most-recent to avoid huge fetches after long gaps
+      uids = uids.slice(-maxMessages);
+    } else {
+      uids = await client.searchUids('ALL');
+      uids = uids.slice(-maxMessages);
+    }
 
-    const envelopes = await client.fetchEnvelopes(recent);
+    if (!uids.length) return [];
+
+    const envelopes = await client.fetchEnvelopes(uids.reverse());
     return envelopes.map((message) => ({
       ...message,
       bodyText: '',

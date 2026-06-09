@@ -3417,6 +3417,8 @@ export default function Email() {
     const silentRefresh = async (refreshStructure = false) => {
       if (refreshInFlightRef.current) return;
       refreshInFlightRef.current = true;
+      // Safety valve: if a hung IMAP connection never resolves, reset after 30s
+      const safetyTimer = setTimeout(() => { refreshInFlightRef.current = false; }, 30_000);
       try {
         if (currentImapAccount) {
           if (refreshStructure) {
@@ -3438,6 +3440,7 @@ export default function Email() {
 
         await loadEmails(true, undefined, { silent: true, preserveSelection: true });
       } finally {
+        clearTimeout(safetyTimer);
         refreshInFlightRef.current = false;
       }
     };
