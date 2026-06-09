@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import { resolve4 } from 'dns/promises';
 
 export interface SmtpConfig {
   host: string;
@@ -28,23 +29,34 @@ export interface MailMessage {
   attachments?: MailAttachment[];
 }
 
-function makeTransport(cfg: SmtpConfig) {
+async function resolveIPv4(host: string): Promise<string> {
+  try {
+    const [address] = await resolve4(host);
+    return address;
+  } catch {
+    return host;
+  }
+}
+
+function makeTransport(cfg: SmtpConfig, resolvedHost: string) {
   return nodemailer.createTransport({
-    host: cfg.host,
+    host: resolvedHost,
     port: cfg.port,
     secure: cfg.secure,
     auth: { user: cfg.user, pass: cfg.password },
-    tls: { rejectUnauthorized: false },
+    tls: {
+      rejectUnauthorized: false,
+      servername: cfg.host,
+    },
     connectionTimeout: 15_000,
     greetingTimeout: 10_000,
     socketTimeout: 20_000,
-    family: 4,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } as any);
+  });
 }
 
 export async function sendEmail(cfg: SmtpConfig, msg: MailMessage): Promise<void> {
-  const transport = makeTransport(cfg);
+  const resolvedHost = await resolveIPv4(cfg.host);
+  const transport = makeTransport(cfg, resolvedHost);
 
   try {
     await transport.sendMail({
@@ -70,7 +82,8 @@ export async function sendEmail(cfg: SmtpConfig, msg: MailMessage): Promise<void
 }
 
 export async function testSmtpConnection(cfg: SmtpConfig): Promise<void> {
-  const transport = makeTransport(cfg);
+  const resolvedHost = await resolveIPv4(cfg.host);
+  const transport = makeTransport(cfg, resolvedHost);
 
   try {
     await transport.verify();
