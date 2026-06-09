@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { SignedIn, SignedOut } from "@clerk/clerk-react";
 import { ChatUnreadProvider } from './contexts/ChatUnreadContext';
 import { EmailUnreadProvider } from './contexts/EmailUnreadContext';
+import { WhatsAppUnreadProvider } from './contexts/WhatsAppUnreadContext';
 
 // Layouts
 import DashboardLayout from './layouts/DashboardLayout';
@@ -32,6 +33,7 @@ export default function App() {
       <SignedIn>
         <ChatUnreadProvider>
         <EmailUnreadProvider>
+        <WhatsAppUnreadProvider>
         <Routes>
           {/* Redirigir raíz al dashboard */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -67,6 +69,7 @@ export default function App() {
           {/* Capturar rutas desconocidas */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
+        </WhatsAppUnreadProvider>
         </EmailUnreadProvider>
         </ChatUnreadProvider>
       </SignedIn>

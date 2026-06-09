@@ -10,6 +10,7 @@ import { UserButton, useUser, useAuth, useClerk } from "@clerk/clerk-react";
 import { getDeviceId, safeJson, waitForClientIp } from "../lib/api";
 import { useChatUnread } from "../contexts/ChatUnreadContext";
 import { useEmailUnread } from "../contexts/EmailUnreadContext";
+import { useWhatsAppUnread, WA_LAST_SEEN_KEY } from "../contexts/WhatsAppUnreadContext";
 
 // ── Módulos buscables ────────────────────────────────────────────────────────
 const MODULES = [
@@ -450,6 +451,7 @@ function SidebarContent({ pathname, onClose, onSignOut }: { pathname: string; on
   const { user } = useUser();
   const { totalUnread } = useChatUnread();
   const { unreadCount: emailUnreadCount } = useEmailUnread();
+  const { unreadCount: waUnreadCount } = useWhatsAppUnread();
   return (
     <div className="flex flex-col h-full bg-slate-900 border-r border-slate-800">
       {/* Logo */}
@@ -483,8 +485,11 @@ function SidebarContent({ pathname, onClose, onSignOut }: { pathname: string; on
                   const Icon = item.icon;
                   const isChat = item.href === "/dashboard/chat";
                   const isEmail = item.href === "/dashboard/correo";
-                  const chatBadge = isChat && !isActive && totalUnread > 0;
+                  const isWA = item.href === "/dashboard/whatsapp";
+                  const chatBadge  = isChat  && !isActive && totalUnread > 0;
                   const emailBadge = isEmail && !isActive && emailUnreadCount > 0;
+                  const waBadge    = isWA    && !isActive && waUnreadCount > 0;
+                  const badgeCount = chatBadge ? totalUnread : emailBadge ? emailUnreadCount : waUnreadCount;
                   return (
                     <Link key={item.name} to={item.href} onClick={onClose}
                       className={`flex items-center gap-3 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all duration-200 ${
@@ -493,11 +498,9 @@ function SidebarContent({ pathname, onClose, onSignOut }: { pathname: string; on
                       }`}>
                       <Icon className={`h-5 w-5 ${isActive ? "text-white" : "text-slate-500"}`} />
                       <span className="flex-1">{item.name}</span>
-                      {(chatBadge || emailBadge) && (
+                      {(chatBadge || emailBadge || waBadge) && (
                         <span className="ml-auto min-w-[20px] h-5 bg-[#ab0433] text-white text-[10px] font-black rounded-full flex items-center justify-center px-1.5 shadow-lg shadow-red-900/40">
-                          {chatBadge
-                            ? (totalUnread > 99 ? "99+" : totalUnread)
-                            : (emailUnreadCount > 99 ? "99+" : emailUnreadCount)}
+                          {badgeCount > 99 ? "99+" : badgeCount}
                         </span>
                       )}
                     </Link>
@@ -561,18 +564,22 @@ export default function DashboardLayout() {
   const { getToken } = useAuth();
   const clerk        = useClerk();
   const { unreadCount: emailUnreadCount, latestUnread, clearLatestUnread } = useEmailUnread();
+  const { totalUnread: chatTotalUnread } = useChatUnread();
+  const { latestToast: latestWaToast, clearToast: clearWaToast, markSeen: markWaSeen, markAllSeen: markAllWaSeen } = useWhatsAppUnread();
 
-  const [isMobileOpen,  setIsMobileOpen]  = useState(false);
-  const [isNotifOpen,   setIsNotifOpen]   = useState(false);
-  const [searchQuery,   setSearchQuery]   = useState("");
-  const [searchFocused, setSearchFocused] = useState(false);
-  const [notifications, setNotifications] = useState<UnifiedNotification[]>([]);
-  const [notifLoading,  setNotifLoading]  = useState(false);
+  const [isMobileOpen,    setIsMobileOpen]    = useState(false);
+  const [isNotifOpen,     setIsNotifOpen]     = useState(false);
+  const [searchQuery,     setSearchQuery]     = useState("");
+  const [searchFocused,   setSearchFocused]   = useState(false);
+  const [notifications,   setNotifications]   = useState<UnifiedNotification[]>([]);
+  const [notifLoading,    setNotifLoading]    = useState(false);
+  const [latestChatToast, setLatestChatToast] = useState<{ title: string; meta?: string; onClick?: () => void } | null>(null);
 
-  const searchRef      = useRef<HTMLDivElement>(null);
-  const notifRef       = useRef<HTMLDivElement>(null);
-  const loginFiredRef  = useRef<string | null>(null); // tracks which userId we've already logged-in
-  const notifBusyRef   = useRef(false);
+  const searchRef          = useRef<HTMLDivElement>(null);
+  const notifRef           = useRef<HTMLDivElement>(null);
+  const loginFiredRef      = useRef<string | null>(null);
+  const notifBusyRef       = useRef(false);
+  const prevChatUnreadRef  = useRef(-1);
 
   // ── Registrar LOGIN en trazabilidad cuando el usuario se autentica ──────
   useEffect(() => {
@@ -673,13 +680,18 @@ export default function DashboardLayout() {
         const chatItems = Array.isArray(chatData?.data) ? chatData.data : [];
         for (const item of chatItems) {
           const unread = Number(item?.no_leidos || 0);
-          if (item?.tipo !== "directo" || unread <= 0) continue;
-          const dmName = item?.dm_target_user_name || "Chat interno";
+          if (unread <= 0) continue;
+          const isDM = item?.tipo === "directo";
+          const channelLabel = isDM
+            ? (item?.dm_target_user_name || "Chat directo")
+            : `#${item?.nombre || "canal"}`;
           next.push({
             id: `chat-${item.id}`,
             kind: "chat",
-            title: dmName,
-            subtitle: unread > 1 ? `${unread} mensajes internos sin leer` : "1 mensaje interno sin leer",
+            title: channelLabel,
+            subtitle: isDM
+              ? (unread > 1 ? `${unread} mensajes directos sin leer` : "1 mensaje directo sin leer")
+              : (unread > 1 ? `${unread} mensajes sin leer` : "1 mensaje sin leer"),
             meta: item?.ultimo_mensaje || undefined,
             count: unread,
             created_at: item?.ultimo_mensaje_at || item?.created_at || new Date().toISOString(),
@@ -733,18 +745,29 @@ export default function DashboardLayout() {
 
       if (waRes.ok) {
         const waItems = Array.isArray(waData?.data) ? waData.data : [];
+        const waLastSeen: Record<string, string> = (() => {
+          try { return JSON.parse(localStorage.getItem(WA_LAST_SEEN_KEY) || "{}"); } catch { return {}; }
+        })();
         for (const item of waItems) {
           if (String(item?.last_message_direction || "") !== "inbound") continue;
-          if (!item?.last_message_at) continue;
+          if (!item?.last_message_at || !item?.id) continue;
+          const msgTime = new Date(item.last_message_at).getTime();
+          if (Date.now() - msgTime > 48 * 60 * 60 * 1000) continue; // skip if older than 48h
+          const seenAt = waLastSeen[item.id];
+          if (seenAt && msgTime <= new Date(seenAt).getTime()) continue;
+          const contactName = item?.commercial_name || `${item?.first_name || ""} ${item?.last_name || ""}`.trim() || item?.email || "WhatsApp";
           next.push({
             id: `wa-${item.id}`,
             kind: "whatsapp",
-            title: item?.commercial_name || `${item?.first_name || ""} ${item?.last_name || ""}`.trim() || item?.email || "WhatsApp",
+            title: contactName,
             subtitle: "Mensaje recibido por WhatsApp",
             meta: item?.last_message_body || undefined,
             count: 1,
             created_at: item?.last_message_at,
-            onClick: () => navigate(`/dashboard/whatsapp?clientId=${encodeURIComponent(item.id)}&mode=thread`),
+            onClick: () => {
+              markWaSeen(item.id);
+              navigate(`/dashboard/whatsapp?clientId=${encodeURIComponent(item.id)}&mode=thread`);
+            },
           });
         }
       }
@@ -756,7 +779,7 @@ export default function DashboardLayout() {
       notifBusyRef.current = false;
       if (showLoader) setNotifLoading(false);
     }
-  }, [getToken, navigate]);
+  }, [getToken, navigate, markWaSeen]);
 
   const openNotifications = useCallback(async () => {
     setIsNotifOpen(true);
@@ -794,10 +817,39 @@ export default function DashboardLayout() {
     };
   }, [fetchNotifications]);
 
+  // Marcar WA como visto al entrar en la página de WhatsApp
+  useEffect(() => {
+    if (!location.pathname.startsWith("/dashboard/whatsapp")) return;
+    const waItems = notifications.filter(n => n.kind === "whatsapp");
+    if (waItems.length > 0) {
+      markAllWaSeen(waItems.map(n => n.id.replace("wa-", "")));
+    }
+  }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Toast de chat — detectar cuando sube el total de no-leídos
+  useEffect(() => {
+    if (prevChatUnreadRef.current === -1) {
+      prevChatUnreadRef.current = chatTotalUnread;
+      return;
+    }
+    if (chatTotalUnread > prevChatUnreadRef.current && !location.pathname.startsWith("/dashboard/chat")) {
+      const newestChat = notifications
+        .filter(n => n.kind === "chat")
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+      setLatestChatToast(newestChat
+        ? { title: newestChat.title, meta: newestChat.meta, onClick: newestChat.onClick }
+        : { title: "Nuevo mensaje en Chat", onClick: () => navigate("/dashboard/chat") }
+      );
+    }
+    prevChatUnreadRef.current = chatTotalUnread;
+  }, [chatTotalUnread]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const visibleNotifications = useMemo(
     () => notifications.filter((item) => !hiddenKinds.has(item.kind)),
     [hiddenKinds, notifications],
   );
+
+  const totalBadge = visibleNotifications.length + (!hiddenKinds.has("email") && emailUnreadCount > 0 ? 1 : 0);
 
   return (
     <div className="erp-shell min-h-screen flex font-sans antialiased text-neutral-900">
@@ -809,6 +861,31 @@ export default function DashboardLayout() {
           onOpen={() => {
             navigate(`/dashboard/correo?openEmail=${encodeURIComponent(latestUnread.id)}`);
             clearLatestUnread();
+          }}
+        />
+      )}
+
+      {latestWaToast && !location.pathname.startsWith("/dashboard/whatsapp") && (
+        <WaToast
+          name={latestWaToast.name}
+          message={latestWaToast.message}
+          onClose={clearWaToast}
+          onOpen={() => {
+            markWaSeen(latestWaToast.contactId);
+            navigate(`/dashboard/whatsapp?clientId=${encodeURIComponent(latestWaToast.contactId)}&mode=thread`);
+            clearWaToast();
+          }}
+        />
+      )}
+
+      {latestChatToast && (
+        <ChatToast
+          title={latestChatToast.title}
+          meta={latestChatToast.meta}
+          onClose={() => setLatestChatToast(null)}
+          onOpen={() => {
+            latestChatToast.onClick?.();
+            setLatestChatToast(null);
           }}
         />
       )}
@@ -877,7 +954,7 @@ export default function DashboardLayout() {
                 className="relative p-2.5 rounded-xl hover:bg-slate-50 text-slate-500 border border-slate-100 transition-colors"
               >
                 <Bell className="h-5 w-5" />
-                {(visibleNotifications.length > 0 || (!hiddenKinds.has("email") && emailUnreadCount > 0)) && (
+                {totalBadge > 0 && (
                   <span className="absolute top-2 right-2 h-2 w-2 bg-red-500 rounded-full border-2 border-white" />
                 )}
               </button>
@@ -948,6 +1025,60 @@ function EmailToast({
         >
           Abrir correo
         </button>
+      </div>
+    </div>
+  );
+}
+
+function WaToast({ name, message, onOpen, onClose }: { name: string; message: string; onOpen: () => void; onClose: () => void }) {
+  useEffect(() => {
+    const t = setTimeout(onClose, 10_000);
+    return () => clearTimeout(t);
+  }, [onClose]);
+
+  return (
+    <div className="fixed bottom-6 right-24 z-50 w-[360px] max-w-[calc(100vw-2rem)] rounded-2xl border border-green-100 bg-white shadow-2xl overflow-hidden">
+      <div className="flex items-start gap-3 px-4 py-4 bg-gradient-to-r from-green-50 to-white">
+        <div className="h-10 w-10 rounded-2xl bg-[#25D366] text-white flex items-center justify-center shrink-0">
+          <MessageCircle className="h-5 w-5" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-black tracking-[0.18em] uppercase text-[#1a9e4f]">WhatsApp</p>
+          <p className="text-sm font-semibold text-slate-800 truncate">{name}</p>
+          <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">{message}</p>
+        </div>
+        <button onClick={onClose} className="text-slate-400 hover:text-slate-700"><X size={14} /></button>
+      </div>
+      <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-end gap-2">
+        <button onClick={onClose} className="px-3 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:bg-slate-100">Cerrar</button>
+        <button onClick={onOpen} className="px-3 py-2 rounded-xl text-xs font-semibold bg-[#25D366] text-white hover:bg-[#1ebe5d]">Ver conversación</button>
+      </div>
+    </div>
+  );
+}
+
+function ChatToast({ title, meta, onOpen, onClose }: { title: string; meta?: string; onOpen: () => void; onClose: () => void }) {
+  useEffect(() => {
+    const t = setTimeout(onClose, 8_000);
+    return () => clearTimeout(t);
+  }, [onClose]);
+
+  return (
+    <div className="fixed bottom-6 right-24 z-50 w-[360px] max-w-[calc(100vw-2rem)] rounded-2xl border border-indigo-100 bg-white shadow-2xl overflow-hidden">
+      <div className="flex items-start gap-3 px-4 py-4 bg-gradient-to-r from-indigo-50 to-white">
+        <div className="h-10 w-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
+          <MessageSquare className="h-5 w-5" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-black tracking-[0.18em] uppercase text-indigo-600">Chat interno</p>
+          <p className="text-sm font-semibold text-slate-800 truncate">{title}</p>
+          {meta && <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">{meta}</p>}
+        </div>
+        <button onClick={onClose} className="text-slate-400 hover:text-slate-700"><X size={14} /></button>
+      </div>
+      <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-end gap-2">
+        <button onClick={onClose} className="px-3 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:bg-slate-100">Cerrar</button>
+        <button onClick={onOpen} className="px-3 py-2 rounded-xl text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700">Abrir chat</button>
       </div>
     </div>
   );
