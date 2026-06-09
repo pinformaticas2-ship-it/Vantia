@@ -1580,8 +1580,9 @@ function EmailItem({
   const [hovered, setHovered] = useState(false);
 
   return (
-    <div
-      onClick={onClick}
+    <a
+      href={`/dashboard/correo?openEmail=${encodeURIComponent(email.id)}`}
+      onClick={(e) => { e.preventDefault(); onClick(); }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       className={`flex items-start gap-3 px-4 py-3 cursor-pointer border-b border-gray-100 transition-colors ${
@@ -1631,7 +1632,7 @@ function EmailItem({
         }`}>
         <Star size={15} fill={email.isStarred ? 'currentColor' : 'none'} />
       </button>
-    </div>
+    </a>
   );
 }
 
@@ -3464,8 +3465,9 @@ export default function Email() {
   }, [gmail, handleGmailError, tokenGetter]);
 
   useEffect(() => {
-    if (!pendingOpenEmailId || !gmail) return;
+    if (!pendingOpenEmailId) return;
 
+    // Si el email ya está en la lista (IMAP o Gmail), abrirlo directamente
     const existing = emails.find((email) => email.id === pendingOpenEmailId);
     if (existing) {
       void openEmail(existing);
@@ -3474,6 +3476,9 @@ export default function Email() {
       setSearchParams(next, { replace: true });
       return;
     }
+
+    // Fallback Gmail: obtener por ID si no está en la lista
+    if (!gmail) return;
 
     let cancelled = false;
     (async () => {
