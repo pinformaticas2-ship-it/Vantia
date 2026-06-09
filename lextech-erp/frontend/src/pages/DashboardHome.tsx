@@ -7,7 +7,7 @@ import {
   ChevronDown, FileSpreadsheet, ClipboardList,
   ScanLine, ExternalLink, MoreHorizontal, LayoutGrid, X, GripVertical,
   Briefcase, Users, History, MessageSquare, MessageCircle, Mail, Library,
-  Receipt,
+  Receipt, Reply, MailOpen,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { safeJson } from "../lib/api";
@@ -344,6 +344,8 @@ export default function DashboardHome() {
   const [emailMessages,    setEmailMessages]    = useState<any[]>([]);
   const [emailMsgLoading,  setEmailMsgLoading]  = useState(false);
   const [selectedEmailAccountId, setSelectedEmailAccountId] = useState<string>("");
+  const [openMenuEmailId,      setOpenMenuEmailId]      = useState<string | null>(null);
+  const emailMenuRef = useRef<HTMLDivElement | null>(null);
   const [docStats,      setDocStats]      = useState({ providers: 0, activos: 0, highlights: 0, lexnet: false });
 
   // Billing period state
@@ -499,6 +501,29 @@ export default function DashboardHome() {
     } catch {/* */} finally {
       setEmailMsgLoading(false);
     }
+  }, [getToken]);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (emailMenuRef.current && !emailMenuRef.current.contains(e.target as Node)) {
+        setOpenMenuEmailId(null);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const markEmailRead = useCallback(async (msgId: string) => {
+    try {
+      const token = await getToken({ skipCache: true });
+      await fetch(`/api/email/messages/${msgId}/read`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ read: true }),
+      });
+      setEmailMessages(prev => prev.map(m => m.id === msgId ? { ...m, is_read: true } : m));
+      setEmailStats(prev => ({ ...prev, unread: Math.max(0, prev.unread - 1) }));
+    } catch {/* */}
   }, [getToken]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
@@ -790,7 +815,7 @@ export default function DashboardHome() {
       );
 
       case "correo": return (
-        <div className="group bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all">
+        <div className="group bg-white rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-all">
           <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
               <span className="font-bold text-slate-800 text-sm shrink-0">✉️ Correo</span>
@@ -824,15 +849,47 @@ export default function DashboardHome() {
           ) : emailMessages.length === 0 ? (
             <p className="py-8 text-center text-xs text-slate-400">Sin mensajes recientes</p>
           ) : (
-            <ul className="divide-y divide-slate-50">
+            <ul className="divide-y divide-slate-50" ref={emailMenuRef}>
               {emailMessages.slice(0, 5).map((msg: any, i: number) => (
-                <li key={i} onClick={() => goTo("/dashboard/correo")} className="flex cursor-pointer items-start gap-3 px-4 py-3 hover:bg-slate-50 transition-colors">
+                <li
+                  key={i}
+                  className="relative flex cursor-pointer items-start gap-3 px-4 py-3 hover:bg-slate-50 transition-colors"
+                  onClick={() => setOpenMenuEmailId(openMenuEmailId === msg.id ? null : msg.id)}
+                >
                   <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${msg.is_read ? "bg-slate-200" : "bg-blue-500"}`} />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-xs font-semibold text-slate-800">{msg.from_name || msg.from_email || "Desconocido"}</p>
                     <p className="truncate text-xs text-slate-500">{msg.subject || "(Sin asunto)"}</p>
                   </div>
                   <span className="shrink-0 text-[10px] text-slate-400">{msg.sent_at ? timeAgo(msg.sent_at) : ""}</span>
+
+                  {openMenuEmailId === msg.id && (
+                    <div
+                      className="absolute right-3 top-8 z-30 w-48 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                        onClick={() => { setOpenMenuEmailId(null); navigate(`/dashboard/correo?openEmail=${msg.id}`); }}
+                      >
+                        <ExternalLink size={13} className="text-slate-400" /> Ver correo
+                      </button>
+                      <button
+                        className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                        onClick={() => { setOpenMenuEmailId(null); navigate(`/dashboard/correo?openEmail=${msg.id}&reply=1`); }}
+                      >
+                        <Reply size={13} className="text-slate-400" /> Responder
+                      </button>
+                      {!msg.is_read && (
+                        <button
+                          className="flex w-full items-center gap-2.5 border-t border-slate-100 px-4 py-2.5 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                          onClick={() => { setOpenMenuEmailId(null); markEmailRead(msg.id); }}
+                        >
+                          <MailOpen size={13} className="text-slate-400" /> Marcar como leído
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
