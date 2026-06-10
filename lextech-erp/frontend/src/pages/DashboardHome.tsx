@@ -193,7 +193,16 @@ function WidgetPickerModal({ visible, onClose, onSave }: { visible: string[]; on
 // ── Sortable wrapper ──────────────────────────────────────────────────────────
 function SortableWidget({ id, children, className }: { id: string; children: (handle: ReactNode) => ReactNode; className?: string }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
-  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: 1,
+    boxShadow: isDragging ? "0 24px 48px rgba(15,23,42,0.18), 0 8px 16px rgba(15,23,42,0.12)" : undefined,
+    scale: isDragging ? "1.03" : undefined,
+    rotate: isDragging ? "1.2deg" : undefined,
+    zIndex: isDragging ? 50 : undefined,
+    cursor: isDragging ? "grabbing" : undefined,
+  };
   const handle = (
     <button
       {...listeners} {...attributes}
