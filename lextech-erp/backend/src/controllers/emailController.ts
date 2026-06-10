@@ -322,6 +322,86 @@ export async function deleteAccount(req: Request, res: Response) {
   } catch (e: any) { return err(res, e.message); }
 }
 
+export async function updateAccount(req: Request, res: Response) {
+  const uid = userId(req);
+  if (!uid) return err(res, 'No autenticado', 401);
+  const { id } = req.params;
+  const {
+    label, email,
+    imap_host, imap_port, imap_secure,
+    smtp_host, smtp_port, smtp_secure,
+    username, password,
+  } = req.body;
+
+  try {
+    const { rows: existing } = await pool.query(
+      `SELECT * FROM email_accounts WHERE id=$1 AND user_id=$2`,
+      [id, uid],
+    );
+    if (!existing.length) return err(res, 'Cuenta no encontrada', 404);
+    const acc = existing[0];
+
+    const newPassword = password && String(password).trim() ? String(password).trim() : null;
+    let encPassword = acc.password_enc;
+
+    if (newPassword) {
+      const withTimeout = <T>(p: Promise<T>, ms: number, lbl: string): Promise<T> =>
+        Promise.race([p, new Promise<T>((_, rej) => setTimeout(() => rej(new Error(`Timeout (${lbl}): el servidor tardó demasiado en responder`)), ms))]);
+
+      const proto = String(acc.protocol || 'imap').toLowerCase();
+      const host  = String(imap_host ?? acc.imap_host);
+      const port  = Number(imap_port ?? acc.imap_port);
+      const secure = imap_secure !== undefined ? Boolean(imap_secure) : Boolean(acc.imap_secure);
+      const user  = String(username ?? acc.username);
+
+      if (proto === 'pop3') {
+        const pop3Cfg: Pop3Config = { host, port, secure, user, password: newPassword, timeout: 12000 };
+        await withTimeout(testPop3Connection(pop3Cfg), 20000, 'POP3').catch((e: any) => {
+          throw new Error(explainMailConnectionError(e, 'pop3'));
+        });
+      } else {
+        const imapCfg: ImapConfig = { host, port, secure, user, password: newPassword };
+        await withTimeout(testImapConnection(imapCfg), 20000, 'IMAP').catch((e: any) => {
+          throw new Error(explainMailConnectionError(e, 'imap'));
+        });
+      }
+      encPassword = encryptPassword(newPassword);
+    }
+
+    const { rows } = await pool.query(
+      `UPDATE email_accounts
+          SET label        = COALESCE($3, label),
+              email        = COALESCE($4, email),
+              imap_host    = COALESCE($5, imap_host),
+              imap_port    = COALESCE($6, imap_port),
+              imap_secure  = COALESCE($7, imap_secure),
+              smtp_host    = COALESCE($8, smtp_host),
+              smtp_port    = COALESCE($9, smtp_port),
+              smtp_secure  = COALESCE($10, smtp_secure),
+              username     = COALESCE($11, username),
+              password_enc = $12
+        WHERE id=$1 AND user_id=$2
+        RETURNING id, label, email, imap_host, imap_port, imap_secure,
+                  smtp_host, smtp_port, smtp_secure, username, active,
+                  protocol, last_sync_at, created_at`,
+      [
+        id, uid,
+        label       !== undefined ? String(label)       : null,
+        email       !== undefined ? String(email)       : null,
+        imap_host   !== undefined ? String(imap_host)   : null,
+        imap_port   !== undefined ? Number(imap_port)   : null,
+        imap_secure !== undefined ? Boolean(imap_secure): null,
+        smtp_host   !== undefined ? String(smtp_host)   : null,
+        smtp_port   !== undefined ? Number(smtp_port)   : null,
+        smtp_secure !== undefined ? Boolean(smtp_secure): null,
+        username    !== undefined ? String(username)    : null,
+        encPassword,
+      ],
+    );
+    return ok(res, rows[0]);
+  } catch (e: any) { return err(res, e.message); }
+}
+
 export async function getAccountFolders(req: Request, res: Response) {
   const uid = userId(req);
   if (!uid) return err(res, 'No autenticado', 401);

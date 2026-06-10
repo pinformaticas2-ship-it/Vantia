@@ -20,7 +20,7 @@ import {
   MoreVertical, AlertCircle, Eye, EyeOff,
   ChevronLeft, Edit3, Tag, Wifi, Zap, Pin, FolderPlus, RotateCcw, Folder, Archive,
   AtSign, Shield, Filter, LogIn, Maximize2, Minimize2, Bold, Italic, Underline,
-  AlignLeft, AlignCenter, AlignRight, List, type LucideIcon,
+  AlignLeft, AlignCenter, AlignRight, List, Pencil, type LucideIcon,
 } from 'lucide-react';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -120,7 +120,12 @@ interface ImapAccount {
   label: string;
   email: string;
   imap_host: string;
+  imap_port?: number;
+  imap_secure?: boolean;
   smtp_host: string;
+  smtp_port?: number;
+  smtp_secure?: boolean;
+  username?: string;
   active: boolean;
   last_sync_at: string | null;
 }
@@ -1091,12 +1096,16 @@ const SYSTEM_FOLDERS: {
 // ─── Connect Account Modal ────────────────────────────────────────────────────
 
 function ConnectAccountModal({
-  savedGmailProfiles, onConnectNewGmail, onReconnectProfile, onAddImap, onClose,
+  savedGmailProfiles, imapAccounts, onConnectNewGmail, onReconnectProfile, onAddImap,
+  onEditImap, onDeleteImap, onClose,
 }: {
   savedGmailProfiles: SavedOAuthProfile[];
+  imapAccounts: ImapAccount[];
   onConnectNewGmail: () => void;
   onReconnectProfile: (profile: SavedOAuthProfile) => void;
   onAddImap: () => void;
+  onEditImap: (acc: ImapAccount) => void;
+  onDeleteImap: (id: string) => void;
   onClose: () => void;
 }) {
   const GoogleIcon = () => (
@@ -1107,19 +1116,22 @@ function ConnectAccountModal({
       <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
     </svg>
   );
+
+  const hasExisting = savedGmailProfiles.length > 0 || imapAccounts.length > 0;
+
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-transparent" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="text-base font-bold text-gray-900">Conectar cuenta de correo</h2>
+          <h2 className="text-base font-bold text-gray-900">Cuentas de correo</h2>
           <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
             <X size={16} />
           </button>
         </div>
-        <div className="p-4 space-y-3">
-          {savedGmailProfiles.length > 0 && (
+        <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
+          {hasExisting && (
             <div>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Cuentas guardadas</p>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Cuentas configuradas</p>
               <div className="space-y-1">
                 {savedGmailProfiles.map(profile => (
                   <button
@@ -1132,14 +1144,42 @@ function ConnectAccountModal({
                       <p className="text-sm font-medium text-gray-800 truncate">{profile.display_name || profile.email}</p>
                       <p className="text-xs text-gray-400 truncate">{profile.email}</p>
                     </div>
-                    <RotateCcw size={14} className="text-gray-300 flex-shrink-0" />
+                    <span className="text-xs text-gray-300 flex-shrink-0">Gmail</span>
+                    <RotateCcw size={14} className="text-gray-300 flex-shrink-0 ml-1" />
                   </button>
+                ))}
+                {imapAccounts.map(acc => (
+                  <div
+                    key={acc.id}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-gray-100 bg-gray-50 group">
+                    <AtSign size={18} className="text-indigo-400 flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-gray-800 truncate">{acc.label || acc.email}</p>
+                      <p className="text-xs text-gray-400 truncate">{acc.email}</p>
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => { onEditImap(acc); onClose(); }}
+                        title="Editar cuenta"
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors">
+                        <Pencil size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); onDeleteImap(acc.id); }}
+                        title="Eliminar cuenta"
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-[#ab0433] hover:bg-red-50 transition-colors">
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
           )}
-          <div className={savedGmailProfiles.length > 0 ? 'border-t border-gray-100 pt-3' : ''}>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Nueva cuenta</p>
+          <div className={hasExisting ? 'border-t border-gray-100 pt-3' : ''}>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Añadir cuenta</p>
             {GMAIL_CLIENT_ID && (
               <button
                 type="button"
@@ -2002,16 +2042,18 @@ const KNOWN_PROVIDERS: Record<string, { imap: string; pop3: string; smtp: string
 };
 
 function ImapForm({
-  onClose, onSaved, getToken, defaultEmail, defaultName, preset,
+  onClose, onSaved, getToken, defaultEmail, defaultName, preset, editAccountId,
 }: {
   onClose: () => void; onSaved: (account: ImapAccount) => void | Promise<void>;
   getToken: () => Promise<string>;
   defaultEmail?: string; defaultName?: string;
+  editAccountId?: string;
   preset?: Partial<{
     label: string; email: string; imap_host: string; imap_port: number;
     imap_secure: boolean; smtp_host: string; smtp_port: number; smtp_secure: boolean;
   }> | null;
 }) {
+  const isEdit = Boolean(editAccountId);
   const [step, setStep]       = useState(preset?.imap_host ? 2 : 1);
   const [protocol, setProtocol] = useState<'imap' | 'pop3'>('imap');
   const [form, setForm] = useState({
@@ -2067,18 +2109,26 @@ function ImapForm({
   };
 
   const handleSave = async () => {
-    if (!form.email || !form.imap_host || !form.smtp_host || !form.username || !form.password) {
-      setError('Completa email, servidores, usuario y contraseña antes de continuar.');
+    if (!form.email || !form.imap_host || !form.smtp_host || !form.username) {
+      setError('Completa email, servidores y usuario antes de continuar.');
+      return;
+    }
+    if (!isEdit && !form.password) {
+      setError('La contraseña es obligatoria.');
       return;
     }
     setSaving(true); setError('');
     try {
       const token = await getToken();
       if (!token) throw new Error('Tu sesión ha caducado. Vuelve a iniciar sesión e inténtalo otra vez.');
-      const res = await fetch(`${API}/email/accounts`, {
-        method: 'POST',
+      const url    = isEdit ? `${API}/email/accounts/${editAccountId}` : `${API}/email/accounts`;
+      const method = isEdit ? 'PUT' : 'POST';
+      const body   = { ...form, smtp_secure: form.smtp_port === 465, protocol };
+      if (isEdit && !form.password) delete (body as any).password;
+      const res = await fetch(url, {
+        method,
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, smtp_secure: form.smtp_port === 465, protocol }),
+        body: JSON.stringify(body),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.success || !data?.data) {
@@ -2097,8 +2147,8 @@ function ImapForm({
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div>
-            <h3 className="font-semibold text-gray-900">Añadir cuenta de correo</h3>
-            <p className="text-xs text-gray-400 mt-0.5">Paso {step} de 2</p>
+            <h3 className="font-semibold text-gray-900">{isEdit ? 'Editar cuenta de correo' : 'Añadir cuenta de correo'}</h3>
+            <p className="text-xs text-gray-400 mt-0.5">{isEdit ? 'Actualiza los datos de tu cuenta' : `Paso ${step} de 2`}</p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full text-gray-400">
             <X size={18} />
@@ -2224,7 +2274,9 @@ function ImapForm({
                   className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Contraseña</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  Contraseña{isEdit && <span className="text-gray-400 font-normal"> — dejar vacío para no cambiar</span>}
+                </label>
                 <div className="relative">
                   <input value={form.password} onChange={e => set('password', e.target.value)}
                     type={showPass ? 'text' : 'password'}
@@ -2246,10 +2298,10 @@ function ImapForm({
                   className="flex-1 border border-gray-200 text-gray-600 font-medium py-2.5 rounded-lg text-sm hover:bg-gray-50 transition-colors">
                   Atrás
                 </button>
-                <button onClick={handleSave} disabled={saving || !form.password}
+                <button onClick={handleSave} disabled={saving || (!isEdit && !form.password)}
                   className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 rounded-lg text-sm disabled:opacity-50 transition-colors flex items-center justify-center gap-2">
                   {saving ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
-                  Guardar y probar
+                  {isEdit ? 'Actualizar' : 'Guardar y probar'}
                 </button>
               </div>
             </>
@@ -2862,6 +2914,7 @@ export default function Email() {
   const [fullscreenEmail, setFullscreenEmail] = useState<ParsedEmail | null>(null);
   const [compose, setCompose]           = useState<ComposeData | null>(null);
   const [showImapForm, setShowImapForm] = useState(false);
+  const [editImapId, setEditImapId] = useState<string | undefined>(undefined);
   const [imapPreset, setImapPreset] = useState<Partial<{
     label: string; email: string; imap_host: string; imap_port: number;
     imap_secure: boolean; smtp_host: string; smtp_port: number; smtp_secure: boolean;
@@ -4376,9 +4429,26 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
       {showConnectModal && (
         <ConnectAccountModal
           savedGmailProfiles={savedGmailProfiles}
+          imapAccounts={imapAccounts}
           onConnectNewGmail={() => { setShowConnectModal(false); connectGoogle(); }}
           onReconnectProfile={(profile) => { setShowConnectModal(false); reconnectGoogleProfile(profile); }}
-          onAddImap={() => { setShowConnectModal(false); setImapPreset(null); setShowImapForm(true); }}
+          onAddImap={() => { setShowConnectModal(false); setEditImapId(undefined); setImapPreset(null); setShowImapForm(true); }}
+          onEditImap={(acc) => {
+            setShowConnectModal(false);
+            setEditImapId(acc.id);
+            setImapPreset({
+              label: acc.label,
+              email: acc.email,
+              imap_host: acc.imap_host,
+              imap_port: acc.imap_port,
+              imap_secure: acc.imap_secure,
+              smtp_host: acc.smtp_host,
+              smtp_port: acc.smtp_port,
+              smtp_secure: acc.smtp_secure,
+            });
+            setShowImapForm(true);
+          }}
+          onDeleteImap={(id) => { setShowConnectModal(false); requestDeleteImapAccount(id); }}
           onClose={() => setShowConnectModal(false)}
         />
       )}
@@ -4386,21 +4456,26 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
       {/* ── IMAP form ── */}
       {showImapForm && (
         <ImapForm
-          onClose={() => { setShowImapForm(false); setImapPreset(null); }}
+          onClose={() => { setShowImapForm(false); setImapPreset(null); setEditImapId(undefined); }}
           onSaved={async (savedAccount) => {
             setError('');
-
-            // 1. Recargar lista de cuentas
             setImapAccounts((prev) => {
               const withoutCurrent = prev.filter((account) => account.id !== savedAccount.id);
               return [...withoutCurrent, savedAccount];
             });
 
-            // 2. Seleccionar la cuenta recién añadida
+            if (editImapId) {
+              // Editing an existing account — just close, no need to re-sync
+              setShowImapForm(false);
+              setImapPreset(null);
+              setEditImapId(undefined);
+              return;
+            }
+
+            // New account — select it and run initial sync
             setSelectedImapAccountId(savedAccount.id);
             setSelectedFolder('INBOX');
 
-            // 3. Cargar carpetas y hacer sync inmediato
             setSyncing(true);
             try {
               await refreshImapFolders(savedAccount.id);
@@ -4410,19 +4485,19 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
               if (accountsResponse.ok && accountsPayload?.success) {
                 setImapAccounts(accountsPayload.data || []);
               }
-
               setSelectedEmail(null);
               setShowImapForm(false);
               setImapPreset(null);
+              setEditImapId(undefined);
             } catch (e: any) {
               setError(`La cuenta se guardó, pero la primera sincronización falló: ${e.message || 'error desconocido'}`);
             }
             finally { setSyncing(false); }
-            // loadEmails se dispara solo vía el useEffect [currentImapAccount, selectedFolder]
           }}
           getToken={tokenGetter}
           defaultEmail={userEmail}
           preset={imapPreset}
+          editAccountId={editImapId}
           defaultName={userName}
         />
       )}

@@ -6,6 +6,7 @@ import {
   upsertOAuthProfile,
   deleteOAuthProfile,
   createAccount,
+  updateAccount,
   deleteAccount,
   getAccountFolders,
   createAccountFolder,
@@ -34,6 +35,7 @@ router.get('/profiles',           getOAuthProfiles);
 router.post('/profiles',          upsertOAuthProfile);
 router.delete('/profiles/:id',    deleteOAuthProfile);
 router.post('/accounts',          createAccount);
+router.put('/accounts/:id',       updateAccount);
 router.delete('/accounts/:id',    deleteAccount);
 router.get('/accounts/:id/folders', getAccountFolders);
 router.post('/accounts/:id/folders', createAccountFolder);
