@@ -191,7 +191,7 @@ function WidgetPickerModal({ visible, onClose, onSave }: { visible: string[]; on
 }
 
 // ── Sortable wrapper ──────────────────────────────────────────────────────────
-function SortableWidget({ id, children }: { id: string; children: (handle: ReactNode) => ReactNode }) {
+function SortableWidget({ id, children, className }: { id: string; children: (handle: ReactNode) => ReactNode; className?: string }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
   const handle = (
@@ -203,7 +203,7 @@ function SortableWidget({ id, children }: { id: string; children: (handle: React
       <GripVertical size={14} />
     </button>
   );
-  return <div ref={setNodeRef} style={style}>{children(handle)}</div>;
+  return <div ref={setNodeRef} style={style} className={className}>{children(handle)}</div>;
 }
 
 // ── Billing period selector ───────────────────────────────────────────────────
@@ -345,7 +345,7 @@ export default function DashboardHome() {
   const [emailMsgLoading,  setEmailMsgLoading]  = useState(false);
   const [selectedEmailAccountId, setSelectedEmailAccountId] = useState<string>("");
   const [openMenuEmailId,      setOpenMenuEmailId]      = useState<string | null>(null);
-  const emailMenuRef = useRef<HTMLDivElement | null>(null);
+  const emailMenuRef = useRef<HTMLUListElement | null>(null);
   const [docStats,      setDocStats]      = useState({ providers: 0, activos: 0, highlights: 0, lexnet: false });
 
   // Billing period state
@@ -1101,12 +1101,15 @@ export default function DashboardHome() {
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd} autoScroll={false}>
           <SortableContext items={orderedVisible} strategy={rectSortingStrategy}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {orderedVisible.map(id => (
-                <SortableWidget key={id} id={id}>
-                  {(handle) => renderWidget(id, handle)}
-                </SortableWidget>
-              ))}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+              {orderedVisible.map((id, index) => {
+                const isLastOdd = orderedVisible.length % 2 === 1 && index === orderedVisible.length - 1;
+                return (
+                  <SortableWidget key={id} id={id} className={isLastOdd ? "md:col-span-2" : undefined}>
+                    {(handle) => renderWidget(id, handle)}
+                  </SortableWidget>
+                );
+              })}
             </div>
           </SortableContext>
         </DndContext>
