@@ -826,7 +826,7 @@ function TimeGridView({
   onGcalEventClick: (ev: GCalEvent) => void;
   onDayHeaderClick: (dateStr: string) => void;
   onResizeEvent: (id: string, newEndAt: string) => Promise<void>;
-  onMoveEvent: (id: string, newStartAt: string, newEndAt: string | null) => Promise<void>;
+  onMoveEvent: (id: string, newStartAt: string, newEndAt: string | null, allDay?: boolean) => Promise<void>;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -869,6 +869,7 @@ function TimeGridView({
   } | null>(null);
   const [allDayDragDisplay, setAllDayDragDisplay] = useState<{
     id: string; targetDateStr: string; title: string; colorBg: string;
+    timedStartAt?: string;
   } | null>(null);
 
   // Función para encontrar la columna bajo el cursor
@@ -887,10 +888,22 @@ function TimeGridView({
       // Drag todo el día
       if (draggingAllDayRef.current) {
         const targetDateStr = findDateStrAtX(e.clientX);
-        setAllDayDragDisplay(prev =>
-          prev?.targetDateStr === targetDateStr ? prev
-          : { id: draggingAllDayRef.current!.id, targetDateStr, title: draggingAllDayRef.current!.title, colorBg: draggingAllDayRef.current!.colorBg }
-        );
+        let timedStartAt: string | undefined;
+        if (scrollRef.current) {
+          const gridRect = scrollRef.current.getBoundingClientRect();
+          if (e.clientY >= gridRect.top && e.clientY <= gridRect.bottom) {
+            const rawY = e.clientY - gridRect.top + scrollRef.current.scrollTop;
+            const snapped = Math.round(Math.max(0, Math.min((rawY / HOUR_HEIGHT) * 60, 24 * 60 - 60)) / 15) * 15;
+            const base = new Date(targetDateStr + "T00:00:00");
+            base.setHours(Math.floor(snapped / 60), snapped % 60, 0, 0);
+            timedStartAt = base.toISOString();
+          }
+        }
+        setAllDayDragDisplay(prev => {
+          const next = { id: draggingAllDayRef.current!.id, targetDateStr, title: draggingAllDayRef.current!.title, colorBg: draggingAllDayRef.current!.colorBg, timedStartAt };
+          if (prev?.targetDateStr === next.targetDateStr && prev?.timedStartAt === next.timedStartAt) return prev;
+          return next;
+        });
         return;
       }
       // Resize
@@ -933,7 +946,12 @@ function TimeGridView({
         draggingAllDayRef.current = null;
         const display = allDayDragDisplay;
         setAllDayDragDisplay(null);
-        if (display && display.targetDateStr !== drag.origDateStr) {
+        if (display?.timedStartAt) {
+          // Convertir a evento con hora
+          const newEndAt = new Date(new Date(display.timedStartAt).getTime() + 3600000).toISOString();
+          await onMoveEventRef.current(drag.id, display.timedStartAt, newEndAt, false);
+        } else if (display && display.targetDateStr !== drag.origDateStr) {
+          // Mover a otro día (sigue siendo todo el día)
           const newStartAt = display.targetDateStr + "T00:00:00";
           let newEndAt: string | null = null;
           if (drag.endAt) {
@@ -1174,6 +1192,24 @@ function TimeGridView({
                   );
                 })()}
 
+
+                {/* Ghost al arrastrar evento de todo-el-día a la rejilla horaria */}
+                {allDayDragDisplay?.timedStartAt && allDayDragDisplay.targetDateStr === dateStr && (() => {
+                  const start = new Date(allDayDragDisplay.timedStartAt!);
+                  const end = new Date(start.getTime() + 3600000);
+                  const topPx = (start.getHours() + start.getMinutes() / 60) * HOUR_HEIGHT;
+                  return (
+                    <div
+                      className={`absolute left-1 right-1 rounded px-2 py-1 text-[11px] font-medium text-white pointer-events-none ring-2 ring-white/50 opacity-80 ${allDayDragDisplay.colorBg}`}
+                      style={{ top: topPx, height: HOUR_HEIGHT - 2, zIndex: 20 }}
+                    >
+                      <div className="font-semibold truncate leading-tight">{allDayDragDisplay.title}</div>
+                      <div className="text-[10px] leading-tight text-white/80">
+                        {fmtTime(allDayDragDisplay.timedStartAt!)} – {fmtTime(end.toISOString())}
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {timedEvs.map(ev => {
                   const isResizing = resizingDisplay?.id === ev.id;
@@ -1994,18 +2030,19 @@ export default function Agenda() {
     }
   }, [events, getToken, fetchEvents]);
 
-  const handleMoveEventToDateTime = useCallback(async (id: string, newStartAt: string, newEndAt: string | null) => {
+  const handleMoveEventToDateTime = useCallback(async (id: string, newStartAt: string, newEndAt: string | null, allDay?: boolean) => {
     const ev = events.find(e => e.id === id);
     if (!ev) return;
     const previousEvents = events;
     setMovingEventId(id);
-    setEvents(prev => prev.map(e => e.id === id ? { ...e, start_at: newStartAt, end_at: newEndAt } : e));
+    const updatedEv = { ...ev, start_at: newStartAt, end_at: newEndAt, ...(allDay !== undefined ? { all_day: allDay } : {}) };
+    setEvents(prev => prev.map(e => e.id === id ? updatedEv : e));
     try {
       const token = await getToken({ skipCache: true });
       const res = await fetch(`/api/agenda/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ ...ev, start_at: newStartAt, end_at: newEndAt }),
+        body: JSON.stringify(updatedEv),
       });
       const json = await safeJson(res);
       if (!res.ok) {
