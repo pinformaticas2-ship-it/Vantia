@@ -862,6 +862,15 @@ function TimeGridView({
   const onMoveEventRef = useRef(onMoveEvent);
   onMoveEventRef.current = onMoveEvent;
 
+  // ── Drag de eventos de todo el día ────────────────────────────────────────────
+  const draggingAllDayRef = useRef<{
+    id: string; origDateStr: string; startAt: string; endAt: string | null;
+    title: string; colorBg: string;
+  } | null>(null);
+  const [allDayDragDisplay, setAllDayDragDisplay] = useState<{
+    id: string; targetDateStr: string; title: string; colorBg: string;
+  } | null>(null);
+
   // Función para encontrar la columna bajo el cursor
   const findDateStrAtX = useCallback((clientX: number): string => {
     let best = days[0];
@@ -875,6 +884,15 @@ function TimeGridView({
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
+      // Drag todo el día
+      if (draggingAllDayRef.current) {
+        const targetDateStr = findDateStrAtX(e.clientX);
+        setAllDayDragDisplay(prev =>
+          prev?.targetDateStr === targetDateStr ? prev
+          : { id: draggingAllDayRef.current!.id, targetDateStr, title: draggingAllDayRef.current!.title, colorBg: draggingAllDayRef.current!.colorBg }
+        );
+        return;
+      }
       // Resize
       if (resizingRef.current && scrollRef.current) {
         const rect = scrollRef.current.getBoundingClientRect();
@@ -909,6 +927,24 @@ function TimeGridView({
       }
     };
     const handleMouseUp = async () => {
+      // Drag todo el día
+      if (draggingAllDayRef.current) {
+        const drag = draggingAllDayRef.current;
+        draggingAllDayRef.current = null;
+        const display = allDayDragDisplay;
+        setAllDayDragDisplay(null);
+        if (display && display.targetDateStr !== drag.origDateStr) {
+          const newStartAt = display.targetDateStr + "T00:00:00";
+          let newEndAt: string | null = null;
+          if (drag.endAt) {
+            const origMs = new Date(drag.startAt.slice(0, 10) + "T00:00:00").getTime();
+            const endMs = new Date(drag.endAt.slice(0, 10) + "T00:00:00").getTime();
+            newEndAt = new Date(new Date(newStartAt).getTime() + (endMs - origMs)).toISOString();
+          }
+          await onMoveEventRef.current(drag.id, newStartAt, newEndAt);
+        }
+        return;
+      }
       // Resize
       if (resizingRef.current) {
         const ev = resizingRef.current;
@@ -934,7 +970,7 @@ function TimeGridView({
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [dragDisplay, findDateStrAtX]);
+  }, [dragDisplay, allDayDragDisplay, findDateStrAtX]);
 
   const [nowMins, setNowMins] = useState(() => {
     const n = new Date();
@@ -962,6 +998,9 @@ function TimeGridView({
       {/* Overlay de cursor durante resize o drag */}
       {resizingDisplay && (
         <div className="fixed inset-0 cursor-s-resize" style={{ zIndex: 9999 }} />
+      )}
+      {allDayDragDisplay && (
+        <div className="fixed inset-0 cursor-grabbing" style={{ zIndex: 9999 }} />
       )}
       {dragDisplay && (
         <div className="fixed inset-0 cursor-grabbing select-none" style={{ zIndex: 9999 }} />
@@ -1005,16 +1044,29 @@ function TimeGridView({
             <div key={dateStr} className="flex-1 border-l border-gray-100 px-0.5 py-0.5 space-y-0.5">
               {allDayLex.map(ev => {
                 const tc = EVENT_TYPES[ev.type] || EVENT_TYPES.otro;
+                const isBeingDragged = allDayDragDisplay?.id === ev.id;
                 return (
                   <div
                     key={ev.id}
-                    onClick={() => onEventClick(ev)}
-                    className={`text-[11px] font-medium truncate px-2 py-0.5 rounded cursor-pointer text-white ${tc.bg}`}
+                    onClick={e => { if (allDayDragDisplay) return; e.stopPropagation(); onEventClick(ev); }}
+                    onMouseDown={e => {
+                      if (e.button !== 0) return;
+                      e.stopPropagation(); e.preventDefault();
+                      draggingAllDayRef.current = { id: ev.id, origDateStr: dateStr, startAt: ev.start_at, endAt: ev.end_at, title: ev.title, colorBg: tc.bg };
+                      setAllDayDragDisplay({ id: ev.id, targetDateStr: dateStr, title: ev.title, colorBg: tc.bg });
+                    }}
+                    className={`text-[11px] font-medium truncate px-2 py-0.5 rounded text-white select-none ${tc.bg} ${isBeingDragged ? "opacity-30 cursor-grabbing" : "cursor-grab"}`}
                   >
                     {ev.title}
                   </div>
                 );
               })}
+              {/* Ghost en columna destino */}
+              {allDayDragDisplay?.targetDateStr === dateStr && !allDayLex.some(e => e.id === allDayDragDisplay.id) && (
+                <div className={`text-[11px] font-medium truncate px-2 py-0.5 rounded text-white pointer-events-none ring-2 ring-white/50 opacity-80 ${allDayDragDisplay.colorBg}`}>
+                  {allDayDragDisplay.title}
+                </div>
+              )}
               {allDayGcal.map(ev => (
                 <div
                   key={ev.id}
