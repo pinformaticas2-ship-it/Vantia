@@ -1122,6 +1122,27 @@ function TimeGridView({
                   );
                 })()}
 
+                {/* Tooltip flotante de hora durante resize */}
+                {resizingDisplay && (() => {
+                  const resEv = timedEvs.find(e => e.id === resizingDisplay.id);
+                  if (!resEv) return null;
+                  const resStart = new Date(resEv.start_at);
+                  const resEnd = new Date(resizingDisplay.endAt);
+                  const rTopPx = (resStart.getHours() + resStart.getMinutes() / 60) * HOUR_HEIGHT;
+                  const rDurH = Math.max((resEnd.getTime() - resStart.getTime()) / 3600000, 0.25);
+                  const rHeightPx = rDurH * HOUR_HEIGHT - 2;
+                  return (
+                    <div
+                      className="absolute right-2 pointer-events-none z-50"
+                      style={{ top: rTopPx + rHeightPx + 6 }}
+                    >
+                      <div className="bg-slate-800 text-white text-[11px] font-bold rounded-lg px-2 py-1 shadow-xl whitespace-nowrap">
+                        {fmtTime(resEv.start_at)} – {fmtTime(resizingDisplay.endAt)}
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {timedEvs.map(ev => {
                   const isResizing = resizingDisplay?.id === ev.id;
                   const isDragging = dragDisplay?.id === ev.id;
@@ -1157,7 +1178,7 @@ function TimeGridView({
                       style={{ top: topPx, height: heightPx, zIndex: isResizing ? 30 : 10 }}
                     >
                       <div className="font-semibold truncate leading-tight">{ev.title}</div>
-                      <div className={`text-[10px] leading-tight transition-opacity duration-200 ${isResizing ? "opacity-0" : "text-white/80"}`}>
+                      <div className={`text-[10px] leading-tight transition-opacity duration-200 ${isResizing ? "font-semibold text-white" : "text-white/80"}`}>
                         {fmtTime(ev.start_at)}{effectiveEndAt ? ` – ${fmtTime(effectiveEndAt)}` : ""}
                       </div>
                       {/* Handle de resize */}
