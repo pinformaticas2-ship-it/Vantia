@@ -345,7 +345,7 @@ export default function DashboardHome() {
   const [emailMsgLoading,  setEmailMsgLoading]  = useState(false);
   const [selectedEmailAccountId, setSelectedEmailAccountId] = useState<string>("");
   const [openMenuEmailId,      setOpenMenuEmailId]      = useState<string | null>(null);
-  const emailMenuRef = useRef<HTMLDivElement | null>(null);
+  const emailMenuRef = useRef<HTMLUListElement | null>(null);
   const [docStats,      setDocStats]      = useState({ providers: 0, activos: 0, highlights: 0, lexnet: false });
 
   // Billing period state
@@ -1101,7 +1101,7 @@ export default function DashboardHome() {
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd} autoScroll={false}>
           <SortableContext items={orderedVisible} strategy={rectSortingStrategy}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
               {orderedVisible.map(id => (
                 <SortableWidget key={id} id={id}>
                   {(handle) => renderWidget(id, handle)}
