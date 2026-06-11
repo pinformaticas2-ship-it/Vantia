@@ -36,13 +36,27 @@ export interface Pop3Message {
 
 // ── Helpers de parsing MIME ───────────────────────────────────────────────────
 
-function decodeBase64(s: string): string {
-  try { return Buffer.from(s, 'base64').toString('utf-8'); } catch { return s; }
+function normalizeCharset(cs: string): BufferEncoding {
+  const c = cs.toLowerCase().trim().replace(/[-_]/g, '');
+  if (c === 'iso88591' || c === 'latin1' || c === 'windows1252' || c === 'cp1252') return 'latin1';
+  if (c === 'usascii' || c === 'ascii') return 'ascii';
+  return 'utf8';
 }
 
-function decodeQP(s: string): string {
-  return s.replace(/=\r?\n/g, '').replace(/=([0-9A-Fa-f]{2})/g, (_, h) =>
+function extractCharset(headers: string): BufferEncoding {
+  const m = headers.match(/charset\s*=\s*(?:"([^"]+)"|([^\s;>\r\n]+))/i);
+  return normalizeCharset(m?.[1] || m?.[2] || 'utf-8');
+}
+
+function decodeBase64(s: string, charset: BufferEncoding = 'utf8'): string {
+  try { return Buffer.from(s, 'base64').toString(charset); }
+  catch { try { return Buffer.from(s, 'base64').toString('utf8'); } catch { return s; } }
+}
+
+function decodeQP(s: string, charset: BufferEncoding = 'utf8'): string {
+  const bytes = s.replace(/=\r?\n/g, '').replace(/=([0-9A-Fa-f]{2})/g, (_, h) =>
     String.fromCharCode(parseInt(h, 16)));
+  try { return Buffer.from(bytes, 'binary').toString(charset); } catch { return bytes; }
 }
 
 function decodeHeader(raw: string): string {
@@ -50,10 +64,11 @@ function decodeHeader(raw: string): string {
     /=\?([^?]+)\?([BbQq])\?([^?]*)\?=/g,
     (_m, charset, enc, text) => {
       try {
-        return enc.toUpperCase() === 'B'
-          ? Buffer.from(text, 'base64').toString(charset as BufferEncoding)
-          : Buffer.from(decodeQP(text), 'binary').toString();
-      } catch { return text; }
+        const cs = normalizeCharset(String(charset));
+        return String(enc).toUpperCase() === 'B'
+          ? decodeBase64(String(text), cs)
+          : decodeQP(String(text), cs);
+      } catch { return String(text); }
     },
   );
 }
@@ -72,14 +87,15 @@ function getHeader(headers: string, name: string): string {
 
 function extractBody(raw: string): { html: string; text: string } {
   const [headerPart, ...bodyParts] = raw.split(/\r?\n\r?\n/);
-  const body = bodyParts.join('\r\n\r\n');
-  const ct   = getHeader(headerPart, 'Content-Type').toLowerCase();
-  const cte  = getHeader(headerPart, 'Content-Transfer-Encoding').toLowerCase();
+  const body    = bodyParts.join('\r\n\r\n');
+  const ct      = getHeader(headerPart, 'Content-Type').toLowerCase();
+  const cte     = getHeader(headerPart, 'Content-Transfer-Encoding').toLowerCase();
+  const charset = extractCharset(headerPart);
 
   const decode = (content: string) => {
-    if (cte.includes('base64'))            return decodeBase64(content.replace(/\s+/g, ''));
-    if (cte.includes('quoted-printable'))  return decodeQP(content);
-    return content;
+    if (cte.includes('base64'))           return decodeBase64(content.replace(/\s+/g, ''), charset);
+    if (cte.includes('quoted-printable')) return decodeQP(content, charset);
+    return Buffer.from(content, 'binary').toString(charset);
   };
 
   // Multipart
@@ -90,13 +106,14 @@ function extractBody(raw: string): { html: string; text: string } {
     for (const part of parts) {
       if (!part.trim() || part.trim() === '--') continue;
       const [ph, ...pb] = part.split(/\r?\n\r?\n/);
-      const pct  = getHeader(ph, 'Content-Type').toLowerCase();
-      const pcte = getHeader(ph, 'Content-Transfer-Encoding').toLowerCase();
-      const pbody = pb.join('\r\n\r\n').trim();
+      const pct     = getHeader(ph, 'Content-Type').toLowerCase();
+      const pcte    = getHeader(ph, 'Content-Transfer-Encoding').toLowerCase();
+      const pcs     = extractCharset(ph);
+      const pbody   = pb.join('\r\n\r\n').trim();
       const dec = (s: string) => {
-        if (pcte.includes('base64'))           return decodeBase64(s.replace(/\s+/g, ''));
-        if (pcte.includes('quoted-printable')) return decodeQP(s);
-        return s;
+        if (pcte.includes('base64'))           return decodeBase64(s.replace(/\s+/g, ''), pcs);
+        if (pcte.includes('quoted-printable')) return decodeQP(s, pcs);
+        return Buffer.from(s, 'binary').toString(pcs);
       };
       if (pct.includes('text/html') && !html)  html = dec(pbody);
       if (pct.includes('text/plain') && !text) text = dec(pbody);
