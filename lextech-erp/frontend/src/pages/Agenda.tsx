@@ -857,6 +857,7 @@ function TimeGridView({
   } | null>(null);
   const [dragDisplay, setDragDisplay] = useState<{
     id: string; dateStr: string; startAt: string; endAt: string | null;
+    droppingToAllDay?: boolean;
   } | null>(null);
   const columnRefsMap = useRef<Map<string, HTMLDivElement | null>>(new Map());
   const onMoveEventRef = useRef(onMoveEvent);
@@ -925,11 +926,16 @@ function TimeGridView({
       // Drag
       if (draggingRef.current && scrollRef.current) {
         const gridRect = scrollRef.current.getBoundingClientRect();
+        const targetDateStr = findDateStrAtX(e.clientX);
+        // Si el cursor está sobre la banda de todo el día
+        if (e.clientY < gridRect.top) {
+          setDragDisplay({ id: draggingRef.current.id, dateStr: targetDateStr, startAt: draggingRef.current.startAt, endAt: draggingRef.current.endAt, droppingToAllDay: true });
+          return;
+        }
         const rawY = e.clientY - gridRect.top + scrollRef.current.scrollTop;
         const rawMins = (rawY / HOUR_HEIGHT) * 60 - draggingRef.current.grabOffsetMins;
         const snapped = Math.round(rawMins / 15) * 15;
         const clampedStart = Math.max(0, Math.min(snapped, 24 * 60 - 15));
-        const targetDateStr = findDateStrAtX(e.clientX);
         const base = new Date(targetDateStr + "T00:00:00");
         const newStart = new Date(base);
         newStart.setHours(Math.floor(clampedStart / 60), clampedStart % 60, 0, 0);
@@ -977,7 +983,9 @@ function TimeGridView({
         draggingRef.current = null;
         const display = dragDisplay;
         setDragDisplay(null);
-        if (display && (display.startAt !== drag.startAt || display.dateStr !== drag.startAt.slice(0, 10))) {
+        if (display?.droppingToAllDay) {
+          await onMoveEventRef.current(drag.id, display.dateStr + "T00:00:00", null, true);
+        } else if (display && (display.startAt !== drag.startAt || display.dateStr !== drag.startAt.slice(0, 10))) {
           await onMoveEventRef.current(drag.id, display.startAt, display.endAt);
         }
       }
@@ -1079,12 +1087,23 @@ function TimeGridView({
                   </div>
                 );
               })}
-              {/* Ghost en columna destino */}
+              {/* Ghost en columna destino (drag todo-el-día entre columnas) */}
               {allDayDragDisplay?.targetDateStr === dateStr && !allDayLex.some(e => e.id === allDayDragDisplay.id) && (
                 <div className={`text-[11px] font-medium truncate px-2 py-0.5 rounded text-white pointer-events-none ring-2 ring-white/50 opacity-80 ${allDayDragDisplay.colorBg}`}>
                   {allDayDragDisplay.title}
                 </div>
               )}
+              {/* Ghost al arrastrar evento temporizado a la banda de todo el día */}
+              {dragDisplay?.droppingToAllDay && dragDisplay.dateStr === dateStr && (() => {
+                const draggedEv = Object.values(eventsByDay).flat().find(e => e.id === dragDisplay.id);
+                if (!draggedEv) return null;
+                const tc2 = EVENT_TYPES[draggedEv.type] || EVENT_TYPES.otro;
+                return (
+                  <div className={`text-[11px] font-medium truncate px-2 py-0.5 rounded text-white pointer-events-none ring-2 ring-white/50 opacity-80 ${tc2.bg}`}>
+                    {draggedEv.title}
+                  </div>
+                );
+              })()}
               {allDayGcal.map(ev => (
                 <div
                   key={ev.id}
