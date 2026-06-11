@@ -28,6 +28,52 @@ function decryptPassword(enc: string): string {
 const ok  = (res: Response, data: any)         => res.json({ success: true,  data });
 const err = (res: Response, msg: string, s=500) => res.status(s).json({ success: false, error: msg });
 
+// ── Gmail API helpers ─────────────────────────────────────────────────────────
+
+async function gmailApiGet(path: string, accessToken: string): Promise<any> {
+  const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me${path}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({} as any)) as any;
+    throw Object.assign(
+      new Error(body?.error?.message || `Gmail API ${res.status}`),
+      { code: res.status },
+    );
+  }
+  return res.json();
+}
+
+async function gmailApiPost(path: string, accessToken: string, body: object): Promise<any> {
+  const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me${path}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const b = await res.json().catch(() => ({} as any)) as any;
+    throw Object.assign(new Error(b?.error?.message || `Gmail API ${res.status}`), { code: res.status });
+  }
+  return res.json();
+}
+
+async function getGmailAccessToken(profileId: string, uid: string): Promise<string> {
+  const { rows } = await pool.query(
+    `SELECT access_token_enc, token_expiry FROM email_oauth_profiles WHERE id=$1 AND user_id=$2`,
+    [profileId, uid],
+  );
+  if (!rows.length) throw new Error('Perfil Gmail no encontrado');
+  const row = rows[0];
+  if (row.token_expiry && new Date(row.token_expiry) <= new Date()) {
+    throw Object.assign(
+      new Error('El token de Gmail ha expirado. Vuelve a conectar tu cuenta.'),
+      { code: 401 },
+    );
+  }
+  if (!row.access_token_enc) throw Object.assign(new Error('No hay token de acceso guardado'), { code: 401 });
+  return decryptPassword(row.access_token_enc);
+}
+
 function userId(req: Request): string {
   return (req as any).auth?.userId || '';
 }
@@ -118,10 +164,10 @@ async function upsertEmailContacts(
 
 async function getAccountForMessage(messageId: string, uid: string) {
   const { rows } = await pool.query(
-    `SELECT e.id, e.uid, e.folder, e.user_id,
+    `SELECT e.id, e.uid, e.folder, e.user_id, e.gmail_profile_id, e.gmail_message_id,
             a.id AS account_id, a.imap_host, a.imap_port, a.imap_secure, a.username, a.password_enc
        FROM emails e
-       JOIN email_accounts a ON a.id=e.account_id
+       LEFT JOIN email_accounts a ON a.id=e.account_id
       WHERE e.id=$1 AND e.user_id=$2`,
     [messageId, uid],
   );
@@ -169,27 +215,36 @@ export async function upsertOAuthProfile(req: Request, res: Response) {
   const uid = userId(req);
   if (!uid) return err(res, 'No autenticado', 401);
 
-  const provider = String(req.body?.provider || 'google').toLowerCase();
-  const email = String(req.body?.email || '').trim().toLowerCase();
+  const provider    = String(req.body?.provider || 'google').toLowerCase();
+  const email       = String(req.body?.email || '').trim().toLowerCase();
   const displayName = String(req.body?.display_name || req.body?.displayName || '').trim() || null;
-  const avatarUrl = String(req.body?.avatar_url || req.body?.avatarUrl || '').trim() || null;
-  const externalId = String(req.body?.external_id || req.body?.externalId || '').trim() || null;
+  const avatarUrl   = String(req.body?.avatar_url   || req.body?.avatarUrl   || '').trim() || null;
+  const externalId  = String(req.body?.external_id  || req.body?.externalId  || '').trim() || null;
+  const accessToken = req.body?.access_token as string | undefined;
+  const expiresIn   = Number(req.body?.expires_in || 3600);
 
   if (!email) return err(res, 'Falta el email del perfil', 400);
 
+  const tokenEnc  = accessToken ? encryptPassword(accessToken) : null;
+  const tokenExpiry = accessToken ? new Date(Date.now() + expiresIn * 1000) : null;
+
   try {
     const { rows } = await pool.query(
-      `INSERT INTO email_oauth_profiles (user_id, provider, email, display_name, avatar_url, external_id, last_used_at)
-       VALUES ($1,$2,$3,$4,$5,$6,NOW())
+      `INSERT INTO email_oauth_profiles
+         (user_id, provider, email, display_name, avatar_url, external_id,
+          access_token_enc, token_expiry, last_used_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW())
        ON CONFLICT (user_id, provider, email)
        DO UPDATE SET
-         display_name = COALESCE(EXCLUDED.display_name, email_oauth_profiles.display_name),
-         avatar_url   = COALESCE(EXCLUDED.avatar_url, email_oauth_profiles.avatar_url),
-         external_id  = COALESCE(EXCLUDED.external_id, email_oauth_profiles.external_id),
-         last_used_at = NOW(),
-         updated_at   = NOW()
+         display_name     = COALESCE(EXCLUDED.display_name,     email_oauth_profiles.display_name),
+         avatar_url       = COALESCE(EXCLUDED.avatar_url,       email_oauth_profiles.avatar_url),
+         external_id      = COALESCE(EXCLUDED.external_id,      email_oauth_profiles.external_id),
+         access_token_enc = COALESCE(EXCLUDED.access_token_enc, email_oauth_profiles.access_token_enc),
+         token_expiry     = COALESCE(EXCLUDED.token_expiry,     email_oauth_profiles.token_expiry),
+         last_used_at     = NOW(),
+         updated_at       = NOW()
        RETURNING id, provider, email, display_name, avatar_url, external_id, last_used_at, created_at`,
-      [uid, provider, email, displayName, avatarUrl, externalId],
+      [uid, provider, email, displayName, avatarUrl, externalId, tokenEnc, tokenExpiry],
     );
     return ok(res, rows[0]);
   } catch (e: any) {
@@ -587,28 +642,117 @@ export async function syncAccount(req: Request, res: Response) {
   } catch (e: any) { return err(res, `Error de sincronización: ${e.message}`); }
 }
 
+// ── Sincronización Gmail ──────────────────────────────────────────────────────
+
+export async function syncGmailProfile(req: Request, res: Response) {
+  const uid = userId(req);
+  if (!uid) return err(res, 'No autenticado', 401);
+  const { profileId } = req.params;
+  const folder = (req.query.folder as string) || 'INBOX';
+  const limit  = Math.min(Number(req.query.limit) || 50, 200);
+
+  try {
+    const accessToken = await getGmailAccessToken(profileId, uid);
+
+    const LABEL_MAP: Record<string, string[]> = {
+      INBOX: ['INBOX'], SENT: ['SENT'], DRAFTS: ['DRAFT'], DRAFT: ['DRAFT'],
+      TRASH: ['TRASH'], SPAM: ['SPAM'], STARRED: ['STARRED'],
+    };
+    const labelIds = LABEL_MAP[folder.toUpperCase()] || [folder];
+
+    const params = new URLSearchParams({ maxResults: String(limit) });
+    labelIds.forEach(id => params.append('labelIds', id));
+    const listRes = await gmailApiGet(`/messages?${params}`, accessToken);
+    const messageIds: string[] = (listRes.messages || []).map((m: any) => String(m.id));
+
+    if (!messageIds.length) return ok(res, { synced: 0, inserted: 0, folder });
+
+    let inserted = 0; let synced = 0;
+
+    for (const msgId of messageIds) {
+      const metaP = new URLSearchParams({ format: 'metadata' });
+      ['From', 'To', 'Cc', 'Subject', 'Date', 'Message-ID'].forEach(h => metaP.append('metadataHeaders', h));
+      const msg = await gmailApiGet(`/messages/${msgId}?${metaP}`, accessToken);
+      synced++;
+
+      const hdrs: { name: string; value: string }[] = msg.payload?.headers || [];
+      const h = (name: string) => hdrs.find((x: any) => x.name.toLowerCase() === name.toLowerCase())?.value || '';
+
+      const fromRaw   = h('From');
+      const fromMatch = fromRaw.match(/^(?:"?([^"<]+)"?\s*)?<?([^>]+)>?$/);
+      const fromName  = (fromMatch?.[1] || '').trim() || null;
+      const fromEmail = (fromMatch?.[2] || fromRaw).trim().toLowerCase();
+
+      const dateRaw = h('Date');
+      const sentAt  = dateRaw ? new Date(dateRaw) : new Date(Number(msg.internalDate || 0));
+      const labels  = msg.labelIds || [];
+
+      let primaryFolder = folder;
+      if (labels.includes('DRAFT'))        primaryFolder = 'DRAFTS';
+      else if (labels.includes('SENT'))    primaryFolder = 'SENT';
+      else if (labels.includes('TRASH'))   primaryFolder = 'TRASH';
+      else if (labels.includes('SPAM'))    primaryFolder = 'SPAM';
+      else if (labels.includes('INBOX'))   primaryFolder = 'INBOX';
+
+      const isRead    = !labels.includes('UNREAD');
+      const isStarred = labels.includes('STARRED');
+      const isDraft   = labels.includes('DRAFT');
+      const hasAtt    = (msg.payload?.parts || []).some((p: any) => p.filename && p.filename.length > 0);
+      const msgId_    = h('Message-ID').replace(/[<>]/g, '') || null;
+
+      const { rowCount } = await pool.query(
+        `INSERT INTO emails
+           (gmail_profile_id, user_id, gmail_message_id, message_id, folder,
+            from_email, from_name, to_emails, cc_emails, subject, snippet,
+            is_read, is_starred, is_draft, has_attachments, size_bytes, sent_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+         ON CONFLICT (gmail_profile_id, gmail_message_id)
+           WHERE gmail_profile_id IS NOT NULL
+         DO UPDATE SET
+           is_read    = EXCLUDED.is_read,
+           is_starred = EXCLUDED.is_starred,
+           folder     = EXCLUDED.folder,
+           snippet    = COALESCE(EXCLUDED.snippet, emails.snippet)`,
+        [
+          profileId, uid, msgId, msgId_,
+          primaryFolder, fromEmail, fromName, h('To') || null, h('Cc') || null,
+          h('Subject') || '(Sin asunto)', (msg.snippet || '').slice(0, 200),
+          isRead, isStarred, isDraft, hasAtt, msg.sizeEstimate || 0, sentAt,
+        ],
+      );
+      if (rowCount) inserted++;
+    }
+
+    await pool.query(`UPDATE email_oauth_profiles SET last_used_at=NOW() WHERE id=$1`, [profileId]);
+    return ok(res, { synced, inserted, folder });
+  } catch (e: any) {
+    return err(res, e.message, (e.code === 401 || e.code === 403) ? 401 : 500);
+  }
+}
+
 // ── Mensajes ──────────────────────────────────────────────────────────────────
 
 export async function getMessages(req: Request, res: Response) {
   const uid = userId(req);
   if (!uid) return err(res, 'No autenticado', 401);
 
-  const accountId = req.query.account_id as string | undefined;
-  const folder    = (req.query.folder as string) || 'INBOX';
-  const search    = (req.query.q as string) || '';
-  const onlyUnread = req.query.unread === '1';
-  const onlyStarred = req.query.starred === '1';
-  const page      = Math.max(1, Number(req.query.page) || 1);
-  const pageSize  = Math.min(Number(req.query.limit) || 50, 200);
-  const offset    = (page - 1) * pageSize;
+  const accountId      = req.query.account_id       as string | undefined;
+  const gmailProfileId = req.query.gmail_profile_id as string | undefined;
+  const folder         = (req.query.folder as string) || 'INBOX';
+  const search         = (req.query.q as string) || '';
+  const onlyUnread     = req.query.unread   === '1';
+  const onlyStarred    = req.query.starred  === '1';
+  const page     = Math.max(1, Number(req.query.page)  || 1);
+  const pageSize = Math.min(Number(req.query.limit) || 50, 200);
+  const offset   = (page - 1) * pageSize;
 
   try {
     const params: any[] = [uid];
     const conditions: string[] = ['e.user_id=$1'];
 
-    if (accountId) { params.push(accountId); conditions.push(`e.account_id=$${params.length}`); }
+    if (accountId)      { params.push(accountId);      conditions.push(`e.account_id=$${params.length}`); }
+    if (gmailProfileId) { params.push(gmailProfileId); conditions.push(`e.gmail_profile_id=$${params.length}`); }
 
-    // Map virtual folders
     if (folder === 'STARRED') {
       conditions.push(`e.is_starred=true`);
     } else if (folder === 'UNREAD') {
@@ -628,16 +772,19 @@ export async function getMessages(req: Request, res: Response) {
 
     const where = conditions.join(' AND ');
     params.push(pageSize, offset);
-    const limitP = params.length - 1;
+    const limitP  = params.length - 1;
     const offsetP = params.length;
 
     const { rows } = await pool.query(
       `SELECT e.id, e.uid, e.folder, e.from_email, e.from_name, e.to_emails,
               e.subject, e.snippet, e.is_read, e.is_starred, e.has_attachments,
-              e.size_bytes, e.sent_at, e.account_id, e.expediente_id, e.cliente_id,
-              a.label AS account_label, a.email AS account_email
+              e.size_bytes, e.sent_at, e.account_id, e.gmail_profile_id, e.gmail_message_id,
+              e.expediente_id, e.cliente_id,
+              COALESCE(a.label, op.display_name, op.email) AS account_label,
+              COALESCE(a.email, op.email)                  AS account_email
        FROM emails e
-       JOIN email_accounts a ON a.id=e.account_id
+       LEFT JOIN email_accounts       a  ON a.id  = e.account_id
+       LEFT JOIN email_oauth_profiles op ON op.id = e.gmail_profile_id
        WHERE ${where}
        ORDER BY e.sent_at DESC NULLS LAST
        LIMIT $${limitP} OFFSET $${offsetP}`,
@@ -660,18 +807,46 @@ export async function getMessage(req: Request, res: Response) {
 
   try {
     const { rows } = await pool.query(
-      `SELECT e.*, a.imap_host, a.imap_port, a.imap_secure,
-              a.username, a.password_enc, a.email AS account_email, a.label AS account_label
+      `SELECT e.*,
+              a.imap_host, a.imap_port, a.imap_secure, a.username, a.password_enc,
+              COALESCE(a.email, op.email)                  AS account_email,
+              COALESCE(a.label, op.display_name, op.email) AS account_label
        FROM emails e
-       JOIN email_accounts a ON a.id=e.account_id
+       LEFT JOIN email_accounts       a  ON a.id  = e.account_id
+       LEFT JOIN email_oauth_profiles op ON op.id = e.gmail_profile_id
        WHERE e.id=$1 AND e.user_id=$2`,
       [id, uid],
     );
     if (!rows.length) return err(res, 'Email no encontrado', 404);
     const row = rows[0];
 
-    // If we have a uid and no body, fetch from IMAP
-    if (row.uid && !row.body_html && !row.body_text) {
+    // Fetch body from Gmail API if missing
+    if (row.gmail_profile_id && row.gmail_message_id && !row.body_html && !row.body_text) {
+      try {
+        const accessToken = await getGmailAccessToken(row.gmail_profile_id, uid);
+        const full = await gmailApiGet(`/messages/${row.gmail_message_id}?format=full`, accessToken);
+        let bodyHtml = ''; let bodyText = '';
+        const walkParts = (p: any) => {
+          if (!p) return;
+          const mt = p.mimeType || '';
+          if (mt === 'text/html'  && p.body?.data && !bodyHtml)
+            bodyHtml = Buffer.from(p.body.data.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
+          else if (mt === 'text/plain' && p.body?.data && !bodyText)
+            bodyText = Buffer.from(p.body.data.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
+          if (p.parts) p.parts.forEach(walkParts);
+        };
+        walkParts(full.payload);
+        const snippet = (bodyText || bodyHtml.replace(/<[^>]+>/g, ' ')).slice(0, 200);
+        await pool.query(
+          `UPDATE emails SET body_text=$1, body_html=$2, snippet=$3 WHERE id=$4`,
+          [bodyText, bodyHtml, snippet, id],
+        );
+        row.body_text = bodyText; row.body_html = bodyHtml; row.snippet = snippet;
+      } catch (_e) { /* best effort */ }
+    }
+
+    // Fetch body from IMAP if missing
+    if (!row.gmail_profile_id && row.uid && !row.body_html && !row.body_text) {
       try {
         const password = decryptPassword(row.password_enc);
         const cfg: ImapConfig = {
@@ -684,25 +859,27 @@ export async function getMessage(req: Request, res: Response) {
         await client.selectFolder(row.folder);
         const full = await client.fetchFullMessage(row.uid);
         await client.logout();
-
         if (full) {
           await pool.query(
             `UPDATE emails SET body_text=$1, body_html=$2, snippet=$3 WHERE id=$4`,
             [full.bodyText, full.bodyHtml, full.snippet, id],
           );
-          row.body_text = full.bodyText;
-          row.body_html = full.bodyHtml;
-          row.snippet   = full.snippet;
+          row.body_text = full.bodyText; row.body_html = full.bodyHtml; row.snippet = full.snippet;
         }
-      } catch (_e) { /* best effort — return what we have */ }
+      } catch (_e) { /* best effort */ }
     }
 
     // Mark as read
     if (!row.is_read) {
       await pool.query(`UPDATE emails SET is_read=true WHERE id=$1`, [id]);
       row.is_read = true;
-      // Also mark on IMAP server (best effort)
-      if (row.uid) {
+      if (row.gmail_profile_id && row.gmail_message_id) {
+        try {
+          const token = await getGmailAccessToken(row.gmail_profile_id, uid);
+          await gmailApiPost(`/messages/${row.gmail_message_id}/modify`, token,
+            { addLabelIds: [], removeLabelIds: ['UNREAD'] });
+        } catch (_e) {}
+      } else if (row.uid) {
         try {
           const password = decryptPassword(row.password_enc);
           const cfg: ImapConfig = {
@@ -710,8 +887,7 @@ export async function getMessage(req: Request, res: Response) {
             user: row.username, password,
           };
           const client = new ImapClient(cfg);
-          await client.connect();
-          await client.login();
+          await client.connect(); await client.login();
           await client.selectFolder(row.folder);
           await client.markRead(row.uid, true);
           await client.logout();
@@ -719,7 +895,6 @@ export async function getMessage(req: Request, res: Response) {
       }
     }
 
-    // Remove sensitive fields
     const { imap_host, imap_port, imap_secure, username, password_enc, ...safe } = row;
     return ok(res, safe);
   } catch (e: any) { return err(res, e.message); }
@@ -739,7 +914,15 @@ export async function markRead(req: Request, res: Response) {
       [Boolean(read), id, uid],
     );
 
-    if (message.uid) {
+    if (message.gmail_profile_id && message.gmail_message_id) {
+      try {
+        const token = await getGmailAccessToken(message.gmail_profile_id, uid);
+        await gmailApiPost(`/messages/${message.gmail_message_id}/modify`, token, {
+          addLabelIds:    read ? [] : ['UNREAD'],
+          removeLabelIds: read ? ['UNREAD'] : [],
+        });
+      } catch (_e) {}
+    } else if (message.uid) {
       try {
         const password = decryptPassword(message.password_enc);
         const cfg: ImapConfig = {
@@ -747,12 +930,11 @@ export async function markRead(req: Request, res: Response) {
           user: message.username, password,
         };
         const client = new ImapClient(cfg);
-        await client.connect();
-        await client.login();
+        await client.connect(); await client.login();
         await client.selectFolder(message.folder);
         await client.markRead(Number(message.uid), Boolean(read));
         await client.logout();
-      } catch (_e) { /* best effort */ }
+      } catch (_e) {}
     }
 
     return ok(res, { id, is_read: Boolean(read) });
@@ -773,8 +955,17 @@ export async function toggleStar(req: Request, res: Response) {
       [id, uid],
     );
     if (!rows.length) return err(res, 'Email no encontrado', 404);
+    const starred = Boolean(rows[0].is_starred);
 
-    if (message.uid) {
+    if (message.gmail_profile_id && message.gmail_message_id) {
+      try {
+        const token = await getGmailAccessToken(message.gmail_profile_id, uid);
+        await gmailApiPost(`/messages/${message.gmail_message_id}/modify`, token, {
+          addLabelIds:    starred ? ['STARRED'] : [],
+          removeLabelIds: starred ? [] : ['STARRED'],
+        });
+      } catch (_e) {}
+    } else if (message.uid) {
       try {
         const password = decryptPassword(message.password_enc);
         const cfg: ImapConfig = {
@@ -782,15 +973,14 @@ export async function toggleStar(req: Request, res: Response) {
           user: message.username, password,
         };
         const client = new ImapClient(cfg);
-        await client.connect();
-        await client.login();
+        await client.connect(); await client.login();
         await client.selectFolder(message.folder);
-        await client.markFlagged(Number(message.uid), Boolean(rows[0].is_starred));
+        await client.markFlagged(Number(message.uid), starred);
         await client.logout();
-      } catch (_e) { /* best effort */ }
+      } catch (_e) {}
     }
 
-    return ok(res, { id, is_starred: rows[0].is_starred });
+    return ok(res, { id, is_starred: starred });
   } catch (e: any) { return err(res, e.message); }
 }
 
@@ -1122,21 +1312,23 @@ export async function getDrafts(req: Request, res: Response) {
 export async function getStats(req: Request, res: Response) {
   const uid = userId(req);
   if (!uid) return err(res, 'No autenticado', 401);
-  const accountId = req.query.account_id as string | undefined;
+  const accountId      = req.query.account_id       as string | undefined;
+  const gmailProfileId = req.query.gmail_profile_id as string | undefined;
 
   try {
     const params: any[] = [uid];
-    const accCond = accountId ? `AND account_id=$2` : '';
-    if (accountId) params.push(accountId);
+    let accCond = '';
+    if (accountId)      { params.push(accountId);      accCond = `AND account_id=$2`; }
+    else if (gmailProfileId) { params.push(gmailProfileId); accCond = `AND gmail_profile_id=$2`; }
 
     const { rows } = await pool.query(
       `SELECT
          COUNT(*) FILTER (WHERE is_read=false AND folder='INBOX' AND NOT is_draft) AS unread,
          COUNT(*) FILTER (WHERE is_starred AND NOT is_draft)                        AS starred,
-         COUNT(*) FILTER (WHERE folder='Drafts' AND is_draft)                      AS drafts,
-         COUNT(*) FILTER (WHERE folder='Sent'   AND NOT is_draft)                  AS sent,
-         COUNT(*) FILTER (WHERE folder='Trash'  AND NOT is_draft)                  AS trash,
-         COUNT(*) FILTER (WHERE folder='INBOX'  AND NOT is_draft)                  AS inbox
+         COUNT(*) FILTER (WHERE folder IN ('Drafts','DRAFTS') AND is_draft)         AS drafts,
+         COUNT(*) FILTER (WHERE folder IN ('Sent','SENT')     AND NOT is_draft)     AS sent,
+         COUNT(*) FILTER (WHERE folder IN ('Trash','TRASH')   AND NOT is_draft)     AS trash,
+         COUNT(*) FILTER (WHERE folder='INBOX' AND NOT is_draft)                    AS inbox
        FROM emails WHERE user_id=$1 ${accCond}`,
       params,
     );

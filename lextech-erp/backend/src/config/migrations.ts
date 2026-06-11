@@ -890,6 +890,14 @@ export async function runMigrations(): Promise<void> {
           FOR EACH ROW EXECUTE FUNCTION update_updated_at();
       `);
     } catch (_e: any) {}
+    // Token columns for Gmail/OAuth sync
+    for (const [col, def] of [
+      ['access_token_enc', 'TEXT'],
+      ['token_expiry',     'TIMESTAMPTZ'],
+      ['scopes',           'TEXT'],
+    ] as [string, string][]) {
+      try { await client.query(`ALTER TABLE email_oauth_profiles ADD COLUMN IF NOT EXISTS ${col} ${def}`); } catch (_e: any) {}
+    }
 
     // Emails cacheados desde IMAP
     await client.query(`
@@ -927,6 +935,20 @@ export async function runMigrations(): Promise<void> {
       `CREATE INDEX IF NOT EXISTS idx_emails_is_starred      ON emails (is_starred)`,
       `CREATE INDEX IF NOT EXISTS idx_emails_from_email      ON emails (from_email)`,
     ]) { try { await client.query(idx); } catch (_e: any) {} }
+    // Gmail support: profile FK + message ID + nullable account_id
+    for (const [col, def] of [
+      ['gmail_profile_id', 'UUID REFERENCES email_oauth_profiles(id) ON DELETE CASCADE'],
+      ['gmail_message_id', 'VARCHAR(200)'],
+    ] as [string, string][]) {
+      try { await client.query(`ALTER TABLE emails ADD COLUMN IF NOT EXISTS ${col} ${def}`); } catch (_e: any) {}
+    }
+    try { await client.query(`ALTER TABLE emails ALTER COLUMN account_id DROP NOT NULL`); } catch (_e: any) {}
+    try {
+      await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_emails_gmail_unique ON emails(gmail_profile_id, gmail_message_id) WHERE gmail_profile_id IS NOT NULL`);
+    } catch (_e: any) {}
+    try {
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_emails_gmail_profile ON emails(gmail_profile_id, folder, sent_at DESC) WHERE gmail_profile_id IS NOT NULL`);
+    } catch (_e: any) {}
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS email_contacts (

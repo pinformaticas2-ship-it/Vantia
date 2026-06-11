@@ -2966,6 +2966,8 @@ export default function Email() {
   const loadEmailsGenRef = useRef(0);        // cancela respuestas de carpetas anteriores
   const bodyLoadingRef = useRef<string | null>(null); // id del correo cuyo body está cargando
   const [bodyLoadingId, setBodyLoadingId] = useState<string | null>(null);
+  // Saved Gmail profile matching the active token — used for hybrid DB sync
+  const currentGmailProfileRef = useRef<SavedOAuthProfile | null>(null);
 
   const currentImapAccount = useMemo(
     () => imapAccounts.find((account) => account.id === selectedImapAccountId) || null,
@@ -3208,9 +3210,19 @@ export default function Email() {
     setSavedGmailProfiles((prev) => prev.filter((profile) => profile.id !== profileId));
   }, [authFetch]);
 
-  const persistGoogleProfile = useCallback(async (profile: GmailProfile) => {
-    if (!profile?.emailAddress) return;
-    await authFetch(`${API}/email/profiles`, {
+  const persistGoogleProfile = useCallback(async (profile: GmailProfile): Promise<SavedOAuthProfile | null> => {
+    if (!profile?.emailAddress) return null;
+    // Read token from localStorage to include it in the backend save
+    let accessToken: string | undefined;
+    let expiresIn: number | undefined;
+    try {
+      const stored = JSON.parse(localStorage.getItem(GMAIL_TOKEN_KEY) || '{}');
+      if (stored.access_token && stored.expires_at && Date.now() < stored.expires_at) {
+        accessToken = stored.access_token;
+        expiresIn = Math.floor((stored.expires_at - Date.now()) / 1000);
+      }
+    } catch { /* noop */ }
+    const res = await authFetch(`${API}/email/profiles`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -3218,9 +3230,12 @@ export default function Email() {
         email: profile.emailAddress,
         display_name: userName,
         avatar_url: userAvatar || null,
+        ...(accessToken ? { access_token: accessToken, expires_in: expiresIn } : {}),
       }),
     }).catch(() => null);
+    const payload = await res?.json().catch(() => null);
     await refreshSavedGmailProfiles().catch(() => undefined);
+    return (payload?.success ? payload.data : null) as SavedOAuthProfile | null;
   }, [authFetch, refreshSavedGmailProfiles, userAvatar, userName]);
 
   // ── Load Gmail profile & labels ───────────────────────────────────────────
@@ -3256,6 +3271,13 @@ export default function Email() {
   useEffect(() => {
     void refreshSavedGmailProfiles().catch(() => undefined);
   }, [refreshSavedGmailProfiles]);
+
+  // Keep ref in sync with the active Gmail profile (avoids adding savedGmailProfiles to loadEmails deps)
+  useEffect(() => {
+    currentGmailProfileRef.current = savedGmailProfiles.find(
+      p => p.email === gmailProfile?.emailAddress,
+    ) || null;
+  }, [savedGmailProfiles, gmailProfile]);
 
   useEffect(() => {
     if (!selectedImapAccountId) {
@@ -3337,6 +3359,58 @@ export default function Email() {
       }
 
       if (!gmail) return;
+
+      // ── Hybrid path: sync to DB then read (when profile is saved with token) ─
+      const savedProfile = currentGmailProfileRef.current;
+      if (savedProfile && selectedFolder !== 'PINNED') {
+        try {
+          // Sync current folder from Gmail API to DB
+          await authFetch(
+            `${API}/email/gmail/profiles/${savedProfile.id}/sync?folder=${encodeURIComponent(selectedFolder)}&limit=50`,
+            { method: 'POST' },
+          ).catch(() => null); // best effort — don't fail if sync errors
+
+          if (isStale()) return;
+
+          // Read from DB (same path as IMAP)
+          const qp = new URLSearchParams({ gmail_profile_id: savedProfile.id, limit: '100' });
+          if (selectedFolder === 'STARRED') qp.set('starred', '1');
+          else qp.set('folder', selectedFolder);
+          if (searchQ.trim()) qp.set('q', searchQ.trim());
+
+          const dbRes = await authFetch(`${API}/email/messages?${qp}`);
+          const dbPayload = await dbRes.json();
+          if (!dbRes.ok || !dbPayload?.success) throw new Error(dbPayload?.error || 'Error al cargar correos');
+
+          const nextEmails: ParsedEmail[] = (dbPayload.data?.emails || []).map((row: ImapApiEmail) => parseImapEmail(row));
+          if (isStale()) return;
+          if (reset) {
+            setEmails(nextEmails);
+            if (previousSelectedId && bodyLoadingRef.current !== previousSelectedId) {
+              const nextSel = nextEmails.find(item => item.id === previousSelectedId) || null;
+              if (nextSel) setSelectedEmail(previousSelectedBody
+                ? { ...nextSel, bodyHtml: nextSel.bodyHtml || previousSelectedBody.bodyHtml, bodyText: nextSel.bodyText || previousSelectedBody.bodyText, snippet: nextSel.snippet || previousSelectedBody.snippet }
+                : nextSel);
+            }
+          } else {
+            setEmails(prev => [...prev, ...nextEmails]);
+          }
+          setNextPageToken(undefined);
+
+          // Stats
+          const stRes = await authFetch(`${API}/email/stats?gmail_profile_id=${encodeURIComponent(savedProfile.id)}`);
+          const stPayload = await stRes.json().catch(() => null);
+          if (stRes.ok && stPayload?.success) {
+            setUnreadCount(Number(stPayload.data?.unread || 0));
+            const draftCount_ = Number(stPayload.data?.drafts || 0) + readLocalDrafts().length;
+            setDraftCount(draftCount_);
+          }
+          return;
+        } catch (e: any) {
+          if (!isStale()) handleGmailError(e);
+          return;
+        }
+      }
 
       if (selectedFolder === 'PINNED') {
         const pinned = readPinnedEmailIds(activePinnedKey);
