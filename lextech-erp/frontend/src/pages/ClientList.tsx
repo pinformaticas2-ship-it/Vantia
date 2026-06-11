@@ -964,6 +964,48 @@ function Th({
   );
 }
 
+// ── Dropdown de campo de filtro ──────────────────────────────
+function FieldDropdown({ value, onChange, options }: {
+  value: string;
+  onChange: (val: string) => void;
+  options: { value: string; label: string }[];
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const selected = options.find(o => o.value === value);
+  useEffect(() => {
+    if (!open) return;
+    const handle = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", handle);
+    return () => document.removeEventListener("mousedown", handle);
+  }, [open]);
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-1.5 text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white text-slate-600 min-w-[160px] hover:border-slate-300 focus:outline-none focus:border-red-400 transition-colors select-none"
+      >
+        <span className="flex-1 text-left truncate">{selected?.label ?? "Elegir…"}</span>
+        <ChevronDown size={11} className={`shrink-0 text-slate-400 transition-transform duration-150 ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <ul className="absolute left-0 top-full mt-1 z-50 w-52 rounded-2xl border border-slate-100 bg-white shadow-2xl py-1.5 overflow-hidden">
+          {options.map(o => (
+            <li
+              key={o.value}
+              onMouseDown={e => { e.preventDefault(); onChange(o.value); setOpen(false); }}
+              className={`px-3.5 py-1.5 text-xs cursor-pointer transition-colors ${o.value === value ? "bg-red-50 text-red-600 font-semibold" : "text-slate-600 hover:bg-slate-50"}`}
+            >
+              {o.label}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 // ── Fila de filtro individual ─────────────────────────────────
 function FilterRow({
   filter, onChange, onRemove, canRemove, inputRef,
@@ -977,15 +1019,11 @@ function FilterRow({
   return (
     <div className="flex items-center gap-1.5">
       {/* Selector de campo */}
-      <select
+      <FieldDropdown
         value={filter.field}
-        onChange={e => onChange(filter.id, { field: e.target.value, value: "" })}
-        className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:border-red-400 text-slate-600 min-w-[160px]"
-      >
-        {FILTER_FIELDS.map(f => (
-          <option key={f.value} value={f.value}>{f.label}</option>
-        ))}
-      </select>
+        onChange={val => onChange(filter.id, { field: val, value: "" })}
+        options={FILTER_FIELDS}
+      />
 
       {/* Input de valor */}
       <div className="relative">
