@@ -2968,6 +2968,10 @@ export default function Email() {
   const [bodyLoadingId, setBodyLoadingId] = useState<string | null>(null);
   // Saved Gmail profile matching the active token — used for hybrid DB sync
   const currentGmailProfileRef = useRef<SavedOAuthProfile | null>(null);
+  // Background refresh: new emails detected but not yet shown to user
+  const [pendingNewEmails, setPendingNewEmails] = useState<ParsedEmail[]>([]);
+  const lastRefreshAtRef = useRef<number>(0);
+  const emailIdsRef      = useRef<Set<string>>(new Set());
 
   const currentImapAccount = useMemo(
     () => imapAccounts.find((account) => account.id === selectedImapAccountId) || null,
@@ -3279,6 +3283,16 @@ export default function Email() {
     ) || null;
   }, [savedGmailProfiles, gmailProfile]);
 
+  // Track IDs of currently displayed emails so background refresh can detect new ones
+  useEffect(() => {
+    emailIdsRef.current = new Set(emails.map(e => e.id));
+  }, [emails]);
+
+  // Dismiss pending banner when the user changes folder or account
+  useEffect(() => {
+    setPendingNewEmails([]);
+  }, [selectedFolder, selectedImapAccountId, gmailProfile?.emailAddress]);
+
   useEffect(() => {
     if (!selectedImapAccountId) {
       setImapFolders([]);
@@ -3561,22 +3575,24 @@ export default function Email() {
   useEffect(() => {
     if (!gmail && !currentImapAccount) return;
 
-    const silentRefresh = async (refreshStructure = false) => {
+    const doRefresh = async (checkStructure = false, fromFocus = false) => {
+      // Debounce focus-triggered refreshes: ignore if we refreshed < 30s ago
+      if (fromFocus && Date.now() - lastRefreshAtRef.current < 30_000) return;
       if (refreshInFlightRef.current) return;
       refreshInFlightRef.current = true;
-      // Safety valve: if a hung IMAP connection never resolves, reset after 30s
-      const safetyTimer = setTimeout(() => { refreshInFlightRef.current = false; }, 30_000);
+      lastRefreshAtRef.current = Date.now();
+      const safetyTimer = setTimeout(() => { refreshInFlightRef.current = false; }, 45_000);
+
       try {
+        // ── 1. Sync data source ─────────────────────────────────────────────
         if (currentImapAccount) {
-          if (refreshStructure) {
-            await refreshImapFolders(currentImapAccount.id).catch(() => undefined);
-          }
-          const folder = mapFolderToImapApi(selectedFolder, imapSystemFolderMap);
+          if (checkStructure) await refreshImapFolders(currentImapAccount.id).catch(() => undefined);
+          const folderStr = mapFolderToImapApi(selectedFolder, imapSystemFolderMap);
           await authFetch(
-            `${API}/email/accounts/${currentImapAccount.id}/sync?folder=${encodeURIComponent(folder)}&limit=40`,
+            `${API}/email/accounts/${currentImapAccount.id}/sync?folder=${encodeURIComponent(folderStr)}&limit=20`,
             { method: 'POST' },
           ).catch(() => null);
-        } else if (gmail && refreshStructure) {
+        } else if (gmail && checkStructure) {
           gmail.listLabels().then(({ labels }) => {
             setGmailLabels((labels || []).map((label: any) => ({
               ...label,
@@ -3585,26 +3601,88 @@ export default function Email() {
           }).catch(() => undefined);
         }
 
-        await loadEmails(true, undefined, { silent: true, preserveSelection: true });
+        // ── 2. Fetch latest emails without touching main state yet ──────────
+        const knownIds = emailIdsRef.current; // snapshot of what user currently sees
+        let latestEmails: ParsedEmail[] | null = null;
+
+        if (currentImapAccount) {
+          const folderStr = mapFolderToImapApi(selectedFolder, imapSystemFolderMap);
+          const res = await authFetch(
+            `${API}/email/messages?account_id=${encodeURIComponent(currentImapAccount.id)}&folder=${encodeURIComponent(folderStr)}&limit=50`,
+          ).catch(() => null);
+          if (res?.ok) {
+            const payload = await res.json().catch(() => null);
+            if (payload?.success) latestEmails = (payload.data?.emails || []).map((row: ImapApiEmail) => parseImapEmail(row));
+          }
+        } else {
+          const savedProfile = currentGmailProfileRef.current;
+          if (savedProfile && selectedFolder !== 'PINNED') {
+            const qp = new URLSearchParams({ gmail_profile_id: savedProfile.id, limit: '50' });
+            if (selectedFolder === 'STARRED') qp.set('starred', '1');
+            else qp.set('folder', selectedFolder);
+            const res = await authFetch(`${API}/email/messages?${qp}`).catch(() => null);
+            if (res?.ok) {
+              const payload = await res.json().catch(() => null);
+              if (payload?.success) latestEmails = (payload.data?.emails || []).map((row: ImapApiEmail) => parseImapEmail(row));
+            }
+          } else if (selectedFolder !== 'PINNED') {
+            // Direct Gmail API path — use existing loadEmails (no banner, simple refresh)
+            await loadEmails(true, undefined, { silent: true, preserveSelection: true });
+            return;
+          }
+        }
+
+        if (!latestEmails) return;
+
+        // ── 3. Detect new emails → show banner instead of replacing list ────
+        const brandNew = latestEmails.filter(e => !knownIds.has(e.id));
+        if (brandNew.length > 0 && knownIds.size > 0) {
+          setPendingNewEmails(prev => {
+            const existingIds = new Set(prev.map(p => p.id));
+            const truly = brandNew.filter(e => !existingIds.has(e.id));
+            return [...truly, ...prev];
+          });
+        }
+
+        // ── 4. Silently update is_read / is_starred for visible emails ──────
+        setEmails(prev => prev.map(e => {
+          const fresh = latestEmails!.find(f => f.id === e.id);
+          if (!fresh) return e;
+          if (fresh.isRead === e.isRead && fresh.isStarred === e.isStarred) return e;
+          return { ...e, isRead: fresh.isRead, isStarred: fresh.isStarred };
+        }));
+
+        // ── 5. Refresh unread count ─────────────────────────────────────────
+        const statsQp = currentImapAccount
+          ? `account_id=${encodeURIComponent(currentImapAccount.id)}`
+          : currentGmailProfileRef.current
+            ? `gmail_profile_id=${encodeURIComponent(currentGmailProfileRef.current.id)}`
+            : null;
+        if (statsQp) {
+          const stRes = await authFetch(`${API}/email/stats?${statsQp}`).catch(() => null);
+          if (stRes?.ok) {
+            const sp = await stRes.json().catch(() => null);
+            if (sp?.success) setUnreadCount(Number(sp.data?.unread || 0));
+          }
+        }
+
       } finally {
         clearTimeout(safetyTimer);
         refreshInFlightRef.current = false;
       }
     };
 
-    const startPolling = () => {
-      if (emailRefreshRef.current) clearInterval(emailRefreshRef.current);
-      const intervalMs = document.visibilityState === 'visible'
-        ? (currentImapAccount ? 12000 : 18000)
-        : (currentImapAccount ? 30000 : 45000);
-      emailRefreshRef.current = setInterval(() => { void silentRefresh(false); }, intervalMs);
-    };
+    const getIntervalMs = () => document.visibilityState === 'visible'
+      ? (currentImapAccount ? 30_000 : 60_000)
+      : 180_000;
 
-    startPolling();
+    if (emailRefreshRef.current) clearInterval(emailRefreshRef.current);
+    emailRefreshRef.current = setInterval(() => void doRefresh(false, false), getIntervalMs());
 
     const onFocus = () => {
-      void silentRefresh(true);
-      startPolling();
+      void doRefresh(true, true);
+      if (emailRefreshRef.current) clearInterval(emailRefreshRef.current);
+      emailRefreshRef.current = setInterval(() => void doRefresh(false, false), getIntervalMs());
     };
 
     window.addEventListener('focus', onFocus);
@@ -4237,6 +4315,34 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
               <EmptyState folder={selectedFolder} />
             ) : (
               <>
+                {pendingNewEmails.length > 0 && (
+                  <div className="sticky top-0 z-10 mx-2 mt-1 mb-1 flex items-center justify-between gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm text-white shadow-md">
+                    <button
+                      className="flex-1 text-left font-medium hover:underline"
+                      onClick={() => {
+                        setEmails(prev => {
+                          const existingIds = new Set(prev.map(e => e.id));
+                          const toAdd = pendingNewEmails.filter(e => !existingIds.has(e.id));
+                          return [...toAdd, ...prev];
+                        });
+                        setPendingNewEmails([]);
+                      }}
+                    >
+                      {pendingNewEmails.length === 1
+                        ? '1 mensaje nuevo — haz clic para cargar'
+                        : `${pendingNewEmails.length} mensajes nuevos — haz clic para cargar`}
+                    </button>
+                    <button
+                      className="ml-2 rounded p-0.5 hover:bg-blue-700"
+                      onClick={() => setPendingNewEmails([])}
+                      aria-label="Descartar"
+                    >
+                      <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
                 {emails.map(email => (
                   <EmailItem
                     key={email.id}
