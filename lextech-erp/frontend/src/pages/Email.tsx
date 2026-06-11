@@ -1696,7 +1696,7 @@ function EmailItem({
 
 function EmailReader({
   email, onReply, onReplyAll, onForward, onDelete, onStar, onBack,
-  onPin, onRestore, onAssignLabel, onCreateLabel, userLabels,
+  onPin, onRestore, onAssignLabel, onCreateLabel, userLabels, bodyLoading,
 }: {
   email: ParsedEmail;
   onReply: () => void; onReplyAll: () => void; onForward: () => void;
@@ -1706,6 +1706,7 @@ function EmailReader({
   onAssignLabel: (labelId: string) => void;
   onCreateLabel: () => void;
   userLabels: GmailLabel[];
+  bodyLoading?: boolean;
 }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [iframeH, setIframeH] = useState(300);
@@ -1930,7 +1931,16 @@ function EmailReader({
                 </div>
 
                 <div className="px-6 py-6">
-                  {showRaw ? (
+                  {bodyLoading ? (
+                    <div className="space-y-3 py-2 animate-pulse">
+                      <div className="h-3 bg-slate-100 rounded-full w-3/4" />
+                      <div className="h-3 bg-slate-100 rounded-full w-full" />
+                      <div className="h-3 bg-slate-100 rounded-full w-5/6" />
+                      <div className="h-3 bg-slate-100 rounded-full w-2/3 mt-4" />
+                      <div className="h-3 bg-slate-100 rounded-full w-full" />
+                      <div className="h-3 bg-slate-100 rounded-full w-4/5" />
+                    </div>
+                  ) : showRaw ? (
                     <pre className="text-sm text-slate-700 whitespace-pre-wrap font-mono leading-relaxed">
                       {email.bodyText || email.bodyHtml?.replace(/<[^>]+>/g, '') || '(Sin contenido)'}
                     </pre>
@@ -2953,6 +2963,9 @@ export default function Email() {
   const selectedEmailRef = useRef<ParsedEmail | null>(null);
   const emailRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const refreshInFlightRef = useRef(false);
+  const loadEmailsGenRef = useRef(0);        // cancela respuestas de carpetas anteriores
+  const bodyLoadingRef = useRef<string | null>(null); // id del correo cuyo body está cargando
+  const [bodyLoadingId, setBodyLoadingId] = useState<string | null>(null);
 
   const currentImapAccount = useMemo(
     () => imapAccounts.find((account) => account.id === selectedImapAccountId) || null,
@@ -3275,6 +3288,10 @@ export default function Email() {
     token?: string,
     options?: { silent?: boolean; preserveSelection?: boolean },
   ) => {
+    loadEmailsGenRef.current += 1;
+    const gen = loadEmailsGenRef.current;
+    const isStale = () => gen !== loadEmailsGenRef.current;
+
     const silent = Boolean(options?.silent);
     const preserveSelection = Boolean(options?.preserveSelection);
     const previousSelectedId = preserveSelection ? selectedEmailRef.current?.id || null : null;
@@ -3299,8 +3316,9 @@ export default function Email() {
         if (!res.ok || !payload?.success) throw new Error(payload?.error || 'Error al cargar correos IMAP');
 
         const nextEmails: ParsedEmail[] = (payload.data?.emails || []).map((row: ImapApiEmail) => parseImapEmail(row));
+        if (isStale()) return;
         setEmails(nextEmails);
-        if (previousSelectedId) {
+        if (previousSelectedId && bodyLoadingRef.current !== previousSelectedId) {
           const nextSelected = nextEmails.find((item) => item.id === previousSelectedId) || null;
           if (nextSelected) setSelectedEmail(previousSelectedBody
             ? { ...nextSelected, bodyHtml: nextSelected.bodyHtml || previousSelectedBody.bodyHtml, bodyText: nextSelected.bodyText || previousSelectedBody.bodyText, snippet: nextSelected.snippet || previousSelectedBody.snippet }
@@ -3361,8 +3379,9 @@ export default function Email() {
               };
             }),
         );
+        if (isStale()) return;
         setEmails(parsedPinned);
-        if (previousSelectedId) {
+        if (previousSelectedId && bodyLoadingRef.current !== previousSelectedId) {
           const nextSelected = parsedPinned.find((item) => item.id === previousSelectedId) || null;
           if (nextSelected) setSelectedEmail(previousSelectedBody
             ? { ...nextSelected, bodyHtml: nextSelected.bodyHtml || previousSelectedBody.bodyHtml, bodyText: nextSelected.bodyText || previousSelectedBody.bodyText, snippet: nextSelected.snippet || previousSelectedBody.snippet }
@@ -3435,10 +3454,11 @@ export default function Email() {
         });
 
       const nextEmails = applyPinnedState(parsed);
+      if (isStale()) return;
       if (reset) {
         const mergedEmails = [...localDraftEmails, ...nextEmails];
         setEmails(mergedEmails);
-        if (previousSelectedId) {
+        if (previousSelectedId && bodyLoadingRef.current !== previousSelectedId) {
           const nextSelected = mergedEmails.find((item) => item.id === previousSelectedId) || null;
           if (nextSelected) setSelectedEmail(previousSelectedBody
             ? { ...nextSelected, bodyHtml: nextSelected.bodyHtml || previousSelectedBody.bodyHtml, bodyText: nextSelected.bodyText || previousSelectedBody.bodyText, snippet: nextSelected.snippet || previousSelectedBody.snippet }
@@ -3544,15 +3564,20 @@ export default function Email() {
       setUnreadCount(c => Math.max(0, c - 1));
     }
     if (email.source === 'imap') {
+      bodyLoadingRef.current = email.id;
+      setBodyLoadingId(email.id);
       try {
         const res = await authFetch(`${API}/email/messages/${email.id}`);
         const payload = await res.json();
         if (!res.ok || !payload?.success) throw new Error(payload?.error || 'No se pudo abrir el correo');
         const parsed = parseImapEmail(payload.data as ImapApiEmail);
-        setSelectedEmail(parsed);
+        setSelectedEmail(prev => prev?.id === email.id ? parsed : prev);
         setEmails(prev => prev.map(e => e.id === email.id ? parsed : e));
       } catch (e: any) {
         setError(e.message || 'Error al abrir el correo');
+      } finally {
+        bodyLoadingRef.current = null;
+        setBodyLoadingId(null);
       }
       return;
     }
@@ -4184,6 +4209,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
               onAssignLabel={(labelId) => assignEmailToLabel(selectedEmail, labelId)}
               onCreateLabel={createUserLabel}
               userLabels={gmailLabels.filter((label) => label.type === 'user')}
+              bodyLoading={bodyLoadingId === selectedEmail.id}
             />
           ) : hasActiveMailbox ? (
             <div className="flex flex-col items-center justify-center h-full select-none">

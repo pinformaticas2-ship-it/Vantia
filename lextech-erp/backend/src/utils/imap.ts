@@ -33,28 +33,46 @@ export interface ImapMessage extends ImapEnvelope {
   snippet: string;
 }
 
-function decodeBase64(s: string): string {
+function normalizeCharset(cs: string): BufferEncoding {
+  const c = cs.toLowerCase().trim().replace(/[-_]/g, '');
+  if (c === 'iso88591' || c === 'latin1' || c === 'windows1252' || c === 'cp1252') return 'latin1';
+  if (c === 'usascii' || c === 'ascii') return 'ascii';
+  return 'utf8';
+}
+
+function extractCharset(headers: string): BufferEncoding {
+  const m = headers.match(/charset\s*=\s*(?:"([^"]+)"|([^\s;>\r\n]+))/i);
+  return normalizeCharset(m?.[1] || m?.[2] || 'utf-8');
+}
+
+function decodeBase64(s: string, charset: BufferEncoding = 'utf8'): string {
   try {
-    return Buffer.from(s, 'base64').toString('utf-8');
+    return Buffer.from(s, 'base64').toString(charset);
   } catch {
-    return s;
+    try { return Buffer.from(s, 'base64').toString('utf8'); } catch { return s; }
   }
 }
 
-function decodeQuotedPrintable(s: string): string {
-  return s
+function decodeQuotedPrintable(s: string, charset: BufferEncoding = 'utf8'): string {
+  const bytes = s
     .replace(/=\r?\n/g, '')
-    .replace(/=([0-9A-Fa-f]{2})/g, (_match, hex) => String.fromCharCode(parseInt(hex, 16)));
+    .replace(/=([0-9A-Fa-f]{2})/g, (_m, hex) => String.fromCharCode(parseInt(hex, 16)));
+  try {
+    return Buffer.from(bytes, 'binary').toString(charset);
+  } catch {
+    return bytes;
+  }
 }
 
 function decodeHeader(raw: string): string {
   if (!raw) return '';
   return raw.replace(/=\?([^?]+)\?([BbQq])\?([^?]*)\?=/g, (_match, charset, enc, text) => {
     try {
+      const cs = normalizeCharset(String(charset));
       if (String(enc).toUpperCase() === 'B') {
-        return Buffer.from(String(text), 'base64').toString(String(charset).toLowerCase() as BufferEncoding);
+        return decodeBase64(String(text), cs);
       }
-      return Buffer.from(decodeQuotedPrintable(String(text)), 'binary').toString();
+      return decodeQuotedPrintable(String(text), cs);
     } catch {
       return String(text);
     }
@@ -74,12 +92,14 @@ function parseMimeParts(raw: string): { text: string; html: string } {
 
   if (!raw.includes('boundary=') && !mainCT.includes('multipart')) {
     const headerEnd = raw.indexOf('\r\n\r\n');
+    const headerSection = headerEnd !== -1 ? raw.slice(0, headerEnd) : '';
     const body = headerEnd !== -1 ? raw.slice(headerEnd + 4) : raw;
     const cte = (raw.match(/Content-Transfer-Encoding:\s*(\S+)/i)?.[1] || '').toLowerCase();
+    const charset = extractCharset(headerSection);
     const decoded = cte === 'base64'
-      ? decodeBase64(body.replace(/\r?\n/g, ''))
+      ? decodeBase64(body.replace(/\r?\n/g, ''), charset)
       : cte === 'quoted-printable'
-        ? decodeQuotedPrintable(body)
+        ? decodeQuotedPrintable(body, charset)
         : body;
 
     if (mainCT.includes('text/html')) html = decoded;
@@ -102,6 +122,7 @@ function parseMimeParts(raw: string): { text: string; html: string } {
     const body = part.slice(headerEnd + 4);
     const partCT = (headers.match(/Content-Type:\s*([^\r\n;]+)/i)?.[1] || '').trim().toLowerCase();
     const partCTE = (headers.match(/Content-Transfer-Encoding:\s*(\S+)/i)?.[1] || '').toLowerCase();
+    const partCharset = extractCharset(headers);
 
     if (partCT.includes('multipart')) {
       const nested = parseMimeParts(part);
@@ -111,9 +132,9 @@ function parseMimeParts(raw: string): { text: string; html: string } {
     }
 
     const decoded = partCTE === 'base64'
-      ? decodeBase64(body.replace(/\r?\n/g, ''))
+      ? decodeBase64(body.replace(/\r?\n/g, ''), partCharset)
       : partCTE === 'quoted-printable'
-        ? decodeQuotedPrintable(body)
+        ? decodeQuotedPrintable(body, partCharset)
         : body;
 
     if (partCT.includes('text/html') && !html) html = decoded;
