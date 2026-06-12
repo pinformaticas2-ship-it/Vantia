@@ -3754,6 +3754,9 @@ function CounterConfigModal({ onClose, getToken }: { onClose: () => void; getTok
   const [years, setYears] = useState<number[]>([currentYear]);
   const [yearsLoading, setYearsLoading] = useState(true);
   const [selectedAnio, setSelectedAnio] = useState<number>(currentYear);
+  // Keep a stable ref so effects don't re-fire when the parent re-renders
+  const getTokenRef = useRef(getToken);
+  getTokenRef.current = getToken;
 
   // Datos del año seleccionado (cargados on demand)
   const [yearData, setYearData] = useState<any | null>(null);
@@ -3772,13 +3775,13 @@ function CounterConfigModal({ onClose, getToken }: { onClose: () => void; getTok
     (async () => {
       setYearsLoading(true);
       try {
-        const token = await getToken();
+        const token = await getTokenRef.current();
         const res = await fetch("/api/expedientes/counter-config", { headers: { Authorization: `Bearer ${token}` } });
         const d = await res.json();
         if (res.ok && d.data?.length) setYears(d.data);
       } finally { setYearsLoading(false); }
     })();
-  }, [getToken]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Carga de datos del año seleccionado (lazy)
   useEffect(() => {
@@ -3787,7 +3790,7 @@ function CounterConfigModal({ onClose, getToken }: { onClose: () => void; getTok
     setYearLoading(true);
     (async () => {
       try {
-        const token = await getToken();
+        const token = await getTokenRef.current();
         const res = await fetch(`/api/expedientes/counter-config/${selectedAnio}`, { headers: { Authorization: `Bearer ${token}` } });
         const d = await res.json();
         if (res.ok && d.data) {
@@ -3801,7 +3804,7 @@ function CounterConfigModal({ onClose, getToken }: { onClose: () => void; getTok
         }
       } finally { setYearLoading(false); }
     })();
-  }, [selectedAnio, getToken]);
+  }, [selectedAnio]); // getToken omitted intentionally — stable via ref
 
   const handleAccept = async () => {
     setFormError("");
@@ -3813,7 +3816,7 @@ function CounterConfigModal({ onClose, getToken }: { onClose: () => void; getTok
     }
     setSaving(true);
     try {
-      const token = await getToken();
+      const token = await getTokenRef.current();
       const res = await fetch("/api/expedientes/counter-config", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -3823,7 +3826,7 @@ function CounterConfigModal({ onClose, getToken }: { onClose: () => void; getTok
       setSavedOk(true);
       setTimeout(() => setSavedOk(false), 2500);
       // Refrescar datos del año
-      const token2 = await getToken();
+      const token2 = await getTokenRef.current();
       const res2 = await fetch(`/api/expedientes/counter-config/${selectedAnio}`, { headers: { Authorization: `Bearer ${token2}` } });
       const d2 = await res2.json();
       if (res2.ok && d2.data) setYearData(d2.data);
