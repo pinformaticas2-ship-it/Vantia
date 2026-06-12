@@ -6383,7 +6383,7 @@ export default function ExpedienteList() {
                         {exp.cliente_id ? (
                           <button
                             onClick={e => { e.stopPropagation(); navigate(`/dashboard/clientes/${exp.cliente_id}`); }}
-                            className="text-blue-600 hover:text-blue-800 hover:underline font-semibold text-left truncate block max-w-[130px]">
+                            className="appearance-none p-0 leading-normal text-blue-600 hover:text-blue-800 hover:underline font-semibold text-left truncate block max-w-[130px]">
                             {exp.cliente_nombre || "Ver"}
                           </button>
                         ) : (
