@@ -5795,10 +5795,10 @@ export default function ExpedienteList() {
         />
       )}
 
-      <div className="flex flex-col gap-0 animate-in fade-in duration-300" style={{ height: "calc(100vh - 96px)" }}>
+      <div className="flex flex-col h-full animate-in fade-in duration-300">
 
         {/* ── Cabecera ──────────────────────────────────────── */}
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-white shrink-0">
           <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
             <FolderOpen size={20} className="text-red-600" /> Gestión de Expedientes
           </h1>
@@ -5808,7 +5808,7 @@ export default function ExpedienteList() {
           </button>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm flex flex-col overflow-hidden flex-1 min-h-0">
+        <div className="bg-white flex flex-col overflow-hidden flex-1 min-h-0">
 
           {/* ── Toolbar de acciones ─────────────────────────── */}
           <div className="flex items-center gap-1 px-2.5 py-2 border-b border-slate-100 bg-slate-50/80 flex-wrap">

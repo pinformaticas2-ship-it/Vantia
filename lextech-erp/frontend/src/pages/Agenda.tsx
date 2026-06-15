@@ -2080,7 +2080,7 @@ export default function Agenda() {
   const todayStr = isoDate(today);
 
   return (
-    <div className="agenda-google-shell flex flex-col animate-in fade-in duration-500 -mx-6 -mt-6 h-[calc(100vh-80px)]">
+    <div className="agenda-google-shell flex flex-col animate-in fade-in duration-500 h-full">
       {/* ── Cabecera ─────────────────────────────────────────── */}
       <div className="agenda-google-topbar flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-100 bg-white shrink-0">
         <div className="flex items-center gap-3">
