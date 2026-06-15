@@ -975,13 +975,18 @@ export default function DashboardLayout() {
           <div
             key={location.pathname}
             className={
-              [
-                '/dashboard/correo',
-                '/dashboard/clientes',
-                '/dashboard/expedientes',
-                '/dashboard/trazabilidad',
-                '/dashboard/agenda',
-              ].includes(location.pathname)
+              (
+                [
+                  '/dashboard/correo',
+                  '/dashboard/clientes',
+                  '/dashboard/expedientes',
+                  '/dashboard/trazabilidad',
+                  '/dashboard/agenda',
+                  '/dashboard/chat',
+                  '/dashboard/whatsapp',
+                ].includes(location.pathname) ||
+                location.pathname.startsWith('/dashboard/facturacion')
+              )
                 ? 'w-full h-full module-page'
                 : 'max-w-[1600px] mx-auto p-4 md:p-8 module-page'
             }>

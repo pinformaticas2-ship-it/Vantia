@@ -401,7 +401,7 @@ export default function WhatsApp() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-92px)] min-h-[680px] overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_25px_80px_-40px_rgba(15,23,42,0.4)]">
+    <div className="flex h-full overflow-hidden bg-white">
       <aside className="flex w-[320px] shrink-0 flex-col bg-[linear-gradient(180deg,#1f2334_0%,#111827_100%)] text-white">
         <div className="border-b border-white/10 px-5 py-5">
           <div className="flex items-center justify-between gap-3">
@@ -664,7 +664,7 @@ function WhatsAppAuthGate({
   testingConfig: boolean;
 }) {
   return (
-    <div className="mx-auto flex min-h-[calc(100vh-120px)] max-w-[1360px] items-stretch overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-[0_30px_90px_-45px_rgba(15,23,42,0.42)]">
+    <div className="flex h-full items-stretch overflow-hidden bg-white">
       <section className="flex w-[38%] min-w-[360px] flex-col bg-[linear-gradient(180deg,#1f2334_0%,#111827_100%)] px-8 py-8 text-white">
         <button
           type="button"

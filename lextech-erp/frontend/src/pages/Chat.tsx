@@ -4243,10 +4243,10 @@ export default function Chat() {
   // RENDER
   // ══════════════════════════════════════════════════════════════════════════
   return (
-    <div className="flex h-[calc(100vh-72px)] overflow-hidden rounded-[1.6rem] border border-slate-200/80 bg-gradient-to-br from-white via-slate-50 to-slate-100 shadow-[0_30px_80px_-40px_rgba(15,23,42,0.45)] animate-in fade-in duration-300">
+    <div className="flex h-full overflow-hidden bg-gradient-to-br from-white via-slate-50 to-slate-100 animate-in fade-in duration-300">
 
       {/* ══ SIDEBAR ══════════════════════════════════════════════════════════ */}
-      <aside className="w-64 shrink-0 flex flex-col bg-[radial-gradient(circle_at_top,_rgba(239,68,68,0.2),_transparent_28%),linear-gradient(180deg,_#0f172a_0%,_#111827_46%,_#020617_100%)] rounded-l-[1.6rem] overflow-hidden border-r border-white/10">
+      <aside className="w-64 shrink-0 flex flex-col bg-[radial-gradient(circle_at_top,_rgba(239,68,68,0.2),_transparent_28%),linear-gradient(180deg,_#0f172a_0%,_#111827_46%,_#020617_100%)] overflow-hidden border-r border-white/10">
 
         {/* Workspace header — estilo Slack */}
         <div className="flex items-center justify-between px-3 py-3 border-b border-white/10 shrink-0">

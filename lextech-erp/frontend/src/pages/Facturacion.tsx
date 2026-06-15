@@ -2126,7 +2126,7 @@ function FacturacionContent() {
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[radial-gradient(circle_at_top_right,rgba(248,113,113,0.08),transparent_24%),linear-gradient(180deg,#f8fafc_0%,#f1f5f9_100%)]">
       <div className="flex-1 overflow-y-auto" style={{ scrollbarGutter: "stable" }}>
-        <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-6">
+        <div className="flex flex-col gap-6 px-6 py-6">
           {errorMsg && (
             <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
               <AlertCircle size={18} className="mt-0.5 shrink-0" />
@@ -2216,8 +2216,8 @@ function FacturacionContent() {
               />
             )
           ) : (
-          <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_20px_80px_rgba(15,23,42,0.06)]">
-            <div className="border-b border-slate-200 bg-[linear-gradient(135deg,#f8fafc_0%,#ffffff_45%,#f8fafc_100%)] px-6 py-6">
+          <div>
+            <div className="sticky top-0 z-10 border-b border-slate-200 bg-[linear-gradient(135deg,#f8fafc_0%,#ffffff_45%,#f8fafc_100%)] px-6 py-5">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">
