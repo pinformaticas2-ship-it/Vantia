@@ -975,7 +975,8 @@ export default function DashboardLayout() {
           <div
             key={location.pathname}
             className={
-              location.pathname === '/dashboard/correo'
+              location.pathname === '/dashboard/correo' ||
+              location.pathname === '/dashboard/clientes'
                 ? 'w-full h-full module-page'
                 : 'max-w-[1600px] mx-auto p-4 md:p-8 module-page'
             }>
