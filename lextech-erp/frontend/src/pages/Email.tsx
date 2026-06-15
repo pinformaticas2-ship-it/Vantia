@@ -1625,14 +1625,21 @@ function Sidebar({
 // ─── Email List Item ──────────────────────────────────────────────────────────
 
 function EmailItem({
-  email, selected, onClick, onDoubleClick, onStar,
+  email, selected, onClick, onDoubleClick, onStar, sentFolder,
 }: {
   email: ParsedEmail; selected: boolean;
   onClick: () => void;
   onDoubleClick: () => void;
   onStar: (e: React.MouseEvent) => void;
+  sentFolder?: boolean;
 }) {
   const [hovered, setHovered] = useState(false);
+
+  const displayName = sentFolder
+    ? `Para: ${email.to || '(sin destinatario)'}`
+    : (email.fromName || email.from || '(desconocido)');
+
+  const unread = !email.isRead;
 
   return (
     <a
@@ -1641,52 +1648,84 @@ function EmailItem({
       onDoubleClick={(e) => { e.preventDefault(); onDoubleClick(); }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className={`flex items-start gap-3 px-4 py-3 cursor-pointer border-b border-gray-100 transition-colors ${
+      className={`relative flex items-start gap-2.5 pl-3 pr-3 py-2.5 cursor-pointer border-b border-gray-100 transition-colors ${
         selected
-          ? 'bg-blue-50'
-          : email.isRead
+          ? 'bg-red-50/60'
+          : unread
           ? 'bg-white hover:bg-gray-50'
           : 'bg-white hover:bg-gray-50'
-      }`}
-      style={{ borderLeft: selected ? '4px solid #4f46e5' : '4px solid transparent' }}>
+      }`}>
 
-      {/* Avatar */}
-      <div className="mt-0.5 flex-shrink-0">
-        <Avatar name={email.fromName} email={email.from} size={36} />
+      {/* Unread left stripe */}
+      <div className={`absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full transition-all ${
+        selected ? 'bg-[#ab0433]' : unread ? 'bg-blue-500' : 'bg-transparent'
+      }`} />
+
+      {/* Avatar + unread dot */}
+      <div className="relative mt-0.5 flex-shrink-0">
+        <Avatar name={email.fromName} email={email.from} size={34} />
+        {unread && !selected && (
+          <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-blue-500 border-2 border-white" />
+        )}
       </div>
 
       {/* Content */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-baseline justify-between gap-2 mb-0.5">
-          <span className={`text-sm truncate ${!email.isRead ? 'font-bold text-gray-900' : 'font-medium text-gray-700'}`}>
-            {email.fromName || email.from}
+      <div className="flex-1 min-w-0 overflow-hidden">
+
+        {/* Row 1: name + date */}
+        <div className="flex items-baseline justify-between gap-1.5 mb-0.5">
+          <span className={`text-[13px] truncate leading-snug ${
+            unread ? 'font-bold text-gray-900' : 'font-medium text-gray-500'
+          }`}>
+            {displayName}
           </span>
-          <span className={`text-xs flex-shrink-0 ${!email.isRead ? 'font-semibold text-gray-700' : 'text-gray-400'}`}>
+          <span className={`text-[11px] flex-shrink-0 tabular-nums ${
+            unread ? 'font-semibold text-gray-600' : 'text-gray-400'
+          }`}>
             {fmtDate(email.date)}
           </span>
         </div>
-        <div className="flex items-center gap-1 mb-0.5">
-          <span className={`text-sm truncate ${!email.isRead ? 'font-semibold text-gray-800' : 'text-gray-600'}`}>
-            {email.subject}
-          </span>
-          {email.hasAttachments && (
-            <Paperclip size={12} className="text-gray-400 flex-shrink-0" />
-          )}
+
+        {/* Row 2: subject */}
+        <div className={`text-[12.5px] truncate leading-snug mb-0.5 ${
+          unread ? 'font-semibold text-gray-800' : 'text-gray-500'
+        }`}>
+          {email.subject || <span className="italic text-gray-400">(sin asunto)</span>}
         </div>
-        <p className="text-xs text-gray-400 truncate">{email.snippet}</p>
+
+        {/* Row 3: snippet + badges */}
+        <div className="flex items-center gap-1.5">
+          <p className="flex-1 text-[11.5px] text-gray-400 truncate leading-snug">
+            {email.snippet || <span className="italic">Sin previsualización</span>}
+          </p>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {email.isPinned && (
+              <span title="Fijado">
+                <Pin size={10} className="text-amber-400" />
+              </span>
+            )}
+            {email.hasAttachments && (
+              <span title="Tiene adjuntos">
+                <Paperclip size={10} className="text-gray-300" />
+              </span>
+            )}
+          </div>
+        </div>
+
       </div>
 
       {/* Star */}
       <button
         onClick={onStar}
-        className={`mt-1 flex-shrink-0 transition-colors ${
+        title={email.isStarred ? 'Quitar estrella' : 'Marcar con estrella'}
+        className={`mt-0.5 flex-shrink-0 p-0.5 rounded transition-colors ${
           email.isStarred
-            ? 'text-yellow-400'
+            ? 'text-yellow-400 hover:text-yellow-500'
             : hovered
-            ? 'text-gray-300 hover:text-yellow-300'
+            ? 'text-gray-300 hover:text-yellow-400'
             : 'text-transparent'
         }`}>
-        <Star size={15} fill={email.isStarred ? 'currentColor' : 'none'} />
+        <Star size={13} fill={email.isStarred ? 'currentColor' : 'none'} />
       </button>
     </a>
   );
@@ -2970,6 +3009,7 @@ export default function Email() {
   const currentGmailProfileRef = useRef<SavedOAuthProfile | null>(null);
   // Background refresh: new emails detected but not yet shown to user
   const [pendingNewEmails, setPendingNewEmails] = useState<ParsedEmail[]>([]);
+  const [bgRefreshing, setBgRefreshing] = useState(false);
   const lastRefreshAtRef = useRef<number>(0);
   const emailIdsRef      = useRef<Set<string>>(new Set());
 
@@ -3581,7 +3621,8 @@ export default function Email() {
       if (refreshInFlightRef.current) return;
       refreshInFlightRef.current = true;
       lastRefreshAtRef.current = Date.now();
-      const safetyTimer = setTimeout(() => { refreshInFlightRef.current = false; }, 45_000);
+      setBgRefreshing(true);
+      const safetyTimer = setTimeout(() => { refreshInFlightRef.current = false; setBgRefreshing(false); }, 45_000);
 
       try {
         // ── 1. Sync data source ─────────────────────────────────────────────
@@ -3669,6 +3710,7 @@ export default function Email() {
       } finally {
         clearTimeout(safetyTimer);
         refreshInFlightRef.current = false;
+        setBgRefreshing(false);
       }
     };
 
@@ -4248,17 +4290,27 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
 
           {/* Folder title + refresh */}
           <div className="hidden lg:flex items-center justify-between px-4 py-2 bg-white border-b border-gray-100">
-            <h3 className="text-sm font-semibold text-gray-700">
-              {SYSTEM_FOLDERS.find(f => f.key === selectedFolder)?.label || selectedFolder}
-            </h3>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <h3 className="text-sm font-semibold text-gray-700 truncate">
+                {SYSTEM_FOLDERS.find(f => f.key === selectedFolder)?.label || selectedFolder}
+              </h3>
+              {bgRefreshing && (
+                <span className="flex items-center gap-1 text-[10px] text-gray-400 flex-shrink-0">
+                  <RefreshCw size={10} className="animate-spin" />
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
               {unreadCount > 0 && selectedFolder === 'INBOX' && (
-                <span className="text-xs text-gray-400">{unreadCount} no leídos</span>
+                <span className="text-[11px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">
+                  {unreadCount} no leídos
+                </span>
               )}
               <button
                 onClick={() => loadEmails(true)} disabled={loading || !hasActiveMailbox}
+                title="Recargar"
                 className="p-1.5 hover:bg-gray-100 rounded-full text-gray-400 transition-colors">
-                <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+                <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
               </button>
             </div>
           </div>
@@ -4316,31 +4368,35 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
             ) : (
               <>
                 {pendingNewEmails.length > 0 && (
-                  <div className="sticky top-0 z-10 mx-2 mt-1 mb-1 flex items-center justify-between gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm text-white shadow-md">
-                    <button
-                      className="flex-1 text-left font-medium hover:underline"
-                      onClick={() => {
-                        setEmails(prev => {
-                          const existingIds = new Set(prev.map(e => e.id));
-                          const toAdd = pendingNewEmails.filter(e => !existingIds.has(e.id));
-                          return [...toAdd, ...prev];
-                        });
-                        setPendingNewEmails([]);
-                      }}
-                    >
-                      {pendingNewEmails.length === 1
-                        ? '1 mensaje nuevo — haz clic para cargar'
-                        : `${pendingNewEmails.length} mensajes nuevos — haz clic para cargar`}
-                    </button>
-                    <button
-                      className="ml-2 rounded p-0.5 hover:bg-blue-700"
-                      onClick={() => setPendingNewEmails([])}
-                      aria-label="Descartar"
-                    >
-                      <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                      </svg>
-                    </button>
+                  <div className="sticky top-0 z-10 mx-2 mt-1.5 mb-1">
+                    <div className="flex items-center gap-2 rounded-xl bg-blue-600 pl-3 pr-2 py-2 shadow-lg shadow-blue-200 border border-blue-500">
+                      <span className="relative flex-shrink-0">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-50" />
+                        <Mail size={13} className="relative text-white" />
+                      </span>
+                      <button
+                        className="flex-1 text-left text-[12.5px] font-semibold text-white hover:underline"
+                        onClick={() => {
+                          setEmails(prev => {
+                            const existingIds = new Set(prev.map(e => e.id));
+                            const toAdd = pendingNewEmails.filter(e => !existingIds.has(e.id));
+                            return [...toAdd, ...prev];
+                          });
+                          setPendingNewEmails([]);
+                        }}
+                      >
+                        {pendingNewEmails.length === 1
+                          ? '1 mensaje nuevo — mostrar'
+                          : `${pendingNewEmails.length} mensajes nuevos — mostrar`}
+                      </button>
+                      <button
+                        className="p-1 rounded-lg hover:bg-blue-700 text-blue-200 hover:text-white transition-colors flex-shrink-0"
+                        onClick={() => setPendingNewEmails([])}
+                        aria-label="Descartar"
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
                   </div>
                 )}
                 {emails.map(email => (
@@ -4351,6 +4407,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
                     onClick={() => openEmail(email)}
                     onDoubleClick={() => { void openEmail(email); setFullscreenEmail(email); }}
                     onStar={e => toggleStar(email.id, email.isStarred, e)}
+                    sentFolder={selectedFolder === 'SENT'}
                   />
                 ))}
                 {nextPageToken && (
