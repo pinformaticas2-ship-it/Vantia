@@ -20,7 +20,7 @@ import { AtajosButton } from "../components/AtajosSystem";
 import AdjuntosModal from "../components/AdjuntosModal";
 import ColumnVisibilityModal from "../components/ColumnVisibilityModal";
 import BackButton from "../components/BackButton";
-import { UndoToast } from "../components/UndoToast";
+import { UndoToast, SuccessToast } from "../components/UndoToast";
 import { useUndoDelete } from "../lib/useUndoDelete";
 
 type ViewMode = "list" | "detail" | "multiselect" | "csvImport" | "csvImportConfigure" | "csvImportReview" | "csvImportComplete" | "csvImportHistory" | "csvImportErrorDetail" | "documentImport" | "documentImportVerify";
@@ -4140,6 +4140,7 @@ export default function ExpedienteList() {
     successRate: 0,
     issues: [],
   });
+  const [successToast, setSuccessToast] = useState<{ message: string; startedAt: number } | null>(null);
   const [importHistory, setImportHistory] = useState<ImportBatch[]>([]);
   const [loadingImportHistory, setLoadingImportHistory] = useState(false);
   const [importHistoryError, setImportHistoryError] = useState<string | null>(null);
@@ -4344,6 +4345,7 @@ export default function ExpedienteList() {
       ]);
 
       setDocumentImportSuccessNotice(`Se creó el expediente correctamente desde "${documentImportVerifyItem.payload?.fileName || documentImportVerifyItem.reference || `Documento ${documentImportVerifyItem.row_number}`}".`);
+      setSuccessToast({ message: "1 expediente creado con éxito", startedAt: Date.now() });
       setDocumentImportVerifyItem(null);
       setViewMode("documentImport");
     } catch (e: any) {
@@ -4574,9 +4576,14 @@ export default function ExpedienteList() {
       } catch {}
     }
 
-    if (results.some(item => item?.status === "completed")) {
+    const completedCount = results.filter(item => item?.status === "completed").length;
+    if (completedCount > 0) {
       fetchExpedientes(true);
       fetchImportHistory(true);
+      setSuccessToast({
+        message: completedCount === 1 ? "1 expediente creado con éxito" : `${completedCount} expedientes creados con éxito`,
+        startedAt: Date.now(),
+      });
     }
 
     switchView("csvImportComplete");
@@ -4712,6 +4719,7 @@ export default function ExpedienteList() {
       if (!res.ok) { alert(d.error || "Error al guardar"); return; }
       setShowModal(false); setEditItem(null);
       fetchExpedientes(true);
+      if (!isEdit) setSuccessToast({ message: "1 expediente creado con éxito", startedAt: Date.now() });
     } catch (e: any) { alert(e.message); }
     finally { setSaving(false); }
   };
@@ -5792,6 +5800,15 @@ export default function ExpedienteList() {
           startedAt={pendingDelete.startedAt}
           onUndo={handleUndoDelete}
           onDismiss={dismissDelete}
+        />
+      )}
+
+      {/* ── Success toast ────────────────────────────────── */}
+      {successToast && (
+        <SuccessToast
+          message={successToast.message}
+          startedAt={successToast.startedAt}
+          onDismiss={() => setSuccessToast(null)}
         />
       )}
 
