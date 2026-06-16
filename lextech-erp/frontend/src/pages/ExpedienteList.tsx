@@ -3,7 +3,7 @@
 } from "react";
 import { createPortal } from "react-dom";
 import { useAuth } from "@clerk/clerk-react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import {
   FolderOpen, Plus, Loader2, AlertCircle, RefreshCw,
   X, ChevronUp, ChevronDown, ListFilter, ExternalLink,
@@ -3995,6 +3995,7 @@ function CounterConfigModal({ onClose, getToken }: { onClose: () => void; getTok
 export default function ExpedienteList() {
   const { getToken } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [expedientes, setExpedientes] = useState<any[]>([]);
@@ -4033,6 +4034,14 @@ export default function ExpedienteList() {
       setViewMode("documentImport");
       setSearchParams(prev => { prev.delete("mode"); return prev; }, { replace: true });
     }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Mostrar toast si venimos de otra página con mensaje de éxito en location.state
+  useEffect(() => {
+    const msg = (location.state as any)?.success;
+    if (!msg) return;
+    setSuccessToast({ message: msg, startedAt: Date.now() });
+    navigate(location.pathname + (location.search || ""), { replace: true, state: null });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Confirmación borrado + undo
