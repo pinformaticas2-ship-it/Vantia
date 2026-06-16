@@ -732,7 +732,9 @@ export default function ClientForm() {
         setShowSuccess(true);
         const returnPath = !isEdit && linkedExpedienteId
           ? `/dashboard/expedientes/${linkedExpedienteId}?tab=clientes`
-          : ((isEdit ? id : data.data?.id) ? `/dashboard/clientes/${isEdit ? id : data.data?.id}` : "/dashboard/clientes");
+          : isEdit
+          ? `/dashboard/clientes/${id}`
+          : "/dashboard/clientes";
         setTimeout(() => navigate(returnPath), 1200);
     } catch (err: any) {
       setError(mapClientSaveError(err.message || "Error al guardar", payload));
