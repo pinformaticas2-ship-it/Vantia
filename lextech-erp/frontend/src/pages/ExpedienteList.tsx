@@ -1888,169 +1888,154 @@ function CsvImportCompleteView({
   const visibleIssues = issues.slice(0, 6);
 
   return (
-    <div className="space-y-5 animate-in fade-in duration-300">
-      <div className="flex items-center justify-between gap-4">
+    <div className="flex flex-col h-full animate-in fade-in duration-300">
+
+      {/* ── Cabecera ────────────────────────────────────────────── */}
+      <div className="flex items-center gap-3 px-5 py-3 border-b border-slate-100 bg-white shrink-0">
         <BackButton onClick={onBack} />
+        <div className="flex-1 min-w-0">
+          <h1 className="text-base font-bold text-slate-900 leading-tight">Importar expedientes</h1>
+          <p className="text-xs text-slate-400 truncate">{fileName || "archivo.csv"}</p>
+        </div>
         <button
           type="button"
           onClick={onRestart}
-          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-[#ab0433]/30 hover:bg-red-50 hover:text-[#ab0433]"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:border-[#ab0433]/30 hover:bg-red-50 hover:text-[#ab0433] shrink-0"
         >
-          <RefreshCw size={16} />
+          <RefreshCw size={14} />
           Nueva importacion
         </button>
       </div>
 
-      <div>
-        <h1 className="text-2xl font-black text-slate-900">Importar expedientes</h1>
-        <p className="mt-1.5 text-base text-slate-500">Importa expedientes judiciales desde un archivo CSV</p>
-      </div>
+      {/* ── Contenido ────────────────────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto p-5 space-y-4">
 
-      <div className={`relative overflow-hidden rounded-[28px] px-8 py-10 text-white shadow-xl ${
-        hasErrors
-          ? "bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 shadow-orange-100"
-          : "bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-600 shadow-emerald-100"
-      }`}>
-        <div className="absolute -left-10 top-20 h-28 w-28 rounded-full bg-white/10" />
-        <div className="absolute right-6 top-6 h-24 w-24 rounded-full bg-white/10" />
-        <div className="absolute bottom-4 right-16 h-20 w-20 rounded-full bg-white/8" />
-
-        <div className="relative flex flex-col items-center text-center">
-          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-white/20">
-            <div className="flex h-14 w-14 animate-bounce items-center justify-center rounded-full bg-white/20">
-              <Check size={32} strokeWidth={3} />
+        {/* Hero compacto */}
+        <div className={`relative overflow-hidden rounded-2xl px-6 py-5 text-white ${
+          hasErrors
+            ? "bg-gradient-to-r from-amber-500 to-orange-500"
+            : "bg-gradient-to-r from-emerald-500 to-teal-600"
+        }`}>
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 h-28 w-28 rounded-full bg-white/10 pointer-events-none" />
+          <div className="relative flex items-center gap-4">
+            <div className="h-12 w-12 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+              {hasErrors
+                ? <AlertCircle size={22} strokeWidth={2.5} />
+                : <Check size={22} strokeWidth={3} />}
+            </div>
+            <div className="flex-1 min-w-0">
+              <h2 className="text-xl font-black leading-tight">
+                {hasErrors ? "Importacion con incidencias" : "Importacion completada"}
+              </h2>
+              <p className="mt-0.5 text-sm text-white/80 truncate">
+                {totalProcessed} registros procesados con validacion estricta
+              </p>
+            </div>
+            <div className="shrink-0 rounded-xl bg-white/20 px-4 py-2 text-center">
+              <p className="text-2xl font-black leading-none">{successRate}%</p>
+              <p className="mt-0.5 text-[10px] font-semibold text-white/80 uppercase tracking-wide">éxito</p>
             </div>
           </div>
 
-          <h3 className="mt-6 text-4xl font-black">{hasErrors ? "Importacion revisada con incidencias" : "Importacion completada"}</h3>
-          <p className="mt-3 text-lg text-white/90">
-            <span className="font-semibold">{fileName || "archivo.csv"}</span> se ha procesado con validacion estricta de campos obligatorios.
-          </p>
-          <div className="mt-4 rounded-full bg-white/15 px-4 py-2 text-sm font-semibold text-white/95">
-            {totalProcessed} registros procesados - {successRate}% de exito
-          </div>
-        </div>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="relative overflow-hidden rounded-[22px] border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="absolute -right-5 -top-5 h-24 w-24 rounded-full bg-emerald-100/70" />
-          <div className="relative">
-            <div className="flex items-center gap-2 text-emerald-600">
-              <Check size={18} />
-              <p className="text-lg font-semibold text-slate-900">Importados con exito</p>
-            </div>
-            <p className="mt-4 text-5xl font-black text-slate-900">{successCount}</p>
-            <p className="mt-1 text-sm text-slate-500">registros correctos</p>
-            <p className="mt-3 text-sm text-slate-500">{successCount} filas cumplen todos los campos obligatorios</p>
+          {/* Barra de progreso integrada */}
+          <div className="mt-4 h-1.5 rounded-full bg-white/20">
+            <div
+              className="h-full rounded-full bg-white/70 transition-all duration-700"
+              style={{ width: `${successRate}%` }}
+            />
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-[22px] border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="absolute -right-5 -top-5 h-24 w-24 rounded-full bg-red-100/70" />
-          <div className="relative">
-            <div className="flex items-center gap-2 text-red-500">
-              <AlertCircle size={18} />
-              <p className="text-lg font-semibold text-slate-900">Registros con errores</p>
+        {/* Tarjetas de estadísticas */}
+        <div className="grid grid-cols-3 gap-3">
+          <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="h-7 w-7 rounded-lg bg-emerald-100 flex items-center justify-center">
+                <Check size={14} className="text-emerald-600" />
+              </div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Importados</p>
             </div>
-            <p className="mt-4 text-5xl font-black text-slate-900">{errorCount}</p>
-            <p className="mt-1 text-sm text-slate-500">filas bloqueadas por validacion obligatoria</p>
-            <p className="mt-3 text-sm text-slate-500">Referencia, Numero de procedimiento, Tipo de juzgado, Numero de juzgado, Poblacion/Municipio y Tipo de procedimiento son obligatorios.</p>
+            <p className="text-4xl font-black text-slate-900">{successCount}</p>
+            <p className="mt-1 text-xs text-slate-500">registros correctos</p>
+          </div>
+
+          <div className={`rounded-2xl p-4 border ${hasErrors ? "border-red-100 bg-red-50/60" : "border-slate-100 bg-slate-50/60"}`}>
+            <div className="flex items-center gap-2 mb-3">
+              <div className={`h-7 w-7 rounded-lg flex items-center justify-center ${hasErrors ? "bg-red-100" : "bg-slate-100"}`}>
+                <AlertCircle size={14} className={hasErrors ? "text-red-500" : "text-slate-400"} />
+              </div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Con errores</p>
+            </div>
+            <p className="text-4xl font-black text-slate-900">{errorCount}</p>
+            <p className="mt-1 text-xs text-slate-500">filas bloqueadas</p>
             {hasErrors && (
               <button
                 type="button"
                 onClick={onViewDetails}
-                className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50"
+                className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-red-200 py-1.5 text-xs font-semibold text-red-600 transition-colors hover:bg-red-50"
               >
-                <Eye size={15} />
-                Ver detalles
+                <Eye size={12} /> Ver detalles
               </button>
             )}
           </div>
-        </div>
 
-        <div className="relative overflow-hidden rounded-[22px] border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="absolute -right-5 -top-5 h-24 w-24 rounded-full bg-blue-100/70" />
-          <div className="relative">
-            <div className="flex items-center gap-2 text-sky-600">
-              <FileSpreadsheet size={18} />
-              <p className="text-lg font-semibold text-slate-900">Total procesados</p>
-            </div>
-            <p className="mt-4 text-5xl font-black text-slate-900">{totalProcessed}</p>
-            <p className="mt-1 text-sm text-slate-500">registros revisados</p>
-            <p className="mt-3 text-sm text-slate-500">{issues.length} incidencias de validacion detectadas</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-[22px] border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-xl font-bold text-slate-900">Tasa de exito</p>
-            <p className="mt-1.5 text-sm text-slate-500">Porcentaje de registros importados correctamente</p>
-          </div>
-          <div className="rounded-full bg-emerald-50 px-4 py-2 text-lg font-bold text-emerald-600">
-            {successRate}%
-          </div>
-        </div>
-
-        <div className="mt-5 h-4 overflow-hidden rounded-full bg-slate-100">
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all duration-700"
-            style={{ width: `${successRate}%` }}
-          />
-        </div>
-      </div>
-
-      {hasErrors && (
-        <div className="rounded-[22px] border border-red-200 bg-white p-5 shadow-sm">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-xl font-bold text-slate-900">Detalle de errores</p>
-              <p className="mt-1.5 text-sm text-slate-500">
-                Se muestran las primeras incidencias detectadas en los campos obligatorios.
-              </p>
-            </div>
-            <div className="rounded-full bg-red-50 px-4 py-2 text-sm font-semibold text-red-600">
-              {issues.length} incidencias
-            </div>
-          </div>
-
-          <div className="mt-4 space-y-3">
-            {visibleIssues.map((issue, index) => (
-              <div key={`${issue.rowNumber}-${issue.fieldId}-${index}`} className="rounded-2xl border border-red-100 bg-red-50/70 px-4 py-3">
-                <p className="text-sm font-semibold text-slate-900">
-                  Fila {issue.rowNumber} - {issue.fieldLabel}
-                </p>
-                <p className="mt-1 text-sm text-red-700">{issue.message}</p>
+          <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="h-7 w-7 rounded-lg bg-sky-100 flex items-center justify-center">
+                <FileSpreadsheet size={14} className="text-sky-600" />
               </div>
-            ))}
-            {issues.length > visibleIssues.length && (
-              <p className="text-sm text-slate-500">
-                Hay {issues.length - visibleIssues.length} incidencias adicionales no mostradas en este resumen.
-              </p>
-            )}
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Total</p>
+            </div>
+            <p className="text-4xl font-black text-slate-900">{totalProcessed}</p>
+            <p className="mt-1 text-xs text-slate-500">registros revisados</p>
           </div>
         </div>
-      )}
 
-      <div className="flex items-center justify-end gap-3">
-        <button
-          type="button"
-          onClick={onRestart}
-          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-[#ab0433]/30 hover:bg-red-50 hover:text-[#ab0433]"
-        >
-          <RefreshCw size={16} />
-          Nueva importacion
-        </button>
-        <button
-          type="button"
-          onClick={onFinish}
-          className="inline-flex items-center gap-2 rounded-xl bg-[#ab0433] px-6 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[#92042c] hover:shadow"
-        >
-          <Check size={16} />
-          Finalizar
-        </button>
+        {/* Detalle de errores (solo si hay) */}
+        {hasErrors && (
+          <div className="rounded-2xl border border-red-100 bg-white p-5">
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <p className="text-sm font-bold text-slate-900">Detalle de errores</p>
+              <span className="rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-600 border border-red-100">
+                {issues.length} incidencias
+              </span>
+            </div>
+            <div className="space-y-2">
+              {visibleIssues.map((issue, index) => (
+                <div key={`${issue.rowNumber}-${issue.fieldId}-${index}`} className="rounded-xl border border-red-100 bg-red-50/60 px-3 py-2.5">
+                  <p className="text-xs font-semibold text-slate-700">Fila {issue.rowNumber} · {issue.fieldLabel}</p>
+                  <p className="mt-0.5 text-xs text-red-600">{issue.message}</p>
+                </div>
+              ))}
+              {issues.length > visibleIssues.length && (
+                <p className="text-xs text-slate-400 pt-1">
+                  +{issues.length - visibleIssues.length} incidencias adicionales — usa "Ver detalles" para verlas todas.
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Acciones */}
+        <div className="flex items-center justify-end gap-2 pt-1">
+          <button
+            type="button"
+            onClick={onRestart}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:border-[#ab0433]/30 hover:bg-red-50 hover:text-[#ab0433]"
+          >
+            <RefreshCw size={14} />
+            Nueva importacion
+          </button>
+          <button
+            type="button"
+            onClick={onFinish}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-[#ab0433] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[#92042c]"
+          >
+            <Check size={14} />
+            Finalizar
+          </button>
+        </div>
+
       </div>
     </div>
   );
