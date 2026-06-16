@@ -1157,7 +1157,7 @@ function CsvImportView({
   const [showNewModal, setShowNewModal] = useState(false);
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
+    <div className="p-5 space-y-4 animate-in fade-in duration-300">
       <input
         ref={inputRef}
         type="file"
@@ -1172,35 +1172,35 @@ function CsvImportView({
         <div className="flex items-center gap-3">
           <button
             onClick={onOpenSettings}
-            className="rounded-xl border border-slate-200 bg-white p-3 text-slate-600 shadow-sm transition-colors hover:border-[#ab0433]/30 hover:bg-red-50 hover:text-[#ab0433]"
+            className="rounded-xl border border-slate-200 bg-white p-2.5 text-slate-600 shadow-sm transition-colors hover:border-[#ab0433]/30 hover:bg-red-50 hover:text-[#ab0433]"
             title="Configuracion"
           >
-            <Settings2 size={16} />
+            <Settings2 size={15} />
           </button>
           <button
             onClick={onOpenHistory}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-[#ab0433]/30 hover:bg-red-50 hover:text-[#ab0433]"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-[#ab0433]/30 hover:bg-red-50 hover:text-[#ab0433]"
           >
-            <History size={16} />
+            <History size={15} />
             Historial de importaciones
           </button>
         </div>
       </div>
 
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black text-slate-900">Importar expedientes</h1>
-          <p className="mt-2 text-lg text-slate-500">Importa expedientes judiciales desde un archivo CSV</p>
+          <h1 className="text-base font-bold text-slate-900">Importar expedientes</h1>
+          <p className="mt-0.5 text-xs text-slate-500">Importa expedientes judiciales desde un archivo CSV</p>
         </div>
         <button
           onClick={() => setShowNewModal(true)}
-          className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-[#ab0433] px-4 py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[#92042c]"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-[#ab0433] px-3 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[#92042c]"
         >
-          <Plus size={15} /> Nuevo expediente
+          <Plus size={14} /> Nuevo expediente
         </button>
       </div>
 
-      <div className="flex items-center justify-center gap-6 py-4">
+      <div className="flex items-center justify-center gap-5 py-1">
         <ImportStep icon={Upload} label="Subir archivo" active connector />
         <ImportStep icon={SlidersHorizontal} label="Configurar" connector />
         <ImportStep icon={Eye} label="Revisar" />
@@ -1208,66 +1208,66 @@ function CsvImportView({
 
       <button
         onClick={onSelectFile}
-        className="group flex min-h-[165px] w-full flex-col items-center justify-center rounded-[24px] border border-dashed border-slate-300 bg-white/70 px-5 py-8 text-center shadow-sm transition-all hover:border-[#ab0433]/35 hover:bg-white"
+        className="group flex min-h-[100px] w-full flex-col items-center justify-center rounded-[20px] border border-dashed border-slate-300 bg-white/70 px-5 py-5 text-center shadow-sm transition-all hover:border-[#ab0433]/35 hover:bg-white"
       >
-        <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 text-[#ab0433] transition-colors group-hover:bg-red-100 group-hover:text-[#92042c]">
-          <Upload size={24} />
+        <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-2xl bg-red-50 text-[#ab0433] transition-colors group-hover:bg-red-100 group-hover:text-[#92042c]">
+          <Upload size={20} />
         </div>
-        <p className="text-xl font-semibold text-slate-900">
+        <p className="text-sm font-semibold text-slate-900">
           {fileName ? fileName : "Haz click para seleccionar o arrastra tu archivo CSV"}
         </p>
-        <p className="mt-3 text-sm text-slate-500">Máximo 10MB</p>
+        <p className="mt-1.5 text-xs text-slate-500">Máximo 10MB</p>
       </button>
 
       {/* Plantillas descargables */}
-      <div className="rounded-[22px] border border-emerald-200 bg-emerald-50/60 p-5 shadow-sm">
-        <div className="mb-3 flex items-center gap-2">
-          <FileSpreadsheet size={16} className="text-emerald-600" />
-          <h2 className="text-base font-bold text-slate-900">Plantillas para Excel</h2>
+      <div className="rounded-[18px] border border-emerald-200 bg-emerald-50/60 p-4 shadow-sm">
+        <div className="mb-2 flex items-center gap-2">
+          <FileSpreadsheet size={14} className="text-emerald-600" />
+          <h2 className="text-sm font-bold text-slate-900">Plantillas para Excel</h2>
         </div>
-        <p className="text-sm text-slate-600 mb-4">
+        <p className="text-xs text-slate-600 mb-3">
           Descarga una plantilla, rellénala en Excel y súbela aquí. El archivo se abre directamente con Excel.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <button
             onClick={() => downloadCsvTemplate("basica")}
-            className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-white px-4 py-3.5 text-left shadow-sm transition-all hover:border-emerald-400 hover:shadow-md"
+            className="flex items-start gap-2.5 rounded-xl border border-emerald-200 bg-white px-3 py-3 text-left shadow-sm transition-all hover:border-emerald-400 hover:shadow-md"
           >
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 mt-0.5">
-              <Download size={16} />
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 mt-0.5">
+              <Download size={14} />
             </div>
             <div>
-              <p className="text-sm font-bold text-slate-800">Plantilla básica</p>
-              <p className="text-xs text-slate-500 mt-0.5">Campos esenciales: referencia, juzgado, procedimiento, cliente, parte contraria</p>
+              <p className="text-xs font-bold text-slate-800">Plantilla básica</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">Campos esenciales: referencia, juzgado, procedimiento, cliente, parte contraria</p>
             </div>
           </button>
           <button
             onClick={() => downloadCsvTemplate("completa")}
-            className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-white px-4 py-3.5 text-left shadow-sm transition-all hover:border-emerald-400 hover:shadow-md"
+            className="flex items-start gap-2.5 rounded-xl border border-emerald-200 bg-white px-3 py-3 text-left shadow-sm transition-all hover:border-emerald-400 hover:shadow-md"
           >
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 mt-0.5">
-              <FileSpreadsheet size={16} />
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 mt-0.5">
+              <FileSpreadsheet size={14} />
             </div>
             <div>
-              <p className="text-sm font-bold text-slate-800">Plantilla completa</p>
-              <p className="text-xs text-slate-500 mt-0.5">Todos los campos: año, NIG, procurador, estado, observaciones y más</p>
+              <p className="text-xs font-bold text-slate-800">Plantilla completa</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">Todos los campos: año, NIG, procurador, estado, observaciones y más</p>
             </div>
           </button>
         </div>
-        <p className="mt-3 text-xs text-slate-400">
+        <p className="mt-2 text-[11px] text-slate-400">
           Los archivos CSV incluyen 3 filas de ejemplo. Borra esas filas antes de subir tus datos reales.
         </p>
       </div>
 
-      <div className="rounded-[22px] border border-slate-200 bg-white/80 p-5 shadow-sm">
-        <div className="mb-4 flex items-center gap-2">
-          <AlertCircle size={16} className="text-[#ab0433]" />
-          <h2 className="text-xl font-bold text-slate-900">Formato esperado</h2>
+      <div className="rounded-[18px] border border-slate-200 bg-white/80 p-4 shadow-sm">
+        <div className="mb-2.5 flex items-center gap-2">
+          <AlertCircle size={14} className="text-[#ab0433]" />
+          <h2 className="text-sm font-bold text-slate-900">Formato esperado</h2>
         </div>
-        <p className="text-base text-slate-600">
+        <p className="text-xs text-slate-600">
           Tu archivo CSV debe contener las siguientes columnas (con separador <strong>;</strong> o <strong>,</strong>):
         </p>
-        <ul className="mt-3 space-y-1.5 text-base text-slate-600">
+        <ul className="mt-2 space-y-1 text-xs text-slate-600">
           <li>• Referencia (ID del expediente)</li>
           <li>• Número de procedimiento</li>
           <li>• Tipo de juzgado</li>
@@ -1275,7 +1275,7 @@ function CsvImportView({
           <li>• Población/Municipio</li>
           <li>• Tipo de procedimiento</li>
         </ul>
-        <p className="mt-5 text-base text-slate-500">
+        <p className="mt-3 text-xs text-slate-500">
           Las columnas se detectarán automáticamente y podrás ajustarlas en el siguiente paso.
         </p>
       </div>
@@ -1307,30 +1307,30 @@ function CsvImportHistoryView({
   onReload: () => void;
 }) {
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      <div className="flex items-start justify-between gap-4">
+    <div className="p-5 space-y-4 animate-in fade-in duration-300">
+      <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-900">Historial de importaciones</h1>
-          <p className="mt-1.5 text-base text-slate-500">
+          <h1 className="text-base font-bold text-slate-900">Historial de importaciones</h1>
+          <p className="mt-0.5 text-xs text-slate-500">
             Historial de todas las importaciones de expedientes realizadas
           </p>
         </div>
         <BackButton onClick={onBack} />
       </div>
 
-      <div className="rounded-[24px] border border-slate-200 bg-white/90 p-6 shadow-sm">
-        <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-5">
+      <div className="rounded-[20px] border border-slate-200 bg-white/90 p-4 shadow-sm">
+        <div className="flex items-center justify-between gap-4 border-b border-slate-100 pb-3">
           <div>
-            <h2 className="text-xl font-bold text-slate-900">Importaciones recientes</h2>
-            <p className="mt-1.5 text-sm text-slate-500">
+            <h2 className="text-sm font-semibold text-slate-900">Importaciones recientes</h2>
+            <p className="mt-0.5 text-xs text-slate-500">
               Lista de todas las importaciones realizadas en el sistema
             </p>
           </div>
           <button
             onClick={onReload}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-[#ab0433]/30 hover:bg-red-50 hover:text-[#ab0433]"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-[#ab0433]/30 hover:bg-red-50 hover:text-[#ab0433]"
           >
-            <RefreshCw size={15} />
+            <RefreshCw size={14} />
             Actualizar
           </button>
         </div>
@@ -1404,7 +1404,7 @@ function CsvImportHistoryView({
           </table>
         </div>
 
-        <p className="mt-6 text-sm text-slate-500">
+        <p className="mt-4 text-xs text-slate-500">
           Se muestran los ultimos {rows.length} lotes de importacion
         </p>
       </div>
@@ -1552,7 +1552,7 @@ function CsvImportConfigureView({
   const mappingOptions = [CSV_UNASSIGNED, ...csvHeaders];
 
   return (
-    <div className="space-y-5 animate-in fade-in duration-300">
+    <div className="p-5 space-y-4 animate-in fade-in duration-300">
       <input
         ref={inputRef}
         type="file"
@@ -1567,57 +1567,57 @@ function CsvImportConfigureView({
         <div className="flex items-center gap-3">
           <button
             onClick={onOpenSettings}
-            className="rounded-xl border border-slate-200 bg-white p-3 text-slate-600 shadow-sm transition-colors hover:border-[#ab0433]/30 hover:bg-red-50 hover:text-[#ab0433]"
+            className="rounded-xl border border-slate-200 bg-white p-2.5 text-slate-600 shadow-sm transition-colors hover:border-[#ab0433]/30 hover:bg-red-50 hover:text-[#ab0433]"
             title="Configuracion"
           >
-            <Settings2 size={16} />
+            <Settings2 size={15} />
           </button>
           <button
             onClick={onOpenHistory}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-[#ab0433]/30 hover:bg-red-50 hover:text-[#ab0433]"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-[#ab0433]/30 hover:bg-red-50 hover:text-[#ab0433]"
           >
-            <History size={16} />
+            <History size={15} />
             Historial de importaciones
           </button>
         </div>
       </div>
 
       <div>
-        <h1 className="text-2xl font-black text-slate-900">Importar expedientes</h1>
-        <p className="mt-1.5 text-base text-slate-500">Importa expedientes judiciales desde un archivo CSV</p>
+        <h1 className="text-base font-bold text-slate-900">Importar expedientes</h1>
+        <p className="mt-0.5 text-xs text-slate-500">Importa expedientes judiciales desde un archivo CSV</p>
       </div>
 
-      <div className="flex items-center justify-center gap-5 py-3">
+      <div className="flex items-center justify-center gap-5 py-1">
         <ImportStep icon={Check} label="Subir archivo" completed connector />
         <ImportStep icon={SlidersHorizontal} label="Configurar" active connector />
         <ImportStep icon={Eye} label="Revisar" />
       </div>
 
-      <div className="rounded-[22px] border border-slate-200 bg-white/80 p-4 shadow-sm">
+      <div className="rounded-[18px] border border-slate-200 bg-white/80 p-3.5 shadow-sm">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="text-2xl font-bold text-slate-900">Archivo seleccionado</p>
-            <p className="mt-1.5 text-sm text-slate-500">{fileName || "Sin archivo"} (0.00 MB)</p>
+            <p className="text-sm font-bold text-slate-900">Archivo seleccionado</p>
+            <p className="mt-0.5 text-xs text-slate-500">{fileName || "Sin archivo"} (0.00 MB)</p>
           </div>
           <button
             onClick={onSelectFile}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-[#ab0433]/30 hover:bg-red-50 hover:text-[#ab0433]"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-[#ab0433]/30 hover:bg-red-50 hover:text-[#ab0433]"
           >
-            <RefreshCw size={15} />
+            <RefreshCw size={14} />
             Cambiar archivo
           </button>
         </div>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         <div className="flex items-end justify-between gap-4">
           <div>
-            <h2 className="text-[28px] font-bold text-slate-900">Campos Obligatorios</h2>
-            <p className="mt-1.5 text-base text-slate-500">
+            <h2 className="text-sm font-semibold text-slate-900">Campos Obligatorios</h2>
+            <p className="mt-0.5 text-xs text-slate-500">
               Estos campos son necesarios para crear los expedientes. Verifica que las columnas detectadas sean correctas.
             </p>
           </div>
-          <p className="text-base text-slate-500">{assignedRequired} de {requiredFields.length} asignados</p>
+          <p className="text-xs text-slate-500">{assignedRequired} de {requiredFields.length} asignados</p>
         </div>
 
         <div className="space-y-2">
@@ -1633,9 +1633,9 @@ function CsvImportConfigureView({
         </div>
       </div>
 
-      <details className="overflow-visible rounded-2xl border border-dashed border-slate-300 bg-white/70 px-5 py-4">
-        <summary className="cursor-pointer list-none text-xl font-semibold text-slate-900">
-          Columnas del CSV sin asignar <span className="ml-2 text-base font-normal text-slate-500">({unassignedHeaders.length} columnas)</span>
+      <details className="overflow-visible rounded-2xl border border-dashed border-slate-300 bg-white/70 px-4 py-3">
+        <summary className="cursor-pointer list-none text-sm font-semibold text-slate-900">
+          Columnas del CSV sin asignar <span className="ml-1.5 text-xs font-normal text-slate-500">({unassignedHeaders.length} columnas)</span>
         </summary>
         <div className="mt-4 flex flex-wrap gap-2">
           {unassignedHeaders.map((item) => (
@@ -1651,9 +1651,9 @@ function CsvImportConfigureView({
         </div>
       </details>
 
-      <details className="overflow-visible rounded-2xl border border-slate-200 bg-white/80 px-5 py-4" open>
-        <summary className="cursor-pointer list-none text-xl font-semibold text-slate-900">
-          Campos Opcionales <span className="ml-2 text-base font-normal text-slate-500">({assignedOptional} de {optionalFields.length} asignados)</span>
+      <details className="overflow-visible rounded-2xl border border-slate-200 bg-white/80 px-4 py-3" open>
+        <summary className="cursor-pointer list-none text-sm font-semibold text-slate-900">
+          Campos Opcionales <span className="ml-1.5 text-xs font-normal text-slate-500">({assignedOptional} de {optionalFields.length} asignados)</span>
         </summary>
         <div className="mt-4 space-y-2 overflow-visible">
           {optionalFields.map((field) => (
@@ -1731,48 +1731,48 @@ function CsvImportReviewView({
     : "px-4 py-4";
 
   return (
-    <div className="space-y-5 animate-in fade-in duration-300">
+    <div className="p-5 space-y-4 animate-in fade-in duration-300">
       <div className="flex items-center justify-between gap-4">
         <BackButton onClick={onBack} />
 
         <div className="flex items-center gap-3">
           <button
             onClick={onOpenSettings}
-            className="rounded-xl border border-slate-200 bg-white p-3 text-slate-600 shadow-sm transition-colors hover:border-[#ab0433]/30 hover:bg-red-50 hover:text-[#ab0433]"
+            className="rounded-xl border border-slate-200 bg-white p-2.5 text-slate-600 shadow-sm transition-colors hover:border-[#ab0433]/30 hover:bg-red-50 hover:text-[#ab0433]"
             title="Configuracion"
           >
-            <Settings2 size={16} />
+            <Settings2 size={15} />
           </button>
           <button
             onClick={onOpenHistory}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-[#ab0433]/30 hover:bg-red-50 hover:text-[#ab0433]"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-[#ab0433]/30 hover:bg-red-50 hover:text-[#ab0433]"
           >
-            <History size={16} />
+            <History size={15} />
             Historial de importaciones
           </button>
         </div>
       </div>
 
       <div>
-        <h1 className="text-2xl font-black text-slate-900">Importar expedientes</h1>
-        <p className="mt-1.5 text-base text-slate-500">Importa expedientes judiciales desde un archivo CSV</p>
+        <h1 className="text-base font-bold text-slate-900">Importar expedientes</h1>
+        <p className="mt-0.5 text-xs text-slate-500">Importa expedientes judiciales desde un archivo CSV</p>
       </div>
 
-      <div className="flex items-center justify-center gap-5 py-3">
+      <div className="flex items-center justify-center gap-5 py-1">
         <ImportStep icon={Check} label="Subir archivo" completed connector />
         <ImportStep icon={Check} label="Configurar" completed connector />
         <ImportStep icon={Eye} label="Revisar" active />
       </div>
 
-      <div className="rounded-[22px] border border-slate-200 bg-white/90 p-5 shadow-sm">
+      <div className="rounded-[18px] border border-slate-200 bg-white/90 p-4 shadow-sm">
         <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-50 text-[#ffcf26]">
-              <FileSpreadsheet size={20} />
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-[#ffcf26]">
+              <FileSpreadsheet size={17} />
             </div>
             <div>
-              <p className="text-base font-bold text-slate-900">Listo para importar</p>
-              <p className="mt-1 text-sm text-slate-500">{fileName || "archivo.csv"} - {previewRows.length} registros</p>
+              <p className="text-sm font-bold text-slate-900">Listo para importar</p>
+              <p className="mt-0.5 text-xs text-slate-500">{fileName || "archivo.csv"} - {previewRows.length} registros</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -1787,14 +1787,14 @@ function CsvImportReviewView({
       </div>
 
       {validationSummary.issues.length > 0 && (
-        <div className="rounded-[22px] border border-amber-200 bg-amber-50 p-5 shadow-sm">
+        <div className="rounded-[18px] border border-amber-200 bg-amber-50 p-4 shadow-sm">
           <div className="flex items-start gap-3">
-            <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-600" />
+            <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-600" />
             <div>
-              <p className="text-base font-bold text-amber-900">
+              <p className="text-sm font-semibold text-amber-900">
                 {validationSummary.issues.length === 1 ? "1 aviso detectado" : `${validationSummary.issues.length} avisos detectados`}
               </p>
-              <p className="mt-1 text-sm text-amber-800">
+              <p className="mt-0.5 text-xs text-amber-800">
                 Se importarán todos los registros igualmente. Los avisos son solo informativos.
               </p>
             </div>
@@ -1803,7 +1803,7 @@ function CsvImportReviewView({
       )}
 
       <div>
-        <p className="mb-3 text-2xl font-bold text-slate-900">Vista previa de los primeros registros</p>
+        <p className="mb-2 text-sm font-semibold text-slate-900">Vista previa de los primeros registros</p>
         <div className="overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-sm">
           <table className="min-w-full text-left">
             <thead className="border-b border-slate-200 bg-slate-50">
@@ -2653,7 +2653,7 @@ function DocumentImportView({
   }));
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
+    <div className="p-5 space-y-4 animate-in fade-in duration-300">
       <input
         ref={inputRef}
         type="file"
@@ -2667,37 +2667,37 @@ function DocumentImportView({
       </div>
 
       <div>
-        <h1 className="text-3xl font-black text-slate-900">Importar Expedientes desde Documentos</h1>
-        <p className="mt-2 text-lg text-slate-500">Sube tus archivos para crear nuevos expedientes automáticamente.</p>
+        <h1 className="text-base font-bold text-slate-900">Importar Expedientes desde Documentos</h1>
+        <p className="mt-0.5 text-xs text-slate-500">Sube tus archivos para crear nuevos expedientes automáticamente.</p>
       </div>
 
-      <section className="rounded-[24px] border border-slate-200 bg-white px-6 py-6 shadow-sm">
-        <h2 className="text-[15px] font-bold text-slate-900">Configuración de Asignación (Opcional)</h2>
-        <p className="mt-1 text-sm text-slate-500">
+      <section className="rounded-[20px] border border-slate-200 bg-white px-4 py-4 shadow-sm">
+        <h2 className="text-sm font-semibold text-slate-900">Configuración de Asignación (Opcional)</h2>
+        <p className="mt-0.5 text-xs text-slate-500">
           Puedes asignar automáticamente los expedientes creados a otras organizaciones.
         </p>
 
         <button
           type="button"
           onClick={onToggleAutoAssign}
-          className="mt-6 inline-flex items-center gap-3 text-left"
+          className="mt-4 inline-flex items-center gap-3 text-left"
         >
           <span
-            className={`relative inline-flex h-7 w-12 shrink-0 rounded-full transition-colors ${
+            className={`relative inline-flex h-6 w-10 shrink-0 rounded-full transition-colors ${
               autoAssignOrganizations ? "bg-[#ab0433]" : "bg-slate-200"
             }`}
           >
             <span
-              className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
-                autoAssignOrganizations ? "translate-x-6" : "translate-x-1"
+              className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+                autoAssignOrganizations ? "translate-x-[18px]" : "translate-x-0.5"
               }`}
             />
           </span>
-          <span className="text-[15px] font-semibold text-slate-900">Asignar automáticamente organizaciones</span>
+          <span className="text-sm font-semibold text-slate-900">Asignar automáticamente organizaciones</span>
         </button>
 
         {autoAssignOrganizations && (
-          <div className="mt-8 grid gap-5 md:grid-cols-2">
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
             <PrettyAssignSelect
               label="Cliente"
               placeholder="Seleccionar cliente..."
@@ -2709,7 +2709,7 @@ function DocumentImportView({
             />
 
             <label className="block">
-              <span className="mb-2 block text-[15px] font-semibold text-slate-900">Procurador</span>
+              <span className="mb-1.5 block text-sm font-semibold text-slate-900">Procurador</span>
               <input
                 type="text"
                 value={selectedProcurador}
@@ -2722,9 +2722,9 @@ function DocumentImportView({
         )}
       </section>
 
-      <section className="rounded-[24px] border border-slate-200 bg-white px-6 py-6 shadow-sm">
-        <h2 className="text-[15px] font-bold text-slate-900">Importar Expedientes</h2>
-        <p className="mt-1 text-sm text-slate-500">
+      <section className="rounded-[20px] border border-slate-200 bg-white px-4 py-4 shadow-sm">
+        <h2 className="text-sm font-semibold text-slate-900">Importar Expedientes</h2>
+        <p className="mt-0.5 text-xs text-slate-500">
           Sube un archivo ZIP que contenga documentos del expediente. Cada documento se procesará como un nuevo expediente.
         </p>
 
@@ -2734,7 +2734,7 @@ function DocumentImportView({
           onFileChange={onFileChange}
         />
 
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
           <div>
             <p className="text-sm font-semibold text-slate-900">
               {zipFile ? "Archivo listo para importar" : "Selecciona un ZIP para comenzar"}
@@ -2789,11 +2789,11 @@ function DocumentImportView({
       )}
 
       {(activeBatch || activeItems.length > 0) && (
-        <section className="rounded-[24px] border border-slate-200 bg-white px-6 py-6 shadow-sm">
+        <section className="rounded-[20px] border border-slate-200 bg-white px-4 py-4 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <div className="flex items-center gap-3">
-                <h2 className="text-[15px] font-bold text-slate-900">Última importación</h2>
+                <h2 className="text-sm font-semibold text-slate-900">Última importación</h2>
                 {activeBatch && (activeBatch.pending_count ?? 0) > 0 && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-800">
                     {activeBatch.pending_count} pendiente{(activeBatch.pending_count ?? 0) !== 1 ? "s" : ""}
@@ -2818,27 +2818,27 @@ function DocumentImportView({
           </div>
 
           {activeBatch && (
-            <div className="mt-5 grid gap-3 md:grid-cols-4">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs uppercase tracking-wide text-slate-400">Archivo</p>
-                <p className="mt-1 text-sm font-semibold text-slate-900 break-all">{activeBatch.file_name}</p>
+            <div className="mt-4 grid gap-2.5 md:grid-cols-4">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <p className="text-[10px] uppercase tracking-wide text-slate-400">Archivo</p>
+                <p className="mt-0.5 text-xs font-semibold text-slate-900 break-all">{activeBatch.file_name}</p>
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs uppercase tracking-wide text-slate-400">Total</p>
-                <p className="mt-1 text-2xl font-black text-slate-900">{activeBatch.total_count || 0}</p>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <p className="text-[10px] uppercase tracking-wide text-slate-400">Total</p>
+                <p className="mt-0.5 text-xl font-black text-slate-900">{activeBatch.total_count || 0}</p>
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs uppercase tracking-wide text-slate-400">Creados</p>
-                <p className="mt-1 text-2xl font-black text-emerald-600">{activeBatch.completed_count || 0}</p>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <p className="text-[10px] uppercase tracking-wide text-slate-400">Creados</p>
+                <p className="mt-0.5 text-xl font-black text-emerald-600">{activeBatch.completed_count || 0}</p>
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs uppercase tracking-wide text-slate-400">Errores</p>
-                <p className="mt-1 text-2xl font-black text-red-600">{activeBatch.error_count || 0}</p>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <p className="text-[10px] uppercase tracking-wide text-slate-400">Errores</p>
+                <p className="mt-0.5 text-xl font-black text-red-600">{activeBatch.error_count || 0}</p>
               </div>
             </div>
           )}
 
-          <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200">
+          <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">
             <div className="grid grid-cols-[88px_minmax(0,1.3fr)_120px_minmax(0,1.2fr)_120px] gap-3 bg-slate-50 px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-slate-500">
               <span>Fila</span>
               <span>Documento</span>
@@ -2912,18 +2912,18 @@ function DocumentImportView({
         </section>
       )}
 
-      <section className="rounded-[24px] border border-slate-200 bg-white px-6 py-6 shadow-sm">
+      <section className="rounded-[20px] border border-slate-200 bg-white px-4 py-4 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-[15px] font-bold text-slate-900">Historial reciente</h2>
-            <p className="mt-1 text-sm text-slate-500">Últimos lotes importados desde documentos.</p>
+            <h2 className="text-sm font-semibold text-slate-900">Historial reciente</h2>
+            <p className="mt-0.5 text-xs text-slate-500">Últimos lotes importados desde documentos.</p>
           </div>
           <button
             type="button"
             onClick={onReloadHistory}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50"
           >
-            <RefreshCw size={13} />
+            <RefreshCw size={12} />
             Recargar
           </button>
         </div>
@@ -3610,22 +3610,22 @@ function ImportStep({
   connector?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-5">
-      <div className="flex flex-col items-center gap-3">
-        <div className={`flex h-12 w-12 items-center justify-center rounded-full border ${
+    <div className="flex items-center gap-3">
+      <div className="flex flex-col items-center gap-1.5">
+        <div className={`flex h-9 w-9 items-center justify-center rounded-full border ${
           completed
-            ? "border-emerald-500 bg-emerald-500 text-white shadow-lg shadow-emerald-200"
+            ? "border-emerald-500 bg-emerald-500 text-white shadow-md shadow-emerald-200"
             : active
-            ? "border-[#ab0433] bg-[#ab0433] text-white shadow-lg shadow-red-200"
+            ? "border-[#ab0433] bg-[#ab0433] text-white shadow-md shadow-red-200"
             : "border-slate-300 bg-white text-slate-500"
         }`}>
-          <Icon size={18} />
+          <Icon size={15} />
         </div>
-        <span className={`text-sm font-semibold ${
+        <span className={`text-[11px] font-semibold ${
           completed ? "text-emerald-600" : active ? "text-[#ab0433]" : "text-slate-500"
         }`}>{label}</span>
       </div>
-      {connector && <div className={`h-px w-32 ${completed ? "bg-emerald-500" : "bg-slate-300"}`} />}
+      {connector && <div className={`h-px w-20 mb-4 ${completed ? "bg-emerald-500" : "bg-slate-300"}`} />}
     </div>
   );
 }
