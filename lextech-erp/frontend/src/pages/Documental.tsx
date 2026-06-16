@@ -1,9 +1,9 @@
-﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAuth } from "@clerk/clerk-react";
 import {
   Library, Landmark, Scale, ShieldCheck, Search, Loader2, ExternalLink,
-  FileText, BookOpen, Sparkles, Link2, AlertCircle, CheckCircle2, X, HelpCircle,
+  FileText, BookOpen, Link2, AlertCircle, CheckCircle2, X, ChevronDown,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 
@@ -103,64 +103,12 @@ interface CendojAdvancedFilters {
   year: string;
 }
 
-function ProviderCard({ provider }: { provider: ProviderInfo }) {
-  const tone = provider.status === "available"
-    ? "border-emerald-200 bg-emerald-50/70 text-emerald-700"
-    : provider.status === "partial" || provider.status === "prepared"
-    ? "border-amber-200 bg-amber-50/70 text-amber-700"
-    : "border-slate-200 bg-slate-50 text-slate-600";
-
-  return (
-    <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">{provider.name}</p>
-          <h3 className="mt-1 text-lg font-black text-slate-900">{provider.mode.replaceAll("_", " ")}</h3>
-        </div>
-        <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${tone}`}>
-          {provider.status}
-        </span>
-      </div>
-
-      <p className="mt-3 text-sm leading-6 text-slate-500">{provider.note}</p>
-
-      <div className="mt-4 flex flex-wrap gap-2">
-        {provider.supports.map((item) => (
-          <span key={item} className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-500">
-            {item.replaceAll("_", " ")}
-          </span>
-        ))}
-      </div>
-
-      <div className="mt-5 flex flex-wrap gap-2">
-        <a href={provider.docsUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50">
-          <BookOpen size={13} />
-          Fuente oficial
-        </a>
-        <a href={provider.searchUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50">
-          <ExternalLink size={13} />
-          Abrir servicio
-        </a>
-      </div>
-    </div>
-  );
-}
-
-function ResultMeta({ label, value }: { label: string; value: string | null | undefined }) {
-  if (!value) return null;
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2">
-      <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">{label}</p>
-      <p className="mt-1 text-sm font-medium text-slate-700">{value}</p>
-    </div>
-  );
-}
 
 export default function Documental() {
   const { getToken } = useAuth();
   const [providers, setProviders] = useState<Record<string, ProviderInfo> | null>(null);
-  const [loadingProviders, setLoadingProviders] = useState(true);
-  const [providerError, setProviderError] = useState<string | null>(null);
+  const [, setLoadingProviders] = useState(true);
+  const [, setProviderError] = useState<string | null>(null);
 
   const [boeId, setBoeId] = useState("BOE-A-2020-8099");
   const [boeDocument, setBoeDocument] = useState<BoeDocumentResponse | null>(null);
@@ -183,8 +131,8 @@ export default function Documental() {
   const [selectedBlockError, setSelectedBlockError] = useState<string | null>(null);
 
   const [cendojHighlights, setCendojHighlights] = useState<CendojHighlight[]>([]);
-  const [cendojLoading, setCendojLoading] = useState(false);
-  const [cendojError, setCendojError] = useState<string | null>(null);
+  const [, setCendojLoading] = useState(false);
+  const [, setCendojError] = useState<string | null>(null);
   const [cendojQuery, setCendojQuery] = useState("caducidad");
   const [cendojSearchLoading, setCendojSearchLoading] = useState(false);
   const [cendojSearchError, setCendojSearchError] = useState<string | null>(null);
@@ -194,7 +142,8 @@ export default function Documental() {
   const [cendojRecoverableMax, setCendojRecoverableMax] = useState<number | null>(null);
   const [cendojSearchUrl, setCendojSearchUrl] = useState<string | null>(null);
   const [cendojSearchWarning, setCendojSearchWarning] = useState<string | null>(null);
-  const [showCendojHelp, setShowCendojHelp] = useState(false);
+  const [activeTab, setActiveTab] = useState<"boe" | "cendoj" | "lexnet">("boe");
+  const [showBoeAdvanced, setShowBoeAdvanced] = useState(false);
   const [cendojAdvanced, setCendojAdvanced] = useState<CendojAdvancedFilters>({
     organo: "",
     tipo: "",
@@ -322,7 +271,6 @@ export default function Documental() {
     };
   }, [selectedBlock, selectedBlockError, selectedBlockLoading]);
 
-  const providerList = useMemo(() => providers ? Object.values(providers) : [], [providers]);
   const lexnetProvider = providers?.lexnet;
   const cendojProvider = providers?.cendoj;
   const showBlockModal = selectedBlockLoading || selectedBlock || selectedBlockError;
@@ -370,660 +318,479 @@ export default function Documental() {
 
   return (
     <>
-    <div className="space-y-6">
-      <section className="rounded-[30px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(171,4,51,0.08),_transparent_32%),linear-gradient(180deg,_white,_rgba(248,250,252,0.96))] px-7 py-7 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-5">
-          <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#ab0433] shadow-sm ring-1 ring-red-100">
-              <Library size={13} />
-              Módulo Documental
-            </div>
-            <h1 className="mt-4 text-3xl font-black tracking-tight text-slate-900">BOE, CENDOJ y LexNET conectados hasta donde hoy es viable</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-500">
-              He dejado una base documental real: BOE operativo con API oficial, CENDOJ enlazado y preparado con información pública oficial,
-              y LexNET listo para integración segura cuando tengamos credenciales y certificado del despacho.
-            </p>
-          </div>
+    <div className="flex flex-col gap-5 max-w-5xl mx-auto w-full">
 
-          <div className="grid min-w-[260px] gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">BOE</p>
-              <p className="mt-2 text-lg font-black text-emerald-600">API oficial</p>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">CENDOJ</p>
-              <p className="mt-2 text-lg font-black text-amber-600">Portal público</p>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">LexNET</p>
-              <p className="mt-2 text-lg font-black text-slate-700">
-                {lexnetProvider?.configured ? "Preparado" : "Pendiente"}
-              </p>
-            </div>
+      {/* ── Header ──────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-2xl bg-[#ab0433]/10 flex items-center justify-center">
+            <Library size={18} className="text-[#ab0433]" />
+          </div>
+          <div>
+            <h1 className="text-xl font-black text-slate-900">Documental</h1>
+            <p className="text-xs text-slate-500">BOE · CENDOJ · LexNET</p>
           </div>
         </div>
-      </section>
+        <div className="flex flex-wrap gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />BOE · API oficial
+          </span>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />CENDOJ · Portal público
+          </span>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-500">
+            <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />LexNET · {lexnetProvider?.configured ? "Preparado" : "Pendiente"}
+          </span>
+        </div>
+      </div>
 
-      <section className="grid gap-5 xl:grid-cols-3">
-        {loadingProviders ? (
-          <div className="xl:col-span-3 flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm text-slate-500">
-            <Loader2 size={16} className="animate-spin" />
-            Cargando conectores documentales...
-          </div>
-        ) : providerError ? (
-          <div className="xl:col-span-3 flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
-            <AlertCircle size={16} />
-            {providerError}
-          </div>
-        ) : (
-          providerList.map((provider) => <ProviderCard key={provider.key} provider={provider} />)
-        )}
-      </section>
+      {/* ── Tabs ────────────────────────────────────────────────── */}
+      <div className="flex gap-1 rounded-2xl bg-slate-100 p-1 w-fit">
+        {(["boe", "cendoj", "lexnet"] as const).map((t) => (
+          <button
+            key={t}
+            onClick={() => setActiveTab(t)}
+            className={`rounded-xl px-5 py-2.5 text-sm font-bold transition-all ${
+              activeTab === t ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            {t === "boe" ? "BOE" : t === "cendoj" ? "CENDOJ" : "LexNET"}
+          </button>
+        ))}
+      </div>
 
-      <section className="grid items-start gap-6 xl:grid-cols-[1.3fr_1fr]">
-        <div className="self-start rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-emerald-600">BOE operativo</p>
-              <h2 className="mt-2 text-2xl font-black text-slate-900">Consulta de norma por identificador</h2>
-              <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-500">
-                Esta parte ya está conectada con la API oficial de datos abiertos del BOE. Puedes recuperar metadatos y estructura del texto consolidado.
-              </p>
-            </div>
-            <Landmark size={22} className="text-emerald-500" />
-          </div>
-
-          <div className="mt-5 flex flex-wrap gap-3">
-            <div className="min-w-[320px] flex-1">
-              <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-400">Identificador BOE</label>
-              <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 focus-within:border-emerald-300 focus-within:bg-white">
-                <Search size={15} className="text-slate-400" />
-                <input
-                  value={boeId}
-                  onChange={(e) => setBoeId(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      void handleBoeLookup();
-                    }
-                  }}
-                  placeholder="BOE-A-2020-8099 o Ley 40/2015"
-                  className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
-                />
-              </div>
-              <p className="mt-2 text-xs text-slate-400">
-                Usa un identificador BOE exacto o una referencia tipo <span className="font-semibold">Ley 40/2015</span>.
-              </p>
+      {/* ── BOE ─────────────────────────────────────────────────── */}
+      {activeTab === "boe" && (
+        <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-wrap gap-3">
+            <div className="flex-1 min-w-[240px] flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 focus-within:border-emerald-300 focus-within:bg-white transition-colors">
+              <Search size={15} className="text-slate-400 shrink-0" />
+              <input
+                value={boeId}
+                onChange={(e) => setBoeId(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void handleBoeLookup(); } }}
+                placeholder="BOE-A-2020-8099 · Ley 40/2015 · texto libre..."
+                className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
+              />
+              {boeId && <button type="button" onClick={() => setBoeId("")} className="text-slate-300 hover:text-slate-500"><X size={13} /></button>}
             </div>
             <button
               type="button"
               onClick={() => void handleBoeLookup()}
-              className="self-end inline-flex items-center gap-2 rounded-2xl bg-[#ab0433] px-4 py-3 text-sm font-bold text-white shadow-lg shadow-red-200 transition-colors hover:bg-[#92042c]"
+              disabled={boeLoading}
+              className="inline-flex items-center gap-2 rounded-2xl bg-[#ab0433] px-5 py-3 text-sm font-bold text-white hover:bg-[#92042c] disabled:opacity-60 transition-colors"
             >
-              {boeLoading ? <Loader2 size={15} className="animate-spin" /> : <FileText size={15} />}
+              {boeLoading ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
               Consultar
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowBoeAdvanced((v) => !v)}
+              className={`inline-flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold transition-colors ${
+                showBoeAdvanced ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              <ChevronDown size={14} className={`transition-transform ${showBoeAdvanced ? "rotate-180" : ""}`} />
+              Filtros
             </button>
           </div>
 
-          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            <div>
-              <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-400">Título exacto</label>
-              <input
-                value={boeAdvanced.title}
-                onChange={(e) => setBoeAdvanced((current) => ({ ...current, title: e.target.value }))}
-                placeholder="Ley Orgánica 3/2018"
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-emerald-300 focus:bg-white"
-              />
-            </div>
-            <div>
-              <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-400">Texto legal</label>
-              <input
-                value={boeAdvanced.texto}
-                onChange={(e) => setBoeAdvanced((current) => ({ ...current, texto: e.target.value }))}
-                placeholder="protección de datos"
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-emerald-300 focus:bg-white"
-              />
-            </div>
-            <div>
-              <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-400">Rango</label>
-              <input
-                value={boeAdvanced.rango}
-                onChange={(e) => setBoeAdvanced((current) => ({ ...current, rango: e.target.value }))}
-                placeholder="Ley, Real Decreto..."
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-emerald-300 focus:bg-white"
-              />
-            </div>
-            <div>
-              <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-400">Departamento</label>
-              <input
-                value={boeAdvanced.departamento}
-                onChange={(e) => setBoeAdvanced((current) => ({ ...current, departamento: e.target.value }))}
-                placeholder="Ministerio de Justicia"
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-emerald-300 focus:bg-white"
-              />
-            </div>
-            <div>
-              <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-400">Materia</label>
-              <input
-                value={boeAdvanced.materia}
-                onChange={(e) => setBoeAdvanced((current) => ({ ...current, materia: e.target.value }))}
-                placeholder="procedimiento administrativo"
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-emerald-300 focus:bg-white"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-400">Año desde</label>
-                <input
-                  value={boeAdvanced.yearFrom}
-                  onChange={(e) => setBoeAdvanced((current) => ({ ...current, yearFrom: e.target.value.replace(/[^\d]/g, "").slice(0, 4) }))}
-                  placeholder="2015"
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-emerald-300 focus:bg-white"
-                />
-              </div>
-              <div>
-                <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-400">Año hasta</label>
-                <input
-                  value={boeAdvanced.yearTo}
-                  onChange={(e) => setBoeAdvanced((current) => ({ ...current, yearTo: e.target.value.replace(/[^\d]/g, "").slice(0, 4) }))}
-                  placeholder="2024"
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-emerald-300 focus:bg-white"
-                />
+          {showBoeAdvanced && (
+            <div className="mt-4 grid gap-3 grid-cols-2 md:grid-cols-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              {[
+                { label: "Título", key: "title" as const, placeholder: "Ley Orgánica 3/2018" },
+                { label: "Texto", key: "texto" as const, placeholder: "protección de datos" },
+                { label: "Rango", key: "rango" as const, placeholder: "Ley, Real Decreto..." },
+                { label: "Departamento", key: "departamento" as const, placeholder: "Ministerio de Justicia" },
+                { label: "Materia", key: "materia" as const, placeholder: "procedimiento administrativo" },
+              ].map(({ label, key, placeholder }) => (
+                <div key={key}>
+                  <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</label>
+                  <input
+                    value={boeAdvanced[key]}
+                    onChange={(e) => setBoeAdvanced((c) => ({ ...c, [key]: e.target.value }))}
+                    placeholder={placeholder}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none placeholder:text-slate-400 focus:border-emerald-300"
+                  />
+                </div>
+              ))}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-slate-400">Desde</label>
+                  <input value={boeAdvanced.yearFrom} onChange={(e) => setBoeAdvanced((c) => ({ ...c, yearFrom: e.target.value.replace(/[^\d]/g, "").slice(0, 4) }))} placeholder="2015" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none placeholder:text-slate-400 focus:border-emerald-300" />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-slate-400">Hasta</label>
+                  <input value={boeAdvanced.yearTo} onChange={(e) => setBoeAdvanced((c) => ({ ...c, yearTo: e.target.value.replace(/[^\d]/g, "").slice(0, 4) }))} placeholder="2024" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none placeholder:text-slate-400 focus:border-emerald-300" />
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {boeError && (
-            <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {boeError}
+            <div className="mt-4 flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <AlertCircle size={14} className="shrink-0" /> {boeError}
+            </div>
+          )}
+
+          {boeLoading && (
+            <div className="mt-5 flex items-center gap-2 text-sm text-slate-500">
+              <Loader2 size={15} className="animate-spin" /> Consultando BOE...
             </div>
           )}
 
           {boeSearchMode === "search" && !boeLoading && !boeError && (
-            <div className="mt-5 rounded-[24px] border border-slate-200 bg-slate-50 p-5">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-400">Resultados BOE</p>
-                  <h3 className="mt-1 text-lg font-black text-slate-900">
-                    {boeSearchResults.length > 0 ? `${boeSearchResults.length} coincidencias` : "Sin resultados"}
-                  </h3>
-                </div>
-                <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-500 ring-1 ring-slate-200">
-                  búsqueda por referencia/texto
-                </span>
-              </div>
-
-              {boeSearchResults.length === 0 ? (
-                <p className="mt-4 text-sm text-slate-500">No he encontrado normas consolidadas con esa referencia o texto.</p>
-              ) : (
-                    <div className="mt-4 space-y-3">
-                      {boeSearchResults.map((item) => (
-                        <button
-                      key={`${item.identificador}-${item.numero_oficial}-${item.titulo}`}
-                      type="button"
-                      onClick={() => {
-                        if (!item.identificador) return;
-                        setBoeId(item.identificador);
-                        setBoeSearchMode("id");
-                        setBoeSearchResults([]);
-                        void fetchBoeDocument(item.identificador);
-                      }}
-                          className="block w-full rounded-[24px] border border-slate-200 bg-white p-5 text-left transition-colors hover:border-[#ab0433]/30 hover:bg-red-50/30"
-                        >
-                          <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div className="min-w-0 flex-1">
-                              <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{item.identificador || "sin identificador"}</p>
-                              <p className="mt-1 text-lg font-black text-slate-900">{item.titulo || "Norma BOE"}</p>
-                              {item.numero_oficial && (
-                                <p className="mt-2 text-sm text-slate-500">{item.numero_oficial}</p>
-                              )}
-                            </div>
-                            <span className="inline-flex items-center rounded-full bg-[#ab0433] px-3 py-1 text-xs font-semibold text-white">
-                              Abrir ficha
-                            </span>
-                          </div>
-
-                          <div className="mt-4 grid gap-3 md:grid-cols-3">
-                            <ResultMeta label="Rango" value={item.rango} />
-                            <ResultMeta label="Publicación" value={item.fecha_publicacion} />
-                            <ResultMeta label="Departamento" value={item.departamento} />
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-              )}
-            </div>
-          )}
-
-          {!boeDocument && !boeError && boeSearchMode !== "search" && !boeLoading && (
-            <div className="mt-5 rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-4 text-sm text-slate-500">
-              Busca por identificador BOE o por referencia para cargar la ficha de la norma sin ocupar media pantalla vacía.
-            </div>
-          )}
-
-          {boeDocument && (
-            <div className="mt-6 space-y-5">
-              <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-5">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{boeDocument.id}</p>
-                    <h3 className="mt-2 text-xl font-black leading-tight text-slate-900">{boeDocument.titulo || "Norma BOE"}</h3>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {boeDocument.rango && <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200">{boeDocument.rango}</span>}
-                      {boeDocument.fecha_publicacion && <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200">Publicación {boeDocument.fecha_publicacion}</span>}
-                      {boeDocument.estado_consolidacion && <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600 ring-1 ring-slate-200">{boeDocument.estado_consolidacion}</span>}
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <a href={boeDocument.urlHtml} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100">
-                      <ExternalLink size={13} />
-                      Abrir BOE
-                    </a>
-                    <a href={boeDocument.urlPdf} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100">
-                      <Link2 size={13} />
-                      Texto oficial
-                    </a>
-                  </div>
-                </div>
-
-                {boeDocument.departamento && (
-                  <p className="mt-4 text-sm text-slate-500">Departamento: <span className="font-medium text-slate-700">{boeDocument.departamento}</span></p>
-                )}
-
-                {boeDocument.materias.length > 0 && (
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {boeDocument.materias.map((materia) => (
-                      <span key={materia} className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
-                        {materia}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="rounded-[24px] border border-slate-200 p-5">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <Sparkles size={16} className="text-[#ab0433]" />
-                    <h4 className="text-sm font-bold uppercase tracking-wide text-slate-500">Estructura consolidada</h4>
-                  </div>
-                  {boeDocument.blocks.length > 12 && (
-                    <button
-                      type="button"
-                      onClick={() => setShowAllBoeBlocks((current) => !current)}
-                      className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50"
-                    >
-                      {showAllBoeBlocks ? "Mostrar menos" : `Mostrar todos (${boeDocument.blocks.length})`}
-                    </button>
-                  )}
-                </div>
-
-                {boeDocument.blocks.length === 0 ? (
-                  <p className="mt-4 text-sm text-slate-400">No se pudieron recuperar bloques estructurados.</p>
-                ) : (
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    {(showAllBoeBlocks ? boeDocument.blocks : boeDocument.blocks.slice(0, 12)).map((block) => (
+            <div className="mt-5">
+              <p className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-400">
+                {boeSearchResults.length > 0 ? `${boeSearchResults.length} resultados` : "Sin resultados"}
+              </p>
+              {boeSearchResults.length === 0
+                ? <p className="text-sm text-slate-500">No se encontraron normas con esa referencia o texto.</p>
+                : (
+                  <div className="space-y-2">
+                    {boeSearchResults.map((item) => (
                       <button
-                        key={`${block.id}-${block.titulo}`}
+                        key={`${item.identificador}-${item.titulo}`}
                         type="button"
-                        onClick={() => block.id && void fetchBoeBlock(boeDocument.id, block.id)}
-                        className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition-colors hover:border-[#ab0433]/30 hover:bg-red-50/40"
+                        onClick={() => {
+                          if (!item.identificador) return;
+                          setBoeId(item.identificador);
+                          setBoeSearchMode("id");
+                          setBoeSearchResults([]);
+                          void fetchBoeDocument(item.identificador);
+                        }}
+                        className="w-full flex items-center gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3.5 text-left transition-colors hover:border-[#ab0433]/30 hover:bg-red-50/40"
                       >
-                        <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{block.id || "bloque"}</p>
-                        <p className="mt-1 text-sm font-semibold text-slate-800">{block.titulo || "Bloque sin título"}</p>
-                        {block.fecha_actualizacion && (
-                          <p className="mt-2 text-xs text-slate-400">Actualizado {block.fecha_actualizacion}</p>
-                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[11px] font-bold text-slate-400">{item.identificador}</p>
+                          <p className="mt-0.5 text-sm font-semibold text-slate-900 truncate">{item.titulo || "Norma BOE"}</p>
+                          <p className="mt-0.5 text-xs text-slate-400 flex flex-wrap gap-3">
+                            {item.rango && <span>{item.rango}</span>}
+                            {item.fecha_publicacion && <span>{item.fecha_publicacion}</span>}
+                            {item.departamento && <span className="truncate">{item.departamento}</span>}
+                          </p>
+                        </div>
+                        <ExternalLink size={13} className="text-slate-400 shrink-0" />
                       </button>
                     ))}
                   </div>
                 )}
+            </div>
+          )}
+
+          {!boeDocument && !boeError && boeSearchMode !== "search" && !boeLoading && (
+            <div className="mt-5 flex flex-col items-center gap-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 px-6 py-10 text-center">
+              <Landmark size={28} className="text-slate-300" />
+              <p className="text-sm text-slate-400">Escribe un identificador BOE o texto para buscar normas consolidadas</p>
+            </div>
+          )}
+
+          {boeDocument && (
+            <div className="mt-5 space-y-4">
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-600">{boeDocument.id}</p>
+                    <h3 className="mt-1 text-lg font-black leading-snug text-slate-900">{boeDocument.titulo || "Norma BOE"}</h3>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {boeDocument.rango && <span className="rounded-full bg-white px-2.5 py-0.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200">{boeDocument.rango}</span>}
+                      {boeDocument.fecha_publicacion && <span className="rounded-full bg-white px-2.5 py-0.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200">{boeDocument.fecha_publicacion}</span>}
+                      {boeDocument.estado_consolidacion && <span className="rounded-full bg-white px-2.5 py-0.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200">{boeDocument.estado_consolidacion}</span>}
+                    </div>
+                    {boeDocument.departamento && <p className="mt-2 text-xs text-slate-500">{boeDocument.departamento}</p>}
+                    {boeDocument.materias.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {boeDocument.materias.map((m) => <span key={m} className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-medium text-emerald-700">{m}</span>)}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <a href={boeDocument.urlHtml} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
+                      <ExternalLink size={12} /> Abrir BOE
+                    </a>
+                    <a href={boeDocument.urlPdf} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
+                      <Link2 size={12} /> PDF
+                    </a>
+                  </div>
+                </div>
               </div>
 
+              <div>
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                    Estructura · {boeDocument.blocks.length} secciones
+                  </p>
+                  {boeDocument.blocks.length > 12 && (
+                    <button type="button" onClick={() => setShowAllBoeBlocks((c) => !c)} className="text-xs font-semibold text-[#ab0433] hover:underline">
+                      {showAllBoeBlocks ? "Mostrar menos" : `Ver todas (${boeDocument.blocks.length})`}
+                    </button>
+                  )}
+                </div>
+                {boeDocument.blocks.length === 0
+                  ? <p className="text-sm text-slate-400">Sin secciones disponibles.</p>
+                  : (
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {(showAllBoeBlocks ? boeDocument.blocks : boeDocument.blocks.slice(0, 12)).map((block) => (
+                        <button
+                          key={`${block.id}-${block.titulo}`}
+                          type="button"
+                          onClick={() => block.id && void fetchBoeBlock(boeDocument.id, block.id)}
+                          className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition-colors hover:border-[#ab0433]/30 hover:bg-red-50/40"
+                        >
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{block.id || "—"}</p>
+                          <p className="mt-0.5 text-sm font-semibold text-slate-800">{block.titulo || "Sección"}</p>
+                          {block.fecha_actualizacion && <p className="mt-1 text-[11px] text-slate-400">Act. {block.fecha_actualizacion}</p>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+              </div>
             </div>
           )}
         </div>
+      )}
 
-        <div className="space-y-6">
-          <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-amber-600">CENDOJ funcional</p>
-                <h2 className="mt-2 text-xl font-black text-slate-900">Búsqueda pública de jurisprudencia</h2>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowCendojHelp((current) => !current)}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50"
-                  title="Qué necesita CENDOJ para funcionar bien"
-                >
-                  <HelpCircle size={16} />
-                </button>
-                <Scale size={20} className="text-amber-500" />
-              </div>
+      {/* ── CENDOJ ──────────────────────────────────────────────── */}
+      {activeTab === "cendoj" && (
+        <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-wrap gap-3">
+            <div className="flex-1 min-w-[240px] flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 focus-within:border-amber-300 focus-within:bg-white transition-colors">
+              <Search size={15} className="text-slate-400 shrink-0" />
+              <input
+                value={cendojQuery}
+                onChange={(e) => setCendojQuery(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void searchCendoj(cendojQuery); } }}
+                placeholder="caducidad, despido, Ley 40/2015..."
+                className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
+              />
+              {cendojQuery && <button type="button" onClick={() => setCendojQuery("")} className="text-slate-300 hover:text-slate-500"><X size={13} /></button>}
             </div>
+            <button
+              type="button"
+              onClick={() => void searchCendoj(cendojQuery)}
+              disabled={cendojSearchLoading}
+              className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-bold text-white hover:bg-slate-800 disabled:opacity-60 transition-colors"
+            >
+              {cendojSearchLoading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+              Buscar
+            </button>
+          </div>
 
-            {showCendojHelp && (
-              <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm leading-6 text-amber-900">
-                <p className="font-semibold">Para que CENDOJ funcione correctamente necesitamos:</p>
-                <p>Que el portal público del CGPJ permita la consulta automática en ese momento, que no bloquee la petición por protección anti-bot y que la búsqueda no supere el límite recuperable que el propio portal publica.</p>
-                <p className="mt-2">Si CENDOJ devuelve `403` o limita resultados, el ERP seguirá mostrándote la opción de abrir la búsqueda oficial directamente en el portal.</p>
-              </div>
-            )}
+          <div className="mt-3 flex flex-wrap gap-2">
+            <input value={cendojAdvanced.organo} onChange={(e) => setCendojAdvanced((c) => ({ ...c, organo: e.target.value }))} placeholder="Órgano judicial" className="flex-1 min-w-[150px] rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none placeholder:text-slate-400 focus:border-amber-300 focus:bg-white transition-colors" />
+            <input value={cendojAdvanced.tipo} onChange={(e) => setCendojAdvanced((c) => ({ ...c, tipo: e.target.value }))} placeholder="Tipo (Sentencia...)" className="flex-1 min-w-[140px] rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none placeholder:text-slate-400 focus:border-amber-300 focus:bg-white transition-colors" />
+            <input value={cendojAdvanced.ponente} onChange={(e) => setCendojAdvanced((c) => ({ ...c, ponente: e.target.value }))} placeholder="Ponente" className="flex-1 min-w-[120px] rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none placeholder:text-slate-400 focus:border-amber-300 focus:bg-white transition-colors" />
+            <input value={cendojAdvanced.year} onChange={(e) => setCendojAdvanced((c) => ({ ...c, year: e.target.value.replace(/[^\d]/g, "").slice(0, 4) }))} placeholder="Año" className="w-24 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none placeholder:text-slate-400 focus:border-amber-300 focus:bg-white transition-colors" />
+          </div>
 
-            <p className="mt-3 text-sm leading-7 text-slate-500">
-              Ahora puedes buscar jurisprudencia pública en CENDOJ desde el ERP, revisar datos clave de cada resolución y abrir el documento oficial en el portal del CGPJ.
-            </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <a href={cendojProvider?.searchUrl || "https://www.poderjudicial.es/search/indexAN.jsp"} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
+              <ExternalLink size={12} /> Abrir CENDOJ oficial
+            </a>
+            <a href={cendojProvider?.docsUrl || "https://www.poderjudicial.es"} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
+              <BookOpen size={12} /> CGPJ
+            </a>
+          </div>
 
-            <div className="mt-5 flex flex-wrap gap-2">
-              <a href={cendojProvider?.searchUrl || "https://www.poderjudicial.es/search/indexAN.jsp"} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50">
-                <ExternalLink size={13} />
-                Abrir buscador oficial
-              </a>
-              <a href={cendojProvider?.docsUrl || "https://www.poderjudicial.es/cgpj/es/Servicios/Jurisprudencia/Buscador-Fondo-Documental-Jurisprudencia/?perfil=1"} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50">
-                <BookOpen size={13} />
-                Fuente CGPJ
-              </a>
+          {cendojSearchError && (
+            <div className="mt-4 flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <AlertCircle size={14} className="shrink-0" /> {cendojSearchError}
             </div>
+          )}
 
-            <div className="mt-5 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-              <div className="flex flex-wrap gap-3">
-                <div className="min-w-[260px] flex-1">
-                  <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-400">Buscar en CENDOJ</label>
-                  <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 focus-within:border-amber-300">
-                    <Search size={15} className="text-slate-400" />
-                    <input
-                      value={cendojQuery}
-                      onChange={(e) => setCendojQuery(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          void searchCendoj(cendojQuery);
-                        }
-                      }}
-                      placeholder="caducidad, despido, Ley 40/2015..."
-                      className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
-                    />
-                  </div>
-                  <p className="mt-2 text-xs text-slate-400">
-                    Busca por concepto jurídico, referencia normativa o texto libre.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => void searchCendoj(cendojQuery)}
-                  className="self-end inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-slate-800"
-                >
-                  {cendojSearchLoading ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}
-                  Buscar
-                </button>
-              </div>
-
-              <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <div>
-                  <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-400">Órgano</label>
-                  <input
-                    value={cendojAdvanced.organo}
-                    onChange={(e) => setCendojAdvanced((current) => ({ ...current, organo: e.target.value }))}
-                    placeholder="Tribunal Supremo"
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-amber-300"
-                  />
-                </div>
-                <div>
-                  <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-400">Tipo</label>
-                  <input
-                    value={cendojAdvanced.tipo}
-                    onChange={(e) => setCendojAdvanced((current) => ({ ...current, tipo: e.target.value }))}
-                    placeholder="Sentencia, Auto..."
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-amber-300"
-                  />
-                </div>
-                <div>
-                  <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-400">Ponente</label>
-                  <input
-                    value={cendojAdvanced.ponente}
-                    onChange={(e) => setCendojAdvanced((current) => ({ ...current, ponente: e.target.value }))}
-                    placeholder="apellido del ponente"
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-amber-300"
-                  />
-                </div>
-                <div>
-                  <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-400">Año</label>
-                  <input
-                    value={cendojAdvanced.year}
-                    onChange={(e) => setCendojAdvanced((current) => ({ ...current, year: e.target.value.replace(/[^\d]/g, "").slice(0, 4) }))}
-                    placeholder="2024"
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-amber-300"
-                  />
-                </div>
-              </div>
-
-              {cendojSearchError && (
-                <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{cendojSearchError}</div>
-              )}
-
-              {!cendojSearchError && cendojSearchWarning && (
-                <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                  <p>{cendojSearchWarning}</p>
-                  {cendojSearchUrl && (
-                    <a
-                      href={cendojSearchUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="mt-3 inline-flex items-center gap-2 rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-amber-900 transition-colors hover:bg-amber-100"
-                    >
-                      <ExternalLink size={13} />
-                      Abrir búsqueda en CENDOJ
-                    </a>
-                  )}
-                </div>
-              )}
-
-              {!cendojSearchError && !cendojSearchWarning && (cendojSearchLoading || cendojSearchResults.length > 0 || cendojSearchTotal === 0) && (
-                <div className="mt-4 space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-400">Resultados CENDOJ</p>
-                    {typeof cendojSearchTotal === "number" && (
-                      <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-500 ring-1 ring-slate-200">
-                        {typeof cendojRemoteTotal === "number" ? `${cendojRemoteTotal} resultados en CENDOJ` : `${cendojSearchTotal} resultados cargados`}
-                      </span>
-                    )}
-                  </div>
-
-                  {typeof cendojRecoverableMax === "number" && typeof cendojRemoteTotal === "number" && cendojRemoteTotal > cendojRecoverableMax && (
-                    <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                      CENDOJ informa de <span className="font-semibold">{cendojRemoteTotal}</span> resultados, pero el propio portal limita la recuperación automática a <span className="font-semibold">{cendojRecoverableMax}</span> documentos por búsqueda.
-                    </div>
-                  )}
-
-                  {cendojSearchLoading ? (
-                    <div className="flex items-center gap-2 text-sm text-slate-500">
-                      <Loader2 size={15} className="animate-spin" />
-                      Consultando CENDOJ...
-                    </div>
-                  ) : cendojSearchResults.length === 0 ? (
-                    <p className="text-sm text-slate-500">No he encontrado resoluciones para esa búsqueda.</p>
-                  ) : (
-                    <div className="space-y-4">
-                      {cendojSearchResults.map((item) => (
-                        <a
-                          key={`${item.id}-${item.roj}-${item.ecli}`}
-                          href={item.url || cendojProvider?.searchUrl || "https://www.poderjudicial.es/search/indexAN.jsp"}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="block rounded-[24px] border border-slate-200 bg-white p-5 transition-colors hover:border-amber-300 hover:bg-amber-50/30"
-                        >
-                          <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div className="min-w-0 flex-1">
-                              <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{item.roj || "ROJ no disponible"}</p>
-                              <h4 className="mt-1 text-lg font-black text-slate-900">{item.organo || "Resolución CENDOJ"}</h4>
-                              {item.ecli && (
-                                <p className="mt-1 break-all text-sm text-slate-500">{item.ecli}</p>
-                              )}
-                            </div>
-                            <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                              <ExternalLink size={12} />
-                              Abrir
-                            </span>
-                          </div>
-
-                          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                            <ResultMeta label="Fecha" value={item.fecha} />
-                            <ResultMeta label="Tipo" value={item.tipoResolucion} />
-                            <ResultMeta label="Ponente" value={item.ponente} />
-                            <ResultMeta label="Recurso" value={item.numeroRecurso} />
-                          </div>
-
-                          {item.municipio && (
-                            <div className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs font-medium uppercase tracking-wide text-amber-700">
-                              Municipio: <span className="text-amber-900">{item.municipio}</span>
-                            </div>
-                          )}
-
-                          {item.resumen && (
-                            <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                              <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-400">Resumen</p>
-                              <p className="mt-3 text-sm leading-6 text-slate-600">{item.resumen}</p>
-                            </div>
-                          )}
-                        </a>
-                      ))}
-                    </div>
-                  )}
-                </div>
+          {!cendojSearchError && cendojSearchWarning && (
+            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800">
+              <p>{cendojSearchWarning}</p>
+              {cendojSearchUrl && (
+                <a href={cendojSearchUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-100">
+                  <ExternalLink size={12} /> Abrir en CENDOJ
+                </a>
               )}
             </div>
+          )}
 
+          {cendojSearchLoading && !cendojSearchError && (
+            <div className="mt-4 flex items-center gap-2 text-sm text-slate-500">
+              <Loader2 size={15} className="animate-spin" /> Consultando CENDOJ...
+            </div>
+          )}
+
+          {!cendojSearchError && !cendojSearchLoading && cendojSearchResults.length > 0 && (
             <div className="mt-5">
-              <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.24em] text-slate-400">Resoluciones destacadas</p>
-              {cendojLoading ? (
-                <div className="flex items-center gap-2 text-sm text-slate-400">
-                  <Loader2 size={15} className="animate-spin" />
-                  Cargando resoluciones destacadas...
-                </div>
-              ) : cendojError ? (
-                <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{cendojError}</div>
-              ) : cendojHighlights.length === 0 ? (
-                <p className="text-sm text-slate-400">No hay destacados disponibles ahora mismo.</p>
-              ) : (
-                <div className="space-y-3">
-                  {cendojHighlights.map((item) => (
-                    <a key={item.id} href={item.url} target="_blank" rel="noreferrer" className="block rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 transition-colors hover:border-amber-300 hover:bg-amber-50/40">
-                      <p className="text-sm font-semibold text-slate-800">{item.title}</p>
-                    </a>
-                  ))}
-                </div>
-              )}
-            </div>
-          </section>
-
-          <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-500">LexNET preparado</p>
-                <h2 className="mt-2 text-xl font-black text-slate-900">Integración segura pendiente de credenciales</h2>
-              </div>
-              <ShieldCheck size={20} className="text-slate-500" />
-            </div>
-
-            <p className="mt-3 text-sm leading-7 text-slate-500">
-              LexNET no se puede dejar operativo sin certificado válido y flujo de autenticación del despacho. Te he dejado el módulo preparado para esa siguiente fase.
-            </p>
-
-            <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-              <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                {lexnetProvider?.configured ? <CheckCircle2 size={15} className="text-emerald-500" /> : <AlertCircle size={15} className="text-amber-500" />}
-                {lexnetProvider?.configured ? "Configuración base detectada" : "Faltan certificado y credenciales de integración"}
-              </div>
-              <p className="mt-2 text-xs leading-6 text-slate-500">
-                Cuando tengas acceso técnico del despacho, el siguiente paso es montar autenticación, manejo de certificado y operaciones permitidas sobre la sede.
-              </p>
-            </div>
-
-            <div className="mt-5 flex flex-wrap gap-2">
-              <a href={lexnetProvider?.searchUrl || "https://sedejudicial.justicia.es/-/lexnet"} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50">
-                <ExternalLink size={13} />
-                Abrir LexNET oficial
-              </a>
-            </div>
-          </section>
-        </div>
-      </section>
-
-    </div>
-    {showBlockModal && typeof document !== "undefined" && createPortal(
-      <div className="fixed inset-0 z-[100] overflow-hidden bg-transparent">
-        <div className="fixed inset-0 grid place-items-center px-4 py-6">
-          <div className="my-auto w-full max-w-4xl overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl max-h-[calc(100vh-3rem)]">
-            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
-              <div className="min-w-0">
-                <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#ab0433]">Bloque BOE</p>
-                <h3 className="mt-2 truncate text-2xl font-black text-slate-900">
-                  {selectedBlock?.titulo || selectedBlock?.id || "Cargando bloque"}
-                </h3>
-                {selectedBlock?.tipo && (
-                  <p className="mt-1 text-sm text-slate-500">Tipo: <span className="font-medium text-slate-700">{selectedBlock.tipo}</span></p>
+              <div className="mb-3 flex flex-wrap items-center gap-3">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                  {typeof cendojRemoteTotal === "number" ? `${cendojRemoteTotal} resultados en CENDOJ` : `${cendojSearchTotal ?? cendojSearchResults.length} resultados`}
+                </p>
+                {typeof cendojRecoverableMax === "number" && typeof cendojRemoteTotal === "number" && cendojRemoteTotal > cendojRecoverableMax && (
+                  <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-medium text-amber-700">Límite portal: {cendojRecoverableMax}</span>
                 )}
               </div>
-              <button
-                type="button"
-                onClick={() => { setSelectedBlock(null); setSelectedBlockError(null); }}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="overflow-y-auto px-6 py-5 max-h-[calc(100vh-11rem)]">
-              {selectedBlockLoading ? (
-                <div className="flex items-center gap-2 text-sm text-slate-500">
-                  <Loader2 size={16} className="animate-spin" />
-                  Cargando contenido del bloque...
-                </div>
-              ) : selectedBlockError ? (
-                <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{selectedBlockError}</div>
-              ) : selectedBlock ? (
-                <div className="space-y-5">
-                  <div className="flex flex-wrap gap-2">
-                    {selectedBlock.id && <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{selectedBlock.id}</span>}
-                    {selectedBlock.fechaPublicacion && <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">Publicado {selectedBlock.fechaPublicacion}</span>}
-                    {selectedBlock.fechaVigencia && <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">Vigencia {selectedBlock.fechaVigencia}</span>}
-                  </div>
-
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-400">Texto legible</p>
-                    <div className="mt-4 space-y-4 text-[15px] leading-7 text-slate-700">
-                      {selectedBlock.paragraphs.map((paragraph, index) => (
-                        <p key={`p-${index}`}>{paragraph}</p>
-                      ))}
-                      {selectedBlock.quotes.map((quote, index) => (
-                        <blockquote key={`q-${index}`} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-600">
-                          {quote.split("\n").map((line, lineIndex) => (
-                            <p key={`ql-${lineIndex}`}>{line}</p>
-                          ))}
-                        </blockquote>
-                      ))}
-                      {selectedBlock.paragraphs.length === 0 && selectedBlock.quotes.length === 0 && (
-                        <p className="text-slate-400">Este bloque no trae párrafos renderizables con el formato actual del BOE.</p>
-                      )}
+              <div className="space-y-2">
+                {cendojSearchResults.map((item) => (
+                  <a
+                    key={`${item.id}-${item.roj}`}
+                    href={item.url || cendojProvider?.searchUrl || "https://www.poderjudicial.es/search/indexAN.jsp"}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-start gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 transition-colors hover:border-amber-300 hover:bg-amber-50/30"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-[11px] font-bold text-slate-400">{item.roj || "ROJ —"}</p>
+                        {item.fecha && <span className="text-[11px] text-slate-400">{item.fecha}</span>}
+                        {item.tipoResolucion && <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-600 ring-1 ring-slate-200">{item.tipoResolucion}</span>}
+                      </div>
+                      <p className="mt-0.5 text-sm font-semibold text-slate-900">{item.organo || "Resolución CENDOJ"}</p>
+                      {item.ecli && <p className="mt-0.5 text-xs text-slate-400 truncate">{item.ecli}</p>}
+                      <div className="mt-1 flex flex-wrap gap-3 text-xs text-slate-400">
+                        {item.ponente && <span>Ponente: {item.ponente}</span>}
+                        {item.municipio && <span>{item.municipio}</span>}
+                        {item.numeroRecurso && <span>Recurso: {item.numeroRecurso}</span>}
+                      </div>
+                      {item.resumen && <p className="mt-1.5 text-xs leading-5 text-slate-500 line-clamp-2">{item.resumen}</p>}
                     </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <a href={selectedBlock.htmlUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50">
-                      <ExternalLink size={13} />
-                      Abrir en BOE
-                    </a>
-                    <a href={selectedBlock.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50">
-                      <Link2 size={13} />
-                      Ver XML oficial
-                    </a>
-                  </div>
-                </div>
-              ) : null}
+                    <ExternalLink size={13} className="text-slate-400 shrink-0 mt-0.5" />
+                  </a>
+                ))}
+              </div>
             </div>
+          )}
+
+          {!cendojSearchError && !cendojSearchLoading && cendojSearchTotal === 0 && (
+            <p className="mt-4 text-sm text-slate-500">No se encontraron resoluciones para esa búsqueda.</p>
+          )}
+
+          {!cendojSearchError && !cendojSearchLoading && cendojSearchResults.length === 0 && cendojSearchTotal === null && (
+            <div className="mt-5">
+              {cendojHighlights.length > 0 ? (
+                <>
+                  <p className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-400">Resoluciones destacadas</p>
+                  <div className="space-y-2">
+                    {cendojHighlights.map((item) => (
+                      <a key={item.id} href={item.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 transition-colors hover:border-amber-300 hover:bg-amber-50/40">
+                        <FileText size={13} className="text-slate-400 shrink-0" />
+                        <p className="flex-1 min-w-0 text-sm font-medium text-slate-800 truncate">{item.title}</p>
+                        <ExternalLink size={12} className="text-slate-400 shrink-0" />
+                      </a>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 px-6 py-10 text-center">
+                  <Scale size={28} className="text-slate-300" />
+                  <p className="text-sm text-slate-400">Busca jurisprudencia por concepto, órgano o referencia</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── LexNET ──────────────────────────────────────────────── */}
+      {activeTab === "lexnet" && (
+        <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex items-start gap-4">
+            <div className="h-12 w-12 rounded-2xl bg-slate-100 flex items-center justify-center shrink-0">
+              <ShieldCheck size={22} className="text-slate-500" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-wrap items-center gap-3">
+                <h2 className="text-xl font-black text-slate-900">LexNET</h2>
+                <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-0.5 text-xs font-semibold ${
+                  lexnetProvider?.configured
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : "border-amber-200 bg-amber-50 text-amber-700"
+                }`}>
+                  {lexnetProvider?.configured ? "Preparado" : "Pendiente de configuración"}
+                </span>
+              </div>
+              <p className="mt-1 text-sm text-slate-500">Comunicaciones judiciales electrónicas seguras</p>
+            </div>
+          </div>
+
+          <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4">
+            <div className="flex items-start gap-3">
+              {lexnetProvider?.configured
+                ? <CheckCircle2 size={16} className="text-emerald-500 shrink-0 mt-0.5" />
+                : <AlertCircle size={16} className="text-amber-500 shrink-0 mt-0.5" />}
+              <div>
+                <p className="text-sm font-semibold text-slate-700">
+                  {lexnetProvider?.configured ? "Configuración base detectada" : "Faltan certificado y credenciales"}
+                </p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  LexNET requiere certificado digital válido del despacho y credenciales de integración. El módulo está preparado para activarse cuando dispongas de acceso técnico.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-5">
+            <a href={lexnetProvider?.searchUrl || "https://sedejudicial.justicia.es/-/lexnet"} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
+              <ExternalLink size={14} /> Abrir LexNET oficial
+            </a>
+          </div>
+        </div>
+      )}
+
+    </div>
+
+    {showBlockModal && typeof document !== "undefined" && createPortal(
+      <div className="fixed inset-0 z-[100] bg-black/30 backdrop-blur-sm flex items-center justify-center px-4 py-6">
+        <div className="w-full max-w-3xl overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-2xl max-h-[calc(100vh-3rem)] flex flex-col">
+          <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5 shrink-0">
+            <div className="min-w-0">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-[#ab0433]">Bloque BOE</p>
+              <h3 className="mt-1 truncate text-xl font-black text-slate-900">
+                {selectedBlock?.titulo || selectedBlock?.id || "Cargando bloque"}
+              </h3>
+              {selectedBlock?.tipo && <p className="mt-0.5 text-xs text-slate-500">{selectedBlock.tipo}</p>}
+            </div>
+            <button
+              type="button"
+              onClick={() => { setSelectedBlock(null); setSelectedBlockError(null); }}
+              className="h-9 w-9 flex items-center justify-center rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors shrink-0"
+            >
+              <X size={16} />
+            </button>
+          </div>
+
+          <div className="overflow-y-auto px-6 py-5 flex-1">
+            {selectedBlockLoading ? (
+              <div className="flex items-center gap-2 text-sm text-slate-500">
+                <Loader2 size={16} className="animate-spin" /> Cargando contenido del bloque...
+              </div>
+            ) : selectedBlockError ? (
+              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{selectedBlockError}</div>
+            ) : selectedBlock ? (
+              <div className="space-y-4">
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedBlock.id && <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">{selectedBlock.id}</span>}
+                  {selectedBlock.fechaPublicacion && <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">Publicado {selectedBlock.fechaPublicacion}</span>}
+                  {selectedBlock.fechaVigencia && <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">Vigencia {selectedBlock.fechaVigencia}</span>}
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-[15px] leading-7 text-slate-700 space-y-4">
+                  {selectedBlock.paragraphs.map((p, i) => <p key={`p-${i}`}>{p}</p>)}
+                  {selectedBlock.quotes.map((q, i) => (
+                    <blockquote key={`q-${i}`} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-600">
+                      {q.split("\n").map((line, li) => <p key={`ql-${li}`}>{line}</p>)}
+                    </blockquote>
+                  ))}
+                  {selectedBlock.paragraphs.length === 0 && selectedBlock.quotes.length === 0 && (
+                    <p className="text-slate-400 text-sm">Este bloque no tiene párrafos renderizables en el formato actual del BOE.</p>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <a href={selectedBlock.htmlUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
+                    <ExternalLink size={12} /> Abrir en BOE
+                  </a>
+                  <a href={selectedBlock.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
+                    <Link2 size={12} /> Ver XML oficial
+                  </a>
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>,

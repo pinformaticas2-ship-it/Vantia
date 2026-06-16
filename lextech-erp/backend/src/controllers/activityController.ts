@@ -336,7 +336,6 @@ export const getMyActivity = async (req: Request, res: Response) => {
   if (!userId) {
     return res.status(401).json({ success: false, error: 'No autenticado' });
   }
-
   const limit = Math.min(parseInt((req.query.limit as string) || '100'), 500);
   const offset = parseInt((req.query.offset as string) || '0');
   const eventType = (req.query.event_type as string) || '';
