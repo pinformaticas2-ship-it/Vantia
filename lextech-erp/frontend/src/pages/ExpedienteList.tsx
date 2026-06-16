@@ -3,7 +3,7 @@
 } from "react";
 import { createPortal } from "react-dom";
 import { useAuth } from "@clerk/clerk-react";
-import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   FolderOpen, Plus, Loader2, AlertCircle, RefreshCw,
   X, ChevronUp, ChevronDown, ListFilter, ExternalLink,
@@ -20,7 +20,7 @@ import { AtajosButton } from "../components/AtajosSystem";
 import AdjuntosModal from "../components/AdjuntosModal";
 import ColumnVisibilityModal from "../components/ColumnVisibilityModal";
 import BackButton from "../components/BackButton";
-import { UndoToast, SuccessToast } from "../components/UndoToast";
+import { UndoToast } from "../components/UndoToast";
 import { useUndoDelete } from "../lib/useUndoDelete";
 
 type ViewMode = "list" | "detail" | "multiselect" | "csvImport" | "csvImportConfigure" | "csvImportReview" | "csvImportComplete" | "csvImportHistory" | "csvImportErrorDetail" | "documentImport" | "documentImportVerify";
@@ -3980,7 +3980,6 @@ function CounterConfigModal({ onClose, getToken }: { onClose: () => void; getTok
 export default function ExpedienteList() {
   const { getToken } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [expedientes, setExpedientes] = useState<any[]>([]);
@@ -4019,14 +4018,6 @@ export default function ExpedienteList() {
       setViewMode("documentImport");
       setSearchParams(prev => { prev.delete("mode"); return prev; }, { replace: true });
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Mostrar toast si venimos de otra página con mensaje de éxito en location.state
-  useEffect(() => {
-    const msg = (location.state as any)?.success;
-    if (!msg) return;
-    setSuccessToast({ message: msg, startedAt: Date.now() });
-    navigate(location.pathname + (location.search || ""), { replace: true, state: null });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Confirmación borrado + undo
@@ -4134,7 +4125,6 @@ export default function ExpedienteList() {
     successRate: 0,
     issues: [],
   });
-  const [successToast, setSuccessToast] = useState<{ message: string; startedAt: number } | null>(null);
   const [importHistory, setImportHistory] = useState<ImportBatch[]>([]);
   const [loadingImportHistory, setLoadingImportHistory] = useState(false);
   const [importHistoryError, setImportHistoryError] = useState<string | null>(null);
@@ -4339,7 +4329,6 @@ export default function ExpedienteList() {
       ]);
 
       setDocumentImportSuccessNotice(`Se creó el expediente correctamente desde "${documentImportVerifyItem.payload?.fileName || documentImportVerifyItem.reference || `Documento ${documentImportVerifyItem.row_number}`}".`);
-      setSuccessToast({ message: "1 expediente creado con éxito", startedAt: Date.now() });
       setDocumentImportVerifyItem(null);
       setViewMode("documentImport");
     } catch (e: any) {
@@ -4574,10 +4563,6 @@ export default function ExpedienteList() {
     if (completedCount > 0) {
       fetchExpedientes(true);
       fetchImportHistory(true);
-      setSuccessToast({
-        message: completedCount === 1 ? "1 expediente creado con éxito" : `${completedCount} expedientes creados con éxito`,
-        startedAt: Date.now(),
-      });
     }
 
     switchView("csvImportComplete");
@@ -4713,7 +4698,6 @@ export default function ExpedienteList() {
       if (!res.ok) { alert(d.error || "Error al guardar"); return; }
       setShowModal(false); setEditItem(null);
       fetchExpedientes(true);
-      if (!isEdit) setSuccessToast({ message: "1 expediente creado con éxito", startedAt: Date.now() });
     } catch (e: any) { alert(e.message); }
     finally { setSaving(false); }
   };
@@ -5123,192 +5107,158 @@ export default function ExpedienteList() {
     </div>
   );
 
-  // Toast de éxito compartido — se incluye en todos los returns intermedios
-  // porque SuccessToast usa createPortal y solo renderiza si está en el árbol
-  const sharedSuccessToast = successToast ? (
-    <SuccessToast
-      message={successToast.message}
-      startedAt={successToast.startedAt}
-      onDismiss={() => setSuccessToast(null)}
-    />
-  ) : null;
-
   if (viewMode === "csvImport") {
     return (
-      <>
-        {sharedSuccessToast}
-        <CsvImportView
-          fileName={csvFileName}
-          onBack={() => switchView("list")}
-          onOpenHistory={() => switchView("csvImportHistory")}
-          onOpenSettings={() => alert("La configuracion de importacion la dejamos preparada para la siguiente fase.")}
-          onSelectFile={() => csvInputRef.current?.click()}
-          onFileChange={(file) => handleCsvSelected(file)}
-          inputRef={csvInputRef}
-          clientes={clientes}
-          onSaveNew={async (form) => { await handleSave(form); }}
-          savingNew={saving}
-        />
-      </>
+      <CsvImportView
+        fileName={csvFileName}
+        onBack={() => switchView("list")}
+        onOpenHistory={() => switchView("csvImportHistory")}
+        onOpenSettings={() => alert("La configuracion de importacion la dejamos preparada para la siguiente fase.")}
+        onSelectFile={() => csvInputRef.current?.click()}
+        onFileChange={(file) => handleCsvSelected(file)}
+        inputRef={csvInputRef}
+        clientes={clientes}
+        onSaveNew={async (form) => { await handleSave(form); }}
+        savingNew={saving}
+      />
     );
   }
 
   if (viewMode === "csvImportConfigure") {
     return (
-      <>
-        {sharedSuccessToast}
-        <CsvImportConfigureView
-          fileName={csvFileName}
-          csvHeaders={csvHeaders}
-          mappings={csvFieldMappings}
-          onBack={() => switchView("csvImport")}
-          onContinue={() => switchView("csvImportReview")}
-          onOpenHistory={() => switchView("csvImportHistory")}
-          onOpenSettings={() => alert("La configuracion avanzada de importacion la dejamos preparada para la siguiente fase.")}
-          onSelectFile={() => csvInputRef.current?.click()}
-          onChangeMapping={handleCsvMappingChange}
-          onFileChange={(file) => handleCsvSelected(file)}
-          inputRef={csvInputRef}
-        />
-      </>
+      <CsvImportConfigureView
+        fileName={csvFileName}
+        csvHeaders={csvHeaders}
+        mappings={csvFieldMappings}
+        onBack={() => switchView("csvImport")}
+        onContinue={() => switchView("csvImportReview")}
+        onOpenHistory={() => switchView("csvImportHistory")}
+        onOpenSettings={() => alert("La configuracion avanzada de importacion la dejamos preparada para la siguiente fase.")}
+        onSelectFile={() => csvInputRef.current?.click()}
+        onChangeMapping={handleCsvMappingChange}
+        onFileChange={(file) => handleCsvSelected(file)}
+        inputRef={csvInputRef}
+      />
     );
   }
 
   if (viewMode === "csvImportReview") {
     return (
-      <>
-        {sharedSuccessToast}
-        <CsvImportReviewView
-          fileName={csvFileName}
-          mappings={csvFieldMappings}
-          previewRows={csvPreviewRows}
-          validationSummary={validateCsvImport(csvFieldMappings, csvPreviewRows)}
-          importProgress={csvImportProgress}
-          onBack={() => switchView("csvImportConfigure")}
-          onImport={handleImportCsv}
-          onOpenHistory={() => switchView("csvImportHistory")}
-          onOpenSettings={() => alert("La configuracion avanzada de importacion la dejamos preparada para la siguiente fase.")}
-        />
-      </>
+      <CsvImportReviewView
+        fileName={csvFileName}
+        mappings={csvFieldMappings}
+        previewRows={csvPreviewRows}
+        validationSummary={validateCsvImport(csvFieldMappings, csvPreviewRows)}
+        importProgress={csvImportProgress}
+        onBack={() => switchView("csvImportConfigure")}
+        onImport={handleImportCsv}
+        onOpenHistory={() => switchView("csvImportHistory")}
+        onOpenSettings={() => alert("La configuracion avanzada de importacion la dejamos preparada para la siguiente fase.")}
+      />
     );
   }
 
   if (viewMode === "csvImportComplete") {
     return (
-      <>
-        {sharedSuccessToast}
-        <CsvImportCompleteView
-          fileName={csvFileName}
-          summary={csvImportSummary}
-          onBack={() => switchView("csvImportReview")}
-          onViewDetails={() => switchView("csvImportErrorDetail")}
-          onRestart={() => switchView("csvImport")}
-          onFinish={() => switchView("list")}
-        />
-      </>
+      <CsvImportCompleteView
+        fileName={csvFileName}
+        summary={csvImportSummary}
+        onBack={() => switchView("csvImportReview")}
+        onViewDetails={() => switchView("csvImportErrorDetail")}
+        onRestart={() => switchView("csvImport")}
+        onFinish={() => switchView("list")}
+      />
     );
   }
 
   if (viewMode === "csvImportErrorDetail") {
     return (
-      <>
-        {sharedSuccessToast}
-        <CsvImportErrorDetailView
-          fileName={csvFileName}
-          batchId={csvImportBatchId}
-          summary={csvImportSummary}
-          previewRows={csvPreviewRows}
-          mappings={csvFieldMappings}
-          onBack={() => switchView("csvImportComplete")}
-        />
-      </>
+      <CsvImportErrorDetailView
+        fileName={csvFileName}
+        batchId={csvImportBatchId}
+        summary={csvImportSummary}
+        previewRows={csvPreviewRows}
+        mappings={csvFieldMappings}
+        onBack={() => switchView("csvImportComplete")}
+      />
     );
   }
 
   if (viewMode === "csvImportHistory") {
     return (
-      <>
-        {sharedSuccessToast}
-        <CsvImportHistoryView
-          rows={importHistory}
-          loading={loadingImportHistory}
-          error={importHistoryError}
-          onBack={() => switchView("csvImport")}
-          onReload={() => fetchImportHistory()}
-        />
-      </>
+      <CsvImportHistoryView
+        rows={importHistory}
+        loading={loadingImportHistory}
+        error={importHistoryError}
+        onBack={() => switchView("csvImport")}
+        onReload={() => fetchImportHistory()}
+      />
     );
   }
 
   if (viewMode === "documentImport") {
     return (
-      <>
-        {sharedSuccessToast}
-        <DocumentImportView
-          zipFile={documentImportZipFile}
-          zipFileName={documentImportZipFileName}
-          autoAssignOrganizations={documentImportAutoAssignOrganizations}
-          selectedClientId={documentImportAssignedClientId}
-          selectedProcurador={documentImportAssignedProcurador}
-          clients={clientes}
-          importBusy={documentImportSubmitting}
-          uploadProgress={documentImportUploadProgress}
-          uploadStage={documentImportUploadStage}
-          importError={documentImportError}
-          activeBatch={documentImportActiveBatch}
-          activeItems={documentImportItems}
-          history={documentImportHistory}
-          loadingHistory={documentImportHistoryLoading}
-          historyError={documentImportHistoryError}
-          successNotice={documentImportSuccessNotice}
-          onBack={() => switchView("list")}
-          onToggleAutoAssign={() => {
-            setDocumentImportAutoAssignOrganizations((prev) => {
-              const next = !prev;
-              if (!next) {
-                setDocumentImportAssignedClientId("");
-                setDocumentImportAssignedProcurador("");
-              }
-              return next;
-            });
-          }}
-          onChangeClient={setDocumentImportAssignedClientId}
-          onChangeProcurador={setDocumentImportAssignedProcurador}
-          onSelectFile={() => documentImportInputRef.current?.click()}
-          onFileChange={(file) => handleDocumentImportZipSelected(file)}
-          onStartImport={handleStartDocumentImport}
-          onReloadHistory={() => fetchDocumentImportHistory()}
-          onVerifyItem={openDocumentImportVerify}
-          onDeleteBatch={handleDeleteBatch}
-          onReviewBatch={handleReviewBatch}
-          inputRef={documentImportInputRef}
-        />
-      </>
+      <DocumentImportView
+        zipFile={documentImportZipFile}
+        zipFileName={documentImportZipFileName}
+        autoAssignOrganizations={documentImportAutoAssignOrganizations}
+        selectedClientId={documentImportAssignedClientId}
+        selectedProcurador={documentImportAssignedProcurador}
+        clients={clientes}
+        importBusy={documentImportSubmitting}
+        uploadProgress={documentImportUploadProgress}
+        uploadStage={documentImportUploadStage}
+        importError={documentImportError}
+        activeBatch={documentImportActiveBatch}
+        activeItems={documentImportItems}
+        history={documentImportHistory}
+        loadingHistory={documentImportHistoryLoading}
+        historyError={documentImportHistoryError}
+        successNotice={documentImportSuccessNotice}
+        onBack={() => switchView("list")}
+        onToggleAutoAssign={() => {
+          setDocumentImportAutoAssignOrganizations((prev) => {
+            const next = !prev;
+            if (!next) {
+              setDocumentImportAssignedClientId("");
+              setDocumentImportAssignedProcurador("");
+            }
+            return next;
+          });
+        }}
+        onChangeClient={setDocumentImportAssignedClientId}
+        onChangeProcurador={setDocumentImportAssignedProcurador}
+        onSelectFile={() => documentImportInputRef.current?.click()}
+        onFileChange={(file) => handleDocumentImportZipSelected(file)}
+        onStartImport={handleStartDocumentImport}
+        onReloadHistory={() => fetchDocumentImportHistory()}
+        onVerifyItem={openDocumentImportVerify}
+        onDeleteBatch={handleDeleteBatch}
+        onReviewBatch={handleReviewBatch}
+        inputRef={documentImportInputRef}
+      />
     );
   }
 
   if (viewMode === "documentImportVerify" && documentImportVerifyItem) {
     return (
-      <>
-        {sharedSuccessToast}
-        <DocumentImportVerifyView
-          item={documentImportVerifyItem}
-          clients={clientes}
-          form={documentImportVerifyForm}
-          representaA={documentImportRepresentaA}
-          saving={documentImportVerifySaving}
-          error={documentImportVerifyError}
-          onBack={() => {
-            setDocumentImportVerifyError(null);
-            setViewMode("documentImport");
-          }}
-          onChange={(key, value) => setDocumentImportVerifyForm((prev) => ({ ...prev, [key]: value }))}
-          onChangeRepresentaA={(value) => {
-            setDocumentImportRepresentaA(value);
-          }}
-          onAccept={handleAcceptDocumentImportItem}
-        />
-      </>
+      <DocumentImportVerifyView
+        item={documentImportVerifyItem}
+        clients={clientes}
+        form={documentImportVerifyForm}
+        representaA={documentImportRepresentaA}
+        saving={documentImportVerifySaving}
+        error={documentImportVerifyError}
+        onBack={() => {
+          setDocumentImportVerifyError(null);
+          setViewMode("documentImport");
+        }}
+        onChange={(key, value) => setDocumentImportVerifyForm((prev) => ({ ...prev, [key]: value }))}
+        onChangeRepresentaA={(value) => {
+          setDocumentImportRepresentaA(value);
+        }}
+        onAccept={handleAcceptDocumentImportItem}
+      />
     );
   }
 
@@ -5828,15 +5778,6 @@ export default function ExpedienteList() {
           startedAt={pendingDelete.startedAt}
           onUndo={handleUndoDelete}
           onDismiss={dismissDelete}
-        />
-      )}
-
-      {/* ── Success toast ────────────────────────────────── */}
-      {successToast && (
-        <SuccessToast
-          message={successToast.message}
-          startedAt={successToast.startedAt}
-          onDismiss={() => setSuccessToast(null)}
         />
       )}
 
