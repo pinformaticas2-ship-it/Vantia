@@ -717,7 +717,7 @@ function AltaOptionsBtn({
                   <option.icon size={15} />
                 </div>
                 <div>
-                  <p className="text-[15px] font-semibold text-slate-800">{option.title}</p>
+                  <p className="text-sm font-semibold text-slate-800">{option.title}</p>
                   <p className="mt-0.5 text-sm leading-6 text-slate-500">{option.description}</p>
                 </div>
               </button>
@@ -1630,7 +1630,7 @@ export default function ClientList() {
   // ── Render: error ──────────────────────────────────────────
   if (error) return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-3">
+      <h1 className="text-xl font-bold text-slate-900 flex items-center gap-3">
         <Users className="text-red-600" /> Gestión de Clientes
       </h1>
       <div className="flex items-center gap-3 p-5 bg-red-50 border border-red-200 rounded-xl text-red-700">

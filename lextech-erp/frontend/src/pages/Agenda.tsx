@@ -338,7 +338,7 @@ function EventModal({
                   onChange={e => set("title", e.target.value)}
                   placeholder="Añade un titulo"
                   required
-                  className="w-full border-0 border-b-2 border-slate-200 bg-transparent px-0 pb-3 text-3xl font-semibold text-slate-900 placeholder:text-slate-400 focus:border-red-400 focus:outline-none"
+                  className="w-full border-0 border-b-2 border-slate-200 bg-transparent px-0 pb-3 text-xl font-semibold text-slate-900 placeholder:text-slate-400 focus:border-red-400 focus:outline-none"
                 />
                 {missingTitle && <p className="mt-2 text-xs font-medium text-amber-600">Escribe un título para poder guardar el evento.</p>}
               </div>

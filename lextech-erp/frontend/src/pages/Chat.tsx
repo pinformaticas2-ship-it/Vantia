@@ -4251,7 +4251,7 @@ export default function Chat() {
         {/* Workspace header — estilo Slack */}
         <div className="flex items-center justify-between px-3 py-3 border-b border-white/10 shrink-0">
           <button className="flex items-center gap-2 min-w-0 flex-1 hover:bg-white/5 rounded-xl px-2.5 py-2 transition-all duration-200 group">
-            <div className="w-9 h-9 rounded-2xl bg-[#ab0433] flex items-center justify-center shrink-0 shadow-lg shadow-red-950/30 text-white font-black text-sm">
+            <div className="w-9 h-9 rounded-2xl bg-[#ab0433] flex items-center justify-center shrink-0 shadow-lg shadow-red-950/30 text-white font-bold text-sm">
               V
             </div>
             <div className="flex-1 min-w-0 text-left">

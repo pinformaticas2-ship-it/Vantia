@@ -618,7 +618,7 @@ export default function DashboardHome() {
                     <div className={`w-1 h-8 rounded-full shrink-0 ${sty.color}`} />
                     <div className="w-16 shrink-0 text-right">
                       <p className={`text-[10px] font-bold ${lbl==="Hoy"?"text-red-500":"text-slate-500"}`}>{lbl}</p>
-                      {!ev.all_day ? <p className="text-sm font-black text-slate-700">{fmtTime(ev.start_at)}</p> : <p className="text-[10px] text-slate-400 font-semibold">Todo el día</p>}
+                      {!ev.all_day ? <p className="text-sm font-bold text-slate-700">{fmtTime(ev.start_at)}</p> : <p className="text-[10px] text-slate-400 font-semibold">Todo el día</p>}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold text-slate-800 truncate group-hover:text-red-600">{ev.title}</p>
@@ -648,26 +648,26 @@ export default function DashboardHome() {
             <div className="grid grid-cols-2">
               <div className="p-5 bg-red-50 border-r border-red-100">
                 <p className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-1">Vencidas</p>
-                <p className={`text-4xl font-black leading-none ${taskStats.vencidas>0?"text-red-600":"text-slate-300"}`}>{taskStats.vencidas}</p>
+                <p className={`text-lg font-bold leading-none ${taskStats.vencidas>0?"text-red-600":"text-slate-300"}`}>{taskStats.vencidas}</p>
                 <p className="text-[10px] text-red-300 mt-1">vencidas</p>
               </div>
               <div className="p-5">
                 <p className="text-[10px] font-bold text-amber-400 uppercase tracking-widest mb-1">Próximas</p>
-                <p className={`text-4xl font-black leading-none ${taskStats.proximas>0?"text-amber-500":"text-slate-300"}`}>{taskStats.proximas}</p>
+                <p className={`text-lg font-bold leading-none ${taskStats.proximas>0?"text-amber-500":"text-slate-300"}`}>{taskStats.proximas}</p>
                 <p className="text-[10px] text-amber-300 mt-1">esta semana</p>
               </div>
             </div>
             <div className="grid grid-cols-3 border-t border-slate-100">
               <div className="p-4 text-center border-r border-slate-100">
-                <p className="text-2xl font-black text-slate-700">{taskStats.urgentes}</p>
+                <p className="text-lg font-bold text-slate-700">{taskStats.urgentes}</p>
                 <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Urgentes</p>
               </div>
               <div className="p-4 text-center border-r border-slate-100">
-                <p className="text-2xl font-black text-slate-700">{taskStats.pendientes}</p>
+                <p className="text-lg font-bold text-slate-700">{taskStats.pendientes}</p>
                 <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Pendientes</p>
               </div>
               <div className="p-4 text-center">
-                <p className="text-2xl font-black text-emerald-500">{taskStats.completadas}</p>
+                <p className="text-lg font-bold text-emerald-500">{taskStats.completadas}</p>
                 <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Hechas</p>
               </div>
             </div>
@@ -695,7 +695,7 @@ export default function DashboardHome() {
             <div className="grid grid-cols-2 border-b border-slate-100">
               <div className="px-5 py-4 border-r border-slate-100">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Movimientos</p>
-                <p className="mt-1 text-3xl font-black text-slate-800">{activityTotal}</p>
+                <p className="mt-1 text-xl font-bold text-slate-800">{activityTotal}</p>
               </div>
               <div className="px-5 py-4">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Ultimo registro</p>
@@ -744,19 +744,19 @@ export default function DashboardHome() {
           <div className="grid grid-cols-2 gap-px bg-slate-100">
             <div className="bg-white px-5 py-4">
               <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Fichas</p>
-              <p className="mt-1 text-3xl font-black text-slate-800">{clientStats.total}</p>
+              <p className="mt-1 text-xl font-bold text-slate-800">{clientStats.total}</p>
             </div>
             <div className="bg-white px-5 py-4">
               <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-500">Activos</p>
-              <p className="mt-1 text-3xl font-black text-emerald-600">{clientStats.activos}</p>
+              <p className="mt-1 text-xl font-bold text-emerald-600">{clientStats.activos}</p>
             </div>
             <div className="bg-white px-5 py-4">
               <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Con email</p>
-              <p className="mt-1 text-2xl font-black text-slate-700">{clientStats.conEmail}</p>
+              <p className="mt-1 text-lg font-bold text-slate-700">{clientStats.conEmail}</p>
             </div>
             <div className="bg-white px-5 py-4">
               <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Con teléfono</p>
-              <p className="mt-1 text-2xl font-black text-slate-700">{clientStats.conTelefono}</p>
+              <p className="mt-1 text-lg font-bold text-slate-700">{clientStats.conTelefono}</p>
             </div>
           </div>
         </div>
@@ -774,15 +774,15 @@ export default function DashboardHome() {
           <div className="grid grid-cols-3">
             <div className="px-5 py-4 border-r border-slate-100">
               <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Canales</p>
-              <p className="mt-1 text-3xl font-black text-slate-800">{chatStats.canales}</p>
+              <p className="mt-1 text-xl font-bold text-slate-800">{chatStats.canales}</p>
             </div>
             <div className="px-5 py-4 border-r border-slate-100 bg-violet-50/50">
               <p className="text-[10px] font-bold uppercase tracking-widest text-violet-500">No leídos</p>
-              <p className="mt-1 text-3xl font-black text-violet-700">{chatStats.noLeidos}</p>
+              <p className="mt-1 text-xl font-bold text-violet-700">{chatStats.noLeidos}</p>
             </div>
             <div className="px-5 py-4">
               <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">DM</p>
-              <p className="mt-1 text-3xl font-black text-slate-700">{chatStats.directos}</p>
+              <p className="mt-1 text-xl font-bold text-slate-700">{chatStats.directos}</p>
             </div>
           </div>
         </div>
@@ -801,7 +801,7 @@ export default function DashboardHome() {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Estado</p>
-                <p className={`mt-1 text-sm font-black ${waStats.configurado ? "text-emerald-600" : "text-slate-500"}`}>
+                <p className={`mt-1 text-sm font-bold ${waStats.configurado ? "text-emerald-600" : "text-slate-500"}`}>
                   {waStats.configurado ? "Configurado" : "Pendiente"}
                 </p>
               </div>
@@ -812,11 +812,11 @@ export default function DashboardHome() {
             <div className="mt-4 grid grid-cols-2 gap-3">
               <div className="rounded-2xl bg-slate-50 px-4 py-3">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Programados</p>
-                <p className="mt-1 text-2xl font-black text-slate-800">{waStats.programados}</p>
+                <p className="mt-1 text-lg font-bold text-slate-800">{waStats.programados}</p>
               </div>
               <div className="rounded-2xl bg-slate-50 px-4 py-3">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Origen</p>
-                <p className="mt-1 text-sm font-black text-slate-700">{waStats.origen}</p>
+                <p className="mt-1 text-sm font-bold text-slate-700">{waStats.origen}</p>
               </div>
             </div>
           </div>
@@ -919,15 +919,15 @@ export default function DashboardHome() {
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Fuentes</p>
-                <p className="mt-1 text-3xl font-black text-slate-800">{docStats.providers}</p>
+                <p className="mt-1 text-xl font-bold text-slate-800">{docStats.providers}</p>
               </div>
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Activas</p>
-                <p className="mt-1 text-3xl font-black text-emerald-600">{docStats.activos}</p>
+                <p className="mt-1 text-xl font-bold text-emerald-600">{docStats.activos}</p>
               </div>
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Destacados</p>
-                <p className="mt-1 text-3xl font-black text-slate-700">{docStats.highlights}</p>
+                <p className="mt-1 text-xl font-bold text-slate-700">{docStats.highlights}</p>
               </div>
             </div>
             <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-xs text-slate-500">
@@ -972,19 +972,19 @@ export default function DashboardHome() {
               <div className="grid grid-cols-3 gap-2 mb-3">
                 <div>
                   <p className="text-[10px] font-semibold text-slate-500 mb-1">Ingresos</p>
-                  <p className="text-sm font-black text-emerald-600 leading-tight">{fmtEur(billingCalc.ingresos)}</p>
+                  <p className="text-sm font-bold text-emerald-600 leading-tight">{fmtEur(billingCalc.ingresos)}</p>
                   <p className="text-[10px] text-slate-400 mt-1.5">IVA {fmtEur(billingCalc.ivaIng)}</p>
                   <p className="text-[10px] text-slate-400">IRPF 0,00 €</p>
                 </div>
                 <div>
                   <p className="text-[10px] font-semibold text-slate-500 mb-1">Gastos</p>
-                  <p className="text-sm font-black text-red-500 leading-tight">{fmtEur(billingCalc.gastosTot)}</p>
+                  <p className="text-sm font-bold text-red-500 leading-tight">{fmtEur(billingCalc.gastosTot)}</p>
                   <p className="text-[10px] text-slate-400 mt-1.5">IVA {fmtEur(billingCalc.ivaGas)}</p>
                   <p className="text-[10px] text-slate-400">IRPF 0,00 €</p>
                 </div>
                 <div>
                   <p className="text-[10px] font-semibold text-slate-500 mb-1">Total</p>
-                  <p className={`text-sm font-black leading-tight ${billingCalc.total>=0?"text-slate-800":"text-red-600"}`}>{fmtEur(billingCalc.total)}</p>
+                  <p className={`text-sm font-bold leading-tight ${billingCalc.total>=0?"text-slate-800":"text-red-600"}`}>{fmtEur(billingCalc.total)}</p>
                   <p className="text-[10px] text-slate-400 mt-1.5">IVA {fmtEur(billingCalc.ivaLiq)}</p>
                 </div>
               </div>
@@ -1014,7 +1014,7 @@ export default function DashboardHome() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-slate-900">
+            <h1 className="text-lg font-bold text-slate-900">
               {greeting}, <span className="text-red-600">{user?.firstName || "usuario"}</span>
             </h1>
             {weather && (
@@ -1040,7 +1040,7 @@ export default function DashboardHome() {
               <div className="absolute left-0 top-full z-50 mt-2 w-[300px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-300/40">
                 <div className="border-b border-slate-100 px-5 py-4">
                   <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-400">Alta de clientes</p>
-                  <h3 className="mt-1 text-[15px] font-bold text-slate-900">Elige cómo quieres agregar clientes</h3>
+                  <h3 className="mt-1 text-sm font-semibold text-slate-900">Elige cómo quieres agregar clientes</h3>
                 </div>
                 <div className="px-3 py-3">
                   {[
@@ -1067,7 +1067,7 @@ export default function DashboardHome() {
               <div className="absolute right-0 top-full z-50 mt-2 w-[300px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-300/40">
                 <div className="border-b border-slate-100 px-5 py-4">
                   <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-400">Alta de expedientes</p>
-                  <h3 className="mt-1 text-[15px] font-bold text-slate-900">Elige cómo quieres agregar expedientes</h3>
+                  <h3 className="mt-1 text-sm font-semibold text-slate-900">Elige cómo quieres agregar expedientes</h3>
                 </div>
                 <div className="px-3 py-3">
                   {[

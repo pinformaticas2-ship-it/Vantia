@@ -4047,17 +4047,17 @@ function TabApuntesEconomicos({ expedienteId, locked = false }: { expedienteId: 
       <div className="grid grid-cols-3 gap-4">
         <div className="rounded-2xl border border-red-100 bg-white p-5">
           <div className="flex items-center gap-2 mb-2"><TrendingDown size={14} className="text-red-400" /><p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Total cargos</p></div>
-          <p className="text-2xl font-black text-red-600">{fmtMoney(totalCargos)}</p>
+          <p className="text-2xl font-bold text-red-600">{fmtMoney(totalCargos)}</p>
           <p className="text-xs text-slate-400 mt-1">{apuntes.filter(a => a.tipo === "cargo").length} apunte{apuntes.filter(a => a.tipo === "cargo").length !== 1 ? "s" : ""}</p>
         </div>
         <div className="rounded-2xl border border-emerald-100 bg-white p-5">
           <div className="flex items-center gap-2 mb-2"><TrendingUp size={14} className="text-emerald-500" /><p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Total abonos</p></div>
-          <p className="text-2xl font-black text-emerald-600">{fmtMoney(totalAbonos)}</p>
+          <p className="text-2xl font-bold text-emerald-600">{fmtMoney(totalAbonos)}</p>
           <p className="text-xs text-slate-400 mt-1">{apuntes.filter(a => a.tipo === "abono").length} apunte{apuntes.filter(a => a.tipo === "abono").length !== 1 ? "s" : ""}</p>
         </div>
         <div className={`rounded-2xl border p-5 ${saldo > 0 ? "border-amber-200 bg-amber-50" : "border-slate-200 bg-white"}`}>
           <div className="flex items-center gap-2 mb-2"><Banknote size={14} className={saldo > 0 ? "text-amber-500" : "text-slate-400"} /><p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Saldo pendiente</p></div>
-          <p className={`text-2xl font-black ${saldo > 0 ? "text-amber-600" : "text-slate-500"}`}>{fmtMoney(saldo)}</p>
+          <p className={`text-2xl font-bold ${saldo > 0 ? "text-amber-600" : "text-slate-500"}`}>{fmtMoney(saldo)}</p>
           <p className="text-xs text-slate-400 mt-1">{saldo > 0 ? "pendiente de cobro" : saldo < 0 ? "saldo a favor del cliente" : "al día"}</p>
         </div>
       </div>
@@ -4187,7 +4187,7 @@ function TabApuntesEconomicos({ expedienteId, locked = false }: { expedienteId: 
                   <tr className="border-t-2 border-slate-200">
                     <td colSpan={2} className="pt-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Saldo pendiente</td>
                     <td />
-                    <td className={`pt-3 text-right text-base font-black ${saldo > 0 ? "text-amber-600" : "text-slate-500"}`}>{fmtMoney(saldo)}</td>
+                    <td className={`pt-3 text-right text-base font-bold ${saldo > 0 ? "text-amber-600" : "text-slate-500"}`}>{fmtMoney(saldo)}</td>
                     {!locked && <td />}
                   </tr>
                 </tfoot>
@@ -5414,7 +5414,7 @@ export default function ExpedienteDetail() {
                         <BadgeEuro size={15} className="text-slate-400" />
                         <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Facturado (cliente)</p>
                       </div>
-                      <p className="text-2xl font-black text-slate-800">{fmtMoney(totalFacturado)}</p>
+                      <p className="text-2xl font-bold text-slate-800">{fmtMoney(totalFacturado)}</p>
                       <p className="text-xs text-slate-400 mt-1">{allVisible.length} factura{allVisible.length !== 1 ? "s" : ""}</p>
                     </div>
                     <div className="rounded-2xl border border-slate-200 bg-white p-5">
@@ -5422,7 +5422,7 @@ export default function ExpedienteDetail() {
                         <TrendingUp size={15} className="text-emerald-500" />
                         <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Cobrado</p>
                       </div>
-                      <p className="text-2xl font-black text-emerald-600">{fmtMoney(totalCobrado)}</p>
+                      <p className="text-2xl font-bold text-emerald-600">{fmtMoney(totalCobrado)}</p>
                       <p className="text-xs text-slate-400 mt-1">facturas cobradas</p>
                     </div>
                     <div className="rounded-2xl border border-slate-200 bg-white p-5">
@@ -5430,7 +5430,7 @@ export default function ExpedienteDetail() {
                         <TrendingDown size={15} className="text-amber-500" />
                         <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Pendiente</p>
                       </div>
-                      <p className="text-2xl font-black text-amber-600">{fmtMoney(totalPendiente)}</p>
+                      <p className="text-2xl font-bold text-amber-600">{fmtMoney(totalPendiente)}</p>
                       <p className="text-xs text-slate-400 mt-1">por cobrar</p>
                     </div>
                   </div>

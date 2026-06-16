@@ -407,7 +407,7 @@ export default function WhatsApp() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-white/45">LexTech</p>
-              <h1 className="mt-1 text-2xl font-black">WhatsApp</h1>
+              <h1 className="mt-1 text-base font-bold">WhatsApp</h1>
             </div>
             <button
               type="button"
@@ -507,7 +507,7 @@ export default function WhatsApp() {
                     </div>
                   )}
                   <div>
-                    <h2 className="text-xl font-black text-slate-900">{getClientLabel(selectedClient)}</h2>
+                    <h2 className="text-base font-bold text-slate-900">{getClientLabel(selectedClient)}</h2>
                     <div className="mt-1 flex items-center gap-2 text-sm text-slate-500">
                       <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
                       WhatsApp Cloud API directa
@@ -516,7 +516,7 @@ export default function WhatsApp() {
                 </>
               ) : (
                 <div>
-                  <h2 className="text-xl font-black text-slate-900">Panel de mensajería</h2>
+                  <h2 className="text-base font-bold text-slate-900">Panel de mensajería</h2>
                   <p className="mt-1 text-sm text-slate-500">Selecciona una conversación para empezar.</p>
                 </div>
               )}
@@ -677,7 +677,7 @@ function WhatsAppAuthGate({
 
         <div className="mt-8">
           <p className="text-[11px] font-bold uppercase tracking-[0.32em] text-white/40">WhatsApp Business</p>
-          <h1 className="mt-3 text-4xl font-black leading-tight">Conecta tu canal y entra al panel de mensajería</h1>
+          <h1 className="mt-3 text-xl font-bold leading-tight">Conecta tu canal y entra al panel de mensajería</h1>
           <p className="mt-4 max-w-md text-base leading-7 text-white/70">
             Antes de abrir la bandeja real, autentica el número Business del despacho. Cuando la conexión esté verificada,
             el módulo mostrará tus conversaciones y te permitirá responder desde el ERP.
@@ -710,7 +710,7 @@ function WhatsAppAuthGate({
       <section className="flex flex-1 flex-col bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-8 py-8">
         <div className="max-w-3xl">
           <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-400">Autenticador</p>
-          <h2 className="mt-2 text-3xl font-black text-slate-900">Acceso a WhatsApp Business Cloud API</h2>
+          <h2 className="mt-2 text-lg font-bold text-slate-900">Acceso a WhatsApp Business Cloud API</h2>
           <p className="mt-3 text-sm leading-6 text-slate-500">
             Introduce o revisa la configuración del canal. Después valida la conexión para entrar a la pantalla de mensajería.
           </p>

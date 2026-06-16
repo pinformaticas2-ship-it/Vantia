@@ -781,7 +781,7 @@ export default function ClientForm() {
                 </div>
                 <div>
                   <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-slate-400">Alta de clientes</p>
-                  <h1 className="mt-1 text-[18px] font-bold leading-tight text-slate-900">Dar de alta clientes con DNI</h1>
+                  <h1 className="mt-1 text-base font-semibold leading-tight text-slate-900">Dar de alta clientes con DNI</h1>
                   <p className="mt-1 text-sm text-slate-500">
                     {dniStep === "scan"
                       ? "Sube anverso y reverso del DNI, revisa la identidad detectada y continúa al alta asistida."
@@ -842,7 +842,7 @@ export default function ClientForm() {
         )}
 
         <section className="rounded-[24px] border border-slate-200 bg-white px-6 py-5 shadow-sm">
-          <h2 className="text-[15px] font-bold text-slate-900">
+          <h2 className="text-sm font-semibold text-slate-900">
             {dniStep === "scan" ? "Paso 1 · Lectura inteligente del DNI" : "Paso 2 · Completar alta del cliente"}
           </h2>
           <p className="mt-1 text-sm text-slate-500">
@@ -871,7 +871,7 @@ export default function ClientForm() {
         <section className="rounded-[24px] border border-slate-200 bg-white px-6 py-6 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h2 className="text-[15px] font-bold text-slate-900">Importar DNI</h2>
+              <h2 className="text-sm font-semibold text-slate-900">Importar DNI</h2>
               <p className="mt-1 text-sm text-slate-500">
                 Carga anverso y reverso para detectar identidad, fecha de nacimiento y datos de domicilio.
               </p>
@@ -1085,7 +1085,7 @@ export default function ClientForm() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-slate-400">Datos detectados</p>
-              <h2 className="mt-1 text-[15px] font-bold text-slate-900">
+              <h2 className="mt-1 text-sm font-semibold text-slate-900">
                 {dniStep === "scan"
                   ? dniReviewEditable ? "Verificación editable del cliente" : "Resumen del cliente"
                   : "Identidad personal detectada"}
@@ -1384,7 +1384,7 @@ export default function ClientForm() {
 
         {isDniFlow && (
           <div className="rounded-[24px] border border-slate-200 bg-white px-6 py-5 shadow-sm">
-            <h2 className="text-[15px] font-bold text-slate-900">Lectura inteligente del DNI</h2>
+            <h2 className="text-sm font-semibold text-slate-900">Lectura inteligente del DNI</h2>
             <p className="mt-1 text-sm text-slate-500">
               Esta pantalla está orientada a importar primero la identidad del cliente desde su DNI y después revisar manualmente la ficha antes de guardar.
             </p>
@@ -1419,7 +1419,7 @@ export default function ClientForm() {
                 <div className="rounded-[24px] border border-slate-200 bg-slate-50 px-6 py-6">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <h4 className="text-[15px] font-bold text-slate-900">Importar datos desde DNI</h4>
+                      <h4 className="text-sm font-semibold text-slate-900">Importar datos desde DNI</h4>
                       <p className="mt-1 text-sm text-slate-500">
                         Vista asistida de lectura, similar a la importación de expedientes, pero centrada en anverso y reverso del DNI.
                       </p>
@@ -1645,7 +1645,7 @@ export default function ClientForm() {
                 <div className="rounded-[24px] border border-slate-200 bg-slate-50 px-6 py-6">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <h4 className="text-[15px] font-bold text-slate-900">Crear cliente desde enlace</h4>
+                      <h4 className="text-sm font-semibold text-slate-900">Crear cliente desde enlace</h4>
                       <p className="mt-1 text-sm text-slate-500">
                         Usa este modo cuando quieras iniciar la ficha a partir de una URL de referencia, formulario externo o enlace de contacto.
                       </p>

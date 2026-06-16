@@ -327,7 +327,7 @@ export default function Documental() {
             <Library size={18} className="text-[#ab0433]" />
           </div>
           <div>
-            <h1 className="text-xl font-black text-slate-900">Documental</h1>
+            <h1 className="text-base font-bold text-slate-900">Documental</h1>
             <p className="text-xs text-slate-500">BOE · CENDOJ · LexNET</p>
           </div>
         </div>
@@ -491,7 +491,7 @@ export default function Documental() {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-600">{boeDocument.id}</p>
-                    <h3 className="mt-1 text-lg font-black leading-snug text-slate-900">{boeDocument.titulo || "Norma BOE"}</h3>
+                    <h3 className="mt-1 text-sm font-semibold leading-snug text-slate-900">{boeDocument.titulo || "Norma BOE"}</h3>
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {boeDocument.rango && <span className="rounded-full bg-white px-2.5 py-0.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200">{boeDocument.rango}</span>}
                       {boeDocument.fecha_publicacion && <span className="rounded-full bg-white px-2.5 py-0.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200">{boeDocument.fecha_publicacion}</span>}
@@ -695,7 +695,7 @@ export default function Documental() {
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap items-center gap-3">
-                <h2 className="text-xl font-black text-slate-900">LexNET</h2>
+                <h2 className="text-base font-semibold text-slate-900">LexNET</h2>
                 <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-0.5 text-xs font-semibold ${
                   lexnetProvider?.configured
                     ? "border-emerald-200 bg-emerald-50 text-emerald-700"
@@ -740,7 +740,7 @@ export default function Documental() {
           <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-5 shrink-0">
             <div className="min-w-0">
               <p className="text-[11px] font-bold uppercase tracking-wider text-[#ab0433]">Bloque BOE</p>
-              <h3 className="mt-1 truncate text-xl font-black text-slate-900">
+              <h3 className="mt-1 truncate text-sm font-semibold text-slate-900">
                 {selectedBlock?.titulo || selectedBlock?.id || "Cargando bloque"}
               </h3>
               {selectedBlock?.tipo && <p className="mt-0.5 text-xs text-slate-500">{selectedBlock.tipo}</p>}
@@ -769,7 +769,7 @@ export default function Documental() {
                   {selectedBlock.fechaVigencia && <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">Vigencia {selectedBlock.fechaVigencia}</span>}
                 </div>
 
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-[15px] leading-7 text-slate-700 space-y-4">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm leading-7 text-slate-700 space-y-4">
                   {selectedBlock.paragraphs.map((p, i) => <p key={`p-${i}`}>{p}</p>)}
                   {selectedBlock.quotes.map((q, i) => (
                     <blockquote key={`q-${i}`} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-600">

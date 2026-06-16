@@ -397,7 +397,7 @@ function KanbanCardContent({
         </button>
         <div className="min-w-0 flex-1">
           <button onClick={() => onEdit(task)} className="text-left w-full">
-            <div className={`text-[15px] leading-5 font-bold ${done ? "line-through text-slate-400" : "text-slate-800"}`}>
+            <div className={`text-sm leading-5 font-semibold ${done ? "line-through text-slate-400" : "text-slate-800"}`}>
               {task.titulo}
             </div>
           </button>
@@ -1115,7 +1115,7 @@ export default function Tareas() {
         ].map(s => (
           <div key={s.label} className={`rounded-xl border px-4 py-3 ${s.bg}`}>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{s.label}</p>
-            <p className={`text-2xl font-extrabold mt-0.5 ${s.cls}`}>{s.val}</p>
+            <p className={`text-xl font-bold mt-0.5 ${s.cls}`}>{s.val}</p>
           </div>
         ))}
       </div>

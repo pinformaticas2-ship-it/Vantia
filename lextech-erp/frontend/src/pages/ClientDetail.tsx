@@ -3448,7 +3448,7 @@ function TabEconomico({ clientId }: { clientId: string }) {
             <BadgeEuro size={15} className="text-slate-400" />
             <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Facturado</p>
           </div>
-          <p className="text-2xl font-black text-slate-800">{fmtMoney(totalFacturado)}</p>
+          <p className="text-2xl font-bold text-slate-800">{fmtMoney(totalFacturado)}</p>
           <p className="text-xs text-slate-400 mt-1">{clientFacturas.length} factura{clientFacturas.length !== 1 ? "s" : ""}</p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
@@ -3456,7 +3456,7 @@ function TabEconomico({ clientId }: { clientId: string }) {
             <TrendingUp size={15} className="text-emerald-500" />
             <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Cobrado</p>
           </div>
-          <p className="text-2xl font-black text-emerald-600">{fmtMoney(totalCobrado)}</p>
+          <p className="text-2xl font-bold text-emerald-600">{fmtMoney(totalCobrado)}</p>
           <p className="text-xs text-slate-400 mt-1">facturas cobradas</p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
@@ -3464,7 +3464,7 @@ function TabEconomico({ clientId }: { clientId: string }) {
             <TrendingDown size={15} className="text-amber-500" />
             <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Pendiente</p>
           </div>
-          <p className="text-2xl font-black text-amber-600">{fmtMoney(totalPendiente)}</p>
+          <p className="text-2xl font-bold text-amber-600">{fmtMoney(totalPendiente)}</p>
           <p className="text-xs text-slate-400 mt-1">por cobrar</p>
         </div>
       </div>

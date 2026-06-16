@@ -405,7 +405,7 @@ function NotificationsPanel({ notifs, loading, onClose }: { notifs: UnifiedNotif
               <p className="text-[10px] text-slate-400 mt-0.5">{timeAgo(n.created_at)}</p>
             </div>
             {!!n.count && n.count > 1 && (
-              <span className="ml-2 min-w-[20px] h-5 bg-slate-100 text-slate-600 text-[10px] font-black rounded-full flex items-center justify-center px-1.5">
+              <span className="ml-2 min-w-[20px] h-5 bg-slate-100 text-slate-600 text-[10px] font-bold rounded-full flex items-center justify-center px-1.5">
                 {n.count > 99 ? "99+" : n.count}
               </span>
             )}
@@ -499,7 +499,7 @@ function SidebarContent({ pathname, onClose, onSignOut }: { pathname: string; on
                       <Icon className={`h-5 w-5 ${isActive ? "text-white" : "text-slate-500"}`} />
                       <span className="flex-1">{item.name}</span>
                       {(chatBadge || emailBadge || waBadge) && (
-                        <span className="ml-auto min-w-[20px] h-5 bg-[#ab0433] text-white text-[10px] font-black rounded-full flex items-center justify-center px-1.5 shadow-lg shadow-red-900/40">
+                        <span className="ml-auto min-w-[20px] h-5 bg-[#ab0433] text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1.5 shadow-lg shadow-red-900/40">
                           {badgeCount > 99 ? "99+" : badgeCount}
                         </span>
                       )}
@@ -1014,7 +1014,7 @@ function EmailToast({
           <Mail className="h-5 w-5" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-black tracking-[0.18em] uppercase text-[#ab0433]">Nuevo correo</p>
+          <p className="text-xs font-bold tracking-[0.18em] uppercase text-[#ab0433]">Nuevo correo</p>
           <p className="text-sm font-semibold text-slate-800 truncate">{email.subject}</p>
           <p className="text-xs text-slate-500 truncate">{email.from}</p>
           {email.snippet && <p className="text-xs text-slate-400 mt-1 line-clamp-2">{email.snippet}</p>}
@@ -1054,7 +1054,7 @@ function WaToast({ name, message, onOpen, onClose }: { name: string; message: st
           <MessageCircle className="h-5 w-5" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-black tracking-[0.18em] uppercase text-[#1a9e4f]">WhatsApp</p>
+          <p className="text-xs font-bold tracking-[0.18em] uppercase text-[#1a9e4f]">WhatsApp</p>
           <p className="text-sm font-semibold text-slate-800 truncate">{name}</p>
           <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">{message}</p>
         </div>
@@ -1081,7 +1081,7 @@ function ChatToast({ title, meta, onOpen, onClose }: { title: string; meta?: str
           <MessageSquare className="h-5 w-5" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-black tracking-[0.18em] uppercase text-indigo-600">Chat interno</p>
+          <p className="text-xs font-bold tracking-[0.18em] uppercase text-indigo-600">Chat interno</p>
           <p className="text-sm font-semibold text-slate-800 truncate">{title}</p>
           {meta && <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">{meta}</p>}
         </div>

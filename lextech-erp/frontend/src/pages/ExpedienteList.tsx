@@ -1924,7 +1924,7 @@ function CsvImportCompleteView({
                 : <Check size={22} strokeWidth={3} />}
             </div>
             <div className="flex-1 min-w-0">
-              <h2 className="text-xl font-black leading-tight">
+              <h2 className="text-base font-bold leading-tight">
                 {hasErrors ? "Importacion con incidencias" : "Importacion completada"}
               </h2>
               <p className="mt-0.5 text-sm text-white/80 truncate">
@@ -1932,7 +1932,7 @@ function CsvImportCompleteView({
               </p>
             </div>
             <div className="shrink-0 rounded-xl bg-white/20 px-4 py-2 text-center">
-              <p className="text-2xl font-black leading-none">{successRate}%</p>
+              <p className="text-xl font-bold leading-none">{successRate}%</p>
               <p className="mt-0.5 text-[10px] font-semibold text-white/80 uppercase tracking-wide">éxito</p>
             </div>
           </div>
@@ -1955,7 +1955,7 @@ function CsvImportCompleteView({
               </div>
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Importados</p>
             </div>
-            <p className="text-4xl font-black text-slate-900">{successCount}</p>
+            <p className="text-xl font-bold text-slate-900">{successCount}</p>
             <p className="mt-1 text-xs text-slate-500">registros correctos</p>
           </div>
 
@@ -1966,7 +1966,7 @@ function CsvImportCompleteView({
               </div>
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Con errores</p>
             </div>
-            <p className="text-4xl font-black text-slate-900">{errorCount}</p>
+            <p className="text-xl font-bold text-slate-900">{errorCount}</p>
             <p className="mt-1 text-xs text-slate-500">filas bloqueadas</p>
             {hasErrors && (
               <button
@@ -1986,7 +1986,7 @@ function CsvImportCompleteView({
               </div>
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Total</p>
             </div>
-            <p className="text-4xl font-black text-slate-900">{totalProcessed}</p>
+            <p className="text-xl font-bold text-slate-900">{totalProcessed}</p>
             <p className="mt-1 text-xs text-slate-500">registros revisados</p>
           </div>
         </div>
@@ -2091,7 +2091,7 @@ function CsvImportErrorDetailView({
     <div className="space-y-6 animate-in fade-in duration-300">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black text-slate-900">Detalles de importacion</h1>
+          <h1 className="text-base font-bold text-slate-900">Detalles de importacion</h1>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-500">
             <span className="rounded-full bg-slate-100 px-3 py-1 font-medium text-slate-700">
               Lote {batchId ? `${batchId.slice(0, 8)}...` : "Temporal"}
@@ -2154,22 +2154,22 @@ function CsvImportErrorDetailView({
             <div className="mt-4 grid grid-cols-2 gap-3">
               <div className="rounded-2xl bg-emerald-50 px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Completados</p>
-                <p className="mt-2 text-3xl font-black text-slate-900">{successCount}</p>
+                <p className="mt-2 text-xl font-bold text-slate-900">{successCount}</p>
                 <p className="text-xs text-slate-500">({completedPct.toFixed(2)}%)</p>
               </div>
               <div className="rounded-2xl bg-red-50 px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Errores</p>
-                <p className="mt-2 text-3xl font-black text-slate-900">{errorCount}</p>
+                <p className="mt-2 text-xl font-bold text-slate-900">{errorCount}</p>
                 <p className="text-xs text-slate-500">({errorPct.toFixed(2)}%)</p>
               </div>
               <div className="rounded-2xl bg-amber-50 px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Pendientes</p>
-                <p className="mt-2 text-3xl font-black text-slate-900">0</p>
+                <p className="mt-2 text-xl font-bold text-slate-900">0</p>
                 <p className="text-xs text-slate-500">(0.00%)</p>
               </div>
               <div className="rounded-2xl bg-slate-100 px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Total</p>
-                <p className="mt-2 text-3xl font-black text-slate-900">{totalProcessed}</p>
+                <p className="mt-2 text-xl font-bold text-slate-900">{totalProcessed}</p>
                 <p className="text-xs text-slate-500">registros</p>
               </div>
             </div>
@@ -2238,7 +2238,7 @@ function CsvImportErrorDetailView({
                       </div>
                       <div className="rounded-2xl bg-slate-50 px-4 py-4">
                         <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Impacto</p>
-                        <p className="mt-2 text-3xl font-black text-slate-900">{group.length}</p>
+                        <p className="mt-2 text-xl font-bold text-slate-900">{group.length}</p>
                         <p className="text-sm text-slate-500">registros afectados</p>
                       </div>
                     </div>
@@ -2825,15 +2825,15 @@ function DocumentImportView({
               </div>
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <p className="text-[10px] uppercase tracking-wide text-slate-400">Total</p>
-                <p className="mt-0.5 text-xl font-black text-slate-900">{activeBatch.total_count || 0}</p>
+                <p className="mt-0.5 text-base font-bold text-slate-900">{activeBatch.total_count || 0}</p>
               </div>
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <p className="text-[10px] uppercase tracking-wide text-slate-400">Creados</p>
-                <p className="mt-0.5 text-xl font-black text-emerald-600">{activeBatch.completed_count || 0}</p>
+                <p className="mt-0.5 text-base font-bold text-emerald-600">{activeBatch.completed_count || 0}</p>
               </div>
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <p className="text-[10px] uppercase tracking-wide text-slate-400">Errores</p>
-                <p className="mt-0.5 text-xl font-black text-red-600">{activeBatch.error_count || 0}</p>
+                <p className="mt-0.5 text-base font-bold text-red-600">{activeBatch.error_count || 0}</p>
               </div>
             </div>
           )}

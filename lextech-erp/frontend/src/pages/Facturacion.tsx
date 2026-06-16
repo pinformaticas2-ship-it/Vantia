@@ -1040,7 +1040,7 @@ function FacturaWorkspacePage({
           <button onClick={onBack} className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 transition-colors hover:text-slate-800">
             <ArrowLeft size={15} /> Volver a facturación
           </button>
-          <h1 className="mt-4 text-4xl font-bold tracking-tight text-slate-900">
+          <h1 className="mt-4 text-xl font-bold tracking-tight text-slate-900">
             {initialValues?.id ? "Editar factura de ingreso" : "Nueva factura de ingreso"}
           </h1>
           <p className="mt-2 max-w-3xl text-sm text-slate-500">
@@ -2225,7 +2225,7 @@ function FacturacionContent() {
                     <span className="text-slate-300">/</span>
                     <span className="text-red-600">Facturación</span>
                   </div>
-                  <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-900">Centro de facturación del despacho</h1>
+                  <h1 className="mt-3 text-xl font-bold tracking-tight text-slate-900">Centro de facturación del despacho</h1>
                   <p className="mt-2 max-w-3xl text-sm text-slate-500">Controla ventas, provisiones, gastos, presupuestos y relación cliente-expediente con una estructura tipo ERP, sin perder el flujo jurídico del despacho.</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -2568,11 +2568,11 @@ function FacturacionContent() {
                         <div className="grid grid-cols-2 border-b border-slate-100">
                           <div className="px-6 py-4 border-r border-slate-100">
                             <p className="text-xs text-slate-500 font-medium">Ingresos</p>
-                            <p className="mt-1 text-2xl font-black text-emerald-600">{fmtEur(totalFacturado)}</p>
+                            <p className="mt-1 text-2xl font-bold text-emerald-600">{fmtEur(totalFacturado)}</p>
                           </div>
                           <div className="px-6 py-4">
                             <p className="text-xs text-slate-500 font-medium">Gastos</p>
-                            <p className="mt-1 text-2xl font-black text-red-500">{fmtEur(gastosMensuales)}</p>
+                            <p className="mt-1 text-2xl font-bold text-red-500">{fmtEur(gastosMensuales)}</p>
                           </div>
                         </div>
                         {/* Fila 2: IVA+IRPF desglosados */}
@@ -2765,10 +2765,10 @@ function FacturacionContent() {
                               ))}
                             </tbody>
                             <tfoot><tr className="border-t-2 border-slate-200">
-                              <td className="pt-2.5 pr-8 text-[11px] font-black uppercase tracking-widest text-slate-500">Total</td>
-                              <td className="pt-2.5 pr-8 text-right font-black text-emerald-600">{fmtEur(totCobrar)}</td>
-                              <td className="pt-2.5 pr-8 text-right font-black text-red-500">{fmtEur(totPagar)}</td>
-                              <td className={`pt-2.5 text-right font-black ${totCobrar - totPagar >= 0 ? "text-slate-900" : "text-red-600"}`}>{fmtEur(totCobrar - totPagar)}</td>
+                              <td className="pt-2.5 pr-8 text-[11px] font-bold uppercase tracking-widest text-slate-500">Total</td>
+                              <td className="pt-2.5 pr-8 text-right font-bold text-emerald-600">{fmtEur(totCobrar)}</td>
+                              <td className="pt-2.5 pr-8 text-right font-bold text-red-500">{fmtEur(totPagar)}</td>
+                              <td className={`pt-2.5 text-right font-bold ${totCobrar - totPagar >= 0 ? "text-slate-900" : "text-red-600"}`}>{fmtEur(totCobrar - totPagar)}</td>
                             </tr></tfoot>
                           </table>
                         </div>
@@ -3153,7 +3153,7 @@ function BankAccountsTab({
                   <button onClick={() => deleteAcc(acc.id)} className="rounded-lg border border-red-200 p-1.5 hover:bg-red-50"><Trash2 size={12} className="text-red-500" /></button>
                 </div>
               </div>
-              <p className={`text-2xl font-black ${acc.balance >= 0 ? "text-slate-900" : "text-red-600"}`}>{fmtEur(acc.balance)}</p>
+              <p className={`text-2xl font-bold ${acc.balance >= 0 ? "text-slate-900" : "text-red-600"}`}>{fmtEur(acc.balance)}</p>
               <p className="text-[11px] text-slate-400 mt-2">{acc.currency} · Introducida manualmente</p>
             </div>
           ))}
@@ -3182,7 +3182,7 @@ function BankAccountsTab({
                   </p>
                 </div>
               </div>
-              <p className={`text-2xl font-black ${acc.balance >= 0 ? "text-slate-900" : "text-red-600"}`}>
+              <p className={`text-2xl font-bold ${acc.balance >= 0 ? "text-slate-900" : "text-red-600"}`}>
                 {fmtEur(acc.balance)}
               </p>
               <div className="mt-3 flex items-center justify-between">
@@ -3213,7 +3213,7 @@ function BankAccountsTab({
               <p className="text-xs text-slate-500">{selectedAcc?.bankName}{ibanShort ? ` ${ibanShort}` : ""}</p>
             </div>
             <div className="text-right shrink-0">
-              <p className={`text-xl font-black ${(selectedAcc?.balance ?? 0) >= 0 ? "text-slate-900" : "text-red-600"}`}>
+              <p className={`text-xl font-bold ${(selectedAcc?.balance ?? 0) >= 0 ? "text-slate-900" : "text-red-600"}`}>
                 {fmtEur(selectedAcc?.balance ?? 0)}
               </p>
               {lastSyncAt && <p className="text-[11px] text-slate-400">Última sincronización {fmtDate(lastSyncAt)}</p>}

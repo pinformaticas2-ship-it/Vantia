@@ -65,7 +65,7 @@ export default function VantiaBrand({
       <BrandMark size={size} />
       {showWordmark && (
         <div className="min-w-0">
-          <p className={`text-xl font-black tracking-tight leading-none ${titleClass}`}>
+          <p className={`text-xl font-bold tracking-tight leading-none ${titleClass}`}>
             vant<span className={accentClass}>IA</span>
           </p>
           {subtitle && (
