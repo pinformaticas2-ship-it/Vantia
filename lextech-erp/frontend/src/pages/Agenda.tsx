@@ -1222,11 +1222,19 @@ function TimeGridView({
         }
       }
     };
+    const handleDocLeave = (e: MouseEvent) => {
+      if (e.relatedTarget === null && slotDragRef.current) {
+        slotDragRef.current = null;
+        setSlotDragDisplay(null);
+      }
+    };
     window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("mouseup", handleMouseUp);
+    document.addEventListener("mouseleave", handleDocLeave);
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
+      document.removeEventListener("mouseleave", handleDocLeave);
     };
   }, [dragDisplay, allDayDragDisplay, findDateStrAtX]);
 
@@ -1389,6 +1397,7 @@ function TimeGridView({
                       const rawY = e.clientY - gridRect.top + (scrollRef.current?.scrollTop ?? 0);
                       const totalMins = Math.max(0, (rawY / HOUR_HEIGHT) * 60);
                       const snappedMins = Math.round(totalMins / 15) * 15;
+                      // Solo guardar en ref — el ghost y overlay se activan al primer mousemove
                       slotDragRef.current = {
                         dateStr,
                         startMins: snappedMins,
@@ -1397,7 +1406,6 @@ function TimeGridView({
                         clientY: e.clientY,
                         hasMoved: false,
                       };
-                      setSlotDragDisplay({ dateStr, startMins: snappedMins, endMins: snappedMins + 15 });
                     }}
                   >
                     {h > 0 && <div className="border-t border-gray-100 w-full" />}
