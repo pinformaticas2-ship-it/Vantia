@@ -26,37 +26,53 @@ const WhatsAppUnreadContext = createContext<WhatsAppUnreadCtx>({
   markAllSeen: () => {},
 });
 
-function loadLastSeen(): Record<string, string> {
-  try { return JSON.parse(localStorage.getItem(WA_LAST_SEEN_KEY) || "{}"); } catch { return {}; }
+function getLastSeenKey(userId: string): string {
+  return `${WA_LAST_SEEN_KEY}-${userId}`;
 }
 
-function saveLastSeen(data: Record<string, string>): void {
-  try { localStorage.setItem(WA_LAST_SEEN_KEY, JSON.stringify(data)); } catch {}
+function loadLastSeen(userId?: string): Record<string, string> {
+  const key = userId ? getLastSeenKey(userId) : WA_LAST_SEEN_KEY;
+  try { return JSON.parse(localStorage.getItem(key) || "{}"); } catch { return {}; }
+}
+
+function saveLastSeen(data: Record<string, string>, userId?: string): void {
+  const key = userId ? getLastSeenKey(userId) : WA_LAST_SEEN_KEY;
+  try { localStorage.setItem(key, JSON.stringify(data)); } catch {}
 }
 
 export function WhatsAppUnreadProvider({ children }: { children: React.ReactNode }) {
-  const { getToken, isLoaded } = useAuth();
+  const { getToken, isLoaded, userId } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
   const [latestToast, setLatestToast] = useState<WaToastItem | null>(null);
 
-  const lastSeenRef     = useRef<Record<string, string>>(loadLastSeen());
-  const bootstrappedRef = useRef(Object.keys(lastSeenRef.current).length > 0);
+  const lastSeenRef     = useRef<Record<string, string>>({});
+  const bootstrappedRef = useRef(false);
   const busyRef         = useRef(false);
   const timerRef        = useRef<ReturnType<typeof setInterval> | null>(null);
   const getTokenRef     = useRef(getToken);
+  const userIdRef       = useRef(userId);
 
   useEffect(() => { getTokenRef.current = getToken; }, [getToken]);
+  useEffect(() => { userIdRef.current = userId; }, [userId]);
+
+  // Cargar lastSeen desde localStorage cuando el userId esté disponible
+  useEffect(() => {
+    if (!userId) return;
+    const stored = loadLastSeen(userId);
+    lastSeenRef.current = stored;
+    bootstrappedRef.current = Object.keys(stored).length > 0;
+  }, [userId]);
 
   const markSeen = useCallback((contactId: string) => {
     lastSeenRef.current[contactId] = new Date().toISOString();
-    saveLastSeen(lastSeenRef.current);
+    saveLastSeen(lastSeenRef.current, userIdRef.current ?? undefined);
     setUnreadCount(prev => Math.max(0, prev - 1));
   }, []);
 
   const markAllSeen = useCallback((contactIds: string[]) => {
     const now = new Date().toISOString();
     for (const id of contactIds) lastSeenRef.current[id] = now;
-    saveLastSeen(lastSeenRef.current);
+    saveLastSeen(lastSeenRef.current, userIdRef.current ?? undefined);
     setUnreadCount(0);
     setLatestToast(null);
   }, []);
@@ -80,7 +96,7 @@ export function WhatsAppUnreadProvider({ children }: { children: React.ReactNode
             lastSeenRef.current[c.id] = c.last_message_at;
           }
         }
-        saveLastSeen(lastSeenRef.current);
+        saveLastSeen(lastSeenRef.current, userIdRef.current ?? undefined);
         bootstrappedRef.current = true;
         setUnreadCount(0);
         return;

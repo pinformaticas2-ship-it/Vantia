@@ -1,9 +1,16 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
 
-const GMAIL_TOKEN_KEY  = "lextech-gmail-token-v1";
-const KNOWN_IDS_KEY    = "lextech-gmail-known-ids-v1";   // persiste entre recargas
-const MAX_KNOWN        = 200;                             // límite para no crecer indefinidamente
+const GMAIL_TOKEN_KEY_BASE = "lextech-gmail-token-v1";
+const KNOWN_IDS_KEY_BASE   = "lextech-gmail-known-ids-v1";
+const MAX_KNOWN            = 200;
+
+function gmailTokenKey(userId?: string | null): string {
+  return userId ? `${GMAIL_TOKEN_KEY_BASE}-${userId}` : GMAIL_TOKEN_KEY_BASE;
+}
+function knownIdsKey(userId?: string | null): string {
+  return userId ? `${KNOWN_IDS_KEY_BASE}-${userId}` : KNOWN_IDS_KEY_BASE;
+}
 
 interface EmailToastItem {
   id: string;
@@ -34,9 +41,10 @@ async function gmailReq<T>(token: string, path: string): Promise<T> {
   return res.json();
 }
 
-function getStoredGmailToken(): string {
+function getStoredGmailToken(_userId?: string | null): string {
+  // Gmail token is saved by Email.tsx using the base key — keep compatibility
   try {
-    const stored = JSON.parse(localStorage.getItem(GMAIL_TOKEN_KEY) || "{}");
+    const stored = JSON.parse(localStorage.getItem(GMAIL_TOKEN_KEY_BASE) || "{}");
     if (stored.expires_at && Date.now() < stored.expires_at) return stored.access_token || "";
     return "";
   } catch {
@@ -44,38 +52,50 @@ function getStoredGmailToken(): string {
   }
 }
 
-// Carga IDs ya vistos desde localStorage (sobreviven recargas de página)
-function loadKnownIds(): Set<string> {
+function loadKnownIds(userId?: string | null): Set<string> {
+  const key = knownIdsKey(userId);
   try {
-    const arr = JSON.parse(localStorage.getItem(KNOWN_IDS_KEY) || "[]");
+    const arr = JSON.parse(localStorage.getItem(key) || "[]");
     return new Set(Array.isArray(arr) ? arr : []);
   } catch {
     return new Set();
   }
 }
 
-// Guarda los IDs conocidos (solo los últimos MAX_KNOWN para no crecer sin límite)
-function saveKnownIds(ids: Set<string>): void {
+function saveKnownIds(ids: Set<string>, userId?: string | null): void {
+  const key = knownIdsKey(userId);
   try {
     const arr = [...ids].slice(-MAX_KNOWN);
-    localStorage.setItem(KNOWN_IDS_KEY, JSON.stringify(arr));
+    localStorage.setItem(key, JSON.stringify(arr));
   } catch { /* quota exceeded — ignorar */ }
 }
 
 export function EmailUnreadProvider({ children }: { children: React.ReactNode }) {
-  const { isLoaded } = useAuth();
+  const { isLoaded, userId } = useAuth();
   const [unreadCount,  setUnreadCount]  = useState(0);
   const [latestUnread, setLatestUnread] = useState<EmailToastItem | null>(null);
 
-  // IDs que ya conocemos, cargados desde localStorage al arrancar
-  const knownIdsRef    = useRef<Set<string>>(loadKnownIds());
-  const didBootstrapRef = useRef(knownIdsRef.current.size > 0); // si ya hay IDs guardados, no necesitamos bootstrap
-  const busyRef        = useRef(false);
-  const timerRef       = useRef<ReturnType<typeof setInterval> | null>(null);
+  const userIdRef       = useRef(userId);
+  useEffect(() => { userIdRef.current = userId; }, [userId]);
+
+  // IDs que ya conocemos, cargados desde localStorage al arrancar (sin userId todavía)
+  const knownIdsRef     = useRef<Set<string>>(new Set());
+  const didBootstrapRef = useRef(false);
+  const busyRef         = useRef(false);
+  const timerRef        = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Cargar IDs guardados cuando el userId esté disponible
+  useEffect(() => {
+    if (!userId) return;
+    const ids = loadKnownIds(userId);
+    knownIdsRef.current = ids;
+    didBootstrapRef.current = ids.size > 0;
+  }, [userId]);
 
   const refreshUnread = useCallback(async () => {
     if (!isLoaded || busyRef.current) return;
-    const token = getStoredGmailToken();
+    const uid = userIdRef.current;
+    const token = getStoredGmailToken(uid);
     if (!token) {
       setUnreadCount(0);
       return;
@@ -83,35 +103,29 @@ export function EmailUnreadProvider({ children }: { children: React.ReactNode })
 
     busyRef.current = true;
     try {
-      // Obtener conteo de no leídos
       const labels = await gmailReq<{ labels?: Array<{ id: string; messagesUnread?: number }> }>(
         token, "/labels",
       );
       const inbox = labels.labels?.find((l) => l.id === "INBOX");
       setUnreadCount(Number(inbox?.messagesUnread || 0));
 
-      // Obtener los últimos no leídos para detectar nuevos
       const list = await gmailReq<{ messages?: Array<{ id: string }> }>(
         token,
         "/messages?labelIds=INBOX&q=is%3Aunread&maxResults=10",
       );
-      const ids        = list.messages?.map((m) => m.id) || [];
-      const currentSet = new Set(ids);
+      const ids = list.messages?.map((m) => m.id) || [];
 
       if (!didBootstrapRef.current) {
-        // Primera vez: registrar los IDs actuales como "ya conocidos" sin notificar
         ids.forEach(id => knownIdsRef.current.add(id));
-        saveKnownIds(knownIdsRef.current);
+        saveKnownIds(knownIdsRef.current, uid);
         didBootstrapRef.current = true;
         return;
       }
 
-      // Detectar IDs nuevos (no estaban en knownIds)
       const newIds = ids.filter((id) => !knownIdsRef.current.has(id));
 
-      // Actualizar IDs conocidos y persistir
       ids.forEach(id => knownIdsRef.current.add(id));
-      saveKnownIds(knownIdsRef.current);
+      saveKnownIds(knownIdsRef.current, uid);
 
       if (newIds.length > 0) {
         const message = await gmailReq<any>(
@@ -133,9 +147,9 @@ export function EmailUnreadProvider({ children }: { children: React.ReactNode })
   // Cuando Gmail se desconecta (token eliminado), limpiar IDs guardados
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
-      if (e.key === GMAIL_TOKEN_KEY && !e.newValue) {
+      if (e.key === GMAIL_TOKEN_KEY_BASE && !e.newValue) {
         knownIdsRef.current.clear();
-        saveKnownIds(knownIdsRef.current);
+        saveKnownIds(knownIdsRef.current, userIdRef.current);
         didBootstrapRef.current = false;
         setUnreadCount(0);
         setLatestUnread(null);

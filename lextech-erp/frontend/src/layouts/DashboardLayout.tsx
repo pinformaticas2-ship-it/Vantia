@@ -581,6 +581,17 @@ export default function DashboardLayout() {
   const loginFiredRef      = useRef<string | null>(null);
   const notifBusyRef       = useRef(false);
   const prevChatUnreadRef  = useRef(-1);
+  const activeUserIdRef    = useRef<string | null>(null);
+
+  // ── Detectar cambio de sesión Clerk (mismo navegador, cuentas distintas) ──
+  useEffect(() => {
+    if (!user?.id) return;
+    if (activeUserIdRef.current && activeUserIdRef.current !== user.id) {
+      // La sesión cambió a otro usuario — resetear al dashboard
+      navigate("/dashboard", { replace: true });
+    }
+    activeUserIdRef.current = user.id;
+  }, [user?.id, navigate]);
 
   // ── Registrar LOGIN en trazabilidad cuando el usuario se autentica ──────
   useEffect(() => {
@@ -746,8 +757,9 @@ export default function DashboardLayout() {
 
       if (waRes.ok) {
         const waItems = Array.isArray(waData?.data) ? waData.data : [];
+        const waLastSeenKey = user?.id ? `${WA_LAST_SEEN_KEY}-${user.id}` : WA_LAST_SEEN_KEY;
         const waLastSeen: Record<string, string> = (() => {
-          try { return JSON.parse(localStorage.getItem(WA_LAST_SEEN_KEY) || "{}"); } catch { return {}; }
+          try { return JSON.parse(localStorage.getItem(waLastSeenKey) || "{}"); } catch { return {}; }
         })();
         for (const item of waItems) {
           if (String(item?.last_message_direction || "") !== "inbound") continue;
