@@ -3,6 +3,7 @@
  * OAuth Google para Gmail · IMAP para otras cuentas
  * El usuario autenticado (Clerk) se usa como identidad principal
  */
+import { Spinner } from "../components/Spinner";
 import React, {
   useState, useEffect, useRef, useCallback, useMemo,
 } from 'react';
@@ -4348,8 +4349,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
               />
             ) : loading && emails.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20">
-                <Loader2 size={32} className="animate-spin text-[#ab0433] mb-3" />
-                <p className="text-sm text-gray-400">Cargando mensajes...</p>
+                <Spinner size="lg" label="Cargando mensajes..." />
               </div>
             ) : error ? (
               <div className="flex flex-col items-center justify-center py-16 px-6 text-center">

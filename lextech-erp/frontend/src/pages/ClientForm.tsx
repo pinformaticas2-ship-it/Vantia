@@ -1,4 +1,5 @@
 ﻿import React, { useState, useRef, useCallback, useEffect } from "react";
+import { Spinner } from "../components/Spinner";
 import { useAuth } from "@clerk/clerk-react";
 import { useNavigate, useParams, Link, useSearchParams } from "react-router-dom";
 import {
@@ -749,8 +750,7 @@ export default function ClientForm() {
   // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Loading skeleton al cargar datos de ediciÃƒÆ’Ã‚Â³n ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
   if (loadingData) return (
     <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-      <Loader2 className="animate-spin text-red-600 mb-3" size={32} />
-      <p className="text-sm animate-pulse">Cargando datos del cliente...</p>
+      <Spinner size="lg" label="Cargando datos del cliente..." />
     </div>
   );
 

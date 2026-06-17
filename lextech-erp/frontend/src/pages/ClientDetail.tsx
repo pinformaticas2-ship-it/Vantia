@@ -19,6 +19,7 @@ import { useAutoRefresh } from "../lib/useAutoRefresh";
 import { FilesTabPanel } from "../components/FilesTabPanel";
 import { EtapaSelect } from "../components/EtapaSelect";
 import BackButton from "../components/BackButton";
+import { Spinner } from "../components/Spinner";
 
 // ── helpers ───────────────────────────────────────────────────
 const statusColor: Record<string, string> = {
@@ -203,7 +204,7 @@ function TabExpedientes({ clientId }: { clientId: string }) {
 
   if (loading) return (
     <div className="flex items-center justify-center py-20">
-      <Loader2 size={28} className="animate-spin text-red-400" />
+      <Spinner size="lg" />
     </div>
   );
 
@@ -419,7 +420,7 @@ function TabHistorial({ clientId }: { clientId: string }) {
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
         {loading ? (
           <div className="p-14 flex flex-col items-center gap-3 text-slate-400">
-            <Loader2 size={28} className="animate-spin opacity-40" />
+            <Spinner size="lg" muted />
             <p className="text-sm">Cargando historial…</p>
           </div>
         ) : error ? (
@@ -655,7 +656,7 @@ function TabNotas({ clientId }: { clientId: string }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 size={32} className="animate-spin text-slate-400" />
+        <Spinner size="lg" muted />
       </div>
     );
   }
@@ -1037,8 +1038,8 @@ function TabTareas({ clientId, autoOpen = false, initialTaskType = "" }: { clien
   });
 
   if (loading) return (
-    <div className="flex justify-center py-16">
-      <Loader2 size={22} className="animate-spin text-slate-300" />
+    <div className="flex items-center justify-center py-16">
+      <Spinner size="md" muted />
     </div>
   );
 
@@ -2585,7 +2586,7 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
           ${isDragOver ? "border-red-400 bg-red-50/50 scale-[1.01]" : "border-slate-200 hover:border-red-300 hover:bg-red-50/20"}`}
       >
         {uploading
-          ? <><Loader2 size={26} className="text-red-500 animate-spin" /><p className="text-sm font-medium text-red-600">Subiendo archivos…</p></>
+          ? <><Spinner size="md" /><p className="text-sm font-medium text-red-600">Subiendo archivos…</p></>
           : <><Upload size={26} className={isDragOver ? "text-red-500" : "text-slate-400"} />
               <p className={`text-sm font-medium ${isDragOver ? "text-red-600" : "text-slate-500"}`}>Arrastra archivos o carpetas aquí</p>
               <p className="text-xs text-slate-400">PDF, Word, Excel, imágenes — máx. 50 MB por archivo</p></>
@@ -2597,8 +2598,8 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
         {/* Lista de archivos */}
         <div className={`${preview ? "w-[42%] shrink-0" : "w-full"} transition-all duration-300`}>
           {loadingFiles ? (
-            <div className="bg-white border border-slate-200 rounded-xl p-10 flex justify-center">
-              <Loader2 size={24} className="animate-spin text-red-500" />
+            <div className="bg-white border border-slate-200 rounded-xl p-10 flex items-center justify-center">
+              <Spinner size="md" />
             </div>
           ) : files.length === 0 ? (
             <div className="bg-white border border-slate-200 rounded-xl p-12 flex flex-col items-center gap-2 text-slate-400">
@@ -2942,7 +2943,7 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
                   <div className="flex-1 overflow-y-auto p-2 space-y-1">
                     {docPlantLoading ? (
                       <div className="flex flex-col items-center justify-center py-12 gap-3 text-slate-400">
-                        <Loader2 size={22} className="animate-spin text-red-500" />
+                        <Spinner size="md" />
                         <p className="text-xs">Cargando plantillas…</p>
                       </div>
                     ) : docPlantError ? (
@@ -3044,7 +3045,7 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
                       <div className="flex-1 overflow-hidden relative">
                         {tplPreviewLoading ? (
                           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-slate-400">
-                            <Loader2 size={28} className="animate-spin text-red-500" />
+                            <Spinner size="lg" />
                             <p className="text-sm">Cargando vista previa…</p>
                           </div>
                         ) : tplPreviewMime === 'application/pdf' && tplPreviewUrl ? (
@@ -3338,7 +3339,7 @@ function PanelIndicadores({ clientId, onTabChange }: { clientId: string; onTabCh
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden sticky top-6">
         <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
           <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Indicadores</h3>
-          {loading && <Loader2 size={11} className="animate-spin text-slate-300" />}
+          {loading && <Spinner size="sm" muted />}
         </div>
 
         <div className="px-4 py-3">
@@ -3480,8 +3481,8 @@ function TabEconomico({ clientId }: { clientId: string }) {
           </Link>
         </div>
         {loading ? (
-          <div className="flex justify-center py-10">
-            <Loader2 size={18} className="animate-spin text-slate-300" />
+          <div className="flex items-center justify-center py-10">
+            <Spinner size="sm" muted />
           </div>
         ) : clientFacturas.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 gap-2 text-slate-300">
@@ -3576,8 +3577,8 @@ function TabAgenda({ clientId }: { clientId: string }) {
         </Link>
       </div>
       {loading ? (
-        <div className="flex justify-center py-10">
-          <Loader2 size={18} className="animate-spin text-slate-300" />
+        <div className="flex items-center justify-center py-10">
+          <Spinner size="sm" muted />
         </div>
       ) : clientEvents.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 gap-2 text-slate-300">
@@ -3727,8 +3728,8 @@ export default function ClientDetail() {
 
   if (loading) return (
     <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-      <Loader2 className="animate-spin text-red-600 mb-3" size={32} />
-      <p className="text-sm animate-pulse">Cargando ficha...</p>
+      <Spinner size="lg" />
+      <p className="text-sm animate-pulse mt-3">Cargando ficha...</p>
     </div>
   );
 

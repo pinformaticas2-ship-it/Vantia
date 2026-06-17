@@ -1,6 +1,7 @@
 ﻿import React, { useState, useRef, useCallback, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useAuth } from "@clerk/clerk-react";
+import { Spinner } from "./Spinner";
 import {
   X, Upload, FolderOpen, FilePlus2, Sparkles, Loader2,
   Eye, Download, Trash2, Edit3, ExternalLink, FileText,
@@ -1036,7 +1037,7 @@ export default function AdjuntosModal({
 
             {loadingFiles ? (
               <div className="flex-1 flex items-center justify-center">
-                <Loader2 size={28} className="animate-spin text-red-500" />
+                <Spinner size="lg" />
               </div>
             ) : viewMode === "list" ? (
               /* ── Table view ── */
@@ -1323,8 +1324,7 @@ export default function AdjuntosModal({
                 <div className="flex-1 overflow-y-auto p-2 space-y-1">
                   {docPlantLoading ? (
                     <div className="flex flex-col items-center justify-center py-12 gap-3 text-slate-400">
-                      <Loader2 size={22} className="animate-spin text-red-500" />
-                      <p className="text-xs">Cargando plantillas…</p>
+                      <Spinner size="md" label="Cargando plantillas…" />
                     </div>
                   ) : docPlantError ? (
                     <div className="p-3">
@@ -1419,8 +1419,7 @@ export default function AdjuntosModal({
                     <div className="flex-1 overflow-hidden relative">
                       {tplPreviewLoading ? (
                         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-slate-400">
-                          <Loader2 size={28} className="animate-spin text-red-500" />
-                          <p className="text-sm">Cargando vista previa…</p>
+                          <Spinner size="lg" label="Cargando vista previa…" />
                         </div>
                       ) : tplPreviewHtml ? (
                         <iframe srcDoc={tplPreviewHtml} className="w-full h-full border-0" title="Vista previa de plantilla" sandbox="allow-same-origin" />

@@ -47,6 +47,7 @@ import {
   ClipboardPaste,
 } from "lucide-react";
 import { safeJson, resolveApiUrl } from "../lib/api";
+import { Spinner } from "../components/Spinner";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
 import { usePasteFiles, setErpClipboard } from "../lib/usePasteFiles";
 import {
@@ -450,8 +451,8 @@ function CronologiaTab({
 
       {/* Timeline */}
       {loading ? (
-        <div className="flex justify-center py-14">
-          <Loader2 size={20} className="animate-spin text-slate-300" />
+        <div className="flex items-center justify-center py-14">
+          <Spinner size="sm" muted />
         </div>
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-300">
@@ -792,7 +793,7 @@ function TabNotas({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 size={32} className="animate-spin text-slate-400" />
+        <Spinner size="lg" muted />
       </div>
     );
   }
@@ -1218,7 +1219,7 @@ function TabTareas({
     return true;
   });
 
-  if (loading) return <div className="flex justify-center py-16"><Loader2 size={22} className="animate-spin text-slate-300" /></div>;
+  if (loading) return <div className="flex items-center justify-center py-16"><Spinner size="md" muted /></div>;
 
   if (fetchError) {
     return (
@@ -2229,9 +2230,8 @@ function ActuacionAdjuntosPanel({ taskId, locked = false }: { taskId: string; lo
           onDrop={(e) => { e.preventDefault(); setIsDragOver(false); handleFolderImport(e.dataTransfer.files); }}
         >
           {loading ? (
-            <div className="flex items-center justify-center gap-2 py-16 text-sm text-slate-400">
-              <Loader2 size={16} className="animate-spin" />
-              Cargando adjuntos...
+            <div className="flex items-center justify-center py-16">
+              <Spinner size="sm" muted label="Cargando adjuntos..." />
             </div>
           ) : files.length === 0 ? (
             <div className={`m-4 rounded-2xl border-2 border-dashed px-6 py-12 text-center transition-colors ${isDragOver ? "border-red-300 bg-red-50" : "border-slate-200 bg-slate-50/60"}`}>
@@ -2402,9 +2402,8 @@ function ActuacionAdjuntosPanel({ taskId, locked = false }: { taskId: string; lo
 
       <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
         {loading ? (
-          <div className="flex items-center justify-center gap-2 py-16 text-sm text-slate-400">
-            <Loader2 size={16} className="animate-spin" />
-            Cargando adjuntos...
+          <div className="flex items-center justify-center py-16">
+            <Spinner size="sm" muted label="Cargando adjuntos..." />
           </div>
         ) : files.length === 0 ? (
           <div className="px-6 py-14 text-center">
@@ -3144,9 +3143,8 @@ function TabActuacion({
         </div>
         <div className="p-5">
           {loading ? (
-            <div className="flex items-center gap-2 text-sm text-slate-400">
-              <Loader2 size={15} className="animate-spin" />
-              Cargando actuaciones...
+            <div className="flex items-center justify-center py-4">
+              <Spinner size="sm" muted label="Cargando actuaciones..." />
             </div>
           ) : actuaciones.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center">
@@ -3575,7 +3573,7 @@ function TabCorreoExpediente({
             </div>
             <div className="flex-1 overflow-y-auto">
               {pickerLoading ? (
-                <div className="flex items-center justify-center py-10 text-slate-400"><Loader2 size={18} className="animate-spin mr-2" /><span className="text-sm">Cargando archivos...</span></div>
+                <div className="flex items-center justify-center py-10"><Spinner size="sm" muted label="Cargando archivos..." /></div>
               ) : pickerFiles.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-10 gap-2 text-slate-300">
                   <Paperclip size={24} className="opacity-30" />
@@ -3633,7 +3631,7 @@ function TabCorreoExpediente({
             </div>
             <div className="flex-1 overflow-y-auto">
               {allEmailsLoading ? (
-                <div className="flex items-center justify-center py-10 text-slate-400"><Loader2 size={18} className="animate-spin mr-2" /><span className="text-sm">Cargando correos...</span></div>
+                <div className="flex items-center justify-center py-10"><Spinner size="sm" muted label="Cargando correos..." /></div>
               ) : filteredAllEmails.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-10 gap-2 text-slate-300">
                   <Mail size={24} className="opacity-30" />
@@ -3676,7 +3674,7 @@ function TabCorreoExpediente({
 
       {/* Lista de correos */}
       {loading ? (
-        <div className="flex items-center justify-center py-12 text-slate-400"><Loader2 size={18} className="animate-spin mr-2" /><span className="text-sm">Cargando correos...</span></div>
+        <div className="flex items-center justify-center py-12"><Spinner size="sm" muted label="Cargando correos..." /></div>
       ) : emails.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-14 gap-3 text-slate-300">
           <Mail size={32} className="opacity-20" />
@@ -3730,7 +3728,7 @@ function TabCorreoExpediente({
                         </button>
                       </div>
                       {viewLoading && viewEmail === email.id ? (
-                        <div className="flex items-center justify-center py-6 text-slate-400"><Loader2 size={16} className="animate-spin mr-2" />Cargando...</div>
+                        <div className="flex items-center justify-center py-6"><Spinner size="sm" muted label="Cargando..." /></div>
                       ) : (
                         <div className="text-sm text-slate-700 leading-relaxed bg-white rounded-xl border border-slate-100 p-4 max-h-80 overflow-y-auto"
                           dangerouslySetInnerHTML={{ __html: viewBody }} />
@@ -4133,7 +4131,7 @@ function TabApuntesEconomicos({ expedienteId, locked = false }: { expedienteId: 
         {/* Lista */}
         <div className="p-5">
           {loading ? (
-            <div className="flex items-center justify-center py-10 text-slate-400"><Loader2 size={18} className="animate-spin mr-2" /><span className="text-sm">Cargando apuntes...</span></div>
+            <div className="flex items-center justify-center py-10"><Spinner size="sm" muted label="Cargando apuntes..." /></div>
           ) : apuntes.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 gap-2 text-slate-300">
               <Banknote size={28} className="opacity-30" />
@@ -4383,9 +4381,8 @@ function TabExpedientesRelacionados({
 
         <div className="p-5">
           {loading ? (
-            <div className="flex items-center gap-2 text-sm text-slate-400">
-              <Loader2 size={15} className="animate-spin" />
-              Cargando expedientes relacionados...
+            <div className="flex items-center justify-center py-4">
+              <Spinner size="sm" muted label="Cargando expedientes relacionados..." />
             </div>
           ) : related.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-10 text-center">
@@ -4511,9 +4508,8 @@ function TabExpedientesRelacionados({
                     </div>
                   </div>
                 ) : searching ? (
-                  <div className="flex items-center justify-center gap-2.5 px-5 py-12 bg-slate-50/60 text-sm text-slate-400">
-                    <Loader2 size={16} className="animate-spin" />
-                    Buscando expedientes...
+                  <div className="flex items-center justify-center px-5 py-12 bg-slate-50/60">
+                    <Spinner size="sm" muted label="Buscando expedientes..." />
                   </div>
                 ) : searchResults.length === 0 ? (
                   <div className="flex flex-col items-center justify-center px-6 py-12 bg-slate-50/60 text-center gap-3">
@@ -4919,9 +4915,8 @@ export default function ExpedienteDetail() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-        <Loader2 className="animate-spin text-red-600 mb-3" size={32} />
-        <p className="text-sm animate-pulse">Cargando expediente...</p>
+      <div className="flex flex-col items-center justify-center h-64">
+        <Spinner size="lg" label="Cargando expediente..." />
       </div>
     );
   }
@@ -5447,7 +5442,7 @@ export default function ExpedienteDetail() {
                       </Link>
                     </div>
                     {billingLoading ? (
-                      <div className="flex justify-center py-10"><Loader2 size={18} className="animate-spin text-slate-300" /></div>
+                      <div className="flex items-center justify-center py-10"><Spinner size="sm" muted /></div>
                     ) : expFacturas.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-10 gap-2 text-slate-300">
                         <Banknote size={24} className="opacity-30" />
@@ -5522,8 +5517,8 @@ export default function ExpedienteDetail() {
                 });
               };
               if (historialLoading) return (
-                <div className="flex items-center justify-center py-16 text-slate-400">
-                  <Loader2 className="w-5 h-5 animate-spin mr-2" /><span className="text-sm">Cargando historial…</span>
+                <div className="flex items-center justify-center py-16">
+                  <Spinner size="sm" muted label="Cargando historial…" />
                 </div>
               );
               if (!historial || historial.length === 0) return <EmptyTab icon={Activity} label="Sin historial por ahora" />;
@@ -5591,8 +5586,8 @@ export default function ExpedienteDetail() {
                     </Link>
                   </div>
                   {agendaLoading ? (
-                    <div className="flex justify-center py-10">
-                      <Loader2 size={18} className="animate-spin text-slate-300" />
+                    <div className="flex items-center justify-center py-10">
+                      <Spinner size="sm" muted />
                     </div>
                   ) : expEvents.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-12 gap-2 text-slate-300">

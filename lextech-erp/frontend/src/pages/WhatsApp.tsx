@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Spinner } from "../components/Spinner";
 import { useAuth } from "@clerk/clerk-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -357,8 +358,7 @@ export default function WhatsApp() {
     return (
       <div className="flex h-[60vh] items-center justify-center text-slate-400">
         <div className="flex items-center gap-3">
-          <Loader2 size={22} className="animate-spin text-[#ab0433]" />
-          <span className="text-sm font-medium">Cargando módulo de WhatsApp Business...</span>
+          <Spinner size="md" label="Cargando módulo de WhatsApp Business..." />
         </div>
       </div>
     );
@@ -547,7 +547,7 @@ export default function WhatsApp() {
               <EmptyConversation />
             ) : loadingConversation ? (
               <div className="flex h-full items-center justify-center">
-                <Loader2 size={24} className="animate-spin text-[#ab0433]" />
+                <Spinner size="md" />
               </div>
             ) : conversation.length === 0 ? (
               <div className="mx-auto flex max-w-xl flex-col items-center rounded-[28px] border border-dashed border-slate-200 bg-white px-8 py-10 text-center">

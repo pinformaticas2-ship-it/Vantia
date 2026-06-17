@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef, ReactNode } from "react";
+import { Spinner } from "../components/Spinner";
 import { createPortal } from "react-dom";
 import { useUser, useAuth } from "@clerk/clerk-react";
 import {
@@ -601,7 +602,7 @@ export default function DashboardHome() {
             </div>
           </div>
           {agendaLoading ? (
-            <div className="flex justify-center py-8"><Loader2 size={16} className="animate-spin text-slate-300" /></div>
+            <div className="flex items-center justify-center py-8"><Spinner size="sm" muted /></div>
           ) : agendaEvents.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 gap-2 text-slate-400">
               <Calendar size={22} className="opacity-20" />
@@ -687,7 +688,7 @@ export default function DashboardHome() {
             </div>
           </div>
           {actLoading ? (
-            <div className="flex justify-center py-8"><Loader2 size={16} className="animate-spin text-slate-300" /></div>
+            <div className="flex items-center justify-center py-8"><Spinner size="sm" muted /></div>
           ) : activity.length === 0 ? (
             <p className="text-xs text-slate-400 text-center py-8">Sin actividad reciente</p>
           ) : (
@@ -854,7 +855,7 @@ export default function DashboardHome() {
             </div>
           </div>
           {emailMsgLoading ? (
-            <div className="flex justify-center py-8"><Loader2 size={16} className="animate-spin text-slate-300" /></div>
+            <div className="flex items-center justify-center py-8"><Spinner size="sm" muted /></div>
           ) : emailMessages.length === 0 ? (
             <p className="py-8 text-center text-xs text-slate-400">Sin mensajes recientes</p>
           ) : (
@@ -966,7 +967,7 @@ export default function DashboardHome() {
           </div>
           {/* Body */}
           {!billingCalc ? (
-            <div className="flex justify-center py-8"><Loader2 size={16} className="animate-spin text-slate-300" /></div>
+            <div className="flex items-center justify-center py-8"><Spinner size="sm" muted /></div>
           ) : (
             <div className="p-4">
               <div className="grid grid-cols-3 gap-2 mb-3">

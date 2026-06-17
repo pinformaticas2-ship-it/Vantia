@@ -1,4 +1,5 @@
 ﻿import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { Spinner } from "../components/Spinner";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Briefcase, Users, Settings,
@@ -388,7 +389,7 @@ function NotificationsPanel({ notifs, loading, onClose }: { notifs: UnifiedNotif
       </div>
       <div className="max-h-72 overflow-y-auto divide-y divide-slate-50">
         {loading ? (
-          <div className="flex justify-center py-8"><Loader2 size={18} className="animate-spin text-slate-300" /></div>
+          <div className="flex items-center justify-center py-8"><Spinner size="sm" muted /></div>
         ) : notifs.length === 0 ? (
           <div className="py-8 text-center text-slate-400 text-xs">Sin mensajes pendientes</div>
         ) : notifs.map((n) => (

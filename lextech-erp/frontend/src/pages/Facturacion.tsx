@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Spinner } from "../components/Spinner";
 import { useAuth } from "@clerk/clerk-react";
 import { Link } from "react-router-dom";
 import {
@@ -2193,9 +2194,8 @@ function FacturacionContent() {
 
           {facturaRouteMode ? (
             loading ? (
-              <div className="flex items-center gap-3 rounded-3xl border border-slate-200 bg-white px-6 py-6 shadow-[0_20px_80px_rgba(15,23,42,0.06)]">
-                <Loader2 size={16} className="animate-spin text-slate-500" />
-                <p className="text-sm text-slate-600">Preparando la pantalla de factura…</p>
+              <div className="flex items-center justify-center gap-3 rounded-3xl border border-slate-200 bg-white px-6 py-6 shadow-[0_20px_80px_rgba(15,23,42,0.06)]">
+                <Spinner size="sm" muted label="Preparando la pantalla de factura…" />
               </div>
             ) : facturaRouteMode === "edit" && !facturaRouteRecord ? (
               <div className="rounded-3xl border border-slate-200 bg-white px-6 py-8 shadow-[0_20px_80px_rgba(15,23,42,0.06)]">
@@ -2346,7 +2346,7 @@ function FacturacionContent() {
                       {quipuError && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{quipuError}</div>}
                       <TableShell title="Contactos de Quipu" count={`${quipuContacts.length} registros`} headers={["Nombre", "Tipo", "NIF/CIF", "Email", "Teléfono", ""]}>
                         {loadingQuipu ? (
-                          <tr><td colSpan={6} className="px-5 py-8 text-center text-sm text-slate-400"><Loader2 size={16} className="inline animate-spin mr-2" />Cargando...</td></tr>
+                          <tr><td colSpan={6} className="px-5 py-8 text-center"><div className="flex items-center justify-center gap-2"><Spinner size="sm" muted /><span className="text-sm text-slate-400">Cargando...</span></div></td></tr>
                         ) : quipuContacts.map(c => (
                           <tr key={c.id} className="transition-colors hover:bg-slate-50/60">
                             <td className="px-5 py-3 text-sm font-semibold text-slate-800">{c.name}</td>
@@ -2400,7 +2400,7 @@ function FacturacionContent() {
                       {quipuError && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{quipuError}</div>}
                       <TableShell title="Cobros de Quipu" count={`${quipuReceipts.length} registros`} headers={["Número", "Contacto", "Factura", "Fecha cobro", "Importe", "Forma de pago", "Tipo"]}>
                         {loadingQuipu ? (
-                          <tr><td colSpan={7} className="px-5 py-8 text-center text-sm text-slate-400"><Loader2 size={16} className="inline animate-spin mr-2" />Cargando cobros...</td></tr>
+                          <tr><td colSpan={7} className="px-5 py-8 text-center"><div className="flex items-center justify-center gap-2"><Spinner size="sm" muted /><span className="text-sm text-slate-400">Cargando cobros...</span></div></td></tr>
                         ) : quipuReceipts.length === 0 ? (
                           <tr><td colSpan={7} className="px-5 py-8 text-center text-sm text-slate-400">Sin cobros registrados</td></tr>
                         ) : quipuReceipts.map(r => (
@@ -2682,8 +2682,8 @@ function FacturacionContent() {
                         </button>
                       </div>
                       {loadingQuipu && quipuBankAccounts.length === 0 ? (
-                        <div className="flex items-center justify-center gap-2 py-8 text-sm text-slate-400">
-                          <Loader2 size={15} className="animate-spin" /> Cargando cuentas...
+                        <div className="flex items-center justify-center gap-2 py-8">
+                          <Spinner size="sm" muted label="Cargando cuentas..." />
                         </div>
                       ) : quipuBankAccounts.length === 0 ? (
                         <div className="px-5 py-6 text-sm text-slate-400 text-center">Sin cuentas bancarias. Sincroniza Quipu primero.</div>
@@ -3166,7 +3166,7 @@ function BankAccountsTab({
           </button>
 
           {loading ? (
-            <div className="flex items-center justify-center py-8 text-sm text-slate-400"><Loader2 size={16} className="animate-spin mr-2" />Cargando...</div>
+            <div className="flex items-center justify-center py-8"><Spinner size="sm" muted label="Cargando..." /></div>
           ) : null}
           {accounts.map(acc => (
             <button key={acc.id} onClick={() => onSelectAccount(acc.id)}
@@ -3260,7 +3260,7 @@ function BankAccountsTab({
               </div>
             </div>
             {loading ? (
-              <div className="flex items-center justify-center py-12 text-sm text-slate-400"><Loader2 size={16} className="animate-spin mr-2" />Cargando movimientos...</div>
+              <div className="flex items-center justify-center py-12"><Spinner size="sm" muted label="Cargando movimientos..." /></div>
             ) : filtered.length === 0 ? (
               <div className="py-12 text-center text-sm text-slate-400">No existen resultados para tu búsqueda.</div>
             ) : (

@@ -8,9 +8,9 @@ interface SpinnerProps {
 }
 
 const sizeConfig = {
-  sm: { barH: 16, barW: 3, gap: '3px' },
-  md: { barH: 24, barW: 3, gap: '4px' },
-  lg: { barH: 32, barW: 4, gap: '5px' },
+  sm: { barH: 20, barW: 3, gap: '3px' },
+  md: { barH: 30, barW: 4, gap: '4px' },
+  lg: { barH: 42, barW: 5, gap: '6px' },
 };
 
 export function Spinner({ size = 'md', muted = false, label, className = '' }: SpinnerProps) {

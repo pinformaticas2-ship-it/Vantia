@@ -1,6 +1,7 @@
 ﻿import React, { useState, useRef, useCallback, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useAuth } from "@clerk/clerk-react";
+import { Spinner } from "./Spinner";
 import {
   Upload, FolderOpen, FilePlus2, Sparkles, Loader2,
   Eye, Download, Trash2, Edit3, ExternalLink, FileText,
@@ -914,7 +915,7 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false, loc
           ${locked ? "border-slate-100 bg-slate-50/50 cursor-not-allowed opacity-50" : `cursor-pointer ${isDragOver ? "border-red-400 bg-red-50/50 scale-[1.01]" : "border-slate-200 hover:border-red-300 hover:bg-red-50/20"}`}`}
       >
         {uploading
-          ? <><Loader2 size={26} className="text-red-500 animate-spin" /><p className="text-sm font-medium text-red-600">Subiendo archivos…</p></>
+          ? <><Spinner size="md" /><p className="text-sm font-medium text-red-600">Subiendo archivos…</p></>
           : <><Upload size={26} className={isDragOver ? "text-red-500" : "text-slate-400"} />
               <p className={`text-sm font-medium ${isDragOver ? "text-red-600" : "text-slate-500"}`}>Arrastra archivos o carpetas aquí</p>
               <p className="text-xs text-slate-400">PDF, Word, Excel, imágenes — máx. 50 MB por archivo</p>
@@ -935,8 +936,8 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false, loc
         {/* Lista de archivos */}
         <div className={`${preview ? "w-[42%] shrink-0" : "w-full"} transition-all duration-300`}>
           {loadingFiles ? (
-            <div className="bg-white border border-slate-200 rounded-xl p-10 flex justify-center">
-              <Loader2 size={24} className="animate-spin text-red-500" />
+            <div className="bg-white border border-slate-200 rounded-xl p-10 flex items-center justify-center">
+              <Spinner size="md" />
             </div>
           ) : files.length === 0 ? (
             <div className="bg-white border border-slate-200 rounded-xl p-12 flex flex-col items-center gap-2 text-slate-400">
@@ -1297,8 +1298,7 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false, loc
                   <div className="flex-1 overflow-y-auto p-2 space-y-1">
                     {docPlantLoading ? (
                       <div className="flex flex-col items-center justify-center py-12 gap-3 text-slate-400">
-                        <Loader2 size={22} className="animate-spin text-red-500" />
-                        <p className="text-xs">Cargando plantillas…</p>
+                        <Spinner size="md" label="Cargando plantillas…" />
                       </div>
                     ) : docPlantError ? (
                       <div className="p-3">
@@ -1399,8 +1399,7 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false, loc
                       <div className="flex-1 overflow-hidden relative">
                         {tplPreviewLoading ? (
                           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-slate-400">
-                            <Loader2 size={28} className="animate-spin text-red-500" />
-                            <p className="text-sm">Cargando vista previa…</p>
+                            <Spinner size="lg" label="Cargando vista previa…" />
                           </div>
                         ) : tplPreviewMime === 'application/pdf' && tplPreviewUrl ? (
                           <iframe

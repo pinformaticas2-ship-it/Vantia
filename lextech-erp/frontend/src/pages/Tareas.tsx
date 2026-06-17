@@ -1,6 +1,7 @@
 import React, {
   useEffect, useState, useCallback, useMemo, useRef,
 } from "react";
+import { Spinner } from "../components/Spinner";
 import { useAuth } from "@clerk/clerk-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -1204,8 +1205,8 @@ export default function Tareas() {
 
       {/* Contenido principal */}
       {loading ? (
-        <div className="flex justify-center py-16">
-          <Loader2 size={24} className="animate-spin text-slate-300" />
+        <div className="flex items-center justify-center py-16">
+          <Spinner size="md" muted />
         </div>
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400 border-2 border-dashed border-slate-200 rounded-2xl">

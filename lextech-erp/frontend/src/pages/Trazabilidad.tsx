@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
+import { Spinner } from "../components/Spinner";
 import { useAuth } from "@clerk/clerk-react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -266,7 +267,7 @@ export default function Trazabilidad() {
           {/* Lista de usuarios */}
           <div className="flex-1 overflow-y-auto">
             {loadUsers && (
-              <div className="flex justify-center py-8"><Loader2 className="animate-spin text-slate-300" size={24}/></div>
+              <div className="flex items-center justify-center py-8"><Spinner size="sm" muted /></div>
             )}
             {!loadUsers && filteredUsers.length === 0 && (
               <div className="flex flex-col items-center justify-center py-12 text-slate-300">
@@ -378,7 +379,7 @@ export default function Trazabilidad() {
               {/* Lista de actividad */}
               <div className="flex-1 overflow-y-auto bg-white">
                 {loadItems && (
-                  <div className="flex justify-center py-8"><Loader2 className="animate-spin text-slate-300" size={22}/></div>
+                  <div className="flex items-center justify-center py-8"><Spinner size="sm" muted /></div>
                 )}
                 {!loadItems && filteredItems.length === 0 && (
                   <div className="flex flex-col items-center justify-center py-12 text-slate-300 gap-2">

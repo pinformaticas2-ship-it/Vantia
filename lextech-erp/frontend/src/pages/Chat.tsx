@@ -1226,8 +1226,8 @@ function EmojiPicker({
         </div>
         {mediaTab === "emoji" ? (
           emojiApiLoading && !apiGroups ? (
-            <div className="flex items-center justify-center pb-3 pt-1 text-slate-400">
-              <Loader2 size={16} className="animate-spin" />
+            <div className="flex items-center justify-center pb-3 pt-1">
+              <Spinner size="sm" muted />
             </div>
           ) : emojiApiError && (!apiGroups || apiGroups.length === 0) ? (
             <div className="pb-3 text-xs text-red-600">
@@ -1273,8 +1273,8 @@ function EmojiPicker({
                 {gifError}
               </div>
             ) : gifLoading ? (
-              <div className="flex items-center justify-center py-10 text-slate-400">
-                <Loader2 size={18} className="animate-spin" />
+              <div className="flex items-center justify-center py-10">
+                <Spinner size="sm" muted />
               </div>
             ) : gifs.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-400">
@@ -1316,8 +1316,8 @@ function EmojiPicker({
           )}
         </div>
         {emojiApiLoading && (!apiGroups || apiGroups.length === 0) ? (
-          <div className="flex items-center justify-center py-10 text-slate-400">
-            <Loader2 size={18} className="animate-spin" />
+          <div className="flex items-center justify-center py-10">
+            <Spinner size="sm" muted />
           </div>
         ) : emojiApiError && (!apiGroups || apiGroups.length === 0) ? (
           <div className="rounded-xl border border-dashed border-red-200 bg-red-50 px-4 py-6 text-center text-sm text-red-600">
@@ -4560,7 +4560,7 @@ export default function Chat() {
               {/* Messages list */}
               <div className="flex-1 flex flex-col min-w-0 relative overflow-hidden">
                 <div ref={listRef} onScroll={onScroll} className="flex-1 overflow-y-auto pb-1 bg-[radial-gradient(circle_at_top,_rgba(248,113,113,0.08),_transparent_22%),linear-gradient(180deg,_transparent,_rgba(248,250,252,0.75))]">
-                  {loadingMore&&<div className="flex justify-center py-2"><Loader2 className="animate-spin text-slate-300" size={16}/></div>}
+                  {loadingMore&&<div className="flex items-center justify-center py-2"><Spinner size="sm" muted /></div>}
                   {!hasMore&&mensajes.length>0&&(
                     <p className="text-center text-xs text-slate-300 py-3 select-none">
                       ― Inicio de #{canalActivo.nombre} ―
@@ -4569,8 +4569,7 @@ export default function Chat() {
                   {loadingMsgs?(
                     <div className="flex flex-col items-center justify-center h-40 gap-3">
                       <div className="rounded-2xl bg-white/90 px-5 py-4 shadow-sm border border-slate-200 flex flex-col items-center gap-2">
-                        <Loader2 className="animate-spin text-slate-300" size={24}/>
-                        <p className="text-xs text-slate-400">Cargando mensajes…</p>
+                        <Spinner size="md" muted label="Cargando mensajes…" />
                       </div>
                     </div>
                   ):mensajes.length===0?(
