@@ -71,6 +71,8 @@ function getVantIAContext(pathname: string): string {
     return "Eres VantIA, especializado en gestión de expedientes judiciales. Conoces el flujo de un expediente legal, plazos procesales, tipos de procedimientos y cómo gestionar casos en un despacho. Responde siempre en español.";
   if (pathname.startsWith("/dashboard/agenda"))
     return "Eres VantIA, especializado en gestión de agenda y citas para un despacho legal. Ayudas con vistas, reuniones, plazos judiciales, y organización del tiempo. Responde siempre en español.";
+  if (pathname.startsWith("/dashboard/chat-ia"))
+    return "Eres VantIA, asistente IA avanzado del despacho. Ayudas con consultas complejas, uso de herramientas, recuperación de historial y apoyo transversal a todos los módulos. Responde siempre en español.";
   if (pathname.startsWith("/dashboard/chat"))
     return "Eres VantIA, asistente del despacho. En este momento el usuario está en el chat de equipo. Puedes ayudar a redactar mensajes, resumir conversaciones o resolver dudas jurídicas puntuales. Responde siempre en español.";
   if (pathname.startsWith("/dashboard/whatsapp"))
@@ -83,8 +85,6 @@ function getVantIAContext(pathname: string): string {
     return "Eres VantIA, asistente de contabilidad y facturación del despacho. Ayudas con honorarios, facturas, cobros, vencimientos y control económico. Responde siempre en español.";
   if (pathname.startsWith("/dashboard/plaud-ia"))
     return "Eres VantIA, asistente de Plaud IA. Ayudas con grabaciones, transcripciones, resúmenes y extracción de tareas o acuerdos relevantes. Responde siempre en español.";
-  if (pathname.startsWith("/dashboard/chat-ia"))
-    return "Eres VantIA, asistente IA avanzado del despacho. Ayudas con consultas complejas, uso de herramientas, recuperación de historial y apoyo transversal a todos los módulos. Responde siempre en español.";
   if (pathname.startsWith("/dashboard/config"))
     return "Eres VantIA, asistente de configuración de VANTIA Legis ERP. Ayudas con ajustes del sistema, usuarios, permisos y personalización. Responde siempre en español.";
   return "Eres VantIA, el asistente inteligente de VANTIA Legis ERP, un ERP para despachos de abogados. Tienes conocimientos generales de derecho español, gestión de despachos, expedientes, clientes y documentación. Eres útil, conciso y profesional. Responde siempre en español.";
@@ -94,13 +94,13 @@ function getVantIALabel(pathname: string): string {
   if (pathname.startsWith("/dashboard/clientes"))    return "Especialista en Clientes";
   if (pathname.startsWith("/dashboard/expedientes")) return "Especialista en Expedientes";
   if (pathname.startsWith("/dashboard/agenda"))      return "Especialista en Agenda";
+  if (pathname.startsWith("/dashboard/chat-ia"))      return "Asistente IA Avanzado";
   if (pathname.startsWith("/dashboard/chat"))         return "Asistente de Equipo";
   if (pathname.startsWith("/dashboard/whatsapp"))     return "Asistente de WhatsApp";
   if (pathname.startsWith("/dashboard/correo"))       return "Asistente de Correo";
   if (pathname.startsWith("/dashboard/documental"))   return "Asistente Documental";
   if (pathname.startsWith("/dashboard/facturacion"))  return "Asistente de Facturación";
   if (pathname.startsWith("/dashboard/plaud-ia"))     return "Asistente Plaud IA";
-  if (pathname.startsWith("/dashboard/chat-ia"))      return "Asistente IA Avanzado";
   return "Asistente General";
 }
 
@@ -482,7 +482,7 @@ function SidebarContent({ pathname, onClose, onSignOut }: { pathname: string; on
               </p>
               <div className="space-y-1">
                 {items.map((item) => {
-                  const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
+                  const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href + '/'));
                   const Icon = item.icon;
                   const isChat = item.href === "/dashboard/chat";
                   const isEmail = item.href === "/dashboard/correo";
