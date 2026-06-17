@@ -4,7 +4,7 @@
 import { Spinner } from "../components/Spinner";
 import { useAuth } from "@clerk/clerk-react";
 import {
-  Calendar, ChevronLeft, ChevronRight, Plus,
+  Calendar, ChevronLeft, ChevronRight, Plus, X,
   Loader2, Clock, MapPin, Briefcase, Users,
   Trash2, Edit3, CheckCircle2, AlertCircle,
   Phone, Video, FileText, Flag, Circle,
@@ -235,6 +235,8 @@ const emptyForm = (date?: string) => {
   };
 };
 
+type AgendaFormData = ReturnType<typeof emptyForm>;
+
 // ── Modal de evento ───────────────────────────────────────────────────────────
 function EventModal({
   event,
@@ -249,6 +251,7 @@ function EventModal({
 }: {
   event: AgendaEvent | null;
   defaultDate: string | null;
+  initialFormData?: AgendaFormData;
   organizationExpedientes: AgendaOrganizationExpediente[];
   organizationUsers: AgendaOrganizationUser[];
   onClose: () => void;
@@ -273,7 +276,7 @@ function EventModal({
         related_user_name: event.related_user_name || "",
         organization_context: event.organization_context || "",
       }
-    : emptyForm(defaultDate || undefined)
+    : (initialFormData || emptyForm(defaultDate || undefined))
   );
 
   const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }));
@@ -801,6 +804,181 @@ function GoogleEventModal({
   );
 }
 
+// ── Quick Event Popover ───────────────────────────────────────────────────────
+function QuickEventPopover({
+  date,
+  position,
+  onClose,
+  onSave,
+  onExpand,
+  saving,
+  errorMsg,
+}: {
+  date: string;
+  position: { x: number; y: number };
+  onClose: () => void;
+  onSave: (data: any) => void;
+  onExpand: (data: AgendaFormData) => void;
+  saving: boolean;
+  errorMsg: string | null;
+}) {
+  const [form, setForm] = useState<AgendaFormData>(() => emptyForm(date));
+  const titleRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { titleRef.current?.focus(); }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }));
+
+  const POPOVER_W = 340;
+  const POPOVER_H = 360;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  let left = position.x + 12;
+  let top  = position.y - 20;
+  if (left + POPOVER_W > vw - 12) left = position.x - POPOVER_W - 12;
+  if (top  + POPOVER_H > vh - 12) top  = vh - POPOVER_H - 12;
+  if (top  < 12) top  = 12;
+  if (left < 12) left = 12;
+
+  const missingTitle = !form.title.trim();
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (missingTitle) return;
+    onSave({
+      ...form,
+      start_at: inputToISO(form.start_at),
+      end_at:   form.end_at ? inputToISO(form.end_at) : null,
+      expediente_id: null,
+      cliente_id: null,
+      related_user_id: null,
+      related_user_name: null,
+      organization_context: null,
+    });
+  };
+
+  return createPortal(
+    <>
+      <div className="fixed inset-0 z-[190]" onClick={onClose} />
+      <div
+        className="fixed z-[200] w-[340px] rounded-2xl border border-slate-200 bg-white shadow-[0_24px_64px_rgba(15,23,42,0.20)] animate-in zoom-in-95 fade-in duration-150 origin-top-left overflow-hidden"
+        style={{ left, top }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Cabecera */}
+        <div className="flex items-center justify-between bg-slate-50 px-4 py-2.5 border-b border-slate-100">
+          <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Nuevo evento</span>
+          <button
+            onClick={onClose}
+            className="rounded-lg p-1 text-slate-300 hover:bg-slate-200 hover:text-slate-600 transition-colors"
+          >
+            <X size={14} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-4 space-y-4">
+          {/* Título */}
+          <input
+            ref={titleRef}
+            value={form.title}
+            onChange={e => set("title", e.target.value)}
+            placeholder="Añade un título"
+            className="w-full border-0 border-b-2 border-slate-100 bg-transparent pb-2 text-[15px] font-semibold text-slate-900 placeholder:text-slate-300 focus:border-red-400 focus:outline-none transition-colors"
+          />
+
+          {/* Fecha y hora */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Calendar size={13} className="text-slate-400 shrink-0" />
+              <input
+                type={form.all_day ? "date" : "datetime-local"}
+                value={form.all_day ? form.start_at.slice(0, 10) : form.start_at}
+                onChange={e => set("start_at", form.all_day ? e.target.value + "T00:00" : e.target.value)}
+                className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none transition-colors"
+              />
+            </div>
+            {!form.all_day && (
+              <div className="flex items-center gap-2 pl-[21px]">
+                <span className="text-[11px] text-slate-400 shrink-0">hasta</span>
+                <input
+                  type="datetime-local"
+                  value={form.end_at}
+                  onChange={e => set("end_at", e.target.value)}
+                  className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none transition-colors"
+                />
+              </div>
+            )}
+            <label className="flex items-center gap-2 pl-[21px] text-xs text-slate-500 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={form.all_day}
+                onChange={e => set("all_day", e.target.checked)}
+                className="rounded border-slate-300 text-red-600 focus:ring-red-300"
+              />
+              Todo el día
+            </label>
+          </div>
+
+          {/* Tipo */}
+          <div className="flex items-center gap-2">
+            <Flag size={13} className="text-slate-400 shrink-0" />
+            <select
+              value={form.type}
+              onChange={e => set("type", e.target.value)}
+              className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none transition-colors"
+            >
+              {Object.entries(EVENT_TYPES).map(([k, v]) => (
+                <option key={k} value={k}>{v.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Error inline */}
+          {errorMsg && (
+            <p className="rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-600">{errorMsg}</p>
+          )}
+
+          {/* Acciones */}
+          <div className="flex items-center justify-between border-t border-slate-100 pt-3">
+            <button
+              type="button"
+              onClick={() => onExpand(form)}
+              className="text-xs font-semibold text-slate-500 hover:text-red-600 transition-colors"
+            >
+              Más opciones
+            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-3 py-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={saving || missingTitle}
+                title={missingTitle ? "Añade un título para guardar" : ""}
+                className="flex items-center gap-1.5 rounded-xl bg-red-600 px-4 py-1.5 text-xs font-bold text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+              >
+                {saving && <Loader2 size={11} className="animate-spin" />}
+                Guardar
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </>,
+    document.body
+  );
+}
+
 // ── Vista de rejilla horaria (Semana / Día) ───────────────────────────────────
 function TimeGridView({
   days,
@@ -822,7 +1000,7 @@ function TimeGridView({
   selectedDay: string;
   todayStr: string;
   movingEventId: string | null;
-  onSlotClick: (dateStr: string, hour: number) => void;
+  onSlotClick: (dateStr: string, hour: number, e: React.MouseEvent) => void;
   onEventClick: (ev: AgendaEvent) => void;
   onGcalEventClick: (ev: GCalEvent) => void;
   onDayHeaderClick: (dateStr: string) => void;
@@ -1148,7 +1326,7 @@ function TimeGridView({
                     key={h}
                     className="absolute w-full cursor-pointer group/slot hover:bg-blue-50/40 transition-colors duration-75"
                     style={{ top: h * HOUR_HEIGHT, height: HOUR_HEIGHT }}
-                    onClick={() => onSlotClick(dateStr, h)}
+                    onClick={(e) => onSlotClick(dateStr, h, e)}
                   >
                     {h > 0 && <div className="border-t border-gray-100 w-full" />}
                     <span className="absolute left-1 top-0.5 text-[9px] text-blue-400 opacity-0 group-hover/slot:opacity-100 transition-opacity duration-75 select-none pointer-events-none font-medium">
@@ -1537,6 +1715,13 @@ export default function Agenda() {
   const [errorMsg,     setErrorMsg]     = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
+  // Quick popover (crear evento)
+  const [quickPopover, setQuickPopover] = useState<{
+    date: string;
+    position: { x: number; y: number };
+  } | null>(null);
+  const [expandInitialData, setExpandInitialData] = useState<AgendaFormData | null>(null);
+
   // Modal Google Calendar event (solo lectura)
   const [gcalModal,    setGcalModal]    = useState<GCalEvent | null>(null);
   const [organizationExpedientes, setOrganizationExpedientes] = useState<AgendaOrganizationExpediente[]>([]);
@@ -1730,12 +1915,14 @@ export default function Agenda() {
     setViewMonth(d.getMonth());
   };
 
-  const openNewAtSlot = (dateStr: string, hour: number) => {
+  const openNewAtSlot = (dateStr: string, hour: number, e: React.MouseEvent) => {
     const pad = (n: number) => String(n).padStart(2, "0");
     setEditEvent(null);
-    setDefaultDate(`${dateStr}T${pad(hour)}:00`);
     setErrorMsg(null);
-    setShowModal(true);
+    setQuickPopover({
+      date: `${dateStr}T${pad(hour)}:00`,
+      position: { x: e.clientX, y: e.clientY },
+    });
   };
 
   // Índice de eventos por día
@@ -1866,6 +2053,7 @@ export default function Agenda() {
       }
 
       setShowModal(false);
+      setQuickPopover(null);
       setEditEvent(null);
       await fetchEvents(true);
       if (syncWarning) setGcalError(syncWarning);
@@ -2020,12 +2208,29 @@ export default function Agenda() {
     }
   };
 
-  const openNew = (date?: string) => {
+  const openNew = (date?: string, e?: React.MouseEvent | { clientX: number; clientY: number }) => {
     setEditEvent(null);
-    setDefaultDate(date || selectedDay);
     setErrorMsg(null);
+    if (e) {
+      setQuickPopover({
+        date: date || selectedDay,
+        position: { x: e.clientX, y: e.clientY },
+      });
+    } else {
+      setDefaultDate(date || selectedDay);
+      setExpandInitialData(null);
+      setShowModal(true);
+    }
+  };
+
+  const handleExpandQuickEvent = (formData: AgendaFormData) => {
+    setQuickPopover(null);
+    setEditEvent(null);
+    setExpandInitialData(formData);
+    setDefaultDate(null);
     setShowModal(true);
   };
+
   const openEdit = (ev: AgendaEvent) => {
     setEditEvent(ev);
     setErrorMsg(null);
@@ -2207,7 +2412,7 @@ export default function Agenda() {
           </div>
 
           <button
-            onClick={() => openNew()}
+            onClick={(e) => openNew(undefined, e)}
             className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm transition-colors"
           >
             <Plus size={13} /> Nuevo evento
@@ -2302,10 +2507,10 @@ export default function Agenda() {
                         if (draggingEventId) return;
                         setSelectedDay(key);
                       }}
-                      onDoubleClick={() => {
+                      onDoubleClick={(e) => {
                         if (draggingEventId) return;
                         setSelectedDay(key);
-                        openNew(key);
+                        openNew(key, e);
                       }}
                       className={`border-b border-r border-slate-100 min-h-[90px] p-1.5 cursor-pointer transition-all ${
                         dragOverDay === key ? "bg-emerald-50/90 ring-2 ring-inset ring-emerald-300 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.08)]"
@@ -2324,7 +2529,7 @@ export default function Agenda() {
                           {date.getDate()}
                         </span>
                         <button
-                          onClick={e => { e.stopPropagation(); openNew(key); }}
+                          onClick={e => { e.stopPropagation(); openNew(key, e); }}
                           className="opacity-0 hover:opacity-100 p-0.5 text-slate-300 hover:text-red-500 transition-opacity"
                         >
                           <Plus size={11} />
@@ -2422,7 +2627,7 @@ export default function Agenda() {
                 )}
               </div>
               <button
-                onClick={() => openNew(selectedDay)}
+                onClick={(e) => openNew(selectedDay, e)}
                 className="p-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                 title="Añadir evento en este día"
               >
@@ -2542,11 +2747,24 @@ export default function Agenda() {
         <EventModal
           event={editEvent}
           defaultDate={defaultDate}
+          initialFormData={expandInitialData || undefined}
           organizationExpedientes={organizationExpedientes}
           organizationUsers={organizationUsers}
-          onClose={() => { setShowModal(false); setEditEvent(null); setErrorMsg(null); }}
+          onClose={() => { setShowModal(false); setEditEvent(null); setErrorMsg(null); setExpandInitialData(null); }}
           onSave={handleSave}
           onDelete={handleDelete}
+          saving={saving}
+          errorMsg={errorMsg}
+        />
+      )}
+
+      {quickPopover && (
+        <QuickEventPopover
+          date={quickPopover.date}
+          position={quickPopover.position}
+          onClose={() => { setQuickPopover(null); setErrorMsg(null); }}
+          onSave={handleSave}
+          onExpand={handleExpandQuickEvent}
           saving={saving}
           errorMsg={errorMsg}
         />
