@@ -59,24 +59,25 @@ const normalizeGoogleEvent = (raw: any) => {
 
 export const getEvents = async (req: any, res: Response) => {
   try {
+    const userId = req.auth?.userId;
+    if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+
     const from = (req.query.from as string) || '';
     const to = (req.query.to as string) || '';
     const status = (req.query.status as string) || '';
     const type = (req.query.type as string) || '';
 
-    const conds: string[] = [];
-    const vals: any[] = [];
-    let p = 1;
+    const conds: string[] = [`user_id = $1`];
+    const vals: any[] = [userId];
+    let p = 2;
 
     if (from) { conds.push(`start_at >= $${p}`); vals.push(from); p += 1; }
     if (to) { conds.push(`start_at <= $${p}`); vals.push(to); p += 1; }
     if (status) { conds.push(`status = $${p}`); vals.push(status); p += 1; }
     if (type) { conds.push(`type = $${p}`); vals.push(type); p += 1; }
 
-    const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
-
     const result = await pool.query(
-      `SELECT * FROM agenda_events ${where} ORDER BY start_at ASC LIMIT 500`,
+      `SELECT * FROM agenda_events WHERE ${conds.join(' AND ')} ORDER BY start_at ASC LIMIT 500`,
       vals
     );
 
@@ -89,13 +90,16 @@ export const getEvents = async (req: any, res: Response) => {
 
 export const getUpcomingEvents = async (req: any, res: Response) => {
   try {
+    const userId = req.auth?.userId;
+    if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+
     const limit = Math.min(parseInt((req.query.limit as string) || '10', 10), 50);
     const result = await pool.query(
       `SELECT * FROM agenda_events
-       WHERE start_at >= NOW() AND status != 'cancelado'
+       WHERE user_id = $1 AND start_at >= NOW() AND status != 'cancelado'
        ORDER BY start_at ASC
-       LIMIT $1`,
-      [limit]
+       LIMIT $2`,
+      [userId, limit]
     );
     res.json({ success: true, data: result.rows });
   } catch (error: any) {

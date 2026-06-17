@@ -241,6 +241,7 @@ type AgendaFormData = ReturnType<typeof emptyForm>;
 function EventModal({
   event,
   defaultDate,
+  initialFormData,
   organizationExpedientes,
   organizationUsers,
   onClose,
@@ -1091,6 +1092,13 @@ function TimeGridView({
       // Slot drag (crear nuevo evento arrastrando)
       if (slotDragRef.current && scrollRef.current) {
         const gridRect = scrollRef.current.getBoundingClientRect();
+        const SCROLL_ZONE = 60;
+        const SCROLL_SPEED = 10;
+        if (e.clientY > gridRect.bottom - SCROLL_ZONE) {
+          scrollRef.current.scrollTop += SCROLL_SPEED;
+        } else if (e.clientY < gridRect.top + SCROLL_ZONE) {
+          scrollRef.current.scrollTop -= SCROLL_SPEED;
+        }
         const rawY = e.clientY - gridRect.top + scrollRef.current.scrollTop;
         const totalMins = Math.max(0, Math.min((rawY / HOUR_HEIGHT) * 60, 24 * 60 - 1));
         const snappedMins = Math.round(totalMins / 15) * 15;
@@ -1127,6 +1135,10 @@ function TimeGridView({
       // Resize
       if (resizingRef.current && scrollRef.current) {
         const rect = scrollRef.current.getBoundingClientRect();
+        const SCROLL_ZONE = 60;
+        const SCROLL_SPEED = 10;
+        if (e.clientY > rect.bottom - SCROLL_ZONE) scrollRef.current.scrollTop += SCROLL_SPEED;
+        else if (e.clientY < rect.top + SCROLL_ZONE) scrollRef.current.scrollTop -= SCROLL_SPEED;
         const rawY = e.clientY - rect.top + scrollRef.current.scrollTop;
         const totalMins = Math.max(0, Math.min((rawY / HOUR_HEIGHT) * 60, 24 * 60 - 1));
         const snapped = Math.round(totalMins / 15) * 15;
@@ -1143,6 +1155,10 @@ function TimeGridView({
       // Drag
       if (draggingRef.current && scrollRef.current) {
         const gridRect = scrollRef.current.getBoundingClientRect();
+        const SCROLL_ZONE = 60;
+        const SCROLL_SPEED = 10;
+        if (e.clientY > gridRect.bottom - SCROLL_ZONE) scrollRef.current.scrollTop += SCROLL_SPEED;
+        else if (e.clientY > gridRect.top && e.clientY < gridRect.top + SCROLL_ZONE) scrollRef.current.scrollTop -= SCROLL_SPEED;
         const targetDateStr = findDateStrAtX(e.clientX);
         // Si el cursor está sobre la banda de todo el día
         if (e.clientY < gridRect.top) {
