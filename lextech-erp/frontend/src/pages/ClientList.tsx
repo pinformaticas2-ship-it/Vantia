@@ -1622,8 +1622,8 @@ export default function ClientList() {
 
   // ── Render: carga ──────────────────────────────────────────
   if (loading) return (
-    <div className="flex flex-col items-center justify-center h-64">
-      <Spinner size="lg" label="Cargando clientes..." />
+    <div className="flex flex-col items-center justify-center min-h-[60vh]">
+      <Spinner size="xl" label="Cargando clientes..." />
     </div>
   );
 

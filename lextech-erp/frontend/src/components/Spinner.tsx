@@ -1,7 +1,7 @@
 const DELAYS = ['0s', '0.16s', '0.32s', '0.16s', '0s'];
 
 interface SpinnerProps {
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
   muted?: boolean;
   label?: string;
   className?: string;
@@ -11,6 +11,7 @@ const sizeConfig = {
   sm: { barH: 20, barW: 3, gap: '3px' },
   md: { barH: 30, barW: 4, gap: '4px' },
   lg: { barH: 42, barW: 5, gap: '6px' },
+  xl: { barH: 58, barW: 6, gap: '7px' },
 };
 
 export function Spinner({ size = 'md', muted = false, label, className = '' }: SpinnerProps) {

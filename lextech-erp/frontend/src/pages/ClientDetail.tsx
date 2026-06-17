@@ -203,8 +203,8 @@ function TabExpedientes({ clientId }: { clientId: string }) {
   }, [clientId, getToken]);
 
   if (loading) return (
-    <div className="flex items-center justify-center py-20">
-      <Spinner size="lg" />
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <Spinner size="xl" />
     </div>
   );
 
@@ -655,8 +655,8 @@ function TabNotas({ clientId }: { clientId: string }) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Spinner size="lg" muted />
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Spinner size="xl" muted />
       </div>
     );
   }
@@ -3727,9 +3727,8 @@ export default function ClientDetail() {
   }, [client]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) return (
-    <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-      <Spinner size="lg" />
-      <p className="text-sm animate-pulse mt-3">Cargando ficha...</p>
+    <div className="flex flex-col items-center justify-center min-h-[60vh]">
+      <Spinner size="xl" label="Cargando ficha..." />
     </div>
   );
 

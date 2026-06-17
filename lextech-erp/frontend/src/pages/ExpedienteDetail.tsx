@@ -792,8 +792,8 @@ function TabNotas({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Spinner size="lg" muted />
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Spinner size="xl" muted />
       </div>
     );
   }
@@ -4915,8 +4915,8 @@ export default function ExpedienteDetail() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center h-64">
-        <Spinner size="lg" label="Cargando expediente..." />
+      <div className="flex flex-col items-center justify-center min-h-[60vh]">
+        <Spinner size="xl" label="Cargando expediente..." />
       </div>
     );
   }

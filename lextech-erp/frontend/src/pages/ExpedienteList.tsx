@@ -5084,8 +5084,8 @@ export default function ExpedienteList() {
 
   // ── Render: carga ─────────────────────────────────────────────
   if (loading) return (
-    <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-      <Spinner size="lg" label="Cargando expedientes..." />
+    <div className="flex flex-col items-center justify-center min-h-[60vh]">
+      <Spinner size="xl" label="Cargando expedientes..." />
     </div>
   );
 
