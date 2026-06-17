@@ -1,4 +1,5 @@
 ﻿import React, { useState, useEffect, useCallback, useRef } from "react";
+import { Spinner } from "./Spinner";
 import {
   FolderOpen, Loader2, Paperclip, Activity, FileSpreadsheet,
   Users, ClipboardList, MoreHorizontal,
@@ -300,7 +301,7 @@ export function AdjuntosPanel({ entityId, entityName, onOpenFull }: {
           </div>
         )}
         {loading ? (
-          <div className="flex items-center justify-center h-full"><Loader2 size={20} className="animate-spin text-red-400" /></div>
+          <div className="flex items-center justify-center h-full"><Spinner size="sm" /></div>
         ) : files.length === 0 ? (
           <div
             onClick={() => fileRef.current?.click()}

@@ -766,3 +766,13 @@
     opacity: 0.58;
   }
 }
+
+@keyframes bar-wave {
+  0%, 100% { transform: scaleY(0.28); opacity: 0.38; }
+  50%       { transform: scaleY(1);   opacity: 1; }
+}
+
+.spinner-bar {
+  animation: bar-wave 1.1s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  transform-origin: bottom;
+}

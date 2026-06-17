@@ -1,6 +1,7 @@
 ﻿import React, {
   useEffect, useState, useRef, useCallback, useMemo,
 } from "react";
+import { Spinner } from "../components/Spinner";
 import { useAuth, useUser } from "@clerk/clerk-react";
 import {
   Hash, Lock, Plus, X, Search, Pin, PinOff, Smile, Send,
@@ -1614,7 +1615,7 @@ function GifPicker({
       <div className="max-h-[23rem] overflow-y-auto p-2">
         {loading ? (
           <div className="flex justify-center py-8">
-            <Loader2 className="animate-spin text-slate-400" size={20}/>
+            <Spinner size="sm" muted />
           </div>
         ) : error ? (
           <div className="rounded-2xl border border-dashed border-red-200 bg-red-50 px-4 py-5 text-center">
@@ -2302,7 +2303,7 @@ function PanelMiembros({ canal, sysUsers, getToken, currentUserId, onClose, onDM
       </div>
       {/* Contenido */}
       <div className="flex-1 overflow-y-auto">
-        {loading&&<div className="flex justify-center py-6"><Loader2 className="animate-spin text-slate-300" size={18}/></div>}
+        {loading&&<div className="flex justify-center py-6"><Spinner size="sm" muted /></div>}
         {!loading&&tab==="ver"&&(
           <>
             {admins.length>0&&(
@@ -2407,7 +2408,7 @@ function PanelFijados({ canalId, getToken, onClose, onGoTo, resolveDisplayName }
         <BackButton onClick={onClose} />
       </div>
       <div className="flex-1 overflow-y-auto">
-        {loading&&<div className="flex justify-center py-6"><Loader2 className="animate-spin text-slate-300" size={18}/></div>}
+        {loading&&<div className="flex justify-center py-6"><Spinner size="sm" muted /></div>}
         {!loading&&fijados.length===0&&(
           <div className="flex flex-col items-center justify-center h-full py-12 text-slate-300">
             <Pin size={32} className="mb-2 opacity-40"/>
@@ -2471,7 +2472,7 @@ function PanelFavoritos({ canalId, getToken, onClose, onGoTo, onToggleFavorite, 
         <BackButton onClick={onClose} />
       </div>
       <div className="flex-1 overflow-y-auto">
-        {loading&&<div className="flex justify-center py-6"><Loader2 className="animate-spin text-slate-300" size={18}/></div>}
+        {loading&&<div className="flex justify-center py-6"><Spinner size="sm" muted /></div>}
         {!loading&&favoritos.length===0&&(
           <div className="flex flex-col items-center justify-center h-full py-12 text-slate-300">
             <Star size={32} className="mb-2 opacity-40"/>

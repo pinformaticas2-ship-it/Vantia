@@ -1,4 +1,5 @@
 ﻿import { useCallback, useEffect, useState } from "react";
+import { Spinner } from "../components/Spinner";
 import { createPortal } from "react-dom";
 import { useAuth } from "@clerk/clerk-react";
 import {
@@ -434,8 +435,8 @@ export default function Documental() {
           )}
 
           {boeLoading && (
-            <div className="mt-5 flex items-center gap-2 text-sm text-slate-500">
-              <Loader2 size={15} className="animate-spin" /> Consultando BOE...
+            <div className="mt-5 flex items-center gap-3 text-sm text-slate-500">
+              <Spinner size="sm" muted /> Consultando BOE...
             </div>
           )}
 
@@ -610,8 +611,8 @@ export default function Documental() {
           )}
 
           {cendojSearchLoading && !cendojSearchError && (
-            <div className="mt-4 flex items-center gap-2 text-sm text-slate-500">
-              <Loader2 size={15} className="animate-spin" /> Consultando CENDOJ...
+            <div className="mt-4 flex items-center gap-3 text-sm text-slate-500">
+              <Spinner size="sm" muted /> Consultando CENDOJ...
             </div>
           )}
 
@@ -756,8 +757,8 @@ export default function Documental() {
 
           <div className="overflow-y-auto px-6 py-5 flex-1">
             {selectedBlockLoading ? (
-              <div className="flex items-center gap-2 text-sm text-slate-500">
-                <Loader2 size={16} className="animate-spin" /> Cargando contenido del bloque...
+              <div className="flex items-center gap-3 text-sm text-slate-500">
+                <Spinner size="sm" muted /> Cargando contenido del bloque...
               </div>
             ) : selectedBlockError ? (
               <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{selectedBlockError}</div>

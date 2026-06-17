@@ -1,4 +1,5 @@
 ﻿import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { Spinner } from "../components/Spinner";
 import {
   fetchSharedTemplates, createSharedTemplate as apiCreateTpl,
   updateSharedTemplate as apiUpdateTpl, deleteSharedTemplate as apiDeleteTpl,
@@ -1621,9 +1622,8 @@ export default function ClientList() {
 
   // ── Render: carga ──────────────────────────────────────────
   if (loading) return (
-    <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-      <Loader2 className="animate-spin text-red-600 mb-3" size={32} />
-      <p className="text-sm font-medium animate-pulse">Cargando clientes...</p>
+    <div className="flex flex-col items-center justify-center h-64">
+      <Spinner size="lg" label="Cargando clientes..." />
     </div>
   );
 

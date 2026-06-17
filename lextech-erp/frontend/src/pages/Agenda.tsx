@@ -1,6 +1,7 @@
 ﻿import React, {
   useDeferredValue, useEffect, useState, useCallback, useMemo, useRef,
 } from "react";
+import { Spinner } from "../components/Spinner";
 import { useAuth } from "@clerk/clerk-react";
 import {
   Calendar, ChevronLeft, ChevronRight, Plus,
@@ -2219,7 +2220,7 @@ export default function Agenda() {
         <div className="flex flex-1 min-h-0 overflow-hidden">
           {loading ? (
             <div className="flex flex-1 justify-center items-center">
-              <Loader2 size={22} className="animate-spin text-slate-300" />
+              <Spinner size="md" muted />
             </div>
           ) : (
             <TimeGridView
@@ -2256,7 +2257,7 @@ export default function Agenda() {
           <div className="flex-1 overflow-y-auto">
             {loading ? (
               <div className="flex justify-center items-center h-40">
-                <Loader2 size={22} className="animate-spin text-slate-300" />
+                <Spinner size="md" muted />
               </div>
             ) : (
               <div className="grid grid-cols-7 auto-rows-fr min-h-full">

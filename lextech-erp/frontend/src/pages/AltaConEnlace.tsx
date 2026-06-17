@@ -1,4 +1,5 @@
 ﻿import React, { useEffect, useState, useCallback } from "react";
+import { Spinner } from "../components/Spinner";
 import { useAuth } from "@clerk/clerk-react";
 import { Link2, Plus, Trash2, Copy, Check, Loader2, AlertCircle, RefreshCw, Clock, User, Tag, AlertTriangle } from "lucide-react";
 import { safeJson } from "../lib/api";
@@ -188,9 +189,8 @@ export default function AltaConEnlace() {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-12 text-slate-400">
-            <Loader2 className="w-6 h-6 animate-spin mr-2" />
-            <span className="text-sm">Cargando enlaces...</span>
+          <div className="flex flex-col items-center justify-center py-12">
+            <Spinner size="md" label="Cargando enlaces..." />
           </div>
         ) : links.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-slate-400">
