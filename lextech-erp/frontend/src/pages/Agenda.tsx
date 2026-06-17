@@ -808,6 +808,7 @@ function GoogleEventModal({
 function QuickEventPopover({
   date,
   position,
+  initialData,
   onClose,
   onSave,
   onExpand,
@@ -816,13 +817,14 @@ function QuickEventPopover({
 }: {
   date: string;
   position: { x: number; y: number };
+  initialData?: AgendaFormData;
   onClose: () => void;
   onSave: (data: any) => void;
   onExpand: (data: AgendaFormData) => void;
   saving: boolean;
   errorMsg: string | null;
 }) {
-  const [form, setForm] = useState<AgendaFormData>(() => emptyForm(date));
+  const [form, setForm] = useState<AgendaFormData>(() => initialData || emptyForm(date));
   const titleRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { titleRef.current?.focus(); }, []);
@@ -988,6 +990,7 @@ function TimeGridView({
   todayStr,
   movingEventId,
   onSlotClick,
+  onSlotDragCreate,
   onEventClick,
   onGcalEventClick,
   onDayHeaderClick,
@@ -1000,7 +1003,8 @@ function TimeGridView({
   selectedDay: string;
   todayStr: string;
   movingEventId: string | null;
-  onSlotClick: (dateStr: string, hour: number, e: React.MouseEvent) => void;
+  onSlotClick: (dateStr: string, hour: number, pos: { clientX: number; clientY: number }) => void;
+  onSlotDragCreate: (dateStr: string, startAt: string, endAt: string, pos: { clientX: number; clientY: number }) => void;
   onEventClick: (ev: AgendaEvent) => void;
   onGcalEventClick: (ev: GCalEvent) => void;
   onDayHeaderClick: (dateStr: string) => void;
@@ -1052,6 +1056,25 @@ function TimeGridView({
     timedStartAt?: string;
   } | null>(null);
 
+  // ── Drag para crear evento (slot drag) ───────────────────────────────────────
+  const slotDragRef = useRef<{
+    dateStr: string;
+    startMins: number;
+    endMins: number;
+    clientX: number;
+    clientY: number;
+    hasMoved: boolean;
+  } | null>(null);
+  const [slotDragDisplay, setSlotDragDisplay] = useState<{
+    dateStr: string;
+    startMins: number;
+    endMins: number;
+  } | null>(null);
+  const onSlotClickRef = useRef(onSlotClick);
+  onSlotClickRef.current = onSlotClick;
+  const onSlotDragCreateRef = useRef(onSlotDragCreate);
+  onSlotDragCreateRef.current = onSlotDragCreate;
+
   // Función para encontrar la columna bajo el cursor
   const findDateStrAtX = useCallback((clientX: number): string => {
     let best = days[0];
@@ -1065,6 +1088,21 @@ function TimeGridView({
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
+      // Slot drag (crear nuevo evento arrastrando)
+      if (slotDragRef.current && scrollRef.current) {
+        const gridRect = scrollRef.current.getBoundingClientRect();
+        const rawY = e.clientY - gridRect.top + scrollRef.current.scrollTop;
+        const totalMins = Math.max(0, Math.min((rawY / HOUR_HEIGHT) * 60, 24 * 60 - 1));
+        const snappedMins = Math.round(totalMins / 15) * 15;
+        const endMins = Math.max(snappedMins, slotDragRef.current.startMins + 15);
+        slotDragRef.current.endMins = endMins;
+        slotDragRef.current.hasMoved = true;
+        setSlotDragDisplay(prev => {
+          if (prev?.endMins === endMins && prev.dateStr === slotDragRef.current!.dateStr) return prev;
+          return { dateStr: slotDragRef.current!.dateStr, startMins: slotDragRef.current!.startMins, endMins };
+        });
+        return;
+      }
       // Drag todo el día
       if (draggingAllDayRef.current) {
         const targetDateStr = findDateStrAtX(e.clientX);
@@ -1124,7 +1162,22 @@ function TimeGridView({
         setDragDisplay({ id: draggingRef.current.id, dateStr: targetDateStr, startAt: newStart.toISOString(), endAt: newEnd?.toISOString() ?? null });
       }
     };
-    const handleMouseUp = async () => {
+    const handleMouseUp = async (e: MouseEvent) => {
+      // Slot drag (crear nuevo evento)
+      if (slotDragRef.current) {
+        const drag = slotDragRef.current;
+        slotDragRef.current = null;
+        setSlotDragDisplay(null);
+        if (drag.hasMoved && drag.endMins > drag.startMins + 14) {
+          const base = new Date(drag.dateStr + "T00:00:00");
+          const startAt = new Date(base.getTime() + drag.startMins * 60000).toISOString();
+          const endAt   = new Date(base.getTime() + drag.endMins   * 60000).toISOString();
+          onSlotDragCreateRef.current(drag.dateStr, startAt, endAt, { clientX: e.clientX, clientY: e.clientY });
+        } else {
+          onSlotClickRef.current(drag.dateStr, Math.floor(drag.startMins / 60), { clientX: drag.clientX, clientY: drag.clientY });
+        }
+        return;
+      }
       // Drag todo el día
       if (draggingAllDayRef.current) {
         const drag = draggingAllDayRef.current;
@@ -1200,7 +1253,7 @@ function TimeGridView({
 
   return (
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden bg-white">
-      {/* Overlay de cursor durante resize o drag */}
+      {/* Overlay de cursor durante resize, drag o slot-drag */}
       {resizingDisplay && (
         <div className="fixed inset-0 cursor-s-resize" style={{ zIndex: 9999 }} />
       )}
@@ -1209,6 +1262,9 @@ function TimeGridView({
       )}
       {dragDisplay && (
         <div className="fixed inset-0 cursor-grabbing select-none" style={{ zIndex: 9999 }} />
+      )}
+      {slotDragDisplay && (
+        <div className="fixed inset-0 cursor-ns-resize select-none" style={{ zIndex: 9999 }} />
       )}
       {/* Cabecera de días */}
       <div className="flex shrink-0 border-b border-gray-200 bg-white">
@@ -1320,13 +1376,29 @@ function TimeGridView({
             const timedGcal = (gcalEventsByDay[dateStr] || []).filter(ev => !!ev.start.dateTime);
             return (
               <div key={dateStr} ref={el => { columnRefsMap.current.set(dateStr, el); }} className="flex-1 border-r border-gray-200 relative">
-                {/* Celdas de hora (clic para crear) */}
+                {/* Celdas de hora (clic o arrastre para crear) */}
                 {HOURS.map(h => (
                   <div
                     key={h}
-                    className="absolute w-full cursor-pointer group/slot hover:bg-blue-50/40 transition-colors duration-75"
+                    className="absolute w-full cursor-crosshair group/slot hover:bg-blue-50/30 transition-colors duration-75 select-none"
                     style={{ top: h * HOUR_HEIGHT, height: HOUR_HEIGHT }}
-                    onClick={(e) => onSlotClick(dateStr, h, e)}
+                    onMouseDown={(e) => {
+                      if (e.button !== 0) return;
+                      if (resizingRef.current || draggingRef.current || draggingAllDayRef.current) return;
+                      const gridRect = scrollRef.current?.getBoundingClientRect() ?? { top: 0 };
+                      const rawY = e.clientY - gridRect.top + (scrollRef.current?.scrollTop ?? 0);
+                      const totalMins = Math.max(0, (rawY / HOUR_HEIGHT) * 60);
+                      const snappedMins = Math.round(totalMins / 15) * 15;
+                      slotDragRef.current = {
+                        dateStr,
+                        startMins: snappedMins,
+                        endMins: snappedMins + 15,
+                        clientX: e.clientX,
+                        clientY: e.clientY,
+                        hasMoved: false,
+                      };
+                      setSlotDragDisplay({ dateStr, startMins: snappedMins, endMins: snappedMins + 15 });
+                    }}
                   >
                     {h > 0 && <div className="border-t border-gray-100 w-full" />}
                     <span className="absolute left-1 top-0.5 text-[9px] text-blue-400 opacity-0 group-hover/slot:opacity-100 transition-opacity duration-75 select-none pointer-events-none font-medium">
@@ -1363,6 +1435,28 @@ function TimeGridView({
                       className="absolute left-1 right-1 rounded border-2 border-dashed border-white/70 bg-white/20 pointer-events-none"
                       style={{ top: ghostTopPx, height: ghostH, zIndex: 25 }}
                     />
+                  );
+                })()}
+
+                {/* Ghost de slot drag (nuevo evento) */}
+                {slotDragDisplay?.dateStr === dateStr && (() => {
+                  const topPx    = (slotDragDisplay.startMins / 60) * HOUR_HEIGHT;
+                  const heightPx = Math.max(((slotDragDisplay.endMins - slotDragDisplay.startMins) / 60) * HOUR_HEIGHT, 22);
+                  const fmt = (mins: number) => `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
+                  return (
+                    <div
+                      className="absolute left-1 right-1 rounded-lg bg-red-50 border-2 border-red-400 pointer-events-none select-none overflow-hidden"
+                      style={{ top: topPx, height: heightPx, zIndex: 20 }}
+                    >
+                      <div className="px-1.5 pt-0.5 text-[10px] font-bold text-red-700 leading-tight">
+                        {fmt(slotDragDisplay.startMins)}
+                      </div>
+                      {heightPx >= 38 && (
+                        <div className="absolute bottom-0.5 left-1.5 text-[10px] font-semibold text-red-500">
+                          {fmt(slotDragDisplay.endMins)}
+                        </div>
+                      )}
+                    </div>
                   );
                 })()}
 
@@ -1719,6 +1813,7 @@ export default function Agenda() {
   const [quickPopover, setQuickPopover] = useState<{
     date: string;
     position: { x: number; y: number };
+    initialData?: AgendaFormData;
   } | null>(null);
   const [expandInitialData, setExpandInitialData] = useState<AgendaFormData | null>(null);
 
@@ -1915,15 +2010,39 @@ export default function Agenda() {
     setViewMonth(d.getMonth());
   };
 
-  const openNewAtSlot = (dateStr: string, hour: number, e: React.MouseEvent) => {
+  const openNewAtSlot = (dateStr: string, hour: number, pos: { clientX: number; clientY: number }) => {
     const pad = (n: number) => String(n).padStart(2, "0");
     setEditEvent(null);
     setErrorMsg(null);
     setQuickPopover({
       date: `${dateStr}T${pad(hour)}:00`,
-      position: { x: e.clientX, y: e.clientY },
+      position: { x: pos.clientX, y: pos.clientY },
     });
   };
+
+  const handleSlotDragCreate = useCallback((dateStr: string, startAt: string, endAt: string, pos: { clientX: number; clientY: number }) => {
+    setEditEvent(null);
+    setErrorMsg(null);
+    setQuickPopover({
+      date: localDatetimeInput(startAt),
+      position: { x: pos.clientX, y: pos.clientY },
+      initialData: {
+        title: "",
+        description: "",
+        start_at: localDatetimeInput(startAt),
+        end_at: localDatetimeInput(endAt),
+        all_day: false,
+        type: "cita",
+        status: "pendiente",
+        location: "",
+        expediente_id: "",
+        cliente_id: "",
+        related_user_id: "",
+        related_user_name: "",
+        organization_context: "",
+      },
+    });
+  }, []);
 
   // Índice de eventos por día
   const eventsByDay = useMemo(() => {
@@ -2436,6 +2555,7 @@ export default function Agenda() {
               todayStr={todayStr}
               movingEventId={movingEventId}
               onSlotClick={openNewAtSlot}
+              onSlotDragCreate={handleSlotDragCreate}
               onEventClick={openEdit}
               onGcalEventClick={ev => setGcalModal(ev)}
               onDayHeaderClick={dateStr => { setSelectedDay(dateStr); setView("day"); }}
@@ -2762,6 +2882,7 @@ export default function Agenda() {
         <QuickEventPopover
           date={quickPopover.date}
           position={quickPopover.position}
+          initialData={quickPopover.initialData}
           onClose={() => { setQuickPopover(null); setErrorMsg(null); }}
           onSave={handleSave}
           onExpand={handleExpandQuickEvent}
