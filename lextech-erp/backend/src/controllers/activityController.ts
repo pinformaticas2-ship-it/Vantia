@@ -248,7 +248,7 @@ export const addClientActivity = async (req: Request, res: Response) => {
 
   try {
     const cr = await pool.query(
-      `SELECT COALESCE(commercial_name,CONCAT(first_name,' ',last_name)) AS name FROM entities WHERE id=$1`,
+      `SELECT COALESCE(commercial_name,CONCAT(first_name,' ',last_name)) AS name FROM entities WHERE id=$1`, 
       [clientId]
     );
     const entityName = cr.rows[0]?.name || clientId;
@@ -304,7 +304,7 @@ export const getUserActivity = async (req: Request, res: Response) => {
   const limit = Math.min(parseInt((req.query.limit as string) || '500'), 1000);
   const offset = parseInt((req.query.offset as string) || '0');
   const eventType = (req.query.event_type as string) || '';
-
+  
   try {
     const params: any[] = [userId, limit, offset];
     const filter = eventType ? `AND event_type=$4` : '';
