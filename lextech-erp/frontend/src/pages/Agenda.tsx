@@ -3040,17 +3040,14 @@ export default function Agenda() {
                                       onDragEnd={() => { setDraggingEventId(null); setDragOverDay(null); }}
                                       onClick={e => { e.stopPropagation(); setSelectedDay(key); openViewPopover(ev, { x: e.clientX, y: e.clientY }); }}
                                       onDoubleClick={e => { e.stopPropagation(); }}
-                                      className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold truncate cursor-move transition-all ${
-                                        movingEventId === ev.id ? "opacity-70 scale-[0.98] shadow-sm ring-1 ring-emerald-200 bg-emerald-50/70"
-                                        : ev.status === "cancelado" ? "opacity-40 line-through" : "hover:opacity-80"
+                                      className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold truncate cursor-move transition-all text-white ${tc.bg} ${
+                                        movingEventId === ev.id ? "opacity-70 scale-[0.98] shadow-sm"
+                                        : ev.status === "cancelado" ? "opacity-40 line-through" : "hover:brightness-110"
                                       }`}
                                       title="Arrastra para mover a otro día"
                                     >
-                                      <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${tc.dot}`} />
-                                      <span className="truncate text-slate-700">
-                                        {!ev.all_day && <span className="text-slate-400 mr-0.5">{fmtTime(ev.start_at)}</span>}
-                                        {ev.title}
-                                      </span>
+                                      {!ev.all_day && <span className="opacity-75 shrink-0">{fmtTime(ev.start_at)}</span>}
+                                      <span className="truncate">{ev.title}</span>
                                       {ev.external_provider === "google" && (
                                         <img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_16dp.png" alt="" className="w-2.5 h-2.5 shrink-0" />
                                       )}
