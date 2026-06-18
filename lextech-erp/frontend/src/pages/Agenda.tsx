@@ -1373,7 +1373,7 @@ function TimeGridView({
   } | null>(null);
   const [dragDisplay, setDragDisplay] = useState<{
     id: string; dateStr: string; startAt: string; endAt: string | null;
-    droppingToAllDay?: boolean;
+    droppingToAllDay?: boolean; hasMoved?: boolean;
   } | null>(null);
   const columnRefsMap = useRef<Map<string, HTMLDivElement | null>>(new Map());
   const onMoveEventRef = useRef(onMoveEvent);
@@ -1387,7 +1387,7 @@ function TimeGridView({
   } | null>(null);
   const [allDayDragDisplay, setAllDayDragDisplay] = useState<{
     id: string; targetDateStr: string; title: string; colorBg: string;
-    timedStartAt?: string;
+    timedStartAt?: string; hasMoved?: boolean;
   } | null>(null);
 
   // ── Drag para crear evento (slot drag) ───────────────────────────────────────
@@ -1448,9 +1448,6 @@ function TimeGridView({
       }
       // Drag todo el día
       if (draggingAllDayRef.current) {
-        const dx = e.clientX - draggingAllDayRef.current.mouseX;
-        const dy = e.clientY - draggingAllDayRef.current.mouseY;
-        if (dx * dx + dy * dy < 16) return; // umbral de 4px
         const targetDateStr = findDateStrAtX(e.clientX);
         let timedStartAt: string | undefined;
         if (scrollRef.current) {
@@ -1464,8 +1461,8 @@ function TimeGridView({
           }
         }
         setAllDayDragDisplay(prev => {
-          const next = { id: draggingAllDayRef.current!.id, targetDateStr, title: draggingAllDayRef.current!.title, colorBg: draggingAllDayRef.current!.colorBg, timedStartAt };
-          if (prev?.targetDateStr === next.targetDateStr && prev?.timedStartAt === next.timedStartAt) return prev;
+          const next = { id: draggingAllDayRef.current!.id, targetDateStr, title: draggingAllDayRef.current!.title, colorBg: draggingAllDayRef.current!.colorBg, timedStartAt, hasMoved: true };
+          if (prev?.targetDateStr === next.targetDateStr && prev?.timedStartAt === next.timedStartAt && prev?.hasMoved) return prev;
           return next;
         });
         return;
@@ -1492,9 +1489,6 @@ function TimeGridView({
       }
       // Drag
       if (draggingRef.current && scrollRef.current) {
-        const dx = e.clientX - draggingRef.current.mouseX;
-        const dy = e.clientY - draggingRef.current.mouseY;
-        if (dx * dx + dy * dy < 16) return; // umbral de 4px antes de activar el drag
         const gridRect = scrollRef.current.getBoundingClientRect();
         const SCROLL_ZONE = 60;
         const SCROLL_SPEED = 10;
@@ -1503,7 +1497,7 @@ function TimeGridView({
         const targetDateStr = findDateStrAtX(e.clientX);
         // Si el cursor está sobre la banda de todo el día
         if (e.clientY < gridRect.top) {
-          setDragDisplay({ id: draggingRef.current.id, dateStr: targetDateStr, startAt: draggingRef.current.startAt, endAt: draggingRef.current.endAt, droppingToAllDay: true });
+          setDragDisplay({ id: draggingRef.current.id, dateStr: targetDateStr, startAt: draggingRef.current.startAt, endAt: draggingRef.current.endAt, droppingToAllDay: true, hasMoved: true });
           return;
         }
         const rawY = e.clientY - gridRect.top + scrollRef.current.scrollTop;
@@ -1516,7 +1510,7 @@ function TimeGridView({
         const newEnd = draggingRef.current.durationMs > 0
           ? new Date(newStart.getTime() + draggingRef.current.durationMs)
           : null;
-        setDragDisplay({ id: draggingRef.current.id, dateStr: targetDateStr, startAt: newStart.toISOString(), endAt: newEnd?.toISOString() ?? null });
+        setDragDisplay({ id: draggingRef.current.id, dateStr: targetDateStr, startAt: newStart.toISOString(), endAt: newEnd?.toISOString() ?? null, hasMoved: true });
       }
     };
     const handleMouseUp = async (e: MouseEvent) => {
@@ -1541,10 +1535,10 @@ function TimeGridView({
         draggingAllDayRef.current = null;
         const display = allDayDragDisplay;
         setAllDayDragDisplay(null);
-        if (display?.timedStartAt) {
+        if (display?.hasMoved && display?.timedStartAt) {
           const newEndAt = new Date(new Date(display.timedStartAt).getTime() + 3600000).toISOString();
           await onMoveEventRef.current(drag.id, display.timedStartAt, newEndAt, false);
-        } else if (display && display.targetDateStr !== drag.origDateStr) {
+        } else if (display?.hasMoved && display.targetDateStr !== drag.origDateStr) {
           const newStartAt = display.targetDateStr + "T00:00:00";
           let newEndAt: string | null = null;
           if (drag.endAt) {
@@ -1554,7 +1548,6 @@ function TimeGridView({
           }
           await onMoveEventRef.current(drag.id, newStartAt, newEndAt);
         } else {
-          // Sin movimiento → fue un click
           onEventClickRef.current(drag.origEv, { x: drag.mouseX, y: drag.mouseY });
         }
         return;
@@ -1573,12 +1566,11 @@ function TimeGridView({
         draggingRef.current = null;
         const display = dragDisplay;
         setDragDisplay(null);
-        if (display?.droppingToAllDay) {
+        if (display?.hasMoved && display?.droppingToAllDay) {
           await onMoveEventRef.current(drag.id, display.dateStr + "T00:00:00", null, true);
-        } else if (display && (display.startAt !== drag.startAt || display.dateStr !== drag.startAt.slice(0, 10))) {
+        } else if (display?.hasMoved && (display.startAt !== drag.startAt || display.dateStr !== drag.startAt.slice(0, 10))) {
           await onMoveEventRef.current(drag.id, display.startAt, display.endAt);
         } else {
-          // Sin movimiento → fue un click
           onEventClickRef.current(drag.origEv, { x: drag.mouseX, y: drag.mouseY });
         }
       }
@@ -1626,10 +1618,10 @@ function TimeGridView({
       {resizingDisplay && (
         <div className="fixed inset-0 cursor-s-resize" style={{ zIndex: 9999 }} />
       )}
-      {allDayDragDisplay && (
+      {allDayDragDisplay?.hasMoved && (
         <div className="fixed inset-0 cursor-grabbing" style={{ zIndex: 9999 }} />
       )}
-      {dragDisplay && (
+      {dragDisplay?.hasMoved && (
         <div className="fixed inset-0 cursor-grabbing select-none" style={{ zIndex: 9999 }} />
       )}
       {slotDragDisplay && (
@@ -1683,6 +1675,7 @@ function TimeGridView({
                       e.stopPropagation(); e.preventDefault();
                       const evCol = getEventColor(ev);
                       draggingAllDayRef.current = { id: ev.id, origDateStr: dateStr, startAt: ev.start_at, endAt: ev.end_at, title: ev.title, colorBg: evCol, origEv: ev, mouseX: e.clientX, mouseY: e.clientY };
+                      setAllDayDragDisplay({ id: ev.id, targetDateStr: dateStr, title: ev.title, colorBg: evCol, hasMoved: false });
                     }}
                     className={`text-[11px] font-medium truncate px-2 py-0.5 rounded text-white select-none ${isBeingDragged ? "opacity-30 cursor-grabbing" : "cursor-grab"}`}
                     style={{ backgroundColor: getEventColor(ev) }}
@@ -1692,7 +1685,7 @@ function TimeGridView({
                 );
               })}
               {/* Ghost en columna destino (drag todo-el-día entre columnas) */}
-              {allDayDragDisplay?.targetDateStr === dateStr && !allDayLex.some(e => e.id === allDayDragDisplay.id) && (
+              {allDayDragDisplay?.hasMoved && allDayDragDisplay?.targetDateStr === dateStr && !allDayLex.some(e => e.id === allDayDragDisplay.id) && (
                 <div
                   className="text-[11px] font-medium truncate px-2 py-0.5 rounded text-white pointer-events-none ring-2 ring-white/50 opacity-80"
                   style={{ backgroundColor: allDayDragDisplay.colorBg }}
@@ -1834,7 +1827,7 @@ function TimeGridView({
 
                 {/* Eventos LexTech con hora */}
                 {/* Ghost de drag en esta columna */}
-                {dragDisplay && dragDisplay.dateStr === dateStr && (() => {
+                {dragDisplay?.hasMoved && dragDisplay.dateStr === dateStr && (() => {
                   const ghStart = new Date(dragDisplay.startAt);
                   const ghEnd = dragDisplay.endAt ? new Date(dragDisplay.endAt) : new Date(ghStart.getTime() + 3600000);
                   const ghTop = (ghStart.getHours() + ghStart.getMinutes() / 60) * HOUR_HEIGHT;
@@ -1857,7 +1850,7 @@ function TimeGridView({
 
 
                 {/* Ghost al arrastrar evento de todo-el-día a la rejilla horaria */}
-                {allDayDragDisplay?.timedStartAt && allDayDragDisplay.targetDateStr === dateStr && (() => {
+                {allDayDragDisplay?.hasMoved && allDayDragDisplay?.timedStartAt && allDayDragDisplay.targetDateStr === dateStr && (() => {
                   const start = new Date(allDayDragDisplay.timedStartAt!);
                   const end = new Date(start.getTime() + 3600000);
                   const topPx = (start.getHours() + start.getMinutes() / 60) * HOUR_HEIGHT;
@@ -1876,7 +1869,7 @@ function TimeGridView({
 
                 {timedEvs.map(ev => {
                   const isResizing = resizingDisplay?.id === ev.id;
-                  const isDragging = dragDisplay?.id === ev.id;
+                  const isDragging = dragDisplay?.id === ev.id && !!dragDisplay?.hasMoved;
                   const effectiveEndAt = isResizing ? resizingDisplay!.endAt : ev.end_at;
                   const start = new Date(ev.start_at);
                   const end = effectiveEndAt ? new Date(effectiveEndAt) : new Date(start.getTime() + 3600000);
@@ -1903,6 +1896,7 @@ function TimeGridView({
                           grabOffsetMins: mouseTimeMins - eventStartMins,
                           origEv: ev, mouseX: e.clientX, mouseY: e.clientY,
                         };
+                        setDragDisplay({ id: ev.id, dateStr, startAt: ev.start_at, endAt: ev.end_at, hasMoved: false });
                       }}
                       className={`absolute left-1 right-1 rounded px-2 py-1 text-[11px] font-medium text-white overflow-visible shadow-sm group/ev ${movingEventId === ev.id || isDragging ? "opacity-40" : isResizing ? "brightness-110 shadow-lg" : "hover:brightness-110 hover:shadow-md"} transition-all duration-150 select-none ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
                       style={{ top: topPx, height: heightPx, zIndex: isResizing ? 30 : 10, backgroundColor: evColor }}
