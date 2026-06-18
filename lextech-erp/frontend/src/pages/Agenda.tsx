@@ -1115,79 +1115,89 @@ function EventViewPopover({
     ? new Date(event.end_at).toLocaleDateString("es-ES", { day: "numeric", month: "long" })
     : null;
 
+  const POPOVER_W = 340;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  let left = position.x + 12;
+  let top  = position.y - 20;
+  if (left + POPOVER_W > vw - 12) left = position.x - POPOVER_W - 12;
+  if (top > vh - 120) top = vh - 480;
+  if (top < 12) top = 12;
+  if (left < 12) left = 12;
+
   return createPortal(
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/25 backdrop-blur-[2px]" />
+    <>
+      <div className="fixed inset-0 z-[190]" onClick={onClose} />
       <div
-        className="relative w-full max-w-sm rounded-3xl bg-white shadow-[0_32px_80px_rgba(15,23,42,0.25)] overflow-hidden animate-in zoom-in-95 duration-150"
+        className="fixed z-[200] w-[340px] rounded-2xl border border-slate-200 bg-white shadow-[0_24px_64px_rgba(15,23,42,0.20)] overflow-hidden"
+        style={{ left, top }}
         onClick={e => e.stopPropagation()}
       >
-        {/* Franja de color + cabecera */}
-        <div className="px-5 pt-5 pb-4" style={{ background: `linear-gradient(135deg, ${evColor}18 0%, ${evColor}08 100%)`, borderBottom: `3px solid ${evColor}` }}>
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: evColor }} />
-              <span className="text-[11px] font-bold uppercase tracking-widest text-slate-500">{tc.label}</span>
-            </div>
-            <div className="flex items-center gap-0.5 shrink-0">
-              <button
-                onClick={onEdit}
-                className="rounded-xl p-2 text-slate-400 hover:bg-white/80 hover:text-slate-700 transition-colors"
-                title="Editar"
-              >
-                <Edit3 size={14} />
-              </button>
-              {confirmDelete ? (
-                <div className="flex items-center gap-1 ml-1">
-                  <button
-                    onClick={() => { onDelete(); onClose(); }}
-                    className="rounded-xl px-2.5 py-1.5 text-[11px] font-bold text-white bg-red-500 hover:bg-red-600 transition-colors"
-                  >
-                    Eliminar
-                  </button>
-                  <button
-                    onClick={() => setConfirmDelete(false)}
-                    className="rounded-xl px-2.5 py-1.5 text-[11px] font-semibold text-slate-500 hover:bg-white/80 transition-colors"
-                  >
-                    No
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setConfirmDelete(true)}
-                  className="rounded-xl p-2 text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors"
-                  title="Eliminar"
-                >
-                  <Trash2 size={14} />
-                </button>
-              )}
-              <button
-                onClick={onClose}
-                className="rounded-xl p-2 text-slate-300 hover:bg-white/80 hover:text-slate-600 transition-colors"
-              >
-                <X size={14} />
-              </button>
-            </div>
+        {/* Cabecera */}
+        <div className="flex items-center justify-between bg-slate-50 px-4 py-2.5 border-b border-slate-100">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: evColor }} />
+            <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400">{tc.label}</span>
           </div>
-
-          <h2 className={`mt-3 text-lg font-bold text-slate-900 leading-snug ${event.status === "cancelado" ? "line-through opacity-50" : ""}`}>
-            {event.title}
-          </h2>
+          <div className="flex items-center gap-0.5 shrink-0">
+            <button
+              onClick={onEdit}
+              className="rounded-lg p-1.5 text-slate-300 hover:bg-slate-200 hover:text-slate-600 transition-colors"
+              title="Editar"
+            >
+              <Edit3 size={13} />
+            </button>
+            {confirmDelete ? (
+              <div className="flex items-center gap-1 ml-1">
+                <button
+                  onClick={() => { onDelete(); onClose(); }}
+                  className="rounded-lg px-2.5 py-1 text-[11px] font-bold text-white bg-red-500 hover:bg-red-600 transition-colors"
+                >
+                  Eliminar
+                </button>
+                <button
+                  onClick={() => setConfirmDelete(false)}
+                  className="rounded-lg px-2 py-1 text-[11px] font-semibold text-slate-500 hover:bg-slate-200 transition-colors"
+                >
+                  No
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmDelete(true)}
+                className="rounded-lg p-1.5 text-slate-300 hover:bg-red-50 hover:text-red-500 transition-colors"
+                title="Eliminar"
+              >
+                <Trash2 size={13} />
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="rounded-lg p-1.5 text-slate-300 hover:bg-slate-200 hover:text-slate-600 transition-colors"
+            >
+              <X size={14} />
+            </button>
+          </div>
         </div>
 
         {/* Cuerpo */}
-        <div className="px-5 py-4 space-y-3">
+        <div className="p-4 space-y-3 overflow-y-auto" style={{ maxHeight: Math.min(vh - top - 60, 420) }}>
+          {/* Título */}
+          <p className={`text-[15px] font-semibold text-slate-900 leading-snug ${event.status === "cancelado" ? "line-through opacity-50" : ""}`}>
+            {event.title}
+          </p>
+
           {/* Fecha y hora */}
-          <div className="flex items-start gap-3 text-sm text-slate-700">
-            <Calendar size={15} className="text-slate-400 shrink-0 mt-0.5" style={{ color: evColor }} />
+          <div className="flex items-start gap-2 text-xs text-slate-600">
+            <Calendar size={13} className="shrink-0 mt-0.5 text-slate-400" />
             <div>
               <p className="font-medium capitalize">{dateLabel}</p>
-              {endDateLabel && <p className="text-xs text-slate-500">hasta {endDateLabel}</p>}
+              {endDateLabel && <p className="text-slate-500">hasta {endDateLabel}</p>}
               {event.all_day
-                ? <p className="text-xs text-slate-500 mt-0.5">Todo el día</p>
+                ? <p className="text-slate-500 mt-0.5">Todo el día</p>
                 : event.end_at && (
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    <Clock size={11} className="inline mr-1 -mt-px" />
+                  <p className="text-slate-500 mt-0.5 flex items-center gap-1">
+                    <Clock size={10} />
                     {fmtTime(event.start_at)} – {fmtTime(event.end_at)}
                   </p>
                 )
@@ -1196,35 +1206,36 @@ function EventViewPopover({
           </div>
 
           {event.location && (
-            <div className="flex items-center gap-3 text-sm text-slate-600">
-              <MapPin size={15} className="text-slate-400 shrink-0" style={{ color: evColor }} />
+            <div className="flex items-center gap-2 text-xs text-slate-600">
+              <MapPin size={13} className="shrink-0 text-slate-400" />
               <span className="truncate">{event.location}</span>
             </div>
           )}
 
           {event.description && (
-            <div className="flex items-start gap-3 text-sm text-slate-600">
-              <div className="w-[15px] shrink-0 mt-0.5 border-l-2 self-stretch" style={{ borderColor: evColor }} />
-              <p className="text-xs leading-relaxed line-clamp-4">{event.description}</p>
+            <div className="flex items-start gap-2 text-xs text-slate-600">
+              <div className="w-[2px] shrink-0 self-stretch rounded-full mt-0.5" style={{ backgroundColor: evColor }} />
+              <p className="leading-relaxed line-clamp-4">{event.description}</p>
             </div>
           )}
 
           {(event.organization_context || event.cliente_id) && (
-            <div className="flex items-center gap-3 text-sm text-slate-600">
-              <Briefcase size={15} className="text-slate-400 shrink-0" style={{ color: evColor }} />
-              <span className="truncate text-sm">{event.organization_context || event.cliente_id}</span>
+            <div className="flex items-center gap-2 text-xs text-slate-600">
+              <Briefcase size={13} className="shrink-0 text-slate-400" />
+              <span className="truncate">{event.organization_context || event.cliente_id}</span>
             </div>
           )}
 
           {event.related_user_name && (
-            <div className="flex items-center gap-3 text-sm text-slate-600">
-              <Users size={15} className="text-slate-400 shrink-0" style={{ color: evColor }} />
+            <div className="flex items-center gap-2 text-xs text-slate-600">
+              <Users size={13} className="shrink-0 text-slate-400" />
               <span className="truncate">{event.related_user_name}</span>
             </div>
           )}
 
+          {/* Pie: estado + Google */}
           <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-            <span className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-semibold ${stConf.cls}`}>
+            <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${stConf.cls}`}>
               {stConf.label}
             </span>
             {event.external_provider === "google" && (
@@ -1233,7 +1244,7 @@ function EventViewPopover({
           </div>
         </div>
       </div>
-    </div>,
+    </>,
     document.body
   );
 }
