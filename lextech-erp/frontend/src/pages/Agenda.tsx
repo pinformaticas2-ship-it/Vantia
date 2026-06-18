@@ -982,6 +982,171 @@ function QuickEventPopover({
   );
 }
 
+// ── Popover de visualización de evento ───────────────────────────────────────
+function EventViewPopover({
+  event,
+  position,
+  onClose,
+  onEdit,
+  onDelete,
+}: {
+  event: AgendaEvent;
+  position: { x: number; y: number };
+  onClose: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const POPOVER_W = 320;
+  const POPOVER_H = 320;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  let left = position.x + 12;
+  let top  = position.y - 20;
+  if (left + POPOVER_W > vw - 12) left = position.x - POPOVER_W - 12;
+  if (top  + POPOVER_H > vh - 12) top  = vh - POPOVER_H - 12;
+  if (top  < 12) top  = 12;
+  if (left < 12) left = 12;
+
+  const tc     = EVENT_TYPES[event.type] || EVENT_TYPES.otro;
+  const stConf = STATUS_OPTS.find(s => s.value === event.status) || STATUS_OPTS[0];
+  const dateLabel = new Date(event.start_at).toLocaleDateString("es-ES", {
+    weekday: "long", day: "numeric", month: "long",
+  });
+
+  return createPortal(
+    <>
+      <div className="fixed inset-0 z-[190]" onClick={onClose} />
+      <div
+        className="fixed z-[200] w-[320px] rounded-2xl border border-slate-200 bg-white shadow-[0_24px_64px_rgba(15,23,42,0.20)] overflow-hidden quick-popup"
+        style={{ left, top }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Cabecera con acciones */}
+        <div className="flex items-center justify-between bg-slate-50 px-4 py-2.5 border-b border-slate-100">
+          <div className="flex items-center gap-1.5">
+            <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${tc.dot}`} />
+            <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400">{tc.label}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={onEdit}
+              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition-colors"
+              title="Editar evento"
+            >
+              <Edit3 size={13} />
+            </button>
+            {confirmDelete ? (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => { onDelete(); onClose(); }}
+                  className="rounded-lg px-2 py-1 text-[10px] font-bold text-white bg-red-500 hover:bg-red-600 transition-colors"
+                >
+                  Eliminar
+                </button>
+                <button
+                  onClick={() => setConfirmDelete(false)}
+                  className="rounded-lg px-2 py-1 text-[10px] font-semibold text-slate-500 hover:bg-slate-200 transition-colors"
+                >
+                  No
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmDelete(true)}
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors"
+                title="Eliminar evento"
+              >
+                <Trash2 size={13} />
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="rounded-lg p-1.5 text-slate-300 hover:bg-slate-200 hover:text-slate-600 transition-colors"
+            >
+              <X size={13} />
+            </button>
+          </div>
+        </div>
+
+        {/* Cuerpo */}
+        <div className="p-4 space-y-3">
+          {/* Título */}
+          <p className={`text-[15px] font-semibold text-slate-900 leading-tight ${event.status === "cancelado" ? "line-through opacity-50" : ""}`}>
+            {event.title}
+          </p>
+
+          {/* Fecha y hora */}
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 text-xs text-slate-600">
+              <Calendar size={12} className="text-slate-400 shrink-0" />
+              <span className="capitalize">{dateLabel}</span>
+            </div>
+            {!event.all_day && (
+              <div className="flex items-center gap-2 text-xs text-slate-600 pl-[20px]">
+                <Clock size={12} className="text-slate-400 shrink-0 -ml-[20px]" />
+                <span>
+                  {fmtTime(event.start_at)}
+                  {event.end_at && <> – {fmtTime(event.end_at)}</>}
+                </span>
+              </div>
+            )}
+            {event.all_day && (
+              <p className="text-xs text-slate-500 pl-[20px]">Todo el día</p>
+            )}
+          </div>
+
+          {/* Ubicación */}
+          {event.location && (
+            <div className="flex items-center gap-2 text-xs text-slate-600">
+              <MapPin size={12} className="text-slate-400 shrink-0" />
+              <span className="truncate">{event.location}</span>
+            </div>
+          )}
+
+          {/* Descripción */}
+          {event.description && (
+            <p className="text-xs text-slate-500 leading-relaxed line-clamp-3 pl-[20px] border-l-2 border-slate-100">
+              {event.description}
+            </p>
+          )}
+
+          {/* Expediente / Cliente */}
+          {(event.organization_context || event.cliente_id) && (
+            <div className="flex items-start gap-2 text-xs text-slate-600">
+              <Briefcase size={12} className="text-slate-400 shrink-0 mt-0.5" />
+              <span className="truncate">{event.organization_context || event.cliente_id}</span>
+            </div>
+          )}
+
+          {/* Usuario relacionado */}
+          {event.related_user_name && (
+            <div className="flex items-center gap-2 text-xs text-slate-600">
+              <Users size={12} className="text-slate-400 shrink-0" />
+              <span className="truncate">{event.related_user_name}</span>
+            </div>
+          )}
+
+          {/* Estado */}
+          <div className="pt-1 border-t border-slate-100">
+            <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold ${stConf.cls}`}>
+              {stConf.label}
+            </span>
+          </div>
+        </div>
+      </div>
+    </>,
+    document.body
+  );
+}
+
 // ── Vista de rejilla horaria (Semana / Día) ───────────────────────────────────
 function TimeGridView({
   days,
@@ -1006,7 +1171,7 @@ function TimeGridView({
   movingEventId: string | null;
   onSlotClick: (dateStr: string, hour: number, pos: { clientX: number; clientY: number }) => void;
   onSlotDragCreate: (dateStr: string, startAt: string, endAt: string, pos: { clientX: number; clientY: number }) => void;
-  onEventClick: (ev: AgendaEvent) => void;
+  onEventClick: (ev: AgendaEvent, pos: { x: number; y: number }) => void;
   onGcalEventClick: (ev: GCalEvent) => void;
   onDayHeaderClick: (dateStr: string) => void;
   onResizeEvent: (id: string, newEndAt: string) => Promise<void>;
@@ -1333,7 +1498,7 @@ function TimeGridView({
                 return (
                   <div
                     key={ev.id}
-                    onClick={e => { if (allDayDragDisplay) return; e.stopPropagation(); onEventClick(ev); }}
+                    onClick={e => { if (allDayDragDisplay) return; e.stopPropagation(); onEventClick(ev, { x: e.clientX, y: e.clientY }); }}
                     onMouseDown={e => {
                       if (e.button !== 0) return;
                       e.stopPropagation(); e.preventDefault();
@@ -1540,7 +1705,7 @@ function TimeGridView({
                   return (
                     <div
                       key={ev.id}
-                      onClick={e => { if (isResizing || isDragging) return; e.stopPropagation(); onEventClick(ev); }}
+                      onClick={e => { if (isResizing || isDragging) return; e.stopPropagation(); onEventClick(ev, { x: e.clientX, y: e.clientY }); }}
                       onMouseDown={e => {
                         if (e.button !== 0 || resizingRef.current) return;
                         const target = e.target as HTMLElement;
@@ -1840,6 +2005,17 @@ export default function Agenda() {
     initialData?: AgendaFormData;
   } | null>(null);
   const [expandInitialData, setExpandInitialData] = useState<AgendaFormData | null>(null);
+
+  // View popover (visualizar evento)
+  const [viewPopover, setViewPopover] = useState<{
+    event: AgendaEvent;
+    position: { x: number; y: number };
+  } | null>(null);
+
+  const openViewPopover = (ev: AgendaEvent, pos: { x: number; y: number }) => {
+    setViewPopover({ event: ev, position: pos });
+    setQuickPopover(null);
+  };
 
   // Modal Google Calendar event (solo lectura)
   const [gcalModal,    setGcalModal]    = useState<GCalEvent | null>(null);
@@ -2375,6 +2551,7 @@ export default function Agenda() {
   };
 
   const openEdit = (ev: AgendaEvent) => {
+    setViewPopover(null);
     setEditEvent(ev);
     setErrorMsg(null);
     setShowModal(true);
@@ -2580,7 +2757,7 @@ export default function Agenda() {
               movingEventId={movingEventId}
               onSlotClick={openNewAtSlot}
               onSlotDragCreate={handleSlotDragCreate}
-              onEventClick={openEdit}
+              onEventClick={openViewPopover}
               onGcalEventClick={ev => setGcalModal(ev)}
               onDayHeaderClick={dateStr => { setSelectedDay(dateStr); setView("day"); }}
               onResizeEvent={handleResizeEvent}
@@ -2698,8 +2875,8 @@ export default function Agenda() {
                                 setDraggingEventId(null);
                                 setDragOverDay(null);
                               }}
-                              onClick={e => { e.stopPropagation(); setSelectedDay(key); }}
-                              onDoubleClick={e => { e.stopPropagation(); setSelectedDay(key); openEdit(ev); }}
+                              onClick={e => { e.stopPropagation(); setSelectedDay(key); openViewPopover(ev, { x: e.clientX, y: e.clientY }); }}
+                              onDoubleClick={e => { e.stopPropagation(); }}
                               className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold truncate cursor-move transition-all ${
                                 movingEventId === ev.id ? "opacity-70 scale-[0.98] shadow-sm ring-1 ring-emerald-200 bg-emerald-50/70" :
                                 ev.status === "cancelado" ? "opacity-40 line-through" : "hover:opacity-80"
@@ -2796,7 +2973,7 @@ export default function Agenda() {
                   return (
                     <button
                       key={ev.id}
-                      onClick={() => openEdit(ev)}
+                      onClick={e => openViewPopover(ev, { x: e.clientX, y: e.clientY })}
                       className={`w-full text-left px-3 py-2.5 rounded-xl border hover:shadow-sm transition-all group ${
                         ev.status === "cancelado"
                           ? "opacity-50 border-slate-100 bg-slate-50"
@@ -2912,6 +3089,16 @@ export default function Agenda() {
           onExpand={handleExpandQuickEvent}
           saving={saving}
           errorMsg={errorMsg}
+        />
+      )}
+
+      {viewPopover && (
+        <EventViewPopover
+          event={viewPopover.event}
+          position={viewPopover.position}
+          onClose={() => setViewPopover(null)}
+          onEdit={() => openEdit(viewPopover.event)}
+          onDelete={() => handleDelete(viewPopover.event.id)}
         />
       )}
 
