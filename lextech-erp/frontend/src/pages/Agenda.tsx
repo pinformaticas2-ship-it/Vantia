@@ -911,14 +911,13 @@ function QuickEventPopover({
   const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }));
 
   const POPOVER_W = 340;
-  const POPOVER_H = 360;
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   let left = position.x + 12;
   let top  = position.y - 20;
   if (left + POPOVER_W > vw - 12) left = position.x - POPOVER_W - 12;
-  if (top  + POPOVER_H > vh - 12) top  = vh - POPOVER_H - 12;
-  if (top  < 12) top  = 12;
+  if (top > vh - 120) top = vh - 480;
+  if (top < 12) top = 12;
   if (left < 12) left = 12;
 
   const missingTitle = !form.title.trim();
@@ -969,7 +968,7 @@ function QuickEventPopover({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-4 space-y-4">
+        <form onSubmit={handleSubmit} className="p-4 space-y-4 overflow-y-auto" style={{ maxHeight: Math.min(vh - top - 60, 460) }}>
           {/* Título */}
           <input
             ref={titleRef}
