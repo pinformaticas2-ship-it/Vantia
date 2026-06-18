@@ -883,6 +883,18 @@ function QuickEventPopover({
 
   const missingTitle = !form.title.trim();
 
+  const durationLabel = (() => {
+    if (!form.start_at || !form.end_at || form.all_day) return null;
+    const diffMs = new Date(form.end_at).getTime() - new Date(form.start_at).getTime();
+    if (diffMs <= 0) return null;
+    const totalMin = Math.round(diffMs / 60000);
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    if (h === 0) return `${m}m`;
+    if (m === 0) return `${h}h`;
+    return `${h}h ${m}m`;
+  })();
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (missingTitle) return;
@@ -947,6 +959,11 @@ function QuickEventPopover({
                   onChange={e => set("end_at", e.target.value)}
                   className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none transition-colors"
                 />
+                {durationLabel && (
+                  <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-600">
+                    {durationLabel}
+                  </span>
+                )}
               </div>
             )}
             <label className="flex items-center gap-2 pl-[21px] text-xs text-slate-500 cursor-pointer select-none">
