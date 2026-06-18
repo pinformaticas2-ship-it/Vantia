@@ -3173,6 +3173,7 @@ export default function Agenda() {
               <div className="space-y-1 px-3">
                 {/* Eventos LexTech */}
                 {dayEvents.map(ev => {
+                  const tc = EVENT_TYPES[ev.type] || EVENT_TYPES.otro;
                   const stConf = STATUS_OPTS.find(s => s.value === ev.status) || STATUS_OPTS[0];
                   return (
                     <button
