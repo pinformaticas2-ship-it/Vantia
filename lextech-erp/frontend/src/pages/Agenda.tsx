@@ -1458,6 +1458,9 @@ function TimeGridView({
       }
       // Drag todo el día
       if (draggingAllDayRef.current) {
+        const dx = e.clientX - draggingAllDayRef.current.mouseX;
+        const dy = e.clientY - draggingAllDayRef.current.mouseY;
+        if (dx * dx + dy * dy < 16) return; // umbral de 4px
         const targetDateStr = findDateStrAtX(e.clientX);
         let timedStartAt: string | undefined;
         if (scrollRef.current) {
@@ -1499,6 +1502,9 @@ function TimeGridView({
       }
       // Drag
       if (draggingRef.current && scrollRef.current) {
+        const dx = e.clientX - draggingRef.current.mouseX;
+        const dy = e.clientY - draggingRef.current.mouseY;
+        if (dx * dx + dy * dy < 16) return; // umbral de 4px antes de activar el drag
         const gridRect = scrollRef.current.getBoundingClientRect();
         const SCROLL_ZONE = 60;
         const SCROLL_SPEED = 10;
@@ -1687,7 +1693,6 @@ function TimeGridView({
                       e.stopPropagation(); e.preventDefault();
                       const evCol = getEventColor(ev);
                       draggingAllDayRef.current = { id: ev.id, origDateStr: dateStr, startAt: ev.start_at, endAt: ev.end_at, title: ev.title, colorBg: evCol, origEv: ev, mouseX: e.clientX, mouseY: e.clientY };
-                      setAllDayDragDisplay({ id: ev.id, targetDateStr: dateStr, title: ev.title, colorBg: evCol });
                     }}
                     className={`text-[11px] font-medium truncate px-2 py-0.5 rounded text-white select-none ${isBeingDragged ? "opacity-30 cursor-grabbing" : "cursor-grab"}`}
                     style={{ backgroundColor: getEventColor(ev) }}
@@ -1908,7 +1913,6 @@ function TimeGridView({
                           grabOffsetMins: mouseTimeMins - eventStartMins,
                           origEv: ev, mouseX: e.clientX, mouseY: e.clientY,
                         };
-                        setDragDisplay({ id: ev.id, dateStr, startAt: ev.start_at, endAt: ev.end_at });
                       }}
                       className={`absolute left-1 right-1 rounded px-2 py-1 text-[11px] font-medium text-white overflow-visible shadow-sm group/ev ${movingEventId === ev.id || isDragging ? "opacity-40" : isResizing ? "brightness-110 shadow-lg" : "hover:brightness-110 hover:shadow-md"} transition-all duration-150 select-none ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
                       style={{ top: topPx, height: heightPx, zIndex: isResizing ? 30 : 10, backgroundColor: evColor }}
