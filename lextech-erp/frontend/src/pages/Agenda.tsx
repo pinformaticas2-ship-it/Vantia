@@ -788,7 +788,7 @@ function GoogleEventModal({
     <>
       <div className="fixed inset-0 z-[190]" onClick={onClose} />
       <div
-        className="fixed z-[200] w-[340px] rounded-2xl border border-blue-200 bg-white shadow-[0_24px_64px_rgba(15,23,42,0.20)] overflow-hidden animate-in zoom-in-95 fade-in-0 duration-150"
+        className="fixed z-[200] w-[340px] rounded-2xl border border-blue-200 bg-white shadow-[0_24px_64px_rgba(15,23,42,0.20)] overflow-hidden popup-card"
         style={{ left, top }}
         onClick={e => e.stopPropagation()}
       >
@@ -943,7 +943,7 @@ function QuickEventPopover({
     <>
       <div className="fixed inset-0 z-[190]" onClick={onClose} />
       <div
-        className="fixed z-[200] w-[340px] rounded-2xl border border-slate-200 bg-white shadow-[0_24px_64px_rgba(15,23,42,0.20)] overflow-hidden quick-popup animate-in zoom-in-95 fade-in-0 duration-150"
+        className="fixed z-[200] w-[340px] rounded-2xl border border-slate-200 bg-white shadow-[0_24px_64px_rgba(15,23,42,0.20)] overflow-hidden quick-popup popup-card"
         style={{ left, top }}
         onClick={e => e.stopPropagation()}
       >
@@ -1119,7 +1119,7 @@ function EventViewPopover({
     <>
       <div className="fixed inset-0 z-[190]" onClick={onClose} />
       <div
-        className="fixed z-[200] w-[340px] rounded-2xl border border-slate-200 bg-white shadow-[0_24px_64px_rgba(15,23,42,0.20)] overflow-hidden animate-in zoom-in-95 fade-in-0 duration-150"
+        className="fixed z-[200] w-[340px] rounded-2xl border border-slate-200 bg-white shadow-[0_24px_64px_rgba(15,23,42,0.20)] overflow-hidden popup-card"
         style={{ left, top }}
         onClick={e => e.stopPropagation()}
       >
