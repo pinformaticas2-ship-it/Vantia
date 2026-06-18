@@ -3006,22 +3006,8 @@ export default function Agenda() {
                               onClick={e => {
                                 if (draggingEventId) return;
                                 setSelectedDay(key);
-                                const spansHere = spanningEvents.filter(ev =>
-                                  localDateKey(ev.start_at) <= key && localDateKey(ev.end_at!) >= key
-                                );
-                                const allForDay = [
-                                  ...spansHere,
-                                  ...(eventsByDay[key] || []).filter(ev => !isSpanning(ev)),
-                                ];
-                                if (allForDay.length === 0) return;
-                                if (allForDay.length === 1) {
-                                  openViewPopover(allForDay[0], { x: e.clientX, y: e.clientY });
-                                } else {
-                                  setViewPopover(null);
-                                  setDayPopover({ date: key, events: allForDay, position: { x: e.clientX, y: e.clientY } });
-                                }
+                                openNew(key, e);
                               }}
-                              onDoubleClick={(e) => { if (draggingEventId) return; setSelectedDay(key); openNew(key, e); }}
                               className={`border-b border-r border-slate-100 min-h-[80px] p-1.5 cursor-pointer transition-all ${
                                 dragOverDay === key ? "bg-emerald-50/90 ring-2 ring-inset ring-emerald-300"
                                 : isSel   ? "bg-red-50/60"
