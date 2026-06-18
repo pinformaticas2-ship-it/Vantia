@@ -121,6 +121,38 @@ function fmtTime(dateStr: string): string {
 function fmtDateShort(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" });
 }
+function isSpanning(ev: AgendaEvent): boolean {
+  if (!ev.end_at) return false;
+  return localDateKey(ev.end_at) > localDateKey(ev.start_at);
+}
+function getWeekSpanning(
+  weekKeys: (string | null)[],
+  spanEvs: AgendaEvent[]
+): { ev: AgendaEvent; colStart: number; colEnd: number; isFirst: boolean; isLast: boolean }[] {
+  const nonNull = weekKeys.filter(Boolean) as string[];
+  if (!nonNull.length) return [];
+  const firstKey = nonNull[0];
+  const lastKey  = nonNull[nonNull.length - 1];
+  return spanEvs
+    .filter(ev => {
+      const s = localDateKey(ev.start_at);
+      const e = localDateKey(ev.end_at!);
+      return s <= lastKey && e >= firstKey;
+    })
+    .map(ev => {
+      const s = localDateKey(ev.start_at);
+      const e = localDateKey(ev.end_at!);
+      const ci = weekKeys.indexOf(s);
+      const ei = weekKeys.indexOf(e);
+      return {
+        ev,
+        colStart: s <= firstKey ? 0 : ci < 0 ? 0 : ci,
+        colEnd:   e >= lastKey  ? 6 : ei < 0 ? 6 : ei,
+        isFirst:  s >= firstKey,
+        isLast:   e <= lastKey,
+      };
+    });
+}
 function localDatetimeInput(dateStr: string | null | undefined): string {
   if (!dateStr) return "";
   const d = new Date(dateStr);
@@ -2271,6 +2303,16 @@ export default function Agenda() {
   // Días del calendario
   const calDays = useMemo(() => buildCalendarDays(viewYear, viewMonth), [viewYear, viewMonth]);
 
+  // Semanas para vista mensual (arrays de 7 fechas o null)
+  const calWeeks = useMemo(() => {
+    const weeks: (Date | null)[][] = [];
+    for (let i = 0; i < calDays.length; i += 7) weeks.push(calDays.slice(i, i + 7));
+    return weeks;
+  }, [calDays]);
+
+  // Eventos multi-día (para barras de spanning en vista mensual)
+  const spanningEvents = useMemo(() => events.filter(isSpanning), [events]);
+
   // Días de la semana activa (para vista semana)
   const weekDays = useMemo(() => {
     const monday = getMondayOfWeek(selectedDay);
@@ -2793,143 +2835,149 @@ export default function Agenda() {
                 <Spinner size="md" muted />
               </div>
             ) : (
-              <div className="grid grid-cols-7 auto-rows-fr min-h-full">
-                {calDays.map((date, idx) => {
-                  if (!date) {
-                    return <div key={`empty-${idx}`} className="border-b border-r border-slate-50 bg-slate-50/40 min-h-[90px]" />;
-                  }
-                  const key  = isoDate(date);
-                  const isToday  = key === todayStr;
-                  const isSel    = key === selectedDay;
-                  const dayEvs   = eventsByDay[key] || [];
-                  const dayGcal  = gcalEventsByDay[key] || [];
-                  const totalEvs = dayEvs.length + dayGcal.length;
-                  const maxShow  = 3;
-                  const lexShow  = dayEvs.slice(0, maxShow);
-                  const gcalShow = dayGcal.slice(0, Math.max(0, maxShow - lexShow.length));
-                  const overflow = totalEvs - lexShow.length - gcalShow.length;
+              <div className="flex flex-col min-h-full">
+                {calWeeks.map((week, weekIdx) => {
+                  const weekKeys = week.map(d => d ? isoDate(d) : null);
+                  const spans    = getWeekSpanning(weekKeys, spanningEvents);
+                  const spanBandH = spans.length > 0 ? spans.length * 22 + 4 : 0;
 
                   return (
-                    <div
-                      key={key}
-                      onDragOver={e => {
-                        if (!draggingEventId) return;
-                        e.preventDefault();
-                        if (dragOverDay !== key) setDragOverDay(key);
-                      }}
-                      onDragLeave={() => {
-                        if (dragOverDay === key) setDragOverDay(null);
-                      }}
-                      onDrop={async e => {
-                        e.preventDefault();
-                        const eventId = e.dataTransfer.getData("text/plain");
-                        const draggedEvent = events.find((item) => item.id === eventId);
-                        if (!draggedEvent) {
-                          setDraggingEventId(null);
-                          setDragOverDay(null);
-                          return;
-                        }
-                        await handleQuickMoveEvent(draggedEvent, key);
-                      }}
-                      onClick={() => {
-                        if (draggingEventId) return;
-                        setSelectedDay(key);
-                      }}
-                      onDoubleClick={(e) => {
-                        if (draggingEventId) return;
-                        setSelectedDay(key);
-                        openNew(key, e);
-                      }}
-                      className={`border-b border-r border-slate-100 min-h-[90px] p-1.5 cursor-pointer transition-all ${
-                        dragOverDay === key ? "bg-emerald-50/90 ring-2 ring-inset ring-emerald-300 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.08)]"
-                        : isSel   ? "bg-red-50/60"
-                        : isToday ? "bg-amber-50/40"
-                        : "hover:bg-slate-50"
-                      }`}
-                    >
-                      {/* Número día */}
-                      <div className="flex items-center justify-between mb-1">
-                        <span className={`text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full ${
-                          isToday ? "bg-red-600 text-white"
-                          : isSel  ? "text-red-600"
-                          : "text-slate-600"
-                        }`}>
-                          {date.getDate()}
-                        </span>
-                        <button
-                          onClick={e => { e.stopPropagation(); openNew(key, e); }}
-                          className="opacity-0 hover:opacity-100 p-0.5 text-slate-300 hover:text-red-500 transition-opacity"
-                        >
-                          <Plus size={11} />
-                        </button>
-                      </div>
+                    <div key={weekIdx} className="flex-1 relative flex flex-col">
+                      {/* ── Banda de eventos multi-día ── */}
+                      {spans.length > 0 && (
+                        <div className="relative shrink-0 w-full" style={{ height: spanBandH }}>
+                          {spans.map((item, rowIdx) => {
+                            const tc = EVENT_TYPES[item.ev.type] || EVENT_TYPES.otro;
+                            const leftPct  = (item.colStart / 7) * 100;
+                            const widthPct = ((item.colEnd - item.colStart + 1) / 7) * 100;
+                            return (
+                              <div
+                                key={item.ev.id}
+                                className="absolute z-10 cursor-pointer"
+                                style={{
+                                  left:   `calc(${leftPct}% + 2px)`,
+                                  width:  `calc(${widthPct}% - 4px)`,
+                                  top:    rowIdx * 22 + 2,
+                                  height: 18,
+                                }}
+                                onClick={e => { e.stopPropagation(); openViewPopover(item.ev, { x: e.clientX, y: e.clientY }); }}
+                              >
+                                <div className={`h-full flex items-center px-2 text-[10px] font-semibold text-white overflow-hidden ${tc.bg} ${item.isFirst && item.isLast ? "rounded" : item.isFirst ? "rounded-l" : item.isLast ? "rounded-r" : ""} hover:brightness-110 transition-[filter] ${item.ev.status === "cancelado" ? "opacity-40 line-through" : ""}`}>
+                                  {item.isFirst && <span className="truncate">{item.ev.title}</span>}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
 
-                      {/* Eventos LexTech */}
-                      <div className="space-y-0.5">
-                        {lexShow.map(ev => {
-                          const tc = EVENT_TYPES[ev.type] || EVENT_TYPES.otro;
+                      {/* ── Celdas de días ── */}
+                      <div className="grid grid-cols-7 flex-1">
+                        {week.map((date, colIdx) => {
+                          if (!date) {
+                            return <div key={`empty-${weekIdx}-${colIdx}`} className="border-b border-r border-slate-50 bg-slate-50/40 min-h-[80px]" />;
+                          }
+                          const key     = isoDate(date);
+                          const isToday = key === todayStr;
+                          const isSel   = key === selectedDay;
+                          const dayEvs  = (eventsByDay[key] || []).filter(ev => !isSpanning(ev));
+                          const dayGcal = gcalEventsByDay[key] || [];
+                          const maxShow = 3;
+                          const lexShow = dayEvs.slice(0, maxShow);
+                          const gcalShow = dayGcal.slice(0, Math.max(0, maxShow - lexShow.length));
+                          const overflow = (dayEvs.length + dayGcal.length) - lexShow.length - gcalShow.length;
+
                           return (
                             <div
-                              key={ev.id}
-                              draggable
-                              onDragStart={e => {
-                                e.dataTransfer.setData("text/plain", ev.id);
-                                e.dataTransfer.effectAllowed = "move";
-                                setDraggingEventId(ev.id);
-                                setDragOverDay(key);
+                              key={key}
+                              onDragOver={e => {
+                                if (!draggingEventId) return;
+                                e.preventDefault();
+                                if (dragOverDay !== key) setDragOverDay(key);
                               }}
-                              onDragEnd={() => {
-                                setDraggingEventId(null);
-                                setDragOverDay(null);
+                              onDragLeave={() => { if (dragOverDay === key) setDragOverDay(null); }}
+                              onDrop={async e => {
+                                e.preventDefault();
+                                const eventId = e.dataTransfer.getData("text/plain");
+                                const draggedEvent = events.find(item => item.id === eventId);
+                                if (!draggedEvent) { setDraggingEventId(null); setDragOverDay(null); return; }
+                                await handleQuickMoveEvent(draggedEvent, key);
                               }}
-                              onClick={e => { e.stopPropagation(); setSelectedDay(key); openViewPopover(ev, { x: e.clientX, y: e.clientY }); }}
-                              onDoubleClick={e => { e.stopPropagation(); }}
-                              className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold truncate cursor-move transition-all ${
-                                movingEventId === ev.id ? "opacity-70 scale-[0.98] shadow-sm ring-1 ring-emerald-200 bg-emerald-50/70" :
-                                ev.status === "cancelado" ? "opacity-40 line-through" : "hover:opacity-80"
+                              onClick={() => { if (draggingEventId) return; setSelectedDay(key); }}
+                              onDoubleClick={(e) => { if (draggingEventId) return; setSelectedDay(key); openNew(key, e); }}
+                              className={`border-b border-r border-slate-100 min-h-[80px] p-1.5 cursor-pointer transition-all ${
+                                dragOverDay === key ? "bg-emerald-50/90 ring-2 ring-inset ring-emerald-300"
+                                : isSel   ? "bg-red-50/60"
+                                : isToday ? "bg-amber-50/40"
+                                : "hover:bg-slate-50"
                               }`}
-                              title="Arrastra para mover a otro día"
                             >
-                              <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${tc.dot}`} />
-                              <span className="truncate text-slate-700">
-                                {!ev.all_day && <span className="text-slate-400 mr-0.5">{fmtTime(ev.start_at)}</span>}
-                                {ev.title}
-                              </span>
-                              {ev.external_provider === "google" && (
-                                <img
-                                  src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_16dp.png"
-                                  alt="Google Calendar"
-                                  className="w-2.5 h-2.5 shrink-0"
-                                />
-                              )}
+                              <div className="flex items-center justify-between mb-1">
+                                <span className={`text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full ${
+                                  isToday ? "bg-red-600 text-white" : isSel ? "text-red-600" : "text-slate-600"
+                                }`}>
+                                  {date.getDate()}
+                                </span>
+                                <button
+                                  onClick={e => { e.stopPropagation(); openNew(key, e); }}
+                                  className="opacity-0 hover:opacity-100 p-0.5 text-slate-300 hover:text-red-500 transition-opacity"
+                                >
+                                  <Plus size={11} />
+                                </button>
+                              </div>
+
+                              <div className="space-y-0.5">
+                                {lexShow.map(ev => {
+                                  const tc = EVENT_TYPES[ev.type] || EVENT_TYPES.otro;
+                                  return (
+                                    <div
+                                      key={ev.id}
+                                      draggable
+                                      onDragStart={e => { e.dataTransfer.setData("text/plain", ev.id); e.dataTransfer.effectAllowed = "move"; setDraggingEventId(ev.id); setDragOverDay(key); }}
+                                      onDragEnd={() => { setDraggingEventId(null); setDragOverDay(null); }}
+                                      onClick={e => { e.stopPropagation(); setSelectedDay(key); openViewPopover(ev, { x: e.clientX, y: e.clientY }); }}
+                                      onDoubleClick={e => { e.stopPropagation(); }}
+                                      className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold truncate cursor-move transition-all ${
+                                        movingEventId === ev.id ? "opacity-70 scale-[0.98] shadow-sm ring-1 ring-emerald-200 bg-emerald-50/70"
+                                        : ev.status === "cancelado" ? "opacity-40 line-through" : "hover:opacity-80"
+                                      }`}
+                                      title="Arrastra para mover a otro día"
+                                    >
+                                      <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${tc.dot}`} />
+                                      <span className="truncate text-slate-700">
+                                        {!ev.all_day && <span className="text-slate-400 mr-0.5">{fmtTime(ev.start_at)}</span>}
+                                        {ev.title}
+                                      </span>
+                                      {ev.external_provider === "google" && (
+                                        <img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_16dp.png" alt="" className="w-2.5 h-2.5 shrink-0" />
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                                {gcalShow.map(ev => {
+                                  const timeStr = ev.start.dateTime ? new Date(ev.start.dateTime).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : null;
+                                  return (
+                                    <div
+                                      key={`gcal-${ev.id}`}
+                                      onClick={e => { e.stopPropagation(); setSelectedDay(key); }}
+                                      onDoubleClick={e => { e.stopPropagation(); setSelectedDay(key); setGcalModal(ev); }}
+                                      className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold truncate cursor-pointer hover:opacity-80 transition-opacity"
+                                    >
+                                      <img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_16dp.png" alt="" className="w-2 h-2 shrink-0" />
+                                      <span className="truncate text-blue-700">
+                                        {timeStr && <span className="text-blue-400 mr-0.5">{timeStr}</span>}
+                                        {ev.summary}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                                {overflow > 0 && (
+                                  <div className="text-[10px] text-slate-400 font-semibold px-1.5">+{overflow} más</div>
+                                )}
+                              </div>
                             </div>
                           );
                         })}
-                        {/* Eventos Google Calendar */}
-                        {gcalShow.map(ev => {
-                          const timeStr = ev.start.dateTime
-                            ? new Date(ev.start.dateTime).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })
-                            : null;
-                          return (
-                            <div
-                              key={`gcal-${ev.id}`}
-                              onClick={e => { e.stopPropagation(); setSelectedDay(key); }}
-                              onDoubleClick={e => { e.stopPropagation(); setSelectedDay(key); setGcalModal(ev); }}
-                              className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold truncate cursor-pointer hover:opacity-80 transition-opacity"
-                            >
-                              <img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_16dp.png" alt="" className="w-2 h-2 shrink-0" />
-                              <span className="truncate text-blue-700">
-                                {timeStr && <span className="text-blue-400 mr-0.5">{timeStr}</span>}
-                                {ev.summary}
-                              </span>
-                            </div>
-                          );
-                        })}
-                        {overflow > 0 && (
-                          <div className="text-[10px] text-slate-400 font-semibold px-1.5">
-                            +{overflow} más
-                          </div>
-                        )}
                       </div>
                     </div>
                   );
