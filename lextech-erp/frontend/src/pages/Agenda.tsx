@@ -1179,6 +1179,80 @@ function EventViewPopover({
   );
 }
 
+// ── Popover de eventos del día (lista) ───────────────────────────────────────
+function DayEventsPopover({
+  date,
+  events,
+  position,
+  onClose,
+  onEventClick,
+}: {
+  date: string;
+  events: AgendaEvent[];
+  position: { x: number; y: number };
+  onClose: () => void;
+  onEventClick: (ev: AgendaEvent, pos: { x: number; y: number }) => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onMouse = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose(); };
+    const onKey   = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("mousedown", onMouse);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onMouse); document.removeEventListener("keydown", onKey); };
+  }, [onClose]);
+
+  const dateLabel = new Date(date + "T12:00:00").toLocaleDateString("es-ES", {
+    weekday: "long", day: "numeric", month: "long",
+  });
+
+  const style: React.CSSProperties = {
+    position: "fixed",
+    zIndex: 9999,
+    left: Math.min(position.x, window.innerWidth - 272),
+    top:  Math.min(position.y + 8, window.innerHeight - 320),
+  };
+
+  return ReactDOM.createPortal(
+    <div ref={ref} style={style} className="w-64 bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden">
+      <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between">
+        <span className="text-xs font-semibold text-slate-700 capitalize">{dateLabel}</span>
+        <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-0.5 rounded transition-colors">
+          <X size={13} />
+        </button>
+      </div>
+      <div className="max-h-56 overflow-y-auto p-2 space-y-1">
+        {events.map(ev => {
+          const tc = EVENT_TYPES[ev.type] || EVENT_TYPES.otro;
+          const spanning = isSpanning(ev);
+          return (
+            <div
+              key={ev.id}
+              onClick={e => { e.stopPropagation(); onClose(); onEventClick(ev, { x: e.clientX, y: e.clientY }); }}
+              className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-50 cursor-pointer"
+            >
+              <span className={`w-2 h-2 rounded-full shrink-0 ${tc.dot}`} />
+              <div className="flex-1 min-w-0">
+                <p className={`text-xs font-medium text-slate-800 truncate ${ev.status === "cancelado" ? "line-through opacity-50" : ""}`}>{ev.title}</p>
+                {!ev.all_day && !spanning && (
+                  <p className="text-[10px] text-slate-400">{fmtTime(ev.start_at)}{ev.end_at ? ` – ${fmtTime(ev.end_at)}` : ""}</p>
+                )}
+                {spanning && (
+                  <p className="text-[10px] text-slate-400">
+                    {fmtDateShort(ev.start_at)} – {fmtDateShort(ev.end_at!)}
+                  </p>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 // ── Vista de rejilla horaria (Semana / Día) ───────────────────────────────────
 function TimeGridView({
   days,
@@ -2051,9 +2125,17 @@ export default function Agenda() {
     position: { x: number; y: number };
   } | null>(null);
 
+  // Day events popover (lista de eventos del día)
+  const [dayPopover, setDayPopover] = useState<{
+    date: string;
+    events: AgendaEvent[];
+    position: { x: number; y: number };
+  } | null>(null);
+
   const openViewPopover = (ev: AgendaEvent, pos: { x: number; y: number }) => {
     setViewPopover({ event: ev, position: pos });
     setQuickPopover(null);
+    setDayPopover(null);
   };
 
   // Modal Google Calendar event (solo lectura)
@@ -2601,6 +2683,7 @@ export default function Agenda() {
 
   const openEdit = (ev: AgendaEvent) => {
     setViewPopover(null);
+    setDayPopover(null);
     setEditEvent(ev);
     setErrorMsg(null);
     setShowModal(true);
@@ -2903,7 +2986,24 @@ export default function Agenda() {
                                 if (!draggedEvent) { setDraggingEventId(null); setDragOverDay(null); return; }
                                 await handleQuickMoveEvent(draggedEvent, key);
                               }}
-                              onClick={() => { if (draggingEventId) return; setSelectedDay(key); }}
+                              onClick={e => {
+                                if (draggingEventId) return;
+                                setSelectedDay(key);
+                                const spansHere = spanningEvents.filter(ev =>
+                                  localDateKey(ev.start_at) <= key && localDateKey(ev.end_at!) >= key
+                                );
+                                const allForDay = [
+                                  ...spansHere,
+                                  ...(eventsByDay[key] || []).filter(ev => !isSpanning(ev)),
+                                ];
+                                if (allForDay.length === 0) return;
+                                if (allForDay.length === 1) {
+                                  openViewPopover(allForDay[0], { x: e.clientX, y: e.clientY });
+                                } else {
+                                  setViewPopover(null);
+                                  setDayPopover({ date: key, events: allForDay, position: { x: e.clientX, y: e.clientY } });
+                                }
+                              }}
                               onDoubleClick={(e) => { if (draggingEventId) return; setSelectedDay(key); openNew(key, e); }}
                               className={`border-b border-r border-slate-100 min-h-[80px] p-1.5 cursor-pointer transition-all ${
                                 dragOverDay === key ? "bg-emerald-50/90 ring-2 ring-inset ring-emerald-300"
@@ -3154,6 +3254,16 @@ export default function Agenda() {
           onClose={() => setViewPopover(null)}
           onEdit={() => openEdit(viewPopover.event)}
           onDelete={() => handleDelete(viewPopover.event.id)}
+        />
+      )}
+
+      {dayPopover && (
+        <DayEventsPopover
+          date={dayPopover.date}
+          events={dayPopover.events}
+          position={dayPopover.position}
+          onClose={() => setDayPopover(null)}
+          onEventClick={openViewPopover}
         />
       )}
 
