@@ -1098,25 +1098,12 @@ function EventViewPopover({
   const tc      = EVENT_TYPES[event.type] || EVENT_TYPES.otro;
   const stConf  = STATUS_OPTS.find(s => s.value === event.status) || STATUS_OPTS[0];
   const evColor = getEventColor(event);
-
-  const startDateLabel = new Date(event.start_at).toLocaleDateString("es-ES", {
+  const dateLabel = new Date(event.start_at).toLocaleDateString("es-ES", {
     weekday: "long", day: "numeric", month: "long",
   });
   const endDateLabel = event.end_at && isSpanning({ ...event, end_at: event.end_at })
-    ? new Date(event.end_at).toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })
+    ? new Date(event.end_at).toLocaleDateString("es-ES", { day: "numeric", month: "long" })
     : null;
-
-  const durationLabel = (() => {
-    if (!event.start_at || !event.end_at || event.all_day) return null;
-    const diffMs = new Date(event.end_at).getTime() - new Date(event.start_at).getTime();
-    if (diffMs <= 0) return null;
-    const totalMin = Math.round(diffMs / 60000);
-    const h = Math.floor(totalMin / 60);
-    const m = totalMin % 60;
-    if (h === 0) return `${m}m`;
-    if (m === 0) return `${h}h`;
-    return `${h}h ${m}m`;
-  })();
 
   const POPOVER_W = 340;
   const vw = window.innerWidth;
@@ -1124,11 +1111,9 @@ function EventViewPopover({
   let left = position.x + 12;
   let top  = position.y - 20;
   if (left + POPOVER_W > vw - 12) left = position.x - POPOVER_W - 12;
-  if (top > vh - 120) top = vh - 520;
+  if (top > vh - 120) top = vh - 480;
   if (top < 12) top = 12;
   if (left < 12) left = 12;
-
-  const fieldCls = "flex-1 min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 capitalize";
 
   return createPortal(
     <>
@@ -1138,119 +1123,108 @@ function EventViewPopover({
         style={{ left, top }}
         onClick={e => e.stopPropagation()}
       >
-        {/* Cabecera — igual que QuickEventPopover */}
+        {/* Cabecera */}
         <div className="flex items-center justify-between bg-slate-50 px-4 py-2.5 border-b border-slate-100">
           <div className="flex items-center gap-2 min-w-0">
             <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: evColor }} />
             <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400">{tc.label}</span>
           </div>
           <div className="flex items-center gap-0.5 shrink-0">
-            <button onClick={onEdit} className="rounded-lg p-1.5 text-slate-300 hover:bg-slate-200 hover:text-slate-600 transition-colors" title="Editar">
+            <button
+              onClick={onEdit}
+              className="rounded-lg p-1.5 text-slate-300 hover:bg-slate-200 hover:text-slate-600 transition-colors"
+              title="Editar"
+            >
               <Edit3 size={13} />
             </button>
             {confirmDelete ? (
               <div className="flex items-center gap-1 ml-1">
-                <button onClick={() => { onDelete(); onClose(); }} className="rounded-lg px-2.5 py-1 text-[11px] font-bold text-white bg-red-500 hover:bg-red-600 transition-colors">Eliminar</button>
-                <button onClick={() => setConfirmDelete(false)} className="rounded-lg px-2 py-1 text-[11px] font-semibold text-slate-500 hover:bg-slate-200 transition-colors">No</button>
+                <button
+                  onClick={() => { onDelete(); onClose(); }}
+                  className="rounded-lg px-2.5 py-1 text-[11px] font-bold text-white bg-red-500 hover:bg-red-600 transition-colors"
+                >
+                  Eliminar
+                </button>
+                <button
+                  onClick={() => setConfirmDelete(false)}
+                  className="rounded-lg px-2 py-1 text-[11px] font-semibold text-slate-500 hover:bg-slate-200 transition-colors"
+                >
+                  No
+                </button>
               </div>
             ) : (
-              <button onClick={() => setConfirmDelete(true)} className="rounded-lg p-1.5 text-slate-300 hover:bg-red-50 hover:text-red-500 transition-colors" title="Eliminar">
+              <button
+                onClick={() => setConfirmDelete(true)}
+                className="rounded-lg p-1.5 text-slate-300 hover:bg-red-50 hover:text-red-500 transition-colors"
+                title="Eliminar"
+              >
                 <Trash2 size={13} />
               </button>
             )}
-            <button onClick={onClose} className="rounded-lg p-1.5 text-slate-300 hover:bg-slate-200 hover:text-slate-600 transition-colors">
+            <button
+              onClick={onClose}
+              className="rounded-lg p-1.5 text-slate-300 hover:bg-slate-200 hover:text-slate-600 transition-colors"
+            >
               <X size={14} />
             </button>
           </div>
         </div>
 
-        {/* Cuerpo — mismo layout visual que QuickEventPopover */}
-        <div className="p-4 space-y-4 overflow-y-auto" style={{ maxHeight: Math.min(vh - top - 60, 460) }}>
-
-          {/* Título — misma línea subrayada */}
-          <p className={`w-full border-0 border-b-2 border-slate-100 pb-2 text-[15px] font-semibold text-slate-900 ${event.status === "cancelado" ? "line-through opacity-50" : ""}`}>
+        {/* Cuerpo */}
+        <div className="p-4 space-y-3 overflow-y-auto" style={{ maxHeight: Math.min(vh - top - 60, 420) }}>
+          {/* Título */}
+          <p className={`text-[15px] font-semibold text-slate-900 leading-snug ${event.status === "cancelado" ? "line-through opacity-50" : ""}`}>
             {event.title}
           </p>
 
-          {/* Fecha y hora — mismas cajas de input */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Calendar size={13} className="text-slate-400 shrink-0" />
-              <div className={fieldCls}>{startDateLabel}</div>
+          {/* Fecha y hora */}
+          <div className="flex items-start gap-2 text-xs text-slate-600">
+            <Calendar size={13} className="shrink-0 mt-0.5 text-slate-400" />
+            <div>
+              <p className="font-medium capitalize">{dateLabel}</p>
+              {endDateLabel && <p className="text-slate-500">hasta {endDateLabel}</p>}
+              {event.all_day
+                ? <p className="text-slate-500 mt-0.5">Todo el día</p>
+                : event.end_at && (
+                  <p className="text-slate-500 mt-0.5 flex items-center gap-1">
+                    <Clock size={10} />
+                    {fmtTime(event.start_at)} – {fmtTime(event.end_at)}
+                  </p>
+                )
+              }
             </div>
-            {!event.all_day && (
-              <div className="flex items-center gap-2 pl-[21px]">
-                <span className="text-[11px] text-slate-400 shrink-0">hasta</span>
-                <div className={`${fieldCls} ${endDateLabel ? "" : "capitalize-none"}`}>
-                  {endDateLabel ? endDateLabel : (event.end_at ? fmtTime(event.end_at) : "—")}
-                </div>
-                {durationLabel && (
-                  <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-600">
-                    {durationLabel}
-                  </span>
-                )}
-              </div>
-            )}
-            {event.all_day && (
-              <div className="pl-[21px] text-xs text-slate-500 flex items-center gap-1.5">
-                <span className="rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium">Todo el día</span>
-              </div>
-            )}
           </div>
 
-          {/* Tipo — misma caja select */}
-          <div className="flex items-center gap-2">
-            <Flag size={13} className="text-slate-400 shrink-0" />
-            <div className={fieldCls}>{tc.label}</div>
-          </div>
-
-          {/* Color actual — misma fila de swatches pero solo muestra el color activo */}
-          <div className="flex flex-wrap gap-1.5 pl-[21px]">
-            {EVENT_COLORS.map(hex => (
-              <span
-                key={hex}
-                className="w-5 h-5 rounded-full"
-                style={{
-                  backgroundColor: hex,
-                  boxShadow: hex === evColor ? `0 0 0 2px white, 0 0 0 3px ${hex}` : undefined,
-                  opacity: hex === evColor ? 1 : 0.18,
-                }}
-              />
-            ))}
-          </div>
-
-          {/* Ubicación */}
           {event.location && (
-            <div className="flex items-center gap-2">
-              <MapPin size={13} className="text-slate-400 shrink-0" />
-              <div className={fieldCls + " truncate"}>{event.location}</div>
+            <div className="flex items-center gap-2 text-xs text-slate-600">
+              <MapPin size={13} className="shrink-0 text-slate-400" />
+              <span className="truncate">{event.location}</span>
             </div>
           )}
 
-          {/* Descripción */}
           {event.description && (
-            <div className="flex items-start gap-2">
+            <div className="flex items-start gap-2 text-xs text-slate-600">
               <div className="w-[2px] shrink-0 self-stretch rounded-full mt-0.5" style={{ backgroundColor: evColor }} />
-              <p className="text-xs text-slate-600 leading-relaxed line-clamp-4">{event.description}</p>
+              <p className="leading-relaxed line-clamp-4">{event.description}</p>
             </div>
           )}
 
-          {/* Contexto / usuario relacionado */}
           {(event.organization_context || event.cliente_id) && (
-            <div className="flex items-center gap-2">
-              <Briefcase size={13} className="text-slate-400 shrink-0" />
-              <div className={fieldCls + " truncate"}>{event.organization_context || event.cliente_id}</div>
-            </div>
-          )}
-          {event.related_user_name && (
-            <div className="flex items-center gap-2">
-              <Users size={13} className="text-slate-400 shrink-0" />
-              <div className={fieldCls + " truncate"}>{event.related_user_name}</div>
+            <div className="flex items-center gap-2 text-xs text-slate-600">
+              <Briefcase size={13} className="shrink-0 text-slate-400" />
+              <span className="truncate">{event.organization_context || event.cliente_id}</span>
             </div>
           )}
 
-          {/* Pie: estado + Google — mismo borde separador que QuickEventPopover */}
-          <div className="flex items-center justify-between border-t border-slate-100 pt-3">
+          {event.related_user_name && (
+            <div className="flex items-center gap-2 text-xs text-slate-600">
+              <Users size={13} className="shrink-0 text-slate-400" />
+              <span className="truncate">{event.related_user_name}</span>
+            </div>
+          )}
+
+          {/* Pie: estado + Google */}
+          <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
             <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${stConf.cls}`}>
               {stConf.label}
             </span>
