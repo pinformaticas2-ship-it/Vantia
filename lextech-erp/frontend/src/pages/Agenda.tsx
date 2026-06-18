@@ -89,15 +89,27 @@ interface AgendaOrganizationExpediente {
 }
 
 // ── Config de tipos de evento ─────────────────────────────────────────────────
-const EVENT_TYPES: Record<string, { label: string; color: string; bg: string; dot: string; icon: any }> = {
-  cita:    { label: "Cita",       color: "text-blue-700",   bg: "bg-blue-500",   dot: "bg-blue-500",   icon: Users },
-  vista:   { label: "Vista oral", color: "text-red-700",    bg: "bg-red-500",    dot: "bg-red-500",    icon: Flag },
-  reunion: { label: "Reunión",    color: "text-violet-700", bg: "bg-violet-500", dot: "bg-violet-500", icon: Users },
-  plazo:   { label: "Plazo",      color: "text-amber-700",  bg: "bg-amber-500",  dot: "bg-amber-500",  icon: AlertCircle },
-  llamada: { label: "Llamada",    color: "text-green-700",  bg: "bg-green-500",  dot: "bg-green-500",  icon: Phone },
-  video:   { label: "Videollamada", color: "text-cyan-700", bg: "bg-cyan-500",   dot: "bg-cyan-500",   icon: Video },
-  otro:    { label: "Otro",       color: "text-slate-700",  bg: "bg-slate-400",  dot: "bg-slate-400",  icon: Circle },
+const EVENT_TYPES: Record<string, { label: string; color: string; bg: string; dot: string; hex: string; icon: any }> = {
+  cita:    { label: "Cita",         color: "text-blue-700",   bg: "bg-blue-500",   dot: "bg-blue-500",   hex: "#3b82f6", icon: Users },
+  vista:   { label: "Vista oral",   color: "text-red-700",    bg: "bg-red-500",    dot: "bg-red-500",    hex: "#ef4444", icon: Flag },
+  reunion: { label: "Reunión",      color: "text-violet-700", bg: "bg-violet-500", dot: "bg-violet-500", hex: "#8b5cf6", icon: Users },
+  plazo:   { label: "Plazo",        color: "text-amber-700",  bg: "bg-amber-500",  dot: "bg-amber-500",  hex: "#f59e0b", icon: AlertCircle },
+  llamada: { label: "Llamada",      color: "text-green-700",  bg: "bg-green-500",  dot: "bg-green-500",  hex: "#22c55e", icon: Phone },
+  video:   { label: "Videollamada", color: "text-cyan-700",   bg: "bg-cyan-500",   dot: "bg-cyan-500",   hex: "#06b6d4", icon: Video },
+  otro:    { label: "Otro",         color: "text-slate-700",  bg: "bg-slate-400",  dot: "bg-slate-400",  hex: "#94a3b8", icon: Circle },
 };
+
+const EVENT_COLORS = [
+  "#ef4444","#f97316","#f59e0b","#84cc16",
+  "#22c55e","#10b981","#14b8a6","#06b6d4",
+  "#3b82f6","#6366f1","#8b5cf6","#a855f7",
+  "#ec4899","#6b7280","#1e293b",
+];
+
+function getEventColor(ev: { color?: string | null; type: string }): string {
+  if (ev.color) return ev.color;
+  return (EVENT_TYPES[ev.type] || EVENT_TYPES.otro).hex;
+}
 
 const STATUS_OPTS = [
   { value: "pendiente",  label: "Pendiente",  cls: "bg-amber-50 text-amber-700 border-amber-200" },
@@ -259,6 +271,7 @@ const emptyForm = (date?: string) => {
     type: "cita",
     status: "pendiente",
     location: "",
+    color: "",
     expediente_id: "",
     cliente_id: "",
     related_user_id: "",
@@ -303,6 +316,7 @@ function EventModal({
         type:         event.type,
         status:       event.status,
         location:     event.location || "",
+        color:        event.color || "",
         expediente_id: event.expediente_id || "",
         cliente_id:   event.cliente_id || "",
         related_user_id: event.related_user_id || "",
@@ -494,6 +508,32 @@ function EventModal({
                 ))}
               </select>
             </div>
+            </div>
+
+            {/* Color */}
+            <div className="mt-4">
+              <label className="block text-xs font-bold text-slate-700 mb-2">Color del evento</label>
+              <div className="flex flex-wrap gap-2">
+                {EVENT_COLORS.map(hex => (
+                  <button
+                    key={hex}
+                    type="button"
+                    onClick={() => set("color", form.color === hex ? "" : hex)}
+                    className="w-6 h-6 rounded-full transition-transform hover:scale-110 focus:outline-none"
+                    style={{ backgroundColor: hex, boxShadow: form.color === hex ? `0 0 0 2px white, 0 0 0 4px ${hex}` : undefined }}
+                    title={hex}
+                  />
+                ))}
+                {form.color && (
+                  <button
+                    type="button"
+                    onClick={() => set("color", "")}
+                    className="px-2 h-6 rounded-full text-[10px] font-semibold text-slate-500 border border-slate-200 hover:border-slate-400 transition-colors"
+                  >
+                    Reset
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
@@ -977,7 +1017,7 @@ function QuickEventPopover({
             </label>
           </div>
 
-          {/* Tipo */}
+          {/* Tipo + Color */}
           <div className="flex items-center gap-2">
             <Flag size={13} className="text-slate-400 shrink-0" />
             <select
@@ -989,6 +1029,19 @@ function QuickEventPopover({
                 <option key={k} value={k}>{v.label}</option>
               ))}
             </select>
+          </div>
+
+          {/* Color */}
+          <div className="flex flex-wrap gap-1.5 pl-[21px]">
+            {EVENT_COLORS.map(hex => (
+              <button
+                key={hex}
+                type="button"
+                onClick={() => set("color", form.color === hex ? "" : hex)}
+                className="w-5 h-5 rounded-full transition-transform hover:scale-110 focus:outline-none"
+                style={{ backgroundColor: hex, boxShadow: form.color === hex ? `0 0 0 2px white, 0 0 0 3px ${hex}` : undefined }}
+              />
+            ))}
           </div>
 
           {/* Error inline */}
@@ -1081,7 +1134,7 @@ function EventViewPopover({
         {/* Cabecera con acciones */}
         <div className="flex items-center justify-between bg-slate-50 px-4 py-2.5 border-b border-slate-100">
           <div className="flex items-center gap-1.5">
-            <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${tc.dot}`} />
+            <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: getEventColor(event) }} />
             <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400">{tc.label}</span>
           </div>
           <div className="flex items-center gap-1">
@@ -1632,10 +1685,12 @@ function TimeGridView({
                     onMouseDown={e => {
                       if (e.button !== 0) return;
                       e.stopPropagation(); e.preventDefault();
-                      draggingAllDayRef.current = { id: ev.id, origDateStr: dateStr, startAt: ev.start_at, endAt: ev.end_at, title: ev.title, colorBg: tc.bg, origEv: ev, mouseX: e.clientX, mouseY: e.clientY };
-                      setAllDayDragDisplay({ id: ev.id, targetDateStr: dateStr, title: ev.title, colorBg: tc.bg });
+                      const evCol = getEventColor(ev);
+                      draggingAllDayRef.current = { id: ev.id, origDateStr: dateStr, startAt: ev.start_at, endAt: ev.end_at, title: ev.title, colorBg: evCol, origEv: ev, mouseX: e.clientX, mouseY: e.clientY };
+                      setAllDayDragDisplay({ id: ev.id, targetDateStr: dateStr, title: ev.title, colorBg: evCol });
                     }}
-                    className={`text-[11px] font-medium truncate px-2 py-0.5 rounded text-white select-none ${tc.bg} ${isBeingDragged ? "opacity-30 cursor-grabbing" : "cursor-grab"}`}
+                    className={`text-[11px] font-medium truncate px-2 py-0.5 rounded text-white select-none ${isBeingDragged ? "opacity-30 cursor-grabbing" : "cursor-grab"}`}
+                    style={{ backgroundColor: getEventColor(ev) }}
                   >
                     {ev.title}
                   </div>
@@ -1643,7 +1698,10 @@ function TimeGridView({
               })}
               {/* Ghost en columna destino (drag todo-el-día entre columnas) */}
               {allDayDragDisplay?.targetDateStr === dateStr && !allDayLex.some(e => e.id === allDayDragDisplay.id) && (
-                <div className={`text-[11px] font-medium truncate px-2 py-0.5 rounded text-white pointer-events-none ring-2 ring-white/50 opacity-80 ${allDayDragDisplay.colorBg}`}>
+                <div
+                  className="text-[11px] font-medium truncate px-2 py-0.5 rounded text-white pointer-events-none ring-2 ring-white/50 opacity-80"
+                  style={{ backgroundColor: allDayDragDisplay.colorBg }}
+                >
                   {allDayDragDisplay.title}
                 </div>
               )}
@@ -1789,11 +1847,10 @@ function TimeGridView({
                   const ghHeight = ghDur * HOUR_HEIGHT - 2;
                   const allEvs = Object.values(eventsByDay).flat();
                   const origEv = allEvs.find(e => e.id === dragDisplay.id);
-                  const tc = EVENT_TYPES[origEv?.type || "otro"] || EVENT_TYPES.otro;
                   return (
                     <div
-                      className={`absolute left-1 right-1 rounded px-2 py-1 text-[11px] font-medium text-white pointer-events-none shadow-lg ring-2 ring-white/60 ${tc.bg} opacity-90`}
-                      style={{ top: ghTop, height: ghHeight, zIndex: 50 }}
+                      className="absolute left-1 right-1 rounded px-2 py-1 text-[11px] font-medium text-white pointer-events-none shadow-lg ring-2 ring-white/60 opacity-90"
+                      style={{ top: ghTop, height: ghHeight, zIndex: 50, backgroundColor: origEv ? getEventColor(origEv) : "#94a3b8" }}
                     >
                       <div className="font-semibold truncate leading-tight">{origEv?.title}</div>
                       <div className="text-white/80 text-[10px] leading-tight">
@@ -1811,8 +1868,8 @@ function TimeGridView({
                   const topPx = (start.getHours() + start.getMinutes() / 60) * HOUR_HEIGHT;
                   return (
                     <div
-                      className={`absolute left-1 right-1 rounded px-2 py-1 text-[11px] font-medium text-white pointer-events-none ring-2 ring-white/50 opacity-80 ${allDayDragDisplay.colorBg}`}
-                      style={{ top: topPx, height: HOUR_HEIGHT - 2, zIndex: 20 }}
+                      className="absolute left-1 right-1 rounded px-2 py-1 text-[11px] font-medium text-white pointer-events-none ring-2 ring-white/50 opacity-80"
+                      style={{ top: topPx, height: HOUR_HEIGHT - 2, zIndex: 20, backgroundColor: allDayDragDisplay.colorBg }}
                     >
                       <div className="font-semibold truncate leading-tight">{allDayDragDisplay.title}</div>
                       <div className="text-[10px] leading-tight text-white/80">
@@ -1831,7 +1888,7 @@ function TimeGridView({
                   const topPx = (start.getHours() + start.getMinutes() / 60) * HOUR_HEIGHT;
                   const durationH = Math.max((end.getTime() - start.getTime()) / 3600000, 0.25);
                   const heightPx = durationH * HOUR_HEIGHT - 2;
-                  const tc = EVENT_TYPES[ev.type] || EVENT_TYPES.otro;
+                  const evColor = getEventColor(ev);
                   return (
                     <div
                       key={ev.id}
@@ -1853,8 +1910,8 @@ function TimeGridView({
                         };
                         setDragDisplay({ id: ev.id, dateStr, startAt: ev.start_at, endAt: ev.end_at });
                       }}
-                      className={`absolute left-1 right-1 rounded px-2 py-1 text-[11px] font-medium text-white overflow-visible shadow-sm group/ev ${tc.bg} ${movingEventId === ev.id || isDragging ? "opacity-40" : isResizing ? "brightness-110 shadow-lg" : "hover:brightness-110 hover:shadow-md"} transition-all duration-150 select-none ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
-                      style={{ top: topPx, height: heightPx, zIndex: isResizing ? 30 : 10 }}
+                      className={`absolute left-1 right-1 rounded px-2 py-1 text-[11px] font-medium text-white overflow-visible shadow-sm group/ev ${movingEventId === ev.id || isDragging ? "opacity-40" : isResizing ? "brightness-110 shadow-lg" : "hover:brightness-110 hover:shadow-md"} transition-all duration-150 select-none ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
+                      style={{ top: topPx, height: heightPx, zIndex: isResizing ? 30 : 10, backgroundColor: evColor }}
                     >
                       {isResizing ? (
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden">
@@ -2947,7 +3004,7 @@ export default function Agenda() {
                       {spans.length > 0 && (
                         <div className="relative shrink-0 w-full" style={{ height: spanBandH }}>
                           {spans.map((item, rowIdx) => {
-                            const tc = EVENT_TYPES[item.ev.type] || EVENT_TYPES.otro;
+                            const evColor = getEventColor(item.ev);
                             const leftPct  = (item.colStart / 7) * 100;
                             const widthPct = ((item.colEnd - item.colStart + 1) / 7) * 100;
                             return (
@@ -2962,7 +3019,10 @@ export default function Agenda() {
                                 }}
                                 onClick={e => { e.stopPropagation(); openViewPopover(item.ev, { x: e.clientX, y: e.clientY }); }}
                               >
-                                <div className={`h-full flex items-center px-2 text-[10px] font-semibold text-white overflow-hidden ${tc.bg} ${item.isFirst && item.isLast ? "rounded" : item.isFirst ? "rounded-l" : item.isLast ? "rounded-r" : ""} hover:brightness-110 transition-[filter] ${item.ev.status === "cancelado" ? "opacity-40 line-through" : ""}`}>
+                                <div
+                                  className={`h-full flex items-center px-2 text-[10px] font-semibold text-white overflow-hidden ${item.isFirst && item.isLast ? "rounded" : item.isFirst ? "rounded-l" : item.isLast ? "rounded-r" : ""} hover:brightness-110 transition-[filter] ${item.ev.status === "cancelado" ? "opacity-40 line-through" : ""}`}
+                                  style={{ backgroundColor: evColor }}
+                                >
                                   {item.isFirst && <span className="truncate">{item.ev.title}</span>}
                                 </div>
                               </div>
@@ -3031,7 +3091,7 @@ export default function Agenda() {
 
                               <div className="space-y-0.5">
                                 {lexShow.map(ev => {
-                                  const tc = EVENT_TYPES[ev.type] || EVENT_TYPES.otro;
+                                  const evColor = getEventColor(ev);
                                   return (
                                     <div
                                       key={ev.id}
@@ -3040,10 +3100,11 @@ export default function Agenda() {
                                       onDragEnd={() => { setDraggingEventId(null); setDragOverDay(null); }}
                                       onClick={e => { e.stopPropagation(); setSelectedDay(key); openViewPopover(ev, { x: e.clientX, y: e.clientY }); }}
                                       onDoubleClick={e => { e.stopPropagation(); }}
-                                      className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold truncate cursor-move transition-all text-white ${tc.bg} ${
+                                      className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold truncate cursor-move transition-all text-white ${
                                         movingEventId === ev.id ? "opacity-70 scale-[0.98] shadow-sm"
                                         : ev.status === "cancelado" ? "opacity-40 line-through" : "hover:brightness-110"
                                       }`}
+                                      style={{ backgroundColor: evColor }}
                                       title="Arrastra para mover a otro día"
                                     >
                                       {!ev.all_day && <span className="opacity-75 shrink-0">{fmtTime(ev.start_at)}</span>}
@@ -3123,7 +3184,6 @@ export default function Agenda() {
               <div className="space-y-1 px-3">
                 {/* Eventos LexTech */}
                 {dayEvents.map(ev => {
-                  const tc = EVENT_TYPES[ev.type] || EVENT_TYPES.otro;
                   const stConf = STATUS_OPTS.find(s => s.value === ev.status) || STATUS_OPTS[0];
                   return (
                     <button
@@ -3136,7 +3196,7 @@ export default function Agenda() {
                       }`}
                     >
                       <div className="flex items-start gap-2">
-                        <div className={`h-2 w-2 rounded-full mt-1.5 shrink-0 ${tc.dot}`} />
+                        <div className="h-2 w-2 rounded-full mt-1.5 shrink-0" style={{ backgroundColor: getEventColor(ev) }} />
                         <div className="flex-1 min-w-0">
                           <p className={`text-xs font-semibold text-slate-800 truncate ${ev.status === "cancelado" ? "line-through" : ""}`}>
                             {ev.title}

@@ -637,6 +637,7 @@ export async function runMigrations(): Promise<void> {
       `ALTER TABLE agenda_events ADD COLUMN IF NOT EXISTS related_user_name VARCHAR(200)`,
       `ALTER TABLE agenda_events ADD COLUMN IF NOT EXISTS organization_context TEXT`,
       `ALTER TABLE agenda_events ADD COLUMN IF NOT EXISTS task_id UUID`,
+      `ALTER TABLE agenda_events ADD COLUMN IF NOT EXISTS color VARCHAR(7)`,
     ]) {
       try { await client.query(col); } catch (_e: any) {}
     }
