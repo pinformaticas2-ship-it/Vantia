@@ -1106,145 +1106,135 @@ function EventViewPopover({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const POPOVER_W = 320;
-  const POPOVER_H = 320;
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
-  let left = position.x + 12;
-  let top  = position.y - 20;
-  if (left + POPOVER_W > vw - 12) left = position.x - POPOVER_W - 12;
-  if (top  + POPOVER_H > vh - 12) top  = vh - POPOVER_H - 12;
-  if (top  < 12) top  = 12;
-  if (left < 12) left = 12;
-
-  const tc     = EVENT_TYPES[event.type] || EVENT_TYPES.otro;
-  const stConf = STATUS_OPTS.find(s => s.value === event.status) || STATUS_OPTS[0];
+  const tc      = EVENT_TYPES[event.type] || EVENT_TYPES.otro;
+  const stConf  = STATUS_OPTS.find(s => s.value === event.status) || STATUS_OPTS[0];
+  const evColor = getEventColor(event);
   const dateLabel = new Date(event.start_at).toLocaleDateString("es-ES", {
     weekday: "long", day: "numeric", month: "long",
   });
+  const endDateLabel = event.end_at && isSpanning({ ...event, end_at: event.end_at })
+    ? new Date(event.end_at).toLocaleDateString("es-ES", { day: "numeric", month: "long" })
+    : null;
 
   return createPortal(
-    <>
-      <div className="fixed inset-0 z-[190]" onClick={onClose} />
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/25 backdrop-blur-[2px]" />
       <div
-        className="fixed z-[200] w-[320px] rounded-2xl border border-slate-200 bg-white shadow-[0_24px_64px_rgba(15,23,42,0.20)] overflow-hidden quick-popup"
-        style={{ left, top }}
+        className="relative w-full max-w-sm rounded-3xl bg-white shadow-[0_32px_80px_rgba(15,23,42,0.25)] overflow-hidden animate-in zoom-in-95 duration-150"
         onClick={e => e.stopPropagation()}
       >
-        {/* Cabecera con acciones */}
-        <div className="flex items-center justify-between bg-slate-50 px-4 py-2.5 border-b border-slate-100">
-          <div className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: getEventColor(event) }} />
-            <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400">{tc.label}</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={onEdit}
-              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition-colors"
-              title="Editar evento"
-            >
-              <Edit3 size={13} />
-            </button>
-            {confirmDelete ? (
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => { onDelete(); onClose(); }}
-                  className="rounded-lg px-2 py-1 text-[10px] font-bold text-white bg-red-500 hover:bg-red-600 transition-colors"
-                >
-                  Eliminar
-                </button>
-                <button
-                  onClick={() => setConfirmDelete(false)}
-                  className="rounded-lg px-2 py-1 text-[10px] font-semibold text-slate-500 hover:bg-slate-200 transition-colors"
-                >
-                  No
-                </button>
-              </div>
-            ) : (
+        {/* Franja de color + cabecera */}
+        <div className="px-5 pt-5 pb-4" style={{ background: `linear-gradient(135deg, ${evColor}18 0%, ${evColor}08 100%)`, borderBottom: `3px solid ${evColor}` }}>
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: evColor }} />
+              <span className="text-[11px] font-bold uppercase tracking-widest text-slate-500">{tc.label}</span>
+            </div>
+            <div className="flex items-center gap-0.5 shrink-0">
               <button
-                onClick={() => setConfirmDelete(true)}
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors"
-                title="Eliminar evento"
+                onClick={onEdit}
+                className="rounded-xl p-2 text-slate-400 hover:bg-white/80 hover:text-slate-700 transition-colors"
+                title="Editar"
               >
-                <Trash2 size={13} />
+                <Edit3 size={14} />
               </button>
-            )}
-            <button
-              onClick={onClose}
-              className="rounded-lg p-1.5 text-slate-300 hover:bg-slate-200 hover:text-slate-600 transition-colors"
-            >
-              <X size={13} />
-            </button>
+              {confirmDelete ? (
+                <div className="flex items-center gap-1 ml-1">
+                  <button
+                    onClick={() => { onDelete(); onClose(); }}
+                    className="rounded-xl px-2.5 py-1.5 text-[11px] font-bold text-white bg-red-500 hover:bg-red-600 transition-colors"
+                  >
+                    Eliminar
+                  </button>
+                  <button
+                    onClick={() => setConfirmDelete(false)}
+                    className="rounded-xl px-2.5 py-1.5 text-[11px] font-semibold text-slate-500 hover:bg-white/80 transition-colors"
+                  >
+                    No
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmDelete(true)}
+                  className="rounded-xl p-2 text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors"
+                  title="Eliminar"
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                className="rounded-xl p-2 text-slate-300 hover:bg-white/80 hover:text-slate-600 transition-colors"
+              >
+                <X size={14} />
+              </button>
+            </div>
           </div>
+
+          <h2 className={`mt-3 text-lg font-bold text-slate-900 leading-snug ${event.status === "cancelado" ? "line-through opacity-50" : ""}`}>
+            {event.title}
+          </h2>
         </div>
 
         {/* Cuerpo */}
-        <div className="p-4 space-y-3">
-          {/* Título */}
-          <p className={`text-[15px] font-semibold text-slate-900 leading-tight ${event.status === "cancelado" ? "line-through opacity-50" : ""}`}>
-            {event.title}
-          </p>
-
+        <div className="px-5 py-4 space-y-3">
           {/* Fecha y hora */}
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 text-xs text-slate-600">
-              <Calendar size={12} className="text-slate-400 shrink-0" />
-              <span className="capitalize">{dateLabel}</span>
+          <div className="flex items-start gap-3 text-sm text-slate-700">
+            <Calendar size={15} className="text-slate-400 shrink-0 mt-0.5" style={{ color: evColor }} />
+            <div>
+              <p className="font-medium capitalize">{dateLabel}</p>
+              {endDateLabel && <p className="text-xs text-slate-500">hasta {endDateLabel}</p>}
+              {event.all_day
+                ? <p className="text-xs text-slate-500 mt-0.5">Todo el día</p>
+                : event.end_at && (
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    <Clock size={11} className="inline mr-1 -mt-px" />
+                    {fmtTime(event.start_at)} – {fmtTime(event.end_at)}
+                  </p>
+                )
+              }
             </div>
-            {!event.all_day && (
-              <div className="flex items-center gap-2 text-xs text-slate-600 pl-[20px]">
-                <Clock size={12} className="text-slate-400 shrink-0 -ml-[20px]" />
-                <span>
-                  {fmtTime(event.start_at)}
-                  {event.end_at && <> – {fmtTime(event.end_at)}</>}
-                </span>
-              </div>
-            )}
-            {event.all_day && (
-              <p className="text-xs text-slate-500 pl-[20px]">Todo el día</p>
-            )}
           </div>
 
-          {/* Ubicación */}
           {event.location && (
-            <div className="flex items-center gap-2 text-xs text-slate-600">
-              <MapPin size={12} className="text-slate-400 shrink-0" />
+            <div className="flex items-center gap-3 text-sm text-slate-600">
+              <MapPin size={15} className="text-slate-400 shrink-0" style={{ color: evColor }} />
               <span className="truncate">{event.location}</span>
             </div>
           )}
 
-          {/* Descripción */}
           {event.description && (
-            <p className="text-xs text-slate-500 leading-relaxed line-clamp-3 pl-[20px] border-l-2 border-slate-100">
-              {event.description}
-            </p>
-          )}
-
-          {/* Expediente / Cliente */}
-          {(event.organization_context || event.cliente_id) && (
-            <div className="flex items-start gap-2 text-xs text-slate-600">
-              <Briefcase size={12} className="text-slate-400 shrink-0 mt-0.5" />
-              <span className="truncate">{event.organization_context || event.cliente_id}</span>
+            <div className="flex items-start gap-3 text-sm text-slate-600">
+              <div className="w-[15px] shrink-0 mt-0.5 border-l-2 self-stretch" style={{ borderColor: evColor }} />
+              <p className="text-xs leading-relaxed line-clamp-4">{event.description}</p>
             </div>
           )}
 
-          {/* Usuario relacionado */}
+          {(event.organization_context || event.cliente_id) && (
+            <div className="flex items-center gap-3 text-sm text-slate-600">
+              <Briefcase size={15} className="text-slate-400 shrink-0" style={{ color: evColor }} />
+              <span className="truncate text-sm">{event.organization_context || event.cliente_id}</span>
+            </div>
+          )}
+
           {event.related_user_name && (
-            <div className="flex items-center gap-2 text-xs text-slate-600">
-              <Users size={12} className="text-slate-400 shrink-0" />
+            <div className="flex items-center gap-3 text-sm text-slate-600">
+              <Users size={15} className="text-slate-400 shrink-0" style={{ color: evColor }} />
               <span className="truncate">{event.related_user_name}</span>
             </div>
           )}
 
-          {/* Estado */}
-          <div className="pt-1 border-t border-slate-100">
-            <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold ${stConf.cls}`}>
+          <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+            <span className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-semibold ${stConf.cls}`}>
               {stConf.label}
             </span>
+            {event.external_provider === "google" && (
+              <img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_16dp.png" alt="Google Calendar" className="w-4 h-4 opacity-60" />
+            )}
           </div>
         </div>
       </div>
-    </>,
+    </div>,
     document.body
   );
 }
