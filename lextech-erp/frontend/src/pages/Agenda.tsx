@@ -1203,6 +1203,7 @@ function TimeGridView({
   const draggingRef = useRef<{
     id: string; startAt: string; endAt: string | null;
     durationMs: number; grabOffsetMins: number;
+    origEv: AgendaEvent; mouseX: number; mouseY: number;
   } | null>(null);
   const [dragDisplay, setDragDisplay] = useState<{
     id: string; dateStr: string; startAt: string; endAt: string | null;
@@ -1216,6 +1217,7 @@ function TimeGridView({
   const draggingAllDayRef = useRef<{
     id: string; origDateStr: string; startAt: string; endAt: string | null;
     title: string; colorBg: string;
+    origEv: AgendaEvent; mouseX: number; mouseY: number;
   } | null>(null);
   const [allDayDragDisplay, setAllDayDragDisplay] = useState<{
     id: string; targetDateStr: string; title: string; colorBg: string;
@@ -1240,6 +1242,8 @@ function TimeGridView({
   onSlotClickRef.current = onSlotClick;
   const onSlotDragCreateRef = useRef(onSlotDragCreate);
   onSlotDragCreateRef.current = onSlotDragCreate;
+  const onEventClickRef = useRef(onEventClick);
+  onEventClickRef.current = onEventClick;
 
   // Función para encontrar la columna bajo el cursor
   const findDateStrAtX = useCallback((clientX: number): string => {
@@ -1366,11 +1370,9 @@ function TimeGridView({
         const display = allDayDragDisplay;
         setAllDayDragDisplay(null);
         if (display?.timedStartAt) {
-          // Convertir a evento con hora
           const newEndAt = new Date(new Date(display.timedStartAt).getTime() + 3600000).toISOString();
           await onMoveEventRef.current(drag.id, display.timedStartAt, newEndAt, false);
         } else if (display && display.targetDateStr !== drag.origDateStr) {
-          // Mover a otro día (sigue siendo todo el día)
           const newStartAt = display.targetDateStr + "T00:00:00";
           let newEndAt: string | null = null;
           if (drag.endAt) {
@@ -1379,6 +1381,9 @@ function TimeGridView({
             newEndAt = new Date(new Date(newStartAt).getTime() + (endMs - origMs)).toISOString();
           }
           await onMoveEventRef.current(drag.id, newStartAt, newEndAt);
+        } else {
+          // Sin movimiento → fue un click
+          onEventClickRef.current(drag.origEv, { x: drag.mouseX, y: drag.mouseY });
         }
         return;
       }
@@ -1400,6 +1405,9 @@ function TimeGridView({
           await onMoveEventRef.current(drag.id, display.dateStr + "T00:00:00", null, true);
         } else if (display && (display.startAt !== drag.startAt || display.dateStr !== drag.startAt.slice(0, 10))) {
           await onMoveEventRef.current(drag.id, display.startAt, display.endAt);
+        } else {
+          // Sin movimiento → fue un click
+          onEventClickRef.current(drag.origEv, { x: drag.mouseX, y: drag.mouseY });
         }
       }
     };
@@ -1498,11 +1506,10 @@ function TimeGridView({
                 return (
                   <div
                     key={ev.id}
-                    onClick={e => { if (allDayDragDisplay) return; e.stopPropagation(); onEventClick(ev, { x: e.clientX, y: e.clientY }); }}
                     onMouseDown={e => {
                       if (e.button !== 0) return;
                       e.stopPropagation(); e.preventDefault();
-                      draggingAllDayRef.current = { id: ev.id, origDateStr: dateStr, startAt: ev.start_at, endAt: ev.end_at, title: ev.title, colorBg: tc.bg };
+                      draggingAllDayRef.current = { id: ev.id, origDateStr: dateStr, startAt: ev.start_at, endAt: ev.end_at, title: ev.title, colorBg: tc.bg, origEv: ev, mouseX: e.clientX, mouseY: e.clientY };
                       setAllDayDragDisplay({ id: ev.id, targetDateStr: dateStr, title: ev.title, colorBg: tc.bg });
                     }}
                     className={`text-[11px] font-medium truncate px-2 py-0.5 rounded text-white select-none ${tc.bg} ${isBeingDragged ? "opacity-30 cursor-grabbing" : "cursor-grab"}`}
@@ -1705,7 +1712,6 @@ function TimeGridView({
                   return (
                     <div
                       key={ev.id}
-                      onClick={e => { if (isResizing || isDragging) return; e.stopPropagation(); onEventClick(ev, { x: e.clientX, y: e.clientY }); }}
                       onMouseDown={e => {
                         if (e.button !== 0 || resizingRef.current) return;
                         const target = e.target as HTMLElement;
@@ -1720,6 +1726,7 @@ function TimeGridView({
                           id: ev.id, startAt: ev.start_at, endAt: ev.end_at,
                           durationMs: endMs - start.getTime(),
                           grabOffsetMins: mouseTimeMins - eventStartMins,
+                          origEv: ev, mouseX: e.clientX, mouseY: e.clientY,
                         };
                         setDragDisplay({ id: ev.id, dateStr, startAt: ev.start_at, endAt: ev.end_at });
                       }}
