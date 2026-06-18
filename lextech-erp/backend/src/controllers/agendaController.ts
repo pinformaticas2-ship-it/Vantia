@@ -37,8 +37,13 @@ const toBoolean = (value: any) => {
 const normalizeGoogleEvent = (raw: any) => {
   const externalId = sanitizeText(raw?.external_id || raw?.id);
   const title = sanitizeTitle(raw?.title || raw?.summary);
-  const startAt = raw?.start_at || raw?.start?.dateTime || (raw?.start?.date ? `${raw.start.date}T00:00:00.000Z` : null);
-  const endAt = raw?.end_at || raw?.end?.dateTime || (raw?.end?.date ? `${raw.end.date}T23:59:59.999Z` : null);
+  const startAt = raw?.start_at || raw?.start?.dateTime || (raw?.start?.date ? `${raw.start.date}T12:00:00.000Z` : null);
+  const endAt = raw?.end_at || raw?.end?.dateTime || (raw?.end?.date ? (() => {
+    // GCal all-day end.date is exclusive (day after last); subtract 1 day to get inclusive end
+    const d = new Date(raw.end.date + 'T00:00:00.000Z');
+    d.setUTCDate(d.getUTCDate() - 1);
+    return d.toISOString().slice(0, 10) + 'T12:00:00.000Z';
+  })() : null);
   const allDay = toBoolean(raw?.all_day) || (!!raw?.start?.date && !raw?.start?.dateTime);
 
   return {
@@ -666,9 +671,10 @@ export const syncGoogleEvents = async (req: any, res: Response) => {
       `SELECT id, external_id, title
        FROM agenda_events
        WHERE external_provider = 'google'
+         AND user_id = $3
          AND start_at >= $1
          AND start_at <= $2`,
-      [from, to]
+      [from, to, userId]
     );
 
     for (const row of existingInRange.rows) {
