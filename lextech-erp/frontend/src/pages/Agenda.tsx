@@ -1294,6 +1294,7 @@ function TimeGridView({
   selectedDay,
   todayStr,
   movingEventId,
+  activeSelection,
   onSlotClick,
   onSlotDragCreate,
   onEventClick,
@@ -1308,6 +1309,7 @@ function TimeGridView({
   selectedDay: string;
   todayStr: string;
   movingEventId: string | null;
+  activeSelection: { dateStr: string; startMins: number; endMins: number } | null;
   onSlotClick: (dateStr: string, hour: number, pos: { clientX: number; clientY: number }) => void;
   onSlotDragCreate: (dateStr: string, startAt: string, endAt: string, pos: { clientX: number; clientY: number }) => void;
   onEventClick: (ev: AgendaEvent, pos: { x: number; y: number }) => void;
@@ -1790,9 +1792,10 @@ function TimeGridView({
                 })()}
 
                 {/* Ghost de slot drag (nuevo evento) */}
-                {slotDragDisplay?.dateStr === dateStr && (() => {
-                  const topPx    = (slotDragDisplay.startMins / 60) * HOUR_HEIGHT;
-                  const heightPx = Math.max(((slotDragDisplay.endMins - slotDragDisplay.startMins) / 60) * HOUR_HEIGHT, 22);
+                {(slotDragDisplay?.dateStr === dateStr || activeSelection?.dateStr === dateStr) && (() => {
+                  const sel = (slotDragDisplay && slotDragDisplay.dateStr === dateStr) ? slotDragDisplay : activeSelection!;
+                  const topPx    = (sel.startMins / 60) * HOUR_HEIGHT;
+                  const heightPx = Math.max(((sel.endMins - sel.startMins) / 60) * HOUR_HEIGHT, 22);
                   const fmt = (mins: number) => `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
                   return (
                     <div
@@ -1800,11 +1803,11 @@ function TimeGridView({
                       style={{ top: topPx, height: heightPx, zIndex: 20 }}
                     >
                       <div className="px-1.5 pt-0.5 text-[10px] font-bold text-red-700 leading-tight">
-                        {fmt(slotDragDisplay.startMins)}
+                        {fmt(sel.startMins)}
                       </div>
                       {heightPx >= 38 && (
                         <div className="absolute bottom-0.5 left-1.5 text-[10px] font-semibold text-red-500">
-                          {fmt(slotDragDisplay.endMins)}
+                          {fmt(sel.endMins)}
                         </div>
                       )}
                     </div>
@@ -2167,6 +2170,7 @@ export default function Agenda() {
     position: { x: number; y: number };
     initialData?: AgendaFormData;
   } | null>(null);
+  const [activeSelection, setActiveSelection] = useState<{ dateStr: string; startMins: number; endMins: number } | null>(null);
   const [expandInitialData, setExpandInitialData] = useState<AgendaFormData | null>(null);
 
   // View popover (visualizar evento)
@@ -2394,6 +2398,9 @@ export default function Agenda() {
   const handleSlotDragCreate = useCallback((dateStr: string, startAt: string, endAt: string, pos: { clientX: number; clientY: number }) => {
     setEditEvent(null);
     setErrorMsg(null);
+    const s = new Date(startAt);
+    const e = new Date(endAt);
+    setActiveSelection({ dateStr, startMins: s.getHours() * 60 + s.getMinutes(), endMins: e.getHours() * 60 + e.getMinutes() });
     setQuickPopover({
       date: localDatetimeInput(startAt),
       position: { x: pos.clientX, y: pos.clientY },
@@ -2551,6 +2558,7 @@ export default function Agenda() {
 
       setShowModal(false);
       setQuickPopover(null);
+      setActiveSelection(null);
       setEditEvent(null);
       await fetchEvents(true);
       if (syncWarning) setGcalError(syncWarning);
@@ -2736,6 +2744,7 @@ export default function Agenda() {
 
   const handleExpandQuickEvent = (formData: AgendaFormData) => {
     setQuickPopover(null);
+    setActiveSelection(null);
     setEditEvent(null);
     setExpandInitialData(formData);
     setDefaultDate(null);
@@ -2948,6 +2957,7 @@ export default function Agenda() {
               selectedDay={selectedDay}
               todayStr={todayStr}
               movingEventId={movingEventId}
+              activeSelection={activeSelection}
               onSlotClick={openNewAtSlot}
               onSlotDragCreate={handleSlotDragCreate}
               onEventClick={openViewPopover}
@@ -3252,7 +3262,7 @@ export default function Agenda() {
           date={quickPopover.date}
           position={quickPopover.position}
           initialData={quickPopover.initialData}
-          onClose={() => { setQuickPopover(null); setErrorMsg(null); }}
+          onClose={() => { setQuickPopover(null); setActiveSelection(null); setErrorMsg(null); }}
           onSave={handleSave}
           onExpand={handleExpandQuickEvent}
           saving={saving}
