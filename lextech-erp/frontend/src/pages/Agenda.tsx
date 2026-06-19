@@ -137,34 +137,7 @@ function isSpanning(ev: AgendaEvent): boolean {
   if (!ev.end_at) return false;
   return localDateKey(ev.end_at) > localDateKey(ev.start_at);
 }
-function getWeekSpanning(
-  weekKeys: (string | null)[],
-  spanEvs: AgendaEvent[]
-): { ev: AgendaEvent; colStart: number; colEnd: number; isFirst: boolean; isLast: boolean }[] {
-  const nonNull = weekKeys.filter(Boolean) as string[];
-  if (!nonNull.length) return [];
-  const firstKey = nonNull[0];
-  const lastKey  = nonNull[nonNull.length - 1];
-  return spanEvs
-    .filter(ev => {
-      const s = localDateKey(ev.start_at);
-      const e = localDateKey(ev.end_at!);
-      return s <= lastKey && e >= firstKey;
-    })
-    .map(ev => {
-      const s = localDateKey(ev.start_at);
-      const e = localDateKey(ev.end_at!);
-      const ci = weekKeys.indexOf(s);
-      const ei = weekKeys.indexOf(e);
-      return {
-        ev,
-        colStart: s <= firstKey ? 0 : ci < 0 ? 0 : ci,
-        colEnd:   e >= lastKey  ? 6 : ei < 0 ? 6 : ei,
-        isFirst:  s >= firstKey,
-        isLast:   e <= lastKey,
-      };
-    });
-}
+
 function localDatetimeInput(dateStr: string | null | undefined): string {
   if (!dateStr) return "";
   const d = new Date(dateStr);
@@ -1375,6 +1348,7 @@ function TimeGridView({
     id: string; dateStr: string; startAt: string; endAt: string | null;
     droppingToAllDay?: boolean; hasMoved?: boolean;
   } | null>(null);
+  const dragDisplayRef = useRef<typeof dragDisplay>(null);
   const columnRefsMap = useRef<Map<string, HTMLDivElement | null>>(new Map());
   const onMoveEventRef = useRef(onMoveEvent);
   onMoveEventRef.current = onMoveEvent;
@@ -1389,6 +1363,7 @@ function TimeGridView({
     id: string; targetDateStr: string; title: string; colorBg: string;
     timedStartAt?: string; hasMoved?: boolean;
   } | null>(null);
+  const allDayDragDisplayRef = useRef<typeof allDayDragDisplay>(null);
 
   // ── Drag para crear evento (slot drag) ───────────────────────────────────────
   const slotDragRef = useRef<{
@@ -1440,9 +1415,11 @@ function TimeGridView({
         const endMins = Math.max(snappedMins, slotDragRef.current.startMins + 15);
         slotDragRef.current.endMins = endMins;
         slotDragRef.current.hasMoved = true;
+        const currentSlotDrag = slotDragRef.current;
         setSlotDragDisplay(prev => {
-          if (prev?.endMins === endMins && prev.dateStr === slotDragRef.current!.dateStr) return prev;
-          return { dateStr: slotDragRef.current!.dateStr, startMins: slotDragRef.current!.startMins, endMins };
+          if (!currentSlotDrag) return null;
+          if (prev?.endMins === endMins && prev.dateStr === currentSlotDrag.dateStr) return prev;
+          return { dateStr: currentSlotDrag.dateStr, startMins: currentSlotDrag.startMins, endMins };
         });
         return;
       }
@@ -1460,8 +1437,9 @@ function TimeGridView({
             timedStartAt = base.toISOString();
           }
         }
+        const next = { id: draggingAllDayRef.current.id, targetDateStr, title: draggingAllDayRef.current.title, colorBg: draggingAllDayRef.current.colorBg, timedStartAt, hasMoved: true };
+        allDayDragDisplayRef.current = next;
         setAllDayDragDisplay(prev => {
-          const next = { id: draggingAllDayRef.current!.id, targetDateStr, title: draggingAllDayRef.current!.title, colorBg: draggingAllDayRef.current!.colorBg, timedStartAt, hasMoved: true };
           if (prev?.targetDateStr === next.targetDateStr && prev?.timedStartAt === next.timedStartAt && prev?.hasMoved) return prev;
           return next;
         });
@@ -1497,7 +1475,9 @@ function TimeGridView({
         const targetDateStr = findDateStrAtX(e.clientX);
         // Si el cursor está sobre la banda de todo el día
         if (e.clientY < gridRect.top) {
-          setDragDisplay({ id: draggingRef.current.id, dateStr: targetDateStr, startAt: draggingRef.current.startAt, endAt: draggingRef.current.endAt, droppingToAllDay: true, hasMoved: true });
+          const dd = { id: draggingRef.current.id, dateStr: targetDateStr, startAt: draggingRef.current.startAt, endAt: draggingRef.current.endAt, droppingToAllDay: true, hasMoved: true };
+          dragDisplayRef.current = dd;
+          setDragDisplay(dd);
           return;
         }
         const rawY = e.clientY - gridRect.top + scrollRef.current.scrollTop;
@@ -1510,7 +1490,9 @@ function TimeGridView({
         const newEnd = draggingRef.current.durationMs > 0
           ? new Date(newStart.getTime() + draggingRef.current.durationMs)
           : null;
-        setDragDisplay({ id: draggingRef.current.id, dateStr: targetDateStr, startAt: newStart.toISOString(), endAt: newEnd?.toISOString() ?? null, hasMoved: true });
+        const dd = { id: draggingRef.current.id, dateStr: targetDateStr, startAt: newStart.toISOString(), endAt: newEnd?.toISOString() ?? null, hasMoved: true };
+        dragDisplayRef.current = dd;
+        setDragDisplay(dd);
       }
     };
     const handleMouseUp = async (e: MouseEvent) => {
@@ -1533,7 +1515,8 @@ function TimeGridView({
       if (draggingAllDayRef.current) {
         const drag = draggingAllDayRef.current;
         draggingAllDayRef.current = null;
-        const display = allDayDragDisplay;
+        const display = allDayDragDisplayRef.current;
+        allDayDragDisplayRef.current = null;
         setAllDayDragDisplay(null);
         if (display?.hasMoved && display?.timedStartAt) {
           const newEndAt = new Date(new Date(display.timedStartAt).getTime() + 3600000).toISOString();
@@ -1564,7 +1547,8 @@ function TimeGridView({
       if (draggingRef.current) {
         const drag = draggingRef.current;
         draggingRef.current = null;
-        const display = dragDisplay;
+        const display = dragDisplayRef.current;
+        dragDisplayRef.current = null;
         setDragDisplay(null);
         if (display?.hasMoved && display?.droppingToAllDay) {
           await onMoveEventRef.current(drag.id, display.dateStr + "T00:00:00", null, true);
@@ -1589,7 +1573,7 @@ function TimeGridView({
       window.removeEventListener("mouseup", handleMouseUp);
       document.removeEventListener("mouseleave", handleDocLeave);
     };
-  }, [dragDisplay, allDayDragDisplay, findDateStrAtX]);
+  }, [findDateStrAtX]);
 
   const [nowMins, setNowMins] = useState(() => {
     const n = new Date();
@@ -1675,7 +1659,9 @@ function TimeGridView({
                       e.stopPropagation(); e.preventDefault();
                       const evCol = getEventColor(ev);
                       draggingAllDayRef.current = { id: ev.id, origDateStr: dateStr, startAt: ev.start_at, endAt: ev.end_at, title: ev.title, colorBg: evCol, origEv: ev, mouseX: e.clientX, mouseY: e.clientY };
-                      setAllDayDragDisplay({ id: ev.id, targetDateStr: dateStr, title: ev.title, colorBg: evCol, hasMoved: false });
+                      const initAllDay = { id: ev.id, targetDateStr: dateStr, title: ev.title, colorBg: evCol, hasMoved: false };
+                      allDayDragDisplayRef.current = initAllDay;
+                      setAllDayDragDisplay(initAllDay);
                     }}
                     className={`text-[11px] font-medium truncate px-2 py-0.5 rounded text-white select-none ${isBeingDragged ? "opacity-30 cursor-grabbing" : "cursor-grab"}`}
                     style={{ backgroundColor: getEventColor(ev) }}
@@ -1896,7 +1882,9 @@ function TimeGridView({
                           grabOffsetMins: mouseTimeMins - eventStartMins,
                           origEv: ev, mouseX: e.clientX, mouseY: e.clientY,
                         };
-                        setDragDisplay({ id: ev.id, dateStr, startAt: ev.start_at, endAt: ev.end_at, hasMoved: false });
+                        const initDd = { id: ev.id, dateStr, startAt: ev.start_at, endAt: ev.end_at, hasMoved: false };
+                        dragDisplayRef.current = initDd;
+                        setDragDisplay(initDd);
                       }}
                       className={`absolute left-1 right-1 rounded px-2 py-1 text-[11px] font-medium text-white overflow-visible shadow-sm group/ev ${movingEventId === ev.id || isDragging ? "opacity-40" : isResizing ? "brightness-110 shadow-lg" : "hover:brightness-110 hover:shadow-md"} transition-all duration-150 select-none ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
                       style={{ top: topPx, height: heightPx, zIndex: isResizing ? 30 : 10, backgroundColor: evColor }}
@@ -2453,9 +2441,6 @@ export default function Agenda() {
     for (let i = 0; i < calDays.length; i += 7) weeks.push(calDays.slice(i, i + 7));
     return weeks;
   }, [calDays]);
-
-  // Eventos multi-día (para barras de spanning en vista mensual)
-  const spanningEvents = useMemo(() => events.filter(isSpanning), [events]);
 
   // Días de la semana activa (para vista semana)
   const weekDays = useMemo(() => {
