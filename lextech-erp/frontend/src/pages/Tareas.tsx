@@ -516,7 +516,7 @@ function KanbanLane({
 
       <div
         ref={setNodeRef}
-        className={`p-3 min-h-[440px] space-y-3 transition-colors ${isOver ? "bg-indigo-50/40" : "bg-[linear-gradient(180deg,#fbfcff_0%,#f8fafc_100%)]"}`}
+        className={`p-3 space-y-3 transition-colors ${isOver ? "bg-indigo-50/40" : "bg-[linear-gradient(180deg,#fbfcff_0%,#f8fafc_100%)]"}`}
       >
         {tasks.length === 0 ? (
           <div className={`min-h-[200px] rounded-2xl border-2 border-dashed flex items-center justify-center text-xs font-medium transition-colors
