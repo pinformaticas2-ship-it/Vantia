@@ -2617,7 +2617,21 @@ export default function Agenda() {
     if (originalDateKey === targetDateKey) return;
 
     const nextStart = moveIsoToDateKeepingTime(ev.start_at, targetDateKey);
-    const nextEnd = ev.end_at ? moveIsoToDateKeepingTime(ev.end_at, targetDateKey) : null;
+    let nextEnd: string | null = null;
+    if (ev.end_at) {
+      if (isSpanning(ev)) {
+        // Preserve duration: shift end by the same number of days as start
+        const origStartMs = new Date(originalDateKey + "T00:00:00").getTime();
+        const origEndDay  = localDateKey(ev.end_at);
+        const origEndMs   = new Date(origEndDay + "T00:00:00").getTime();
+        const diffDays    = Math.round((origEndMs - origStartMs) / 86400000);
+        const targetMs    = new Date(targetDateKey + "T00:00:00").getTime();
+        const newEndDay   = new Date(targetMs + diffDays * 86400000).toISOString().slice(0, 10);
+        nextEnd = moveIsoToDateKeepingTime(ev.end_at, newEndDay);
+      } else {
+        nextEnd = moveIsoToDateKeepingTime(ev.end_at, targetDateKey);
+      }
+    }
     const previousEvents = events;
     const optimisticEvent = { ...ev, start_at: nextStart, end_at: nextEnd };
 
@@ -2982,43 +2996,8 @@ export default function Agenda() {
             ) : (
               <div className="flex flex-col min-h-full">
                 {calWeeks.map((week, weekIdx) => {
-                  const weekKeys = week.map(d => d ? isoDate(d) : null);
-                  const spans    = getWeekSpanning(weekKeys, spanningEvents);
-                  const spanBandH = spans.length > 0 ? spans.length * 22 + 4 : 0;
-
                   return (
                     <div key={weekIdx} className="flex-1 relative flex flex-col">
-                      {/* ── Banda de eventos multi-día ── */}
-                      {spans.length > 0 && (
-                        <div className="relative shrink-0 w-full" style={{ height: spanBandH }}>
-                          {spans.map((item, rowIdx) => {
-                            const evColor = getEventColor(item.ev);
-                            const leftPct  = (item.colStart / 7) * 100;
-                            const widthPct = ((item.colEnd - item.colStart + 1) / 7) * 100;
-                            return (
-                              <div
-                                key={item.ev.id}
-                                className="absolute z-10 cursor-pointer"
-                                style={{
-                                  left:   `calc(${leftPct}% + 2px)`,
-                                  width:  `calc(${widthPct}% - 4px)`,
-                                  top:    rowIdx * 22 + 2,
-                                  height: 18,
-                                }}
-                                onClick={e => { e.stopPropagation(); openViewPopover(item.ev, { x: e.clientX, y: e.clientY }); }}
-                              >
-                                <div
-                                  className={`h-full flex items-center px-2 text-[10px] font-semibold text-white overflow-hidden ${item.isFirst && item.isLast ? "rounded" : item.isFirst ? "rounded-l" : item.isLast ? "rounded-r" : ""} hover:brightness-110 transition-[filter] ${item.ev.status === "cancelado" ? "opacity-40 line-through" : ""}`}
-                                  style={{ backgroundColor: evColor }}
-                                >
-                                  {item.isFirst && <span className="truncate">{item.ev.title}</span>}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-
                       {/* ── Celdas de días ── */}
                       <div className="grid grid-cols-7 flex-1">
                         {week.map((date, colIdx) => {
@@ -3028,7 +3007,7 @@ export default function Agenda() {
                           const key     = isoDate(date);
                           const isToday = key === todayStr;
                           const isSel   = key === selectedDay;
-                          const dayEvs  = (eventsByDay[key] || []).filter(ev => !isSpanning(ev));
+                          const dayEvs  = (eventsByDay[key] || []);
                           const dayGcal = gcalEventsByDay[key] || [];
                           const maxShow = 3;
                           const lexShow = dayEvs.slice(0, maxShow);
@@ -3097,6 +3076,7 @@ export default function Agenda() {
                                     >
                                       {!ev.all_day && <span className="opacity-75 shrink-0">{fmtTime(ev.start_at)}</span>}
                                       <span className="truncate">{ev.title}</span>
+                                      {isSpanning(ev) && <span className="opacity-80 shrink-0">→</span>}
                                       {ev.external_provider === "google" && (
                                         <img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_16dp.png" alt="" className="w-2.5 h-2.5 shrink-0" />
                                       )}
