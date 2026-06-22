@@ -5004,103 +5004,54 @@ export default function ExpedienteDetail() {
 
   return (
     <div className="flex gap-6 animate-in fade-in duration-500">
-      <div className="flex-1 min-w-0 space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm text-slate-500 min-w-0 overflow-hidden">
-            <Link to="/dashboard/expedientes" className="hover:text-slate-800 transition-colors shrink-0">
-              Expedientes
-            </Link>
-            <span className="shrink-0">/</span>
-            <span className="text-slate-800 font-medium truncate">
-              {exp.descripcion || `${exp.anio}/${exp.num_exp}`}
-            </span>
+      <div className="flex-1 min-w-0 space-y-3">
+        {/* ── Cabecera compacta (breadcrumb + info + acciones en una sola fila) ── */}
+        <div className="bg-white border border-slate-200 rounded-xl px-4 py-3 flex items-center gap-3">
+          <div className="h-9 w-9 bg-gradient-to-br from-red-500 to-red-700 rounded-lg flex items-center justify-center text-white shadow shadow-red-200 shrink-0">
+            <FolderOpen size={16} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 text-xs text-slate-400 mb-0.5">
+              <Link to="/dashboard/expedientes" className="hover:text-slate-600 transition-colors shrink-0">Expedientes</Link>
+              <span>/</span>
+              <span className="font-mono text-slate-400">{exp.anio}/{exp.num_exp}</span>
+              {exp.ref_expediente && <><span>/</span><span className="font-mono">{exp.ref_expediente}</span></>}
+              {exp.fecha_inicio && <><span>·</span><span>{fmtDate(exp.fecha_inicio)}</span></>}
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-sm font-bold text-slate-900 truncate">
+                {exp.descripcion || "Sin descripción"}
+              </h1>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${estadoConf.color}`}>{estadoConf.label}</span>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${tipoConf.color}`}>{tipoConf.label}</span>
+              {exp.tipos_asunto && <span className="text-xs text-slate-400">· {exp.tipos_asunto}</span>}
+            </div>
           </div>
           <div className="flex gap-2 shrink-0">
             <BackButton onClick={() => navigate("/dashboard/expedientes")} />
             {editing ? (
               <>
-                <button
-                  onClick={() => { setEditing(false); setEditForm(null); }}
-                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl shadow-sm active:scale-95 transition-all"
-                >
-                  <X size={14} /> Cancelar
+                <button onClick={() => { setEditing(false); setEditForm(null); }} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg shadow-sm active:scale-95 transition-all">
+                  <X size={13} /> Cancelar
                 </button>
-                <button
-                  onClick={() => handleSave(editForm)}
-                  disabled={saving || !editForm?.descripcion?.trim()}
-                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-xl shadow-sm active:scale-95 transition-all"
-                >
-                  {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-                  Guardar cambios
+                <button onClick={() => handleSave(editForm)} disabled={saving || !editForm?.descripcion?.trim()} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-lg shadow-sm active:scale-95 transition-all">
+                  {saving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Guardar
                 </button>
               </>
             ) : exp?.estado === "cerrado" ? (
-              <button
-                onClick={handleToggleEstado}
-                disabled={saving}
-                className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-50 rounded-xl shadow-sm active:scale-95 transition-all"
-              >
-                {saving ? <Loader2 size={14} className="animate-spin" /> : <FolderOpen size={14} />}
-                Reabrir expediente
+              <button onClick={handleToggleEstado} disabled={saving} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-50 rounded-lg shadow-sm active:scale-95 transition-all">
+                {saving ? <Loader2 size={13} className="animate-spin" /> : <FolderOpen size={13} />} Reabrir
               </button>
             ) : (
               <>
-                <button
-                  onClick={handleToggleEstado}
-                  disabled={saving}
-                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50 rounded-xl shadow-sm active:scale-95 transition-all"
-                >
-                  {saving ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
-                  Cerrar expediente
+                <button onClick={handleToggleEstado} disabled={saving} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50 rounded-lg shadow-sm active:scale-95 transition-all">
+                  {saving ? <Loader2 size={13} className="animate-spin" /> : <X size={13} />} Cerrar
                 </button>
-                <button
-                  onClick={startEdit}
-                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm active:scale-95 transition-all"
-                >
-                  <Edit3 size={14} /> Editar
+                <button onClick={startEdit} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-sm active:scale-95 transition-all">
+                  <Edit3 size={13} /> Editar
                 </button>
               </>
             )}
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-xl p-5">
-          <div className="flex items-center gap-4">
-            <div className="h-16 w-16 bg-gradient-to-br from-red-500 to-red-700 rounded-xl flex items-center justify-center text-white shadow-lg shadow-red-200 shrink-0">
-              <FolderOpen size={28} />
-            </div>
-
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-xl font-bold text-slate-900 truncate">
-                  {exp.descripcion || "Sin descripción"}
-                </h1>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${estadoConf.color}`}>
-                  {estadoConf.label}
-                </span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${tipoConf.color}`}>
-                  {tipoConf.label}
-                </span>
-              </div>
-              {exp.tipos_asunto && <p className="text-slate-500 text-sm mt-0.5">{exp.tipos_asunto}</p>}
-              <div className="flex items-center gap-4 mt-2 text-xs text-slate-400 flex-wrap">
-                <span className="flex items-center gap-1 font-mono">
-                  <Hash size={11} />
-                  {exp.anio}/{exp.num_exp}
-                </span>
-                {exp.ref_expediente && (
-                  <span className="flex items-center gap-1 font-mono">
-                    <Hash size={11} />
-                    {exp.ref_expediente}
-                  </span>
-                )}
-                {exp.fecha_inicio && (
-                  <span className="flex items-center gap-1">
-                    <Calendar size={11} /> Alta: {fmtDate(exp.fecha_inicio)}
-                  </span>
-                )}
-              </div>
-            </div>
           </div>
         </div>
 
