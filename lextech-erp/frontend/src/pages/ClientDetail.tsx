@@ -3930,7 +3930,7 @@ export default function ClientDetail() {
         {/* ── TABS ────────────────────────────────────────────── */}
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden flex-1 min-h-0 flex flex-col">
           {/* Barra de tabs */}
-          <div className="flex border-b border-slate-100 overflow-x-auto shrink-0">
+          <div className="flex border-b border-slate-100 shrink-0">
             {TABS.map(tab => {
               const Icon = tab.icon;
               const active = activeTab === tab.id;
