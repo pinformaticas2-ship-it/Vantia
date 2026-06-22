@@ -4626,8 +4626,8 @@ function PanelIndicadoresExpediente({ expedienteId, onTabChange }: { expedienteI
     v == null ? '—' : new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v);
 
   return (
-    <aside className="w-52 shrink-0">
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden sticky top-6">
+    <aside className="w-52 shrink-0 flex flex-col min-h-0">
+      <div className="bg-white border border-slate-200 rounded-xl overflow-y-auto flex-1 min-h-0">
         <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100">
           <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Indicadores</h3>
         </div>
@@ -5009,9 +5009,9 @@ export default function ExpedienteDetail() {
   };
 
   return (
-    <div className="flex gap-6 animate-in fade-in duration-500">
-      <div className="flex-1 min-w-0 space-y-4">
-        <div className="flex items-center justify-between">
+    <div className="flex gap-6 h-full animate-in fade-in duration-500">
+      <div className="flex-1 min-w-0 flex flex-col min-h-0 gap-4">
+        <div className="flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2 text-sm text-slate-500 min-w-0 overflow-hidden">
             <Link to="/dashboard/expedientes" className="hover:text-slate-800 transition-colors shrink-0">
               Expedientes
@@ -5070,7 +5070,7 @@ export default function ExpedienteDetail() {
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-5">
+        <div className="bg-white border border-slate-200 rounded-xl p-5 shrink-0">
           <div className="flex items-center gap-4">
             <div className="h-16 w-16 bg-gradient-to-br from-red-500 to-red-700 rounded-xl flex items-center justify-center text-white shadow-lg shadow-red-200 shrink-0">
               <FolderOpen size={28} />
@@ -5110,8 +5110,8 @@ export default function ExpedienteDetail() {
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-          <div className="flex border-b border-slate-100 overflow-x-auto">
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden flex-1 min-h-0 flex flex-col">
+          <div className="flex border-b border-slate-100 overflow-x-auto shrink-0">
             {DETAIL_TABS.map((tabItem) => {
               const Icon = tabItem.icon;
               const active = tab === tabItem.key;
@@ -5132,7 +5132,7 @@ export default function ExpedienteDetail() {
             })}
           </div>
 
-          <div className="p-5">
+          <div className="p-5 flex-1 overflow-y-auto min-h-0">
             {tab === "perfil" && !editing && (
               <div className="space-y-4">
                 {exp.estado === "cerrado" && (
