@@ -163,7 +163,6 @@ const DETAIL_TABS: { key: DetailTabKey; label: string; icon: any }[] = [
   { key: "notas",       label: "Notas",                  icon: StickyNote },
   { key: "clientes",    label: "Cliente",                icon: Users },
   { key: "contrarios",  label: "Contrarios",             icon: Users },
-  { key: "relacionados",label: "Expedientes relacionados",icon: Link2 },
   { key: "tareas",      label: "Tareas / Plazos",        icon: AlertTriangle },
   { key: "actuacion",   label: "Actuaciones",            icon: ClipboardList },
   { key: "adjuntos",    label: "Adjuntos",               icon: Paperclip },
@@ -4682,6 +4681,10 @@ function PanelIndicadoresExpediente({ expedienteId, onTabChange }: { expedienteI
           <button onClick={() => onTabChange('adjuntos')}
             className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors">
             📎 Adjuntos
+          </button>
+          <button onClick={() => onTabChange('relacionados')}
+            className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors">
+            🔗 Expedientes relacionados
           </button>
         </div>
       </div>
