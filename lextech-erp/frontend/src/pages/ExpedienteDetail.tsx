@@ -159,16 +159,16 @@ type DetailTabKey = "perfil" | TabKey | "relacionados" | "actuacion" | "economic
 
 const DETAIL_TABS: { key: DetailTabKey; label: string; icon: any }[] = [
   { key: "perfil",      label: "Datos",                  icon: User },
-  { key: "economico",   label: "Económico",              icon: Banknote },
   { key: "clientes",    label: "Cliente",                icon: Users },
   { key: "contrarios",  label: "Contrarios",             icon: Users },
-  { key: "tareas",      label: "Tareas / Plazos",        icon: AlertTriangle },
-  { key: "actuacion",   label: "Actuaciones",            icon: ClipboardList },
   { key: "adjuntos",    label: "Adjuntos",               icon: Paperclip },
+  { key: "agenda",      label: "Agenda",                 icon: Calendar },
+  { key: "actuacion",   label: "Actuaciones",            icon: ClipboardList },
+  { key: "tareas",      label: "Tareas / Plazos",        icon: AlertTriangle },
+  { key: "economico",   label: "Económico",              icon: Banknote },
   { key: "correo",      label: "Correo",                 icon: Mail },
   { key: "historial",   label: "Historial expediente",   icon: Activity },
   { key: "cronologia",  label: "Cronología",             icon: Clock },
-  { key: "agenda",      label: "Agenda",                 icon: Calendar },
 ];
 
 const NOTIF_TIPOS = [
@@ -3871,11 +3871,11 @@ function TabClienteVinculado({ exp, clientes, linkedClient, linkedClientDisplayN
 // ── Tab Contrarios ─────────────────────────────────────────────────────────────
 function TabContrarios({ exp, onPatch }: { exp: any; onPatch: (fields: Record<string, any>) => Promise<boolean> }) {
   const [editing, setEditing] = useState(false);
-  const [cForm, setCForm] = useState({ contrario: exp.contrario || "", procurador_contrario: exp.procurador_contrario || "" });
+  const [cForm, setCForm] = useState({ contrario: exp.contrario || "", procurador_contrario: exp.procurador_contrario || "", abogado_contrario: exp.abogado_contrario || "" });
   const [saving, setSaving] = useState(false);
 
   const isClosed = exp?.estado === "cerrado";
-  const hasData = !!(exp.contrario || exp.procurador_contrario);
+  const hasData = !!(exp.contrario || exp.procurador_contrario || exp.abogado_contrario);
 
   const handleSaveContrario = async () => {
     setSaving(true);
@@ -3886,8 +3886,8 @@ function TabContrarios({ exp, onPatch }: { exp: any; onPatch: (fields: Record<st
 
   const handleClear = async () => {
     setSaving(true);
-    await onPatch({ contrario: "", procurador_contrario: "" });
-    setCForm({ contrario: "", procurador_contrario: "" });
+    await onPatch({ contrario: "", procurador_contrario: "", abogado_contrario: "" });
+    setCForm({ contrario: "", procurador_contrario: "", abogado_contrario: "" });
     setSaving(false);
   };
 
@@ -3901,7 +3901,7 @@ function TabContrarios({ exp, onPatch }: { exp: any; onPatch: (fields: Record<st
         {!isClosed && !editing && (
           <div className="flex items-center gap-2">
             <button type="button"
-              onClick={() => { setCForm({ contrario: exp.contrario || "", procurador_contrario: exp.procurador_contrario || "" }); setEditing(true); }}
+              onClick={() => { setCForm({ contrario: exp.contrario || "", procurador_contrario: exp.procurador_contrario || "", abogado_contrario: exp.abogado_contrario || "" }); setEditing(true); }}
               className="text-xs font-bold text-red-600 hover:underline">
               {hasData ? "Editar" : "Añadir parte contraria"}
             </button>
@@ -3912,11 +3912,17 @@ function TabContrarios({ exp, onPatch }: { exp: any; onPatch: (fields: Record<st
       <div className="p-5">
         {editing && !isClosed ? (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div>
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Nombre parte contraria</label>
                 <input autoFocus value={cForm.contrario} onChange={e => setCForm(f => ({ ...f, contrario: e.target.value }))}
                   placeholder="Nombre o razón social..."
+                  className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-1 focus:ring-red-400" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Abogado contrario</label>
+                <input value={cForm.abogado_contrario} onChange={e => setCForm(f => ({ ...f, abogado_contrario: e.target.value }))}
+                  placeholder="Nombre del abogado..."
                   className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-1 focus:ring-red-400" />
               </div>
               <div>
@@ -3941,6 +3947,7 @@ function TabContrarios({ exp, onPatch }: { exp: any; onPatch: (fields: Record<st
             </div>
             <div className="min-w-0 flex-1 space-y-1">
               <p className="text-sm font-semibold text-slate-800">{exp.contrario || <span className="text-slate-400 font-normal">Sin nombre</span>}</p>
+              {exp.abogado_contrario && <p className="text-xs text-slate-500">Abogado contrario: {exp.abogado_contrario}</p>}
               {exp.procurador_contrario && <p className="text-xs text-slate-500">Procurador contrario: {exp.procurador_contrario}</p>}
             </div>
           </div>
