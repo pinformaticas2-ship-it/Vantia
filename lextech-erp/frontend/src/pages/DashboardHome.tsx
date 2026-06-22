@@ -582,17 +582,18 @@ export default function DashboardHome() {
     switch (id) {
 
       case "agenda": return (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
-            <h2 className="font-bold text-slate-800 flex items-center gap-2 text-sm">
-              <Calendar size={15} className="text-blue-500" /> Próximas citas
-            </h2>
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
               {handle}
-              <Link to="/dashboard/agenda" onClick={e => e.stopPropagation()} className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-0.5">
-                Ver agenda <ChevronRight size={11} />
-              </Link>
+              <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0">
+                <Calendar size={15} className="text-indigo-600" />
+              </div>
+              <h2 className="font-semibold text-slate-800 text-base">Próximas citas</h2>
             </div>
+            <Link to="/dashboard/agenda" onClick={e => e.stopPropagation()} className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-0.5">
+              Ver agenda <ChevronRight size={11} />
+            </Link>
           </div>
           {agendaLoading ? (
             <div className="flex items-center justify-center py-8"><Spinner size="sm" muted /></div>
@@ -600,11 +601,11 @@ export default function DashboardHome() {
             <div className="flex flex-col items-center justify-center py-10 gap-2 text-slate-300">
               <Calendar size={28} className="opacity-30" />
               <p className="text-sm font-medium text-slate-500">Sin próximas citas</p>
-              <Link to="/dashboard/agenda" className="text-xs font-bold text-red-500 hover:underline">+ Crear evento</Link>
+              <Link to="/dashboard/agenda" className="text-xs font-bold text-indigo-500 hover:underline">+ Crear evento</Link>
             </div>
           ) : (
-            <div className="divide-y divide-slate-50">
-              {agendaEvents.map((ev: any) => {
+            <div className="p-4 space-y-2">
+              {agendaEvents.map((ev: any, idx: number) => {
                 const badge = EVENT_BADGE[ev.type] || EVENT_BADGE.otro;
                 const d = new Date(ev.start_at);
                 const month = d.toLocaleDateString("es-ES", { month: "short" }).toUpperCase().replace(".", "");
@@ -614,19 +615,20 @@ export default function DashboardHome() {
                   : ev.end_at
                     ? `${fmtTime(ev.start_at)} - ${fmtTime(ev.end_at)}`
                     : fmtTime(ev.start_at);
+                const isFirst = idx === 0;
                 return (
-                  <div key={ev.id} onClick={() => goTo("/dashboard/agenda")} className="flex items-center gap-4 px-5 py-3.5 hover:bg-slate-50 cursor-pointer transition-colors">
-                    <div className="flex-none w-11 h-11 bg-slate-50 border border-slate-100 rounded-xl flex flex-col items-center justify-center">
-                      <span className="text-[9px] font-bold text-slate-400 uppercase leading-none">{month}</span>
-                      <span className="text-base font-bold text-slate-800 leading-tight">{day}</span>
+                  <div key={ev.id} onClick={() => goTo("/dashboard/agenda")} className="flex items-start gap-4 p-3 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors border border-transparent hover:border-slate-100">
+                    <div className={`flex-none min-w-[56px] py-2 rounded-md flex flex-col items-center justify-center ${isFirst ? "bg-indigo-50 text-indigo-700" : "bg-slate-100 text-slate-600"}`}>
+                      <span className="text-[9px] font-bold uppercase leading-none">{month}</span>
+                      <span className="text-base font-bold leading-tight mt-0.5">{day}</span>
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-slate-800 truncate">{ev.title}</p>
-                      <p className="text-[11px] text-slate-400 mt-0.5 truncate">
+                      <p className="text-xs text-slate-500 mt-0.5 truncate flex items-center gap-1">
                         ⏰ {timeStr}{ev.location ? ` · ${ev.location}` : ""}
                       </p>
                     </div>
-                    <span className={`shrink-0 text-[10px] font-bold px-2.5 py-1 rounded-full ${badge.color}`}>{badge.label}</span>
+                    <span className={`shrink-0 text-[10px] font-semibold px-2.5 py-1 rounded-full ${badge.color}`}>{badge.label}</span>
                   </div>
                 );
               })}
@@ -637,38 +639,39 @@ export default function DashboardHome() {
 
       case "tareas": return (
         <div onClick={() => goTo("/dashboard/tareas")} className="cursor-pointer group">
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all">
-            <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="font-bold text-slate-800 flex items-center gap-2 text-sm">
-                <CheckCircle2 size={14} className="text-slate-400" /> Tareas
-              </h3>
-              <div className="flex items-center gap-1">
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
                 {handle}
-                <ChevronRight size={14} className="text-slate-300 group-hover:text-red-500 transition-colors" />
+                <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
+                  <CheckCircle2 size={14} className="text-red-500" />
+                </div>
+                <h3 className="font-semibold text-slate-800 text-base">Tareas</h3>
               </div>
+              <ChevronRight size={14} className="text-slate-300 group-hover:text-red-500 transition-colors" />
             </div>
-            <div className="grid grid-cols-2">
-              <div className="p-5 bg-red-50 border-r border-red-100">
-                <p className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-1">Vencidas</p>
-                <p className={`text-lg font-bold leading-none ${taskStats.vencidas>0?"text-red-600":"text-slate-300"}`}>{taskStats.vencidas}</p>
-                <p className="text-[10px] text-red-300 mt-1">revisar hoy</p>
+            <div className="p-4 grid grid-cols-2 gap-3 mb-1">
+              <div className="bg-red-50/50 border border-red-100 rounded-xl p-4">
+                <p className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-2">Vencidas</p>
+                <p className={`text-4xl font-black leading-none ${taskStats.vencidas>0?"text-red-600":"text-slate-200"}`}>{taskStats.vencidas}</p>
+                <p className="text-[10px] text-red-300 mt-2">revisar hoy</p>
               </div>
-              <div className="p-5">
-                <p className="text-[10px] font-bold text-amber-400 uppercase tracking-widest mb-1">Próximas</p>
-                <p className={`text-lg font-bold leading-none ${taskStats.proximas>0?"text-amber-500":"text-slate-300"}`}>{taskStats.proximas}</p>
-                <p className="text-[10px] text-amber-300 mt-1">esta semana</p>
+              <div className="bg-amber-50/50 border border-amber-100 rounded-xl p-4">
+                <p className="text-[10px] font-bold text-amber-400 uppercase tracking-widest mb-2">Próximas</p>
+                <p className={`text-4xl font-black leading-none ${taskStats.proximas>0?"text-amber-500":"text-slate-200"}`}>{taskStats.proximas}</p>
+                <p className="text-[10px] text-amber-300 mt-2">esta semana</p>
               </div>
             </div>
             <div className="grid grid-cols-3 border-t border-slate-100">
-              <div className="p-4 text-center border-r border-slate-100">
+              <div className="p-4 text-center border-r border-slate-100 hover:bg-slate-50 transition-colors">
                 <p className="text-lg font-bold text-slate-700">{taskStats.urgentes}</p>
                 <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Urgentes</p>
               </div>
-              <div className="p-4 text-center border-r border-slate-100">
+              <div className="p-4 text-center border-r border-slate-100 hover:bg-slate-50 transition-colors">
                 <p className="text-lg font-bold text-slate-700">{taskStats.pendientes}</p>
                 <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Pendientes</p>
               </div>
-              <div className="p-4 text-center">
+              <div className="p-4 text-center hover:bg-slate-50 transition-colors">
                 <p className="text-lg font-bold text-emerald-500">{taskStats.completadas}</p>
                 <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Hechas</p>
               </div>
@@ -678,28 +681,29 @@ export default function DashboardHome() {
       );
 
       case "actividad": return (
-        <div onClick={() => goTo("/dashboard/trazabilidad")} className="cursor-pointer group bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all">
-          <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-            <h3 className="font-bold text-slate-800 flex items-center gap-2 text-sm">
-              <RefreshCw size={13} className="text-slate-400" /> ⚡ Actividad reciente
-            </h3>
-            <div className="flex items-center gap-1">
+        <div onClick={() => goTo("/dashboard/trazabilidad")} className="cursor-pointer group bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all">
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
               {handle}
-              <ChevronRight size={14} className="text-slate-300 group-hover:text-red-500 transition-colors" />
+              <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center shrink-0">
+                <RefreshCw size={13} className="text-slate-500" />
+              </div>
+              <h3 className="font-semibold text-slate-800 text-base">Actividad reciente</h3>
             </div>
+            <ChevronRight size={14} className="text-slate-300 group-hover:text-red-500 transition-colors" />
           </div>
           {actLoading ? (
             <div className="flex items-center justify-center py-8"><Spinner size="sm" muted /></div>
           ) : activity.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 px-8 gap-3 text-center">
-              <div className="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center">
-                <History size={22} className="text-slate-300" />
+              <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center">
+                <History size={24} className="text-slate-300" />
               </div>
               <div>
                 <p className="text-sm font-semibold text-slate-700">No hay actividad reciente</p>
                 <p className="text-xs text-slate-400 mt-1 max-w-sm">Los movimientos de tus expedientes, tareas completadas y nuevos documentos aparecerán aquí.</p>
               </div>
-              <button onClick={() => goTo("/dashboard/trazabilidad")} className="mt-1 px-4 py-2 text-xs font-semibold text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
+              <button onClick={() => goTo("/dashboard/trazabilidad")} className="mt-1 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
                 Ver historial completo
               </button>
             </div>
@@ -733,7 +737,7 @@ export default function DashboardHome() {
       );
 
       case "expedientes": return (
-        <div onClick={() => goTo("/dashboard/expedientes")} className="cursor-pointer group bg-white rounded-2xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition-all">
+        <div onClick={() => goTo("/dashboard/expedientes")} className="cursor-pointer group bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition-all">
           <div className="flex items-center justify-between mb-2">
             <span className="font-bold text-slate-800 text-sm flex items-center gap-2">📁 Expedientes</span>
             <div className="flex items-center gap-1">
@@ -746,7 +750,7 @@ export default function DashboardHome() {
       );
 
       case "clientes": return (
-        <div onClick={() => goTo("/dashboard/clientes")} className="cursor-pointer group bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all">
+        <div onClick={() => goTo("/dashboard/clientes")} className="cursor-pointer group bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all">
           <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
             <span className="font-bold text-slate-800 text-sm flex items-center gap-2">👥 Clientes</span>
             <div className="flex items-center gap-1">
@@ -776,7 +780,7 @@ export default function DashboardHome() {
       );
 
       case "chat": return (
-        <div onClick={() => goTo("/dashboard/chat")} className="cursor-pointer group bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all">
+        <div onClick={() => goTo("/dashboard/chat")} className="cursor-pointer group bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all">
           <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
             <span className="font-bold text-slate-800 text-sm flex items-center gap-2">💬 Chat interno</span>
             <div className="flex items-center gap-1">
@@ -802,7 +806,7 @@ export default function DashboardHome() {
       );
 
       case "whatsapp": return (
-        <div onClick={() => goTo("/dashboard/whatsapp")} className="cursor-pointer group bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all">
+        <div onClick={() => goTo("/dashboard/whatsapp")} className="cursor-pointer group bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all">
           <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
             <span className="font-bold text-slate-800 text-sm flex items-center gap-2">📱 WhatsApp</span>
             <div className="flex items-center gap-1">
@@ -837,7 +841,7 @@ export default function DashboardHome() {
       );
 
       case "correo": return (
-        <div className="group bg-white rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-all">
+        <div className="group bg-white rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-all">
           <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
               <span className="font-bold text-slate-800 text-sm shrink-0">✉️ Correo</span>
@@ -920,7 +924,7 @@ export default function DashboardHome() {
       );
 
       case "documental": return (
-        <div onClick={() => goTo("/dashboard/documental")} className="cursor-pointer group bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all">
+        <div onClick={() => goTo("/dashboard/documental")} className="cursor-pointer group bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all">
           <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
             <span className="font-bold text-slate-800 text-sm flex items-center gap-2">📚 Documental</span>
             <div className="flex items-center gap-1">
@@ -951,7 +955,7 @@ export default function DashboardHome() {
       );
 
       case "facturacion": return (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           {/* Header */}
           <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-2">
             <h3 className="font-bold text-slate-800 text-sm shrink-0">💶 Facturación</h3>
@@ -1027,7 +1031,7 @@ export default function DashboardHome() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-lg font-bold text-slate-900">
+            <h1 className="text-2xl font-semibold text-slate-900">
               {greeting}, <span className="text-red-600">{user?.firstName || "usuario"}</span>
             </h1>
             {weather && (
@@ -1038,7 +1042,7 @@ export default function DashboardHome() {
               </div>
             )}
           </div>
-          <p className="text-slate-400 text-sm mt-0.5">
+          <p className="text-sm text-slate-500 mt-1 capitalize">
             {new Date().toLocaleDateString("es-ES", { weekday:"long", day:"numeric", month:"long", year:"numeric" })}
           </p>
         </div>
@@ -1046,7 +1050,7 @@ export default function DashboardHome() {
 
           {/* Nuevo Cliente */}
           <div className="relative" ref={clienteMenuRef}>
-            <button onClick={() => setShowClienteMenu(v => !v)} className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-semibold text-sm shadow-sm border transition-all select-none ${showClienteMenu?"bg-slate-100 text-slate-800 border-slate-300":"bg-white border-slate-200 text-slate-700 hover:bg-slate-50"}`}>
+            <button onClick={() => setShowClienteMenu(v => !v)} className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg font-semibold text-sm shadow-sm border transition-all select-none ${showClienteMenu?"bg-slate-100 text-slate-800 border-slate-300":"bg-white border-slate-200 text-slate-700 hover:bg-slate-50"}`}>
               <Plus size={15} /> Nuevo Cliente <ChevronDown size={13} className={`transition-transform ${showClienteMenu?"rotate-180":""}`} />
             </button>
             {showClienteMenu && (
@@ -1073,7 +1077,7 @@ export default function DashboardHome() {
 
           {/* Nuevo Expediente */}
           <div className="relative -mr-1" ref={altaMenuRef}>
-            <button onClick={() => setShowAltaMenu(v => !v)} className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-semibold text-sm shadow-md shadow-red-200 transition-all select-none ${showAltaMenu?"bg-red-800 text-white":"bg-red-600 hover:bg-red-700 text-white"}`}>
+            <button onClick={() => setShowAltaMenu(v => !v)} className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg font-semibold text-sm shadow-md shadow-red-200 transition-all select-none ${showAltaMenu?"bg-red-800 text-white":"bg-red-600 hover:bg-red-700 text-white"}`}>
               <Plus size={15} /> Nuevo Expediente <ChevronDown size={13} className={`transition-transform ${showAltaMenu?"rotate-180":""}`} />
             </button>
             {showAltaMenu && (
@@ -1100,7 +1104,7 @@ export default function DashboardHome() {
 
           {/* Dots */}
           <div className="relative" ref={dotsMenuRef}>
-            <button onClick={() => setShowDotsMenu(v => !v)} title="Más opciones" className={`flex items-center justify-center h-9 w-9 rounded-xl border transition-all ${showDotsMenu?"bg-slate-100 border-slate-300 text-slate-800":"bg-white border-slate-200 text-slate-500 hover:bg-slate-50"}`}>
+            <button onClick={() => setShowDotsMenu(v => !v)} title="Más opciones" className={`flex items-center justify-center h-9 w-9 rounded-lg border transition-all ${showDotsMenu?"bg-slate-100 border-slate-300 text-slate-800":"bg-white border-slate-200 text-slate-500 hover:bg-slate-50"}`}>
               <MoreHorizontal size={16} />
             </button>
             {showDotsMenu && (
@@ -1123,11 +1127,13 @@ export default function DashboardHome() {
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd} autoScroll={false}>
           <SortableContext items={orderedVisible} strategy={rectSortingStrategy}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-              {orderedVisible.map((id, index) => {
-                const isLastOdd = orderedVisible.length % 2 === 1 && index === orderedVisible.length - 1;
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
+              {orderedVisible.map((id) => {
+                const colSpan = id === "agenda" ? "xl:col-span-2"
+                  : id === "actividad" || id === "correo" ? "xl:col-span-3"
+                  : undefined;
                 return (
-                  <SortableWidget key={id} id={id} className={isLastOdd ? "md:col-span-2" : undefined}>
+                  <SortableWidget key={id} id={id} className={colSpan}>
                     {(handle) => renderWidget(id, handle)}
                   </SortableWidget>
                 );
