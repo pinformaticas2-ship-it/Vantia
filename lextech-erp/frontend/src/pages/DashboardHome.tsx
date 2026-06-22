@@ -77,22 +77,15 @@ function fmtEur(n: number) {
 }
 
 // ── Agenda helpers ────────────────────────────────────────────────────────────
-const EVENT_STYLES: Record<string, { color: string; icon: any }> = {
-  cita:    { color: "bg-blue-500",   icon: Clock },
-  reunion: { color: "bg-violet-500", icon: Clock },
-  llamada: { color: "bg-green-500",  icon: Phone },
-  vista:   { color: "bg-red-500",    icon: MapPin },
-  plazo:   { color: "bg-amber-500",  icon: CheckCircle2 },
-  video:   { color: "bg-cyan-500",   icon: Video },
-  otro:    { color: "bg-slate-400",  icon: Clock },
+const EVENT_BADGE: Record<string, { label: string; color: string; dot: string }> = {
+  cita:    { label: "Confirmada",  color: "bg-blue-50 text-blue-600 border border-blue-100",     dot: "bg-blue-400" },
+  reunion: { label: "Reunión",     color: "bg-violet-50 text-violet-600 border border-violet-100", dot: "bg-violet-400" },
+  llamada: { label: "Llamada",     color: "bg-green-50 text-green-600 border border-green-100",  dot: "bg-green-400" },
+  vista:   { label: "Importante",  color: "bg-red-50 text-red-600 border border-red-100",        dot: "bg-red-400" },
+  plazo:   { label: "Plazo",       color: "bg-amber-50 text-amber-600 border border-amber-100",  dot: "bg-amber-400" },
+  video:   { label: "Videollamada",color: "bg-cyan-50 text-cyan-600 border border-cyan-100",     dot: "bg-cyan-400" },
+  otro:    { label: "Evento",      color: "bg-slate-100 text-slate-500 border border-slate-200", dot: "bg-slate-400" },
 };
-function eventDayLabel(dateStr: string): string {
-  const d = new Date(dateStr), now = new Date();
-  const diff = Math.round((d.setHours(0,0,0,0) - now.setHours(0,0,0,0)) / 86400000);
-  if (diff === 0) return "Hoy";
-  if (diff === 1) return "Mañana";
-  return new Date(dateStr).toLocaleDateString("es-ES", { weekday:"short", day:"numeric", month:"short" });
-}
 function fmtTime(s: string) { return new Date(s).toLocaleTimeString("es-ES", { hour:"2-digit", minute:"2-digit" }); }
 
 // ── Widget picker ─────────────────────────────────────────────────────────────
@@ -590,13 +583,13 @@ export default function DashboardHome() {
 
       case "agenda": return (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+          <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
             <h2 className="font-bold text-slate-800 flex items-center gap-2 text-sm">
-              <Calendar size={15} className="text-red-500" /> Próximas citas
+              <Calendar size={15} className="text-blue-500" /> Próximas citas
             </h2>
             <div className="flex items-center gap-2">
               {handle}
-              <Link to="/dashboard/agenda" onClick={e => e.stopPropagation()} className="text-xs font-bold text-red-600 hover:underline flex items-center gap-0.5">
+              <Link to="/dashboard/agenda" onClick={e => e.stopPropagation()} className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-0.5">
                 Ver agenda <ChevronRight size={11} />
               </Link>
             </div>
@@ -604,28 +597,36 @@ export default function DashboardHome() {
           {agendaLoading ? (
             <div className="flex items-center justify-center py-8"><Spinner size="sm" muted /></div>
           ) : agendaEvents.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 gap-2 text-slate-400">
-              <Calendar size={22} className="opacity-20" />
-              <p className="text-xs">Sin próximos eventos</p>
+            <div className="flex flex-col items-center justify-center py-10 gap-2 text-slate-300">
+              <Calendar size={28} className="opacity-30" />
+              <p className="text-sm font-medium text-slate-500">Sin próximas citas</p>
               <Link to="/dashboard/agenda" className="text-xs font-bold text-red-500 hover:underline">+ Crear evento</Link>
             </div>
           ) : (
             <div className="divide-y divide-slate-50">
-              {agendaEvents.map((ev:any) => {
-                const sty = EVENT_STYLES[ev.type] || EVENT_STYLES.otro;
-                const lbl = eventDayLabel(ev.start_at);
+              {agendaEvents.map((ev: any) => {
+                const badge = EVENT_BADGE[ev.type] || EVENT_BADGE.otro;
+                const d = new Date(ev.start_at);
+                const month = d.toLocaleDateString("es-ES", { month: "short" }).toUpperCase().replace(".", "");
+                const day = d.getDate();
+                const timeStr = ev.all_day
+                  ? "Todo el día"
+                  : ev.end_at
+                    ? `${fmtTime(ev.start_at)} - ${fmtTime(ev.end_at)}`
+                    : fmtTime(ev.start_at);
                 return (
-                  <div key={ev.id} onClick={() => goTo("/dashboard/agenda")} className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 cursor-pointer transition-colors group">
-                    <div className={`w-1 h-8 rounded-full shrink-0 ${sty.color}`} />
-                    <div className="w-16 shrink-0 text-right">
-                      <p className={`text-[10px] font-bold ${lbl==="Hoy"?"text-red-500":"text-slate-500"}`}>{lbl}</p>
-                      {!ev.all_day ? <p className="text-sm font-bold text-slate-700">{fmtTime(ev.start_at)}</p> : <p className="text-[10px] text-slate-400 font-semibold">Todo el día</p>}
+                  <div key={ev.id} onClick={() => goTo("/dashboard/agenda")} className="flex items-center gap-4 px-5 py-3.5 hover:bg-slate-50 cursor-pointer transition-colors">
+                    <div className="flex-none w-11 h-11 bg-slate-50 border border-slate-100 rounded-xl flex flex-col items-center justify-center">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase leading-none">{month}</span>
+                      <span className="text-base font-bold text-slate-800 leading-tight">{day}</span>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-slate-800 truncate group-hover:text-red-600">{ev.title}</p>
-                      {ev.location && <p className="text-[10px] text-slate-400 mt-0.5">{ev.location}</p>}
+                      <p className="text-sm font-semibold text-slate-800 truncate">{ev.title}</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5 truncate">
+                        ⏰ {timeStr}{ev.location ? ` · ${ev.location}` : ""}
+                      </p>
                     </div>
-                    {lbl==="Hoy" && <span className="shrink-0 text-[10px] font-bold text-red-500 bg-red-50 border border-red-100 px-2 py-0.5 rounded-full">Hoy</span>}
+                    <span className={`shrink-0 text-[10px] font-bold px-2.5 py-1 rounded-full ${badge.color}`}>{badge.label}</span>
                   </div>
                 );
               })}
@@ -650,7 +651,7 @@ export default function DashboardHome() {
               <div className="p-5 bg-red-50 border-r border-red-100">
                 <p className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-1">Vencidas</p>
                 <p className={`text-lg font-bold leading-none ${taskStats.vencidas>0?"text-red-600":"text-slate-300"}`}>{taskStats.vencidas}</p>
-                <p className="text-[10px] text-red-300 mt-1">vencidas</p>
+                <p className="text-[10px] text-red-300 mt-1">revisar hoy</p>
               </div>
               <div className="p-5">
                 <p className="text-[10px] font-bold text-amber-400 uppercase tracking-widest mb-1">Próximas</p>
@@ -690,7 +691,18 @@ export default function DashboardHome() {
           {actLoading ? (
             <div className="flex items-center justify-center py-8"><Spinner size="sm" muted /></div>
           ) : activity.length === 0 ? (
-            <p className="text-xs text-slate-400 text-center py-8">Sin actividad reciente</p>
+            <div className="flex flex-col items-center justify-center py-12 px-8 gap-3 text-center">
+              <div className="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center">
+                <History size={22} className="text-slate-300" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-700">No hay actividad reciente</p>
+                <p className="text-xs text-slate-400 mt-1 max-w-sm">Los movimientos de tus expedientes, tareas completadas y nuevos documentos aparecerán aquí.</p>
+              </div>
+              <button onClick={() => goTo("/dashboard/trazabilidad")} className="mt-1 px-4 py-2 text-xs font-semibold text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
+                Ver historial completo
+              </button>
+            </div>
           ) : (
             <>
             <div className="grid grid-cols-2 border-b border-slate-100">
