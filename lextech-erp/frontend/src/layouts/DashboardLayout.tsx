@@ -4,7 +4,7 @@ import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Briefcase, Users, Settings,
   Menu, Search, X, Bell, ShieldCheck, Calendar,
-  MessageCircle, Bot, Send, ChevronRight, Loader2, History, CheckCircle2,
+  MessageCircle, Bot, Send, ChevronRight, ChevronLeft, Loader2, History, CheckCircle2,
   MessageSquare, LogOut, Mail, Library, Receipt, Mic, Sparkles,
 } from "lucide-react";
 import { UserButton, useUser, useAuth, useClerk } from "@clerk/clerk-react";
@@ -448,57 +448,83 @@ function SearchDropdown({ query, onSelect }: { query: string; onSelect: () => vo
 }
 
 // ── Sidebar ──────────────────────────────────────────────────────────────────
-function SidebarContent({ pathname, onClose, onSignOut }: { pathname: string; onClose?: () => void; onSignOut?: () => void }) {
+function SidebarContent({ pathname, onClose, onSignOut, collapsed, onToggleCollapse }: {
+  pathname: string;
+  onClose?: () => void;
+  onSignOut?: () => void;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
+}) {
   const { user } = useUser();
   const { totalUnread } = useChatUnread();
   const { unreadCount: emailUnreadCount } = useEmailUnread();
   const { unreadCount: waUnreadCount } = useWhatsAppUnread();
+
   return (
-    <div className="flex flex-col h-full bg-slate-900 border-r border-slate-800">
+    <div className="flex flex-col h-full bg-slate-900 border-r border-slate-800 overflow-hidden">
+
       {/* Logo */}
-      <div className="flex items-center justify-center px-6 py-5 border-b border-slate-800 shrink-0">
+      <div className={`flex items-center border-b border-slate-800 shrink-0 transition-all duration-300 ${collapsed ? "justify-center px-2 py-4" : "justify-center px-6 py-5"}`}>
         <img
           src="/vantia-sidebar-slate.png"
           alt="Vantia Legis"
-          className="h-12 w-full object-contain"
+          className={`object-contain transition-all duration-300 ${collapsed ? "h-8 w-8" : "h-12 w-full"}`}
         />
       </div>
 
-      {/* Nav principal */}
-      <nav className="modules-scrollbar flex-1 px-4 overflow-y-auto">
+      {/* Nav */}
+      <nav className={`modules-scrollbar flex-1 overflow-y-auto transition-all duration-300 ${collapsed ? "px-2 pt-2" : "px-4"}`}>
         {NAV_GROUPS.map((group) => {
           const items = group.items
             .map((name) => NAV_ITEMS.find((item) => item.name === name))
             .filter((item): item is (typeof NAV_ITEMS)[number] => !!item);
-
           if (!items.length) return null;
-
           return (
-            <div key={group.label} className="mb-5">
-              <p className="px-2 pb-2 text-[10px] font-bold uppercase tracking-[0.24em] text-slate-600">
-                {group.label}
-              </p>
+            <div key={group.label} className="mb-4">
+              {!collapsed && (
+                <p className="px-2 pb-2 text-[10px] font-bold uppercase tracking-[0.24em] text-slate-600">
+                  {group.label}
+                </p>
+              )}
+              {collapsed && <div className="h-px bg-slate-800 mb-2 mx-1" />}
               <div className="space-y-1">
                 {items.map((item) => {
                   const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href + '/'));
                   const Icon = item.icon;
-                  const isChat = item.href === "/dashboard/chat";
+                  const isChat  = item.href === "/dashboard/chat";
                   const isEmail = item.href === "/dashboard/correo";
-                  const isWA = item.href === "/dashboard/whatsapp";
+                  const isWA    = item.href === "/dashboard/whatsapp";
                   const chatBadge  = isChat  && !isActive && totalUnread > 0;
                   const emailBadge = isEmail && !isActive && emailUnreadCount > 0;
                   const waBadge    = isWA    && !isActive && waUnreadCount > 0;
                   const badgeCount = chatBadge ? totalUnread : emailBadge ? emailUnreadCount : waUnreadCount;
+                  const hasBadge   = chatBadge || emailBadge || waBadge;
+
+                  if (collapsed) {
+                    return (
+                      <Link key={item.name} to={item.href} onClick={onClose} title={item.name}
+                        className={`relative flex items-center justify-center h-10 w-10 mx-auto rounded-lg transition-colors border-l-4 ${
+                          isActive ? "bg-red-500/10 text-white border-red-500"
+                                   : "text-slate-400 hover:bg-slate-800/50 hover:text-white border-transparent"
+                        }`}>
+                        <Icon className={`h-5 w-5 ${isActive ? "text-red-400" : "text-slate-500"}`} />
+                        {hasBadge && (
+                          <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full ring-1 ring-slate-900" />
+                        )}
+                      </Link>
+                    );
+                  }
+
                   return (
                     <Link key={item.name} to={item.href} onClick={onClose}
                       className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors border-l-4 ${
                         isActive ? "bg-red-500/10 text-white border-red-500"
                                  : "text-slate-400 hover:bg-slate-800/50 hover:text-white border-transparent"
                       }`}>
-                      <Icon className={`h-4.5 w-4.5 ${isActive ? "text-red-400" : "text-slate-500"}`} />
-                      <span className="flex-1">{item.name}</span>
-                      {(chatBadge || emailBadge || waBadge) && (
-                        <span className="ml-auto min-w-[20px] h-5 bg-[#ab0433] text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1.5 shadow-lg shadow-red-900/40">
+                      <Icon className={`h-4 w-4 shrink-0 ${isActive ? "text-red-400" : "text-slate-500"}`} />
+                      <span className="flex-1 truncate">{item.name}</span>
+                      {hasBadge && (
+                        <span className="ml-auto min-w-[20px] h-5 bg-red-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1.5">
                           {badgeCount > 99 ? "99+" : badgeCount}
                         </span>
                       )}
@@ -511,45 +537,74 @@ function SidebarContent({ pathname, onClose, onSignOut }: { pathname: string; on
         })}
       </nav>
 
+      {/* Toggle colapsar */}
+      <div className={`transition-all duration-300 ${collapsed ? "px-2 pb-2" : "px-4 pb-2"}`}>
+        <button
+          onClick={onToggleCollapse}
+          title={collapsed ? "Expandir sidebar" : "Colapsar sidebar"}
+          className={`flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800/50 transition-colors ${
+            collapsed ? "h-10 w-10 mx-auto" : "w-full py-2 gap-2 text-xs font-medium px-3"
+          }`}
+        >
+          {collapsed ? <ChevronRight size={15} /> : <><ChevronLeft size={14} /><span>Colapsar</span></>}
+        </button>
+      </div>
+
       {/* Configuración */}
-      <div className="px-4 pb-3">
-        <Link to="/dashboard/config" onClick={onClose}
-          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors border-l-4 ${
-            pathname === "/dashboard/config" ? "bg-red-500/10 text-white border-red-500" : "text-slate-400 hover:bg-slate-800/50 hover:text-white border-transparent"
-          }`}>
-          <Settings className="h-4.5 w-4.5 text-slate-500" /> Configuración
-        </Link>
+      <div className={`transition-all duration-300 ${collapsed ? "px-2 pb-2" : "px-4 pb-3"}`}>
+        {collapsed ? (
+          <Link to="/dashboard/config" onClick={onClose} title="Configuración"
+            className={`flex items-center justify-center h-10 w-10 mx-auto rounded-lg transition-colors border-l-4 ${
+              pathname === "/dashboard/config" ? "bg-red-500/10 text-white border-red-500" : "text-slate-400 hover:bg-slate-800/50 hover:text-white border-transparent"
+            }`}>
+            <Settings className="h-5 w-5 text-slate-500" />
+          </Link>
+        ) : (
+          <Link to="/dashboard/config" onClick={onClose}
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors border-l-4 ${
+              pathname === "/dashboard/config" ? "bg-red-500/10 text-white border-red-500" : "text-slate-400 hover:bg-slate-800/50 hover:text-white border-transparent"
+            }`}>
+            <Settings className="h-4 w-4 shrink-0 text-slate-500" /> Configuración
+          </Link>
+        )}
       </div>
 
       {/* Usuario */}
-      <div className="px-4 pb-4">
-        <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-slate-800/50 border border-slate-700/50 cursor-pointer hover:bg-slate-800 transition-colors">
-          <UserButton afterSignOutUrl="/" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-slate-200 truncate leading-tight">{user?.fullName || user?.firstName || "Usuario"}</p>
-            <p className="text-[10px] text-slate-500 truncate">{user?.primaryEmailAddress?.emailAddress || ""}</p>
+      <div className={`transition-all duration-300 ${collapsed ? "px-2 pb-3" : "px-4 pb-4"}`}>
+        {collapsed ? (
+          <div className="flex justify-center">
+            <UserButton afterSignOutUrl="/" />
           </div>
-          {onSignOut && (
-            <button
-              onClick={onSignOut}
-              title="Cerrar sesión"
-              className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-400/10 transition-colors shrink-0"
-            >
-              <LogOut size={14} />
-            </button>
-          )}
-        </div>
+        ) : (
+          <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-slate-800/50 border border-slate-700/50 cursor-pointer hover:bg-slate-800 transition-colors">
+            <UserButton afterSignOutUrl="/" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-slate-200 truncate leading-tight">{user?.fullName || user?.firstName || "Usuario"}</p>
+              <p className="text-[10px] text-slate-500 truncate">{user?.primaryEmailAddress?.emailAddress || ""}</p>
+            </div>
+            {onSignOut && (
+              <button onClick={onSignOut} title="Cerrar sesión"
+                className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-400/10 transition-colors shrink-0">
+                <LogOut size={14} />
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Badge */}
-      <div className="px-4 pb-4">
-        <div className="p-3 bg-emerald-900/20 rounded-lg border border-emerald-800/30 flex items-center gap-3">
-          <ShieldCheck className="h-4 w-4 text-emerald-500 shrink-0" />
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-tighter truncate">Conexión Segura</p>
-            <p className="text-[9px] text-slate-500 truncate">VANTIA Legis ERP</p>
+      {/* Badge seguridad */}
+      <div className={`transition-all duration-300 ${collapsed ? "px-2 pb-4 flex justify-center" : "px-4 pb-4"}`}>
+        {collapsed ? (
+          <ShieldCheck className="h-5 w-5 text-emerald-500" />
+        ) : (
+          <div className="p-3 bg-emerald-900/20 rounded-lg border border-emerald-800/30 flex items-center gap-3">
+            <ShieldCheck className="h-4 w-4 text-emerald-500 shrink-0" />
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-tighter truncate">Conexión Segura</p>
+              <p className="text-[9px] text-slate-500 truncate">VANTIA Legis ERP</p>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
@@ -567,6 +622,7 @@ export default function DashboardLayout() {
   const { latestToast: latestWaToast, clearToast: clearWaToast, markSeen: markWaSeen, markAllSeen: markAllWaSeen } = useWhatsAppUnread();
 
   const [isMobileOpen,    setIsMobileOpen]    = useState(false);
+  const [isCollapsed,     setIsCollapsed]     = useState(() => localStorage.getItem("sidebar_collapsed") === "1");
   const [isNotifOpen,     setIsNotifOpen]     = useState(false);
   const [searchQuery,     setSearchQuery]     = useState("");
   const [searchFocused,   setSearchFocused]   = useState(false);
@@ -643,6 +699,14 @@ export default function DashboardLayout() {
       clerk.signOut({ redirectUrl: '/' });
     }
   }, [getToken, clerk]);
+
+  const toggleSidebar = useCallback(() => {
+    setIsCollapsed(prev => {
+      const next = !prev;
+      localStorage.setItem("sidebar_collapsed", next ? "1" : "0");
+      return next;
+    });
+  }, []);
 
   // Cerrar paneles al clicar fuera
   useEffect(() => {
@@ -905,8 +969,8 @@ export default function DashboardLayout() {
       <VantIAWidget pathname={location.pathname} getToken={getToken} />
 
       {/* Sidebar Desktop */}
-      <aside className="hidden md:flex w-64 flex-col fixed inset-y-0 z-30">
-        <SidebarContent pathname={location.pathname} onSignOut={handleSignOut} />
+      <aside className={`hidden md:flex flex-col fixed inset-y-0 z-30 transition-all duration-300 ${isCollapsed ? "w-16" : "w-64"}`}>
+        <SidebarContent pathname={location.pathname} onSignOut={handleSignOut} collapsed={isCollapsed} onToggleCollapse={toggleSidebar} />
       </aside>
 
       {/* Menú Móvil */}
@@ -923,7 +987,7 @@ export default function DashboardLayout() {
       )}
 
       {/* Contenedor principal */}
-      <main className="relative flex-1 md:pl-64 flex flex-col min-w-0 overflow-hidden">
+      <main className={`relative flex-1 flex flex-col min-w-0 overflow-hidden transition-all duration-300 ${isCollapsed ? "md:pl-16" : "md:pl-64"}`}>
 
         {/* Topbar */}
         <header className="h-16 border-b border-slate-200 bg-white shadow-sm flex items-center gap-4 px-5 md:px-8 sticky top-0 z-20">
