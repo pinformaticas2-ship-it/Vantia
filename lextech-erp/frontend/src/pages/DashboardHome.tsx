@@ -1128,16 +1128,11 @@ export default function DashboardHome() {
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd} autoScroll={false}>
           <SortableContext items={orderedVisible} strategy={rectSortingStrategy}>
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
-              {orderedVisible.map((id) => {
-                const colSpan = id === "agenda" ? "xl:col-span-2"
-                  : id === "actividad" || id === "correo" ? "xl:col-span-3"
-                  : undefined;
-                return (
-                  <SortableWidget key={id} id={id} className={colSpan}>
-                    {(handle) => renderWidget(id, handle)}
-                  </SortableWidget>
-                );
-              })}
+              {orderedVisible.map((id) => (
+                <SortableWidget key={id} id={id}>
+                  {(handle) => renderWidget(id, handle)}
+                </SortableWidget>
+              ))}
             </div>
           </SortableContext>
         </DndContext>
