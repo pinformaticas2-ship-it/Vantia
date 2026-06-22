@@ -94,12 +94,12 @@ function encodeVantiaPayload(payload: unknown) {
 const TABS = [
   { id: "perfil",      label: "Perfil",         icon: User },
   { id: "expedientes", label: "Expedientes",     icon: Briefcase },
-  { id: "economico",   label: "Económico",       icon: Banknote },
-  { id: "agenda",      label: "Agenda",          icon: Calendar },
-  { id: "historial",   label: "Historial",       icon: Clock },
-  { id: "notas",       label: "Notas",           icon: StickyNote },
-  { id: "tareas",      label: "Tareas / Plazos", icon: AlertTriangle },
   { id: "adjuntos",    label: "Adjuntos",        icon: Paperclip },
+  { id: "agenda",      label: "Agenda",          icon: Calendar },
+  { id: "tareas",      label: "Tareas / Plazos", icon: AlertTriangle },
+  { id: "economico",   label: "Económico",       icon: Banknote },
+  { id: "notas",       label: "Notas",           icon: StickyNote },
+  { id: "historial",   label: "Historial",       icon: Clock },
 ];
 
 // ── Tab: Perfil ───────────────────────────────────────────────
@@ -3383,18 +3383,6 @@ function PanelIndicadores({ clientId, onTabChange }: { clientId: string; onTabCh
             color={ind?.tiene_domicilio ? "text-emerald-600" : "text-red-500"} />
         </div>
 
-        {/* Acciones rápidas */}
-        <div className="px-4 pb-4 space-y-2 border-t border-slate-100 pt-3 mt-1">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Acciones</p>
-          <button onClick={() => onTabChange("tareas")}
-            className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors">
-            <AlertTriangle size={13} className="text-amber-500" /> Ver tareas
-          </button>
-          <button onClick={() => onTabChange("adjuntos")}
-            className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors">
-            <Paperclip size={13} className="text-red-500" /> Adjuntos
-          </button>
-        </div>
       </div>
     </aside>
   );
