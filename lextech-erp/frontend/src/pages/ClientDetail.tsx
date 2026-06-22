@@ -3335,8 +3335,8 @@ function PanelIndicadores({ clientId, onTabChange }: { clientId: string; onTabCh
     n == null ? "—" : `${n}${suffix}`;
 
   return (
-    <aside className="w-52 shrink-0 space-y-4">
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden sticky top-6">
+    <aside className="w-52 shrink-0 space-y-4 overflow-y-auto min-h-0">
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
         <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
           <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Indicadores</h3>
           {loading && <Spinner size="sm" muted />}
@@ -3813,10 +3813,10 @@ export default function ClientDetail() {
   };
 
   return (
-    <div className="flex gap-6 animate-in fade-in duration-500">
+    <div className="flex gap-6 animate-in fade-in duration-500 h-full min-h-0 p-4 md:p-8 max-w-[1600px] mx-auto w-full box-border">
 
       {/* ── COLUMNA PRINCIPAL ──────────────────────────────────── */}
-      <div className="flex-1 min-w-0 space-y-4">
+      <div className="flex-1 min-w-0 flex flex-col gap-4 min-h-0">
 
         {/* Breadcrumb + acciones */}
         <div className="flex items-center justify-between">
@@ -3928,9 +3928,9 @@ export default function ClientDetail() {
         </div>
 
         {/* ── TABS ────────────────────────────────────────────── */}
-        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col flex-1 min-h-0">
           {/* Barra de tabs */}
-          <div className="flex border-b border-slate-100 overflow-x-auto">
+          <div className="flex border-b border-slate-100 overflow-x-auto shrink-0">
             {TABS.map(tab => {
               const Icon = tab.icon;
               const active = activeTab === tab.id;
@@ -3952,7 +3952,7 @@ export default function ClientDetail() {
           </div>
 
           {/* Contenido del tab activo — lazy-mount: monta al primer acceso, oculta con CSS */}
-          <div className="p-5">
+          <div className="p-5 flex-1 overflow-y-auto min-h-0">
             <div style={{ display: activeTab === "perfil" ? "block" : "none" }}>
               {!editing && <TabPerfil client={client} formatDate={formatDate} age={age} />}
               {editing && editForm && (
