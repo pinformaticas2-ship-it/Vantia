@@ -926,60 +926,47 @@ export default function DashboardLayout() {
 
       {/* Contenedor principal */}
       <main className="relative flex-1 md:pl-64 flex flex-col min-w-0 overflow-hidden">
-        <div className="erp-ornaments pointer-events-none absolute inset-0" aria-hidden="true">
-          <div className="erp-orb erp-orb-top-right" />
-          <div className="erp-orb erp-orb-bottom-left" />
-          <div className="erp-panel erp-panel-top-left" />
-          <div className="erp-panel erp-panel-bottom-right" />
-          <div className="erp-line erp-line-top" />
-          <div className="erp-line erp-line-bottom" />
-        </div>
 
         {/* Topbar */}
-        <header className="relative h-18 border-b bg-white flex items-center justify-between px-5 md:px-8 sticky top-0 z-20 py-4">
-          <div className="flex items-center gap-4">
-            <button className="md:hidden p-2 rounded-xl hover:bg-slate-100 text-slate-600" onClick={() => setIsMobileOpen(true)}>
-              <Menu className="h-5 w-5" />
-            </button>
+        <header className="border-b bg-white flex items-center gap-4 px-5 md:px-8 sticky top-0 z-20 py-3.5">
+          <button className="md:hidden p-2 rounded-xl hover:bg-slate-100 text-slate-600 shrink-0" onClick={() => setIsMobileOpen(true)}>
+            <Menu className="h-5 w-5" />
+          </button>
 
-            {/* Búsqueda funcional */}
-            <div ref={searchRef} className="relative hidden lg:block">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <input
-                type="search"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onFocus={() => setSearchFocused(true)}
-                placeholder="Buscar módulos..."
-                className="pl-11 h-11 w-80 rounded-2xl border border-slate-100 bg-slate-50 text-sm focus:bg-white focus:ring-4 focus:ring-red-500/5 focus:border-slate-200 outline-none transition-all"
-              />
-              {searchFocused && searchQuery && (
-                <SearchDropdown query={searchQuery} onSelect={() => { setSearchQuery(""); setSearchFocused(false); }} />
-              )}
-            </div>
+          {/* Búsqueda — ocupa todo el espacio disponible */}
+          <div ref={searchRef} className="relative flex-1">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onFocus={() => setSearchFocused(true)}
+              placeholder="Buscar módulos, clientes, expedientes..."
+              className="pl-11 h-11 w-full rounded-2xl border border-slate-100 bg-slate-50 text-sm focus:bg-white focus:ring-4 focus:ring-red-500/5 focus:border-slate-200 outline-none transition-all"
+            />
+            {searchFocused && searchQuery && (
+              <SearchDropdown query={searchQuery} onSelect={() => { setSearchQuery(""); setSearchFocused(false); }} />
+            )}
           </div>
 
-          <div className="flex items-center gap-3">
-            {/* Notificaciones */}
-            <div ref={notifRef} className="relative">
-              <button
-                onClick={isNotifOpen ? () => setIsNotifOpen(false) : openNotifications}
-                className="relative p-2.5 rounded-xl hover:bg-slate-50 text-slate-500 border border-slate-100 transition-colors"
-              >
-                <Bell className="h-5 w-5" />
-                {totalBadge > 0 && (
-                  <span className="absolute top-2 right-2 h-2 w-2 bg-red-500 rounded-full border-2 border-white" />
-                )}
-              </button>
-              {isNotifOpen && (
-                <NotificationsPanel
-                  notifs={visibleNotifications.slice(0, 10)}
-                  loading={notifLoading}
-                  onClose={() => setIsNotifOpen(false)}
-                />
+          {/* Notificaciones */}
+          <div ref={notifRef} className="relative shrink-0">
+            <button
+              onClick={isNotifOpen ? () => setIsNotifOpen(false) : openNotifications}
+              className="relative p-2.5 rounded-xl hover:bg-slate-50 text-slate-500 border border-slate-100 transition-colors"
+            >
+              <Bell className="h-5 w-5" />
+              {totalBadge > 0 && (
+                <span className="absolute top-2 right-2 h-2 w-2 bg-red-500 rounded-full border-2 border-white" />
               )}
-            </div>
-
+            </button>
+            {isNotifOpen && (
+              <NotificationsPanel
+                notifs={visibleNotifications.slice(0, 10)}
+                loading={notifLoading}
+                onClose={() => setIsNotifOpen(false)}
+              />
+            )}
           </div>
         </header>
 
