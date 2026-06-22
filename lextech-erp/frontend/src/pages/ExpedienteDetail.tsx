@@ -160,7 +160,6 @@ type DetailTabKey = "perfil" | TabKey | "relacionados" | "actuacion" | "economic
 const DETAIL_TABS: { key: DetailTabKey; label: string; icon: any }[] = [
   { key: "perfil",      label: "Datos",                  icon: User },
   { key: "economico",   label: "Económico",              icon: Banknote },
-  { key: "notas",       label: "Notas",                  icon: StickyNote },
   { key: "clientes",    label: "Cliente",                icon: Users },
   { key: "contrarios",  label: "Contrarios",             icon: Users },
   { key: "tareas",      label: "Tareas / Plazos",        icon: AlertTriangle },
@@ -4681,6 +4680,10 @@ function PanelIndicadoresExpediente({ expedienteId, onTabChange }: { expedienteI
           <button onClick={() => onTabChange('adjuntos')}
             className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors">
             📎 Adjuntos
+          </button>
+          <button onClick={() => onTabChange('notas')}
+            className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors">
+            🗒️ Notas
           </button>
           <button onClick={() => onTabChange('relacionados')}
             className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors">
