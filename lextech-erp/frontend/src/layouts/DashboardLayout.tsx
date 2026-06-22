@@ -456,18 +456,12 @@ function SidebarContent({ pathname, onClose, onSignOut }: { pathname: string; on
   return (
     <div className="flex flex-col h-full bg-slate-900 border-r border-slate-800">
       {/* Logo */}
-      <div className="h-20 flex items-center px-6 border-b border-slate-800 shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="flex gap-1 items-end">
-            <div className="w-1.5 h-5 bg-red-500 rounded-sm" style={{ transform: "skewX(-10deg)" }} />
-            <div className="w-1.5 h-7 bg-slate-300 rounded-sm" style={{ transform: "skewX(-10deg)" }} />
-            <div className="w-1.5 h-5 bg-red-500 rounded-sm" style={{ transform: "skewX(-10deg)" }} />
-          </div>
-          <div className="flex flex-col leading-none">
-            <span className="text-white font-bold text-base tracking-[0.18em]">VANTIA</span>
-            <span className="text-slate-500 text-[9px] tracking-[0.3em] mt-0.5">LEGIS ERP</span>
-          </div>
-        </div>
+      <div className="flex items-center justify-center px-6 py-5 border-b border-slate-800 shrink-0">
+        <img
+          src="/vantia-sidebar-slate.png"
+          alt="Vantia Legis"
+          className="h-12 w-full object-contain"
+        />
       </div>
 
       {/* Nav principal */}
