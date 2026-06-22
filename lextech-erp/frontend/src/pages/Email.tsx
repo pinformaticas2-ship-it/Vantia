@@ -1502,9 +1502,17 @@ function EmailItem({
 
 // ─── Email Reader ─────────────────────────────────────────────────────────────
 
+interface EmailAttachment {
+  id: string;
+  filename: string;
+  contentType: string;
+  size: number;
+  inline: boolean;
+}
+
 function EmailReader({
   email, onReply, onReplyAll, onForward, onDelete, onStar, onBack,
-  onPin, onRestore, onAssignLabel, onCreateLabel, userLabels,
+  onPin, onRestore, onAssignLabel, onCreateLabel, userLabels, getToken,
 }: {
   email: ParsedEmail;
   onReply: () => void; onReplyAll: () => void; onForward: () => void;
@@ -1514,12 +1522,49 @@ function EmailReader({
   onAssignLabel: (labelId: string) => void;
   onCreateLabel: () => void;
   userLabels: GmailLabel[];
+  getToken: () => Promise<string>;
 }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [iframeH, setIframeH] = useState(300);
   const [showRaw, setShowRaw] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [attachments, setAttachments] = useState<EmailAttachment[]>([]);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  // Load attachments from EmailEngine when email has them
+  useEffect(() => {
+    if (!email.hasAttachments || !email.id || email.source === 'gmail') return;
+    setAttachments([]);
+    getToken().then(async (token) => {
+      if (!token) return;
+      const r = await fetch(`${API}/email/messages/${email.id}/body`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!r.ok) return;
+      const j = await r.json();
+      const list: EmailAttachment[] = (j?.data?.attachments || []).filter((a: any) => !a.inline);
+      setAttachments(list);
+    }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [email.id, email.hasAttachments]);
+
+  const handleDownload = async (att: EmailAttachment) => {
+    setDownloadingId(att.id);
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API}/email/messages/${email.id}/attachments/${att.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Error al descargar');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = att.filename; a.click();
+      URL.revokeObjectURL(url);
+    } catch (e: any) { console.error(e); }
+    finally { setDownloadingId(null); }
+  };
 
   useEffect(() => {
     const iframe = iframeRef.current;
@@ -1753,6 +1798,48 @@ function EmailReader({
                 </div>
               </div>
             </div>
+
+            {/* ── Attachments panel ── */}
+            {attachments.length > 0 && (
+              <div className="px-8 pb-4">
+                <div className="mx-auto max-w-[760px] rounded-2xl border border-amber-100 bg-amber-50/60 px-5 py-4">
+                  <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-amber-800">
+                    <Paperclip size={15} />
+                    {attachments.length === 1 ? '1 adjunto' : `${attachments.length} adjuntos`}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {attachments.map((att) => {
+                      const isDownloading = downloadingId === att.id;
+                      const ext = att.filename.split('.').pop()?.toLowerCase() || '';
+                      const isImg = ['jpg','jpeg','png','gif','webp','svg'].includes(ext);
+                      const isPdf = ext === 'pdf';
+                      return (
+                        <button
+                          key={att.id}
+                          onClick={() => void handleDownload(att)}
+                          disabled={isDownloading}
+                          className="flex items-center gap-2 px-3 py-2 bg-white border border-amber-200 hover:border-amber-400 hover:bg-amber-50 rounded-xl text-sm text-amber-900 transition-all disabled:opacity-60 shadow-sm">
+                          {isDownloading
+                            ? <Loader2 size={14} className="animate-spin text-amber-600 flex-shrink-0" />
+                            : isImg
+                              ? <span className="text-base leading-none">🖼️</span>
+                              : isPdf
+                                ? <span className="text-base leading-none">📄</span>
+                                : <Paperclip size={14} className="text-amber-600 flex-shrink-0" />
+                          }
+                          <span className="max-w-[160px] truncate font-medium">{att.filename}</span>
+                          <span className="text-xs text-amber-500 flex-shrink-0">
+                            {att.size > 1024 * 1024
+                              ? `${(att.size / 1024 / 1024).toFixed(1)} MB`
+                              : `${Math.round(att.size / 1024)} KB`}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="px-8 pb-8 flex items-center gap-2 flex-wrap">
               <button
@@ -3236,9 +3323,12 @@ export default function Email() {
 
     const startPolling = () => {
       if (emailRefreshRef.current) clearInterval(emailRefreshRef.current);
-      const intervalMs = document.visibilityState === 'visible'
-        ? (currentImapAccount ? 12000 : 18000)
-        : (currentImapAccount ? 30000 : 45000);
+      // With EmailEngine, IMAP accounts get real-time webhooks → poll DB less aggressively.
+      // Gmail still needs polling (no webhook). Hidden tabs always use long intervals.
+      const isVisible = document.visibilityState === 'visible';
+      const intervalMs = currentImapAccount
+        ? (isVisible ? 8000 : 60000)   // EmailEngine pushes to DB; just refresh list
+        : (isVisible ? 18000 : 45000); // Gmail: keep existing cadence
       emailRefreshRef.current = setInterval(() => { void silentRefresh(false); }, intervalMs);
     };
 
@@ -3896,6 +3986,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
               onAssignLabel={(labelId) => assignEmailToLabel(selectedEmail, labelId)}
               onCreateLabel={createUserLabel}
               userLabels={gmailLabels.filter((label) => label.type === 'user')}
+              getToken={tokenGetter}
             />
           ) : hasActiveMailbox ? (
             <div className="flex flex-col items-center justify-center h-full select-none">

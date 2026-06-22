@@ -864,6 +864,15 @@ export async function runMigrations(): Promise<void> {
       `CREATE INDEX IF NOT EXISTS idx_email_accounts_user_id ON email_accounts (user_id)`,
     ]) { try { await client.query(idx); } catch (_e: any) {} }
 
+    // ── EmailEngine integration columns ───────────────────────────────────────
+    for (const col of [
+      `ALTER TABLE emails ADD COLUMN IF NOT EXISTS engine_msg_id  VARCHAR(200)`,
+      `ALTER TABLE emails ADD COLUMN IF NOT EXISTS thread_id      VARCHAR(500)`,
+      `ALTER TABLE emails ADD COLUMN IF NOT EXISTS attachments_json TEXT`,
+      `CREATE INDEX IF NOT EXISTS idx_emails_engine_msg_id ON emails (engine_msg_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_emails_thread_id     ON emails (thread_id)`,
+    ]) { try { await client.query(col); } catch (_e: any) {} }
+
     await client.query(`
       CREATE TABLE IF NOT EXISTS email_oauth_profiles (
         id             UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),

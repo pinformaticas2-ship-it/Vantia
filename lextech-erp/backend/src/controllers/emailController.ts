@@ -1,10 +1,11 @@
 import { Request, Response } from 'express';
 import * as crypto from 'crypto';
 import pool from '../config/database';
-import { ImapClient, ImapConfig, ImapFolderInfo, syncInbox, testImapConnection } from '../utils/imap';
+import { ImapClient, ImapConfig, syncInbox, testImapConnection } from '../utils/imap';
 import { Pop3Config, syncPop3Inbox, testPop3Connection } from '../utils/pop3';
 import { sendEmail, SmtpConfig, MailMessage, testSmtpConnection } from '../utils/smtp';
 import { logActivityForReq } from './activityController';
+import { isEmailEngineEnabled, eeRegisterAccount, eeDeleteAccount, eeUpdateAccount, eeGetMessage, eeGetAttachment } from '../utils/emailEngineClient';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -301,7 +302,19 @@ export async function createAccount(req: Request, res: Response) {
       [uid, label, email, imap_host, inPort, Boolean(imap_secure),
        smtp_host, Number(smtp_port), Boolean(smtp_secure), username, enc, proto],
     );
-    return ok(res, rows[0]);
+    const saved = rows[0];
+
+    // Register with EmailEngine for real-time IMAP sync
+    if (isEmailEngineEnabled() && proto === 'imap') {
+      eeRegisterAccount({
+        accountId: saved.id,
+        name: String(label),
+        imap: { auth: { user: String(username), pass: String(password) }, host: String(imap_host), port: inPort, secure: Boolean(imap_secure) },
+        smtp: { auth: { user: String(username), pass: String(password) }, host: String(smtp_host), port: Number(smtp_port), secure: Boolean(smtp_secure) },
+      }).catch((e: any) => console.warn('EmailEngine register:', e?.message));
+    }
+
+    return ok(res, saved);
   } catch (e: any) { return err(res, e.message); }
 }
 
@@ -310,6 +323,9 @@ export async function deleteAccount(req: Request, res: Response) {
   if (!uid) return err(res, 'No autenticado', 401);
   const { id } = req.params;
   try {
+    if (isEmailEngineEnabled()) {
+      eeDeleteAccount(id).catch((e: any) => console.warn('EmailEngine deregister:', e?.message));
+    }
     const { rowCount } = await pool.query(
       `DELETE FROM email_accounts WHERE id=$1 AND user_id=$2`,
       [id, uid],
@@ -1054,5 +1070,93 @@ export async function getStats(req: Request, res: Response) {
       params,
     );
     return ok(res, rows[0]);
+  } catch (e: any) { return err(res, e.message); }
+}
+
+// ── Attachment download (via EmailEngine) ──────────────────────────────────────
+
+export async function downloadAttachment(req: Request, res: Response) {
+  const uid = userId(req);
+  if (!uid) return err(res, 'No autenticado', 401);
+  const { id: messageDbId, attachmentId } = req.params;
+
+  try {
+    // Verify the email belongs to this user and get engine_msg_id + account_id
+    const { rows } = await pool.query(
+      `SELECT e.engine_msg_id, e.attachments_json, a.id AS account_id
+         FROM emails e
+         JOIN email_accounts a ON a.id = e.account_id
+        WHERE e.id=$1 AND e.user_id=$2`,
+      [messageDbId, uid],
+    );
+    if (!rows.length) return err(res, 'Correo no encontrado', 404);
+    const { engine_msg_id, attachments_json, account_id } = rows[0];
+
+    if (!isEmailEngineEnabled() || !engine_msg_id) {
+      return err(res, 'Descarga de adjuntos no disponible (EmailEngine no configurado)', 503);
+    }
+
+    // Find attachment metadata so we can set Content-Type and filename
+    let filename = 'adjunto';
+    let contentType = 'application/octet-stream';
+    if (attachments_json) {
+      try {
+        const list: any[] = JSON.parse(attachments_json);
+        const meta = list.find((a: any) => a.id === attachmentId);
+        if (meta) { filename = meta.filename || filename; contentType = meta.contentType || contentType; }
+      } catch {}
+    }
+
+    const buffer = await eeGetAttachment(account_id, attachmentId);
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+    res.setHeader('Content-Length', buffer.length);
+    res.send(buffer);
+  } catch (e: any) { return err(res, e.message); }
+}
+
+// ── Fetch full message body via EmailEngine (faster than IMAP on-demand) ──────
+
+export async function getMessageBodyFromEngine(req: Request, res: Response) {
+  const uid = userId(req);
+  if (!uid) return err(res, 'No autenticado', 401);
+  const { id: messageDbId } = req.params;
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT e.engine_msg_id, e.body_html, e.body_text, e.attachments_json, a.id AS account_id
+         FROM emails e
+         JOIN email_accounts a ON a.id = e.account_id
+        WHERE e.id=$1 AND e.user_id=$2`,
+      [messageDbId, uid],
+    );
+    if (!rows.length) return err(res, 'Correo no encontrado', 404);
+    const row = rows[0];
+
+    // If body already cached in DB, return it directly
+    if (row.body_html || row.body_text) {
+      return ok(res, {
+        body_html: row.body_html,
+        body_text: row.body_text,
+        attachments: row.attachments_json ? JSON.parse(row.attachments_json) : [],
+      });
+    }
+
+    if (!isEmailEngineEnabled() || !row.engine_msg_id) {
+      return err(res, 'Cuerpo no disponible', 404);
+    }
+
+    const msg = await eeGetMessage(row.account_id, row.engine_msg_id);
+    const bodyHtml = msg.text?.html || null;
+    const bodyText = msg.text?.plain || null;
+    const attachments = msg.attachments || [];
+
+    // Cache in DB for subsequent requests
+    await pool.query(
+      `UPDATE emails SET body_html=$1, body_text=$2, attachments_json=$3 WHERE id=$4`,
+      [bodyHtml, bodyText, attachments.length ? JSON.stringify(attachments) : null, messageDbId],
+    );
+
+    return ok(res, { body_html: bodyHtml, body_text: bodyText, attachments });
   } catch (e: any) { return err(res, e.message); }
 }

@@ -13,6 +13,7 @@ import expedientesRoutes from './routes/expedientes';
 import agendaRoutes from './routes/agenda';
 import chatRoutes           from './routes/chat';
 import emailRoutes          from './routes/email';
+import emailEngineWebhookRoute from './routes/emailEngineWebhook';
 import whatsappRoutes       from './routes/whatsapp';
 import documentImportRoutes from './routes/documentImport';
 import documentalRoutes     from './routes/documental';
@@ -26,6 +27,8 @@ import { migrateLocalFoldersStructure } from './controllers/filesController';
 import { logServerStart } from './controllers/activityController';
 import pool from './config/database';
 import { SHOULD_START_LOCAL_WATCHER, UPLOADS_ROOT } from './config/paths';
+import { isEmailEngineEnabled, eeConfigureWebhook, eeRegisterAccount, eeHealthCheck } from './utils/emailEngineClient';
+import { decryptPassword } from './utils/emailCrypto';
 
 dotenv.config();
 
@@ -102,6 +105,9 @@ app.use(compression());
 
 // Servir archivos estáticos (fotos DNI subidas, etc.)
 app.use('/uploads', express.static(UPLOADS_ROOT));
+
+// ── EmailEngine webhook — BEFORE Clerk (no user session, called by EmailEngine) ──
+app.use('/api/email/webhook/engine', emailEngineWebhookRoute);
 
 // --- RUTAS ---
 app.use('/api/entities', entityRoutes);
@@ -232,5 +238,42 @@ runMigrations().then(() => {
     }
     // Registrar arranque en trazabilidad
     try { await logServerStart(); } catch { /**/ }
+
+    // ── EmailEngine: configure webhook + register existing accounts ───────────
+    if (isEmailEngineEnabled()) {
+      setTimeout(async () => {
+        try {
+          const alive = await eeHealthCheck();
+          if (!alive) { console.warn('⚠️  EmailEngine no responde — sync en tiempo real desactivado'); return; }
+
+          const publicUrl = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
+          await eeConfigureWebhook(`${publicUrl}/api/email/webhook/engine`).catch(() => {});
+
+          const { rows } = await pool.query(
+            `SELECT id, imap_host, imap_port, imap_secure, smtp_host, smtp_port, smtp_secure,
+                    username, password_enc, label, protocol
+               FROM email_accounts WHERE active=true AND COALESCE(protocol,'imap')='imap'`,
+          );
+          for (const acc of rows) {
+            try {
+              const pass = decryptPassword(acc.password_enc);
+              await eeRegisterAccount({
+                accountId: acc.id,
+                name: acc.label || acc.username,
+                imap: { auth: { user: acc.username, pass }, host: acc.imap_host, port: acc.imap_port, secure: acc.imap_secure },
+                smtp: { auth: { user: acc.username, pass }, host: acc.smtp_host, port: acc.smtp_port, secure: acc.smtp_secure },
+              });
+            } catch (e: any) { console.warn(`⚠️  EmailEngine: no se pudo registrar cuenta ${acc.id}:`, e?.message); }
+          }
+          console.log(`✅ EmailEngine activo — ${rows.length} cuenta(s) en sync tiempo real`);
+        } catch (e: any) { console.warn('⚠️  EmailEngine setup:', e?.message); }
+      }, 5_000);
+    }
+
+    // Quipu auto-sync: run once after 30s (let DB settle), then every 30 min
+    setTimeout(() => {
+      syncAllQuipuUsers().catch(() => {});
+      setInterval(() => syncAllQuipuUsers().catch(() => {}), 30 * 60 * 1000);
+    }, 30_000);
   });
 });

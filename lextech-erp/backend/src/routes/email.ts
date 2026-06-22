@@ -23,6 +23,9 @@ import {
   logGmailSent,
   linkEmailToExpediente,
   emptyTrash,
+  updateAccount,
+  downloadAttachment,
+  getMessageBodyFromEngine,
 } from '../controllers/emailController';
 
 const router = Router();
@@ -34,6 +37,7 @@ router.get('/profiles',           getOAuthProfiles);
 router.post('/profiles',          upsertOAuthProfile);
 router.delete('/profiles/:id',    deleteOAuthProfile);
 router.post('/accounts',          createAccount);
+router.put('/accounts/:id',       updateAccount);
 router.delete('/accounts/:id',    deleteAccount);
 router.get('/accounts/:id/folders', getAccountFolders);
 router.post('/accounts/:id/folders', createAccountFolder);
@@ -58,6 +62,10 @@ router.get('/stats',              getStats);
 
 // ── Papelera ──────────────────────────────────────────────────────────────────
 router.delete('/trash',           emptyTrash);
+
+// ── EmailEngine: adjuntos y cuerpo enriquecido ───────────────────────────────
+router.get('/messages/:id/body',                    getMessageBodyFromEngine);
+router.get('/messages/:id/attachments/:attachmentId', downloadAttachment);
 
 // ── Asociar email a expediente ───────────────────────────────────────────────
 router.patch('/messages/:id/link', linkEmailToExpediente);
