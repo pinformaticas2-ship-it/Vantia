@@ -3941,14 +3941,18 @@ function TabContrarios({ exp, onPatch }: { exp: any; onPatch: (fields: Record<st
             </div>
           </div>
         ) : hasData ? (
-          <div className="flex items-start gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200 bg-white text-sm font-bold text-slate-600 shrink-0">
-              {initialsFromName(exp.contrario || "?")}
+          <div className="grid grid-cols-3 gap-px bg-slate-100 rounded-xl overflow-hidden border border-slate-100">
+            <div className="bg-white px-4 py-3">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Parte contraria</p>
+              <p className="text-sm text-slate-800">{exp.contrario || <span className="text-slate-300">—</span>}</p>
             </div>
-            <div className="min-w-0 flex-1 space-y-1">
-              <p className="text-sm font-semibold text-slate-800">{exp.contrario || <span className="text-slate-400 font-normal">Sin nombre</span>}</p>
-              {exp.abogado_contrario && <p className="text-xs text-slate-500">Abogado contrario: {exp.abogado_contrario}</p>}
-              {exp.procurador_contrario && <p className="text-xs text-slate-500">Procurador contrario: {exp.procurador_contrario}</p>}
+            <div className="bg-white px-4 py-3">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Abogado contrario</p>
+              <p className="text-sm text-slate-800">{exp.abogado_contrario || <span className="text-slate-300">—</span>}</p>
+            </div>
+            <div className="bg-white px-4 py-3">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Procurador contrario</p>
+              <p className="text-sm text-slate-800">{exp.procurador_contrario || <span className="text-slate-300">—</span>}</p>
             </div>
           </div>
         ) : (
