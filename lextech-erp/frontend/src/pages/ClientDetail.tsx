@@ -3816,65 +3816,114 @@ export default function ClientDetail() {
     <div className="flex gap-6 animate-in fade-in duration-500">
 
       {/* ── COLUMNA PRINCIPAL ──────────────────────────────────── */}
-      <div className="flex-1 min-w-0 space-y-3">
+      <div className="flex-1 min-w-0 space-y-4">
 
-        {/* ── Cabecera compacta (breadcrumb + info + acciones en una sola fila) ── */}
-        <div className="bg-white border border-slate-200 rounded-xl px-4 py-3 flex items-center gap-3">
-          {client.photo_url ? (
-            <button onClick={() => setPhotoZoom(true)} className="shrink-0 rounded-lg overflow-hidden shadow focus:outline-none focus:ring-2 focus:ring-red-400 cursor-zoom-in" title="Ver foto ampliada">
-              <img src={client.photo_url} alt="Foto" className="h-9 w-9 object-cover hover:scale-105 transition-transform duration-200" />
-            </button>
-          ) : (
-            <div className="h-9 w-9 bg-gradient-to-br from-red-500 to-red-700 rounded-lg flex items-center justify-center text-white font-bold text-sm shadow shadow-red-200 shrink-0">
-              {initials}
-            </div>
-          )}
-
-          {/* Lightbox foto */}
-          {photoZoom && client.photo_url && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70" onClick={() => setPhotoZoom(false)}>
-              <div className="relative max-w-2xl w-full mx-4" onClick={e => e.stopPropagation()}>
-                <img src={client.photo_url} alt="Foto ampliada" className="w-full rounded-2xl shadow-2xl object-contain max-h-[90vh]" />
-                <button onClick={() => setPhotoZoom(false)} className="absolute -top-3 -right-3 bg-white rounded-full p-1.5 shadow-lg text-slate-500 hover:text-slate-800 transition-colors">
-                  <X size={16} />
-                </button>
-                <p className="text-center text-white/70 text-xs mt-3">{client.first_name} {client.last_name}</p>
-              </div>
-            </div>
-          )}
-
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5 text-xs text-slate-400 mb-0.5">
-              <Link to="/dashboard/clientes" className="hover:text-slate-600 transition-colors shrink-0">Clientes</Link>
-              <span>/</span>
-              {client.nif_cif && <><span className="font-mono">{client.nif_cif}</span><span>·</span></>}
-              {client.internal_number && <><span>Nº {client.internal_number}</span><span>·</span></>}
-              {client.date_alta && <span><Calendar size={10} className="inline mr-0.5" />Alta: {formatDate(client.date_alta)}</span>}
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-sm font-bold text-slate-900 truncate">{client.first_name} {client.last_name}</h1>
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${statusColor[client.client_status] || "bg-slate-100 text-slate-600"}`}>{client.client_status || "Alta"}</span>
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${typeColor[client.type] || "bg-slate-100 text-slate-600"}`}>{client.type || "Cliente"}</span>
-              {client.commercial_name && <span className="text-xs text-slate-400">· {client.commercial_name}</span>}
-            </div>
+        {/* Breadcrumb + acciones */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm text-slate-500">
+            <Link to="/dashboard/clientes" className="hover:text-slate-800 transition-colors">Clientes</Link>
+            <span>/</span>
+            <span className="text-slate-800 font-medium">{client.first_name} {client.last_name}</span>
           </div>
-
-          <div className="flex gap-2 shrink-0">
+          <div className="flex gap-2">
             <BackButton onClick={() => navigate("/dashboard/clientes")} />
             {editing ? (
               <>
-                <button onClick={() => { setEditing(false); setEditForm(null); }} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg shadow-sm active:scale-95 transition-all">
-                  <X size={13} /> Cancelar
+                <button
+                  onClick={() => { setEditing(false); setEditForm(null); }}
+                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl shadow-sm active:scale-95 transition-all"
+                >
+                  <X size={14} /> Cancelar
                 </button>
-                <button onClick={handleSaveClient} disabled={saving || (!editForm?.first_name?.trim() && !editForm?.commercial_name?.trim())} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-lg shadow-sm active:scale-95 transition-all">
-                  {saving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Guardar
+                <button
+                  onClick={handleSaveClient}
+                  disabled={saving || (!editForm?.first_name?.trim() && !editForm?.commercial_name?.trim())}
+                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-xl shadow-sm active:scale-95 transition-all"
+                >
+                  {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                  Guardar cambios
                 </button>
               </>
             ) : (
-              <button onClick={startEdit} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-sm active:scale-95 transition-all">
-                <Edit3 size={13} /> Editar
+              <button
+                onClick={startEdit}
+                className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm active:scale-95 transition-all"
+              >
+                <Edit3 size={14} /> Editar
               </button>
             )}
+          </div>
+        </div>
+
+        {/* Header tarjeta del cliente */}
+        <div className="bg-white border border-slate-200 rounded-xl p-5">
+          <div className="flex items-center gap-4">
+            {client.photo_url
+              ? (
+                <button
+                  onClick={() => setPhotoZoom(true)}
+                  className="shrink-0 rounded-xl overflow-hidden shadow focus:outline-none focus:ring-2 focus:ring-red-400 cursor-zoom-in"
+                  title="Ver foto ampliada"
+                >
+                  <img src={client.photo_url} alt="Foto" className="h-16 w-16 object-cover hover:scale-105 transition-transform duration-200" />
+                </button>
+              )
+              : (
+                <div className="h-16 w-16 bg-gradient-to-br from-red-500 to-red-700 rounded-xl flex items-center justify-center text-white font-bold text-2xl shadow-lg shadow-red-200 shrink-0">
+                  {initials}
+                </div>
+              )
+            }
+
+            {/* Lightbox foto */}
+            {photoZoom && client.photo_url && (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+                onClick={() => setPhotoZoom(false)}
+              >
+                <div className="relative max-w-2xl w-full mx-4" onClick={e => e.stopPropagation()}>
+                  <img
+                    src={client.photo_url}
+                    alt="Foto ampliada"
+                    className="w-full rounded-2xl shadow-2xl object-contain max-h-[90vh]"
+                  />
+                  <button
+                    onClick={() => setPhotoZoom(false)}
+                    className="absolute -top-3 -right-3 bg-white rounded-full p-1.5 shadow-lg text-slate-500 hover:text-slate-800 transition-colors"
+                  >
+                    <X size={16} />
+                  </button>
+                  <p className="text-center text-white/70 text-xs mt-3">
+                    {client.first_name} {client.last_name}
+                  </p>
+                </div>
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-xl font-bold text-slate-900 truncate">
+                  {client.first_name} {client.last_name}
+                </h1>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${statusColor[client.client_status] || "bg-slate-100 text-slate-600"}`}>
+                  {client.client_status || "Alta"}
+                </span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${typeColor[client.type] || "bg-slate-100 text-slate-600"}`}>
+                  {client.type || "Cliente"}
+                </span>
+              </div>
+              {client.commercial_name && <p className="text-slate-500 text-sm mt-0.5">{client.commercial_name}</p>}
+              <div className="flex items-center gap-4 mt-2 text-xs text-slate-400 flex-wrap">
+                {client.nif_cif && (
+                  <span className="flex items-center gap-1 font-mono"><Hash size={11} />{client.nif_cif}</span>
+                )}
+                {client.internal_number && (
+                  <span className="flex items-center gap-1">Nº {client.internal_number}</span>
+                )}
+                {client.date_alta && (
+                  <span className="flex items-center gap-1"><Calendar size={11} /> Alta: {formatDate(client.date_alta)}</span>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
