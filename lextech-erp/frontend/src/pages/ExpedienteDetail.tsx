@@ -3758,6 +3758,10 @@ function TabClienteVinculado({ exp, clientes, linkedClient, linkedClientDisplayN
   const [procuradorVal, setProcuradorVal] = useState(exp.procurador || "");
   const [procuradorSaving, setProcuradorSaving] = useState(false);
 
+  // Sync local values when exp changes from outside (e.g. saved in Datos tab)
+  useEffect(() => { if (!abogadoEdit) setAbogadoVal(exp.abogado_propio || ""); }, [exp.abogado_propio]);
+  useEffect(() => { if (!procuradorEdit) setProcuradorVal(exp.procurador || ""); }, [exp.procurador]);
+
   const filtered = clientSearch.trim()
     ? clientes.filter(c => {
         const name = (c.commercial_name || `${c.first_name || ""} ${c.last_name || ""}`.trim()).toLowerCase();
@@ -3972,6 +3976,13 @@ function TabContrarios({ exp, onPatch }: { exp: any; onPatch: (fields: Record<st
   const [editing, setEditing] = useState(false);
   const [cForm, setCForm] = useState({ contrario: exp.contrario || "", procurador_contrario: exp.procurador_contrario || "", abogado_contrario: exp.abogado_contrario || "" });
   const [saving, setSaving] = useState(false);
+
+  // Sync cForm when exp changes from outside (e.g. saved in Datos tab) but user is not editing
+  useEffect(() => {
+    if (!editing) {
+      setCForm({ contrario: exp.contrario || "", procurador_contrario: exp.procurador_contrario || "", abogado_contrario: exp.abogado_contrario || "" });
+    }
+  }, [exp.contrario, exp.procurador_contrario, exp.abogado_contrario]);
 
   const isClosed = exp?.estado === "cerrado";
   const hasData = !!(exp.contrario || exp.procurador_contrario || exp.abogado_contrario);
@@ -4968,7 +4979,7 @@ export default function ExpedienteDetail() {
       const res = await fetch(`/api/expedientes/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...exp, ...form }),
       });
       const d = await safeJson(res);
       if (!res.ok) {
@@ -5106,6 +5117,9 @@ export default function ExpedienteDetail() {
       contacto: exp.contacto || "",
       centro: exp.centro || "",
       color: exp.color || "ninguno",
+      abogado_propio: exp.abogado_propio || "",
+      abogado_contrario: exp.abogado_contrario || "",
+      procurador_contrario: exp.procurador_contrario || "",
     });
     setEditing(true);
     setTab("perfil");

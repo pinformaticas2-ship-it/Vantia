@@ -452,6 +452,7 @@ export async function runMigrations(): Promise<void> {
       ['fecha_notificacion',    `DATE`],
       ['procurador_contrario',  `VARCHAR(200)`],
       ['abogado_propio',        `VARCHAR(200)`],
+      ['abogado_contrario',     `VARCHAR(200)`],
     ];
     for (const [col, def] of expedientesCols) {
       try {
