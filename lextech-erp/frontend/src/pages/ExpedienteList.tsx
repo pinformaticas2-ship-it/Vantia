@@ -5820,13 +5820,8 @@ export default function ExpedienteList() {
           <div className="px-6 py-2.5 border-b border-slate-200 bg-slate-50 flex items-center flex-shrink-0 z-10 overflow-x-auto">
             <div className="flex items-center gap-1.5 min-w-max pb-0.5">
 
-              {/* Alta (split button) */}
-              <div className="flex shadow-sm rounded-md" ref={altaMenuRef}>
-                <button
-                  onClick={openManualCreate}
-                  className="relative inline-flex items-center gap-1.5 rounded-l-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 transition-colors">
-                  <Plus size={12} /> Alta
-                </button>
+              {/* Alta */}
+              <div ref={altaMenuRef}>
                 <button
                   onClick={() => {
                     if (altaMenuRef.current) {
@@ -5835,8 +5830,8 @@ export default function ExpedienteList() {
                     }
                     setShowAltaMenu(v => !v);
                   }}
-                  className="relative -ml-px inline-flex items-center rounded-r-md border-l border-red-700 bg-red-600 px-2 py-1.5 text-xs font-medium text-white hover:bg-red-700 transition-colors">
-                  <ChevronDown size={10} />
+                  className="inline-flex items-center gap-1.5 rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 transition-colors shadow-sm">
+                  <Plus size={12} /> Alta <ChevronDown size={10} />
                 </button>
               </div>
               {showAltaMenu && typeof document !== "undefined" && createPortal(
