@@ -5635,39 +5635,35 @@ export default function ExpedienteList() {
       )}
 
       {showExportTemplateEditor && typeof document !== "undefined" && createPortal(
-        <div className="fixed inset-0 z-[126] flex items-center justify-center bg-transparent px-4 animate-in fade-in duration-200" onClick={() => setShowExportTemplateEditor(false)}>
-          <div className="w-full max-w-5xl rounded-3xl border border-slate-200 bg-white shadow-2xl overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-2 duration-200" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-              <h3 className="text-lg font-bold text-slate-900">{exportEditorMode === "create" ? "Nueva plantilla de exportación" : "Modificar plantilla de exportación"}</h3>
-              <button type="button" onClick={() => setShowExportTemplateEditor(false)} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-400 hover:text-slate-700">
-                <X size={16} />
+        <div className="fixed inset-0 z-[126] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setShowExportTemplateEditor(false)}>
+          <div className="w-full max-w-4xl rounded-2xl bg-white shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
+              <h3 className="text-xl font-bold text-slate-800">{exportEditorMode === "create" ? "Nueva plantilla de exportación" : "Modificar plantilla de exportación"}</h3>
+              <button type="button" onClick={() => setShowExportTemplateEditor(false)} className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors shadow-sm">
+                <X size={14} />
               </button>
             </div>
-            <div className="p-6">
-              <div className="grid gap-6 lg:grid-cols-[1fr_84px_1fr]">
-                <div>
+            <div className="p-6 flex flex-col gap-6">
+              <div className="grid gap-4 lg:grid-cols-[1fr_64px_1fr]">
+                {/* Campos disponibles */}
+                <div className="flex flex-col">
                   <div className="mb-3 flex items-center justify-between">
-                    <h4 className="font-semibold text-slate-800">Campos disponibles</h4>
+                    <span className="font-semibold text-slate-800">Campos disponibles</span>
                     <div className="relative">
-                      <select
-                        value="expedientes"
-                        disabled
-                        className="appearance-none rounded-xl border border-slate-200 bg-white px-4 py-2 pr-9 text-sm text-slate-700 outline-none disabled:opacity-100"
-                      >
+                      <select value="expedientes" disabled className="appearance-none rounded-lg border border-slate-200 bg-white px-3 py-1.5 pr-8 text-sm text-slate-700 outline-none disabled:opacity-100 cursor-default">
                         <option>Expedientes</option>
                       </select>
-                      <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <ChevronDown size={13} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                     </div>
                   </div>
-                  <div className="h-[340px] overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50/40 p-3">
+                  <div className="h-[320px] overflow-y-auto rounded-xl border border-slate-200 bg-white">
                     {availableExportFields.map((field) => (
-                      <label key={field.id} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 transition-all hover:bg-white hover:shadow-sm">
+                      <label key={field.id} className="flex cursor-pointer items-center gap-2.5 px-4 py-2 transition-colors hover:bg-slate-50 border-b border-slate-100 last:border-b-0">
                         <input
                           type="checkbox"
+                          className="w-3.5 h-3.5 rounded border-slate-300 text-red-600"
                           checked={exportAvailableSelected.includes(field.id)}
-                          onChange={(e) => {
-                            setExportAvailableSelected((prev) => e.target.checked ? [...prev, field.id] : prev.filter((id) => id !== field.id));
-                          }}
+                          onChange={(e) => setExportAvailableSelected((prev) => e.target.checked ? [...prev, field.id] : prev.filter((id) => id !== field.id))}
                         />
                         <span className="text-sm text-slate-700">{field.label}</span>
                       </label>
@@ -5675,38 +5671,35 @@ export default function ExpedienteList() {
                   </div>
                 </div>
 
-                <div className="flex flex-col items-center justify-center gap-3">
-                  <button type="button" onClick={() => moveFieldsToVisible(exportAvailableSelected)} className="rounded-xl border border-slate-200 bg-white p-2 text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm"><ArrowRight size={18} /></button>
-                  <button type="button" onClick={() => moveFieldsToAvailable(exportVisibleSelected)} className="rounded-xl border border-slate-200 bg-white p-2 text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm"><ArrowLeft size={18} /></button>
-                  <button type="button" onClick={() => moveFieldsToVisible(availableExportFields.map((field) => field.id))} className="rounded-xl border border-slate-200 bg-white p-2 text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm"><ChevronsRight size={18} /></button>
-                  <button type="button" onClick={() => moveFieldsToAvailable([...exportVisibleFields])} className="rounded-xl border border-slate-200 bg-white p-2 text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm"><ChevronsLeft size={18} /></button>
+                {/* Botones de movimiento */}
+                <div className="flex flex-col items-center justify-center gap-2.5">
+                  <button type="button" onClick={() => moveFieldsToVisible(exportAvailableSelected)} className="w-10 h-10 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:shadow-sm transition-all flex items-center justify-center"><ArrowRight size={16} /></button>
+                  <button type="button" onClick={() => moveFieldsToAvailable(exportVisibleSelected)} className="w-10 h-10 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:shadow-sm transition-all flex items-center justify-center"><ArrowLeft size={16} /></button>
+                  <button type="button" onClick={() => moveFieldsToVisible(availableExportFields.map((f) => f.id))} className="w-10 h-10 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:shadow-sm transition-all flex items-center justify-center"><ChevronsRight size={16} /></button>
+                  <button type="button" onClick={() => moveFieldsToAvailable([...exportVisibleFields])} className="w-10 h-10 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:shadow-sm transition-all flex items-center justify-center"><ChevronsLeft size={16} /></button>
                 </div>
 
-                <div>
+                {/* Campos visibles */}
+                <div className="flex flex-col">
                   <div className="mb-3 flex items-center justify-between">
-                    <h4 className="font-semibold text-slate-800">Campos visibles</h4>
+                    <span className="font-semibold text-slate-800">Campos visibles</span>
                     <div className="relative">
-                      <select
-                        value={selectedExportFormat}
-                        onChange={(e) => setSelectedExportFormat(e.target.value as ExportFormat)}
-                        className="appearance-none rounded-xl border border-slate-200 bg-white px-4 py-2 pr-9 text-sm text-slate-700 outline-none"
-                      >
+                      <select value={selectedExportFormat} onChange={(e) => setSelectedExportFormat(e.target.value as ExportFormat)} className="appearance-none rounded-lg border border-slate-200 bg-white px-3 py-1.5 pr-8 text-sm text-slate-700 outline-none focus:border-slate-300">
                         <option value="excel">Excel</option>
                         <option value="xml">XML</option>
                         <option value="word">Word</option>
                       </select>
-                      <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <ChevronDown size={13} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                     </div>
                   </div>
-                  <div className="h-[340px] overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50/40 p-3">
+                  <div className="h-[320px] overflow-y-auto rounded-xl border border-slate-200 bg-white">
                     {exportVisibleFields.map((fieldId) => (
-                      <label key={fieldId} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 transition-all hover:bg-white hover:shadow-sm">
+                      <label key={fieldId} className="flex cursor-pointer items-center gap-2.5 px-4 py-2 transition-colors hover:bg-slate-50 border-b border-slate-100 last:border-b-0">
                         <input
                           type="checkbox"
+                          className="w-3.5 h-3.5 rounded border-slate-300 text-red-600"
                           checked={exportVisibleSelected.includes(fieldId)}
-                          onChange={(e) => {
-                            setExportVisibleSelected((prev) => e.target.checked ? [...prev, fieldId] : prev.filter((id) => id !== fieldId));
-                          }}
+                          onChange={(e) => setExportVisibleSelected((prev) => e.target.checked ? [...prev, fieldId] : prev.filter((id) => id !== fieldId))}
                         />
                         <span className="text-sm text-slate-700">{getExportFieldLabel(fieldId)}</span>
                       </label>
@@ -5715,25 +5708,25 @@ export default function ExpedienteList() {
                 </div>
               </div>
 
-              <div className="mt-6">
+              <div>
                 <label className="mb-2 block text-sm font-semibold text-slate-700">Nombre de la plantilla</label>
                 <input
                   value={exportTemplateName}
                   onChange={(e) => setExportTemplateName(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-700 outline-none focus:border-slate-300"
+                  className="w-full rounded-lg border border-slate-200 px-4 py-3 text-sm text-slate-700 outline-none focus:border-slate-300 focus:ring-1 focus:ring-slate-200"
                   placeholder="Ej. Listado actual"
                 />
               </div>
 
               {exportError && (
-                <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                   {exportError}
                 </div>
               )}
 
-              <div className="mt-6 flex items-center justify-end gap-3">
-                <button type="button" onClick={() => setShowExportTemplateEditor(false)} className="rounded-xl border border-slate-200 px-4 py-2 font-medium text-slate-600 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm">Cancelar</button>
-                <button type="button" onClick={saveExportTemplate} className="rounded-xl bg-red-600 px-4 py-2 font-semibold text-white transition-all hover:-translate-y-0.5 hover:bg-red-700 hover:shadow-lg">Guardar</button>
+              <div className="flex items-center justify-end gap-3">
+                <button type="button" onClick={() => setShowExportTemplateEditor(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">Cancelar</button>
+                <button type="button" onClick={saveExportTemplate} className="rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white hover:bg-red-700 transition-colors shadow-sm">Guardar</button>
               </div>
             </div>
           </div>
