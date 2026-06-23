@@ -5657,12 +5657,9 @@ export default function ExpedienteList() {
                 <div className="flex flex-col">
                   <div className="mb-3 flex items-center justify-between">
                     <span className="font-semibold text-slate-800">Campos disponibles</span>
-                    <div className="relative">
-                      <select value="expedientes" disabled className="appearance-none rounded-lg border border-slate-200 bg-white px-3 py-1.5 pr-8 text-sm text-slate-700 outline-none disabled:opacity-100 cursor-default">
-                        <option>Expedientes</option>
-                      </select>
-                      <ChevronDown size={13} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                    </div>
+                    <span className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-500 select-none">
+                      Expedientes <ChevronDown size={11} className="text-slate-400" />
+                    </span>
                   </div>
                   <div className="h-[320px] overflow-y-auto rounded-xl border border-slate-200 bg-white">
                     {availableExportFields.map((field) => (
@@ -5702,10 +5699,10 @@ export default function ExpedienteList() {
                           }
                           setShowFormatDropdown(v => !v);
                         }}
-                        className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors min-w-[90px] justify-between"
+                        className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors min-w-[80px] justify-between shadow-sm ${showFormatDropdown ? "bg-slate-100 border-slate-300 text-slate-800" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}
                       >
-                        <span className="capitalize">{selectedExportFormat === "excel" ? "Excel" : selectedExportFormat === "xml" ? "XML" : "Word"}</span>
-                        <ChevronDown size={13} className="text-slate-400 shrink-0" />
+                        <span>{selectedExportFormat === "excel" ? "Excel" : selectedExportFormat === "xml" ? "XML" : "Word"}</span>
+                        <ChevronDown size={11} className="text-slate-400 shrink-0" />
                       </button>
                       {showFormatDropdown && typeof document !== "undefined" && createPortal(
                         <div
