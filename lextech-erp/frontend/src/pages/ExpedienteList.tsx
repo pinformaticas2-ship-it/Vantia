@@ -845,8 +845,16 @@ function DropdownToolBtn({
   }[];
 }) {
   const [open, setOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
   const btnRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const openMenu = () => {
+    if (disabled || !btnRef.current) return;
+    const r = btnRef.current.getBoundingClientRect();
+    setMenuPos({ top: r.bottom + 8, left: r.left });
+    setOpen(true);
+  };
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -861,12 +869,62 @@ function DropdownToolBtn({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  const menu = (
+    <div
+      ref={menuRef}
+      style={{ position: "fixed", top: menuPos.top, left: menuPos.left, zIndex: 9999 }}
+      className="min-w-[220px] max-w-[280px] rounded-2xl border border-slate-200 bg-white py-1.5 shadow-2xl shadow-slate-300/40"
+    >
+      {items.map((item, index) =>
+        item.divider ? (
+          <div key={`divider-${index}`} className="my-1 h-px bg-slate-100" />
+        ) : item.children?.length ? (
+          <div key={`${item.label}-${index}`} className="group relative">
+            <button
+              type="button"
+              className="flex w-full items-center justify-between gap-2.5 px-3 py-2 text-left text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-700"
+            >
+              <span className="flex items-center gap-2.5">
+                {item.icon && <item.icon size={12} className="shrink-0 text-slate-400" />}
+                {item.label}
+              </span>
+              <ChevronRight size={11} className="text-slate-300" />
+            </button>
+            <div className="invisible absolute left-full top-0 ml-2 min-w-[180px] rounded-2xl border border-slate-200 bg-white py-1.5 opacity-0 shadow-2xl shadow-slate-300/40 transition-all group-hover:visible group-hover:opacity-100">
+              {item.children.map((child, childIndex) => (
+                <button
+                  key={`${child.label}-${childIndex}`}
+                  type="button"
+                  onClick={() => { child.onClick(); setOpen(false); }}
+                  className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-700"
+                >
+                  {child.icon && <child.icon size={12} className="shrink-0 text-slate-400" />}
+                  {child.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <button
+            key={`${item.label}-${index}`}
+            type="button"
+            onClick={() => { item.onClick?.(); setOpen(false); }}
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-700"
+          >
+            {item.icon && <item.icon size={12} className="shrink-0 text-slate-400" />}
+            {item.label}
+          </button>
+        )
+      )}
+    </div>
+  );
+
   return (
     <div className="relative shrink-0">
       <button
         ref={btnRef}
         type="button"
-        onClick={() => !disabled && setOpen((prev) => !prev)}
+        onClick={openMenu}
         disabled={disabled}
         className={`
           flex items-center gap-0 rounded-lg text-[11px] font-semibold transition-all active:scale-[0.98] border overflow-hidden shadow-sm
@@ -881,61 +939,7 @@ function DropdownToolBtn({
           <ChevronDown size={10} />
         </span>
       </button>
-
-      {open && (
-        <div
-          ref={menuRef}
-          className="absolute left-0 top-full z-[9999] mt-2 min-w-[220px] max-w-[280px] rounded-2xl border border-slate-200 bg-white py-1.5 shadow-2xl shadow-slate-300/40"
-        >
-          {items.map((item, index) =>
-            item.divider ? (
-              <div key={`divider-${index}`} className="my-1 h-px bg-slate-100" />
-            ) : item.children?.length ? (
-              <div key={`${item.label}-${index}`} className="group relative">
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between gap-2.5 px-3 py-2 text-left text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-700"
-                >
-                  <span className="flex items-center gap-2.5">
-                    {item.icon && <item.icon size={12} className="shrink-0 text-slate-400" />}
-                    {item.label}
-                  </span>
-                  <ChevronRight size={11} className="text-slate-300" />
-                </button>
-                <div className="invisible absolute left-full top-0 ml-2 min-w-[180px] rounded-2xl border border-slate-200 bg-white py-1.5 opacity-0 shadow-2xl shadow-slate-300/40 transition-all group-hover:visible group-hover:opacity-100">
-                  {item.children.map((child, childIndex) => (
-                    <button
-                      key={`${child.label}-${childIndex}`}
-                      type="button"
-                      onClick={() => {
-                        child.onClick();
-                        setOpen(false);
-                      }}
-                      className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-700"
-                    >
-                      {child.icon && <child.icon size={12} className="shrink-0 text-slate-400" />}
-                      {child.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <button
-                key={`${item.label}-${index}`}
-                type="button"
-                onClick={() => {
-                  item.onClick?.();
-                  setOpen(false);
-                }}
-                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-700"
-              >
-                {item.icon && <item.icon size={12} className="shrink-0 text-slate-400" />}
-                {item.label}
-              </button>
-            )
-          )}
-        </div>
-      )}
+      {open && typeof document !== "undefined" && createPortal(menu, document.body)}
     </div>
   );
 }
@@ -4163,9 +4167,12 @@ export default function ExpedienteList() {
 
   // Dropdowns click-based
   const [showOpciones, setShowOpciones] = useState(false);
+  const [opcionesMenuPos, setOpcionesMenuPos] = useState({ top: 0, left: 0 });
   const opcionesRef = useRef<HTMLDivElement>(null);
+  const opcionesBtnRef = useRef<HTMLButtonElement>(null);
   const [showColumnModal, setShowColumnModal] = useState(false);
   const [showAltaMenu, setShowAltaMenu] = useState(false);
+  const [altaMenuPos, setAltaMenuPos] = useState({ top: 0, left: 0 });
   const altaMenuRef = useRef<HTMLDivElement>(null);
   const [visibleColumns, setVisibleColumns] = useState<Record<ExpedienteListColumnKey, boolean>>(() => {
     try {
@@ -5814,30 +5821,38 @@ export default function ExpedienteList() {
             <div className="flex items-center gap-1.5 min-w-max pb-0.5">
 
               {/* Alta (split button) */}
-              <div className="relative flex shadow-sm rounded-md" ref={altaMenuRef}>
+              <div className="flex shadow-sm rounded-md" ref={altaMenuRef}>
                 <button
                   onClick={openManualCreate}
                   className="relative inline-flex items-center gap-1.5 rounded-l-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 transition-colors">
                   <Plus size={12} /> Alta
                 </button>
                 <button
-                  onClick={() => setShowAltaMenu(v => !v)}
+                  onClick={() => {
+                    if (altaMenuRef.current) {
+                      const r = altaMenuRef.current.getBoundingClientRect();
+                      setAltaMenuPos({ top: r.bottom + 8, left: r.left });
+                    }
+                    setShowAltaMenu(v => !v);
+                  }}
                   className="relative -ml-px inline-flex items-center rounded-r-md border-l border-red-700 bg-red-600 px-2 py-1.5 text-xs font-medium text-white hover:bg-red-700 transition-colors">
                   <ChevronDown size={10} />
                 </button>
-                {showAltaMenu && (
-                  <div className="absolute left-0 top-full z-50 mt-2 w-[320px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
-                    <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
-                      <p className="text-sm font-semibold text-slate-600">Elige cómo quieres agregar expedientes</p>
-                    </div>
-                    <div className="p-2">
-                      <AltaOption icon={Plus} title="Crear manualmente" description="Crea un expediente desde cero introduciendo los datos" iconClassName="bg-green-100 text-green-600" onClick={openManualCreate} />
-                      <AltaOption icon={FileSpreadsheet} title="Importar desde CSV" description="Sube un archivo CSV con múltiples expedientes" iconClassName="bg-blue-100 text-blue-600" onClick={openCsvImport} />
-                      <AltaOption icon={ClipboardList} title="Desde documentos" description="Procesa documentos para crear expedientes" iconClassName="bg-amber-100 text-amber-700" onClick={openDocumentImport} />
-                    </div>
-                  </div>
-                )}
               </div>
+              {showAltaMenu && typeof document !== "undefined" && createPortal(
+                <div style={{ position: "fixed", top: altaMenuPos.top, left: altaMenuPos.left, zIndex: 9999 }}
+                  className="w-[320px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+                  <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
+                    <p className="text-sm font-semibold text-slate-600">Elige cómo quieres agregar expedientes</p>
+                  </div>
+                  <div className="p-2">
+                    <AltaOption icon={Plus} title="Crear manualmente" description="Crea un expediente desde cero introduciendo los datos" iconClassName="bg-green-100 text-green-600" onClick={openManualCreate} />
+                    <AltaOption icon={FileSpreadsheet} title="Importar desde CSV" description="Sube un archivo CSV con múltiples expedientes" iconClassName="bg-blue-100 text-blue-600" onClick={openCsvImport} />
+                    <AltaOption icon={ClipboardList} title="Desde documentos" description="Procesa documentos para crear expedientes" iconClassName="bg-amber-100 text-amber-700" onClick={openDocumentImport} />
+                  </div>
+                </div>,
+                document.body
+              )}
 
               <div className="w-px h-5 bg-slate-200 mx-1" />
 
@@ -5891,12 +5906,20 @@ export default function ExpedienteList() {
               <AtajosButton modulo="Expedientes" />
               <div className="relative" ref={opcionesRef}>
                 <button
-                  onClick={() => setShowOpciones(v => !v)}
+                  ref={opcionesBtnRef}
+                  onClick={() => {
+                    if (opcionesBtnRef.current) {
+                      const r = opcionesBtnRef.current.getBoundingClientRect();
+                      setOpcionesMenuPos({ top: r.bottom + 4, left: r.right - 230 });
+                    }
+                    setShowOpciones(v => !v);
+                  }}
                   className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-colors border shadow-sm ${showOpciones ? "bg-red-50 border-red-300 text-red-700" : "text-slate-600 hover:bg-slate-100 border-slate-200 bg-white"}`}>
                   <MoreHorizontal size={13} /> Opciones <ChevronDown size={10} />
                 </button>
-                {showOpciones && (
-                  <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[230px] py-1.5 overflow-visible">
+                {showOpciones && typeof document !== "undefined" && createPortal(
+                  <div style={{ position: "fixed", top: opcionesMenuPos.top, left: opcionesMenuPos.left, zIndex: 9999 }}
+                    className="bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[230px] py-1.5 overflow-visible">
                     <button onClick={() => alert("Seleccionar opciones favoritas")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
                       <Star size={12} className="text-slate-400" /> Seleccionar Opciones Favoritas
                     </button>
@@ -5964,7 +5987,8 @@ export default function ExpedienteList() {
                         <button onClick={() => alert("Comparar con versión")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors"><RefreshCw size={12} className="text-slate-400" /> Comparar versión</button>
                       </div>
                     </div>
-                  </div>
+                  </div>,
+                  document.body
                 )}
               </div>
 
