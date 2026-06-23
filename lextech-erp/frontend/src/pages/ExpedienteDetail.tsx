@@ -4828,6 +4828,9 @@ export default function ExpedienteDetail() {
   const [billingLoading, setBillingLoading] = useState(false);
   const [agendaEvents, setAgendaEvents] = useState<any[] | null>(null);
   const [agendaLoading, setAgendaLoading] = useState(false);
+  const [showAgendaForm, setShowAgendaForm] = useState(false);
+  const [agendaSaving, setAgendaSaving] = useState(false);
+  const [agendaForm, setAgendaForm] = useState({ title: "", type: "cita", start_at: "", end_at: "", all_day: false, description: "", status: "pendiente" });
   const [notificaciones, setNotificaciones] = useState<any[] | null>(null);
   const [notifLoading, setNotifLoading] = useState(false);
   const [historial, setHistorial] = useState<any[] | null>(null);
@@ -5183,7 +5186,7 @@ export default function ExpedienteDetail() {
 
       {/* ── 3-column body ── */}
       <div className="flex-1 overflow-auto bg-[#f4f6f8]">
-        <div className={`max-w-[1600px] mx-auto p-6 sm:p-8 flex flex-col gap-8 items-start ${isCollapsed ? "md:flex-row" : "lg:flex-row"}`}>
+        <div className={`w-full p-6 sm:p-8 flex flex-col gap-8 items-start ${isCollapsed ? "md:flex-row" : "lg:flex-row"}`}>
 
           {/* Columna 1: Nav vertical */}
           <div className={`w-full flex-shrink-0 ${isCollapsed ? "md:w-56 md:sticky md:top-6" : "lg:w-56 lg:sticky lg:top-6"}`}>
@@ -5683,59 +5686,201 @@ export default function ExpedienteDetail() {
                 cancelado:   "bg-slate-100 text-slate-500",
               };
               const expEvents = (agendaEvents || []).filter((e: any) => e.expediente_id === id);
+
+              const handleCreateEvent = async (e: React.FormEvent) => {
+                e.preventDefault();
+                if (!agendaForm.title.trim() || !agendaForm.start_at) return;
+                setAgendaSaving(true);
+                try {
+                  const token = await getToken({ skipCache: true });
+                  const body = {
+                    title: agendaForm.title.trim(),
+                    type: agendaForm.type,
+                    start_at: agendaForm.all_day ? agendaForm.start_at + "T00:00:00" : agendaForm.start_at,
+                    end_at: agendaForm.end_at ? (agendaForm.all_day ? agendaForm.end_at + "T23:59:00" : agendaForm.end_at) : null,
+                    all_day: agendaForm.all_day,
+                    description: agendaForm.description || null,
+                    status: agendaForm.status,
+                    expediente_id: id,
+                    source: "manual",
+                  };
+                  const res = await fetch("/api/agenda", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                    body: JSON.stringify(body),
+                  });
+                  const d = await safeJson(res);
+                  if (!res.ok) { alert(d.error || "Error al crear el evento"); return; }
+                  setAgendaEvents(prev => [d.data, ...(prev || [])]);
+                  setShowAgendaForm(false);
+                  setAgendaForm({ title: "", type: "cita", start_at: "", end_at: "", all_day: false, description: "", status: "pendiente" });
+                } finally {
+                  setAgendaSaving(false);
+                }
+              };
+
               return (
-                <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-                  <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Calendar size={14} className="text-slate-400" />
-                      <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Eventos de agenda</h3>
+                <div className="space-y-4">
+                  <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
+                    <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Calendar size={14} className="text-slate-400" />
+                        <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Eventos de agenda</h3>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {exp?.estado !== "cerrado" && (
+                          <button
+                            onClick={() => {
+                              const now = new Date();
+                              const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+                              setAgendaForm(f => ({ ...f, start_at: local }));
+                              setShowAgendaForm(v => !v);
+                            }}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                          >
+                            <Plus size={11} /> Nuevo evento
+                          </button>
+                        )}
+                        <Link to="/dashboard/agenda" className="text-xs font-bold text-slate-400 hover:text-slate-600 flex items-center gap-1">
+                          Ver agenda <ChevronRight size={11} />
+                        </Link>
+                      </div>
                     </div>
-                    <Link to="/dashboard/agenda" className="text-xs font-bold text-red-600 hover:underline flex items-center gap-1">
-                      Ir a agenda <ChevronRight size={11} />
-                    </Link>
-                  </div>
-                  {agendaLoading ? (
-                    <div className="flex items-center justify-center py-10">
-                      <Spinner size="sm" muted />
-                    </div>
-                  ) : expEvents.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-12 gap-2 text-slate-300">
-                      <Calendar size={28} className="opacity-30" />
-                      <p className="text-sm font-medium">Sin eventos vinculados a este expediente</p>
-                      <Link to="/dashboard/agenda" className="mt-1 text-xs font-bold text-red-500 hover:underline">Crear evento</Link>
-                    </div>
-                  ) : (
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-slate-100">
-                          <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Título</th>
-                          <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Tipo</th>
-                          <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Fecha inicio</th>
-                          <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Fecha fin</th>
-                          <th className="px-5 py-3 text-center text-[11px] font-bold text-slate-400 uppercase tracking-wider">Estado</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-50">
-                        {expEvents.map((e: any) => (
-                          <tr key={e.id} className="hover:bg-slate-50 transition-colors">
-                            <td className="px-5 py-3 text-xs text-slate-700 font-medium">{e.title}</td>
-                            <td className="px-5 py-3">
-                              <span className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold capitalize ${TYPE_BADGE[e.type] || "bg-slate-100 text-slate-600"}`}>
-                                {e.type || "—"}
-                              </span>
-                            </td>
-                            <td className="px-5 py-3 text-xs text-slate-500">{fmtDate(e.start_at)}</td>
-                            <td className="px-5 py-3 text-xs text-slate-500">{e.end_at ? fmtDate(e.end_at) : "—"}</td>
-                            <td className="px-5 py-3 text-center">
-                              <span className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold capitalize ${STATUS_BADGE[e.status] || "bg-slate-100 text-slate-600"}`}>
-                                {e.status || "—"}
-                              </span>
-                            </td>
+
+                    {/* Formulario de creación rápida */}
+                    {showAgendaForm && (
+                      <form onSubmit={handleCreateEvent} className="border-b border-slate-100 bg-slate-50/60 px-5 py-4 space-y-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="sm:col-span-2">
+                            <input
+                              autoFocus
+                              required
+                              value={agendaForm.title}
+                              onChange={e => setAgendaForm(f => ({ ...f, title: e.target.value }))}
+                              placeholder="Título del evento *"
+                              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-red-400 bg-white"
+                            />
+                          </div>
+                          <div className="flex gap-2">
+                            <select
+                              value={agendaForm.type}
+                              onChange={e => setAgendaForm(f => ({ ...f, type: e.target.value }))}
+                              className="flex-1 px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-red-400 bg-white text-slate-700"
+                            >
+                              <option value="cita">Cita</option>
+                              <option value="plazo">Plazo</option>
+                              <option value="reunion">Reunión</option>
+                              <option value="juicio">Juicio</option>
+                              <option value="otro">Otro</option>
+                            </select>
+                            <select
+                              value={agendaForm.status}
+                              onChange={e => setAgendaForm(f => ({ ...f, status: e.target.value }))}
+                              className="flex-1 px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-red-400 bg-white text-slate-700"
+                            >
+                              <option value="pendiente">Pendiente</option>
+                              <option value="completado">Completado</option>
+                              <option value="cancelado">Cancelado</option>
+                            </select>
+                          </div>
+                          <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={agendaForm.all_day}
+                              onChange={e => setAgendaForm(f => ({ ...f, all_day: e.target.checked }))}
+                              className="rounded"
+                            />
+                            Todo el día
+                          </label>
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Inicio *</label>
+                            <input
+                              required
+                              type={agendaForm.all_day ? "date" : "datetime-local"}
+                              value={agendaForm.all_day ? agendaForm.start_at.slice(0, 10) : agendaForm.start_at}
+                              onChange={e => setAgendaForm(f => ({ ...f, start_at: e.target.value }))}
+                              className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-red-400 bg-white mt-1"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Fin</label>
+                            <input
+                              type={agendaForm.all_day ? "date" : "datetime-local"}
+                              value={agendaForm.all_day ? agendaForm.end_at.slice(0, 10) : agendaForm.end_at}
+                              onChange={e => setAgendaForm(f => ({ ...f, end_at: e.target.value }))}
+                              className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-red-400 bg-white mt-1"
+                            />
+                          </div>
+                          <div className="sm:col-span-2">
+                            <input
+                              value={agendaForm.description}
+                              onChange={e => setAgendaForm(f => ({ ...f, description: e.target.value }))}
+                              placeholder="Descripción (opcional)"
+                              className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-red-400 bg-white"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 pt-1">
+                          <button type="submit" disabled={agendaSaving || !agendaForm.title.trim() || !agendaForm.start_at}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-xl transition-colors">
+                            {agendaSaving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                            Guardar evento
+                          </button>
+                          <button type="button" onClick={() => setShowAgendaForm(false)}
+                            className="px-3 py-2 text-xs text-slate-400 hover:text-slate-600">
+                            Cancelar
+                          </button>
+                        </div>
+                      </form>
+                    )}
+
+                    {agendaLoading ? (
+                      <div className="flex items-center justify-center py-10">
+                        <Spinner size="sm" muted />
+                      </div>
+                    ) : expEvents.length === 0 && !showAgendaForm ? (
+                      <div className="flex flex-col items-center justify-center py-12 gap-2 text-slate-300">
+                        <Calendar size={28} className="opacity-30" />
+                        <p className="text-sm font-medium text-slate-400">Sin eventos vinculados a este expediente</p>
+                        {exp?.estado !== "cerrado" && (
+                          <button onClick={() => setShowAgendaForm(true)} className="mt-1 text-xs font-bold text-red-500 hover:underline">
+                            + Crear primer evento
+                          </button>
+                        )}
+                      </div>
+                    ) : expEvents.length > 0 ? (
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-slate-100">
+                            <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Título</th>
+                            <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Tipo</th>
+                            <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Fecha inicio</th>
+                            <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Fecha fin</th>
+                            <th className="px-5 py-3 text-center text-[11px] font-bold text-slate-400 uppercase tracking-wider">Estado</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                          {expEvents.map((e: any) => (
+                            <tr key={e.id} className="hover:bg-slate-50 transition-colors">
+                              <td className="px-5 py-3 text-xs text-slate-700 font-medium">{e.title}</td>
+                              <td className="px-5 py-3">
+                                <span className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold capitalize ${TYPE_BADGE[e.type] || "bg-slate-100 text-slate-600"}`}>
+                                  {e.type || "—"}
+                                </span>
+                              </td>
+                              <td className="px-5 py-3 text-xs text-slate-500">{fmtDate(e.start_at)}</td>
+                              <td className="px-5 py-3 text-xs text-slate-500">{e.end_at ? fmtDate(e.end_at) : "—"}</td>
+                              <td className="px-5 py-3 text-center">
+                                <span className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold capitalize ${STATUS_BADGE[e.status] || "bg-slate-100 text-slate-600"}`}>
+                                  {e.status || "—"}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : null}
+                  </div>
                 </div>
               );
             })()}
