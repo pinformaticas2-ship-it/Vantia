@@ -652,7 +652,7 @@ export function AtajosButton({ modulo }: { modulo: string }) {
         <div
           ref={menuRef}
           style={{ position: "fixed", top: menuPos.top, left: menuPos.left, zIndex: 9999 }}
-          className="bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[240px] py-1.5 max-h-[70vh] overflow-y-auto"
+          className="bg-white border border-slate-200 rounded-xl shadow-xl min-w-[240px] py-1 max-h-[70vh] overflow-y-auto"
         >
           {visibles.length === 0 ? (
             <div className="px-4 py-6 text-center">
@@ -672,9 +672,9 @@ export function AtajosButton({ modulo }: { modulo: string }) {
                   <button
                     key={a.id}
                     onClick={() => { setOpen(false); alert(`Ejecutando: ${a.nombre}`); }}
-                    className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-amber-50 hover:text-amber-800 transition-colors text-left"
+                    className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors text-left"
                   >
-                    <Bookmark size={11} className="text-amber-400 shrink-0" />
+                    <Bookmark size={13} className="text-slate-400 shrink-0" />
                     {a.nombre}
                   </button>
                 ))}
@@ -682,17 +682,18 @@ export function AtajosButton({ modulo }: { modulo: string }) {
               </div>
             ))
           )}
+          <div className="h-px bg-slate-100 my-1" />
           <button
             onClick={() => { setOpen(false); setShowNuevo(true); }}
-            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-colors italic"
+            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors"
           >
-            <Plus size={11} className="text-slate-300" /> &lt;Añadir nuevo&gt;
+            <Plus size={13} className="text-slate-300 shrink-0" /> Añadir atajo
           </button>
           <button
             onClick={() => { setOpen(false); setShowListado(true); }}
-            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-colors italic"
+            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors"
           >
-            <Settings size={11} className="text-slate-300" /> &lt;Configurar Atajos&gt;
+            <Settings size={13} className="text-slate-300 shrink-0" /> Configurar Atajos
           </button>
         </div>,
         document.body

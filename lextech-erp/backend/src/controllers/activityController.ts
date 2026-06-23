@@ -347,6 +347,7 @@ export const getMyActivity = async (req: Request, res: Response) => {
 
     const [rows, total] = await Promise.all([
       pool.query(
+        
         `
         SELECT id, user_id, user_name, action_type,
                entity_type, entity_id, entity_name,

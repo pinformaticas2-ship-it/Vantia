@@ -873,7 +873,7 @@ function DropdownToolBtn({
     <div
       ref={menuRef}
       style={{ position: "fixed", top: menuPos.top, left: menuPos.left, zIndex: 9999 }}
-      className="min-w-[220px] max-w-[280px] rounded-2xl border border-slate-200 bg-white py-1.5 shadow-2xl shadow-slate-300/40"
+      className="min-w-[220px] max-w-[280px] rounded-xl border border-slate-200 bg-white py-1 shadow-xl"
     >
       {items.map((item, index) =>
         item.divider ? (
@@ -882,23 +882,23 @@ function DropdownToolBtn({
           <div key={`${item.label}-${index}`} className="group relative">
             <button
               type="button"
-              className="flex w-full items-center justify-between gap-2.5 px-3 py-2 text-left text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-700"
+              className="flex w-full items-center justify-between gap-2.5 px-3.5 py-2 text-left text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
             >
               <span className="flex items-center gap-2.5">
-                {item.icon && <item.icon size={12} className="shrink-0 text-slate-400" />}
+                {item.icon && <item.icon size={13} className="shrink-0 text-slate-400" />}
                 {item.label}
               </span>
               <ChevronRight size={11} className="text-slate-300" />
             </button>
-            <div className="invisible absolute left-full top-0 ml-2 min-w-[180px] rounded-2xl border border-slate-200 bg-white py-1.5 opacity-0 shadow-2xl shadow-slate-300/40 transition-all group-hover:visible group-hover:opacity-100">
+            <div className="invisible absolute left-full top-0 ml-1 min-w-[180px] rounded-xl border border-slate-200 bg-white py-1 opacity-0 shadow-xl transition-all group-hover:visible group-hover:opacity-100">
               {item.children.map((child, childIndex) => (
                 <button
                   key={`${child.label}-${childIndex}`}
                   type="button"
                   onClick={() => { child.onClick(); setOpen(false); }}
-                  className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-700"
+                  className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
                 >
-                  {child.icon && <child.icon size={12} className="shrink-0 text-slate-400" />}
+                  {child.icon && <child.icon size={13} className="shrink-0 text-slate-400" />}
                   {child.label}
                 </button>
               ))}
@@ -909,9 +909,9 @@ function DropdownToolBtn({
             key={`${item.label}-${index}`}
             type="button"
             onClick={() => { item.onClick?.(); setOpen(false); }}
-            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-700"
+            className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
           >
-            {item.icon && <item.icon size={12} className="shrink-0 text-slate-400" />}
+            {item.icon && <item.icon size={13} className="shrink-0 text-slate-400" />}
             {item.label}
           </button>
         )
@@ -5841,11 +5841,11 @@ export default function ExpedienteList() {
               </div>
               {showAltaMenu && typeof document !== "undefined" && createPortal(
                 <div style={{ position: "fixed", top: altaMenuPos.top, left: altaMenuPos.left, zIndex: 9999 }}
-                  className="w-[320px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
-                  <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
-                    <p className="text-sm font-semibold text-slate-600">Elige cómo quieres agregar expedientes</p>
+                  className="w-[300px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+                  <div className="border-b border-slate-100 bg-slate-50 px-3.5 py-2.5">
+                    <p className="text-xs font-semibold text-slate-600">Elige cómo quieres agregar expedientes</p>
                   </div>
-                  <div className="p-2">
+                  <div className="p-1">
                     <AltaOption icon={Plus} title="Crear manualmente" description="Crea un expediente desde cero introduciendo los datos" iconClassName="bg-green-100 text-green-600" onClick={openManualCreate} />
                     <AltaOption icon={FileSpreadsheet} title="Importar desde CSV" description="Sube un archivo CSV con múltiples expedientes" iconClassName="bg-blue-100 text-blue-600" onClick={openCsvImport} />
                     <AltaOption icon={ClipboardList} title="Desde documentos" description="Procesa documentos para crear expedientes" iconClassName="bg-amber-100 text-amber-700" onClick={openDocumentImport} />
@@ -5919,31 +5919,31 @@ export default function ExpedienteList() {
                 </button>
                 {showOpciones && typeof document !== "undefined" && createPortal(
                   <div style={{ position: "fixed", top: opcionesMenuPos.top, left: opcionesMenuPos.left, zIndex: 9999 }}
-                    className="bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[230px] py-1.5 overflow-visible">
-                    <button onClick={() => alert("Seleccionar opciones favoritas")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                      <Star size={12} className="text-slate-400" /> Seleccionar Opciones Favoritas
+                    className="bg-white border border-slate-200 rounded-xl shadow-xl min-w-[230px] py-1 overflow-visible">
+                    <button onClick={() => alert("Seleccionar opciones favoritas")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+                      <Star size={13} className="text-slate-400 shrink-0" /> Seleccionar Opciones Favoritas
                     </button>
-                    <button type="button" onClick={() => { setShowColumnModal(true); setShowOpciones(false); }} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-700">
-                      <span className="flex items-center gap-2.5"><LayoutList size={12} className="text-slate-400" /> Elegir columnas</span>
+                    <button type="button" onClick={() => { setShowColumnModal(true); setShowOpciones(false); }} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50">
+                      <span className="flex items-center gap-2.5"><LayoutList size={13} className="text-slate-400 shrink-0" /> Elegir columnas</span>
                     </button>
-                    <div className="h-px bg-slate-100 my-1.5" />
+                    <div className="h-px bg-slate-100 my-1" />
                     <div className="relative group/sub">
-                      <button className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                        <span className="flex items-center gap-2.5"><ExternalLink size={12} className="text-slate-400" /> Ir a</span>
+                      <button className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+                        <span className="flex items-center gap-2.5"><ExternalLink size={13} className="text-slate-400 shrink-0" /> Ir a</span>
                         <ChevronRight size={11} className="text-slate-300" />
                       </button>
-                      <div className="absolute right-full -mr-px top-[-1px] z-50 bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[180px] py-1.5 hidden group-hover/sub:block">
-                        <button onClick={() => selectedExp?.cliente_id && navigate(`/dashboard/clientes/${selectedExp.cliente_id}`)} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors"><Users size={12} className="text-slate-400" /> Ir a Cliente</button>
-                        <button onClick={() => selected && navigate(`/dashboard/expedientes/${selected}`)} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors"><FolderOpen size={12} className="text-slate-400" /> Ir a Expediente</button>
-                        <button onClick={() => alert("Ir a Juzgado")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors"><ClipboardList size={12} className="text-slate-400" /> Ir a Juzgado</button>
+                      <div className="absolute right-full -mr-px top-[-1px] z-50 bg-white border border-slate-200 rounded-xl shadow-xl min-w-[180px] py-1 hidden group-hover/sub:block">
+                        <button onClick={() => selectedExp?.cliente_id && navigate(`/dashboard/clientes/${selectedExp.cliente_id}`)} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><Users size={13} className="text-slate-400 shrink-0" /> Ir a Cliente</button>
+                        <button onClick={() => selected && navigate(`/dashboard/expedientes/${selected}`)} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><FolderOpen size={13} className="text-slate-400 shrink-0" /> Ir a Expediente</button>
+                        <button onClick={() => alert("Ir a Juzgado")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><ClipboardList size={13} className="text-slate-400 shrink-0" /> Ir a Juzgado</button>
                       </div>
                     </div>
                     <div className="relative group/color">
-                      <button className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                        <span className="flex items-center gap-2.5"><Palette size={12} className="text-slate-400" /> Asignar Color</span>
+                      <button className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+                        <span className="flex items-center gap-2.5"><Palette size={13} className="text-slate-400 shrink-0" /> Asignar Color</span>
                         <ChevronRight size={11} className="text-slate-300" />
                       </button>
-                      <div className="absolute right-full -mr-px top-[-1px] z-50 hidden min-w-[190px] rounded-xl border border-slate-200 bg-white py-1.5 shadow-2xl group-hover/color:block">
+                      <div className="absolute right-full -mr-px top-[-1px] z-50 hidden min-w-[190px] rounded-xl border border-slate-200 bg-white py-1 shadow-xl group-hover/color:block">
                         {[
                           { value: "ninguno", label: "Sin color", dot: "bg-slate-300" },
                           { value: "azul",    label: "Azul suave",    dot: "bg-sky-400" },
@@ -5954,37 +5954,37 @@ export default function ExpedienteList() {
                           { value: "morado",  label: "Morado suave",  dot: "bg-violet-400" },
                         ].map((option) => (
                           <button key={option.value} type="button" onClick={() => assignExpedienteColor(option.value)}
-                            className="flex w-full items-center justify-between gap-2.5 px-3.5 py-2 text-left text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-700">
+                            className="flex w-full items-center justify-between gap-2.5 px-3.5 py-2 text-left text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50">
                             <span className="flex items-center gap-2.5"><span className={`h-2.5 w-2.5 rounded-full ${option.dot}`} />{option.label}</span>
                             {selectedExp?.color === option.value && <Check size={11} className="text-red-500" />}
                           </button>
                         ))}
                       </div>
                     </div>
-                    <div className="h-px bg-slate-100 my-1.5" />
+                    <div className="h-px bg-slate-100 my-1" />
                     <button disabled={!selectedExp} onClick={toggleExpedienteEstado}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                       {selectedExp?.estado === "cerrado"
-                        ? <><Unlock size={12} className="text-slate-400" /> Reabrir expediente</>
-                        : <><Lock size={12} className="text-slate-400" /> Cerrar expediente</>}
+                        ? <><Unlock size={13} className="text-slate-400 shrink-0" /> Reabrir expediente</>
+                        : <><Lock size={13} className="text-slate-400 shrink-0" /> Cerrar expediente</>}
                     </button>
-                    <button onClick={() => alert("Alta Acción")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors"><Zap size={12} className="text-slate-400" /> Alta Acción</button>
-                    <button onClick={() => alert("Crear Recall")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors"><Bell size={12} className="text-slate-400" /> Crear Recall</button>
-                    <div className="h-px bg-slate-100 my-1.5" />
-                    <button onClick={() => { setShowCounterModal(true); setShowOpciones(false); }} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors"><Hash size={12} className="text-slate-400" /> Configurar numeración</button>
-                    <div className="h-px bg-slate-100 my-1.5" />
-                    <button onClick={() => alert("Duplicar expediente")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors"><Copy size={12} className="text-slate-400" /> Duplicar</button>
-                    <button onClick={() => alert("Fusionar expedientes")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors"><GitMerge size={12} className="text-slate-400" /> Fusionar</button>
-                    <div className="h-px bg-slate-100 my-1.5" />
-                    <button onClick={() => selectedExp && window.open(`https://wa.me/?text=Expediente ${selectedExp.anio}/${selectedExp.num_exp}`, "_blank")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors"><Smartphone size={12} className="text-slate-400" /> Enviar SMS</button>
+                    <button onClick={() => alert("Alta Acción")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><Zap size={13} className="text-slate-400 shrink-0" /> Alta Acción</button>
+                    <button onClick={() => alert("Crear Recall")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><Bell size={13} className="text-slate-400 shrink-0" /> Crear Recall</button>
+                    <div className="h-px bg-slate-100 my-1" />
+                    <button onClick={() => { setShowCounterModal(true); setShowOpciones(false); }} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><Hash size={13} className="text-slate-400 shrink-0" /> Configurar numeración</button>
+                    <div className="h-px bg-slate-100 my-1" />
+                    <button onClick={() => alert("Duplicar expediente")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><Copy size={13} className="text-slate-400 shrink-0" /> Duplicar</button>
+                    <button onClick={() => alert("Fusionar expedientes")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><GitMerge size={13} className="text-slate-400 shrink-0" /> Fusionar</button>
+                    <div className="h-px bg-slate-100 my-1" />
+                    <button onClick={() => selectedExp && window.open(`https://wa.me/?text=Expediente ${selectedExp.anio}/${selectedExp.num_exp}`, "_blank")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><Smartphone size={13} className="text-slate-400 shrink-0" /> Enviar SMS</button>
                     <div className="relative group/ver">
-                      <button className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                        <span className="flex items-center gap-2.5"><History size={12} className="text-slate-400" /> Versión Antigua</span>
+                      <button className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+                        <span className="flex items-center gap-2.5"><History size={13} className="text-slate-400 shrink-0" /> Versión Antigua</span>
                         <ChevronRight size={11} className="text-slate-300" />
                       </button>
-                      <div className="absolute right-full -mr-px top-[-1px] z-50 bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[180px] py-1.5 hidden group-hover/ver:block">
-                        <button onClick={() => alert("Restaurar versión anterior")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors"><History size={12} className="text-slate-400" /> Ver historial versiones</button>
-                        <button onClick={() => alert("Comparar con versión")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors"><RefreshCw size={12} className="text-slate-400" /> Comparar versión</button>
+                      <div className="absolute right-full -mr-px top-[-1px] z-50 bg-white border border-slate-200 rounded-xl shadow-xl min-w-[180px] py-1 hidden group-hover/ver:block">
+                        <button onClick={() => alert("Restaurar versión anterior")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><History size={13} className="text-slate-400 shrink-0" /> Ver historial versiones</button>
+                        <button onClick={() => alert("Comparar con versión")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><RefreshCw size={13} className="text-slate-400 shrink-0" /> Comparar versión</button>
                       </div>
                     </div>
                   </div>,
