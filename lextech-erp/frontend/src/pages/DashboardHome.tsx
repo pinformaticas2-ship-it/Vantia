@@ -1,4 +1,5 @@
-import { useEffect, useState, useCallback, useRef, ReactNode } from "react";
+import { useEffect, useState, useCallback, useRef, ReactNode, useContext } from "react";
+import { SidebarContext } from "../layouts/DashboardLayout";
 import { Spinner } from "../components/Spinner";
 import { createPortal } from "react-dom";
 import { useUser, useAuth } from "@clerk/clerk-react";
@@ -306,6 +307,7 @@ export default function DashboardHome() {
   const navigate     = useNavigate();
   const weather      = useWeather();
   const greeting     = getGreeting();
+  const { isCollapsed } = useContext(SidebarContext);
 
   const [showAltaMenu,     setShowAltaMenu]     = useState(false);
   const [showClienteMenu,  setShowClienteMenu]  = useState(false);
@@ -1148,7 +1150,7 @@ export default function DashboardHome() {
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd} autoScroll={false}>
           <SortableContext items={orderedVisible} strategy={rectSortingStrategy}>
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
+            <div className={`grid gap-6 items-start grid-cols-1 ${isCollapsed ? "lg:grid-cols-3" : "xl:grid-cols-3"} md:grid-cols-2`}>
               {orderedVisible.map((id) => (
                 <SortableWidget key={id} id={id}>
                   {(handle) => renderWidget(id, handle)}

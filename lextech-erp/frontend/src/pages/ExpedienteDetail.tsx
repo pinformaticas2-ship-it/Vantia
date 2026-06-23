@@ -1,4 +1,5 @@
-﻿import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
+﻿import React, { useEffect, useState, useCallback, useMemo, useRef, useContext } from "react";
+import { SidebarContext } from "../layouts/DashboardLayout";
 import { createPortal } from "react-dom";
 import { useParams, useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
@@ -4799,6 +4800,7 @@ function PanelIndicadoresExpediente({ expedienteId, onTabChange }: { expedienteI
 export default function ExpedienteDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { isCollapsed } = useContext(SidebarContext);
   const [searchParams, setSearchParams] = useSearchParams();
   const { getToken } = useAuth();
 
@@ -5167,10 +5169,10 @@ export default function ExpedienteDetail() {
 
       {/* ── 3-column body ── */}
       <div className="flex-1 overflow-auto bg-[#f4f6f8]">
-        <div className="max-w-[1600px] mx-auto p-6 sm:p-8 flex flex-col lg:flex-row gap-8 items-start">
+        <div className={`max-w-[1600px] mx-auto p-6 sm:p-8 flex flex-col gap-8 items-start ${isCollapsed ? "md:flex-row" : "lg:flex-row"}`}>
 
           {/* Columna 1: Nav vertical */}
-          <div className="w-full lg:w-56 flex-shrink-0 lg:sticky lg:top-6">
+          <div className={`w-full flex-shrink-0 ${isCollapsed ? "md:w-56 md:sticky md:top-6" : "lg:w-56 lg:sticky lg:top-6"}`}>
             <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 mb-3">Secciones del Expediente</h3>
             <nav className="flex flex-col gap-0.5">
               {DETAIL_TABS.slice(0, 8).map((tabItem) => {
@@ -5728,7 +5730,7 @@ export default function ExpedienteDetail() {
 
           {/* Columna 3: Panel indicadores */}
           {id && (
-            <div className="w-full lg:w-[280px] xl:w-[300px] flex-shrink-0 lg:sticky lg:top-6">
+            <div className={`w-full flex-shrink-0 ${isCollapsed ? "md:w-[280px] md:sticky md:top-6" : "lg:w-[280px] xl:w-[300px] lg:sticky lg:top-6"}`}>
               <PanelIndicadoresExpediente
                 expedienteId={id}
                 onTabChange={(t) => setTab(t as any)}
