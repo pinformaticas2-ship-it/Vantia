@@ -5657,8 +5657,8 @@ export default function ExpedienteList() {
                 <div className="flex flex-col">
                   <div className="mb-3 flex items-center justify-between">
                     <span className="font-semibold text-slate-800">Campos disponibles</span>
-                    <span className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-500 select-none">
-                      Expedientes <ChevronDown size={11} className="text-slate-400" />
+                    <span className="rounded-md bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-500 uppercase tracking-wide select-none">
+                      Expedientes
                     </span>
                   </div>
                   <div className="h-[320px] overflow-y-auto rounded-xl border border-slate-200 bg-white">
