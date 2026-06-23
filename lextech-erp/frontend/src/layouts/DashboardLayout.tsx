@@ -1058,7 +1058,7 @@ export default function DashboardLayout() {
                   location.pathname.startsWith('/dashboard/expedientes/') ||
                   location.pathname.startsWith('/dashboard/clientes/')
                 )
-                  ? 'w-full h-full p-4 md:p-8 module-page'
+                  ? 'w-full h-full module-page'
                   : 'max-w-[1600px] mx-auto p-4 md:p-8 module-page'
             }>
             <Outlet />
