@@ -4038,6 +4038,9 @@ export default function ExpedienteList() {
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const switchView = (v: ViewMode) => { setViewMode(v); if (v !== "multiselect") setSelectedIds(new Set()); };
 
+  const PAGE_SIZE = 12;
+  const [currentPage, setCurrentPage] = useState(1);
+
   // Multiselect
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkStateLoading, setBulkStateLoading] = useState(false);
@@ -4667,6 +4670,15 @@ export default function ExpedienteList() {
     });
     return rows;
   }, [expedientes, filters, sort, dir]);
+
+  // Reset page when filter/sort changes
+  useEffect(() => { setCurrentPage(1); }, [filters, sort, dir]);
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated = useMemo(
+    () => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [filtered, currentPage]
+  );
 
   // ── Stats (computed localmente, sin llamada extra a la API) ────
   const stats = useMemo(() => ({
@@ -5784,496 +5796,227 @@ export default function ExpedienteList() {
       <div className="flex flex-col h-full animate-in fade-in duration-300">
 
         {/* ── Cabecera ──────────────────────────────────────── */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-white shrink-0">
-          <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-            <FolderOpen size={20} className="text-red-600" /> Gestión de Expedientes
-          </h1>
-          <button onClick={() => fetchExpedientes(true)}
-            className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors" title="Actualizar">
-            <RefreshCw size={14} />
+        <div className="px-6 py-4 border-b border-slate-100 bg-white flex items-center justify-between flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <FolderOpen size={20} className="text-red-600" />
+            <h1 className="text-xl font-bold text-slate-800">Gestión de Expedientes</h1>
+          </div>
+          <button onClick={() => fetchExpedientes(true)} title="Refrescar"
+            className="p-1 rounded hover:bg-slate-50 text-slate-400 hover:text-slate-600 transition-colors">
+            <RefreshCw size={14} className={refreshSpin ? "animate-spin" : ""} />
           </button>
         </div>
 
         <div className="bg-white flex flex-col overflow-hidden flex-1 min-h-0">
 
-          {/* ── Toolbar de acciones ─────────────────────────── */}
-          <div className="flex items-center gap-1 px-2.5 py-2 border-b border-slate-100 bg-slate-50/80 flex-wrap">
+          {/* ── Toolbar 1: Acciones ──────────────────────────── */}
+          <div className="px-6 py-2.5 border-b border-slate-200 bg-slate-50 flex items-center flex-shrink-0 z-10 overflow-x-auto">
+            <div className="flex items-center gap-1.5 min-w-max pb-0.5">
 
-            {/* — Alta / Baja / Modificar — */}
-            <div className="relative" ref={altaMenuRef}>
-              <button
-                onClick={() => setShowAltaMenu(v => !v)}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all select-none whitespace-nowrap ${
-                  showAltaMenu
-                    ? "bg-red-800 text-white shadow-sm"
-                    : "bg-red-700 text-white hover:bg-red-800 shadow-sm active:scale-95"
-                }`}
-              >
-                <Plus size={13} />
-                Alta
-                <ChevronDown size={10} className={`transition-transform ${showAltaMenu ? "rotate-180" : ""}`} />
-              </button>
-
-              {showAltaMenu && (
-                <div className="absolute left-0 top-full z-50 mt-2 w-[320px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
-                  <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
-                    <p className="text-sm font-semibold text-slate-600">Elige cómo quieres agregar expedientes</p>
-                  </div>
-
-                  <div className="p-2">
-                    <AltaOption
-                      icon={Plus}
-                      title="Crear manualmente"
-                      description="Crea un expediente desde cero introduciendo los datos"
-                      iconClassName="bg-green-100 text-green-600"
-                      onClick={openManualCreate}
-                    />
-                    <AltaOption
-                      icon={FileSpreadsheet}
-                      title="Importar desde CSV"
-                      description="Sube un archivo CSV con múltiples expedientes"
-                      iconClassName="bg-blue-100 text-blue-600"
-                      onClick={openCsvImport}
-                    />
-                    <AltaOption
-                      icon={ClipboardList}
-                      title="Desde documentos"
-                      description="Procesa documentos para crear expedientes"
-                      iconClassName="bg-amber-100 text-amber-700"
-                      onClick={openDocumentImport}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-            <ToolBtn icon={Trash2}       label="Baja"       danger   disabled={!selected} onClick={() => selected && setDeleteId(selected)} />
-            <ToolBtn icon={Edit3}        label="Modificar"           disabled={!selected || selectedExp?.estado === "cerrado"} onClick={() => selected && selectedExp?.estado !== "cerrado" && navigate(`/dashboard/expedientes/${selected}?edit=1`)} />
-
-            <div className="w-px h-5 bg-slate-200 mx-0.5" />
-
-            <DropdownToolBtn
-              icon={Mail}
-              label="Enviar Correo"
-              disabled={!selected}
-              items={[
-                {
-                  label: "Nuevo",
-                  icon: Mail,
-                  onClick: () => {
-                    if (!selectedExp) return;
-                    const params = new URLSearchParams({
-                      compose: '1',
-                      subject: `Expediente ${selectedExp.anio}/${selectedExp.num_exp} - ${selectedExp.descripcion || ''}`,
-                      ...(selectedExp.cliente_email ? { to: selectedExp.cliente_email } : {}),
-                      expediente_id: selectedExp.id,
-                    });
-                    navigate(`/dashboard/correo?${params.toString()}`);
-                  },
-                },
-                {
-                  label: "Con Plantilla",
-                  icon: FileText,
-                  onClick: () => {
-                    if (!selectedExp) return;
-                    const params = new URLSearchParams({
-                      compose: '1',
-                      subject: `Expediente ${selectedExp.anio}/${selectedExp.num_exp} - ${selectedExp.descripcion || ''}`,
-                      ...(selectedExp.cliente_email ? { to: selectedExp.cliente_email } : {}),
-                      expediente_id: selectedExp.id,
-                      open_templates: '1',
-                    });
-                    navigate(`/dashboard/correo?${params.toString()}`);
-                  },
-                },
-                { divider: true, label: '' },
-                {
-                  label: "Con Adjuntos",
-                  icon: Paperclip,
-                  children: [
-                    {
-                      label: "Nuevo",
-                      icon: Mail,
-                      onClick: () => {
-                        if (!selectedExp) return;
-                        const params = new URLSearchParams({
-                          compose: '1',
-                          subject: `Expediente ${selectedExp.anio}/${selectedExp.num_exp} - ${selectedExp.descripcion || ''} (con adjuntos)`,
-                          ...(selectedExp.cliente_email ? { to: selectedExp.cliente_email } : {}),
-                          expediente_id: selectedExp.id,
-                          open_attachments: '1',
-                        });
-                        navigate(`/dashboard/correo?${params.toString()}`);
-                      },
-                    },
-                    {
-                      label: "Con Plantilla",
-                      icon: FileText,
-                      onClick: () => {
-                        if (!selectedExp) return;
-                        const params = new URLSearchParams({
-                          compose: '1',
-                          subject: `Expediente ${selectedExp.anio}/${selectedExp.num_exp} - ${selectedExp.descripcion || ''}`,
-                          ...(selectedExp.cliente_email ? { to: selectedExp.cliente_email } : {}),
-                          expediente_id: selectedExp.id,
-                          open_templates: '1',
-                          open_attachments: '1',
-                        });
-                        navigate(`/dashboard/correo?${params.toString()}`);
-                      },
-                    },
-                  ],
-                },
-                { divider: true, label: '' },
-                {
-                  label: "MN Sign",
-                  icon: Pencil,
-                  onClick: () => selected && navigate(`/dashboard/expedientes/${selected}#firma`),
-                },
-              ]}
-            />
-            <DropdownToolBtn
-              icon={MessageCircle}
-              label="Enviar WhatsApp"
-              disabled={!selectedExp?.cliente_id}
-              items={[
-                {
-                  label: "Nuevo",
-                  icon: MessageCircle,
-                  onClick: () => {
-                    if (!selectedExp?.cliente_id) return;
-                    navigate(`/dashboard/whatsapp?clientId=${selectedExp.cliente_id}&mode=new`);
-                  },
-                },
-                {
-                  label: "Con Plantilla",
-                  icon: FileSpreadsheet,
-                  onClick: () => {
-                    if (!selectedExp?.cliente_id) return;
-                    navigate(`/dashboard/whatsapp?clientId=${selectedExp.cliente_id}&mode=template`);
-                  },
-                },
-                {
-                  label: "Programar WhatsApp",
-                  icon: Bell,
-                  onClick: () => {
-                    if (!selectedExp?.cliente_id) return;
-                    navigate(`/dashboard/whatsapp?clientId=${selectedExp.cliente_id}&mode=schedule`);
-                  },
-                },
-                {
-                  label: "Sign",
-                  icon: Pencil,
-                  onClick: () => selected && navigate(`/dashboard/expedientes/${selected}#firma`),
-                },
-                {
-                  label: "Ver Conversación",
-                  icon: ExternalLink,
-                  onClick: () => {
-                    if (!selectedExp?.cliente_id) return;
-                    navigate(`/dashboard/whatsapp?clientId=${selectedExp.cliente_id}&mode=thread`);
-                  },
-                },
-              ]}
-            />
-
-            <div className="w-px h-5 bg-slate-200 mx-0.5" />
-
-            <ToolBtn
-              icon={PenLine}
-              label="Sign"
-              disabled={!selected}
-              onClick={() => selected && navigate(`/dashboard/expedientes/${selected}#firma`)}
-            />
-            <DropdownToolBtn
-              icon={ClipboardList}
-              label="Tareas"
-              disabled={!selected || selectedExp?.estado === "cerrado"}
-              items={[
-                {
-                  label: "Nueva actuación",
-                  icon: Activity,
-                  onClick: () => selected && navigate(`/dashboard/expedientes/${selected}?tab=actuacion&newActuacion=1`),
-                },
-                {
-                  label: "Crear obligaciones",
-                  icon: ClipboardList,
-                  onClick: () => selected && navigate(`/dashboard/expedientes/${selected}?tab=tareas&newTarea=1&type=plazo_procesal`),
-                },
-              ]}
-            />
-
-            <div className="w-px h-5 bg-slate-200 mx-0.5" />
-
-            <ToolBtn icon={GitMerge}     label="Asociar"       disabled={!selectedExp} onClick={openRelacionarModal} />
-            <ToolBtn icon={Paperclip}    label="Adjuntos"      disabled={!selected || selectedExp?.estado === "cerrado"} onClick={() => selected && selectedExp?.estado !== "cerrado" && setShowAdjuntos(true)} />
-            <div className="w-px h-5 bg-slate-200 mx-0.5" />
-
-            <ToolBtn icon={FileSpreadsheet} label="Excel"    onClick={openExportModal} />
-            <ToolBtn icon={Printer}         label="Imprimir" onClick={() => window.print()} />
-            <ToolBtn icon={BarChart2}       label="Informes" onClick={() => navigate("/dashboard")} />
-
-            <div className="w-px h-5 bg-slate-200 mx-0.5" />
-
-            {/* ── Atajos ── */}
-            <AtajosButton modulo="Expedientes" />
-
-            {/* ── Opciones ── */}
-            <div className="relative" ref={opcionesRef}>
-              <button
-                onClick={() => setShowOpciones(v => !v)}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-colors border ${showOpciones ? "bg-red-50 border-red-300 text-red-700" : "text-slate-600 hover:bg-slate-100 border-slate-200"}`}>
-                <MoreHorizontal size={13} /> Opciones <ChevronDown size={10} />
-              </button>
-              {showOpciones && (
-              <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[230px] py-1.5 overflow-visible">
-
-                {/* Grupo 1: acciones principales */}
-                <button onClick={() => alert("Seleccionar opciones favoritas")}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                  <Star size={12} className="text-slate-400" /> Seleccionar Opciones Favoritas
+              {/* Alta (split button) */}
+              <div className="relative flex shadow-sm rounded-md" ref={altaMenuRef}>
+                <button
+                  onClick={openManualCreate}
+                  className="relative inline-flex items-center gap-1.5 rounded-l-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 transition-colors">
+                  <Plus size={12} /> Alta
                 </button>
                 <button
-                  type="button"
-                  onClick={() => {
-                    setShowColumnModal(true);
-                    setShowOpciones(false);
-                  }}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-700"
-                >
-                  <span className="flex items-center gap-2.5">
-                    <LayoutList size={12} className="text-slate-400" /> Elegir columnas
-                  </span>
+                  onClick={() => setShowAltaMenu(v => !v)}
+                  className="relative -ml-px inline-flex items-center rounded-r-md border-l border-red-700 bg-red-600 px-2 py-1.5 text-xs font-medium text-white hover:bg-red-700 transition-colors">
+                  <ChevronDown size={10} />
                 </button>
-
-                <div className="h-px bg-slate-100 my-1.5" />
-
-                {/* Grupo 2: navegación y color */}
-                {/* Ir a → submenú */}
-                <div className="relative group/sub">
-                  <button className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                    <span className="flex items-center gap-2.5">
-                      <ExternalLink size={12} className="text-slate-400" /> Ir a
-                    </span>
-                    <ChevronRight size={11} className="text-slate-300" />
-                  </button>
-                  <div className="absolute right-full -mr-px top-[-1px] z-50 bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[180px] py-1.5 hidden group-hover/sub:block">
-                    <button onClick={() => selectedExp?.cliente_id && navigate(`/dashboard/clientes/${selectedExp.cliente_id}`)}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                      <Users size={12} className="text-slate-400" /> Ir a Cliente
-                    </button>
-                    <button onClick={() => selected && navigate(`/dashboard/expedientes/${selected}`)}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                      <FolderOpen size={12} className="text-slate-400" /> Ir a Expediente
-                    </button>
-                    <button onClick={() => alert("Ir a Juzgado")}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                      <ClipboardList size={12} className="text-slate-400" /> Ir a Juzgado
-                    </button>
+                {showAltaMenu && (
+                  <div className="absolute left-0 top-full z-50 mt-2 w-[320px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+                    <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
+                      <p className="text-sm font-semibold text-slate-600">Elige cómo quieres agregar expedientes</p>
+                    </div>
+                    <div className="p-2">
+                      <AltaOption icon={Plus} title="Crear manualmente" description="Crea un expediente desde cero introduciendo los datos" iconClassName="bg-green-100 text-green-600" onClick={openManualCreate} />
+                      <AltaOption icon={FileSpreadsheet} title="Importar desde CSV" description="Sube un archivo CSV con múltiples expedientes" iconClassName="bg-blue-100 text-blue-600" onClick={openCsvImport} />
+                      <AltaOption icon={ClipboardList} title="Desde documentos" description="Procesa documentos para crear expedientes" iconClassName="bg-amber-100 text-amber-700" onClick={openDocumentImport} />
+                    </div>
                   </div>
-                </div>
+                )}
+              </div>
 
-                <div className="relative group/color">
-                  <button className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                    <span className="flex items-center gap-2.5">
-                      <Palette size={12} className="text-slate-400" /> Asignar Color
-                    </span>
-                    <ChevronRight size={11} className="text-slate-300" />
-                  </button>
-                  <div className="absolute right-full -mr-px top-[-1px] z-50 hidden min-w-[190px] rounded-xl border border-slate-200 bg-white py-1.5 shadow-2xl group-hover/color:block">
-                    {[
-                      { value: "ninguno", label: "Sin color", dot: "bg-slate-300" },
-                      { value: "azul", label: "Azul suave", dot: "bg-sky-400" },
-                      { value: "verde", label: "Verde suave", dot: "bg-emerald-400" },
-                      { value: "amarillo", label: "Amarillo suave", dot: "bg-amber-400" },
-                      { value: "naranja", label: "Naranja suave", dot: "bg-orange-400" },
-                      { value: "rojo", label: "Rojo suave", dot: "bg-rose-400" },
-                      { value: "morado", label: "Morado suave", dot: "bg-violet-400" },
-                    ].map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() => assignExpedienteColor(option.value)}
-                        className="flex w-full items-center justify-between gap-2.5 px-3.5 py-2 text-left text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-700"
-                      >
-                        <span className="flex items-center gap-2.5">
-                          <span className={`h-2.5 w-2.5 rounded-full ${option.dot}`} />
-                          {option.label}
-                        </span>
-                        {selectedExp?.color === option.value && <Check size={11} className="text-red-500" />}
+              <div className="w-px h-5 bg-slate-200 mx-1" />
+
+              {/* Baja, Modificar */}
+              <ToolBtn icon={Trash2} label="Baja" danger disabled={!selected} onClick={() => selected && setDeleteId(selected)} />
+              <ToolBtn icon={Edit3} label="Modificar" disabled={!selected || selectedExp?.estado === "cerrado"} onClick={() => selected && selectedExp?.estado !== "cerrado" && navigate(`/dashboard/expedientes/${selected}?edit=1`)} />
+
+              <div className="w-px h-5 bg-slate-200 mx-1" />
+
+              {/* Correo, WhatsApp */}
+              <DropdownToolBtn icon={Mail} label="Enviar Correo" disabled={!selected} items={[
+                { label: "Nuevo", icon: Mail, onClick: () => { if (!selectedExp) return; const params = new URLSearchParams({ compose: '1', subject: `Expediente ${selectedExp.anio}/${selectedExp.num_exp} - ${selectedExp.descripcion || ''}`, ...(selectedExp.cliente_email ? { to: selectedExp.cliente_email } : {}), expediente_id: selectedExp.id }); navigate(`/dashboard/correo?${params.toString()}`); } },
+                { label: "Con Plantilla", icon: FileText, onClick: () => { if (!selectedExp) return; const params = new URLSearchParams({ compose: '1', subject: `Expediente ${selectedExp.anio}/${selectedExp.num_exp} - ${selectedExp.descripcion || ''}`, ...(selectedExp.cliente_email ? { to: selectedExp.cliente_email } : {}), expediente_id: selectedExp.id, open_templates: '1' }); navigate(`/dashboard/correo?${params.toString()}`); } },
+                { divider: true, label: '' },
+                { label: "Con Adjuntos", icon: Paperclip, children: [
+                  { label: "Nuevo", icon: Mail, onClick: () => { if (!selectedExp) return; const params = new URLSearchParams({ compose: '1', subject: `Expediente ${selectedExp.anio}/${selectedExp.num_exp} - ${selectedExp.descripcion || ''} (con adjuntos)`, ...(selectedExp.cliente_email ? { to: selectedExp.cliente_email } : {}), expediente_id: selectedExp.id, open_attachments: '1' }); navigate(`/dashboard/correo?${params.toString()}`); } },
+                  { label: "Con Plantilla", icon: FileText, onClick: () => { if (!selectedExp) return; const params = new URLSearchParams({ compose: '1', subject: `Expediente ${selectedExp.anio}/${selectedExp.num_exp} - ${selectedExp.descripcion || ''}`, ...(selectedExp.cliente_email ? { to: selectedExp.cliente_email } : {}), expediente_id: selectedExp.id, open_templates: '1', open_attachments: '1' }); navigate(`/dashboard/correo?${params.toString()}`); } },
+                ]},
+                { divider: true, label: '' },
+                { label: "MN Sign", icon: Pencil, onClick: () => selected && navigate(`/dashboard/expedientes/${selected}#firma`) },
+              ]} />
+              <DropdownToolBtn icon={MessageCircle} label="Enviar WhatsApp" disabled={!selectedExp?.cliente_id} items={[
+                { label: "Nuevo", icon: MessageCircle, onClick: () => { if (!selectedExp?.cliente_id) return; navigate(`/dashboard/whatsapp?clientId=${selectedExp.cliente_id}&mode=new`); } },
+                { label: "Con Plantilla", icon: FileSpreadsheet, onClick: () => { if (!selectedExp?.cliente_id) return; navigate(`/dashboard/whatsapp?clientId=${selectedExp.cliente_id}&mode=template`); } },
+                { label: "Programar WhatsApp", icon: Bell, onClick: () => { if (!selectedExp?.cliente_id) return; navigate(`/dashboard/whatsapp?clientId=${selectedExp.cliente_id}&mode=schedule`); } },
+                { label: "Sign", icon: Pencil, onClick: () => selected && navigate(`/dashboard/expedientes/${selected}#firma`) },
+                { label: "Ver Conversación", icon: ExternalLink, onClick: () => { if (!selectedExp?.cliente_id) return; navigate(`/dashboard/whatsapp?clientId=${selectedExp.cliente_id}&mode=thread`); } },
+              ]} />
+
+              <div className="w-px h-5 bg-slate-200 mx-1" />
+
+              {/* Sign, Tareas, Asociar, Adjuntos */}
+              <ToolBtn icon={PenLine} label="Sign" disabled={!selected} onClick={() => selected && navigate(`/dashboard/expedientes/${selected}#firma`)} />
+              <DropdownToolBtn icon={ClipboardList} label="Tareas" disabled={!selected || selectedExp?.estado === "cerrado"} items={[
+                { label: "Nueva actuación", icon: Activity, onClick: () => selected && navigate(`/dashboard/expedientes/${selected}?tab=actuacion&newActuacion=1`) },
+                { label: "Crear obligaciones", icon: ClipboardList, onClick: () => selected && navigate(`/dashboard/expedientes/${selected}?tab=tareas&newTarea=1&type=plazo_procesal`) },
+              ]} />
+              <ToolBtn icon={GitMerge} label="Asociar" disabled={!selectedExp} onClick={openRelacionarModal} />
+              <ToolBtn icon={Paperclip} label="Adjuntos" disabled={!selected || selectedExp?.estado === "cerrado"} onClick={() => selected && selectedExp?.estado !== "cerrado" && setShowAdjuntos(true)} />
+
+              <div className="w-px h-5 bg-slate-200 mx-1" />
+
+              {/* Excel, Imprimir, Informes */}
+              <ToolBtn icon={FileSpreadsheet} label="Excel" onClick={openExportModal} />
+              <ToolBtn icon={Printer} label="Imprimir" onClick={() => window.print()} />
+              <ToolBtn icon={BarChart2} label="Informes" onClick={() => navigate("/dashboard")} />
+
+              <div className="w-px h-5 bg-slate-200 mx-1" />
+
+              {/* Atajos, Opciones */}
+              <AtajosButton modulo="Expedientes" />
+              <div className="relative" ref={opcionesRef}>
+                <button
+                  onClick={() => setShowOpciones(v => !v)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-colors border shadow-sm ${showOpciones ? "bg-red-50 border-red-300 text-red-700" : "text-slate-600 hover:bg-slate-100 border-slate-200 bg-white"}`}>
+                  <MoreHorizontal size={13} /> Opciones <ChevronDown size={10} />
+                </button>
+                {showOpciones && (
+                  <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[230px] py-1.5 overflow-visible">
+                    <button onClick={() => alert("Seleccionar opciones favoritas")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
+                      <Star size={12} className="text-slate-400" /> Seleccionar Opciones Favoritas
+                    </button>
+                    <button type="button" onClick={() => { setShowColumnModal(true); setShowOpciones(false); }} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-700">
+                      <span className="flex items-center gap-2.5"><LayoutList size={12} className="text-slate-400" /> Elegir columnas</span>
+                    </button>
+                    <div className="h-px bg-slate-100 my-1.5" />
+                    <div className="relative group/sub">
+                      <button className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
+                        <span className="flex items-center gap-2.5"><ExternalLink size={12} className="text-slate-400" /> Ir a</span>
+                        <ChevronRight size={11} className="text-slate-300" />
                       </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="h-px bg-slate-100 my-1.5" />
-
-                {/* Grupo 3: acciones especiales */}
-                <button
-                  disabled={!selectedExp}
-                  onClick={toggleExpedienteEstado}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  {selectedExp?.estado === "cerrado"
-                    ? <><Unlock size={12} className="text-slate-400" /> Reabrir expediente</>
-                    : <><Lock size={12} className="text-slate-400" /> Cerrar expediente</>
-                  }
-                </button>
-                <button onClick={() => alert("Alta Acción")}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                  <Zap size={12} className="text-slate-400" /> Alta Acción
-                </button>
-                <button onClick={() => alert("Crear Recall")}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                  <Bell size={12} className="text-slate-400" /> Crear Recall
-                </button>
-
-                <div className="h-px bg-slate-100 my-1.5" />
-
-                {/* Configurar numeración */}
-                <button
-                  onClick={() => { setShowCounterModal(true); setShowOpciones(false); }}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors"
-                >
-                  <Hash size={12} className="text-slate-400" /> Configurar numeración
-                </button>
-
-                <div className="h-px bg-slate-100 my-1.5" />
-
-                {/* Grupo 4: duplicar / fusionar */}
-                <button onClick={() => alert("Duplicar expediente")}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                  <Copy size={12} className="text-slate-400" /> Duplicar
-                </button>
-                <button onClick={() => alert("Fusionar expedientes")}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                  <GitMerge size={12} className="text-slate-400" /> Fusionar
-                </button>
-
-                <div className="h-px bg-slate-100 my-1.5" />
-
-                {/* Grupo 5: comunicación + debug */}
-                <button onClick={() => selectedExp && window.open(`https://wa.me/?text=Expediente ${selectedExp.anio}/${selectedExp.num_exp}`, "_blank")}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                  <Smartphone size={12} className="text-slate-400" /> Enviar SMS
-                </button>
-
-                {/* Versión Antigua → submenú */}
-                <div className="relative group/ver">
-                  <button className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                    <span className="flex items-center gap-2.5">
-                      <History size={12} className="text-slate-400" /> Versión Antigua
-                    </span>
-                    <ChevronRight size={11} className="text-slate-300" />
-                  </button>
-                  <div className="absolute right-full -mr-px top-[-1px] z-50 bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[180px] py-1.5 hidden group-hover/ver:block">
-                    <button onClick={() => alert("Restaurar versión anterior")}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                      <History size={12} className="text-slate-400" /> Ver historial versiones
+                      <div className="absolute right-full -mr-px top-[-1px] z-50 bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[180px] py-1.5 hidden group-hover/sub:block">
+                        <button onClick={() => selectedExp?.cliente_id && navigate(`/dashboard/clientes/${selectedExp.cliente_id}`)} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors"><Users size={12} className="text-slate-400" /> Ir a Cliente</button>
+                        <button onClick={() => selected && navigate(`/dashboard/expedientes/${selected}`)} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors"><FolderOpen size={12} className="text-slate-400" /> Ir a Expediente</button>
+                        <button onClick={() => alert("Ir a Juzgado")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors"><ClipboardList size={12} className="text-slate-400" /> Ir a Juzgado</button>
+                      </div>
+                    </div>
+                    <div className="relative group/color">
+                      <button className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
+                        <span className="flex items-center gap-2.5"><Palette size={12} className="text-slate-400" /> Asignar Color</span>
+                        <ChevronRight size={11} className="text-slate-300" />
+                      </button>
+                      <div className="absolute right-full -mr-px top-[-1px] z-50 hidden min-w-[190px] rounded-xl border border-slate-200 bg-white py-1.5 shadow-2xl group-hover/color:block">
+                        {[
+                          { value: "ninguno", label: "Sin color", dot: "bg-slate-300" },
+                          { value: "azul",    label: "Azul suave",    dot: "bg-sky-400" },
+                          { value: "verde",   label: "Verde suave",   dot: "bg-emerald-400" },
+                          { value: "amarillo",label: "Amarillo suave",dot: "bg-amber-400" },
+                          { value: "naranja", label: "Naranja suave", dot: "bg-orange-400" },
+                          { value: "rojo",    label: "Rojo suave",    dot: "bg-rose-400" },
+                          { value: "morado",  label: "Morado suave",  dot: "bg-violet-400" },
+                        ].map((option) => (
+                          <button key={option.value} type="button" onClick={() => assignExpedienteColor(option.value)}
+                            className="flex w-full items-center justify-between gap-2.5 px-3.5 py-2 text-left text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-700">
+                            <span className="flex items-center gap-2.5"><span className={`h-2.5 w-2.5 rounded-full ${option.dot}`} />{option.label}</span>
+                            {selectedExp?.color === option.value && <Check size={11} className="text-red-500" />}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="h-px bg-slate-100 my-1.5" />
+                    <button disabled={!selectedExp} onClick={toggleExpedienteEstado}
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                      {selectedExp?.estado === "cerrado"
+                        ? <><Unlock size={12} className="text-slate-400" /> Reabrir expediente</>
+                        : <><Lock size={12} className="text-slate-400" /> Cerrar expediente</>}
                     </button>
-                    <button onClick={() => alert("Comparar con versión")}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                      <RefreshCw size={12} className="text-slate-400" /> Comparar versión
-                    </button>
+                    <button onClick={() => alert("Alta Acción")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors"><Zap size={12} className="text-slate-400" /> Alta Acción</button>
+                    <button onClick={() => alert("Crear Recall")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors"><Bell size={12} className="text-slate-400" /> Crear Recall</button>
+                    <div className="h-px bg-slate-100 my-1.5" />
+                    <button onClick={() => { setShowCounterModal(true); setShowOpciones(false); }} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors"><Hash size={12} className="text-slate-400" /> Configurar numeración</button>
+                    <div className="h-px bg-slate-100 my-1.5" />
+                    <button onClick={() => alert("Duplicar expediente")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors"><Copy size={12} className="text-slate-400" /> Duplicar</button>
+                    <button onClick={() => alert("Fusionar expedientes")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors"><GitMerge size={12} className="text-slate-400" /> Fusionar</button>
+                    <div className="h-px bg-slate-100 my-1.5" />
+                    <button onClick={() => selectedExp && window.open(`https://wa.me/?text=Expediente ${selectedExp.anio}/${selectedExp.num_exp}`, "_blank")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors"><Smartphone size={12} className="text-slate-400" /> Enviar SMS</button>
+                    <div className="relative group/ver">
+                      <button className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
+                        <span className="flex items-center gap-2.5"><History size={12} className="text-slate-400" /> Versión Antigua</span>
+                        <ChevronRight size={11} className="text-slate-300" />
+                      </button>
+                      <div className="absolute right-full -mr-px top-[-1px] z-50 bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[180px] py-1.5 hidden group-hover/ver:block">
+                        <button onClick={() => alert("Restaurar versión anterior")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors"><History size={12} className="text-slate-400" /> Ver historial versiones</button>
+                        <button onClick={() => alert("Comparar con versión")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors"><RefreshCw size={12} className="text-slate-400" /> Comparar versión</button>
+                      </div>
+                    </div>
                   </div>
-                </div>
-
+                )}
               </div>
-              )}
+
             </div>
-
-            {/* Expediente seleccionado */}
-            {false && selectedExp && (
-              <div className="ml-auto flex items-center gap-1.5 px-2 py-1 bg-red-50 border border-red-100 rounded-lg shrink-0">
-                <div className="w-2 h-2 bg-red-500 rounded-full" />
-                <span className="text-xs text-red-700 font-medium max-w-[200px] truncate">
-                  {selectedExp.anio}/{selectedExp.num_exp} — {selectedExp.descripcion}
-                </span>
-                <button onClick={() => setSelected(null)} className="text-red-300 hover:text-red-600 ml-0.5">
-                  <X size={11} />
-                </button>
-              </div>
-            )}
           </div>
 
-          {/* ── Barra de filtros ────────────────────────────── */}
-          <div className="px-4 py-2 border-b border-slate-100 bg-white">
-            <div className="flex flex-col gap-1.5">
+          {/* ── Toolbar 2: Filtros y Vistas ──────────────────── */}
+          <div className="px-6 py-2.5 border-b border-slate-200 bg-white flex flex-col sm:flex-row items-center justify-between gap-3 flex-shrink-0 z-10">
+            <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
               {filters.map((filter, idx) => (
-                <div key={filter.id} className="flex items-center gap-1.5 flex-wrap">
-                  <FilterRow
-                    filter={filter}
-                    onChange={updateFilter}
-                    onRemove={removeFilter}
-                    canRemove={filters.length > 1}
-                    inputRef={idx === 0 ? firstInputRef : undefined}
-                  />
-                  {idx === filters.length - 1 && (
-                    <div className="flex items-center gap-1">
-                      <button onClick={addFilter}
-                        className="flex items-center justify-center w-6 h-6 rounded-md border border-slate-200 text-slate-500 hover:border-red-400 hover:text-red-600 hover:bg-red-50 transition-colors text-sm font-bold">
-                        +
-                      </button>
-                      {filters.length > 1 && (
-                        <button onClick={() => removeFilter(filter.id)}
-                          className="flex items-center justify-center w-6 h-6 rounded-md border border-slate-200 text-slate-400 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors text-xs font-bold">
-                          −
-                        </button>
-                      )}
-                      <button onClick={clearAllFilters}
-                        className={`flex items-center justify-center w-6 h-6 rounded-md border transition-colors ${hasActiveFilters || filters.length > 1 ? "border-red-300 text-red-500 hover:bg-red-50" : "border-slate-200 text-slate-300 cursor-default"}`}>
-                        <ListFilter size={12} />
-                      </button>
-                    </div>
-                  )}
-                  {idx === filters.length - 1 && (
-                    <div className="ml-auto flex items-center gap-2">
-                      {/* Contador */}
-                      <span className="text-xs text-slate-400 whitespace-nowrap">
-                        {filtered.length !== expedientes.length
-                          ? <span className="text-amber-600 font-medium">{filtered.length} de {expedientes.length}</span>
-                          : <>{expedientes.length} {expedientes.length === 1 ? "registro" : "registros"}</>
-                        }
-                      </span>
-
-                      <div className="w-px h-4 bg-slate-200" />
-
-                      {/* Controles de vista */}
-                      <div className="flex items-center gap-0.5 bg-slate-100 rounded-lg p-0.5">
-                        <button
-                          onClick={() => switchView("list")}
-                          title="Vista listado"
-                          className={`p-1.5 rounded-md transition-all ${viewMode === "list" ? "bg-white shadow-sm text-red-600" : "text-slate-400 hover:text-slate-600"}`}
-                        >
-                          <AlignJustify size={13} />
-                        </button>
-                        <button
-                          onClick={() => switchView("detail")}
-                          title="Vista listado con detalle"
-                          className={`p-1.5 rounded-md transition-all ${viewMode === "detail" ? "bg-white shadow-sm text-red-600" : "text-slate-400 hover:text-slate-600"}`}
-                        >
-                          <LayoutList size={13} />
-                        </button>
-                        <button
-                          onClick={() => switchView("multiselect")}
-                          title="Selección múltiple"
-                          className={`p-1.5 rounded-md transition-all ${viewMode === "multiselect" ? "bg-white shadow-sm text-red-600" : "text-slate-400 hover:text-slate-600"}`}
-                        >
-                          <ListChecks size={13} />
-                        </button>
-                      </div>
-
-                      {/* Refrescar */}
-                      <button
-                        onClick={handleRefresh}
-                        title="Refrescar datos"
-                        className="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-300 hover:bg-red-50 transition-all"
-                      >
-                        <RefreshCw size={13} className={refreshSpin ? "animate-spin" : ""} />
-                      </button>
-                    </div>
-                  )}
-                </div>
+                <FilterRow
+                  key={filter.id}
+                  filter={filter}
+                  onChange={updateFilter}
+                  onRemove={removeFilter}
+                  canRemove={filters.length > 1}
+                  inputRef={idx === 0 ? firstInputRef : undefined}
+                />
               ))}
+              <button onClick={addFilter} title="Añadir filtro"
+                className="flex items-center justify-center w-7 h-7 rounded-md border border-slate-200 text-slate-500 bg-white hover:bg-slate-50 shadow-sm transition-colors">
+                <Plus size={13} />
+              </button>
+              <button onClick={clearAllFilters} title="Limpiar filtros"
+                className={`flex items-center justify-center w-7 h-7 rounded-md border bg-white shadow-sm transition-colors ${hasActiveFilters || filters.length > 1 ? "border-red-300 text-red-500 hover:bg-red-50" : "border-slate-200 text-slate-300"}`}>
+                <ListFilter size={12} />
+              </button>
+            </div>
+            <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+              <span className="text-xs font-medium text-slate-500 whitespace-nowrap">
+                {filtered.length !== expedientes.length
+                  ? <span className="text-amber-600 font-medium">{filtered.length} de {expedientes.length}</span>
+                  : <>{expedientes.length} {expedientes.length === 1 ? "registro" : "registros"}</>}
+              </span>
+              <div className="flex items-center bg-white rounded-md border border-slate-200 shadow-sm p-0.5">
+                <button onClick={() => switchView("list")} title="Vista listado"
+                  className={`px-2 py-1 rounded transition-all ${viewMode === "list" ? "bg-red-50 text-red-600 border border-red-100" : "text-slate-400 hover:text-slate-600"}`}>
+                  <AlignJustify size={12} />
+                </button>
+                <button onClick={() => switchView("detail")} title="Vista detalle"
+                  className={`px-2 py-1 transition-all ${viewMode === "detail" ? "text-red-600 bg-red-50" : "text-slate-400 hover:text-slate-600"}`}>
+                  <LayoutList size={12} />
+                </button>
+                <button onClick={() => switchView("multiselect")} title="Selección múltiple"
+                  className={`px-2 py-1 transition-all ${viewMode === "multiselect" ? "text-red-600 bg-red-50" : "text-slate-400 hover:text-slate-600"}`}>
+                  <ListChecks size={12} />
+                </button>
+              </div>
+              <button onClick={handleRefresh} title="Refrescar datos"
+                className="p-1.5 border border-slate-200 rounded-md text-slate-400 hover:text-red-600 hover:border-red-300 hover:bg-red-50 transition-all bg-white shadow-sm w-8 h-8 flex items-center justify-center">
+                <RefreshCw size={13} className={refreshSpin ? "animate-spin" : ""} />
+              </button>
             </div>
           </div>
 
@@ -6292,11 +6035,11 @@ export default function ExpedienteList() {
                   {visibleColumns.tipo && <Th label="Tipo de Expediente"     sk="tipo"           sort={sort} dir={dir} onSort={handleSort} className="w-40" />}
                   {visibleColumns.cliente_nombre && <Th label="Cliente"                sk="cliente_nombre" sort={sort} dir={dir} onSort={handleSort} className="w-36" />}
                   {visibleColumns.contrario && <Th label="Contrario"              sk="contrario"      sort={sort} dir={dir} onSort={handleSort} className="w-36" />}
-                  {visibleColumns.procurador && <Th label="Procurador Propio"                          sort={sort} dir={dir} onSort={handleSort} className="w-32 hidden xl:table-cell" />}
-                  {visibleColumns.juzgado && <Th label="Juzgado Principal"      sk="juzgado"        sort={sort} dir={dir} onSort={handleSort} className="w-44 hidden lg:table-cell" />}
-                  {visibleColumns.tipo_proc && <Th label="Tipo Procedimiento"                         sort={sort} dir={dir} onSort={handleSort} className="w-28 hidden xl:table-cell" />}
-                  {visibleColumns.num_autos && <Th label="Núm. Autos"                                 sort={sort} dir={dir} onSort={handleSort} className="w-24 hidden lg:table-cell" />}
-                  {visibleColumns.nig && <Th label="NIG"                                        sort={sort} dir={dir} onSort={handleSort} className="w-28 hidden xl:table-cell" />}
+                  {visibleColumns.procurador && <Th label="Procurador Propio"                          sort={sort} dir={dir} onSort={handleSort} className="w-32" />}
+                  {visibleColumns.juzgado && <Th label="Juzgado Principal"      sk="juzgado"        sort={sort} dir={dir} onSort={handleSort} className="w-44" />}
+                  {visibleColumns.tipo_proc && <Th label="Tipo Procedimiento"                         sort={sort} dir={dir} onSort={handleSort} className="w-28" />}
+                  {visibleColumns.num_autos && <Th label="Núm. Autos"                                 sort={sort} dir={dir} onSort={handleSort} className="w-24" />}
+                  {visibleColumns.nig && <Th label="NIG"                                        sort={sort} dir={dir} onSort={handleSort} className="w-28" />}
                   {visibleColumns.estado && <Th label="Estado"                 sk="estado"         sort={sort} dir={dir} onSort={handleSort} className="w-24" />}
                   <th className="px-3 py-2.5 w-10" />
                 </tr>
@@ -6385,27 +6128,27 @@ export default function ExpedienteList() {
                       </td>}
 
                       {/* Procurador */}
-                      {visibleColumns.procurador && <td className="px-3 py-3 text-slate-400 hidden xl:table-cell truncate max-w-[120px]">
+                      {visibleColumns.procurador && <td className="px-3 py-3 text-slate-400 truncate max-w-[120px]">
                         {exp.procurador || <span className="text-slate-200">—</span>}
                       </td>}
 
                       {/* Juzgado */}
-                      {visibleColumns.juzgado && <td className="px-3 py-3 text-slate-400 hidden lg:table-cell truncate max-w-[150px]">
+                      {visibleColumns.juzgado && <td className="px-3 py-3 text-slate-400 truncate max-w-[150px]">
                         {exp.juzgado || <span className="text-slate-200">—</span>}
                       </td>}
 
                       {/* Tipo proc */}
-                      {visibleColumns.tipo_proc && <td className="px-3 py-3 text-slate-400 uppercase hidden xl:table-cell whitespace-nowrap">
+                      {visibleColumns.tipo_proc && <td className="px-3 py-3 text-slate-400 uppercase whitespace-nowrap">
                         {exp.tipo_proc || <span className="text-slate-200">—</span>}
                       </td>}
 
                       {/* Núm. Autos */}
-                      {visibleColumns.num_autos && <td className="px-3 py-3 font-mono text-slate-400 hidden lg:table-cell">
+                      {visibleColumns.num_autos && <td className="px-3 py-3 font-mono text-slate-400">
                         {exp.num_autos || <span className="text-slate-200">—</span>}
                       </td>}
 
                       {/* NIG */}
-                      {visibleColumns.nig && <td className="px-3 py-3 font-mono text-slate-300 hidden xl:table-cell">
+                      {visibleColumns.nig && <td className="px-3 py-3 font-mono text-slate-300">
                         {exp.nig ? <span title={exp.nig}>{exp.nig.slice(0,12)}{exp.nig.length > 12 ? "…" : ""}</span> : <span className="text-slate-200">—</span>}
                       </td>}
 
