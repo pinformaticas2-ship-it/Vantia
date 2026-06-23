@@ -5817,8 +5817,8 @@ export default function ExpedienteList() {
       )}
 
       {/* ── Confirmar borrado ───────────────────────────────── */}
-      {deleteId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent">
+      {deleteId && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm mx-4 p-6">
             <div className="flex items-start gap-3 mb-4">
               <div className="p-2 bg-red-100 rounded-xl shrink-0">
@@ -5836,7 +5836,8 @@ export default function ExpedienteList() {
                 className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg active:scale-95">Eliminar</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ── Undo toast ──────────────────────────────────────── */}
@@ -6379,8 +6380,8 @@ export default function ExpedienteList() {
           )}
 
           {/* ── Confirmar borrado masivo ── */}
-          {bulkDeleteConfirm && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent">
+          {bulkDeleteConfirm && createPortal(
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
               <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm mx-4 p-6">
                 <div className="flex items-start gap-3 mb-4">
                   <div className="p-2 bg-red-100 rounded-xl shrink-0">
@@ -6396,7 +6397,8 @@ export default function ExpedienteList() {
                   <button onClick={handleBulkDelete} className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg active:scale-95">Dar de baja</button>
                 </div>
               </div>
-            </div>
+            </div>,
+            document.body
           )}
 
           {viewMode === "detail" && (
