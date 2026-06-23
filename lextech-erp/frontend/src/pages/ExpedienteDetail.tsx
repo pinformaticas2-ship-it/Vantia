@@ -159,7 +159,7 @@ type DetailTabKey = "perfil" | TabKey | "relacionados" | "actuacion" | "economic
 
 const DETAIL_TABS: { key: DetailTabKey; label: string; icon: any }[] = [
   { key: "perfil",      label: "Datos",                  icon: User },
-  { key: "clientes",    label: "Cliente",                icon: Users },
+  { key: "clientes",    label: "Propio",                 icon: Users },
   { key: "contrarios",  label: "Contrarios",             icon: Users },
   { key: "adjuntos",    label: "Adjuntos",               icon: Paperclip },
   { key: "agenda",      label: "Agenda",                 icon: Calendar },
@@ -3750,6 +3750,12 @@ function TabClienteVinculado({ exp, clientes, linkedClient, linkedClientDisplayN
   const [clientSearch, setClientSearch] = useState("");
   const [showPicker, setShowPicker] = useState(false);
   const [linkSaving, setLinkSaving] = useState(false);
+  const [abogadoEdit, setAbogadoEdit] = useState(false);
+  const [abogadoVal, setAbogadoVal] = useState(exp.abogado_propio || "");
+  const [abogadoSaving, setAbogadoSaving] = useState(false);
+  const [procuradorEdit, setProcuradorEdit] = useState(false);
+  const [procuradorVal, setProcuradorVal] = useState(exp.procurador || "");
+  const [procuradorSaving, setProcuradorSaving] = useState(false);
 
   const filtered = clientSearch.trim()
     ? clientes.filter(c => {
@@ -3779,7 +3785,7 @@ function TabClienteVinculado({ exp, clientes, linkedClient, linkedClientDisplayN
         <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Users size={14} className="text-slate-400" />
-            <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Cliente vinculado</h3>
+            <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Cliente</h3>
           </div>
           {!isClosed && exp.cliente_id && !showPicker && (
             <div className="flex items-center gap-2">
@@ -3861,6 +3867,98 @@ function TabClienteVinculado({ exp, clientes, linkedClient, linkedClientDisplayN
                 <Plus size={12} /> Crear nuevo cliente
               </Link>
             </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Abogado propio ── */}
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <User size={14} className="text-slate-400" />
+            <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Abogado</h3>
+          </div>
+          {!isClosed && !abogadoEdit && (
+            <button type="button" onClick={() => setAbogadoEdit(true)} className="text-xs font-bold text-red-600 hover:underline">Editar</button>
+          )}
+        </div>
+        <div className="px-5 py-4">
+          {abogadoEdit ? (
+            <div className="flex items-center gap-2">
+              <input
+                autoFocus
+                value={abogadoVal}
+                onChange={e => setAbogadoVal(e.target.value)}
+                placeholder="Nombre del abogado propio…"
+                className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-red-400"
+              />
+              <button
+                type="button"
+                disabled={abogadoSaving}
+                onClick={async () => {
+                  setAbogadoSaving(true);
+                  await onPatch({ abogado_propio: abogadoVal.trim() || null });
+                  setAbogadoSaving(false);
+                  setAbogadoEdit(false);
+                }}
+                className="px-3 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl disabled:opacity-50"
+              >
+                {abogadoSaving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+              </button>
+              <button type="button" onClick={() => { setAbogadoEdit(false); setAbogadoVal(exp.abogado_propio || ""); }} className="px-3 py-2 text-xs text-slate-400 hover:text-slate-600">
+                <X size={13} />
+              </button>
+            </div>
+          ) : exp.abogado_propio ? (
+            <p className="text-sm font-medium text-slate-800">{exp.abogado_propio}</p>
+          ) : (
+            <p className="text-sm text-slate-400 italic">Sin abogado asignado</p>
+          )}
+        </div>
+      </div>
+
+      {/* ── Procurador propio ── */}
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Briefcase size={14} className="text-slate-400" />
+            <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Procurador</h3>
+          </div>
+          {!isClosed && !procuradorEdit && (
+            <button type="button" onClick={() => setProcuradorEdit(true)} className="text-xs font-bold text-red-600 hover:underline">Editar</button>
+          )}
+        </div>
+        <div className="px-5 py-4">
+          {procuradorEdit ? (
+            <div className="flex items-center gap-2">
+              <input
+                autoFocus
+                value={procuradorVal}
+                onChange={e => setProcuradorVal(e.target.value)}
+                placeholder="Nombre del procurador propio…"
+                className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-red-400"
+              />
+              <button
+                type="button"
+                disabled={procuradorSaving}
+                onClick={async () => {
+                  setProcuradorSaving(true);
+                  await onPatch({ procurador: procuradorVal.trim() || null });
+                  setProcuradorSaving(false);
+                  setProcuradorEdit(false);
+                }}
+                className="px-3 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl disabled:opacity-50"
+              >
+                {procuradorSaving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+              </button>
+              <button type="button" onClick={() => { setProcuradorEdit(false); setProcuradorVal(exp.procurador || ""); }} className="px-3 py-2 text-xs text-slate-400 hover:text-slate-600">
+                <X size={13} />
+              </button>
+            </div>
+          ) : exp.procurador ? (
+            <p className="text-sm font-medium text-slate-800">{exp.procurador}</p>
+          ) : (
+            <p className="text-sm text-slate-400 italic">Sin procurador asignado</p>
           )}
         </div>
       </div>
