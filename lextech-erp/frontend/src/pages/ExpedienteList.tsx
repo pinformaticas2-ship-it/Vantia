@@ -774,25 +774,37 @@ function exportFormatMeta(format: ExportFormat) {
       return {
         label: "XML",
         icon: FileCode2,
-        className: "from-amber-50 to-orange-50 border-amber-200 text-amber-700",
-        badgeClassName: "bg-amber-100 text-amber-700",
         description: "Estructurado para integraciones y otros sistemas.",
+        iconColor: "text-amber-500",
+        labelColor: "text-amber-700",
+        activeBorder: "border-amber-300",
+        activeBg: "bg-[#fffdf5]",
+        inactiveBorder: "border-amber-100",
+        inactiveBg: "bg-[#fffdf5]",
       };
     case "word":
       return {
         label: "Word",
         icon: FileText,
-        className: "from-blue-50 to-sky-50 border-blue-200 text-blue-700",
-        badgeClassName: "bg-blue-100 text-blue-700",
         description: "Documento editable con apariencia de tabla.",
+        iconColor: "text-blue-500",
+        labelColor: "text-blue-700",
+        activeBorder: "border-blue-300",
+        activeBg: "bg-[#f5f9ff]",
+        inactiveBorder: "border-blue-100",
+        inactiveBg: "bg-[#f5f9ff]",
       };
     default:
       return {
         label: "Excel",
         icon: FileSpreadsheet,
-        className: "from-emerald-50 to-lime-50 border-emerald-200 text-emerald-700",
-        badgeClassName: "bg-emerald-100 text-emerald-700",
         description: "Listado tipo hoja de cálculo con la plantilla por defecto.",
+        iconColor: "text-green-600",
+        labelColor: "text-green-700",
+        activeBorder: "border-green-300",
+        activeBg: "bg-[#f4fcf5]",
+        inactiveBorder: "border-green-100",
+        inactiveBg: "bg-[#f4fcf5]",
       };
   }
 }
@@ -5462,125 +5474,129 @@ export default function ExpedienteList() {
       )}
 
       {showExportModal && typeof document !== "undefined" && createPortal(
-        <div className="fixed inset-0 z-[125] flex items-center justify-center bg-transparent p-3 sm:p-4 animate-in fade-in duration-200" onClick={() => setShowExportModal(false)}>
-          <div className="flex h-[min(860px,calc(100vh-24px))] w-full max-w-[min(1380px,calc(100vw-24px))] flex-col rounded-3xl border border-slate-200 bg-white shadow-2xl overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-2 duration-200" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-5 py-3">
+        <div className="fixed inset-0 z-[125] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setShowExportModal(false)}>
+          <div className="flex h-[92vh] w-full max-w-[95vw] flex-col rounded-xl border border-slate-200 bg-white shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+
+            {/* Header */}
+            <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-6 py-4 flex-shrink-0 bg-white">
               <div>
-                <p className="text-[11px] font-bold uppercase tracking-[0.25em] text-slate-400">Exportar expedientes</p>
-                <h3 className="text-[17px] font-bold text-slate-900">Plantillas de exportación</h3>
+                <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-400 mb-0.5">Exportar expedientes</p>
+                <h3 className="text-xl font-bold text-slate-800">Plantillas de exportación</h3>
               </div>
-              <button type="button" onClick={() => setShowExportModal(false)} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-400 hover:border-slate-300 hover:text-slate-700">
-                <X size={16} />
+              <button type="button" onClick={() => setShowExportModal(false)} className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors shadow-sm">
+                <X size={14} />
               </button>
             </div>
 
-            <div className="border-b border-slate-100 px-4 py-3 sm:px-5">
-              <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
-                <div className="grid gap-2 md:grid-cols-3">
-                  {(["excel", "xml", "word"] as ExportFormat[]).map((format) => {
-                    const meta = exportFormatMeta(format);
-                    const Icon = meta.icon;
-                    const active = selectedExportFormat === format;
-                    return (
-                      <button
-                        key={format}
-                        type="button"
-                        onClick={() => setSelectedExportFormat(format)}
-                        className={`group rounded-2xl border bg-gradient-to-br px-3 py-2.5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${meta.className} ${active ? "ring-2 ring-red-500/70 shadow-md scale-[1.01]" : "opacity-90 hover:opacity-100"}`}
-                      >
-                        <div className="flex items-start justify-between gap-2.5">
-                          <div className="flex items-center gap-2.5">
-                            <div className={`flex h-8 w-8 items-center justify-center rounded-xl ${meta.badgeClassName}`}>
-                              <Icon size={16} />
-                            </div>
-                            <div>
-                              <p className="text-[13px] font-bold leading-none">{meta.label}</p>
-                              <p className="mt-1 text-[10px] leading-4 text-slate-500">{meta.description}</p>
-                            </div>
-                          </div>
-                          {active && <CheckCircle2 size={16} className="text-red-500 shrink-0" />}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-                <div className="flex flex-wrap items-center gap-2 justify-end">
-                  <button type="button" onClick={openCreateExportTemplate} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-medium text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm">Alta</button>
-                  <button type="button" onClick={deleteSelectedTemplate} disabled={selectedExportTemplate.builtIn} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-medium text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-40">Baja</button>
-                  <button type="button" onClick={openEditExportTemplate} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-medium text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm">Modificar</button>
-                  <button type="button" onClick={() => setShowExportModal(false)} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-medium text-slate-600 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm">Cancelar</button>
-                  <button type="button" onClick={runExport} className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-all hover:-translate-y-0.5 hover:bg-red-700 hover:shadow-lg">
-                    <Download size={13} />
-                    Exportar
-                  </button>
-                </div>
-              </div>
-            </div>
+            {/* Body */}
+            <div className="flex flex-1 min-h-0 overflow-hidden">
 
-            <div className="grid min-h-0 flex-1 grid-cols-[260px_minmax(0,1fr)] gap-0">
-              <div className="border-r border-slate-200 p-3">
-                <p className="mb-3 text-[13px] leading-5 text-slate-500">Selecciona una plantilla de exportación o configura una nueva con los campos que quieras exportar.</p>
-                <div className="overflow-hidden rounded-2xl border border-slate-200">
-                  <div className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold uppercase tracking-wider text-slate-500">Plantilla</div>
-                  <div className="max-h-[calc(100vh-360px)] overflow-y-auto">
-                    {exportTemplates.map((template) => (
-                      <button
-                        key={template.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedExportTemplateId(template.id);
-                          setSelectedExportFormat(template.format);
-                        }}
-                        className={`w-full border-b border-slate-100 px-4 py-2.5 text-left last:border-b-0 transition-all duration-150 ${selectedExportTemplateId === template.id ? "bg-gradient-to-r from-lime-300 via-lime-200 to-white text-slate-900 shadow-inner" : "hover:bg-slate-50 text-slate-700 hover:translate-x-1"}`}
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <p className="text-[13px] font-semibold leading-5">{template.name}</p>
-                            <p className="mt-1 text-xs uppercase tracking-wide opacity-70">{template.format}</p>
+              {/* Left sidebar: plantilla selector */}
+              <div className="w-72 border-r border-slate-200 bg-white p-6 flex flex-col gap-6 flex-shrink-0 shadow-[1px_0_4px_rgba(0,0,0,0.02)]">
+                <p className="text-sm text-slate-500 leading-relaxed">
+                  Selecciona una plantilla de exportación o configura una nueva con los campos que quieras exportar.
+                </p>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-3">Plantilla</span>
+                  <div className="space-y-2">
+                    {exportTemplates.map((template) => {
+                      const active = selectedExportTemplateId === template.id;
+                      return (
+                        <button
+                          key={template.id}
+                          type="button"
+                          onClick={() => { setSelectedExportTemplateId(template.id); setSelectedExportFormat(template.format); }}
+                          className={`w-full p-4 rounded-xl border text-left transition-all ${active ? "bg-gradient-to-r from-lime-100 to-lime-50 border-lime-300 shadow-sm" : "bg-white border-slate-200 hover:bg-slate-50"}`}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="font-bold text-sm text-slate-800">{template.name}</p>
+                              <p className="text-[10px] font-bold text-green-600 uppercase tracking-widest mt-0.5">{template.format}</p>
+                            </div>
+                            {active && <CheckCircle2 size={16} className="text-red-500 shrink-0" />}
                           </div>
-                          {selectedExportTemplateId === template.id && <CheckCircle2 size={16} className="text-red-500" />}
-                        </div>
-                      </button>
-                    ))}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
 
-              <div className="min-h-0 p-3">
-                <div className="grid min-h-0 gap-3 xl:grid-cols-[260px_minmax(0,1fr)]">
-                  <div className="overflow-hidden rounded-2xl border border-slate-200">
-                    <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold uppercase tracking-wider text-slate-500">
-                      <span>Campos a exportar</span>
-                      <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] text-slate-600 normal-case">{selectedExportTemplate.fields.length} columnas</span>
+              {/* Right area */}
+              <div className="flex-1 flex flex-col p-6 bg-[#f8fafc] gap-6 min-w-0 overflow-y-auto">
+
+                {/* Top: format cards + action buttons */}
+                <div className="flex flex-wrap xl:flex-nowrap items-center justify-between gap-4 flex-shrink-0">
+                  <div className="flex flex-wrap items-center gap-4">
+                    {(["excel", "xml", "word"] as ExportFormat[]).map((format) => {
+                      const meta = exportFormatMeta(format);
+                      const Icon = meta.icon;
+                      const active = selectedExportFormat === format;
+                      return (
+                        <button
+                          key={format}
+                          type="button"
+                          onClick={() => setSelectedExportFormat(format)}
+                          className={`relative flex items-start gap-3 p-3.5 rounded-xl text-left transition-all w-[220px] shadow-sm hover:shadow-md ${active ? `border-2 ${meta.activeBorder} ${meta.activeBg}` : `border border-slate-200 bg-white hover:bg-slate-50`}`}
+                        >
+                          <Icon size={20} className={`mt-0.5 shrink-0 ${meta.iconColor}`} />
+                          <div className="flex-1 pr-5">
+                            <p className={`font-bold text-sm block ${meta.labelColor}`}>{meta.label}</p>
+                            <p className="text-[10px] text-slate-500 leading-tight block mt-1">{meta.description}</p>
+                          </div>
+                          {active && <CheckCircle2 size={15} className="text-red-500 absolute top-3 right-3 shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <button type="button" onClick={openCreateExportTemplate} className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-sm">Alta</button>
+                    <button type="button" onClick={deleteSelectedTemplate} disabled={selectedExportTemplate.builtIn} className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">Baja</button>
+                    <button type="button" onClick={openEditExportTemplate} className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-sm">Modificar</button>
+                    <button type="button" onClick={() => setShowExportModal(false)} className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-sm ml-2">Cancelar</button>
+                    <button type="button" onClick={runExport} className="inline-flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-sm transition-colors">
+                      <Download size={13} /> Exportar
+                    </button>
+                  </div>
+                </div>
+
+                {/* Bottom: campos + vista previa */}
+                <div className="flex-1 flex flex-col xl:flex-row gap-6 min-h-0">
+
+                  {/* Campos a exportar */}
+                  <div className="w-full xl:w-[280px] bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col overflow-hidden flex-shrink-0">
+                    <div className="px-5 py-4 flex items-center justify-between border-b border-slate-100 flex-shrink-0">
+                      <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Campos a exportar</span>
+                      <span className="px-3 py-1 bg-slate-200 text-slate-700 text-[10px] font-bold rounded-full">{selectedExportTemplate.fields.length} columnas</span>
                     </div>
-                    <div className="max-h-[calc(100vh-360px)] overflow-y-auto px-4 py-3 text-[13px] text-slate-700">
+                    <div className="flex-1 overflow-y-auto py-2">
                       {selectedExportTemplate.fields.map((fieldId) => (
-                        <div key={fieldId} className="py-0.5">{getExportFieldLabel(fieldId)}</div>
+                        <div key={fieldId} className="px-5 py-1.5 text-[13px] text-slate-700">{getExportFieldLabel(fieldId)}</div>
                       ))}
                     </div>
                   </div>
 
-                  <div className="overflow-hidden rounded-2xl border border-slate-200">
-                    <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold uppercase tracking-wider text-slate-500">
-                      <span>Vista previa</span>
-                      <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] text-slate-600 normal-case">{exportPreviewRows.length} filas</span>
+                  {/* Vista previa */}
+                  <div className="flex-1 bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col overflow-hidden min-w-0">
+                    <div className="px-5 py-4 flex items-center justify-between border-b border-slate-100 flex-shrink-0 bg-white shadow-sm">
+                      <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Vista previa</span>
+                      <span className="px-3 py-1 bg-slate-200 text-slate-700 text-[10px] font-bold rounded-full">{exportPreviewRows.length} filas</span>
                     </div>
-                    <div className="h-[calc(100vh-360px)] overflow-auto bg-[#f3f6fb] p-3">
-                      <div className="inline-block min-w-full overflow-hidden border border-[#cfd8e3] bg-white shadow-[0_12px_28px_rgba(15,23,42,0.08)]">
-                      <table className="min-w-max border-collapse text-[10px] text-slate-800">
-                        <thead>
-                          <tr>
-                            <th className="w-10 border border-[#d9e1ea] bg-[#eef2f6] px-2 py-1 text-center font-bold text-slate-500" />
+                    <div className="flex-1 overflow-auto">
+                      <table className="border-collapse text-[11px] text-slate-700 w-max min-w-full">
+                        <thead className="sticky top-0 z-20">
+                          <tr className="bg-slate-50">
+                            <th className="w-12 border border-slate-200 bg-slate-50 px-2 py-2 text-center font-bold text-slate-400" />
                             {selectedExportTemplate.fields.map((fieldId, index) => (
-                              <th key={`${fieldId}-letter`} className="whitespace-nowrap border border-[#d9e1ea] bg-[#eef2f6] px-2 py-1 text-center font-bold text-slate-500">
+                              <th key={`${fieldId}-letter`} className="border border-slate-200 bg-slate-50 px-3 py-2 text-center font-bold text-slate-500">
                                 {toExcelColumnLabel(index)}
                               </th>
                             ))}
                           </tr>
                           <tr>
-                            <th className="w-10 border border-[#d9e1ea] bg-[#eef2f6] px-2 py-1 text-center font-bold text-slate-500">1</th>
+                            <th className="w-12 border border-slate-200 bg-slate-100 px-2 py-2 text-center font-bold text-slate-500 sticky top-[37px] z-10">1</th>
                             {selectedExportTemplate.fields.map((fieldId) => (
-                              <th key={fieldId} className="whitespace-nowrap border border-[#d9e1ea] bg-[#dbe5f1] px-2.5 py-2 text-center font-semibold tracking-wide text-slate-700">
+                              <th key={fieldId} className="whitespace-nowrap border border-slate-200 bg-[#dbe5f1] px-3 py-2 text-center font-semibold text-slate-700 sticky top-[37px] z-10">
                                 {getExportFieldLabel(fieldId)}
                               </th>
                             ))}
@@ -5588,12 +5604,12 @@ export default function ExpedienteList() {
                         </thead>
                         <tbody>
                           {exportPreviewRows.map((row, rowIndex) => (
-                            <tr key={row.id} className={rowIndex % 2 === 0 ? "bg-white" : "bg-[#fbfcfe]"}>
-                              <td className="border border-[#d9e1ea] bg-[#eef2f6] px-2 py-2 text-center font-semibold text-slate-500">{rowIndex + 2}</td>
+                            <tr key={row.id} className={rowIndex % 2 === 0 ? "bg-white hover:bg-slate-50" : "bg-[#fbfcfe] hover:bg-slate-50"}>
+                              <td className="w-12 border border-slate-200 bg-slate-50 px-2 py-2 text-center font-medium text-slate-500 sticky left-0 z-10">{rowIndex + 2}</td>
                               {selectedExportTemplate.fields.map((fieldId) => {
                                 const field = EXPEDIENTE_EXPORT_FIELDS.find((item) => item.id === fieldId);
                                 return (
-                                  <td key={`${row.id}-${fieldId}`} className="border border-[#d9e1ea] px-2.5 py-2 align-top leading-5">
+                                  <td key={`${row.id}-${fieldId}`} className="border border-slate-200 px-3 py-2 whitespace-nowrap">
                                     {field ? field.getValue(row) : ""}
                                   </td>
                                 );
@@ -5602,12 +5618,12 @@ export default function ExpedienteList() {
                           ))}
                         </tbody>
                       </table>
-                      </div>
                     </div>
                   </div>
                 </div>
+
                 {exportError && (
-                  <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex-shrink-0">
                     {exportError}
                   </div>
                 )}
