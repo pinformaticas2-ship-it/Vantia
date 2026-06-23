@@ -4975,6 +4975,13 @@ export default function ExpedienteList() {
     [exportVisibleFields]
   );
 
+  useEffect(() => {
+    if (!showExportModal) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [showExportModal]);
+
   const openExportModal = () => {
     setShowExportModal(true);
     setExportError("");
