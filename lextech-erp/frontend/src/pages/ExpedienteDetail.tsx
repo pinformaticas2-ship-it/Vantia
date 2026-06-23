@@ -5012,130 +5012,116 @@ export default function ExpedienteDetail() {
   };
 
   return (
-    <div className="flex gap-6 h-full animate-in fade-in duration-500">
-      <div className="flex-1 min-w-0 flex flex-col min-h-0 gap-4">
-        <div className="flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2 text-sm text-slate-500 min-w-0 overflow-hidden">
-            <Link to="/dashboard/expedientes" className="hover:text-slate-800 transition-colors shrink-0">
-              Expedientes
-            </Link>
-            <span className="shrink-0">/</span>
-            <span className="text-slate-800 font-medium truncate">
-              {exp.descripcion || `${exp.anio}/${exp.num_exp}`}
-            </span>
+    <div className="flex flex-col h-full animate-in fade-in duration-500 overflow-hidden">
+
+      {/* ── Sticky header ── */}
+      <div className="px-6 sm:px-8 py-4 bg-white border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 flex-shrink-0 shadow-sm z-20">
+        <div className="flex items-center gap-4 min-w-0">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500 to-red-600 text-white flex items-center justify-center shadow-md shadow-red-500/20 flex-shrink-0">
+            <FolderOpen size={22} />
           </div>
-          <div className="flex gap-2 shrink-0">
-            <BackButton onClick={() => navigate("/dashboard/expedientes")} />
-            {editing ? (
-              <>
-                <button
-                  onClick={() => { setEditing(false); setEditForm(null); }}
-                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl shadow-sm active:scale-95 transition-all"
-                >
-                  <X size={14} /> Cancelar
-                </button>
-                <button
-                  onClick={() => handleSave(editForm)}
-                  disabled={saving || !editForm?.descripcion?.trim()}
-                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-xl shadow-sm active:scale-95 transition-all"
-                >
-                  {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-                  Guardar cambios
-                </button>
-              </>
-            ) : exp?.estado === "cerrado" ? (
-              <button
-                onClick={handleToggleEstado}
-                disabled={saving}
-                className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-50 rounded-xl shadow-sm active:scale-95 transition-all"
-              >
-                {saving ? <Loader2 size={14} className="animate-spin" /> : <FolderOpen size={14} />}
-                Reabrir expediente
+          <div className="flex flex-col justify-center min-w-0">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <h1 className="text-xl font-extrabold text-slate-800 leading-none tracking-tight truncate">
+                {exp.descripcion || "Sin descripción"}
+              </h1>
+              <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest leading-none ${estadoConf.color}`}>
+                {estadoConf.label}
+              </span>
+              <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest leading-none ${tipoConf.color}`}>
+                {tipoConf.label}
+              </span>
+            </div>
+            <div className="flex items-center gap-4 text-[11px] font-medium text-slate-500 flex-wrap">
+              {exp.tipos_asunto && <span className="font-bold text-slate-700 tracking-wide uppercase">{exp.tipos_asunto}</span>}
+              <span className="flex items-center gap-1.5"><Hash size={11} className="text-slate-400" /> {exp.anio}/{exp.num_exp}</span>
+              {exp.fecha_inicio && <span className="flex items-center gap-1.5"><Calendar size={11} className="text-slate-400" /> Alta: {fmtDate(exp.fecha_inicio)}</span>}
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2.5 shrink-0">
+          <BackButton onClick={() => navigate("/dashboard/expedientes")} />
+          {editing ? (
+            <>
+              <button onClick={() => { setEditing(false); setEditForm(null); }} className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl shadow-sm active:scale-95 transition-all">
+                <X size={14} /> Cancelar
               </button>
-            ) : (
-              <>
-                <button
-                  onClick={handleToggleEstado}
-                  disabled={saving}
-                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50 rounded-xl shadow-sm active:scale-95 transition-all"
-                >
-                  {saving ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
-                  Cerrar expediente
-                </button>
-                <button
-                  onClick={startEdit}
-                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm active:scale-95 transition-all"
-                >
-                  <Edit3 size={14} /> Editar
-                </button>
-              </>
+              <button onClick={() => handleSave(editForm)} disabled={saving || !editForm?.descripcion?.trim()} className="flex items-center gap-1.5 px-5 py-2.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-xl shadow-sm active:scale-95 transition-all ml-1">
+                {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Guardar cambios
+              </button>
+            </>
+          ) : exp?.estado === "cerrado" ? (
+            <button onClick={handleToggleEstado} disabled={saving} className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-50 rounded-xl shadow-sm active:scale-95 transition-all">
+              {saving ? <Loader2 size={14} className="animate-spin" /> : <FolderOpen size={14} />} Reabrir expediente
+            </button>
+          ) : (
+            <>
+              <button onClick={handleToggleEstado} disabled={saving} className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200 disabled:opacity-50 rounded-xl shadow-sm active:scale-95 transition-all">
+                {saving ? <Loader2 size={14} className="animate-spin" /> : <X size={14} className="text-slate-400" />} Cerrar exp.
+              </button>
+              <button onClick={startEdit} className="flex items-center gap-1.5 px-5 py-2.5 text-xs font-bold text-white bg-red-600 border border-red-700 hover:bg-red-700 rounded-xl shadow-sm active:scale-95 transition-all ml-1">
+                <Edit3 size={14} /> Editar
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* ── 3-column body ── */}
+      <div className="flex-1 overflow-auto bg-[#f4f6f8]">
+        <div className="max-w-[1600px] mx-auto p-6 sm:p-8 flex flex-col lg:flex-row gap-8 items-start">
+
+          {/* Columna 1: Nav vertical */}
+          <div className="w-full lg:w-56 flex-shrink-0 lg:sticky lg:top-6">
+            <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 mb-3">Secciones del Expediente</h3>
+            <nav className="flex flex-col gap-0.5">
+              {DETAIL_TABS.slice(0, 8).map((tabItem) => {
+                const Icon = tabItem.icon;
+                const active = tab === tabItem.key;
+                return (
+                  <button key={tabItem.key} onClick={() => setTab(tabItem.key)}
+                    className={`rounded-xl px-4 py-2.5 flex items-center gap-3 text-sm transition-all text-left ${active ? "bg-white text-red-600 shadow-sm ring-1 ring-slate-200/50 font-semibold" : "text-slate-600 hover:bg-white hover:shadow-sm hover:text-slate-900 font-medium"}`}
+                  >
+                    <Icon size={14} className={active ? "text-red-500 shrink-0" : "text-slate-400 shrink-0"} />
+                    {tabItem.label}
+                    {active && <div className="w-1.5 h-1.5 rounded-full bg-red-500 ml-auto shrink-0 shadow-[0_0_6px_rgba(239,68,68,0.7)]" />}
+                  </button>
+                );
+              })}
+              <div className="h-px w-full bg-slate-200 my-1.5" />
+              {DETAIL_TABS.slice(8).map((tabItem) => {
+                const Icon = tabItem.icon;
+                const active = tab === tabItem.key;
+                return (
+                  <button key={tabItem.key} onClick={() => setTab(tabItem.key)}
+                    className={`rounded-xl px-4 py-2.5 flex items-center gap-3 text-sm transition-all text-left ${active ? "bg-white text-red-600 shadow-sm ring-1 ring-slate-200/50 font-semibold" : "text-slate-600 hover:bg-white hover:shadow-sm hover:text-slate-900 font-medium"}`}
+                  >
+                    <Icon size={14} className={active ? "text-red-500 shrink-0" : "text-slate-400 shrink-0"} />
+                    {tabItem.label}
+                    {active && <div className="w-1.5 h-1.5 rounded-full bg-red-500 ml-auto shrink-0 shadow-[0_0_6px_rgba(239,68,68,0.7)]" />}
+                  </button>
+                );
+              })}
+              <div className="h-px w-full bg-slate-200 my-1.5" />
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-4 mt-1 mb-1">Acciones Rápidas</p>
+              <button className="text-slate-700 hover:bg-white hover:shadow-sm hover:text-slate-900 rounded-xl px-4 py-2.5 flex items-center gap-3 font-medium text-sm transition-all text-left">
+                <StickyNote size={14} className="text-amber-500 shrink-0" /> Notas
+              </button>
+              <button onClick={() => setTab("relacionados" as any)} className="text-slate-700 hover:bg-white hover:shadow-sm hover:text-slate-900 rounded-xl px-4 py-2.5 flex items-center gap-3 font-medium text-sm transition-all text-left">
+                <Link2 size={14} className="text-indigo-500 shrink-0" /> Exp. relacionados
+              </button>
+            </nav>
+          </div>
+
+          {/* Columna 2: Contenido principal */}
+          <div className="flex-1 min-w-0 flex flex-col gap-6 w-full">
+            {exp.estado === "cerrado" && !editing && (
+              <div className="flex items-center gap-3 px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm text-slate-500 shadow-sm">
+                <X size={15} className="shrink-0 text-slate-400" />
+                <span>Este expediente está <strong className="text-slate-700">cerrado</strong>. No se pueden realizar modificaciones. Pulsa <strong className="text-emerald-700">Reabrir expediente</strong> para editarlo.</span>
+              </div>
             )}
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-xl p-5 shrink-0">
-          <div className="flex items-center gap-4">
-            <div className="h-16 w-16 bg-gradient-to-br from-red-500 to-red-700 rounded-xl flex items-center justify-center text-white shadow-lg shadow-red-200 shrink-0">
-              <FolderOpen size={28} />
-            </div>
-
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-xl font-bold text-slate-900 truncate">
-                  {exp.descripcion || "Sin descripción"}
-                </h1>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${estadoConf.color}`}>
-                  {estadoConf.label}
-                </span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${tipoConf.color}`}>
-                  {tipoConf.label}
-                </span>
-              </div>
-              {exp.tipos_asunto && <p className="text-slate-500 text-sm mt-0.5">{exp.tipos_asunto}</p>}
-              <div className="flex items-center gap-4 mt-2 text-xs text-slate-400 flex-wrap">
-                <span className="flex items-center gap-1 font-mono">
-                  <Hash size={11} />
-                  {exp.anio}/{exp.num_exp}
-                </span>
-                {exp.ref_expediente && (
-                  <span className="flex items-center gap-1 font-mono">
-                    <Hash size={11} />
-                    {exp.ref_expediente}
-                  </span>
-                )}
-                {exp.fecha_inicio && (
-                  <span className="flex items-center gap-1">
-                    <Calendar size={11} /> Alta: {fmtDate(exp.fecha_inicio)}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden flex-1 min-h-0 flex flex-col">
-          <div className="flex border-b border-slate-100 shrink-0">
-            {DETAIL_TABS.map((tabItem) => {
-              const Icon = tabItem.icon;
-              const active = tab === tabItem.key;
-              return (
-                <button
-                  key={tabItem.key}
-                  onClick={() => setTab(tabItem.key)}
-                  className={`flex items-center gap-2 px-5 py-3.5 text-[12px] font-bold whitespace-nowrap transition-all border-b-2 ${
-                    active
-                      ? "border-red-600 text-red-600 bg-red-50/50"
-                      : "border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50"
-                  }`}
-                >
-                  <Icon size={13} />
-                  {tabItem.label}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="p-5 flex-1 overflow-y-auto min-h-0">
+            <div>
             {tab === "perfil" && !editing && (
               <div className="space-y-4">
                 {exp.estado === "cerrado" && (
@@ -5640,15 +5626,20 @@ export default function ExpedienteDetail() {
               );
             })()}
           </div>
-        </div>
-      </div>
+          </div>{/* closes col2 */}
 
-      {id && (
-        <PanelIndicadoresExpediente
-          expedienteId={id}
-          onTabChange={(t) => setTab(t as any)}
-        />
-      )}
+          {/* Columna 3: Panel indicadores */}
+          {id && (
+            <div className="w-full lg:w-[280px] xl:w-[300px] flex-shrink-0 lg:sticky lg:top-6">
+              <PanelIndicadoresExpediente
+                expedienteId={id}
+                onTabChange={(t) => setTab(t as any)}
+              />
+            </div>
+          )}
+
+        </div>{/* closes inner wrapper */}
+      </div>{/* closes 3-col body */}
     </div>
   );
 }
