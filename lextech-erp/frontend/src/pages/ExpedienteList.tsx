@@ -4173,6 +4173,10 @@ export default function ExpedienteList() {
   const [exportAvailableSelected, setExportAvailableSelected] = useState<string[]>([]);
   const [exportVisibleSelected, setExportVisibleSelected] = useState<string[]>([]);
   const [exportError, setExportError] = useState("");
+  const [showFormatDropdown, setShowFormatDropdown] = useState(false);
+  const [formatDropdownPos, setFormatDropdownPos] = useState({ top: 0, left: 0, width: 0 });
+  const formatDropdownBtnRef = useRef<HTMLButtonElement>(null);
+  const formatDropdownMenuRef = useRef<HTMLDivElement>(null);
 
   // Modal contador
   const [showCounterModal, setShowCounterModal] = useState(false);
@@ -4202,6 +4206,10 @@ export default function ExpedienteList() {
     function handleClickOutside(e: MouseEvent) {
       if (opcionesRef.current && !opcionesRef.current.contains(e.target as Node)) setShowOpciones(false);
       if (altaMenuRef.current && !altaMenuRef.current.contains(e.target as Node)) setShowAltaMenu(false);
+      if (
+        formatDropdownBtnRef.current && !formatDropdownBtnRef.current.contains(e.target as Node) &&
+        formatDropdownMenuRef.current && !formatDropdownMenuRef.current.contains(e.target as Node)
+      ) setShowFormatDropdown(false);
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -5684,12 +5692,40 @@ export default function ExpedienteList() {
                   <div className="mb-3 flex items-center justify-between">
                     <span className="font-semibold text-slate-800">Campos visibles</span>
                     <div className="relative">
-                      <select value={selectedExportFormat} onChange={(e) => setSelectedExportFormat(e.target.value as ExportFormat)} className="appearance-none rounded-lg border border-slate-200 bg-white px-3 py-1.5 pr-8 text-sm text-slate-700 outline-none focus:border-slate-300">
-                        <option value="excel">Excel</option>
-                        <option value="xml">XML</option>
-                        <option value="word">Word</option>
-                      </select>
-                      <ChevronDown size={13} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <button
+                        ref={formatDropdownBtnRef}
+                        type="button"
+                        onClick={() => {
+                          if (formatDropdownBtnRef.current) {
+                            const r = formatDropdownBtnRef.current.getBoundingClientRect();
+                            setFormatDropdownPos({ top: r.bottom + 4, left: r.left, width: r.width });
+                          }
+                          setShowFormatDropdown(v => !v);
+                        }}
+                        className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors min-w-[90px] justify-between"
+                      >
+                        <span className="capitalize">{selectedExportFormat === "excel" ? "Excel" : selectedExportFormat === "xml" ? "XML" : "Word"}</span>
+                        <ChevronDown size={13} className="text-slate-400 shrink-0" />
+                      </button>
+                      {showFormatDropdown && typeof document !== "undefined" && createPortal(
+                        <div
+                          ref={formatDropdownMenuRef}
+                          style={{ position: "fixed", top: formatDropdownPos.top, left: formatDropdownPos.left, minWidth: formatDropdownPos.width, zIndex: 9999 }}
+                          className="rounded-xl border border-slate-200 bg-white shadow-xl py-1"
+                        >
+                          {(["excel", "xml", "word"] as ExportFormat[]).map((fmt) => (
+                            <button
+                              key={fmt}
+                              type="button"
+                              onClick={() => { setSelectedExportFormat(fmt); setShowFormatDropdown(false); }}
+                              className={`w-full flex items-center gap-2 px-3.5 py-2 text-left text-xs font-medium transition-colors ${selectedExportFormat === fmt ? "bg-slate-100 text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
+                            >
+                              {fmt === "excel" ? "Excel" : fmt === "xml" ? "XML" : "Word"}
+                            </button>
+                          ))}
+                        </div>,
+                        document.body
+                      )}
                     </div>
                   </div>
                   <div className="h-[320px] overflow-y-auto rounded-xl border border-slate-200 bg-white">
