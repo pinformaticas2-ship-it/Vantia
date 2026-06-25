@@ -2898,121 +2898,22 @@ export default function Agenda() {
   return (
     <div className="agenda-google-shell flex flex-col animate-in fade-in duration-500 h-full">
       {/* ── Cabecera ─────────────────────────────────────────── */}
-      <div className="agenda-google-topbar flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-100 bg-white shrink-0">
+      <div className="agenda-google-topbar flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-white shrink-0">
+        {/* Título */}
         <div className="flex items-center gap-3">
-          <div className="h-9 w-9 bg-red-50 rounded-xl flex items-center justify-center">
-            <Calendar size={18} className="text-red-600" />
+          <div className="h-10 w-10 bg-red-50 rounded-xl flex items-center justify-center border border-red-100 shrink-0">
+            <Calendar size={19} className="text-red-600" />
           </div>
           <div>
             <h1 className="text-lg font-extrabold text-slate-900 leading-tight">Agenda</h1>
-            <p className="text-xs text-slate-400">Calendario y eventos del despacho</p>
+            <p className="text-xs text-slate-400 font-medium mt-0.5">Calendario y eventos del despacho</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Selector de vista */}
-          <div className="flex items-center bg-slate-100 rounded-xl p-1 gap-0.5">
-            <button
-              onClick={() => setView("month")}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all duration-200 ${view === "month" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700 hover:bg-white/60"}`}
-            >
-              Mes
-            </button>
-            <button
-              onClick={() => setView("week")}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all duration-200 ${view === "week" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700 hover:bg-white/60"}`}
-            >
-              Semana
-            </button>
-            <button
-              onClick={() => setView("day")}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all duration-200 ${view === "day" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700 hover:bg-white/60"}`}
-            >
-              Día
-            </button>
-          </div>
-          {/* Navegación */}
-          <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl px-1">
-            <button onClick={navigatePrev} className="p-2 hover:text-red-600 rounded-lg transition-colors text-slate-500">
-              <ChevronLeft size={15} />
-            </button>
-            <span className="font-bold text-slate-800 text-sm px-1 min-w-[150px] text-center">
-              {navLabel}
-            </span>
-            <button onClick={navigateNext} className="p-2 hover:text-red-600 rounded-lg transition-colors text-slate-500">
-              <ChevronRight size={15} />
-            </button>
-          </div>
-          <button
-            onClick={goToday}
-            className="px-3 py-2 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
-          >
-            Hoy
-          </button>
-
-          {/* ── Google Calendar ── */}
-          {gcalEnabled ? (
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex min-w-[280px] items-center gap-2 rounded-xl border border-emerald-200 bg-white px-3 py-2 shadow-sm transition-all duration-300">
-                <img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_16dp.png" alt="GCal" className="w-4 h-4" />
-                <div className="leading-tight">
-                  <div className="text-xs font-semibold text-emerald-700">Google Calendar vinculado</div>
-                  <div className="hidden text-[10px] text-slate-500 tabular-nums">
-                    {gcalEvents.length} visibles · {visiblePendingGcalEvents.length} por importar · {importedVisibleGcalCount} ya en ERP
-                  </div>
-                  <div className="text-[10px] text-slate-500 tabular-nums">
-                    <span key={`visible-${smoothGcalVisibleCount}`} className="inline-block animate-in fade-in slide-in-from-top-1 duration-300">
-                      {smoothGcalVisibleCount} visibles
-                    </span>
-                    <span className="mx-1.5 text-slate-300">·</span>
-                    <span key={`pending-${smoothVisiblePendingGcalCount}`} className="inline-block animate-in fade-in slide-in-from-top-1 duration-300">
-                      {smoothVisiblePendingGcalCount} por importar
-                    </span>
-                    <span className="mx-1.5 text-slate-300">·</span>
-                    <span key={`imported-${smoothImportedVisibleGcalCount}`} className="inline-block animate-in fade-in slide-in-from-top-1 duration-300">
-                      {smoothImportedVisibleGcalCount} ya en ERP
-                    </span>
-                  </div>
-                </div>
-                <div className={`ml-auto transition-all duration-300 ${gcalLoading ? "opacity-100 scale-100" : "opacity-0 scale-95"}`}>
-                  <Loader2 size={11} className="animate-spin text-emerald-500" />
-                </div>
-              </div>
-              <button
-                onClick={() => gcalToken && fetchGcalEvents(gcalToken, viewYear, viewMonth)}
-                disabled={gcalLoading || gcalImporting}
-                title="Refrescar Google Calendar"
-                className="p-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-50"
-              >
-                <RefreshCw size={13} className={`text-slate-500 ${gcalLoading ? "animate-spin" : ""}`} />
-              </button>
-              <button
-                onClick={() => importGoogleEventsToAgenda(visiblePendingGcalEvents)}
-                disabled={gcalLoading || gcalImporting || visiblePendingGcalEvents.length === 0}
-                className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-red-600 border border-red-600 rounded-xl hover:bg-red-700 disabled:opacity-50 transition-colors shadow-sm"
-              >
-                {gcalImporting ? <Loader2 size={12} className="animate-spin" /> : <Link2 size={12} />}
-                Importar a agenda
-              </button>
-              <button
-                onClick={disconnectGcal}
-                title="Desconectar Google Calendar"
-                className="p-2 bg-white border border-slate-200 rounded-xl hover:bg-red-50 hover:border-red-200 transition-colors"
-              >
-                <Unlink size={13} className="text-slate-400 hover:text-red-500" />
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={connectGcal}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors shadow-sm"
-            >
-              <img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_16dp.png" alt="GCal" className="w-4 h-4" />
-              Conectar Google Calendar
-            </button>
-          )}
-
-          <div className="flex min-h-[32px] items-center gap-2">
+        {/* Acciones derecha */}
+        <div className="flex items-center gap-2.5">
+          {/* Toasts inline */}
+          <div className="flex items-center gap-2">
             <span className={`max-w-xs overflow-hidden rounded-lg border px-2 py-1 text-xs text-red-600 transition-all duration-300 ${smoothGcalError ? "translate-y-0 border-red-200 bg-red-50 opacity-100" : "pointer-events-none -translate-y-1 border-transparent bg-transparent opacity-0"}`} title={smoothGcalError || ""}>
               ⚠ {gcalError}
             </span>
@@ -3021,13 +2922,119 @@ export default function Agenda() {
             </span>
           </div>
 
+          {/* ── Google Calendar widget ── */}
+          {gcalEnabled ? (
+            <div className="flex items-center bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden h-10">
+              {/* Estado */}
+              <div className="px-3 flex items-center gap-2 bg-slate-50/60 border-r border-slate-200 h-full">
+                <img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_16dp.png" alt="GCal" className="w-4 h-4 shrink-0" />
+                <div className="leading-none">
+                  <div className="text-[10px] font-bold text-emerald-600 leading-tight">Vinculado</div>
+                  <div className="text-[9px] text-slate-500 tabular-nums leading-tight mt-0.5">
+                    <span key={`imported-${smoothImportedVisibleGcalCount}`} className="inline-block animate-in fade-in duration-300">
+                      {smoothImportedVisibleGcalCount} en ERP
+                    </span>
+                    <span className="mx-1 text-slate-300">·</span>
+                    <span key={`pending-${smoothVisiblePendingGcalCount}`} className="inline-block animate-in fade-in duration-300">
+                      {smoothVisiblePendingGcalCount} pdte.
+                    </span>
+                  </div>
+                </div>
+                <div className={`transition-all duration-300 ${gcalLoading ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none"}`}>
+                  <Loader2 size={10} className="animate-spin text-emerald-500" />
+                </div>
+              </div>
+              {/* Refrescar */}
+              <button
+                onClick={() => gcalToken && fetchGcalEvents(gcalToken, viewYear, viewMonth)}
+                disabled={gcalLoading || gcalImporting}
+                title="Refrescar Google Calendar"
+                className="px-2.5 h-full border-r border-slate-200 text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-40"
+              >
+                <RefreshCw size={12} className={gcalLoading ? "animate-spin" : ""} />
+              </button>
+              {/* Importar */}
+              <button
+                onClick={() => importGoogleEventsToAgenda(visiblePendingGcalEvents)}
+                disabled={gcalLoading || gcalImporting || visiblePendingGcalEvents.length === 0}
+                className="px-3 h-full flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors border-r border-slate-200 disabled:opacity-40"
+              >
+                {gcalImporting ? <Loader2 size={11} className="animate-spin" /> : <Link2 size={11} />}
+                Importar a agenda
+              </button>
+              {/* Desconectar */}
+              <button
+                onClick={disconnectGcal}
+                title="Desconectar Google Calendar"
+                className="px-2.5 h-full text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+              >
+                <Unlink size={12} />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={connectGcal}
+              className="flex items-center gap-1.5 px-3 h-10 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors shadow-sm"
+            >
+              <img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_16dp.png" alt="GCal" className="w-4 h-4" />
+              Conectar Google Calendar
+            </button>
+          )}
+
+          {/* Nuevo evento */}
           <button
             onClick={(e) => openNew(undefined, e)}
-            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm transition-colors"
+            className="flex items-center gap-1.5 px-4 h-10 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm shadow-red-600/20 transition-colors"
           >
             <Plus size={13} /> Nuevo evento
           </button>
         </div>
+      </div>
+
+      {/* ── Toolbar (controles del calendario) ───────────────── */}
+      <div className="flex items-center justify-between px-6 py-3 border-b border-slate-100 bg-white shrink-0">
+        {/* Selector de vista */}
+        <div className="flex items-center bg-slate-100 rounded-xl p-1 gap-0.5 border border-slate-200/60">
+          <button
+            onClick={() => setView("month")}
+            className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all duration-200 ${view === "month" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700 hover:bg-white/60"}`}
+          >
+            Mes
+          </button>
+          <button
+            onClick={() => setView("week")}
+            className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all duration-200 ${view === "week" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700 hover:bg-white/60"}`}
+          >
+            Semana
+          </button>
+          <button
+            onClick={() => setView("day")}
+            className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all duration-200 ${view === "day" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700 hover:bg-white/60"}`}
+          >
+            Día
+          </button>
+        </div>
+
+        {/* Navegación de fecha */}
+        <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl px-1">
+          <button onClick={navigatePrev} className="p-2 hover:text-red-600 rounded-lg transition-colors text-slate-500">
+            <ChevronLeft size={15} />
+          </button>
+          <span className="font-bold text-slate-800 text-sm px-2 min-w-[150px] text-center">
+            {navLabel}
+          </span>
+          <button onClick={navigateNext} className="p-2 hover:text-red-600 rounded-lg transition-colors text-slate-500">
+            <ChevronRight size={15} />
+          </button>
+        </div>
+
+        {/* Hoy */}
+        <button
+          onClick={goToday}
+          className="px-4 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+        >
+          Hoy
+        </button>
       </div>
 
       {/* ── Cuerpo ────────────────────────────────────────────── */}
