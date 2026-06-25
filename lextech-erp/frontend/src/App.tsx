@@ -4,6 +4,7 @@ import { SignedIn, SignedOut } from "@clerk/clerk-react";
 import { ChatUnreadProvider } from './contexts/ChatUnreadContext';
 import { EmailUnreadProvider } from './contexts/EmailUnreadContext';
 import { WhatsAppUnreadProvider } from './contexts/WhatsAppUnreadContext';
+import { ThemeProvider } from './lib/ThemeContext';
 
 // Layouts
 import DashboardLayout from './layouts/DashboardLayout';
@@ -26,10 +27,12 @@ import WhatsApp from './pages/WhatsApp';
 import AltaConEnlace from './pages/AltaConEnlace';
 import FormularioCliente from './pages/FormularioCliente';
 import Facturacion from './pages/Facturacion';
+import Configuracion from './pages/Configuracion';
 
 export default function App() {
   return (
-    <>
+    <ThemeProvider>
+      <>
       <SignedIn>
         <ChatUnreadProvider>
         <EmailUnreadProvider>
@@ -60,7 +63,7 @@ export default function App() {
             <Route path="facturacion/facturas/:facturaId/editar" element={<Facturacion />} />
             <Route path="plaud-ia" element={<ModuloEnCarga nombre="Plaud IA" />} />
             <Route path="chat-ia" element={<ModuloEnCarga nombre="Chat IA" />} />
-            <Route path="config" element={<ModuloEnCarga nombre="Configuración" />} />
+            <Route path="config" element={<Configuracion />} />
           </Route>
 
           {/* Formulario público de alta (accesible también si el usuario está logueado) */}
@@ -80,7 +83,8 @@ export default function App() {
           <Route path="*" element={<PublicLanding />} />
         </Routes>
       </SignedOut>
-    </>
+      </>
+    </ThemeProvider>
   );
 }
 

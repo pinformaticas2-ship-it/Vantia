@@ -464,10 +464,10 @@ function SidebarContent({ pathname, onClose, onSignOut, collapsed, onToggleColla
   const { unreadCount: waUnreadCount } = useWhatsAppUnread();
 
   return (
-    <div className="flex flex-col h-full bg-slate-900 border-r border-slate-800 overflow-hidden">
+    <div className="erp-sidebar flex flex-col h-full bg-slate-900 border-r border-slate-800 overflow-hidden">
 
       {/* Logo */}
-      <div className={`flex items-center border-b border-slate-800 shrink-0 transition-all duration-300 ${collapsed ? "justify-center px-2 py-4" : "justify-center px-6 py-5"}`}>
+      <div className={`erp-sidebar-logo-border flex items-center border-b border-slate-800 shrink-0 transition-all duration-300 ${collapsed ? "justify-center px-2 py-4" : "justify-center px-6 py-5"}`}>
         <img
           src="/vantia-sidebar-slate.png"
           alt="Vantia Legis"
@@ -485,11 +485,11 @@ function SidebarContent({ pathname, onClose, onSignOut, collapsed, onToggleColla
           return (
             <div key={group.label} className="mb-4">
               {!collapsed && (
-                <p className="px-2 pb-2 text-[10px] font-bold uppercase tracking-[0.24em] text-slate-600">
+                <p className="erp-sidebar-group-label px-2 pb-2 text-[10px] font-bold uppercase tracking-[0.24em] text-slate-600">
                   {group.label}
                 </p>
               )}
-              {collapsed && <div className="h-px bg-slate-800 mb-2 mx-1" />}
+              {collapsed && <div className="erp-sidebar-divider h-px bg-slate-800 mb-2 mx-1" />}
               <div className="space-y-1">
                 {items.map((item) => {
                   const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href + '/'));
@@ -507,12 +507,12 @@ function SidebarContent({ pathname, onClose, onSignOut, collapsed, onToggleColla
                     return (
                       <Link key={item.name} to={item.href} onClick={onClose} title={item.name}
                         className={`relative flex items-center justify-center h-10 w-10 mx-auto rounded-lg transition-colors border-l-4 ${
-                          isActive ? "bg-red-500/10 text-white border-red-500"
-                                   : "text-slate-400 hover:bg-slate-800/50 hover:text-white border-transparent"
+                          isActive ? "erp-sidebar-nav-active bg-red-500/10 text-white border-red-500"
+                                   : "erp-sidebar-nav-inactive text-slate-400 hover:bg-slate-800/50 hover:text-white border-transparent"
                         }`}>
-                        <Icon className={`h-5 w-5 ${isActive ? "text-red-400" : "text-slate-500"}`} />
+                        <Icon className={`erp-sidebar-icon-${isActive ? "active" : "inactive"} h-5 w-5 ${isActive ? "text-red-400" : "text-slate-500"}`} />
                         {hasBadge && (
-                          <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full ring-1 ring-slate-900" />
+                          <span className="erp-sidebar-badge-dot absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full ring-1 ring-slate-900" />
                         )}
                       </Link>
                     );
@@ -521,13 +521,13 @@ function SidebarContent({ pathname, onClose, onSignOut, collapsed, onToggleColla
                   return (
                     <Link key={item.name} to={item.href} onClick={onClose}
                       className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors border-l-4 ${
-                        isActive ? "bg-red-500/10 text-white border-red-500"
-                                 : "text-slate-400 hover:bg-slate-800/50 hover:text-white border-transparent"
+                        isActive ? "erp-sidebar-nav-active bg-red-500/10 text-white border-red-500"
+                                 : "erp-sidebar-nav-inactive text-slate-400 hover:bg-slate-800/50 hover:text-white border-transparent"
                       }`}>
-                      <Icon className={`h-4 w-4 shrink-0 ${isActive ? "text-red-400" : "text-slate-500"}`} />
+                      <Icon className={`erp-sidebar-icon-${isActive ? "active" : "inactive"} h-4 w-4 shrink-0 ${isActive ? "text-red-400" : "text-slate-500"}`} />
                       <span className="flex-1 truncate">{item.name}</span>
                       {hasBadge && (
-                        <span className="ml-auto min-w-[20px] h-5 bg-red-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1.5">
+                        <span className="erp-sidebar-badge ml-auto min-w-[20px] h-5 bg-red-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1.5">
                           {badgeCount > 99 ? "99+" : badgeCount}
                         </span>
                       )}
@@ -545,7 +545,7 @@ function SidebarContent({ pathname, onClose, onSignOut, collapsed, onToggleColla
         <button
           onClick={onToggleCollapse}
           title={collapsed ? "Expandir sidebar" : "Colapsar sidebar"}
-          className={`flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800/50 transition-colors ${
+          className={`erp-sidebar-collapse flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800/50 transition-colors ${
             collapsed ? "h-10 w-10 mx-auto" : "w-full py-2 gap-2 text-xs font-medium px-3"
           }`}
         >
@@ -558,16 +558,16 @@ function SidebarContent({ pathname, onClose, onSignOut, collapsed, onToggleColla
         {collapsed ? (
           <Link to="/dashboard/config" onClick={onClose} title="Configuración"
             className={`flex items-center justify-center h-10 w-10 mx-auto rounded-lg transition-colors border-l-4 ${
-              pathname === "/dashboard/config" ? "bg-red-500/10 text-white border-red-500" : "text-slate-400 hover:bg-slate-800/50 hover:text-white border-transparent"
+              pathname === "/dashboard/config" ? "erp-sidebar-nav-active bg-red-500/10 text-white border-red-500" : "erp-sidebar-nav-inactive text-slate-400 hover:bg-slate-800/50 hover:text-white border-transparent"
             }`}>
-            <Settings className="h-5 w-5 text-slate-500" />
+            <Settings className="erp-sidebar-icon-inactive h-5 w-5 text-slate-500" />
           </Link>
         ) : (
           <Link to="/dashboard/config" onClick={onClose}
             className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors border-l-4 ${
-              pathname === "/dashboard/config" ? "bg-red-500/10 text-white border-red-500" : "text-slate-400 hover:bg-slate-800/50 hover:text-white border-transparent"
+              pathname === "/dashboard/config" ? "erp-sidebar-nav-active bg-red-500/10 text-white border-red-500" : "erp-sidebar-nav-inactive text-slate-400 hover:bg-slate-800/50 hover:text-white border-transparent"
             }`}>
-            <Settings className="h-4 w-4 shrink-0 text-slate-500" /> Configuración
+            <Settings className="erp-sidebar-icon-inactive h-4 w-4 shrink-0 text-slate-500" /> Configuración
           </Link>
         )}
       </div>
@@ -579,10 +579,10 @@ function SidebarContent({ pathname, onClose, onSignOut, collapsed, onToggleColla
             <UserButton afterSignOutUrl="/" />
           </div>
         ) : (
-          <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-slate-800/50 border border-slate-700/50 cursor-pointer hover:bg-slate-800 transition-colors">
+          <div className="erp-sidebar-user flex items-center gap-3 px-3 py-2.5 rounded-xl bg-slate-800/50 border border-slate-700/50 cursor-pointer hover:bg-slate-800 transition-colors">
             <UserButton afterSignOutUrl="/" />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-slate-200 truncate leading-tight">{user?.fullName || user?.firstName || "Usuario"}</p>
+              <p className="erp-sidebar-username text-sm font-bold text-slate-200 truncate leading-tight">{user?.fullName || user?.firstName || "Usuario"}</p>
               <p className="text-[10px] text-slate-500 truncate">{user?.primaryEmailAddress?.emailAddress || ""}</p>
             </div>
             {onSignOut && (

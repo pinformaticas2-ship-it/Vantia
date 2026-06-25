@@ -2,6 +2,190 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ═══════════════════════════════════════════════════════════════
+   TEMA AZUL — [data-theme="azul"]
+   Reemplaza todo el ecosistema red-* por blue-* en Tailwind JIT
+═══════════════════════════════════════════════════════════════ */
+
+/* CSS custom props */
+[data-theme="azul"] {
+  --primary: 217 91% 60%;
+  --ring: 217 91% 60%;
+  --accent: 217 91% 60%;
+  --destructive: 217 91% 60%;
+}
+
+/* Focus ring en inputs */
+[data-theme="azul"] input:focus,
+[data-theme="azul"] textarea:focus,
+[data-theme="azul"] select:focus {
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.08) !important;
+}
+
+/* ── Backgrounds ── */
+[data-theme="azul"] .bg-red-50  { background-color: #eff6ff !important; }
+[data-theme="azul"] .bg-red-100 { background-color: #dbeafe !important; }
+[data-theme="azul"] .bg-red-200 { background-color: #bfdbfe !important; }
+[data-theme="azul"] .bg-red-300 { background-color: #93c5fd !important; }
+[data-theme="azul"] .bg-red-400 { background-color: #60a5fa !important; }
+[data-theme="azul"] .bg-red-500 { background-color: #3b82f6 !important; }
+[data-theme="azul"] .bg-red-600 { background-color: #2563eb !important; }
+[data-theme="azul"] .bg-red-700 { background-color: #1d4ed8 !important; }
+[data-theme="azul"] .bg-red-800 { background-color: #1e40af !important; }
+[data-theme="azul"] .bg-red-900 { background-color: #1e3a8a !important; }
+
+/* opacity variants compiled by Tailwind JIT */
+[data-theme="azul"] .bg-red-500\/10 { background-color: rgb(59 130 246 / 0.1) !important; }
+[data-theme="azul"] .bg-red-500\/20 { background-color: rgb(59 130 246 / 0.2) !important; }
+[data-theme="azul"] .bg-red-600\/10 { background-color: rgb(37 99 235 / 0.1) !important; }
+[data-theme="azul"] .bg-red-600\/20 { background-color: rgb(37 99 235 / 0.2) !important; }
+
+/* ── Text ── */
+[data-theme="azul"] .text-red-300 { color: #93c5fd !important; }
+[data-theme="azul"] .text-red-400 { color: #60a5fa !important; }
+[data-theme="azul"] .text-red-500 { color: #3b82f6 !important; }
+[data-theme="azul"] .text-red-600 { color: #2563eb !important; }
+[data-theme="azul"] .text-red-700 { color: #1d4ed8 !important; }
+[data-theme="azul"] .text-red-800 { color: #1e40af !important; }
+
+/* ── Border ── */
+[data-theme="azul"] .border-red-100 { border-color: #dbeafe !important; }
+[data-theme="azul"] .border-red-200 { border-color: #bfdbfe !important; }
+[data-theme="azul"] .border-red-300 { border-color: #93c5fd !important; }
+[data-theme="azul"] .border-red-400 { border-color: #60a5fa !important; }
+[data-theme="azul"] .border-red-500 { border-color: #3b82f6 !important; }
+[data-theme="azul"] .border-red-600 { border-color: #2563eb !important; }
+[data-theme="azul"] .border-red-700 { border-color: #1d4ed8 !important; }
+
+/* ── Hover backgrounds ── */
+[data-theme="azul"] .hover\:bg-red-50:hover  { background-color: #eff6ff !important; }
+[data-theme="azul"] .hover\:bg-red-100:hover { background-color: #dbeafe !important; }
+[data-theme="azul"] .hover\:bg-red-200:hover { background-color: #bfdbfe !important; }
+[data-theme="azul"] .hover\:bg-red-500:hover { background-color: #3b82f6 !important; }
+[data-theme="azul"] .hover\:bg-red-600:hover { background-color: #1d4ed8 !important; }
+[data-theme="azul"] .hover\:bg-red-700:hover { background-color: #1e40af !important; }
+
+/* ── Hover text ── */
+[data-theme="azul"] .hover\:text-red-400:hover { color: #60a5fa !important; }
+[data-theme="azul"] .hover\:text-red-500:hover { color: #3b82f6 !important; }
+[data-theme="azul"] .hover\:text-red-600:hover { color: #2563eb !important; }
+[data-theme="azul"] .hover\:text-red-700:hover { color: #1d4ed8 !important; }
+
+/* ── Hover border ── */
+[data-theme="azul"] .hover\:border-red-100:hover { border-color: #dbeafe !important; }
+[data-theme="azul"] .hover\:border-red-200:hover { border-color: #bfdbfe !important; }
+[data-theme="azul"] .hover\:border-red-300:hover { border-color: #93c5fd !important; }
+[data-theme="azul"] .hover\:border-red-400:hover { border-color: #60a5fa !important; }
+[data-theme="azul"] .hover\:border-red-500:hover { border-color: #3b82f6 !important; }
+
+/* ── Focus ring ── */
+[data-theme="azul"] .focus\:ring-red-400:focus { --tw-ring-color: rgba(96, 165, 250, 0.5) !important; }
+[data-theme="azul"] .focus\:ring-red-500:focus { --tw-ring-color: rgba(59, 130, 246, 0.5) !important; }
+[data-theme="azul"] .focus\:border-red-400:focus { border-color: #60a5fa !important; }
+[data-theme="azul"] .focus\:border-red-500:focus { border-color: #3b82f6 !important; }
+
+/* ── Ring ── */
+[data-theme="azul"] .ring-red-400 { --tw-ring-color: rgba(96, 165, 250, 0.5) !important; }
+[data-theme="azul"] .ring-red-500 { --tw-ring-color: rgba(59, 130, 246, 0.5) !important; }
+
+/* ── Shadow glow ── */
+[data-theme="azul"] .shadow-red-500\/20 {
+  --tw-shadow-color: rgba(59, 130, 246, 0.2) !important;
+}
+[data-theme="azul"] .shadow-red-700\/30 {
+  --tw-shadow-color: rgba(29, 78, 216, 0.3) !important;
+}
+[data-theme="azul"] .shadow-red-700\/50 {
+  --tw-shadow-color: rgba(29, 78, 216, 0.5) !important;
+}
+
+/* Glowing dot pulsing */
+[data-theme="azul"] .shadow-\[0_0_6px_rgba\(239\,68\,68\,0\.7\)\] {
+  box-shadow: 0 0 6px rgba(37, 99, 235, 0.7) !important;
+}
+
+/* Scrollbar thumb hover */
+[data-theme="azul"] .modules-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(37, 99, 235, 0.32), rgba(29, 78, 216, 0.75));
+  background-clip: padding-box;
+}
+
+/* erp-shell background */
+[data-theme="azul"] .erp-shell {
+  background: linear-gradient(180deg, #f0f5ff 0%, #e8f0fe 58%, #f0f4ff 100%);
+}
+
+/* agenda google topbar accent override */
+[data-theme="azul"] .agenda-google-topbar .bg-red-600 {
+  background: #2563eb !important;
+  border-color: #2563eb !important;
+}
+[data-theme="azul"] .agenda-google-topbar .bg-red-50 {
+  background: #eff6ff !important;
+  border-color: #bfdbfe !important;
+  color: #2563eb !important;
+}
+[data-theme="azul"] .agenda-google-topbar > div:first-child > div:first-child {
+  background: rgba(37, 99, 235, 0.06) !important;
+  border-color: rgba(37, 99, 235, 0.12) !important;
+  box-shadow: 0 10px 30px rgba(37, 99, 235, 0.08) !important;
+}
+[data-theme="azul"] .agenda-google-topbar > div:first-child > div:first-child svg {
+  color: #2563eb !important;
+}
+
+/* ── Sidebar — tema azul ─────────────────────────────────── */
+[data-theme="azul"] .erp-sidebar {
+  background-color: #ffffff !important;
+  border-right-color: #e2e8f0 !important;
+}
+[data-theme="azul"] .erp-sidebar-logo-border {
+  border-bottom-color: #e2e8f0 !important;
+}
+[data-theme="azul"] .erp-sidebar-group-label { color: #94a3b8 !important; }
+[data-theme="azul"] .erp-sidebar-divider { background-color: #e2e8f0 !important; }
+[data-theme="azul"] .erp-sidebar-nav-inactive {
+  color: #475569 !important;
+  border-color: transparent !important;
+}
+[data-theme="azul"] .erp-sidebar-nav-inactive:hover {
+  background-color: #eff6ff !important;
+  color: #1d4ed8 !important;
+}
+[data-theme="azul"] .erp-sidebar-nav-active {
+  background-color: #eff6ff !important;
+  color: #1d4ed8 !important;
+  border-color: #2563eb !important;
+}
+[data-theme="azul"] .erp-sidebar-icon-active { color: #2563eb !important; }
+[data-theme="azul"] .erp-sidebar-icon-inactive { color: #94a3b8 !important; }
+[data-theme="azul"] .erp-sidebar-badge { background-color: #2563eb !important; }
+[data-theme="azul"] .erp-sidebar-badge-dot {
+  background-color: #3b82f6 !important;
+  --tw-ring-color: #ffffff !important;
+}
+[data-theme="azul"] .erp-sidebar-collapse {
+  color: #94a3b8 !important;
+}
+[data-theme="azul"] .erp-sidebar-collapse:hover {
+  background-color: #f1f5f9 !important;
+  color: #475569 !important;
+}
+[data-theme="azul"] .erp-sidebar-user {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+}
+[data-theme="azul"] .erp-sidebar-user:hover { background-color: #f1f5f9 !important; }
+[data-theme="azul"] .erp-sidebar-username { color: #1e293b !important; }
+[data-theme="azul"] .erp-sidebar-active-dot { background-color: #2563eb !important; }
+
+/* hard-coded #ab0433 in sidebar header / chat bubbles */
+[data-theme="azul"] .erp-sidebar [style*="#ab0433"],
+[data-theme="azul"] .erp-sidebar .bg-\[\#ab0433\] {
+  background-color: #2563eb !important;
+}
+[data-theme="azul"] .erp-sidebar .text-\[\#ab0433\] { color: #2563eb !important; }
+
 @keyframes popIn {
   from { opacity: 0; transform: scale(0.93); }
   to   { opacity: 1; transform: scale(1); }

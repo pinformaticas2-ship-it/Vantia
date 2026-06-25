@@ -13,6 +13,12 @@
     <script src="https://accounts.google.com/gsi/client" async defer></script>
   </head>
   <body>
+    <script>
+      (function() {
+        var t = localStorage.getItem('app-theme');
+        if (t) document.documentElement.setAttribute('data-theme', t);
+      })();
+    </script>
     <div id="root"></div>
     <!-- ESTA LÍNEA ES LA CLAVE: Conecta el HTML con tu código React -->
     <script type="module" src="/src/main.tsx"></script>
