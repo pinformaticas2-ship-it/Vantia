@@ -343,7 +343,7 @@ export async function createAccount(req: Request, res: Response) {
     };
     let smtpWarning: string | null = null;
     const provider = getSendingProvider();
-    if (provider === 'smtp') {
+    if (provider === 'smtp' || provider === 'relay') {
       await withTimeout(testSmtpConnection(smtpCfg), 20000, 'SMTP').catch((e) => {
         smtpWarning = explainMailConnectionError(e, 'smtp');
       });
