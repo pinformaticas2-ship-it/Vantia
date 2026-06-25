@@ -8,7 +8,7 @@ import {
   LayoutDashboard, Briefcase, Users, Settings,
   Menu, Search, X, Bell, ShieldCheck, Calendar,
   MessageCircle, Bot, Send, ChevronRight, ChevronLeft, Loader2, History, CheckCircle2,
-  MessageSquare, LogOut, Mail, Library, Receipt, Mic, Sparkles,
+  MessageSquare, LogOut, Mail, Library, Receipt, Mic, Sparkles, ChevronsUpDown,
 } from "lucide-react";
 import { UserButton, useUser, useAuth, useClerk } from "@clerk/clerk-react";
 import { getDeviceId, safeJson, waitForClientIp } from "../lib/api";
@@ -466,13 +466,30 @@ function SidebarContent({ pathname, onClose, onSignOut, collapsed, onToggleColla
   return (
     <div className="erp-sidebar flex flex-col h-full bg-slate-900 border-r border-slate-800 overflow-hidden">
 
-      {/* Logo */}
-      <div className={`erp-sidebar-logo-border flex items-center border-b border-slate-800 shrink-0 transition-all duration-300 ${collapsed ? "justify-center px-2 py-4" : "justify-center px-6 py-5"}`}>
-        <img
-          src="/vantia-sidebar-slate.png"
-          alt="Vantia Legis"
-          className={`object-contain transition-all duration-300 ${collapsed ? "h-8 w-8" : "h-12 w-full"}`}
-        />
+      {/* Logo / selector empresa */}
+      <div className={`erp-sidebar-logo-border border-b border-slate-800 shrink-0 transition-all duration-300 ${collapsed ? "px-2 py-3" : "px-3 py-3"}`}>
+        {collapsed ? (
+          <div className="flex justify-center">
+            <div className="w-10 h-10 rounded-xl border border-slate-700/60 bg-slate-800/50 flex items-center justify-center cursor-pointer hover:bg-slate-700/50 transition-colors">
+              <img src="/vantia-sidebar-slate.png" alt="Vantia Legis" className="h-6 w-6 object-contain" />
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            title="Seleccionar empresa"
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-slate-700/60 bg-slate-800/40 hover:bg-slate-700/50 hover:border-slate-600 transition-all duration-200 group"
+          >
+            <div className="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700/50 flex items-center justify-center shrink-0 overflow-hidden">
+              <img src="/vantia-sidebar-slate.png" alt="Vantia Legis" className="h-7 w-7 object-contain" />
+            </div>
+            <div className="flex-1 min-w-0 text-left">
+              <p className="text-[11px] font-bold text-slate-200 truncate leading-tight">Avalentia Abogados</p>
+              <p className="text-[10px] text-slate-500 truncate mt-0.5">Despacho principal</p>
+            </div>
+            <ChevronsUpDown size={13} className="text-slate-600 group-hover:text-slate-400 shrink-0 transition-colors" />
+          </button>
+        )}
       </div>
 
       {/* Nav */}
