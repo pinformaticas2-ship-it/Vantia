@@ -179,12 +179,57 @@
 [data-theme="azul"] .erp-sidebar-username { color: #1e293b !important; }
 [data-theme="azul"] .erp-sidebar-active-dot { background-color: #2563eb !important; }
 
-/* hard-coded #ab0433 in sidebar header / chat bubbles */
-[data-theme="azul"] .erp-sidebar [style*="#ab0433"],
-[data-theme="azul"] .erp-sidebar .bg-\[\#ab0433\] {
-  background-color: #2563eb !important;
+/* ── Selector empresa ── */
+[data-theme="azul"] .erp-company-btn {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
 }
-[data-theme="azul"] .erp-sidebar .text-\[\#ab0433\] { color: #2563eb !important; }
+[data-theme="azul"] .erp-company-btn:hover {
+  background-color: #eff6ff !important;
+  border-color: #bfdbfe !important;
+}
+[data-theme="azul"] .erp-company-logo {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+[data-theme="azul"] .erp-company-icon {
+  background-color: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+}
+[data-theme="azul"] .erp-company-icon:hover { background-color: #eff6ff !important; }
+[data-theme="azul"] .erp-company-name { color: #1e293b !important; }
+[data-theme="azul"] .erp-company-sub  { color: #94a3b8 !important; }
+[data-theme="azul"] .erp-company-chevron { color: #cbd5e1 !important; }
+
+/* ── Security badge ── */
+[data-theme="azul"] .erp-sidebar .bg-emerald-900\/20 {
+  background-color: rgb(236 253 245 / 0.8) !important;
+}
+[data-theme="azul"] .erp-sidebar .border-emerald-800\/30 {
+  border-color: rgb(167 243 208 / 0.6) !important;
+}
+
+/* ── Hard-coded #ab0433 en TODA la app ── */
+[data-theme="azul"] .bg-\[\#ab0433\]       { background-color: #2563eb !important; }
+[data-theme="azul"] .bg-\[\#92042c\]       { background-color: #1d4ed8 !important; }
+[data-theme="azul"] .bg-\[\#8f022a\]       { background-color: #1d4ed8 !important; }
+[data-theme="azul"] .text-\[\#ab0433\]     { color: #2563eb !important; }
+[data-theme="azul"] .border-\[\#ab0433\]   { border-color: #2563eb !important; }
+[data-theme="azul"] .hover\:bg-\[\#92042c\]:hover { background-color: #1d4ed8 !important; }
+[data-theme="azul"] .hover\:bg-\[\#8f022a\]:hover { background-color: #1e40af !important; }
+[data-theme="azul"] .focus\:ring-\[\#ab0433\]\/20:focus { --tw-ring-color: rgba(37,99,235,0.2) !important; }
+[data-theme="azul"] .focus\:border-\[\#ab0433\]\/30:focus { border-color: rgba(37,99,235,0.3) !important; }
+/* shadow-red-700/30 y shadow-red-700/50 ya están arriba */
+
+/* ── bg-[#f4f6f8] → azul-tinted en content areas ── */
+[data-theme="azul"] .bg-\[\#f4f6f8\] { background-color: #f0f5ff !important; }
+
+/* ── Agenda shell accent ── */
+[data-theme="azul"] .erp-orb-top-right,
+[data-theme="azul"] .erp-orb-bottom-left {
+  background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.8), rgba(37,99,235,0.06));
+}
+[data-theme="azul"] .erp-panel-bottom-right { border-color: rgba(37,99,235,0.08); }
 
 @keyframes popIn {
   from { opacity: 0; transform: scale(0.93); }
