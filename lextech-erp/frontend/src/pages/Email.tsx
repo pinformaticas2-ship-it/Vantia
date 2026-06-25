@@ -1120,58 +1120,79 @@ function ConnectAccountModal({
 
   const hasExisting = savedGmailProfiles.length > 0 || imapAccounts.length > 0;
 
+  const totalAccounts = savedGmailProfiles.length + imapAccounts.length;
+
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-transparent" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="text-base font-bold text-gray-900">Cuentas de correo</h2>
-          <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-            <X size={16} />
+    <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center bg-black/20 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="bg-white w-full sm:max-w-lg sm:mx-4 sm:rounded-3xl rounded-t-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+        onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div className="px-6 pt-6 pb-4 flex items-start justify-between gap-4 flex-shrink-0">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 tracking-tight">Cuentas de correo</h2>
+            <p className="text-sm text-gray-400 mt-0.5">
+              {totalAccounts === 0 ? 'Conecta tu primera cuenta' : `${totalAccounts} cuenta${totalAccounts > 1 ? 's' : ''} configurada${totalAccounts > 1 ? 's' : ''}`}
+            </p>
+          </div>
+          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-colors mt-0.5 flex-shrink-0">
+            <X size={18} />
           </button>
         </div>
-        <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
+
+        <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-6">
+          {/* Connected accounts */}
           {hasExisting && (
-            <div>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Cuentas configuradas</p>
-              <div className="space-y-1">
+            <div className="space-y-2">
+              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.12em]">Conectadas</p>
+              <div className="space-y-2">
                 {savedGmailProfiles.map(profile => (
-                  <button
-                    key={profile.id}
-                    type="button"
-                    onClick={() => { onReconnectProfile(profile); onClose(); }}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-red-50 transition-colors text-left">
-                    <GoogleIcon />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-gray-800 truncate">{profile.display_name || profile.email}</p>
-                      <p className="text-xs text-gray-400 truncate">{profile.email}</p>
+                  <div key={profile.id} className="flex items-center gap-3 p-3 rounded-2xl border border-gray-100 bg-gray-50/60 group hover:border-red-100 hover:bg-red-50/30 transition-all">
+                    <div className="relative flex-shrink-0">
+                      <div className="w-10 h-10 rounded-xl bg-white border border-gray-200 flex items-center justify-center shadow-sm">
+                        <GoogleIcon />
+                      </div>
+                      <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-400 border-2 border-white rounded-full" />
                     </div>
-                    <span className="text-xs text-gray-300 flex-shrink-0">Gmail</span>
-                    <RotateCcw size={14} className="text-gray-300 flex-shrink-0 ml-1" />
-                  </button>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-gray-800 truncate">{profile.display_name || profile.email}</p>
+                      <p className="text-xs text-gray-400 truncate">{profile.email} · Gmail</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { onReconnectProfile(profile); onClose(); }}
+                      className="flex-shrink-0 flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-[#ab0433] px-2.5 py-1.5 rounded-xl hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100">
+                      <RotateCcw size={12} /> Reconectar
+                    </button>
+                  </div>
                 ))}
                 {imapAccounts.map(acc => (
-                  <div
-                    key={acc.id}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-gray-100 bg-gray-50 group">
-                    <AtSign size={18} className="text-indigo-400 flex-shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-gray-800 truncate">{acc.label || acc.email}</p>
-                      <p className="text-xs text-gray-400 truncate">{acc.email}</p>
+                  <div key={acc.id} className="flex items-center gap-3 p-3 rounded-2xl border border-gray-100 bg-gray-50/60 group hover:border-indigo-100 hover:bg-indigo-50/30 transition-all">
+                    <div className="relative flex-shrink-0">
+                      <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center">
+                        <AtSign size={18} className="text-indigo-500" />
+                      </div>
+                      <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-400 border-2 border-white rounded-full" />
                     </div>
-                    <div className="flex items-center gap-1 flex-shrink-0">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-gray-800 truncate">{acc.label || acc.email}</p>
+                      <p className="text-xs text-gray-400 truncate">{acc.email} · IMAP</p>
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
                         type="button"
                         onClick={() => { onEditImap(acc); onClose(); }}
-                        title="Editar cuenta"
-                        className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors">
-                        <Pencil size={13} />
+                        title="Editar"
+                        className="p-1.5 rounded-xl text-gray-400 hover:text-indigo-600 hover:bg-indigo-100 transition-colors">
+                        <Pencil size={14} />
                       </button>
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); onDeleteImap(acc.id); }}
-                        title="Eliminar cuenta"
-                        className="p-1.5 rounded-lg text-gray-400 hover:text-[#ab0433] hover:bg-red-50 transition-colors">
-                        <Trash2 size={13} />
+                        title="Eliminar"
+                        className="p-1.5 rounded-xl text-gray-400 hover:text-[#ab0433] hover:bg-red-50 transition-colors">
+                        <Trash2 size={14} />
                       </button>
                     </div>
                   </div>
@@ -1179,31 +1200,41 @@ function ConnectAccountModal({
               </div>
             </div>
           )}
-          <div className={hasExisting ? 'border-t border-gray-100 pt-3' : ''}>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Añadir cuenta</p>
-            {GMAIL_CLIENT_ID && (
+
+          {/* Add account */}
+          <div className="space-y-2">
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.12em]">Añadir cuenta</p>
+            <div className="grid gap-2">
+              {GMAIL_CLIENT_ID && (
+                <button
+                  type="button"
+                  onClick={() => { onConnectNewGmail(); onClose(); }}
+                  className="flex items-center gap-4 p-4 rounded-2xl border-2 border-dashed border-gray-200 hover:border-red-300 hover:bg-red-50/40 transition-all text-left group">
+                  <div className="w-10 h-10 rounded-xl bg-white border border-gray-200 flex items-center justify-center shadow-sm flex-shrink-0 group-hover:shadow-md transition-shadow">
+                    <GoogleIcon />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-800">Google / Gmail</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Conexión OAuth segura · sin contraseñas</p>
+                  </div>
+                  <div className="flex-shrink-0 flex items-center gap-1 text-xs font-medium text-yellow-600 bg-yellow-50 px-2 py-1 rounded-lg">
+                    <Zap size={11} /> Rápido
+                  </div>
+                </button>
+              )}
               <button
                 type="button"
-                onClick={() => { onConnectNewGmail(); onClose(); }}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border-2 border-gray-100 hover:border-red-200 hover:bg-red-50 transition-all text-left">
-                <GoogleIcon />
-                <div className="text-left flex-1">
-                  <p className="text-sm font-semibold text-gray-800">Google / Gmail</p>
-                  <p className="text-xs text-gray-400">OAuth seguro — sin contraseñas</p>
+                onClick={() => { onAddImap(); onClose(); }}
+                className="flex items-center gap-4 p-4 rounded-2xl border-2 border-dashed border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/40 transition-all text-left group">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center flex-shrink-0 group-hover:shadow-md transition-shadow">
+                  <AtSign size={18} className="text-indigo-500" />
                 </div>
-                <Zap size={14} className="text-yellow-500 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-800">IMAP / POP3</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Outlook, corporativo, dominio propio...</p>
+                </div>
               </button>
-            )}
-            <button
-              type="button"
-              onClick={() => { onAddImap(); onClose(); }}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border-2 border-gray-100 hover:border-indigo-200 hover:bg-indigo-50 transition-all text-left mt-2">
-              <AtSign size={18} className="text-gray-400 flex-shrink-0" />
-              <div className="text-left flex-1">
-                <p className="text-sm font-semibold text-gray-800">IMAP / POP3</p>
-                <p className="text-xs text-gray-400">Outlook, corporativo, dominio propio...</p>
-              </div>
-            </button>
+            </div>
           </div>
         </div>
       </div>
@@ -1673,18 +1704,28 @@ function EmailItem({
       {/* Content */}
       <div className="flex-1 min-w-0 overflow-hidden">
 
-        {/* Row 1: name + date */}
+        {/* Row 1: name + date + hover-star */}
         <div className="flex items-baseline justify-between gap-1.5 mb-0.5">
           <span className={`text-[13px] truncate leading-snug ${
             unread ? 'font-bold text-gray-900' : 'font-medium text-gray-500'
           }`}>
             {displayName}
           </span>
-          <span className={`text-[11px] flex-shrink-0 tabular-nums ${
-            unread ? 'font-semibold text-gray-600' : 'text-gray-400'
-          }`}>
-            {fmtDate(email.date)}
-          </span>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {hovered && !selected && (
+              <button
+                onClick={onStar}
+                className="p-0.5 rounded text-gray-300 hover:text-amber-400 transition-colors"
+                title={email.isStarred ? 'Quitar estrella' : 'Destacar'}>
+                <Star size={11} fill={email.isStarred ? 'currentColor' : 'none'} />
+              </button>
+            )}
+            <span className={`text-[11px] tabular-nums ${
+              unread ? 'font-semibold text-gray-600' : 'text-gray-400'
+            }`}>
+              {fmtDate(email.date)}
+            </span>
+          </div>
         </div>
 
         {/* Row 2: subject */}
@@ -1734,6 +1775,28 @@ function EmailItem({
 
 // ─── Email Reader ─────────────────────────────────────────────────────────────
 
+function buildEmailDoc(bodyHtml?: string | null, bodyText?: string | null): string {
+  // Detect if bodyText is actually HTML (sometimes stored in wrong field)
+  const looksLikeHtml = bodyText && /<[a-z][\s\S]*>/i.test(bodyText);
+  const html = bodyHtml || (looksLikeHtml ? bodyText : null);
+  const content = html
+    || (bodyText
+      ? `<pre style="font-family:inherit;white-space:pre-wrap;word-break:break-word;margin:0;padding:0">${bodyText.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre>`
+      : '<p style="color:#9ca3af;font-style:italic;margin:0">Sin contenido</p>');
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  html,body{margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:14.5px;color:#1f2937;line-height:1.75;background:#fff;word-break:break-word;overflow-wrap:break-word}
+  a{color:#2563eb}a:hover{text-decoration:underline}
+  img{max-width:100%!important;height:auto}
+  *{box-sizing:border-box}
+  blockquote{border-left:3px solid #e2e8f0;margin:8px 0;padding:4px 14px;color:#64748b}
+  table{max-width:100%!important;border-collapse:collapse}
+  pre{white-space:pre-wrap;word-break:break-word;font-family:inherit}
+  p{margin:0 0 6px}
+</style></head><body>${content}</body></html>`;
+}
+
 function EmailReader({
   email, onReply, onReplyAll, onForward, onDelete, onStar, onBack,
   onPin, onRestore, onAssignLabel, onCreateLabel, userLabels, bodyLoading,
@@ -1754,33 +1817,29 @@ function EmailReader({
   const [moreOpen, setMoreOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
 
-  useEffect(() => {
+  const srcDoc = useMemo(
+    () => buildEmailDoc(email.bodyHtml, email.bodyText),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [email.id, email.bodyHtml, email.bodyText],
+  );
+
+  const handleIframeLoad = useCallback(() => {
     const iframe = iframeRef.current;
     if (!iframe) return;
-    const doc = iframe.contentDocument;
-    if (!doc) return;
-    const bodyContent = email.bodyHtml
-      || (email.bodyText
-        ? `<pre style="font-family:inherit;white-space:pre-wrap;word-break:break-word">${email.bodyText.replace(/</g, '&lt;')}</pre>`
-        : '<p style="color:#9ca3af">Sin contenido</p>');
-    doc.open();
-    doc.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
-<style>
-  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
-       font-size:15px;color:#1f2937;margin:0;padding:0;line-height:1.7;background:#fff}
-  a{color:#ab0433}img{max-width:100%;height:auto}
-  *{box-sizing:border-box}
-  blockquote{border-left:3px solid #e2e8f0;margin:10px 0;padding:4px 14px;color:#64748b}
-  table{max-width:100%!important}
-</style></head><body>${bodyContent}</body></html>`);
-    doc.close();
     const measure = () => {
-      const h = doc.body?.scrollHeight;
-      if (h) setIframeH(h + 24);
+      const doc = iframe.contentDocument;
+      if (!doc) return;
+      const h = Math.max(
+        doc.body?.scrollHeight || 0,
+        doc.documentElement?.scrollHeight || 0,
+        100,
+      );
+      setIframeH(h + 12);
     };
-    setTimeout(measure, 150);
-    iframe.onload = measure;
-  }, [email.id, email.bodyHtml, email.bodyText]);
+    measure();
+    setTimeout(measure, 200);
+    setTimeout(measure, 900); // wait for remote images
+  }, []);
 
   const statusPills = [
     !email.isRead ? { label: 'Nuevo', className: 'bg-red-50 text-[#ab0433] border-red-100' } : null,
@@ -1988,7 +2047,9 @@ function EmailReader({
                     <iframe
                       ref={iframeRef}
                       title="email-body"
-                      sandbox="allow-same-origin"
+                      srcDoc={srcDoc}
+                      onLoad={handleIframeLoad}
+                      sandbox="allow-same-origin allow-popups"
                       style={{ width: '100%', height: iframeH, border: 'none', display: 'block', background: 'white' }}
                     />
                   )}
