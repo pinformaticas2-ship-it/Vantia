@@ -1,4 +1,5 @@
-import { useEffect, useState, useCallback, useRef, ReactNode } from "react";
+import { useEffect, useState, useCallback, useRef, ReactNode, useContext } from "react";
+import { SidebarContext } from "../layouts/DashboardLayout";
 import { Spinner } from "../components/Spinner";
 import { createPortal } from "react-dom";
 import { useUser, useAuth } from "@clerk/clerk-react";
@@ -306,6 +307,7 @@ export default function DashboardHome() {
   const navigate     = useNavigate();
   const weather      = useWeather();
   const greeting     = getGreeting();
+  const { isCollapsed } = useContext(SidebarContext);
 
   const [showAltaMenu,     setShowAltaMenu]     = useState(false);
   const [showClienteMenu,  setShowClienteMenu]  = useState(false);
@@ -735,26 +737,34 @@ export default function DashboardHome() {
       );
 
       case "expedientes": return (
-        <div onClick={() => goTo("/dashboard/expedientes")} className="cursor-pointer group bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition-all">
-          <div className="flex items-center justify-between mb-2">
-            <span className="font-bold text-slate-800 text-sm flex items-center gap-2">📁 Expedientes</span>
-            <div className="flex items-center gap-1">
+        <div onClick={() => goTo("/dashboard/expedientes")} className="cursor-pointer group bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all">
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
               {handle}
-              <ChevronRight size={14} className="text-slate-300 group-hover:text-red-500 transition-colors" />
+              <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center shrink-0">
+                <Briefcase size={14} className="text-amber-600" />
+              </div>
+              <h3 className="font-semibold text-slate-800 text-base">Expedientes</h3>
             </div>
+            <ChevronRight size={14} className="text-slate-300 group-hover:text-red-500 transition-colors" />
           </div>
-          <p className="text-xs text-slate-500">Accede a todos tus expedientes abiertos y activos desde aquí.</p>
+          <div className="px-5 py-4">
+            <p className="text-xs text-slate-500">Accede a todos tus expedientes abiertos y activos desde aquí.</p>
+          </div>
         </div>
       );
 
       case "clientes": return (
         <div onClick={() => goTo("/dashboard/clientes")} className="cursor-pointer group bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all">
-          <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-            <span className="font-bold text-slate-800 text-sm flex items-center gap-2">👥 Clientes</span>
-            <div className="flex items-center gap-1">
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
               {handle}
-              <ChevronRight size={14} className="text-slate-300 group-hover:text-red-500 transition-colors" />
+              <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
+                <Users size={14} className="text-emerald-600" />
+              </div>
+              <h3 className="font-semibold text-slate-800 text-base">Clientes</h3>
             </div>
+            <ChevronRight size={14} className="text-slate-300 group-hover:text-red-500 transition-colors" />
           </div>
           <div className="grid grid-cols-2 gap-px bg-slate-100">
             <div className="bg-white px-5 py-4">
@@ -779,12 +789,15 @@ export default function DashboardHome() {
 
       case "chat": return (
         <div onClick={() => goTo("/dashboard/chat")} className="cursor-pointer group bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all">
-          <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-            <span className="font-bold text-slate-800 text-sm flex items-center gap-2">💬 Chat interno</span>
-            <div className="flex items-center gap-1">
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
               {handle}
-              <ChevronRight size={14} className="text-slate-300 group-hover:text-red-500 transition-colors" />
+              <div className="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center shrink-0">
+                <MessageSquare size={14} className="text-violet-600" />
+              </div>
+              <h3 className="font-semibold text-slate-800 text-base">Chat interno</h3>
             </div>
+            <ChevronRight size={14} className="text-slate-300 group-hover:text-red-500 transition-colors" />
           </div>
           <div className="grid grid-cols-3">
             <div className="px-5 py-4 border-r border-slate-100">
@@ -805,12 +818,15 @@ export default function DashboardHome() {
 
       case "whatsapp": return (
         <div onClick={() => goTo("/dashboard/whatsapp")} className="cursor-pointer group bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all">
-          <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-            <span className="font-bold text-slate-800 text-sm flex items-center gap-2">📱 WhatsApp</span>
-            <div className="flex items-center gap-1">
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
               {handle}
-              <ChevronRight size={14} className="text-slate-300 group-hover:text-red-500 transition-colors" />
+              <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center shrink-0">
+                <MessageCircle size={14} className="text-green-600" />
+              </div>
+              <h3 className="font-semibold text-slate-800 text-base">WhatsApp</h3>
             </div>
+            <ChevronRight size={14} className="text-slate-300 group-hover:text-red-500 transition-colors" />
           </div>
           <div className="px-5 py-4">
             <div className="flex items-center justify-between gap-3">
@@ -840,9 +856,13 @@ export default function DashboardHome() {
 
       case "correo": return (
         <div className="group bg-white rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-all">
-          <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-2">
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
-              <span className="font-bold text-slate-800 text-sm shrink-0">✉️ Correo</span>
+              {handle}
+              <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+                <Mail size={14} className="text-blue-600" />
+              </div>
+              <h3 className="font-semibold text-slate-800 text-base shrink-0">Correo</h3>
               {emailStats.unread > 0 && (
                 <span className="shrink-0 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white leading-none">
                   {emailStats.unread}
@@ -862,10 +882,7 @@ export default function DashboardHome() {
                   ))}
                 </select>
               )}
-              <div className="flex items-center gap-1">
-                {handle}
-                <ChevronRight size={14} onClick={() => goTo("/dashboard/correo")} className="cursor-pointer text-slate-300 group-hover:text-red-500 transition-colors" />
-              </div>
+              <ChevronRight size={14} onClick={() => goTo("/dashboard/correo")} className="cursor-pointer text-slate-300 group-hover:text-red-500 transition-colors" />
             </div>
           </div>
           {emailMsgLoading ? (
@@ -923,12 +940,15 @@ export default function DashboardHome() {
 
       case "documental": return (
         <div onClick={() => goTo("/dashboard/documental")} className="cursor-pointer group bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all">
-          <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-            <span className="font-bold text-slate-800 text-sm flex items-center gap-2">📚 Documental</span>
-            <div className="flex items-center gap-1">
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
               {handle}
-              <ChevronRight size={14} className="text-slate-300 group-hover:text-red-500 transition-colors" />
+              <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+                <Library size={14} className="text-slate-600" />
+              </div>
+              <h3 className="font-semibold text-slate-800 text-base">Documental</h3>
             </div>
+            <ChevronRight size={14} className="text-slate-300 group-hover:text-red-500 transition-colors" />
           </div>
           <div className="px-5 py-4">
             <div className="grid grid-cols-3 gap-3">
@@ -955,9 +975,15 @@ export default function DashboardHome() {
       case "facturacion": return (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           {/* Header */}
-          <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-2">
-            <h3 className="font-bold text-slate-800 text-sm shrink-0">💶 Facturación</h3>
-            <div className="flex items-center gap-1.5 flex-1 justify-end">
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 shrink-0">
+              {handle}
+              <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
+                <Receipt size={14} className="text-emerald-600" />
+              </div>
+              <h3 className="font-semibold text-slate-800 text-base">Facturación</h3>
+            </div>
+            <div className="flex items-center gap-1.5 justify-end">
               <StyledDropdown
                 selected={billingYear}
                 label={billingYear}
@@ -970,7 +996,6 @@ export default function DashboardHome() {
                 options={PERIODS}
                 onSelect={setBillingQtr}
               />
-              {handle}
               <button
                 onClick={() => goTo("/dashboard/facturacion")}
                 className="flex items-center gap-1 rounded-lg bg-slate-100 hover:bg-red-50 hover:text-red-600 px-2 py-1 text-[11px] font-bold text-slate-600 transition-colors"
@@ -1125,7 +1150,7 @@ export default function DashboardHome() {
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd} autoScroll={false}>
           <SortableContext items={orderedVisible} strategy={rectSortingStrategy}>
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
+            <div className={`grid gap-6 items-start grid-cols-1 ${isCollapsed ? "lg:grid-cols-3" : "xl:grid-cols-3"} md:grid-cols-2`}>
               {orderedVisible.map((id) => (
                 <SortableWidget key={id} id={id}>
                   {(handle) => renderWidget(id, handle)}

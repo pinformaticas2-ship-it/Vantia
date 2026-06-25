@@ -774,25 +774,37 @@ function exportFormatMeta(format: ExportFormat) {
       return {
         label: "XML",
         icon: FileCode2,
-        className: "from-amber-50 to-orange-50 border-amber-200 text-amber-700",
-        badgeClassName: "bg-amber-100 text-amber-700",
         description: "Estructurado para integraciones y otros sistemas.",
+        iconColor: "text-amber-500",
+        labelColor: "text-amber-700",
+        activeBorder: "border-amber-300",
+        activeBg: "bg-[#fffdf5]",
+        inactiveBorder: "border-amber-100",
+        inactiveBg: "bg-[#fffdf5]",
       };
     case "word":
       return {
         label: "Word",
         icon: FileText,
-        className: "from-blue-50 to-sky-50 border-blue-200 text-blue-700",
-        badgeClassName: "bg-blue-100 text-blue-700",
         description: "Documento editable con apariencia de tabla.",
+        iconColor: "text-blue-500",
+        labelColor: "text-blue-700",
+        activeBorder: "border-blue-300",
+        activeBg: "bg-[#f5f9ff]",
+        inactiveBorder: "border-blue-100",
+        inactiveBg: "bg-[#f5f9ff]",
       };
     default:
       return {
         label: "Excel",
         icon: FileSpreadsheet,
-        className: "from-emerald-50 to-lime-50 border-emerald-200 text-emerald-700",
-        badgeClassName: "bg-emerald-100 text-emerald-700",
         description: "Listado tipo hoja de cálculo con la plantilla por defecto.",
+        iconColor: "text-green-600",
+        labelColor: "text-green-700",
+        activeBorder: "border-green-300",
+        activeBg: "bg-[#f4fcf5]",
+        inactiveBorder: "border-green-100",
+        inactiveBg: "bg-[#f4fcf5]",
       };
   }
 }
@@ -845,8 +857,16 @@ function DropdownToolBtn({
   }[];
 }) {
   const [open, setOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
   const btnRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const openMenu = () => {
+    if (disabled || !btnRef.current) return;
+    const r = btnRef.current.getBoundingClientRect();
+    setMenuPos({ top: r.bottom + 8, left: r.left });
+    setOpen(true);
+  };
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -861,12 +881,62 @@ function DropdownToolBtn({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  const menu = (
+    <div
+      ref={menuRef}
+      style={{ position: "fixed", top: menuPos.top, left: menuPos.left, zIndex: 9999 }}
+      className="min-w-[220px] max-w-[280px] rounded-xl border border-slate-200 bg-white py-1 shadow-xl"
+    >
+      {items.map((item, index) =>
+        item.divider ? (
+          <div key={`divider-${index}`} className="my-1 h-px bg-slate-100" />
+        ) : item.children?.length ? (
+          <div key={`${item.label}-${index}`} className="group relative">
+            <button
+              type="button"
+              className="flex w-full items-center justify-between gap-2.5 px-3.5 py-2 text-left text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
+            >
+              <span className="flex items-center gap-2.5">
+                {item.icon && <item.icon size={13} className="shrink-0 text-slate-400" />}
+                {item.label}
+              </span>
+              <ChevronRight size={11} className="text-slate-300" />
+            </button>
+            <div className="invisible absolute left-full top-0 ml-1 min-w-[180px] rounded-xl border border-slate-200 bg-white py-1 opacity-0 shadow-xl transition-all group-hover:visible group-hover:opacity-100">
+              {item.children.map((child, childIndex) => (
+                <button
+                  key={`${child.label}-${childIndex}`}
+                  type="button"
+                  onClick={() => { child.onClick(); setOpen(false); }}
+                  className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                >
+                  {child.icon && <child.icon size={13} className="shrink-0 text-slate-400" />}
+                  {child.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <button
+            key={`${item.label}-${index}`}
+            type="button"
+            onClick={() => { item.onClick?.(); setOpen(false); }}
+            className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
+          >
+            {item.icon && <item.icon size={13} className="shrink-0 text-slate-400" />}
+            {item.label}
+          </button>
+        )
+      )}
+    </div>
+  );
+
   return (
     <div className="relative shrink-0">
       <button
         ref={btnRef}
         type="button"
-        onClick={() => !disabled && setOpen((prev) => !prev)}
+        onClick={openMenu}
         disabled={disabled}
         className={`
           flex items-center gap-0 rounded-lg text-[11px] font-semibold transition-all active:scale-[0.98] border overflow-hidden shadow-sm
@@ -881,61 +951,7 @@ function DropdownToolBtn({
           <ChevronDown size={10} />
         </span>
       </button>
-
-      {open && (
-        <div
-          ref={menuRef}
-          className="absolute left-0 top-full z-[9999] mt-2 min-w-[220px] max-w-[280px] rounded-2xl border border-slate-200 bg-white py-1.5 shadow-2xl shadow-slate-300/40"
-        >
-          {items.map((item, index) =>
-            item.divider ? (
-              <div key={`divider-${index}`} className="my-1 h-px bg-slate-100" />
-            ) : item.children?.length ? (
-              <div key={`${item.label}-${index}`} className="group relative">
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between gap-2.5 px-3 py-2 text-left text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-700"
-                >
-                  <span className="flex items-center gap-2.5">
-                    {item.icon && <item.icon size={12} className="shrink-0 text-slate-400" />}
-                    {item.label}
-                  </span>
-                  <ChevronRight size={11} className="text-slate-300" />
-                </button>
-                <div className="invisible absolute left-full top-0 ml-2 min-w-[180px] rounded-2xl border border-slate-200 bg-white py-1.5 opacity-0 shadow-2xl shadow-slate-300/40 transition-all group-hover:visible group-hover:opacity-100">
-                  {item.children.map((child, childIndex) => (
-                    <button
-                      key={`${child.label}-${childIndex}`}
-                      type="button"
-                      onClick={() => {
-                        child.onClick();
-                        setOpen(false);
-                      }}
-                      className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-700"
-                    >
-                      {child.icon && <child.icon size={12} className="shrink-0 text-slate-400" />}
-                      {child.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <button
-                key={`${item.label}-${index}`}
-                type="button"
-                onClick={() => {
-                  item.onClick?.();
-                  setOpen(false);
-                }}
-                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-700"
-              >
-                {item.icon && <item.icon size={12} className="shrink-0 text-slate-400" />}
-                {item.label}
-              </button>
-            )
-          )}
-        </div>
-      )}
+      {open && typeof document !== "undefined" && createPortal(menu, document.body)}
     </div>
   );
 }
@@ -4038,10 +4054,18 @@ export default function ExpedienteList() {
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const switchView = (v: ViewMode) => { setViewMode(v); if (v !== "multiselect") setSelectedIds(new Set()); };
 
+  const PAGE_SIZE = 12;
+  const [currentPage, setCurrentPage] = useState(1);
+
   // Multiselect
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkStateLoading, setBulkStateLoading] = useState(false);
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+  useEffect(() => {
+    const open = !!deleteId || bulkDeleteConfirm;
+    document.body.style.overflow = open ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [deleteId, bulkDeleteConfirm]);
   const [showBulkStateMenu, setShowBulkStateMenu] = useState(false);
   const bulkStateMenuRef = useRef<HTMLDivElement>(null);
 
@@ -4154,15 +4178,22 @@ export default function ExpedienteList() {
   const [exportAvailableSelected, setExportAvailableSelected] = useState<string[]>([]);
   const [exportVisibleSelected, setExportVisibleSelected] = useState<string[]>([]);
   const [exportError, setExportError] = useState("");
+  const [showFormatDropdown, setShowFormatDropdown] = useState(false);
+  const [formatDropdownPos, setFormatDropdownPos] = useState({ top: 0, left: 0, width: 0 });
+  const formatDropdownBtnRef = useRef<HTMLButtonElement>(null);
+  const formatDropdownMenuRef = useRef<HTMLDivElement>(null);
 
   // Modal contador
   const [showCounterModal, setShowCounterModal] = useState(false);
 
   // Dropdowns click-based
   const [showOpciones, setShowOpciones] = useState(false);
+  const [opcionesMenuPos, setOpcionesMenuPos] = useState({ top: 0, left: 0 });
   const opcionesRef = useRef<HTMLDivElement>(null);
+  const opcionesBtnRef = useRef<HTMLButtonElement>(null);
   const [showColumnModal, setShowColumnModal] = useState(false);
   const [showAltaMenu, setShowAltaMenu] = useState(false);
+  const [altaMenuPos, setAltaMenuPos] = useState({ top: 0, left: 0 });
   const altaMenuRef = useRef<HTMLDivElement>(null);
   const [visibleColumns, setVisibleColumns] = useState<Record<ExpedienteListColumnKey, boolean>>(() => {
     try {
@@ -4179,7 +4210,11 @@ export default function ExpedienteList() {
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (opcionesRef.current && !opcionesRef.current.contains(e.target as Node)) setShowOpciones(false);
-      if (altaMenuRef.current && !altaMenuRef.current.contains(e.target as Node)) setShowAltaMenu(false);
+      if (altaMenuRef.current && !altaMenuRef.current.contains(e.target as Node) && !(e.target as Element).closest?.('[data-alta-menu]')) setShowAltaMenu(false);
+      if (
+        formatDropdownBtnRef.current && !formatDropdownBtnRef.current.contains(e.target as Node) &&
+        formatDropdownMenuRef.current && !formatDropdownMenuRef.current.contains(e.target as Node)
+      ) setShowFormatDropdown(false);
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -4668,6 +4703,15 @@ export default function ExpedienteList() {
     return rows;
   }, [expedientes, filters, sort, dir]);
 
+  // Reset page when filter/sort changes
+  useEffect(() => { setCurrentPage(1); }, [filters, sort, dir]);
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated = useMemo(
+    () => filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [filtered, currentPage]
+  );
+
   // ── Stats (computed localmente, sin llamada extra a la API) ────
   const stats = useMemo(() => ({
     total:      expedientes.length,
@@ -4955,6 +4999,13 @@ export default function ExpedienteList() {
     () => EXPEDIENTE_EXPORT_FIELDS.filter((field) => !exportVisibleFields.includes(field.id)),
     [exportVisibleFields]
   );
+
+  useEffect(() => {
+    if (!showExportModal) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [showExportModal]);
 
   const openExportModal = () => {
     setShowExportModal(true);
@@ -5436,125 +5487,129 @@ export default function ExpedienteList() {
       )}
 
       {showExportModal && typeof document !== "undefined" && createPortal(
-        <div className="fixed inset-0 z-[125] flex items-center justify-center bg-transparent p-3 sm:p-4 animate-in fade-in duration-200" onClick={() => setShowExportModal(false)}>
-          <div className="flex h-[min(860px,calc(100vh-24px))] w-full max-w-[min(1380px,calc(100vw-24px))] flex-col rounded-3xl border border-slate-200 bg-white shadow-2xl overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-2 duration-200" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-5 py-3">
+        <div className="fixed inset-0 z-[125] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-overlay-in" onClick={() => setShowExportModal(false)}>
+          <div className="flex h-[92vh] w-full max-w-[95vw] flex-col rounded-xl border border-slate-200 bg-white shadow-2xl overflow-hidden animate-modal-in" onClick={(e) => e.stopPropagation()}>
+
+            {/* Header */}
+            <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-6 py-4 flex-shrink-0 bg-white">
               <div>
-                <p className="text-[11px] font-bold uppercase tracking-[0.25em] text-slate-400">Exportar expedientes</p>
-                <h3 className="text-[17px] font-bold text-slate-900">Plantillas de exportación</h3>
+                <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-400 mb-0.5">Exportar expedientes</p>
+                <h3 className="text-xl font-bold text-slate-800">Plantillas de exportación</h3>
               </div>
-              <button type="button" onClick={() => setShowExportModal(false)} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-400 hover:border-slate-300 hover:text-slate-700">
-                <X size={16} />
+              <button type="button" onClick={() => setShowExportModal(false)} className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors shadow-sm">
+                <X size={14} />
               </button>
             </div>
 
-            <div className="border-b border-slate-100 px-4 py-3 sm:px-5">
-              <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
-                <div className="grid gap-2 md:grid-cols-3">
-                  {(["excel", "xml", "word"] as ExportFormat[]).map((format) => {
-                    const meta = exportFormatMeta(format);
-                    const Icon = meta.icon;
-                    const active = selectedExportFormat === format;
-                    return (
-                      <button
-                        key={format}
-                        type="button"
-                        onClick={() => setSelectedExportFormat(format)}
-                        className={`group rounded-2xl border bg-gradient-to-br px-3 py-2.5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${meta.className} ${active ? "ring-2 ring-red-500/70 shadow-md scale-[1.01]" : "opacity-90 hover:opacity-100"}`}
-                      >
-                        <div className="flex items-start justify-between gap-2.5">
-                          <div className="flex items-center gap-2.5">
-                            <div className={`flex h-8 w-8 items-center justify-center rounded-xl ${meta.badgeClassName}`}>
-                              <Icon size={16} />
-                            </div>
-                            <div>
-                              <p className="text-[13px] font-bold leading-none">{meta.label}</p>
-                              <p className="mt-1 text-[10px] leading-4 text-slate-500">{meta.description}</p>
-                            </div>
-                          </div>
-                          {active && <CheckCircle2 size={16} className="text-red-500 shrink-0" />}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-                <div className="flex flex-wrap items-center gap-2 justify-end">
-                  <button type="button" onClick={openCreateExportTemplate} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-medium text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm">Alta</button>
-                  <button type="button" onClick={deleteSelectedTemplate} disabled={selectedExportTemplate.builtIn} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-medium text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-40">Baja</button>
-                  <button type="button" onClick={openEditExportTemplate} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-medium text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm">Modificar</button>
-                  <button type="button" onClick={() => setShowExportModal(false)} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-medium text-slate-600 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm">Cancelar</button>
-                  <button type="button" onClick={runExport} className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-all hover:-translate-y-0.5 hover:bg-red-700 hover:shadow-lg">
-                    <Download size={13} />
-                    Exportar
-                  </button>
-                </div>
-              </div>
-            </div>
+            {/* Body */}
+            <div className="flex flex-1 min-h-0 overflow-hidden">
 
-            <div className="grid min-h-0 flex-1 grid-cols-[260px_minmax(0,1fr)] gap-0">
-              <div className="border-r border-slate-200 p-3">
-                <p className="mb-3 text-[13px] leading-5 text-slate-500">Selecciona una plantilla de exportación o configura una nueva con los campos que quieras exportar.</p>
-                <div className="overflow-hidden rounded-2xl border border-slate-200">
-                  <div className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold uppercase tracking-wider text-slate-500">Plantilla</div>
-                  <div className="max-h-[calc(100vh-360px)] overflow-y-auto">
-                    {exportTemplates.map((template) => (
-                      <button
-                        key={template.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedExportTemplateId(template.id);
-                          setSelectedExportFormat(template.format);
-                        }}
-                        className={`w-full border-b border-slate-100 px-4 py-2.5 text-left last:border-b-0 transition-all duration-150 ${selectedExportTemplateId === template.id ? "bg-gradient-to-r from-lime-300 via-lime-200 to-white text-slate-900 shadow-inner" : "hover:bg-slate-50 text-slate-700 hover:translate-x-1"}`}
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <p className="text-[13px] font-semibold leading-5">{template.name}</p>
-                            <p className="mt-1 text-xs uppercase tracking-wide opacity-70">{template.format}</p>
+              {/* Left sidebar: plantilla selector */}
+              <div className="w-72 border-r border-slate-200 bg-white p-6 flex flex-col gap-6 flex-shrink-0 shadow-[1px_0_4px_rgba(0,0,0,0.02)]">
+                <p className="text-sm text-slate-500 leading-relaxed">
+                  Selecciona una plantilla de exportación o configura una nueva con los campos que quieras exportar.
+                </p>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-3">Plantilla</span>
+                  <div className="space-y-2">
+                    {exportTemplates.map((template) => {
+                      const active = selectedExportTemplateId === template.id;
+                      return (
+                        <button
+                          key={template.id}
+                          type="button"
+                          onClick={() => { setSelectedExportTemplateId(template.id); setSelectedExportFormat(template.format); }}
+                          className={`w-full p-4 rounded-xl border text-left transition-all ${active ? "bg-gradient-to-r from-lime-100 to-lime-50 border-lime-300 shadow-sm" : "bg-white border-slate-200 hover:bg-slate-50"}`}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="font-bold text-sm text-slate-800">{template.name}</p>
+                              <p className="text-[10px] font-bold text-green-600 uppercase tracking-widest mt-0.5">{template.format}</p>
+                            </div>
+                            {active && <CheckCircle2 size={16} className="text-red-500 shrink-0" />}
                           </div>
-                          {selectedExportTemplateId === template.id && <CheckCircle2 size={16} className="text-red-500" />}
-                        </div>
-                      </button>
-                    ))}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
 
-              <div className="min-h-0 p-3">
-                <div className="grid min-h-0 gap-3 xl:grid-cols-[260px_minmax(0,1fr)]">
-                  <div className="overflow-hidden rounded-2xl border border-slate-200">
-                    <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold uppercase tracking-wider text-slate-500">
-                      <span>Campos a exportar</span>
-                      <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] text-slate-600 normal-case">{selectedExportTemplate.fields.length} columnas</span>
+              {/* Right area */}
+              <div className="flex-1 flex flex-col p-6 bg-[#f8fafc] gap-6 min-w-0 overflow-y-auto">
+
+                {/* Top: format cards + action buttons */}
+                <div className="flex flex-wrap xl:flex-nowrap items-center justify-between gap-4 flex-shrink-0">
+                  <div className="flex flex-wrap items-center gap-4">
+                    {(["excel", "xml", "word"] as ExportFormat[]).map((format) => {
+                      const meta = exportFormatMeta(format);
+                      const Icon = meta.icon;
+                      const active = selectedExportFormat === format;
+                      return (
+                        <button
+                          key={format}
+                          type="button"
+                          onClick={() => setSelectedExportFormat(format)}
+                          className={`relative flex items-start gap-3 p-3.5 rounded-xl text-left transition-all w-[220px] shadow-sm hover:shadow-md ${active ? `border-2 ${meta.activeBorder} ${meta.activeBg}` : `border border-slate-200 bg-white hover:bg-slate-50`}`}
+                        >
+                          <Icon size={20} className={`mt-0.5 shrink-0 ${meta.iconColor}`} />
+                          <div className="flex-1 pr-5">
+                            <p className={`font-bold text-sm block ${meta.labelColor}`}>{meta.label}</p>
+                            <p className="text-[10px] text-slate-500 leading-tight block mt-1">{meta.description}</p>
+                          </div>
+                          {active && <CheckCircle2 size={15} className="text-red-500 absolute top-3 right-3 shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <button type="button" onClick={openCreateExportTemplate} className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-sm">Alta</button>
+                    <button type="button" onClick={deleteSelectedTemplate} disabled={selectedExportTemplate.builtIn} className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">Baja</button>
+                    <button type="button" onClick={openEditExportTemplate} className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-sm">Modificar</button>
+                    <button type="button" onClick={() => setShowExportModal(false)} className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-sm ml-2">Cancelar</button>
+                    <button type="button" onClick={runExport} className="inline-flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-sm transition-colors">
+                      <Download size={13} /> Exportar
+                    </button>
+                  </div>
+                </div>
+
+                {/* Bottom: campos + vista previa */}
+                <div className="flex-1 flex flex-col xl:flex-row gap-6 min-h-0">
+
+                  {/* Campos a exportar */}
+                  <div className="w-full xl:w-[280px] bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col overflow-hidden flex-shrink-0">
+                    <div className="px-5 py-4 flex items-center justify-between border-b border-slate-100 flex-shrink-0">
+                      <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Campos a exportar</span>
+                      <span className="px-3 py-1 bg-slate-200 text-slate-700 text-[10px] font-bold rounded-full">{selectedExportTemplate.fields.length} columnas</span>
                     </div>
-                    <div className="max-h-[calc(100vh-360px)] overflow-y-auto px-4 py-3 text-[13px] text-slate-700">
+                    <div className="flex-1 overflow-y-auto py-2">
                       {selectedExportTemplate.fields.map((fieldId) => (
-                        <div key={fieldId} className="py-0.5">{getExportFieldLabel(fieldId)}</div>
+                        <div key={fieldId} className="px-5 py-1.5 text-[13px] text-slate-700">{getExportFieldLabel(fieldId)}</div>
                       ))}
                     </div>
                   </div>
 
-                  <div className="overflow-hidden rounded-2xl border border-slate-200">
-                    <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold uppercase tracking-wider text-slate-500">
-                      <span>Vista previa</span>
-                      <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] text-slate-600 normal-case">{exportPreviewRows.length} filas</span>
+                  {/* Vista previa */}
+                  <div className="flex-1 bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col overflow-hidden min-w-0">
+                    <div className="px-5 py-4 flex items-center justify-between border-b border-slate-100 flex-shrink-0 bg-white shadow-sm">
+                      <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Vista previa</span>
+                      <span className="px-3 py-1 bg-slate-200 text-slate-700 text-[10px] font-bold rounded-full">{exportPreviewRows.length} filas</span>
                     </div>
-                    <div className="h-[calc(100vh-360px)] overflow-auto bg-[#f3f6fb] p-3">
-                      <div className="inline-block min-w-full overflow-hidden border border-[#cfd8e3] bg-white shadow-[0_12px_28px_rgba(15,23,42,0.08)]">
-                      <table className="min-w-max border-collapse text-[10px] text-slate-800">
-                        <thead>
-                          <tr>
-                            <th className="w-10 border border-[#d9e1ea] bg-[#eef2f6] px-2 py-1 text-center font-bold text-slate-500" />
+                    <div className="flex-1 overflow-auto">
+                      <table className="border-collapse text-[11px] text-slate-700 w-max min-w-full">
+                        <thead className="sticky top-0 z-20">
+                          <tr className="bg-slate-50">
+                            <th className="w-12 border border-slate-200 bg-slate-50 px-2 py-2 text-center font-bold text-slate-400" />
                             {selectedExportTemplate.fields.map((fieldId, index) => (
-                              <th key={`${fieldId}-letter`} className="whitespace-nowrap border border-[#d9e1ea] bg-[#eef2f6] px-2 py-1 text-center font-bold text-slate-500">
+                              <th key={`${fieldId}-letter`} className="border border-slate-200 bg-slate-50 px-3 py-2 text-center font-bold text-slate-500">
                                 {toExcelColumnLabel(index)}
                               </th>
                             ))}
                           </tr>
                           <tr>
-                            <th className="w-10 border border-[#d9e1ea] bg-[#eef2f6] px-2 py-1 text-center font-bold text-slate-500">1</th>
+                            <th className="w-12 border border-slate-200 bg-slate-100 px-2 py-2 text-center font-bold text-slate-500 sticky top-[37px] z-10">1</th>
                             {selectedExportTemplate.fields.map((fieldId) => (
-                              <th key={fieldId} className="whitespace-nowrap border border-[#d9e1ea] bg-[#dbe5f1] px-2.5 py-2 text-center font-semibold tracking-wide text-slate-700">
+                              <th key={fieldId} className="whitespace-nowrap border border-slate-200 bg-[#dbe5f1] px-3 py-2 text-center font-semibold text-slate-700 sticky top-[37px] z-10">
                                 {getExportFieldLabel(fieldId)}
                               </th>
                             ))}
@@ -5562,12 +5617,12 @@ export default function ExpedienteList() {
                         </thead>
                         <tbody>
                           {exportPreviewRows.map((row, rowIndex) => (
-                            <tr key={row.id} className={rowIndex % 2 === 0 ? "bg-white" : "bg-[#fbfcfe]"}>
-                              <td className="border border-[#d9e1ea] bg-[#eef2f6] px-2 py-2 text-center font-semibold text-slate-500">{rowIndex + 2}</td>
+                            <tr key={row.id} className={rowIndex % 2 === 0 ? "bg-white hover:bg-slate-50" : "bg-[#fbfcfe] hover:bg-slate-50"}>
+                              <td className="w-12 border border-slate-200 bg-slate-50 px-2 py-2 text-center font-medium text-slate-500 sticky left-0 z-10">{rowIndex + 2}</td>
                               {selectedExportTemplate.fields.map((fieldId) => {
                                 const field = EXPEDIENTE_EXPORT_FIELDS.find((item) => item.id === fieldId);
                                 return (
-                                  <td key={`${row.id}-${fieldId}`} className="border border-[#d9e1ea] px-2.5 py-2 align-top leading-5">
+                                  <td key={`${row.id}-${fieldId}`} className="border border-slate-200 px-3 py-2 whitespace-nowrap">
                                     {field ? field.getValue(row) : ""}
                                   </td>
                                 );
@@ -5576,12 +5631,12 @@ export default function ExpedienteList() {
                           ))}
                         </tbody>
                       </table>
-                      </div>
                     </div>
                   </div>
                 </div>
+
                 {exportError && (
-                  <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex-shrink-0">
                     {exportError}
                   </div>
                 )}
@@ -5593,39 +5648,32 @@ export default function ExpedienteList() {
       )}
 
       {showExportTemplateEditor && typeof document !== "undefined" && createPortal(
-        <div className="fixed inset-0 z-[126] flex items-center justify-center bg-transparent px-4 animate-in fade-in duration-200" onClick={() => setShowExportTemplateEditor(false)}>
-          <div className="w-full max-w-5xl rounded-3xl border border-slate-200 bg-white shadow-2xl overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-2 duration-200" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-              <h3 className="text-lg font-bold text-slate-900">{exportEditorMode === "create" ? "Nueva plantilla de exportación" : "Modificar plantilla de exportación"}</h3>
-              <button type="button" onClick={() => setShowExportTemplateEditor(false)} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-400 hover:text-slate-700">
-                <X size={16} />
+        <div className="fixed inset-0 z-[126] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-overlay-in" onClick={() => setShowExportTemplateEditor(false)}>
+          <div className="w-full max-w-4xl rounded-2xl bg-white shadow-2xl overflow-hidden animate-modal-in" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
+              <h3 className="text-xl font-bold text-slate-800">{exportEditorMode === "create" ? "Nueva plantilla de exportación" : "Modificar plantilla de exportación"}</h3>
+              <button type="button" onClick={() => setShowExportTemplateEditor(false)} className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors shadow-sm">
+                <X size={14} />
               </button>
             </div>
-            <div className="p-6">
-              <div className="grid gap-6 lg:grid-cols-[1fr_84px_1fr]">
-                <div>
+            <div className="p-6 flex flex-col gap-6">
+              <div className="grid gap-4 lg:grid-cols-[1fr_64px_1fr]">
+                {/* Campos disponibles */}
+                <div className="flex flex-col">
                   <div className="mb-3 flex items-center justify-between">
-                    <h4 className="font-semibold text-slate-800">Campos disponibles</h4>
-                    <div className="relative">
-                      <select
-                        value="expedientes"
-                        disabled
-                        className="appearance-none rounded-xl border border-slate-200 bg-white px-4 py-2 pr-9 text-sm text-slate-700 outline-none disabled:opacity-100"
-                      >
-                        <option>Expedientes</option>
-                      </select>
-                      <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    </div>
+                    <span className="font-semibold text-slate-800">Campos disponibles</span>
+                    <span className="rounded-md bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-500 uppercase tracking-wide select-none">
+                      Expedientes
+                    </span>
                   </div>
-                  <div className="h-[340px] overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50/40 p-3">
+                  <div className="h-[320px] overflow-y-auto rounded-xl border border-slate-200 bg-white">
                     {availableExportFields.map((field) => (
-                      <label key={field.id} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 transition-all hover:bg-white hover:shadow-sm">
+                      <label key={field.id} className="flex cursor-pointer items-center gap-2.5 px-4 py-2 transition-colors hover:bg-slate-50 border-b border-slate-100 last:border-b-0">
                         <input
                           type="checkbox"
+                          className="w-3.5 h-3.5 rounded border-slate-300 text-red-600"
                           checked={exportAvailableSelected.includes(field.id)}
-                          onChange={(e) => {
-                            setExportAvailableSelected((prev) => e.target.checked ? [...prev, field.id] : prev.filter((id) => id !== field.id));
-                          }}
+                          onChange={(e) => setExportAvailableSelected((prev) => e.target.checked ? [...prev, field.id] : prev.filter((id) => id !== field.id))}
                         />
                         <span className="text-sm text-slate-700">{field.label}</span>
                       </label>
@@ -5633,38 +5681,63 @@ export default function ExpedienteList() {
                   </div>
                 </div>
 
-                <div className="flex flex-col items-center justify-center gap-3">
-                  <button type="button" onClick={() => moveFieldsToVisible(exportAvailableSelected)} className="rounded-xl border border-slate-200 bg-white p-2 text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm"><ArrowRight size={18} /></button>
-                  <button type="button" onClick={() => moveFieldsToAvailable(exportVisibleSelected)} className="rounded-xl border border-slate-200 bg-white p-2 text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm"><ArrowLeft size={18} /></button>
-                  <button type="button" onClick={() => moveFieldsToVisible(availableExportFields.map((field) => field.id))} className="rounded-xl border border-slate-200 bg-white p-2 text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm"><ChevronsRight size={18} /></button>
-                  <button type="button" onClick={() => moveFieldsToAvailable([...exportVisibleFields])} className="rounded-xl border border-slate-200 bg-white p-2 text-slate-700 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm"><ChevronsLeft size={18} /></button>
+                {/* Botones de movimiento */}
+                <div className="flex flex-col items-center justify-center gap-2.5">
+                  <button type="button" onClick={() => moveFieldsToVisible(exportAvailableSelected)} className="w-10 h-10 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:shadow-sm transition-all flex items-center justify-center"><ArrowRight size={16} /></button>
+                  <button type="button" onClick={() => moveFieldsToAvailable(exportVisibleSelected)} className="w-10 h-10 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:shadow-sm transition-all flex items-center justify-center"><ArrowLeft size={16} /></button>
+                  <button type="button" onClick={() => moveFieldsToVisible(availableExportFields.map((f) => f.id))} className="w-10 h-10 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:shadow-sm transition-all flex items-center justify-center"><ChevronsRight size={16} /></button>
+                  <button type="button" onClick={() => moveFieldsToAvailable([...exportVisibleFields])} className="w-10 h-10 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:shadow-sm transition-all flex items-center justify-center"><ChevronsLeft size={16} /></button>
                 </div>
 
-                <div>
+                {/* Campos visibles */}
+                <div className="flex flex-col">
                   <div className="mb-3 flex items-center justify-between">
-                    <h4 className="font-semibold text-slate-800">Campos visibles</h4>
+                    <span className="font-semibold text-slate-800">Campos visibles</span>
                     <div className="relative">
-                      <select
-                        value={selectedExportFormat}
-                        onChange={(e) => setSelectedExportFormat(e.target.value as ExportFormat)}
-                        className="appearance-none rounded-xl border border-slate-200 bg-white px-4 py-2 pr-9 text-sm text-slate-700 outline-none"
+                      <button
+                        ref={formatDropdownBtnRef}
+                        type="button"
+                        onClick={() => {
+                          if (formatDropdownBtnRef.current) {
+                            const r = formatDropdownBtnRef.current.getBoundingClientRect();
+                            setFormatDropdownPos({ top: r.bottom + 4, left: r.left, width: r.width });
+                          }
+                          setShowFormatDropdown(v => !v);
+                        }}
+                        className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors min-w-[80px] justify-between shadow-sm ${showFormatDropdown ? "bg-slate-100 border-slate-300 text-slate-800" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}
                       >
-                        <option value="excel">Excel</option>
-                        <option value="xml">XML</option>
-                        <option value="word">Word</option>
-                      </select>
-                      <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <span>{selectedExportFormat === "excel" ? "Excel" : selectedExportFormat === "xml" ? "XML" : "Word"}</span>
+                        <ChevronDown size={11} className="text-slate-400 shrink-0" />
+                      </button>
+                      {showFormatDropdown && typeof document !== "undefined" && createPortal(
+                        <div
+                          ref={formatDropdownMenuRef}
+                          style={{ position: "fixed", top: formatDropdownPos.top, left: formatDropdownPos.left, minWidth: formatDropdownPos.width, zIndex: 9999 }}
+                          className="rounded-xl border border-slate-200 bg-white shadow-xl py-1"
+                        >
+                          {(["excel", "xml", "word"] as ExportFormat[]).map((fmt) => (
+                            <button
+                              key={fmt}
+                              type="button"
+                              onClick={() => { setSelectedExportFormat(fmt); setShowFormatDropdown(false); }}
+                              className={`w-full flex items-center gap-2 px-3.5 py-2 text-left text-xs font-medium transition-colors ${selectedExportFormat === fmt ? "bg-slate-100 text-slate-900" : "text-slate-700 hover:bg-slate-50"}`}
+                            >
+                              {fmt === "excel" ? "Excel" : fmt === "xml" ? "XML" : "Word"}
+                            </button>
+                          ))}
+                        </div>,
+                        document.body
+                      )}
                     </div>
                   </div>
-                  <div className="h-[340px] overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50/40 p-3">
+                  <div className="h-[320px] overflow-y-auto rounded-xl border border-slate-200 bg-white">
                     {exportVisibleFields.map((fieldId) => (
-                      <label key={fieldId} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 transition-all hover:bg-white hover:shadow-sm">
+                      <label key={fieldId} className="flex cursor-pointer items-center gap-2.5 px-4 py-2 transition-colors hover:bg-slate-50 border-b border-slate-100 last:border-b-0">
                         <input
                           type="checkbox"
+                          className="w-3.5 h-3.5 rounded border-slate-300 text-red-600"
                           checked={exportVisibleSelected.includes(fieldId)}
-                          onChange={(e) => {
-                            setExportVisibleSelected((prev) => e.target.checked ? [...prev, fieldId] : prev.filter((id) => id !== fieldId));
-                          }}
+                          onChange={(e) => setExportVisibleSelected((prev) => e.target.checked ? [...prev, fieldId] : prev.filter((id) => id !== fieldId))}
                         />
                         <span className="text-sm text-slate-700">{getExportFieldLabel(fieldId)}</span>
                       </label>
@@ -5673,25 +5746,25 @@ export default function ExpedienteList() {
                 </div>
               </div>
 
-              <div className="mt-6">
+              <div>
                 <label className="mb-2 block text-sm font-semibold text-slate-700">Nombre de la plantilla</label>
                 <input
                   value={exportTemplateName}
                   onChange={(e) => setExportTemplateName(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-700 outline-none focus:border-slate-300"
+                  className="w-full rounded-lg border border-slate-200 px-4 py-3 text-sm text-slate-700 outline-none focus:border-slate-300 focus:ring-1 focus:ring-slate-200"
                   placeholder="Ej. Listado actual"
                 />
               </div>
 
               {exportError && (
-                <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                   {exportError}
                 </div>
               )}
 
-              <div className="mt-6 flex items-center justify-end gap-3">
-                <button type="button" onClick={() => setShowExportTemplateEditor(false)} className="rounded-xl border border-slate-200 px-4 py-2 font-medium text-slate-600 transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-sm">Cancelar</button>
-                <button type="button" onClick={saveExportTemplate} className="rounded-xl bg-red-600 px-4 py-2 font-semibold text-white transition-all hover:-translate-y-0.5 hover:bg-red-700 hover:shadow-lg">Guardar</button>
+              <div className="flex items-center justify-end gap-3">
+                <button type="button" onClick={() => setShowExportTemplateEditor(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">Cancelar</button>
+                <button type="button" onClick={saveExportTemplate} className="rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white hover:bg-red-700 transition-colors shadow-sm">Guardar</button>
               </div>
             </div>
           </div>
@@ -5749,8 +5822,8 @@ export default function ExpedienteList() {
       )}
 
       {/* ── Confirmar borrado ───────────────────────────────── */}
-      {deleteId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent">
+      {deleteId && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm mx-4 p-6">
             <div className="flex items-start gap-3 mb-4">
               <div className="p-2 bg-red-100 rounded-xl shrink-0">
@@ -5768,7 +5841,8 @@ export default function ExpedienteList() {
                 className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg active:scale-95">Eliminar</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ── Undo toast ──────────────────────────────────────── */}
@@ -5784,496 +5858,239 @@ export default function ExpedienteList() {
       <div className="flex flex-col h-full animate-in fade-in duration-300">
 
         {/* ── Cabecera ──────────────────────────────────────── */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-white shrink-0">
-          <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-            <FolderOpen size={20} className="text-red-600" /> Gestión de Expedientes
-          </h1>
-          <button onClick={() => fetchExpedientes(true)}
-            className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors" title="Actualizar">
-            <RefreshCw size={14} />
+        <div className="px-6 py-4 border-b border-slate-100 bg-white flex items-center justify-between flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <FolderOpen size={20} className="text-red-600" />
+            <h1 className="text-xl font-bold text-slate-800">Gestión de Expedientes</h1>
+          </div>
+          <button onClick={() => fetchExpedientes(true)} title="Refrescar"
+            className="p-1 rounded hover:bg-slate-50 text-slate-400 hover:text-slate-600 transition-colors">
+            <RefreshCw size={14} className={refreshSpin ? "animate-spin" : ""} />
           </button>
         </div>
 
         <div className="bg-white flex flex-col overflow-hidden flex-1 min-h-0">
 
-          {/* ── Toolbar de acciones ─────────────────────────── */}
-          <div className="flex items-center gap-1 px-2.5 py-2 border-b border-slate-100 bg-slate-50/80 flex-wrap">
+          {/* ── Toolbar 1: Acciones ──────────────────────────── */}
+          <div className="px-6 py-2.5 border-b border-slate-200 bg-slate-50 flex items-center flex-shrink-0 z-10 overflow-x-auto">
+            <div className="flex items-center gap-1.5 min-w-max pb-0.5">
 
-            {/* — Alta / Baja / Modificar — */}
-            <div className="relative" ref={altaMenuRef}>
-              <button
-                onClick={() => setShowAltaMenu(v => !v)}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all select-none whitespace-nowrap ${
-                  showAltaMenu
-                    ? "bg-red-800 text-white shadow-sm"
-                    : "bg-red-700 text-white hover:bg-red-800 shadow-sm active:scale-95"
-                }`}
-              >
-                <Plus size={13} />
-                Alta
-                <ChevronDown size={10} className={`transition-transform ${showAltaMenu ? "rotate-180" : ""}`} />
-              </button>
-
-              {showAltaMenu && (
-                <div className="absolute left-0 top-full z-50 mt-2 w-[320px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
-                  <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
-                    <p className="text-sm font-semibold text-slate-600">Elige cómo quieres agregar expedientes</p>
-                  </div>
-
-                  <div className="p-2">
-                    <AltaOption
-                      icon={Plus}
-                      title="Crear manualmente"
-                      description="Crea un expediente desde cero introduciendo los datos"
-                      iconClassName="bg-green-100 text-green-600"
-                      onClick={openManualCreate}
-                    />
-                    <AltaOption
-                      icon={FileSpreadsheet}
-                      title="Importar desde CSV"
-                      description="Sube un archivo CSV con múltiples expedientes"
-                      iconClassName="bg-blue-100 text-blue-600"
-                      onClick={openCsvImport}
-                    />
-                    <AltaOption
-                      icon={ClipboardList}
-                      title="Desde documentos"
-                      description="Procesa documentos para crear expedientes"
-                      iconClassName="bg-amber-100 text-amber-700"
-                      onClick={openDocumentImport}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-            <ToolBtn icon={Trash2}       label="Baja"       danger   disabled={!selected} onClick={() => selected && setDeleteId(selected)} />
-            <ToolBtn icon={Edit3}        label="Modificar"           disabled={!selected || selectedExp?.estado === "cerrado"} onClick={() => selected && selectedExp?.estado !== "cerrado" && navigate(`/dashboard/expedientes/${selected}?edit=1`)} />
-
-            <div className="w-px h-5 bg-slate-200 mx-0.5" />
-
-            <DropdownToolBtn
-              icon={Mail}
-              label="Enviar Correo"
-              disabled={!selected}
-              items={[
-                {
-                  label: "Nuevo",
-                  icon: Mail,
-                  onClick: () => {
-                    if (!selectedExp) return;
-                    const params = new URLSearchParams({
-                      compose: '1',
-                      subject: `Expediente ${selectedExp.anio}/${selectedExp.num_exp} - ${selectedExp.descripcion || ''}`,
-                      ...(selectedExp.cliente_email ? { to: selectedExp.cliente_email } : {}),
-                      expediente_id: selectedExp.id,
-                    });
-                    navigate(`/dashboard/correo?${params.toString()}`);
-                  },
-                },
-                {
-                  label: "Con Plantilla",
-                  icon: FileText,
-                  onClick: () => {
-                    if (!selectedExp) return;
-                    const params = new URLSearchParams({
-                      compose: '1',
-                      subject: `Expediente ${selectedExp.anio}/${selectedExp.num_exp} - ${selectedExp.descripcion || ''}`,
-                      ...(selectedExp.cliente_email ? { to: selectedExp.cliente_email } : {}),
-                      expediente_id: selectedExp.id,
-                      open_templates: '1',
-                    });
-                    navigate(`/dashboard/correo?${params.toString()}`);
-                  },
-                },
-                { divider: true, label: '' },
-                {
-                  label: "Con Adjuntos",
-                  icon: Paperclip,
-                  children: [
-                    {
-                      label: "Nuevo",
-                      icon: Mail,
-                      onClick: () => {
-                        if (!selectedExp) return;
-                        const params = new URLSearchParams({
-                          compose: '1',
-                          subject: `Expediente ${selectedExp.anio}/${selectedExp.num_exp} - ${selectedExp.descripcion || ''} (con adjuntos)`,
-                          ...(selectedExp.cliente_email ? { to: selectedExp.cliente_email } : {}),
-                          expediente_id: selectedExp.id,
-                          open_attachments: '1',
-                        });
-                        navigate(`/dashboard/correo?${params.toString()}`);
-                      },
-                    },
-                    {
-                      label: "Con Plantilla",
-                      icon: FileText,
-                      onClick: () => {
-                        if (!selectedExp) return;
-                        const params = new URLSearchParams({
-                          compose: '1',
-                          subject: `Expediente ${selectedExp.anio}/${selectedExp.num_exp} - ${selectedExp.descripcion || ''}`,
-                          ...(selectedExp.cliente_email ? { to: selectedExp.cliente_email } : {}),
-                          expediente_id: selectedExp.id,
-                          open_templates: '1',
-                          open_attachments: '1',
-                        });
-                        navigate(`/dashboard/correo?${params.toString()}`);
-                      },
-                    },
-                  ],
-                },
-                { divider: true, label: '' },
-                {
-                  label: "MN Sign",
-                  icon: Pencil,
-                  onClick: () => selected && navigate(`/dashboard/expedientes/${selected}#firma`),
-                },
-              ]}
-            />
-            <DropdownToolBtn
-              icon={MessageCircle}
-              label="Enviar WhatsApp"
-              disabled={!selectedExp?.cliente_id}
-              items={[
-                {
-                  label: "Nuevo",
-                  icon: MessageCircle,
-                  onClick: () => {
-                    if (!selectedExp?.cliente_id) return;
-                    navigate(`/dashboard/whatsapp?clientId=${selectedExp.cliente_id}&mode=new`);
-                  },
-                },
-                {
-                  label: "Con Plantilla",
-                  icon: FileSpreadsheet,
-                  onClick: () => {
-                    if (!selectedExp?.cliente_id) return;
-                    navigate(`/dashboard/whatsapp?clientId=${selectedExp.cliente_id}&mode=template`);
-                  },
-                },
-                {
-                  label: "Programar WhatsApp",
-                  icon: Bell,
-                  onClick: () => {
-                    if (!selectedExp?.cliente_id) return;
-                    navigate(`/dashboard/whatsapp?clientId=${selectedExp.cliente_id}&mode=schedule`);
-                  },
-                },
-                {
-                  label: "Sign",
-                  icon: Pencil,
-                  onClick: () => selected && navigate(`/dashboard/expedientes/${selected}#firma`),
-                },
-                {
-                  label: "Ver Conversación",
-                  icon: ExternalLink,
-                  onClick: () => {
-                    if (!selectedExp?.cliente_id) return;
-                    navigate(`/dashboard/whatsapp?clientId=${selectedExp.cliente_id}&mode=thread`);
-                  },
-                },
-              ]}
-            />
-
-            <div className="w-px h-5 bg-slate-200 mx-0.5" />
-
-            <ToolBtn
-              icon={PenLine}
-              label="Sign"
-              disabled={!selected}
-              onClick={() => selected && navigate(`/dashboard/expedientes/${selected}#firma`)}
-            />
-            <DropdownToolBtn
-              icon={ClipboardList}
-              label="Tareas"
-              disabled={!selected || selectedExp?.estado === "cerrado"}
-              items={[
-                {
-                  label: "Nueva actuación",
-                  icon: Activity,
-                  onClick: () => selected && navigate(`/dashboard/expedientes/${selected}?tab=actuacion&newActuacion=1`),
-                },
-                {
-                  label: "Crear obligaciones",
-                  icon: ClipboardList,
-                  onClick: () => selected && navigate(`/dashboard/expedientes/${selected}?tab=tareas&newTarea=1&type=plazo_procesal`),
-                },
-              ]}
-            />
-
-            <div className="w-px h-5 bg-slate-200 mx-0.5" />
-
-            <ToolBtn icon={GitMerge}     label="Asociar"       disabled={!selectedExp} onClick={openRelacionarModal} />
-            <ToolBtn icon={Paperclip}    label="Adjuntos"      disabled={!selected || selectedExp?.estado === "cerrado"} onClick={() => selected && selectedExp?.estado !== "cerrado" && setShowAdjuntos(true)} />
-            <div className="w-px h-5 bg-slate-200 mx-0.5" />
-
-            <ToolBtn icon={FileSpreadsheet} label="Excel"    onClick={openExportModal} />
-            <ToolBtn icon={Printer}         label="Imprimir" onClick={() => window.print()} />
-            <ToolBtn icon={BarChart2}       label="Informes" onClick={() => navigate("/dashboard")} />
-
-            <div className="w-px h-5 bg-slate-200 mx-0.5" />
-
-            {/* ── Atajos ── */}
-            <AtajosButton modulo="Expedientes" />
-
-            {/* ── Opciones ── */}
-            <div className="relative" ref={opcionesRef}>
-              <button
-                onClick={() => setShowOpciones(v => !v)}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-colors border ${showOpciones ? "bg-red-50 border-red-300 text-red-700" : "text-slate-600 hover:bg-slate-100 border-slate-200"}`}>
-                <MoreHorizontal size={13} /> Opciones <ChevronDown size={10} />
-              </button>
-              {showOpciones && (
-              <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[230px] py-1.5 overflow-visible">
-
-                {/* Grupo 1: acciones principales */}
-                <button onClick={() => alert("Seleccionar opciones favoritas")}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                  <Star size={12} className="text-slate-400" /> Seleccionar Opciones Favoritas
-                </button>
+              {/* Alta */}
+              <div ref={altaMenuRef}>
                 <button
-                  type="button"
                   onClick={() => {
-                    setShowColumnModal(true);
-                    setShowOpciones(false);
+                    if (altaMenuRef.current) {
+                      const r = altaMenuRef.current.getBoundingClientRect();
+                      setAltaMenuPos({ top: r.bottom + 8, left: r.left });
+                    }
+                    setShowAltaMenu(v => !v);
                   }}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-700"
-                >
-                  <span className="flex items-center gap-2.5">
-                    <LayoutList size={12} className="text-slate-400" /> Elegir columnas
-                  </span>
+                  className="inline-flex items-center gap-1.5 rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 transition-colors shadow-sm">
+                  <Plus size={12} /> Alta <ChevronDown size={10} />
                 </button>
-
-                <div className="h-px bg-slate-100 my-1.5" />
-
-                {/* Grupo 2: navegación y color */}
-                {/* Ir a → submenú */}
-                <div className="relative group/sub">
-                  <button className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                    <span className="flex items-center gap-2.5">
-                      <ExternalLink size={12} className="text-slate-400" /> Ir a
-                    </span>
-                    <ChevronRight size={11} className="text-slate-300" />
-                  </button>
-                  <div className="absolute right-full -mr-px top-[-1px] z-50 bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[180px] py-1.5 hidden group-hover/sub:block">
-                    <button onClick={() => selectedExp?.cliente_id && navigate(`/dashboard/clientes/${selectedExp.cliente_id}`)}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                      <Users size={12} className="text-slate-400" /> Ir a Cliente
-                    </button>
-                    <button onClick={() => selected && navigate(`/dashboard/expedientes/${selected}`)}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                      <FolderOpen size={12} className="text-slate-400" /> Ir a Expediente
-                    </button>
-                    <button onClick={() => alert("Ir a Juzgado")}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                      <ClipboardList size={12} className="text-slate-400" /> Ir a Juzgado
-                    </button>
-                  </div>
-                </div>
-
-                <div className="relative group/color">
-                  <button className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                    <span className="flex items-center gap-2.5">
-                      <Palette size={12} className="text-slate-400" /> Asignar Color
-                    </span>
-                    <ChevronRight size={11} className="text-slate-300" />
-                  </button>
-                  <div className="absolute right-full -mr-px top-[-1px] z-50 hidden min-w-[190px] rounded-xl border border-slate-200 bg-white py-1.5 shadow-2xl group-hover/color:block">
-                    {[
-                      { value: "ninguno", label: "Sin color", dot: "bg-slate-300" },
-                      { value: "azul", label: "Azul suave", dot: "bg-sky-400" },
-                      { value: "verde", label: "Verde suave", dot: "bg-emerald-400" },
-                      { value: "amarillo", label: "Amarillo suave", dot: "bg-amber-400" },
-                      { value: "naranja", label: "Naranja suave", dot: "bg-orange-400" },
-                      { value: "rojo", label: "Rojo suave", dot: "bg-rose-400" },
-                      { value: "morado", label: "Morado suave", dot: "bg-violet-400" },
-                    ].map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() => assignExpedienteColor(option.value)}
-                        className="flex w-full items-center justify-between gap-2.5 px-3.5 py-2 text-left text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-700"
-                      >
-                        <span className="flex items-center gap-2.5">
-                          <span className={`h-2.5 w-2.5 rounded-full ${option.dot}`} />
-                          {option.label}
-                        </span>
-                        {selectedExp?.color === option.value && <Check size={11} className="text-red-500" />}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="h-px bg-slate-100 my-1.5" />
-
-                {/* Grupo 3: acciones especiales */}
-                <button
-                  disabled={!selectedExp}
-                  onClick={toggleExpedienteEstado}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  {selectedExp?.estado === "cerrado"
-                    ? <><Unlock size={12} className="text-slate-400" /> Reabrir expediente</>
-                    : <><Lock size={12} className="text-slate-400" /> Cerrar expediente</>
-                  }
-                </button>
-                <button onClick={() => alert("Alta Acción")}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                  <Zap size={12} className="text-slate-400" /> Alta Acción
-                </button>
-                <button onClick={() => alert("Crear Recall")}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                  <Bell size={12} className="text-slate-400" /> Crear Recall
-                </button>
-
-                <div className="h-px bg-slate-100 my-1.5" />
-
-                {/* Configurar numeración */}
-                <button
-                  onClick={() => { setShowCounterModal(true); setShowOpciones(false); }}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors"
-                >
-                  <Hash size={12} className="text-slate-400" /> Configurar numeración
-                </button>
-
-                <div className="h-px bg-slate-100 my-1.5" />
-
-                {/* Grupo 4: duplicar / fusionar */}
-                <button onClick={() => alert("Duplicar expediente")}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                  <Copy size={12} className="text-slate-400" /> Duplicar
-                </button>
-                <button onClick={() => alert("Fusionar expedientes")}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                  <GitMerge size={12} className="text-slate-400" /> Fusionar
-                </button>
-
-                <div className="h-px bg-slate-100 my-1.5" />
-
-                {/* Grupo 5: comunicación + debug */}
-                <button onClick={() => selectedExp && window.open(`https://wa.me/?text=Expediente ${selectedExp.anio}/${selectedExp.num_exp}`, "_blank")}
-                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                  <Smartphone size={12} className="text-slate-400" /> Enviar SMS
-                </button>
-
-                {/* Versión Antigua → submenú */}
-                <div className="relative group/ver">
-                  <button className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                    <span className="flex items-center gap-2.5">
-                      <History size={12} className="text-slate-400" /> Versión Antigua
-                    </span>
-                    <ChevronRight size={11} className="text-slate-300" />
-                  </button>
-                  <div className="absolute right-full -mr-px top-[-1px] z-50 bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[180px] py-1.5 hidden group-hover/ver:block">
-                    <button onClick={() => alert("Restaurar versión anterior")}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                      <History size={12} className="text-slate-400" /> Ver historial versiones
-                    </button>
-                    <button onClick={() => alert("Comparar con versión")}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                      <RefreshCw size={12} className="text-slate-400" /> Comparar versión
-                    </button>
-                  </div>
-                </div>
-
               </div>
+              {showAltaMenu && typeof document !== "undefined" && createPortal(
+                <div data-alta-menu style={{ position: "fixed", top: altaMenuPos.top, left: altaMenuPos.left, zIndex: 9999 }}
+                  className="w-[300px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+                  <div className="border-b border-slate-100 bg-slate-50 px-3.5 py-2.5">
+                    <p className="text-xs font-semibold text-slate-600">Elige cómo quieres agregar expedientes</p>
+                  </div>
+                  <div className="p-1">
+                    <AltaOption icon={Plus} title="Crear manualmente" description="Crea un expediente desde cero introduciendo los datos" iconClassName="bg-green-100 text-green-600" onClick={openManualCreate} />
+                    <AltaOption icon={FileSpreadsheet} title="Importar desde CSV" description="Sube un archivo CSV con múltiples expedientes" iconClassName="bg-blue-100 text-blue-600" onClick={openCsvImport} />
+                    <AltaOption icon={ClipboardList} title="Desde documentos" description="Procesa documentos para crear expedientes" iconClassName="bg-amber-100 text-amber-700" onClick={openDocumentImport} />
+                  </div>
+                </div>,
+                document.body
               )}
-            </div>
 
-            {/* Expediente seleccionado */}
-            {false && selectedExp && (
-              <div className="ml-auto flex items-center gap-1.5 px-2 py-1 bg-red-50 border border-red-100 rounded-lg shrink-0">
-                <div className="w-2 h-2 bg-red-500 rounded-full" />
-                <span className="text-xs text-red-700 font-medium max-w-[200px] truncate">
-                  {selectedExp.anio}/{selectedExp.num_exp} — {selectedExp.descripcion}
-                </span>
-                <button onClick={() => setSelected(null)} className="text-red-300 hover:text-red-600 ml-0.5">
-                  <X size={11} />
+              <div className="w-px h-5 bg-slate-200 mx-1" />
+
+              {/* Baja, Modificar */}
+              <ToolBtn icon={Trash2} label="Baja" danger disabled={!selected} onClick={() => selected && setDeleteId(selected)} />
+              <ToolBtn icon={Edit3} label="Modificar" disabled={!selected || selectedExp?.estado === "cerrado"} onClick={() => selected && selectedExp?.estado !== "cerrado" && navigate(`/dashboard/expedientes/${selected}?edit=1`)} />
+
+              <div className="w-px h-5 bg-slate-200 mx-1" />
+
+              {/* Correo, WhatsApp */}
+              <DropdownToolBtn icon={Mail} label="Enviar Correo" disabled={!selected} items={[
+                { label: "Nuevo", icon: Mail, onClick: () => { if (!selectedExp) return; const params = new URLSearchParams({ compose: '1', subject: `Expediente ${selectedExp.anio}/${selectedExp.num_exp} - ${selectedExp.descripcion || ''}`, ...(selectedExp.cliente_email ? { to: selectedExp.cliente_email } : {}), expediente_id: selectedExp.id }); navigate(`/dashboard/correo?${params.toString()}`); } },
+                { label: "Con Plantilla", icon: FileText, onClick: () => { if (!selectedExp) return; const params = new URLSearchParams({ compose: '1', subject: `Expediente ${selectedExp.anio}/${selectedExp.num_exp} - ${selectedExp.descripcion || ''}`, ...(selectedExp.cliente_email ? { to: selectedExp.cliente_email } : {}), expediente_id: selectedExp.id, open_templates: '1' }); navigate(`/dashboard/correo?${params.toString()}`); } },
+                { divider: true, label: '' },
+                { label: "Con Adjuntos", icon: Paperclip, children: [
+                  { label: "Nuevo", icon: Mail, onClick: () => { if (!selectedExp) return; const params = new URLSearchParams({ compose: '1', subject: `Expediente ${selectedExp.anio}/${selectedExp.num_exp} - ${selectedExp.descripcion || ''} (con adjuntos)`, ...(selectedExp.cliente_email ? { to: selectedExp.cliente_email } : {}), expediente_id: selectedExp.id, open_attachments: '1' }); navigate(`/dashboard/correo?${params.toString()}`); } },
+                  { label: "Con Plantilla", icon: FileText, onClick: () => { if (!selectedExp) return; const params = new URLSearchParams({ compose: '1', subject: `Expediente ${selectedExp.anio}/${selectedExp.num_exp} - ${selectedExp.descripcion || ''}`, ...(selectedExp.cliente_email ? { to: selectedExp.cliente_email } : {}), expediente_id: selectedExp.id, open_templates: '1', open_attachments: '1' }); navigate(`/dashboard/correo?${params.toString()}`); } },
+                ]},
+                { divider: true, label: '' },
+                { label: "MN Sign", icon: Pencil, onClick: () => selected && navigate(`/dashboard/expedientes/${selected}#firma`) },
+              ]} />
+              <DropdownToolBtn icon={MessageCircle} label="Enviar WhatsApp" disabled={!selectedExp?.cliente_id} items={[
+                { label: "Nuevo", icon: MessageCircle, onClick: () => { if (!selectedExp?.cliente_id) return; navigate(`/dashboard/whatsapp?clientId=${selectedExp.cliente_id}&mode=new`); } },
+                { label: "Con Plantilla", icon: FileSpreadsheet, onClick: () => { if (!selectedExp?.cliente_id) return; navigate(`/dashboard/whatsapp?clientId=${selectedExp.cliente_id}&mode=template`); } },
+                { label: "Programar WhatsApp", icon: Bell, onClick: () => { if (!selectedExp?.cliente_id) return; navigate(`/dashboard/whatsapp?clientId=${selectedExp.cliente_id}&mode=schedule`); } },
+                { label: "Sign", icon: Pencil, onClick: () => selected && navigate(`/dashboard/expedientes/${selected}#firma`) },
+                { label: "Ver Conversación", icon: ExternalLink, onClick: () => { if (!selectedExp?.cliente_id) return; navigate(`/dashboard/whatsapp?clientId=${selectedExp.cliente_id}&mode=thread`); } },
+              ]} />
+
+              <div className="w-px h-5 bg-slate-200 mx-1" />
+
+              {/* Sign, Tareas, Asociar, Adjuntos */}
+              <ToolBtn icon={PenLine} label="Sign" disabled={!selected} onClick={() => selected && navigate(`/dashboard/expedientes/${selected}#firma`)} />
+              <DropdownToolBtn icon={ClipboardList} label="Tareas" disabled={!selected || selectedExp?.estado === "cerrado"} items={[
+                { label: "Nueva actuación", icon: Activity, onClick: () => selected && navigate(`/dashboard/expedientes/${selected}?tab=actuacion&newActuacion=1`) },
+                { label: "Crear obligaciones", icon: ClipboardList, onClick: () => selected && navigate(`/dashboard/expedientes/${selected}?tab=tareas&newTarea=1&type=plazo_procesal`) },
+              ]} />
+              <ToolBtn icon={GitMerge} label="Asociar" disabled={!selectedExp} onClick={openRelacionarModal} />
+              <ToolBtn icon={Paperclip} label="Adjuntos" disabled={!selected || selectedExp?.estado === "cerrado"} onClick={() => selected && selectedExp?.estado !== "cerrado" && setShowAdjuntos(true)} />
+
+              <div className="w-px h-5 bg-slate-200 mx-1" />
+
+              {/* Excel, Imprimir, Informes */}
+              <ToolBtn icon={FileSpreadsheet} label="Excel" onClick={openExportModal} />
+              <ToolBtn icon={Printer} label="Imprimir" onClick={() => window.print()} />
+              <ToolBtn icon={BarChart2} label="Informes" onClick={() => navigate("/dashboard")} />
+
+              <div className="w-px h-5 bg-slate-200 mx-1" />
+
+              {/* Atajos, Opciones */}
+              <AtajosButton modulo="Expedientes" />
+              <div className="relative" ref={opcionesRef}>
+                <button
+                  ref={opcionesBtnRef}
+                  onClick={() => {
+                    if (opcionesBtnRef.current) {
+                      const r = opcionesBtnRef.current.getBoundingClientRect();
+                      setOpcionesMenuPos({ top: r.bottom + 4, left: r.right - 230 });
+                    }
+                    setShowOpciones(v => !v);
+                  }}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-colors border shadow-sm ${showOpciones ? "bg-red-50 border-red-300 text-red-700" : "text-slate-600 hover:bg-slate-100 border-slate-200 bg-white"}`}>
+                  <MoreHorizontal size={13} /> Opciones <ChevronDown size={10} />
                 </button>
+                {showOpciones && typeof document !== "undefined" && createPortal(
+                  <div style={{ position: "fixed", top: opcionesMenuPos.top, left: opcionesMenuPos.left, zIndex: 9999 }}
+                    className="bg-white border border-slate-200 rounded-xl shadow-xl min-w-[230px] py-1 overflow-visible">
+                    <button onClick={() => alert("Seleccionar opciones favoritas")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+                      <Star size={13} className="text-slate-400 shrink-0" /> Seleccionar Opciones Favoritas
+                    </button>
+                    <button type="button" onClick={() => { setShowColumnModal(true); setShowOpciones(false); }} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50">
+                      <span className="flex items-center gap-2.5"><LayoutList size={13} className="text-slate-400 shrink-0" /> Elegir columnas</span>
+                    </button>
+                    <div className="h-px bg-slate-100 my-1" />
+                    <div className="relative group/sub">
+                      <button className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+                        <span className="flex items-center gap-2.5"><ExternalLink size={13} className="text-slate-400 shrink-0" /> Ir a</span>
+                        <ChevronRight size={11} className="text-slate-300" />
+                      </button>
+                      <div className="absolute right-full -mr-px top-[-1px] z-50 bg-white border border-slate-200 rounded-xl shadow-xl min-w-[180px] py-1 hidden group-hover/sub:block">
+                        <button onClick={() => selectedExp?.cliente_id && navigate(`/dashboard/clientes/${selectedExp.cliente_id}`)} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><Users size={13} className="text-slate-400 shrink-0" /> Ir a Cliente</button>
+                        <button onClick={() => selected && navigate(`/dashboard/expedientes/${selected}`)} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><FolderOpen size={13} className="text-slate-400 shrink-0" /> Ir a Expediente</button>
+                        <button onClick={() => alert("Ir a Juzgado")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><ClipboardList size={13} className="text-slate-400 shrink-0" /> Ir a Juzgado</button>
+                      </div>
+                    </div>
+                    <div className="relative group/color">
+                      <button className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+                        <span className="flex items-center gap-2.5"><Palette size={13} className="text-slate-400 shrink-0" /> Asignar Color</span>
+                        <ChevronRight size={11} className="text-slate-300" />
+                      </button>
+                      <div className="absolute right-full -mr-px top-[-1px] z-50 hidden min-w-[190px] rounded-xl border border-slate-200 bg-white py-1 shadow-xl group-hover/color:block">
+                        {[
+                          { value: "ninguno", label: "Sin color", dot: "bg-slate-300" },
+                          { value: "azul",    label: "Azul suave",    dot: "bg-sky-400" },
+                          { value: "verde",   label: "Verde suave",   dot: "bg-emerald-400" },
+                          { value: "amarillo",label: "Amarillo suave",dot: "bg-amber-400" },
+                          { value: "naranja", label: "Naranja suave", dot: "bg-orange-400" },
+                          { value: "rojo",    label: "Rojo suave",    dot: "bg-rose-400" },
+                          { value: "morado",  label: "Morado suave",  dot: "bg-violet-400" },
+                        ].map((option) => (
+                          <button key={option.value} type="button" onClick={() => assignExpedienteColor(option.value)}
+                            className="flex w-full items-center justify-between gap-2.5 px-3.5 py-2 text-left text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50">
+                            <span className="flex items-center gap-2.5"><span className={`h-2.5 w-2.5 rounded-full ${option.dot}`} />{option.label}</span>
+                            {selectedExp?.color === option.value && <Check size={11} className="text-red-500" />}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="h-px bg-slate-100 my-1" />
+                    <button disabled={!selectedExp} onClick={toggleExpedienteEstado}
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                      {selectedExp?.estado === "cerrado"
+                        ? <><Unlock size={13} className="text-slate-400 shrink-0" /> Reabrir expediente</>
+                        : <><Lock size={13} className="text-slate-400 shrink-0" /> Cerrar expediente</>}
+                    </button>
+                    <button onClick={() => alert("Alta Acción")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><Zap size={13} className="text-slate-400 shrink-0" /> Alta Acción</button>
+                    <button onClick={() => alert("Crear Recall")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><Bell size={13} className="text-slate-400 shrink-0" /> Crear Recall</button>
+                    <div className="h-px bg-slate-100 my-1" />
+                    <button onClick={() => { setShowCounterModal(true); setShowOpciones(false); }} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><Hash size={13} className="text-slate-400 shrink-0" /> Configurar numeración</button>
+                    <div className="h-px bg-slate-100 my-1" />
+                    <button onClick={() => alert("Duplicar expediente")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><Copy size={13} className="text-slate-400 shrink-0" /> Duplicar</button>
+                    <button onClick={() => alert("Fusionar expedientes")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><GitMerge size={13} className="text-slate-400 shrink-0" /> Fusionar</button>
+                    <div className="h-px bg-slate-100 my-1" />
+                    <button onClick={() => selectedExp && window.open(`https://wa.me/?text=Expediente ${selectedExp.anio}/${selectedExp.num_exp}`, "_blank")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><Smartphone size={13} className="text-slate-400 shrink-0" /> Enviar SMS</button>
+                    <div className="relative group/ver">
+                      <button className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+                        <span className="flex items-center gap-2.5"><History size={13} className="text-slate-400 shrink-0" /> Versión Antigua</span>
+                        <ChevronRight size={11} className="text-slate-300" />
+                      </button>
+                      <div className="absolute right-full -mr-px top-[-1px] z-50 bg-white border border-slate-200 rounded-xl shadow-xl min-w-[180px] py-1 hidden group-hover/ver:block">
+                        <button onClick={() => alert("Restaurar versión anterior")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><History size={13} className="text-slate-400 shrink-0" /> Ver historial versiones</button>
+                        <button onClick={() => alert("Comparar con versión")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><RefreshCw size={13} className="text-slate-400 shrink-0" /> Comparar versión</button>
+                      </div>
+                    </div>
+                  </div>,
+                  document.body
+                )}
               </div>
-            )}
+
+            </div>
           </div>
 
-          {/* ── Barra de filtros ────────────────────────────── */}
-          <div className="px-4 py-2 border-b border-slate-100 bg-white">
-            <div className="flex flex-col gap-1.5">
+          {/* ── Toolbar 2: Filtros y Vistas ──────────────────── */}
+          <div className="px-6 py-2.5 border-b border-slate-200 bg-white flex flex-col sm:flex-row items-center justify-between gap-3 flex-shrink-0 z-10">
+            <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
               {filters.map((filter, idx) => (
-                <div key={filter.id} className="flex items-center gap-1.5 flex-wrap">
-                  <FilterRow
-                    filter={filter}
-                    onChange={updateFilter}
-                    onRemove={removeFilter}
-                    canRemove={filters.length > 1}
-                    inputRef={idx === 0 ? firstInputRef : undefined}
-                  />
-                  {idx === filters.length - 1 && (
-                    <div className="flex items-center gap-1">
-                      <button onClick={addFilter}
-                        className="flex items-center justify-center w-6 h-6 rounded-md border border-slate-200 text-slate-500 hover:border-red-400 hover:text-red-600 hover:bg-red-50 transition-colors text-sm font-bold">
-                        +
-                      </button>
-                      {filters.length > 1 && (
-                        <button onClick={() => removeFilter(filter.id)}
-                          className="flex items-center justify-center w-6 h-6 rounded-md border border-slate-200 text-slate-400 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors text-xs font-bold">
-                          −
-                        </button>
-                      )}
-                      <button onClick={clearAllFilters}
-                        className={`flex items-center justify-center w-6 h-6 rounded-md border transition-colors ${hasActiveFilters || filters.length > 1 ? "border-red-300 text-red-500 hover:bg-red-50" : "border-slate-200 text-slate-300 cursor-default"}`}>
-                        <ListFilter size={12} />
-                      </button>
-                    </div>
-                  )}
-                  {idx === filters.length - 1 && (
-                    <div className="ml-auto flex items-center gap-2">
-                      {/* Contador */}
-                      <span className="text-xs text-slate-400 whitespace-nowrap">
-                        {filtered.length !== expedientes.length
-                          ? <span className="text-amber-600 font-medium">{filtered.length} de {expedientes.length}</span>
-                          : <>{expedientes.length} {expedientes.length === 1 ? "registro" : "registros"}</>
-                        }
-                      </span>
-
-                      <div className="w-px h-4 bg-slate-200" />
-
-                      {/* Controles de vista */}
-                      <div className="flex items-center gap-0.5 bg-slate-100 rounded-lg p-0.5">
-                        <button
-                          onClick={() => switchView("list")}
-                          title="Vista listado"
-                          className={`p-1.5 rounded-md transition-all ${viewMode === "list" ? "bg-white shadow-sm text-red-600" : "text-slate-400 hover:text-slate-600"}`}
-                        >
-                          <AlignJustify size={13} />
-                        </button>
-                        <button
-                          onClick={() => switchView("detail")}
-                          title="Vista listado con detalle"
-                          className={`p-1.5 rounded-md transition-all ${viewMode === "detail" ? "bg-white shadow-sm text-red-600" : "text-slate-400 hover:text-slate-600"}`}
-                        >
-                          <LayoutList size={13} />
-                        </button>
-                        <button
-                          onClick={() => switchView("multiselect")}
-                          title="Selección múltiple"
-                          className={`p-1.5 rounded-md transition-all ${viewMode === "multiselect" ? "bg-white shadow-sm text-red-600" : "text-slate-400 hover:text-slate-600"}`}
-                        >
-                          <ListChecks size={13} />
-                        </button>
-                      </div>
-
-                      {/* Refrescar */}
-                      <button
-                        onClick={handleRefresh}
-                        title="Refrescar datos"
-                        className="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-300 hover:bg-red-50 transition-all"
-                      >
-                        <RefreshCw size={13} className={refreshSpin ? "animate-spin" : ""} />
-                      </button>
-                    </div>
-                  )}
-                </div>
+                <FilterRow
+                  key={filter.id}
+                  filter={filter}
+                  onChange={updateFilter}
+                  onRemove={removeFilter}
+                  canRemove={filters.length > 1}
+                  inputRef={idx === 0 ? firstInputRef : undefined}
+                />
               ))}
+              <button onClick={addFilter} title="Añadir filtro"
+                className="flex items-center justify-center w-7 h-7 rounded-md border border-slate-200 text-slate-500 bg-white hover:bg-slate-50 shadow-sm transition-colors">
+                <Plus size={13} />
+              </button>
+              <button onClick={clearAllFilters} title="Limpiar filtros"
+                className={`flex items-center justify-center w-7 h-7 rounded-md border bg-white shadow-sm transition-colors ${hasActiveFilters || filters.length > 1 ? "border-red-300 text-red-500 hover:bg-red-50" : "border-slate-200 text-slate-300"}`}>
+                <ListFilter size={12} />
+              </button>
+            </div>
+            <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+              <span className="text-xs font-medium text-slate-500 whitespace-nowrap">
+                {filtered.length !== expedientes.length
+                  ? <span className="text-amber-600 font-medium">{filtered.length} de {expedientes.length}</span>
+                  : <>{expedientes.length} {expedientes.length === 1 ? "registro" : "registros"}</>}
+              </span>
+              <div className="flex items-center bg-white rounded-md border border-slate-200 shadow-sm p-0.5">
+                <button onClick={() => switchView("list")} title="Vista listado"
+                  className={`px-2 py-1 rounded transition-all ${viewMode === "list" ? "bg-red-50 text-red-600 border border-red-100" : "text-slate-400 hover:text-slate-600"}`}>
+                  <AlignJustify size={12} />
+                </button>
+                <button onClick={() => switchView("detail")} title="Vista detalle"
+                  className={`px-2 py-1 transition-all ${viewMode === "detail" ? "text-red-600 bg-red-50" : "text-slate-400 hover:text-slate-600"}`}>
+                  <LayoutList size={12} />
+                </button>
+                <button onClick={() => switchView("multiselect")} title="Selección múltiple"
+                  className={`px-2 py-1 transition-all ${viewMode === "multiselect" ? "text-red-600 bg-red-50" : "text-slate-400 hover:text-slate-600"}`}>
+                  <ListChecks size={12} />
+                </button>
+              </div>
+              <button onClick={handleRefresh} title="Refrescar datos"
+                className="p-1.5 border border-slate-200 rounded-md text-slate-400 hover:text-red-600 hover:border-red-300 hover:bg-red-50 transition-all bg-white shadow-sm w-8 h-8 flex items-center justify-center">
+                <RefreshCw size={13} className={refreshSpin ? "animate-spin" : ""} />
+              </button>
             </div>
           </div>
 
@@ -6292,11 +6109,11 @@ export default function ExpedienteList() {
                   {visibleColumns.tipo && <Th label="Tipo de Expediente"     sk="tipo"           sort={sort} dir={dir} onSort={handleSort} className="w-40" />}
                   {visibleColumns.cliente_nombre && <Th label="Cliente"                sk="cliente_nombre" sort={sort} dir={dir} onSort={handleSort} className="w-36" />}
                   {visibleColumns.contrario && <Th label="Contrario"              sk="contrario"      sort={sort} dir={dir} onSort={handleSort} className="w-36" />}
-                  {visibleColumns.procurador && <Th label="Procurador Propio"                          sort={sort} dir={dir} onSort={handleSort} className="w-32 hidden xl:table-cell" />}
-                  {visibleColumns.juzgado && <Th label="Juzgado Principal"      sk="juzgado"        sort={sort} dir={dir} onSort={handleSort} className="w-44 hidden lg:table-cell" />}
-                  {visibleColumns.tipo_proc && <Th label="Tipo Procedimiento"                         sort={sort} dir={dir} onSort={handleSort} className="w-28 hidden xl:table-cell" />}
-                  {visibleColumns.num_autos && <Th label="Núm. Autos"                                 sort={sort} dir={dir} onSort={handleSort} className="w-24 hidden lg:table-cell" />}
-                  {visibleColumns.nig && <Th label="NIG"                                        sort={sort} dir={dir} onSort={handleSort} className="w-28 hidden xl:table-cell" />}
+                  {visibleColumns.procurador && <Th label="Procurador Propio"                          sort={sort} dir={dir} onSort={handleSort} className="w-32" />}
+                  {visibleColumns.juzgado && <Th label="Juzgado Principal"      sk="juzgado"        sort={sort} dir={dir} onSort={handleSort} className="w-44" />}
+                  {visibleColumns.tipo_proc && <Th label="Tipo Procedimiento"                         sort={sort} dir={dir} onSort={handleSort} className="w-28" />}
+                  {visibleColumns.num_autos && <Th label="Núm. Autos"                                 sort={sort} dir={dir} onSort={handleSort} className="w-24" />}
+                  {visibleColumns.nig && <Th label="NIG"                                        sort={sort} dir={dir} onSort={handleSort} className="w-28" />}
                   {visibleColumns.estado && <Th label="Estado"                 sk="estado"         sort={sort} dir={dir} onSort={handleSort} className="w-24" />}
                   <th className="px-3 py-2.5 w-10" />
                 </tr>
@@ -6385,27 +6202,27 @@ export default function ExpedienteList() {
                       </td>}
 
                       {/* Procurador */}
-                      {visibleColumns.procurador && <td className="px-3 py-3 text-slate-400 hidden xl:table-cell truncate max-w-[120px]">
+                      {visibleColumns.procurador && <td className="px-3 py-3 text-slate-400 truncate max-w-[120px]">
                         {exp.procurador || <span className="text-slate-200">—</span>}
                       </td>}
 
                       {/* Juzgado */}
-                      {visibleColumns.juzgado && <td className="px-3 py-3 text-slate-400 hidden lg:table-cell truncate max-w-[150px]">
+                      {visibleColumns.juzgado && <td className="px-3 py-3 text-slate-400 truncate max-w-[150px]">
                         {exp.juzgado || <span className="text-slate-200">—</span>}
                       </td>}
 
                       {/* Tipo proc */}
-                      {visibleColumns.tipo_proc && <td className="px-3 py-3 text-slate-400 uppercase hidden xl:table-cell whitespace-nowrap">
+                      {visibleColumns.tipo_proc && <td className="px-3 py-3 text-slate-400 uppercase whitespace-nowrap">
                         {exp.tipo_proc || <span className="text-slate-200">—</span>}
                       </td>}
 
                       {/* Núm. Autos */}
-                      {visibleColumns.num_autos && <td className="px-3 py-3 font-mono text-slate-400 hidden lg:table-cell">
+                      {visibleColumns.num_autos && <td className="px-3 py-3 font-mono text-slate-400">
                         {exp.num_autos || <span className="text-slate-200">—</span>}
                       </td>}
 
                       {/* NIG */}
-                      {visibleColumns.nig && <td className="px-3 py-3 font-mono text-slate-300 hidden xl:table-cell">
+                      {visibleColumns.nig && <td className="px-3 py-3 font-mono text-slate-300">
                         {exp.nig ? <span title={exp.nig}>{exp.nig.slice(0,12)}{exp.nig.length > 12 ? "…" : ""}</span> : <span className="text-slate-200">—</span>}
                       </td>}
 
@@ -6568,8 +6385,8 @@ export default function ExpedienteList() {
           )}
 
           {/* ── Confirmar borrado masivo ── */}
-          {bulkDeleteConfirm && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent">
+          {bulkDeleteConfirm && createPortal(
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
               <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm mx-4 p-6">
                 <div className="flex items-start gap-3 mb-4">
                   <div className="p-2 bg-red-100 rounded-xl shrink-0">
@@ -6585,7 +6402,8 @@ export default function ExpedienteList() {
                   <button onClick={handleBulkDelete} className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg active:scale-95">Dar de baja</button>
                 </div>
               </div>
-            </div>
+            </div>,
+            document.body
           )}
 
           {viewMode === "detail" && (

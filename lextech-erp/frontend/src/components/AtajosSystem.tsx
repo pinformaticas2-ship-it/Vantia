@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   Bookmark, Plus, X, Search, ChevronDown, Check,
   Pencil, Trash2, Settings, AlertTriangle, ChevronUp,
@@ -591,15 +592,20 @@ export function ListadoAtajosModal({
 export function AtajosButton({ modulo }: { modulo: string }) {
   const [atajos, setAtajos]           = useState<Atajo[]>(loadAtajos());
   const [open, setOpen]               = useState(false);
+  const [menuPos, setMenuPos]         = useState({ top: 0, left: 0 });
   const [showListado, setShowListado] = useState(false);
   const [showNuevo, setShowNuevo]     = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const reload = () => setAtajos(loadAtajos());
 
   useEffect(() => {
     function outside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (
+        btnRef.current && !btnRef.current.contains(e.target as Node) &&
+        menuRef.current && !menuRef.current.contains(e.target as Node)
+      ) setOpen(false);
     }
     document.addEventListener("mousedown", outside);
     return () => document.removeEventListener("mousedown", outside);
@@ -622,63 +628,76 @@ export function AtajosButton({ modulo }: { modulo: string }) {
     setShowNuevo(false);
   };
 
+  const openMenu = () => {
+    if (btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setMenuPos({ top: r.bottom + 4, left: r.left });
+    }
+    setOpen(v => !v);
+  };
+
   return (
     <>
-      <div className="relative" ref={ref}>
+      <div className="relative">
         <button
-          onClick={() => setOpen(v => !v)}
+          ref={btnRef}
+          onClick={openMenu}
           className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors border ${open ? "bg-amber-50 border-amber-300 text-amber-700" : "text-slate-600 hover:bg-slate-100 border-slate-200"}`}
         >
           <Bookmark size={13} /> Atajos <ChevronDown size={10} />
         </button>
-
-        {open && (
-          <div className="absolute left-0 top-full mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[240px] py-1.5 max-h-[70vh] overflow-y-auto">
-
-            {visibles.length === 0 ? (
-              <div className="px-4 py-6 text-center">
-                <Bookmark size={22} className="text-slate-200 mx-auto mb-2" />
-                <p className="text-xs text-slate-400 font-medium">No hay atajos configurados</p>
-                <p className="text-[10px] text-slate-300 mt-0.5">Crea el primero con "Añadir nuevo"</p>
-              </div>
-            ) : (
-              Object.entries(porCarpeta).map(([carpeta, items]) => (
-                <div key={carpeta}>
-                  {Object.keys(porCarpeta).length > 1 && (
-                    <div className="px-3.5 pt-2 pb-1">
-                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{carpeta}</span>
-                    </div>
-                  )}
-                  {items.map(a => (
-                    <button
-                      key={a.id}
-                      onClick={() => { setOpen(false); alert(`Ejecutando: ${a.nombre}`); }}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-amber-50 hover:text-amber-800 transition-colors text-left"
-                    >
-                      <Bookmark size={11} className="text-amber-400 shrink-0" />
-                      {a.nombre}
-                    </button>
-                  ))}
-                  <div className="h-px bg-slate-100 my-1" />
-                </div>
-              ))
-            )}
-
-            <button
-              onClick={() => { setOpen(false); setShowNuevo(true); }}
-              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-colors italic"
-            >
-              <Plus size={11} className="text-slate-300" /> &lt;Añadir nuevo&gt;
-            </button>
-            <button
-              onClick={() => { setOpen(false); setShowListado(true); }}
-              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-colors italic"
-            >
-              <Settings size={11} className="text-slate-300" /> &lt;Configurar Atajos&gt;
-            </button>
-          </div>
-        )}
       </div>
+
+      {open && typeof document !== "undefined" && createPortal(
+        <div
+          ref={menuRef}
+          style={{ position: "fixed", top: menuPos.top, left: menuPos.left, zIndex: 9999 }}
+          className="bg-white border border-slate-200 rounded-xl shadow-xl min-w-[240px] py-1 max-h-[70vh] overflow-y-auto"
+        >
+          {visibles.length === 0 ? (
+            <div className="px-4 py-6 text-center">
+              <Bookmark size={22} className="text-slate-200 mx-auto mb-2" />
+              <p className="text-xs text-slate-400 font-medium">No hay atajos configurados</p>
+              <p className="text-[10px] text-slate-300 mt-0.5">Crea el primero con "Añadir nuevo"</p>
+            </div>
+          ) : (
+            Object.entries(porCarpeta).map(([carpeta, items]) => (
+              <div key={carpeta}>
+                {Object.keys(porCarpeta).length > 1 && (
+                  <div className="px-3.5 pt-2 pb-1">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{carpeta}</span>
+                  </div>
+                )}
+                {items.map(a => (
+                  <button
+                    key={a.id}
+                    onClick={() => { setOpen(false); alert(`Ejecutando: ${a.nombre}`); }}
+                    className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors text-left"
+                  >
+                    <Bookmark size={13} className="text-slate-400 shrink-0" />
+                    {a.nombre}
+                  </button>
+                ))}
+                <div className="h-px bg-slate-100 my-1" />
+              </div>
+            ))
+          )}
+          <div className="h-px bg-slate-100 my-1" />
+          <button
+            onClick={() => { setOpen(false); setShowNuevo(true); }}
+            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors"
+          >
+            <Plus size={13} className="text-slate-300 shrink-0" /> Añadir atajo
+          </button>
+          <button
+            onClick={() => { setOpen(false); setShowListado(true); }}
+            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors"
+          >
+            <Settings size={13} className="text-slate-300 shrink-0" /> Configurar Atajos
+          </button>
+        </div>,
+        document.body
+      )}
 
       {showListado && (
         <ListadoAtajosModal

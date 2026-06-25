@@ -1,4 +1,7 @@
-﻿import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+﻿import React, { useState, useEffect, useRef, useCallback, useMemo, createContext, useContext } from "react";
+
+export const SidebarContext = createContext({ isCollapsed: false });
+export function useSidebar() { return useContext(SidebarContext); }
 import { Spinner } from "../components/Spinner";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import {
@@ -927,6 +930,7 @@ export default function DashboardLayout() {
   const totalBadge = visibleNotifications.length + (!hiddenKinds.has("email") && emailUnreadCount > 0 ? 1 : 0);
 
   return (
+    <SidebarContext.Provider value={{ isCollapsed }}>
     <div className="erp-shell min-h-screen flex font-sans antialiased text-neutral-900">
 
       {latestUnread && !location.pathname.startsWith("/dashboard/correo") && (
@@ -1054,7 +1058,7 @@ export default function DashboardLayout() {
                   location.pathname.startsWith('/dashboard/expedientes/') ||
                   location.pathname.startsWith('/dashboard/clientes/')
                 )
-                  ? 'w-full h-full p-4 md:p-8 module-page'
+                  ? 'w-full h-full module-page'
                   : 'max-w-[1600px] mx-auto p-4 md:p-8 module-page'
             }>
             <Outlet />
@@ -1062,6 +1066,7 @@ export default function DashboardLayout() {
         </div>
       </main>
     </div>
+    </SidebarContext.Provider>
   );
 }
 

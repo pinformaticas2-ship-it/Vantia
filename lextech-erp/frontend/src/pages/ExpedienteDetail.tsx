@@ -1,4 +1,5 @@
-﻿import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
+﻿import React, { useEffect, useState, useCallback, useMemo, useRef, useContext } from "react";
+import { SidebarContext } from "../layouts/DashboardLayout";
 import { createPortal } from "react-dom";
 import { useParams, useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
@@ -159,7 +160,7 @@ type DetailTabKey = "perfil" | TabKey | "relacionados" | "actuacion" | "economic
 
 const DETAIL_TABS: { key: DetailTabKey; label: string; icon: any }[] = [
   { key: "perfil",      label: "Datos",                  icon: User },
-  { key: "clientes",    label: "Cliente",                icon: Users },
+  { key: "clientes",    label: "Propio",                 icon: Users },
   { key: "contrarios",  label: "Contrarios",             icon: Users },
   { key: "adjuntos",    label: "Adjuntos",               icon: Paperclip },
   { key: "agenda",      label: "Agenda",                 icon: Calendar },
@@ -3750,6 +3751,16 @@ function TabClienteVinculado({ exp, clientes, linkedClient, linkedClientDisplayN
   const [clientSearch, setClientSearch] = useState("");
   const [showPicker, setShowPicker] = useState(false);
   const [linkSaving, setLinkSaving] = useState(false);
+  const [abogadoEdit, setAbogadoEdit] = useState(false);
+  const [abogadoVal, setAbogadoVal] = useState(exp.abogado_propio || "");
+  const [abogadoSaving, setAbogadoSaving] = useState(false);
+  const [procuradorEdit, setProcuradorEdit] = useState(false);
+  const [procuradorVal, setProcuradorVal] = useState(exp.procurador || "");
+  const [procuradorSaving, setProcuradorSaving] = useState(false);
+
+  // Sync local values when exp changes from outside (e.g. saved in Datos tab)
+  useEffect(() => { if (!abogadoEdit) setAbogadoVal(exp.abogado_propio || ""); }, [exp.abogado_propio]);
+  useEffect(() => { if (!procuradorEdit) setProcuradorVal(exp.procurador || ""); }, [exp.procurador]);
 
   const filtered = clientSearch.trim()
     ? clientes.filter(c => {
@@ -3779,7 +3790,7 @@ function TabClienteVinculado({ exp, clientes, linkedClient, linkedClientDisplayN
         <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Users size={14} className="text-slate-400" />
-            <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Cliente vinculado</h3>
+            <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Cliente</h3>
           </div>
           {!isClosed && exp.cliente_id && !showPicker && (
             <div className="flex items-center gap-2">
@@ -3864,6 +3875,98 @@ function TabClienteVinculado({ exp, clientes, linkedClient, linkedClientDisplayN
           )}
         </div>
       </div>
+
+      {/* ── Abogado propio ── */}
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <User size={14} className="text-slate-400" />
+            <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Abogado</h3>
+          </div>
+          {!isClosed && !abogadoEdit && (
+            <button type="button" onClick={() => setAbogadoEdit(true)} className="text-xs font-bold text-red-600 hover:underline">Editar</button>
+          )}
+        </div>
+        <div className="px-5 py-4">
+          {abogadoEdit ? (
+            <div className="flex items-center gap-2">
+              <input
+                autoFocus
+                value={abogadoVal}
+                onChange={e => setAbogadoVal(e.target.value)}
+                placeholder="Nombre del abogado propio…"
+                className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-red-400"
+              />
+              <button
+                type="button"
+                disabled={abogadoSaving}
+                onClick={async () => {
+                  setAbogadoSaving(true);
+                  await onPatch({ abogado_propio: abogadoVal.trim() || null });
+                  setAbogadoSaving(false);
+                  setAbogadoEdit(false);
+                }}
+                className="px-3 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl disabled:opacity-50"
+              >
+                {abogadoSaving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+              </button>
+              <button type="button" onClick={() => { setAbogadoEdit(false); setAbogadoVal(exp.abogado_propio || ""); }} className="px-3 py-2 text-xs text-slate-400 hover:text-slate-600">
+                <X size={13} />
+              </button>
+            </div>
+          ) : exp.abogado_propio ? (
+            <p className="text-sm font-medium text-slate-800">{exp.abogado_propio}</p>
+          ) : (
+            <p className="text-sm text-slate-400 italic">Sin abogado asignado</p>
+          )}
+        </div>
+      </div>
+
+      {/* ── Procurador propio ── */}
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Briefcase size={14} className="text-slate-400" />
+            <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Procurador</h3>
+          </div>
+          {!isClosed && !procuradorEdit && (
+            <button type="button" onClick={() => setProcuradorEdit(true)} className="text-xs font-bold text-red-600 hover:underline">Editar</button>
+          )}
+        </div>
+        <div className="px-5 py-4">
+          {procuradorEdit ? (
+            <div className="flex items-center gap-2">
+              <input
+                autoFocus
+                value={procuradorVal}
+                onChange={e => setProcuradorVal(e.target.value)}
+                placeholder="Nombre del procurador propio…"
+                className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-red-400"
+              />
+              <button
+                type="button"
+                disabled={procuradorSaving}
+                onClick={async () => {
+                  setProcuradorSaving(true);
+                  await onPatch({ procurador: procuradorVal.trim() || null });
+                  setProcuradorSaving(false);
+                  setProcuradorEdit(false);
+                }}
+                className="px-3 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl disabled:opacity-50"
+              >
+                {procuradorSaving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+              </button>
+              <button type="button" onClick={() => { setProcuradorEdit(false); setProcuradorVal(exp.procurador || ""); }} className="px-3 py-2 text-xs text-slate-400 hover:text-slate-600">
+                <X size={13} />
+              </button>
+            </div>
+          ) : exp.procurador ? (
+            <p className="text-sm font-medium text-slate-800">{exp.procurador}</p>
+          ) : (
+            <p className="text-sm text-slate-400 italic">Sin procurador asignado</p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -3873,6 +3976,13 @@ function TabContrarios({ exp, onPatch }: { exp: any; onPatch: (fields: Record<st
   const [editing, setEditing] = useState(false);
   const [cForm, setCForm] = useState({ contrario: exp.contrario || "", procurador_contrario: exp.procurador_contrario || "", abogado_contrario: exp.abogado_contrario || "" });
   const [saving, setSaving] = useState(false);
+
+  // Sync cForm when exp changes from outside (e.g. saved in Datos tab) but user is not editing
+  useEffect(() => {
+    if (!editing) {
+      setCForm({ contrario: exp.contrario || "", procurador_contrario: exp.procurador_contrario || "", abogado_contrario: exp.abogado_contrario || "" });
+    }
+  }, [exp.contrario, exp.procurador_contrario, exp.abogado_contrario]);
 
   const isClosed = exp?.estado === "cerrado";
   const hasData = !!(exp.contrario || exp.procurador_contrario || exp.abogado_contrario);
@@ -4701,6 +4811,7 @@ function PanelIndicadoresExpediente({ expedienteId, onTabChange }: { expedienteI
 export default function ExpedienteDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { isCollapsed } = useContext(SidebarContext);
   const [searchParams, setSearchParams] = useSearchParams();
   const { getToken } = useAuth();
 
@@ -4717,6 +4828,9 @@ export default function ExpedienteDetail() {
   const [billingLoading, setBillingLoading] = useState(false);
   const [agendaEvents, setAgendaEvents] = useState<any[] | null>(null);
   const [agendaLoading, setAgendaLoading] = useState(false);
+  const [showAgendaForm, setShowAgendaForm] = useState(false);
+  const [agendaSaving, setAgendaSaving] = useState(false);
+  const [agendaForm, setAgendaForm] = useState({ title: "", type: "cita", start_at: "", end_at: "", all_day: false, description: "", status: "pendiente" });
   const [notificaciones, setNotificaciones] = useState<any[] | null>(null);
   const [notifLoading, setNotifLoading] = useState(false);
   const [historial, setHistorial] = useState<any[] | null>(null);
@@ -4868,7 +4982,7 @@ export default function ExpedienteDetail() {
       const res = await fetch(`/api/expedientes/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...exp, ...form }),
       });
       const d = await safeJson(res);
       if (!res.ok) {
@@ -5006,136 +5120,125 @@ export default function ExpedienteDetail() {
       contacto: exp.contacto || "",
       centro: exp.centro || "",
       color: exp.color || "ninguno",
+      abogado_propio: exp.abogado_propio || "",
+      abogado_contrario: exp.abogado_contrario || "",
+      procurador_contrario: exp.procurador_contrario || "",
     });
     setEditing(true);
     setTab("perfil");
   };
 
   return (
-    <div className="flex gap-6 h-full animate-in fade-in duration-500">
-      <div className="flex-1 min-w-0 flex flex-col min-h-0 gap-4">
-        <div className="flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2 text-sm text-slate-500 min-w-0 overflow-hidden">
-            <Link to="/dashboard/expedientes" className="hover:text-slate-800 transition-colors shrink-0">
-              Expedientes
-            </Link>
-            <span className="shrink-0">/</span>
-            <span className="text-slate-800 font-medium truncate">
-              {exp.descripcion || `${exp.anio}/${exp.num_exp}`}
-            </span>
+    <div className="flex flex-col h-full animate-in fade-in duration-500 overflow-hidden">
+
+      {/* ── Sticky header ── */}
+      <div className="px-6 sm:px-8 py-4 bg-white border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 flex-shrink-0 shadow-sm z-20">
+        <div className="flex items-center gap-4 min-w-0">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500 to-red-600 text-white flex items-center justify-center shadow-md shadow-red-500/20 flex-shrink-0">
+            <FolderOpen size={22} />
           </div>
-          <div className="flex gap-2 shrink-0">
-            <BackButton onClick={() => navigate("/dashboard/expedientes")} />
-            {editing ? (
-              <>
-                <button
-                  onClick={() => { setEditing(false); setEditForm(null); }}
-                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl shadow-sm active:scale-95 transition-all"
-                >
-                  <X size={14} /> Cancelar
-                </button>
-                <button
-                  onClick={() => handleSave(editForm)}
-                  disabled={saving || !editForm?.descripcion?.trim()}
-                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-xl shadow-sm active:scale-95 transition-all"
-                >
-                  {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-                  Guardar cambios
-                </button>
-              </>
-            ) : exp?.estado === "cerrado" ? (
-              <button
-                onClick={handleToggleEstado}
-                disabled={saving}
-                className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-50 rounded-xl shadow-sm active:scale-95 transition-all"
-              >
-                {saving ? <Loader2 size={14} className="animate-spin" /> : <FolderOpen size={14} />}
-                Reabrir expediente
+          <div className="flex flex-col justify-center min-w-0">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <h1 className="text-xl font-extrabold text-slate-800 leading-none tracking-tight truncate">
+                {exp.descripcion || "Sin descripción"}
+              </h1>
+              <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest leading-none ${estadoConf.color}`}>
+                {estadoConf.label}
+              </span>
+              <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest leading-none ${tipoConf.color}`}>
+                {tipoConf.label}
+              </span>
+            </div>
+            <div className="flex items-center gap-4 text-[11px] font-medium text-slate-500 flex-wrap">
+              {exp.tipos_asunto && <span className="font-bold text-slate-700 tracking-wide uppercase">{exp.tipos_asunto}</span>}
+              <span className="flex items-center gap-1.5"><Hash size={11} className="text-slate-400" /> {exp.anio}/{exp.num_exp}</span>
+              {exp.fecha_inicio && <span className="flex items-center gap-1.5"><Calendar size={11} className="text-slate-400" /> Alta: {fmtDate(exp.fecha_inicio)}</span>}
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2.5 shrink-0">
+          <BackButton onClick={() => navigate("/dashboard/expedientes")} />
+          {editing ? (
+            <>
+              <button onClick={() => { setEditing(false); setEditForm(null); }} className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl shadow-sm active:scale-95 transition-all">
+                <X size={14} /> Cancelar
               </button>
-            ) : (
-              <>
-                <button
-                  onClick={handleToggleEstado}
-                  disabled={saving}
-                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50 rounded-xl shadow-sm active:scale-95 transition-all"
-                >
-                  {saving ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
-                  Cerrar expediente
-                </button>
-                <button
-                  onClick={startEdit}
-                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm active:scale-95 transition-all"
-                >
-                  <Edit3 size={14} /> Editar
-                </button>
-              </>
+              <button onClick={() => handleSave(editForm)} disabled={saving || !editForm?.descripcion?.trim()} className="flex items-center gap-1.5 px-5 py-2.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-xl shadow-sm active:scale-95 transition-all ml-1">
+                {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Guardar cambios
+              </button>
+            </>
+          ) : exp?.estado === "cerrado" ? (
+            <button onClick={handleToggleEstado} disabled={saving} className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-50 rounded-xl shadow-sm active:scale-95 transition-all">
+              {saving ? <Loader2 size={14} className="animate-spin" /> : <FolderOpen size={14} />} Reabrir expediente
+            </button>
+          ) : (
+            <>
+              <button onClick={handleToggleEstado} disabled={saving} className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-red-50 hover:text-red-600 hover:border-red-200 disabled:opacity-50 rounded-xl shadow-sm active:scale-95 transition-all">
+                {saving ? <Loader2 size={14} className="animate-spin" /> : <X size={14} className="text-slate-400" />} Cerrar exp.
+              </button>
+              <button onClick={startEdit} className="flex items-center gap-1.5 px-5 py-2.5 text-xs font-bold text-white bg-red-600 border border-red-700 hover:bg-red-700 rounded-xl shadow-sm active:scale-95 transition-all ml-1">
+                <Edit3 size={14} /> Editar
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* ── 3-column body ── */}
+      <div className="flex-1 overflow-auto bg-[#f4f6f8]">
+        <div className={`w-full p-6 sm:p-8 flex flex-col gap-8 items-start ${isCollapsed ? "md:flex-row" : "lg:flex-row"}`}>
+
+          {/* Columna 1: Nav vertical */}
+          <div className={`w-full flex-shrink-0 ${isCollapsed ? "md:w-56 md:sticky md:top-6" : "lg:w-56 lg:sticky lg:top-6"}`}>
+            <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 mb-3">Secciones del Expediente</h3>
+            <nav className="flex flex-col gap-0.5">
+              {DETAIL_TABS.slice(0, 8).map((tabItem) => {
+                const Icon = tabItem.icon;
+                const active = tab === tabItem.key;
+                return (
+                  <button key={tabItem.key} onClick={() => setTab(tabItem.key)}
+                    className={`rounded-xl px-4 py-2.5 flex items-center gap-3 text-sm transition-all text-left ${active ? "bg-white text-red-600 shadow-sm ring-1 ring-slate-200/50 font-semibold" : "text-slate-600 hover:bg-white hover:shadow-sm hover:text-slate-900 font-medium"}`}
+                  >
+                    <Icon size={14} className={active ? "text-red-500 shrink-0" : "text-slate-400 shrink-0"} />
+                    {tabItem.label}
+                    {active && <div className="w-1.5 h-1.5 rounded-full bg-red-500 ml-auto shrink-0 shadow-[0_0_6px_rgba(239,68,68,0.7)]" />}
+                  </button>
+                );
+              })}
+              <div className="h-px w-full bg-slate-200 my-1.5" />
+              {DETAIL_TABS.slice(8).map((tabItem) => {
+                const Icon = tabItem.icon;
+                const active = tab === tabItem.key;
+                return (
+                  <button key={tabItem.key} onClick={() => setTab(tabItem.key)}
+                    className={`rounded-xl px-4 py-2.5 flex items-center gap-3 text-sm transition-all text-left ${active ? "bg-white text-red-600 shadow-sm ring-1 ring-slate-200/50 font-semibold" : "text-slate-600 hover:bg-white hover:shadow-sm hover:text-slate-900 font-medium"}`}
+                  >
+                    <Icon size={14} className={active ? "text-red-500 shrink-0" : "text-slate-400 shrink-0"} />
+                    {tabItem.label}
+                    {active && <div className="w-1.5 h-1.5 rounded-full bg-red-500 ml-auto shrink-0 shadow-[0_0_6px_rgba(239,68,68,0.7)]" />}
+                  </button>
+                );
+              })}
+              <div className="h-px w-full bg-slate-200 my-1.5" />
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-4 mt-1 mb-1">Acciones Rápidas</p>
+              <button className="text-slate-700 hover:bg-white hover:shadow-sm hover:text-slate-900 rounded-xl px-4 py-2.5 flex items-center gap-3 font-medium text-sm transition-all text-left">
+                <StickyNote size={14} className="text-amber-500 shrink-0" /> Notas
+              </button>
+              <button onClick={() => setTab("relacionados" as any)} className="text-slate-700 hover:bg-white hover:shadow-sm hover:text-slate-900 rounded-xl px-4 py-2.5 flex items-center gap-3 font-medium text-sm transition-all text-left">
+                <Link2 size={14} className="text-indigo-500 shrink-0" /> Exp. relacionados
+              </button>
+            </nav>
+          </div>
+
+          {/* Columna 2: Contenido principal */}
+          <div className="flex-1 min-w-0 flex flex-col gap-6 w-full">
+            {exp.estado === "cerrado" && !editing && (
+              <div className="flex items-center gap-3 px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm text-slate-500 shadow-sm">
+                <X size={15} className="shrink-0 text-slate-400" />
+                <span>Este expediente está <strong className="text-slate-700">cerrado</strong>. No se pueden realizar modificaciones. Pulsa <strong className="text-emerald-700">Reabrir expediente</strong> para editarlo.</span>
+              </div>
             )}
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-xl p-5 shrink-0">
-          <div className="flex items-center gap-4">
-            <div className="h-16 w-16 bg-gradient-to-br from-red-500 to-red-700 rounded-xl flex items-center justify-center text-white shadow-lg shadow-red-200 shrink-0">
-              <FolderOpen size={28} />
-            </div>
-
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-xl font-bold text-slate-900 truncate">
-                  {exp.descripcion || "Sin descripción"}
-                </h1>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${estadoConf.color}`}>
-                  {estadoConf.label}
-                </span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${tipoConf.color}`}>
-                  {tipoConf.label}
-                </span>
-              </div>
-              {exp.tipos_asunto && <p className="text-slate-500 text-sm mt-0.5">{exp.tipos_asunto}</p>}
-              <div className="flex items-center gap-4 mt-2 text-xs text-slate-400 flex-wrap">
-                <span className="flex items-center gap-1 font-mono">
-                  <Hash size={11} />
-                  {exp.anio}/{exp.num_exp}
-                </span>
-                {exp.ref_expediente && (
-                  <span className="flex items-center gap-1 font-mono">
-                    <Hash size={11} />
-                    {exp.ref_expediente}
-                  </span>
-                )}
-                {exp.fecha_inicio && (
-                  <span className="flex items-center gap-1">
-                    <Calendar size={11} /> Alta: {fmtDate(exp.fecha_inicio)}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden flex-1 min-h-0 flex flex-col">
-          <div className="flex border-b border-slate-100 shrink-0">
-            {DETAIL_TABS.map((tabItem) => {
-              const Icon = tabItem.icon;
-              const active = tab === tabItem.key;
-              return (
-                <button
-                  key={tabItem.key}
-                  onClick={() => setTab(tabItem.key)}
-                  className={`flex items-center gap-2 px-5 py-3.5 text-[12px] font-bold whitespace-nowrap transition-all border-b-2 ${
-                    active
-                      ? "border-red-600 text-red-600 bg-red-50/50"
-                      : "border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50"
-                  }`}
-                >
-                  <Icon size={13} />
-                  {tabItem.label}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="p-5 flex-1 overflow-y-auto min-h-0">
+            <div>
             {tab === "perfil" && !editing && (
               <div className="space-y-4">
                 {exp.estado === "cerrado" && (
@@ -5583,72 +5686,219 @@ export default function ExpedienteDetail() {
                 cancelado:   "bg-slate-100 text-slate-500",
               };
               const expEvents = (agendaEvents || []).filter((e: any) => e.expediente_id === id);
+
+              const handleCreateEvent = async (e: React.FormEvent) => {
+                e.preventDefault();
+                if (!agendaForm.title.trim() || !agendaForm.start_at) return;
+                setAgendaSaving(true);
+                try {
+                  const token = await getToken({ skipCache: true });
+                  const body = {
+                    title: agendaForm.title.trim(),
+                    type: agendaForm.type,
+                    start_at: agendaForm.all_day ? agendaForm.start_at + "T00:00:00" : agendaForm.start_at,
+                    end_at: agendaForm.end_at ? (agendaForm.all_day ? agendaForm.end_at + "T23:59:00" : agendaForm.end_at) : null,
+                    all_day: agendaForm.all_day,
+                    description: agendaForm.description || null,
+                    status: agendaForm.status,
+                    expediente_id: id,
+                    source: "manual",
+                  };
+                  const res = await fetch("/api/agenda", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                    body: JSON.stringify(body),
+                  });
+                  const d = await safeJson(res);
+                  if (!res.ok) { alert(d.error || "Error al crear el evento"); return; }
+                  setAgendaEvents(prev => [d.data, ...(prev || [])]);
+                  setShowAgendaForm(false);
+                  setAgendaForm({ title: "", type: "cita", start_at: "", end_at: "", all_day: false, description: "", status: "pendiente" });
+                } finally {
+                  setAgendaSaving(false);
+                }
+              };
+
               return (
-                <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-                  <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Calendar size={14} className="text-slate-400" />
-                      <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Eventos de agenda</h3>
+                <div className="space-y-4">
+                  <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
+                    <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Calendar size={14} className="text-slate-400" />
+                        <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Eventos de agenda</h3>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {exp?.estado !== "cerrado" && (
+                          <button
+                            onClick={() => {
+                              const now = new Date();
+                              const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+                              setAgendaForm(f => ({ ...f, start_at: local }));
+                              setShowAgendaForm(v => !v);
+                            }}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                          >
+                            <Plus size={11} /> Nuevo evento
+                          </button>
+                        )}
+                        <Link to="/dashboard/agenda" className="text-xs font-bold text-slate-400 hover:text-slate-600 flex items-center gap-1">
+                          Ver agenda <ChevronRight size={11} />
+                        </Link>
+                      </div>
                     </div>
-                    <Link to="/dashboard/agenda" className="text-xs font-bold text-red-600 hover:underline flex items-center gap-1">
-                      Ir a agenda <ChevronRight size={11} />
-                    </Link>
-                  </div>
-                  {agendaLoading ? (
-                    <div className="flex items-center justify-center py-10">
-                      <Spinner size="sm" muted />
-                    </div>
-                  ) : expEvents.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-12 gap-2 text-slate-300">
-                      <Calendar size={28} className="opacity-30" />
-                      <p className="text-sm font-medium">Sin eventos vinculados a este expediente</p>
-                      <Link to="/dashboard/agenda" className="mt-1 text-xs font-bold text-red-500 hover:underline">Crear evento</Link>
-                    </div>
-                  ) : (
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-slate-100">
-                          <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Título</th>
-                          <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Tipo</th>
-                          <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Fecha inicio</th>
-                          <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Fecha fin</th>
-                          <th className="px-5 py-3 text-center text-[11px] font-bold text-slate-400 uppercase tracking-wider">Estado</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-50">
-                        {expEvents.map((e: any) => (
-                          <tr key={e.id} className="hover:bg-slate-50 transition-colors">
-                            <td className="px-5 py-3 text-xs text-slate-700 font-medium">{e.title}</td>
-                            <td className="px-5 py-3">
-                              <span className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold capitalize ${TYPE_BADGE[e.type] || "bg-slate-100 text-slate-600"}`}>
-                                {e.type || "—"}
-                              </span>
-                            </td>
-                            <td className="px-5 py-3 text-xs text-slate-500">{fmtDate(e.start_at)}</td>
-                            <td className="px-5 py-3 text-xs text-slate-500">{e.end_at ? fmtDate(e.end_at) : "—"}</td>
-                            <td className="px-5 py-3 text-center">
-                              <span className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold capitalize ${STATUS_BADGE[e.status] || "bg-slate-100 text-slate-600"}`}>
-                                {e.status || "—"}
-                              </span>
-                            </td>
+
+                    {/* Formulario de creación rápida */}
+                    {showAgendaForm && (
+                      <form onSubmit={handleCreateEvent} className="border-b border-slate-100 bg-slate-50/60 px-5 py-4 space-y-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="sm:col-span-2">
+                            <input
+                              autoFocus
+                              required
+                              value={agendaForm.title}
+                              onChange={e => setAgendaForm(f => ({ ...f, title: e.target.value }))}
+                              placeholder="Título del evento *"
+                              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-red-400 bg-white"
+                            />
+                          </div>
+                          <div className="flex gap-2">
+                            <select
+                              value={agendaForm.type}
+                              onChange={e => setAgendaForm(f => ({ ...f, type: e.target.value }))}
+                              className="flex-1 px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-red-400 bg-white text-slate-700"
+                            >
+                              <option value="cita">Cita</option>
+                              <option value="plazo">Plazo</option>
+                              <option value="reunion">Reunión</option>
+                              <option value="juicio">Juicio</option>
+                              <option value="otro">Otro</option>
+                            </select>
+                            <select
+                              value={agendaForm.status}
+                              onChange={e => setAgendaForm(f => ({ ...f, status: e.target.value }))}
+                              className="flex-1 px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-red-400 bg-white text-slate-700"
+                            >
+                              <option value="pendiente">Pendiente</option>
+                              <option value="completado">Completado</option>
+                              <option value="cancelado">Cancelado</option>
+                            </select>
+                          </div>
+                          <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={agendaForm.all_day}
+                              onChange={e => setAgendaForm(f => ({ ...f, all_day: e.target.checked }))}
+                              className="rounded"
+                            />
+                            Todo el día
+                          </label>
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Inicio *</label>
+                            <input
+                              required
+                              type={agendaForm.all_day ? "date" : "datetime-local"}
+                              value={agendaForm.all_day ? agendaForm.start_at.slice(0, 10) : agendaForm.start_at}
+                              onChange={e => setAgendaForm(f => ({ ...f, start_at: e.target.value }))}
+                              className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-red-400 bg-white mt-1"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Fin</label>
+                            <input
+                              type={agendaForm.all_day ? "date" : "datetime-local"}
+                              value={agendaForm.all_day ? agendaForm.end_at.slice(0, 10) : agendaForm.end_at}
+                              onChange={e => setAgendaForm(f => ({ ...f, end_at: e.target.value }))}
+                              className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-red-400 bg-white mt-1"
+                            />
+                          </div>
+                          <div className="sm:col-span-2">
+                            <input
+                              value={agendaForm.description}
+                              onChange={e => setAgendaForm(f => ({ ...f, description: e.target.value }))}
+                              placeholder="Descripción (opcional)"
+                              className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-red-400 bg-white"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 pt-1">
+                          <button type="submit" disabled={agendaSaving || !agendaForm.title.trim() || !agendaForm.start_at}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-xl transition-colors">
+                            {agendaSaving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                            Guardar evento
+                          </button>
+                          <button type="button" onClick={() => setShowAgendaForm(false)}
+                            className="px-3 py-2 text-xs text-slate-400 hover:text-slate-600">
+                            Cancelar
+                          </button>
+                        </div>
+                      </form>
+                    )}
+
+                    {agendaLoading ? (
+                      <div className="flex items-center justify-center py-10">
+                        <Spinner size="sm" muted />
+                      </div>
+                    ) : expEvents.length === 0 && !showAgendaForm ? (
+                      <div className="flex flex-col items-center justify-center py-12 gap-2 text-slate-300">
+                        <Calendar size={28} className="opacity-30" />
+                        <p className="text-sm font-medium text-slate-400">Sin eventos vinculados a este expediente</p>
+                        {exp?.estado !== "cerrado" && (
+                          <button onClick={() => setShowAgendaForm(true)} className="mt-1 text-xs font-bold text-red-500 hover:underline">
+                            + Crear primer evento
+                          </button>
+                        )}
+                      </div>
+                    ) : expEvents.length > 0 ? (
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-slate-100">
+                            <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Título</th>
+                            <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Tipo</th>
+                            <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Fecha inicio</th>
+                            <th className="px-5 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Fecha fin</th>
+                            <th className="px-5 py-3 text-center text-[11px] font-bold text-slate-400 uppercase tracking-wider">Estado</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                          {expEvents.map((e: any) => (
+                            <tr key={e.id} className="hover:bg-slate-50 transition-colors">
+                              <td className="px-5 py-3 text-xs text-slate-700 font-medium">{e.title}</td>
+                              <td className="px-5 py-3">
+                                <span className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold capitalize ${TYPE_BADGE[e.type] || "bg-slate-100 text-slate-600"}`}>
+                                  {e.type || "—"}
+                                </span>
+                              </td>
+                              <td className="px-5 py-3 text-xs text-slate-500">{fmtDate(e.start_at)}</td>
+                              <td className="px-5 py-3 text-xs text-slate-500">{e.end_at ? fmtDate(e.end_at) : "—"}</td>
+                              <td className="px-5 py-3 text-center">
+                                <span className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold capitalize ${STATUS_BADGE[e.status] || "bg-slate-100 text-slate-600"}`}>
+                                  {e.status || "—"}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : null}
+                  </div>
                 </div>
               );
             })()}
           </div>
-        </div>
-      </div>
+          </div>{/* closes col2 */}
 
-      {id && (
-        <PanelIndicadoresExpediente
-          expedienteId={id}
-          onTabChange={(t) => setTab(t as any)}
-        />
-      )}
+          {/* Columna 3: Panel indicadores */}
+          {id && (
+            <div className={`w-full flex-shrink-0 ${isCollapsed ? "md:w-[280px] md:sticky md:top-6" : "lg:w-[280px] xl:w-[300px] lg:sticky lg:top-6"}`}>
+              <PanelIndicadoresExpediente
+                expedienteId={id}
+                onTabChange={(t) => setTab(t as any)}
+              />
+            </div>
+          )}
+
+        </div>{/* closes inner wrapper */}
+      </div>{/* closes 3-col body */}
     </div>
   );
 }
