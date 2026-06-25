@@ -32,9 +32,10 @@ async function sendViaResend(msg: MailMessage): Promise<void> {
 async function sendViaBrevoApi(msg: MailMessage): Promise<void> {
   const apiKey = process.env.BREVO_API_KEY!;
 
-  const toList  = msg.to.map(addr  => parseAddress(addr));
-  const ccList  = (msg.cc  || []).map(addr => parseAddress(addr));
-  const bccList = (msg.bcc || []).map(addr => parseAddress(addr));
+  const toList  = msg.to.map(addr  => parseAddress(addr)).filter(Boolean) as { email: string; name?: string }[];
+  const ccList  = (msg.cc  || []).map(addr => parseAddress(addr)).filter(Boolean) as { email: string; name?: string }[];
+  const bccList = (msg.bcc || []).map(addr => parseAddress(addr)).filter(Boolean) as { email: string; name?: string }[];
+  if (!toList.length) throw new Error('No hay destinatarios válidos');
 
   const body: Record<string, any> = {
     sender:      { name: msg.fromName || msg.from, email: msg.from },
@@ -65,10 +66,16 @@ async function sendViaBrevoApi(msg: MailMessage): Promise<void> {
   }
 }
 
-function parseAddress(raw: string): { email: string; name?: string } {
-  const m = raw.match(/^(.*?)<([^>]+)>$/);
-  if (m) return { name: m[1].trim().replace(/^"|"$/g, '') || undefined, email: m[2].trim() };
-  return { email: raw.trim() };
+function parseAddress(raw: string): { email: string; name?: string } | null {
+  const s = raw.trim().replace(/[,;]+$/, ''); // strip trailing commas/semicolons
+  if (!s) return null;
+  const m = s.match(/^"?([^"<]*)"?\s*<([^>]+)>$/);
+  if (m) {
+    const name  = m[1].trim() || undefined;
+    const email = m[2].trim();
+    return email.includes('@') ? { email, name } : null;
+  }
+  return s.includes('@') ? { email: s } : null;
 }
 
 function relaySmtpCfg(): SmtpConfig | null {
