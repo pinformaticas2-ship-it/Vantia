@@ -5482,8 +5482,8 @@ export default function ExpedienteList() {
       )}
 
       {showExportModal && typeof document !== "undefined" && createPortal(
-        <div className="fixed inset-0 z-[125] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setShowExportModal(false)}>
-          <div className="flex h-[92vh] w-full max-w-[95vw] flex-col rounded-xl border border-slate-200 bg-white shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[125] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-overlay-in" onClick={() => setShowExportModal(false)}>
+          <div className="flex h-[92vh] w-full max-w-[95vw] flex-col rounded-xl border border-slate-200 bg-white shadow-2xl overflow-hidden animate-modal-in" onClick={(e) => e.stopPropagation()}>
 
             {/* Header */}
             <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-6 py-4 flex-shrink-0 bg-white">
@@ -5643,8 +5643,8 @@ export default function ExpedienteList() {
       )}
 
       {showExportTemplateEditor && typeof document !== "undefined" && createPortal(
-        <div className="fixed inset-0 z-[126] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setShowExportTemplateEditor(false)}>
-          <div className="w-full max-w-4xl rounded-2xl bg-white shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[126] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-overlay-in" onClick={() => setShowExportTemplateEditor(false)}>
+          <div className="w-full max-w-4xl rounded-2xl bg-white shadow-2xl overflow-hidden animate-modal-in" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
               <h3 className="text-xl font-bold text-slate-800">{exportEditorMode === "create" ? "Nueva plantilla de exportación" : "Modificar plantilla de exportación"}</h3>
               <button type="button" onClick={() => setShowExportTemplateEditor(false)} className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors shadow-sm">
