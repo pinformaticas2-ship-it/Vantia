@@ -1301,7 +1301,7 @@ function Sidebar({
   );
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-white border-r border-gray-200">
+    <div className="flex flex-col h-full min-h-0 bg-white border-r border-slate-300/70">
       {/* User info */}
       <div className="px-4 pt-3 pb-3 border-b border-gray-100 flex-shrink-0">
         <div className="flex items-center gap-3">
@@ -1680,24 +1680,21 @@ function EmailItem({
       onDoubleClick={(e) => { e.preventDefault(); onDoubleClick(); }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className={`relative flex items-start gap-2.5 pl-3 pr-3 py-2.5 cursor-pointer border-b border-gray-100 transition-colors ${
+      className={`relative flex items-start gap-3 mx-2 mb-1.5 px-3.5 pt-3 pb-3 rounded-2xl cursor-pointer transition-all duration-200 ${
         selected
-          ? 'bg-red-50/60'
+          ? 'bg-gradient-to-br from-[#ab0433] via-[#c01040] to-[#8f0022] shadow-xl shadow-red-900/50 -translate-y-px'
           : unread
-          ? 'bg-white hover:bg-gray-50'
-          : 'bg-white hover:bg-gray-50'
+          ? 'bg-[#1e2d45] border border-blue-400/20 shadow-md shadow-black/30 hover:-translate-y-px hover:shadow-lg hover:border-blue-400/40'
+          : 'bg-[#161e2e] border border-slate-700/40 hover:-translate-y-px hover:bg-[#1a2540] hover:shadow-md hover:shadow-black/20'
       }`}>
 
-      {/* Unread left stripe */}
-      <div className={`absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full transition-all ${
-        selected ? 'bg-[#ab0433]' : unread ? 'bg-blue-500' : 'bg-transparent'
-      }`} />
-
-      {/* Avatar + unread dot */}
+      {/* Avatar + unread glow ring */}
       <div className="relative mt-0.5 flex-shrink-0">
-        <Avatar name={email.fromName} email={email.from} size={34} />
+        <div className={`rounded-full transition-all ${unread && !selected ? 'ring-2 ring-blue-400/60 ring-offset-1 ring-offset-[#1e2d45]' : ''}`}>
+          <Avatar name={email.fromName} email={email.from} size={36} />
+        </div>
         {unread && !selected && (
-          <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-blue-500 border-2 border-white" />
+          <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-blue-400 shadow-sm shadow-blue-400/60" />
         )}
       </div>
 
@@ -1707,7 +1704,7 @@ function EmailItem({
         {/* Row 1: name + date + hover-star */}
         <div className="flex items-baseline justify-between gap-1.5 mb-0.5">
           <span className={`text-[13px] truncate leading-snug ${
-            unread ? 'font-bold text-gray-900' : 'font-medium text-gray-500'
+            selected ? 'font-bold text-white' : unread ? 'font-bold text-slate-100' : 'font-medium text-slate-300'
           }`}>
             {displayName}
           </span>
@@ -1715,13 +1712,13 @@ function EmailItem({
             {hovered && !selected && (
               <button
                 onClick={onStar}
-                className="p-0.5 rounded text-gray-300 hover:text-amber-400 transition-colors"
+                className="p-0.5 rounded text-slate-500 hover:text-amber-400 transition-colors"
                 title={email.isStarred ? 'Quitar estrella' : 'Destacar'}>
                 <Star size={11} fill={email.isStarred ? 'currentColor' : 'none'} />
               </button>
             )}
             <span className={`text-[11px] tabular-nums ${
-              unread ? 'font-semibold text-gray-600' : 'text-gray-400'
+              selected ? 'text-red-200' : unread ? 'font-semibold text-blue-300' : 'text-slate-500'
             }`}>
               {fmtDate(email.date)}
             </span>
@@ -1730,14 +1727,14 @@ function EmailItem({
 
         {/* Row 2: subject */}
         <div className={`text-[12.5px] truncate leading-snug mb-0.5 ${
-          unread ? 'font-semibold text-gray-800' : 'text-gray-500'
+          selected ? 'font-semibold text-white/90' : unread ? 'font-semibold text-slate-200' : 'text-slate-400'
         }`}>
-          {email.subject || <span className="italic text-gray-400">(sin asunto)</span>}
+          {email.subject || <span className="italic opacity-50">(sin asunto)</span>}
         </div>
 
         {/* Row 3: snippet + badges */}
         <div className="flex items-center gap-1.5">
-          <p className="flex-1 text-[11.5px] text-gray-400 truncate leading-snug">
+          <p className={`flex-1 text-[11.5px] truncate leading-snug ${selected ? 'text-red-100/70' : 'text-slate-500'}`}>
             {email.snippet || <span className="italic">Sin previsualización</span>}
           </p>
           <div className="flex items-center gap-1 flex-shrink-0">
@@ -1748,7 +1745,7 @@ function EmailItem({
             )}
             {email.hasAttachments && (
               <span title="Tiene adjuntos">
-                <Paperclip size={10} className="text-gray-300" />
+                <Paperclip size={10} className={selected ? 'text-red-200' : 'text-slate-500'} />
               </span>
             )}
           </div>
@@ -1762,9 +1759,9 @@ function EmailItem({
         title={email.isStarred ? 'Quitar estrella' : 'Marcar con estrella'}
         className={`mt-0.5 flex-shrink-0 p-0.5 rounded transition-colors ${
           email.isStarred
-            ? 'text-yellow-400 hover:text-yellow-500'
+            ? selected ? 'text-yellow-300' : 'text-yellow-400 hover:text-yellow-500'
             : hovered
-            ? 'text-gray-300 hover:text-yellow-400'
+            ? selected ? 'text-white/60 hover:text-yellow-300' : 'text-slate-500 hover:text-yellow-400'
             : 'text-transparent'
         }`}>
         <Star size={13} fill={email.isStarred ? 'currentColor' : 'none'} />
@@ -1958,9 +1955,14 @@ function EmailReader({
 
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-[1160px] mx-auto px-6 py-6 lg:px-8">
-          <div className="rounded-[28px] border border-slate-200 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.08)] overflow-hidden">
-            <div className="px-8 pt-8 pb-6 border-b border-slate-100 bg-gradient-to-br from-white via-white to-red-50/30">
-              <div className="flex items-start justify-between gap-6">
+          <div className="rounded-[28px] border border-slate-200 overflow-hidden shadow-[0_24px_60px_rgba(15,23,42,0.12)]">
+            {/* Dark immersive header */}
+            <div className="px-8 pt-8 pb-7 border-b border-white/10 bg-gradient-to-br from-[#0f172a] via-[#1a2035] to-[#1e1a2e] relative overflow-hidden">
+              {/* Decorative glow blob */}
+              <div className="absolute -top-12 -right-12 w-52 h-52 bg-[#ab0433]/20 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute bottom-0 left-1/4 w-72 h-24 bg-blue-600/10 rounded-full blur-2xl pointer-events-none" />
+
+              <div className="relative flex items-start justify-between gap-6">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap mb-3">
                     {statusPills.map((pill) => (
@@ -1971,21 +1973,23 @@ function EmailReader({
                       </span>
                     ))}
                   </div>
-                  <h1 className="text-[28px] leading-tight font-semibold text-slate-900 tracking-[-0.02em]">
+                  <h1 className="text-[26px] leading-tight font-semibold text-white tracking-[-0.02em]">
                     {email.subject}
                   </h1>
                 </div>
                 <div className="text-right flex-shrink-0">
-                  <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400 mb-1">Recibido</p>
-                  <p className="text-sm text-slate-600">{fmtFull(email.date)}</p>
+                  <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500 mb-1">Recibido</p>
+                  <p className="text-sm text-slate-300">{fmtFull(email.date)}</p>
                 </div>
               </div>
 
-              <div className="mt-6 flex items-start gap-4">
-                <Avatar name={email.fromName} email={email.from} size={48} />
+              <div className="relative mt-6 flex items-start gap-4">
+                <div className="ring-2 ring-white/20 rounded-full">
+                  <Avatar name={email.fromName} email={email.from} size={48} />
+                </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-base font-semibold text-slate-900">
+                    <span className="text-base font-semibold text-white">
                       {email.fromName || email.from}
                     </span>
                     {email.fromName && (
@@ -1994,20 +1998,20 @@ function EmailReader({
                   </div>
                   <button
                     onClick={() => setDetailsOpen((d) => !d)}
-                    className="mt-1 inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 transition-colors">
+                    className="mt-1 inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-200 transition-colors">
                     <span>{email.to ? `para ${email.to.split(',')[0].trim()}` : 'ver destinatarios'}</span>
                     <ChevronDown size={14} className={`transition-transform ${detailsOpen ? 'rotate-180' : ''}`} />
                   </button>
                   {detailsOpen && (
-                    <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-600 space-y-1.5">
-                      <p><span className="font-medium text-slate-400 mr-2">De:</span>{email.fromName ? `${email.fromName} <${email.from}>` : email.from}</p>
+                    <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm px-4 py-3 text-sm text-slate-300 space-y-1.5">
+                      <p><span className="font-medium text-slate-500 mr-2">De:</span>{email.fromName ? `${email.fromName} <${email.from}>` : email.from}</p>
                       {email.to && (
-                        <p><span className="font-medium text-slate-400 mr-2">Para:</span>{email.to}</p>
+                        <p><span className="font-medium text-slate-500 mr-2">Para:</span>{email.to}</p>
                       )}
                       {email.cc && (
-                        <p><span className="font-medium text-slate-400 mr-2">Cc:</span>{email.cc}</p>
+                        <p><span className="font-medium text-slate-500 mr-2">Cc:</span>{email.cc}</p>
                       )}
-                      <p><span className="font-medium text-slate-400 mr-2">Fecha:</span>{fmtFull(email.date)}</p>
+                      <p><span className="font-medium text-slate-500 mr-2">Fecha:</span>{fmtFull(email.date)}</p>
                     </div>
                   )}
                 </div>
@@ -2092,11 +2096,11 @@ function ConnectWizard({
 }) {
   return (
     <div className="flex flex-col items-center justify-center h-full py-12 px-8">
-      <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mb-6">
-        <Mail size={32} className="text-[#ab0433]" strokeWidth={2.2} />
+      <div className="w-16 h-16 bg-red-900/30 border border-red-800/40 rounded-2xl flex items-center justify-center mb-6">
+        <Mail size={32} className="text-red-400" strokeWidth={2.2} />
       </div>
-      <h2 className="text-xl font-bold text-gray-900 mb-2">Conecta tu correo</h2>
-      <p className="text-sm text-gray-500 text-center mb-8 max-w-sm">
+      <h2 className="text-xl font-bold text-slate-100 mb-2">Conecta tu correo</h2>
+      <p className="text-sm text-slate-400 text-center mb-8 max-w-sm">
         Conecta tu cuenta con un clic. Sin introducir contraseñas.
       </p>
 
@@ -2104,7 +2108,7 @@ function ConnectWizard({
         {/* Gmail */}
         {googleClientId && (
           <button onClick={onConnectGoogle}
-            className="w-full flex items-center gap-3 px-5 py-3.5 border-2 border-gray-100 hover:border-red-200 bg-white hover:bg-red-50 rounded-xl transition-all shadow-sm group">
+            className="w-full flex items-center gap-3 px-5 py-3.5 border border-slate-700/60 hover:border-blue-500/40 bg-[#1a2540] hover:bg-[#1e2d45] rounded-xl transition-all">
             <svg width={22} height={22} viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
               <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -2112,25 +2116,25 @@ function ConnectWizard({
               <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
             </svg>
             <div className="text-left flex-1">
-              <p className="text-sm font-semibold text-gray-800">Conectar Gmail</p>
-              <p className="text-xs text-gray-400">OAuth seguro — sin contraseñas</p>
+              <p className="text-sm font-semibold text-slate-200">Conectar Gmail</p>
+              <p className="text-xs text-slate-500">OAuth seguro — sin contraseñas</p>
             </div>
-            <Zap size={16} className="text-yellow-500" />
+            <Zap size={16} className="text-yellow-400" />
           </button>
         )}
 
         {/* IMAP / POP3 genérico */}
         <button onClick={onConnectOutlook}
-          className="w-full flex items-center gap-3 px-5 py-3.5 border-2 border-gray-100 hover:border-indigo-200 bg-white hover:bg-indigo-50 rounded-xl transition-all shadow-sm">
-          <AtSign size={22} className="text-gray-400" />
+          className="w-full flex items-center gap-3 px-5 py-3.5 border border-slate-700/60 hover:border-indigo-500/40 bg-[#1a2540] hover:bg-[#1e2d45] rounded-xl transition-all">
+          <AtSign size={22} className="text-slate-500" />
           <div className="text-left flex-1">
-            <p className="text-sm font-semibold text-gray-800">Cuenta IMAP / POP3</p>
-            <p className="text-xs text-gray-400">Outlook, corporativo, dominio propio...</p>
+            <p className="text-sm font-semibold text-slate-200">Cuenta IMAP / POP3</p>
+            <p className="text-xs text-slate-500">Outlook, corporativo, dominio propio...</p>
           </div>
         </button>
       </div>
 
-      <p className="text-xs text-gray-400 text-center mt-6 max-w-xs">
+      <p className="text-xs text-slate-600 text-center mt-6 max-w-xs">
         Tus credenciales se cifran con AES-256 y nunca se comparten.
       </p>
     </div>
@@ -2439,11 +2443,11 @@ function EmptyState({ folder }: { folder: string }) {
   const Icon = cfg.icon;
   return (
     <div className="flex flex-col items-center justify-center h-full py-20 text-center px-6">
-      <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mb-4">
-        <Icon size={28} className="text-gray-400" />
+      <div className="w-14 h-14 bg-slate-800 rounded-2xl flex items-center justify-center mb-4">
+        <Icon size={28} className="text-slate-500" />
       </div>
-      <p className="text-base font-semibold text-gray-600">{cfg.title}</p>
-      {cfg.desc && <p className="text-sm text-gray-400 mt-1">{cfg.desc}</p>}
+      <p className="text-base font-semibold text-slate-300">{cfg.title}</p>
+      {cfg.desc && <p className="text-sm text-slate-500 mt-1">{cfg.desc}</p>}
     </div>
   );
 }
@@ -2457,11 +2461,11 @@ function MailboxLockedState({
 }) {
   return (
     <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-      <Shield size={42} className="mb-4 text-gray-200" />
-      <h3 className="text-lg font-semibold text-gray-800">
+      <Shield size={42} className="mb-4 text-slate-600" />
+      <h3 className="text-lg font-semibold text-slate-200">
         {hasConfiguredAccounts ? 'Selecciona una cuenta de correo' : 'Conecta una cuenta de correo'}
       </h3>
-      <p className="mt-2 max-w-md text-sm text-gray-500">
+      <p className="mt-2 max-w-md text-sm text-slate-500">
         {hasConfiguredAccounts
           ? 'Hay cuentas guardadas, pero no hay ninguna activa. Hasta seleccionarla o reconectarla no se podrá usar ninguna función del correo.'
           : 'No hay ninguna cuenta configurada. Conecta Gmail o una cuenta IMAP/POP3 para empezar a usar el módulo de correo.'}
@@ -4306,13 +4310,13 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
 
         {/* ── Email list panel: siempre 380px en desktop, full en móvil sin email ── */}
         <div
-          className={`flex flex-col flex-shrink-0 h-full border-r border-gray-200 ${
+          className={`flex flex-col flex-shrink-0 h-full border-r border-slate-800 bg-[#0d1117] ${
             selectedEmail ? 'hidden lg:flex lg:w-[380px]' : 'flex w-full lg:w-[380px]'
           }`}>
 
           {/* Mobile top: folder name */}
-          <div className="flex items-center gap-2 px-4 py-2 bg-white border-b border-gray-200 lg:hidden">
-            <span className="text-sm font-semibold text-gray-700 flex-1">
+          <div className="flex items-center gap-2 px-4 py-2 bg-[#0d1117] border-b border-slate-800 lg:hidden">
+            <span className="text-sm font-semibold text-slate-200 flex-1">
               {SYSTEM_FOLDERS.find(f => f.key === selectedFolder)?.label || selectedFolder}
             </span>
             <button
@@ -4324,61 +4328,61 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
           </div>
 
           {/* Search bar */}
-          <div className="px-3 py-2.5 border-b border-gray-200 bg-white">
+          <div className="px-3 py-2.5 border-b border-slate-800 bg-[#0d1117]">
             <form
               onSubmit={e => { e.preventDefault(); loadEmails(true); }}
               className="flex items-center gap-2">
-              <div className="flex-1 flex items-center gap-2 bg-gray-100 hover:bg-gray-200 rounded-full px-3 py-1.5 transition-colors">
-                <Search size={14} className="text-gray-400 flex-shrink-0" />
+              <div className="flex-1 flex items-center gap-2 bg-[#1a2540] hover:bg-[#1e2d45] rounded-full px-3 py-1.5 transition-colors border border-slate-700/50">
+                <Search size={14} className="text-slate-500 flex-shrink-0" />
                 <input
                   value={searchQ}
                   onChange={e => setSearchQ(e.target.value)}
                   disabled={!hasActiveMailbox}
                   placeholder="Buscar en correos..."
-                  className="flex-1 bg-transparent text-sm outline-none text-gray-700 placeholder-gray-400 min-w-0" />
+                  className="flex-1 bg-transparent text-sm outline-none text-slate-200 placeholder-slate-500 min-w-0" />
                 {searchQ && (
                   <button
                     type="button"
                     onClick={() => { setSearchQ(''); loadEmails(true); }}>
-                    <X size={13} className="text-gray-400" />
+                    <X size={13} className="text-slate-500" />
                   </button>
                 )}
               </div>
-              <button type="submit" className="p-1.5 hover:bg-gray-100 rounded-full text-gray-400">
+              <button type="submit" className="p-1.5 hover:bg-slate-800 rounded-full text-slate-500">
                 <Filter size={15} />
               </button>
             </form>
           </div>
 
           {/* Folder title + refresh */}
-          <div className="hidden lg:flex items-center justify-between px-4 py-2 bg-white border-b border-gray-100">
+          <div className="hidden lg:flex items-center justify-between px-4 py-2 bg-[#0d1117] border-b border-slate-800/60">
             <div className="flex items-center gap-2 min-w-0">
-              <h3 className="text-sm font-semibold text-gray-700 truncate">
+              <h3 className="text-sm font-semibold text-slate-300 truncate">
                 {SYSTEM_FOLDERS.find(f => f.key === selectedFolder)?.label || selectedFolder}
               </h3>
               {bgRefreshing && (
-                <span className="flex items-center gap-1 text-[10px] text-gray-400 flex-shrink-0">
+                <span className="flex items-center gap-1 text-[10px] text-slate-500 flex-shrink-0">
                   <RefreshCw size={10} className="animate-spin" />
                 </span>
               )}
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
               {unreadCount > 0 && selectedFolder === 'INBOX' && (
-                <span className="text-[11px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-medium">
+                <span className="text-[11px] bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2 py-0.5 rounded-full font-medium">
                   {unreadCount} no leídos
                 </span>
               )}
               <button
                 onClick={() => loadEmails(true)} disabled={loading || !hasActiveMailbox}
                 title="Recargar"
-                className="p-1.5 hover:bg-gray-100 rounded-full text-gray-400 transition-colors">
+                className="p-1.5 hover:bg-slate-800 rounded-full text-slate-500 transition-colors">
                 <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
               </button>
             </div>
           </div>
 
           {/* List */}
-          <div className="flex-1 overflow-y-auto bg-white">
+          <div className="flex-1 overflow-y-auto bg-[#0d1117] pt-2">
             {!hasConfiguredAccounts ? (
               <ConnectWizard
                 onConnectGoogle={connectGoogle}
@@ -4394,8 +4398,8 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
                   <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                 </svg>
                 <div>
-                  <p className="text-sm font-semibold text-gray-800">Sesión de Gmail expirada</p>
-                  <p className="mt-1 text-xs text-gray-400">Tu sesión ha expirado o fue revocada. Vuelve a iniciar sesión para ver tus correos.</p>
+                  <p className="text-sm font-semibold text-slate-200">Sesión de Gmail expirada</p>
+                  <p className="mt-1 text-xs text-slate-500">Tu sesión ha expirado o fue revocada. Vuelve a iniciar sesión para ver tus correos.</p>
                 </div>
                 <button
                   onClick={() => connectGoogle()}
@@ -4409,17 +4413,18 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
                 onConnectAccount={() => setShowConnectModal(true)}
               />
             ) : loading && emails.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20">
-                <Spinner size="lg" label="Cargando mensajes..." />
+              <div className="flex flex-col items-center justify-center py-20 gap-3">
+                <Spinner size="lg" />
+                <span className="text-sm text-slate-500">Cargando mensajes...</span>
               </div>
             ) : error ? (
               <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
-                <AlertCircle size={32} className="text-red-300 mb-3" />
-                <p className="text-sm text-red-500 mb-4">{error}</p>
+                <AlertCircle size={32} className="text-red-400 mb-3" />
+                <p className="text-sm text-red-400 mb-4">{error}</p>
                 {!gmail && (
                   <button
                     onClick={connectGoogle}
-                    className="flex items-center gap-2 text-sm text-[#ab0433] hover:text-[#8f022a] font-medium bg-red-50 px-4 py-2 rounded-full">
+                    className="flex items-center gap-2 text-sm text-red-400 hover:text-red-300 font-medium bg-red-900/20 border border-red-800/40 px-4 py-2 rounded-full">
                     <LogIn size={15} /> Reconectar Gmail
                   </button>
                 )}
@@ -4472,11 +4477,11 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
                   />
                 ))}
                 {nextPageToken && (
-                  <div className="py-4 flex justify-center border-t border-gray-100">
+                  <div className="py-4 flex justify-center border-t border-slate-800/60">
                     <button
                       onClick={() => loadEmails(false, nextPageToken)}
                       disabled={loading || !hasActiveMailbox}
-                      className="text-sm text-[#ab0433] hover:text-[#8f022a] font-medium flex items-center gap-1.5 px-4 py-2 rounded-full hover:bg-red-50 transition-colors">
+                      className="text-sm text-red-400 hover:text-red-300 font-medium flex items-center gap-1.5 px-4 py-2 rounded-full hover:bg-slate-800 transition-colors">
                       {loading
                         ? <Loader2 size={14} className="animate-spin" />
                         : <ChevronDown size={14} />}
