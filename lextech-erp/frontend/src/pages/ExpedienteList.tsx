@@ -4061,6 +4061,11 @@ export default function ExpedienteList() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkStateLoading, setBulkStateLoading] = useState(false);
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+  useEffect(() => {
+    const open = !!deleteId || bulkDeleteConfirm;
+    document.body.style.overflow = open ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [deleteId, bulkDeleteConfirm]);
   const [showBulkStateMenu, setShowBulkStateMenu] = useState(false);
   const bulkStateMenuRef = useRef<HTMLDivElement>(null);
 
