@@ -4205,7 +4205,7 @@ export default function ExpedienteList() {
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (opcionesRef.current && !opcionesRef.current.contains(e.target as Node)) setShowOpciones(false);
-      if (altaMenuRef.current && !altaMenuRef.current.contains(e.target as Node)) setShowAltaMenu(false);
+      if (altaMenuRef.current && !altaMenuRef.current.contains(e.target as Node) && !(e.target as Element).closest?.('[data-alta-menu]')) setShowAltaMenu(false);
       if (
         formatDropdownBtnRef.current && !formatDropdownBtnRef.current.contains(e.target as Node) &&
         formatDropdownMenuRef.current && !formatDropdownMenuRef.current.contains(e.target as Node)
@@ -5885,7 +5885,7 @@ export default function ExpedienteList() {
                 </button>
               </div>
               {showAltaMenu && typeof document !== "undefined" && createPortal(
-                <div style={{ position: "fixed", top: altaMenuPos.top, left: altaMenuPos.left, zIndex: 9999 }}
+                <div data-alta-menu style={{ position: "fixed", top: altaMenuPos.top, left: altaMenuPos.left, zIndex: 9999 }}
                   className="w-[300px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
                   <div className="border-b border-slate-100 bg-slate-50 px-3.5 py-2.5">
                     <p className="text-xs font-semibold text-slate-600">Elige cómo quieres agregar expedientes</p>
