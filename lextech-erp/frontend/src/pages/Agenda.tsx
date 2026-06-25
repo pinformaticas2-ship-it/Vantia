@@ -2901,7 +2901,7 @@ export default function Agenda() {
       <div className="agenda-google-topbar flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-white shrink-0">
         {/* Título */}
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 bg-red-50 rounded-xl flex items-center justify-center border border-red-100 shrink-0">
+          <div className="h-10 w-10 bg-red-50 rounded-lg flex items-center justify-center border border-red-100 shrink-0">
             <Calendar size={19} className="text-red-600" />
           </div>
           <div>
@@ -2924,7 +2924,7 @@ export default function Agenda() {
 
           {/* ── Google Calendar widget ── */}
           {gcalEnabled ? (
-            <div className="flex items-center bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden h-10">
+            <div className="flex items-center bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden h-10">
               {/* Estado */}
               <div className="px-3 flex items-center gap-2 bg-slate-50/60 border-r border-slate-200 h-full">
                 <img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_16dp.png" alt="GCal" className="w-4 h-4 shrink-0" />
@@ -2974,7 +2974,7 @@ export default function Agenda() {
           ) : (
             <button
               onClick={connectGcal}
-              className="flex items-center gap-1.5 px-3 h-10 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors shadow-sm"
+              className="flex items-center gap-1.5 px-3 h-10 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-sm"
             >
               <img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_16dp.png" alt="GCal" className="w-4 h-4" />
               Conectar Google Calendar
@@ -2984,7 +2984,7 @@ export default function Agenda() {
           {/* Nuevo evento */}
           <button
             onClick={(e) => openNew(undefined, e)}
-            className="flex items-center gap-1.5 px-4 h-10 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm shadow-red-600/20 transition-colors"
+            className="flex items-center gap-1.5 px-4 h-10 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-sm shadow-red-600/20 transition-colors"
           >
             <Plus size={13} /> Nuevo evento
           </button>
