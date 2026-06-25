@@ -4,6 +4,7 @@ import pool from '../config/database';
 import { ImapClient, ImapConfig, syncInbox, testImapConnection } from '../utils/imap';
 import { Pop3Config, syncPop3Inbox, testPop3Connection } from '../utils/pop3';
 import { sendEmail, SmtpConfig, MailMessage, testSmtpConnection } from '../utils/smtp';
+import { dispatchEmail, getSendingProvider } from '../utils/mailer';
 import { logActivityForReq } from './activityController';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -341,11 +342,12 @@ export async function createAccount(req: Request, res: Response) {
       password: String(password),
     };
     let smtpWarning: string | null = null;
-    await withTimeout(testSmtpConnection(smtpCfg), 20000, 'SMTP').catch((e) => {
-      // SMTP test failure is non-fatal: save the account anyway so the user
-      // can still receive email via IMAP. The warning is returned to the UI.
-      smtpWarning = explainMailConnectionError(e, 'smtp');
-    });
+    const provider = getSendingProvider();
+    if (provider === 'smtp') {
+      await withTimeout(testSmtpConnection(smtpCfg), 20000, 'SMTP').catch((e) => {
+        smtpWarning = explainMailConnectionError(e, 'smtp');
+      });
+    }
 
     const enc = encryptPassword(password);
     const { rows } = await pool.query(
@@ -1122,7 +1124,7 @@ export async function sendMail(req: Request, res: Response) {
       attachments: Array.isArray(attachments) && attachments.length ? attachments : undefined,
     };
 
-    await sendEmail(smtpCfg, mailMsg);
+    await dispatchEmail(smtpCfg, mailMsg);
 
     // Save to sent
     await pool.query(
