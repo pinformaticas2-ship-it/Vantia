@@ -388,68 +388,84 @@ function KanbanCardContent({
   const done     = task.estado === "completada";
 
   return (
-    <div className={`rounded-2xl border bg-white px-4 py-3.5 shadow-[0_6px_18px_rgba(15,23,42,0.07)] transition-all
-      ${overdue ? "border-red-200" : "border-slate-200"}
-      ${isDragging ? "shadow-2xl rotate-1 scale-105 ring-2 ring-indigo-300" : "hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(15,23,42,0.09)]"}
+    <div className={`rounded-xl border bg-white p-4 shadow-sm transition-all flex flex-col gap-3 relative group
+      ${isDragging ? "shadow-2xl rotate-1 scale-105 ring-2 ring-indigo-300" : "hover:shadow-md hover:border-red-300"}
+      ${overdue && !done ? "border-red-200" : "border-slate-200"}
     `}>
+      {/* Cabecera: checkbox + título + editar */}
       <div className="flex items-start gap-3">
         <button
           onClick={e => { e.stopPropagation(); onToggle(task.id, done ? "pendiente" : "completada"); }}
-          className="mt-0.5 shrink-0 text-slate-400 hover:text-emerald-500 transition-colors"
+          className="mt-0.5 shrink-0 text-slate-300 hover:text-emerald-500 transition-colors"
         >
           {done ? <CheckCircle2 size={18} className="text-emerald-500" /> : <Circle size={18} />}
         </button>
         <div className="min-w-0 flex-1">
           <button onClick={() => onEdit(task)} className="text-left w-full">
-            <div className={`text-sm leading-5 font-semibold ${done ? "line-through text-slate-400" : "text-slate-800"}`}>
+            <h4 className={`text-[13px] font-bold leading-tight group-hover:text-red-600 transition-colors truncate ${done ? "line-through text-slate-400" : "text-slate-800"}`}>
               {task.titulo}
-            </div>
+            </h4>
           </button>
-          {task.descripcion && (
-            <p className="mt-1 text-xs text-slate-500 line-clamp-2">{task.descripcion}</p>
-          )}
+          <p className="text-[11px] font-medium text-slate-500 truncate mt-0.5">{clientName(task)}</p>
         </div>
         <button
           onClick={() => onEdit(task)}
-          className="shrink-0 h-8 w-8 rounded-xl border border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition-colors flex items-center justify-center"
+          className="shrink-0 w-6 h-6 rounded-md border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50 hover:text-slate-700 transition-colors"
         >
-          <Edit3 size={13} />
+          <Edit3 size={10} />
         </button>
       </div>
 
-      <div className="mt-3 flex items-center gap-2 flex-wrap">
-        <span className={`h-2.5 w-2.5 rounded-full ${prioConf.bar}`} />
-        <span className={`text-[10px] font-extrabold px-2 py-1 rounded-full ${tipoConf.color}`}>{tipoConf.label}</span>
-        <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-slate-100 text-slate-600">{PRIO_CONFIG[task.prioridad]?.label || "Media"}</span>
+      {/* Tags */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className={`flex items-center gap-1 text-[10px] font-bold text-slate-600`}>
+          <span className={`h-1.5 w-1.5 rounded-full ${(PRIO_CONFIG[task.prioridad] || PRIO_CONFIG.media).bar}`} />
+          {tipoConf.label}
+        </span>
+        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200/60">
+          {(PRIO_CONFIG[task.prioridad] || PRIO_CONFIG.media).label}
+        </span>
         {task.estado === "urgente" && (
-          <span className="text-[10px] font-extrabold px-2 py-1 rounded-full bg-red-50 text-red-600">Urgente</span>
+          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-600 border border-red-100">Urgente</span>
         )}
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
-        <div className="rounded-xl border border-slate-100 bg-slate-50 px-2.5 py-2">
-          <div className="flex items-center gap-1 text-slate-400 font-bold uppercase tracking-[0.16em] text-[9px]">
-            <Users size={10} /> Cliente
-          </div>
-          <div className="mt-1 font-semibold text-slate-700 truncate">{clientName(task)}</div>
+      {/* Mini grid: cliente + fecha */}
+      <div className="grid grid-cols-2 gap-2">
+        <div className="bg-slate-50 border border-slate-100 rounded-lg p-2 flex flex-col gap-0.5">
+          <span className="text-[9px] font-bold text-slate-400 uppercase flex items-center gap-1">
+            <Users size={9} className="text-slate-300" /> Cliente
+          </span>
+          <span className="text-[10px] font-bold text-slate-700 truncate">{clientName(task)}</span>
         </div>
-        <div className="rounded-xl border border-slate-100 bg-slate-50 px-2.5 py-2">
-          <div className="flex items-center gap-1 text-slate-400 font-bold uppercase tracking-[0.16em] text-[9px]">
-            <Calendar size={10} /> Límite
-          </div>
-          <div className={`mt-1 font-semibold truncate ${overdue ? "text-red-600" : "text-slate-700"}`}>
+        <div className={`rounded-lg p-2 flex flex-col gap-0.5 border ${overdue && !done ? "bg-red-50/50 border-red-100" : "bg-slate-50 border-slate-100"}`}>
+          <span className={`text-[9px] font-bold uppercase flex items-center gap-1 ${overdue && !done ? "text-red-400" : "text-slate-400"}`}>
+            <Calendar size={9} className={overdue && !done ? "text-red-300" : "text-slate-300"} /> Límite
+          </span>
+          <span className={`text-[10px] font-bold truncate ${overdue && !done ? "text-red-600" : "text-slate-700"}`}>
             {task.plazo ? fmtDate(task.plazo) : "Sin fecha"}
-            {days !== null && !overdue && (
-              <span className="ml-1 text-slate-400">{days === 0 ? "· hoy" : `· ${days}d`}</span>
+            {days !== null && !overdue && days <= 7 && (
+              <span className="ml-1 text-slate-400">{days === 0 ? "hoy" : `${days}d`}</span>
             )}
-          </div>
+          </span>
         </div>
       </div>
 
+      {/* Footer */}
       {(task.expediente || task.juzgado) && (
-        <div className="mt-3 flex items-center gap-2 flex-wrap text-[11px] text-slate-500">
-          {task.expediente && <span className="inline-flex items-center gap-1"><Briefcase size={10} /> {task.expediente}</span>}
-          {task.juzgado && <span className="inline-flex items-center gap-1"><Flag size={10} /> {task.juzgado}</span>}
+        <div className="flex flex-col gap-1.5 pt-2 border-t border-slate-100">
+          {task.expediente && (
+            <div className="flex items-center gap-1.5 text-[10px] font-medium text-slate-500">
+              <Briefcase size={10} className="text-slate-400 shrink-0" />
+              <span className="hover:text-indigo-600 hover:underline cursor-pointer truncate">{task.expediente}</span>
+            </div>
+          )}
+          {task.juzgado && (
+            <div className="flex items-start gap-1.5 text-[10px] font-medium text-slate-500">
+              <Flag size={10} className="text-slate-400 shrink-0 mt-0.5" />
+              <span className="line-clamp-2 leading-snug">{task.juzgado}</span>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -480,11 +496,10 @@ function KanbanCard({
 
 // ── Kanban – columna con drop zone ────────────────────────────────────────────
 function KanbanLane({
-  id, title, tone, tasks, onToggle, onEdit, onAddNew,
+  id, title, tasks, onToggle, onEdit, onAddNew,
 }: {
   id: string;
   title: string;
-  tone: string;
   tasks: Task[];
   onToggle: (id: string, newEstado: string) => void;
   onEdit: (t: Task) => void;
@@ -494,36 +509,42 @@ function KanbanLane({
 
   const overdueCount = useMemo(() => tasks.filter(t => isOverdue(t.plazo, t.estado)).length, [tasks]);
 
+  const badgeCls = id === "pendiente"
+    ? "bg-amber-100 text-amber-700"
+    : id === "urgente"
+    ? "bg-red-100 text-red-700"
+    : "bg-emerald-100 text-emerald-700";
+
   return (
-    <div className={`min-w-[340px] max-w-[380px] flex-1 rounded-[24px] border bg-white shadow-[0_12px_36px_rgba(15,23,42,0.06)] overflow-hidden transition-all
-      ${isOver ? "border-indigo-400 shadow-[0_0_0_3px_rgba(99,102,241,0.2)]" : "border-slate-200/90"}
+    <div className={`w-[340px] flex-shrink-0 flex flex-col max-h-full rounded-2xl border overflow-hidden shadow-sm transition-all
+      ${isOver ? "border-indigo-300 shadow-[0_0_0_2px_rgba(99,102,241,0.2)]" : "border-slate-200 bg-slate-100/50"}
     `}>
-      <div className={`px-4 py-3.5 border-b ${tone}`}>
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <GripVertical size={14} className="opacity-40" />
-            <span className="text-sm font-extrabold tracking-tight truncate">{title}</span>
-            <span className="px-2 py-0.5 rounded-full bg-white/90 text-[11px] font-extrabold border border-current/10">{tasks.length}</span>
-          </div>
-          <button className="h-7 w-7 rounded-lg hover:bg-white/70 flex items-center justify-center transition-colors">
-            <MoreHorizontal size={14} />
-          </button>
+      {/* Header */}
+      <div className="px-4 py-3 border-b border-slate-200/60 flex items-center justify-between bg-white/50 backdrop-blur-sm sticky top-0 z-10">
+        <div className="flex items-center gap-2 cursor-grab">
+          <GripVertical size={14} className="text-slate-300" />
+          <h3 className="text-sm font-bold text-slate-800">{title}</h3>
+          <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${badgeCls}`}>{tasks.length}</span>
         </div>
-        {overdueCount > 0 && (
-          <div className="mt-1.5 flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.18em] opacity-75">
-            <AlertTriangle size={9} />
-            <span>{overdueCount} vencidas</span>
-          </div>
-        )}
+        <button className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition-colors">
+          <MoreHorizontal size={14} />
+        </button>
       </div>
 
+      {/* Contenido */}
       <div
         ref={setNodeRef}
-        className={`p-3 space-y-3 transition-colors ${isOver ? "bg-indigo-50/40" : "bg-[linear-gradient(180deg,#fbfcff_0%,#f8fafc_100%)]"}`}
+        className={`flex-1 overflow-y-auto p-3 flex flex-col gap-3 transition-colors ${isOver ? "bg-indigo-50/40" : ""}`}
       >
+        {overdueCount > 0 && (
+          <div className="bg-red-50 border border-red-200/60 rounded-xl px-3 py-2 flex items-center gap-2">
+            <AlertTriangle size={11} className="text-red-500 shrink-0" />
+            <span className="text-[10px] font-bold text-red-600 uppercase tracking-widest">{overdueCount} Vencidas</span>
+          </div>
+        )}
         {tasks.length === 0 ? (
-          <div className={`min-h-[200px] rounded-2xl border-2 border-dashed flex items-center justify-center text-xs font-medium transition-colors
-            ${isOver ? "border-indigo-300 bg-indigo-50/60 text-indigo-500" : "border-slate-200 text-slate-400 bg-white/80"}
+          <div className={`flex-1 flex items-center justify-center min-h-[140px] rounded-xl border-2 border-dashed text-xs font-medium transition-colors
+            ${isOver ? "border-indigo-300 bg-indigo-50/60 text-indigo-500" : "border-slate-300/70 bg-slate-50/50 text-slate-400"}
           `}>
             {isOver ? "Soltar aquí" : "Sin tareas"}
           </div>
@@ -534,9 +555,9 @@ function KanbanLane({
         )}
         <button
           onClick={onAddNew}
-          className="w-full rounded-2xl border border-dashed border-slate-200 bg-white/70 py-3 text-sm font-bold text-slate-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50/60 transition-colors flex items-center justify-center gap-1.5"
+          className="w-full py-2.5 border border-slate-200 rounded-xl text-slate-500 hover:bg-white hover:border-slate-300 hover:text-slate-700 hover:shadow-sm font-semibold text-sm transition-all flex items-center justify-center gap-2 group"
         >
-          <Plus size={13} /> Añadir tarea
+          <Plus size={13} className="text-slate-400 group-hover:text-slate-500" /> Añadir tarea
         </button>
       </div>
     </div>
@@ -1110,17 +1131,19 @@ export default function Tareas() {
       </div>
 
       {/* ── Stats ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {([
-          { label: "VENCIDAS",    val: stats.vencidas,    cls: "text-red-600",     labelCls: "text-red-500",     bg: "bg-red-50",     border: "border-red-100",     Icon: AlertTriangle as React.FC<{ size?: number; className?: string; strokeWidth?: number }> },
-          { label: "URGENTES",    val: stats.urgentes,    cls: "text-orange-600",  labelCls: "text-orange-500",  bg: "bg-orange-50",  border: "border-orange-100",  Icon: Zap           as React.FC<{ size?: number; className?: string; strokeWidth?: number }> },
-          { label: "PENDIENTES",  val: stats.pendientes,  cls: "text-amber-600",   labelCls: "text-amber-500",   bg: "bg-amber-50",   border: "border-amber-100",   Icon: Clock         as React.FC<{ size?: number; className?: string; strokeWidth?: number }> },
-          { label: "COMPLETADAS", val: stats.completadas, cls: "text-emerald-600", labelCls: "text-emerald-500", bg: "bg-emerald-50", border: "border-emerald-100", Icon: CheckCircle2  as React.FC<{ size?: number; className?: string; strokeWidth?: number }> },
+          { label: "VENCIDAS",    val: stats.vencidas,    cls: "text-red-600",     labelCls: "text-red-400",     bg: "bg-red-50/70",     border: "border-red-100",     iconCls: "text-red-100",    Icon: AlertTriangle as React.FC<{ size?: number; className?: string; strokeWidth?: number }> },
+          { label: "URGENTES",    val: stats.urgentes,    cls: "text-orange-500",  labelCls: "text-orange-400",  bg: "bg-orange-50/70",  border: "border-orange-100",  iconCls: "text-orange-100", Icon: Zap           as React.FC<{ size?: number; className?: string; strokeWidth?: number }> },
+          { label: "PENDIENTES",  val: stats.pendientes,  cls: "text-amber-600",   labelCls: "text-amber-500",   bg: "bg-amber-50/70",   border: "border-amber-100",   iconCls: "text-amber-100",  Icon: Clock         as React.FC<{ size?: number; className?: string; strokeWidth?: number }> },
+          { label: "COMPLETADAS", val: stats.completadas, cls: "text-emerald-600", labelCls: "text-emerald-500", bg: "bg-emerald-50/70", border: "border-emerald-100", iconCls: "text-emerald-100",Icon: CheckCircle2  as React.FC<{ size?: number; className?: string; strokeWidth?: number }> },
         ] as const).map(s => (
-          <div key={s.label} className={`relative overflow-hidden rounded-xl border ${s.bg} ${s.border} px-5 py-4`}>
-            <p className={`text-[10px] font-bold uppercase tracking-widest ${s.labelCls}`}>{s.label}</p>
-            <p className={`text-3xl font-extrabold mt-1 ${s.cls}`}>{s.val}</p>
-            <s.Icon size={56} className={`absolute right-3 bottom-1 opacity-[0.08] ${s.cls}`} strokeWidth={1.5} />
+          <div key={s.label} className={`group relative overflow-hidden rounded-xl border shadow-sm hover:shadow-md transition-shadow cursor-pointer ${s.bg} ${s.border} px-5 py-5`}>
+            <div className={`absolute -right-4 -bottom-4 opacity-50 group-hover:scale-110 transition-transform ${s.iconCls}`}>
+              <s.Icon size={88} strokeWidth={1} />
+            </div>
+            <span className={`text-[10px] font-bold uppercase tracking-widest block mb-1 relative z-10 ${s.labelCls}`}>{s.label}</span>
+            <span className={`text-3xl font-black leading-none relative z-10 ${s.cls}`}>{s.val}</span>
           </div>
         ))}
       </div>
@@ -1131,29 +1154,28 @@ export default function Tareas() {
         {/* Toolbar */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 flex-wrap gap-2">
           {/* Left: tabs + view selector */}
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center bg-white p-1 rounded-lg border border-slate-200 shadow-sm">
               {(["todas", "plazos"] as const).map(t => (
                 <button key={t} onClick={() => setTab(t)}
-                  className={`px-3.5 py-1.5 text-xs font-semibold rounded-md transition-colors ${
-                    tab === t ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100"
+                  className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                    tab === t ? "bg-slate-800 text-white shadow-sm" : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                   }`}>
                   {t === "todas" ? "Todas" : "Solo con plazo"}
                 </button>
               ))}
             </div>
-            <div className="w-px h-5 bg-slate-200" />
-            <div className="flex items-center gap-0.5 bg-slate-100 p-1 rounded-lg border border-slate-200/60">
+            <div className="flex items-center bg-white p-1 rounded-lg border border-slate-200 shadow-sm">
               {([
                 { key: "list",   label: "Lista",  Icon: AlignJustify },
                 { key: "kanban", label: "Kanban", Icon: LayoutList   },
                 { key: "gantt",  label: "Gantt",  Icon: BarChart2    },
               ] as const).map(opt => (
                 <button key={opt.key} onClick={() => setView(opt.key as TaskView)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-all ${
+                  className={`flex items-center gap-1.5 px-4 py-1.5 text-xs rounded-md transition-all ${
                     view === opt.key
-                      ? "font-bold text-slate-800 bg-white shadow-sm border border-slate-200/50"
-                      : "font-medium text-slate-600 hover:text-slate-900"
+                      ? "font-bold text-white bg-slate-800 shadow-sm"
+                      : "font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                   }`}>
                   <opt.Icon size={12} /> {opt.label}
                 </button>
@@ -1317,13 +1339,12 @@ export default function Tareas() {
             );
           })()
         ) : view === "kanban" ? (
-          <div className="p-4">
+          <div className="p-5 overflow-x-auto">
             <DndContext onDragStart={handleKanbanDragStart} onDragEnd={handleKanbanDragEnd}>
-              <div className="flex gap-4 overflow-x-auto pb-2">
+              <div className="flex items-start gap-5 pb-3 min-h-[400px]">
                 <KanbanLane
                   id="pendiente"
                   title="Pendientes"
-                  tone="bg-amber-50 text-amber-700"
                   tasks={filtered.filter(t => t.estado === "pendiente")}
                   onToggle={handleToggle}
                   onEdit={openEdit}
@@ -1332,7 +1353,6 @@ export default function Tareas() {
                 <KanbanLane
                   id="urgente"
                   title="Urgentes"
-                  tone="bg-red-50 text-red-700"
                   tasks={filtered.filter(t => t.estado === "urgente")}
                   onToggle={handleToggle}
                   onEdit={openEdit}
@@ -1341,7 +1361,6 @@ export default function Tareas() {
                 <KanbanLane
                   id="completada"
                   title="Completadas"
-                  tone="bg-emerald-50 text-emerald-700"
                   tasks={filtered.filter(t => t.estado === "completada")}
                   onToggle={handleToggle}
                   onEdit={openEdit}
