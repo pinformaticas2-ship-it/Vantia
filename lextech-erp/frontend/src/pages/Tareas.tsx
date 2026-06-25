@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import {
   DndContext, DragOverlay, useDraggable, useDroppable,
+  useSensors, useSensor, PointerSensor, TouchSensor,
 } from "@dnd-kit/core";
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
 import { safeJson } from "../lib/api";
@@ -372,113 +373,143 @@ function TaskRow({
   );
 }
 
-// ── Kanban – tarjeta visual (sin hooks) ───────────────────────────────────────
+// ── Kanban – config columnas ──────────────────────────────────────────────────
+const KANBAN_COL = {
+  pendiente:  { title: "Pendientes",  accent: "#f59e0b", badgeCls: "bg-amber-100 text-amber-700"  },
+  urgente:    { title: "Urgentes",    accent: "#ef4444", badgeCls: "bg-red-100 text-red-700"       },
+  completada: { title: "Completadas", accent: "#10b981", badgeCls: "bg-emerald-100 text-emerald-700"},
+} as const;
+
+// ── Kanban – tarjeta visual (pura) ────────────────────────────────────────────
 function KanbanCardContent({
   task, onToggle, onEdit, isDragging = false,
 }: {
   task: Task;
   onToggle: (id: string, newEstado: string) => void;
-  onEdit: (t: Task) => void;
+  onEdit:   (t: Task) => void;
   isDragging?: boolean;
 }) {
+  const navigate = useNavigate();
   const overdue  = isOverdue(task.plazo, task.estado);
   const days     = daysUntil(task.plazo);
   const tipoConf = TIPO_CONFIG[task.tipo] || TIPO_CONFIG.otro;
-  const prioConf = PRIO_CONFIG[task.prioridad] || PRIO_CONFIG.media;
   const done     = task.estado === "completada";
 
   return (
-    <div className={`rounded-xl border bg-white p-4 shadow-sm transition-all flex flex-col gap-3 relative group
-      ${isDragging ? "shadow-2xl rotate-1 scale-105 ring-2 ring-indigo-300" : "hover:shadow-md hover:border-red-300"}
-      ${overdue && !done ? "border-red-200" : "border-slate-200"}
+    <div className={`bg-white rounded-xl border overflow-hidden flex flex-col select-none transition-all
+      ${isDragging
+        ? "shadow-2xl ring-2 ring-indigo-400/40 scale-[1.02] rotate-1"
+        : "shadow-sm hover:shadow-md border-slate-200 hover:border-slate-300"}
     `}>
-      {/* Cabecera: checkbox + título + editar */}
-      <div className="flex items-start gap-3">
-        <button
-          onClick={e => { e.stopPropagation(); onToggle(task.id, done ? "pendiente" : "completada"); }}
-          className="mt-0.5 shrink-0 text-slate-300 hover:text-emerald-500 transition-colors"
-        >
-          {done ? <CheckCircle2 size={18} className="text-emerald-500" /> : <Circle size={18} />}
-        </button>
-        <div className="min-w-0 flex-1">
-          <button onClick={() => onEdit(task)} className="text-left w-full">
-            <h4 className={`text-[13px] font-bold leading-tight group-hover:text-red-600 transition-colors truncate ${done ? "line-through text-slate-400" : "text-slate-800"}`}>
-              {task.titulo}
-            </h4>
-          </button>
-          <p className="text-[11px] font-medium text-slate-500 truncate mt-0.5">{clientName(task)}</p>
-        </div>
-        <button
-          onClick={() => onEdit(task)}
-          className="shrink-0 w-6 h-6 rounded-md border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50 hover:text-slate-700 transition-colors"
-        >
-          <Edit3 size={10} />
-        </button>
-      </div>
+      {/* Acento de color por tipo (barra superior) */}
+      <div className={`h-[3px] w-full ${tipoConf.color.split(" ").find(c => c.startsWith("bg-")) ?? "bg-slate-200"}`} />
 
-      {/* Tags */}
-      <div className="flex flex-wrap items-center gap-1.5">
-        <span className={`flex items-center gap-1 text-[10px] font-bold text-slate-600`}>
-          <span className={`h-1.5 w-1.5 rounded-full ${(PRIO_CONFIG[task.prioridad] || PRIO_CONFIG.media).bar}`} />
-          {tipoConf.label}
-        </span>
-        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200/60">
-          {(PRIO_CONFIG[task.prioridad] || PRIO_CONFIG.media).label}
-        </span>
-        {task.estado === "urgente" && (
-          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-600 border border-red-100">Urgente</span>
+      <div className="p-3.5 flex flex-col gap-3">
+        {/* Cabecera */}
+        <div className="flex items-start gap-2.5">
+          <button
+            onPointerDown={e => e.stopPropagation()}
+            onClick={e => { e.stopPropagation(); onToggle(task.id, done ? "pendiente" : "completada"); }}
+            className="mt-0.5 shrink-0 text-slate-300 hover:text-emerald-500 transition-colors"
+          >
+            {done
+              ? <CheckCircle2 size={16} className="text-emerald-500" />
+              : <Circle size={16} />}
+          </button>
+          <div className="flex-1 min-w-0">
+            <button
+              onPointerDown={e => e.stopPropagation()}
+              onClick={e => { e.stopPropagation(); onEdit(task); }}
+              className="text-left w-full group/title"
+            >
+              <span className={`text-[13px] font-bold leading-snug block group-hover/title:text-red-600 transition-colors
+                ${done ? "line-through text-slate-400" : "text-slate-800"}`}>
+                {task.titulo}
+              </span>
+            </button>
+            <button
+              onPointerDown={e => e.stopPropagation()}
+              onClick={e => { e.stopPropagation(); task.client_id && navigate(`/dashboard/clientes/${task.client_id}`); }}
+              className="text-[10px] text-slate-500 hover:text-blue-600 hover:underline font-medium mt-0.5 text-left truncate block max-w-full"
+            >
+              {clientName(task)}
+            </button>
+          </div>
+          <button
+            onPointerDown={e => e.stopPropagation()}
+            onClick={e => { e.stopPropagation(); onEdit(task); }}
+            className="shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-slate-300 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+          >
+            <Edit3 size={10} />
+          </button>
+        </div>
+
+        {/* Badges */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${tipoConf.color}`}>
+            {tipoConf.label}
+          </span>
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">
+            {(PRIO_CONFIG[task.prioridad] ?? PRIO_CONFIG.media).label}
+          </span>
+          {overdue && !done && (
+            <span className="flex items-center gap-1 text-[10px] font-bold text-red-600 bg-red-50 border border-red-100 px-2 py-0.5 rounded-md">
+              <AlertTriangle size={9} /> Vencida
+            </span>
+          )}
+        </div>
+
+        {/* Mini-grid: cliente + fecha */}
+        <div className="grid grid-cols-2 gap-2">
+          <div className="bg-slate-50 border border-slate-100 rounded-lg p-2">
+            <div className="flex items-center gap-1 text-[9px] font-bold text-slate-400 uppercase mb-0.5">
+              <Users size={8} /> Cliente
+            </div>
+            <div className="text-[10px] font-bold text-slate-700 truncate">{clientName(task)}</div>
+          </div>
+          <div className={`rounded-lg p-2 border ${overdue && !done ? "bg-red-50/70 border-red-100" : "bg-slate-50 border-slate-100"}`}>
+            <div className={`flex items-center gap-1 text-[9px] font-bold uppercase mb-0.5 ${overdue && !done ? "text-red-400" : "text-slate-400"}`}>
+              <Calendar size={8} /> Límite
+            </div>
+            <div className={`text-[10px] font-bold truncate ${overdue && !done ? "text-red-600" : "text-slate-700"}`}>
+              {task.plazo ? fmtDate(task.plazo) : "Sin fecha"}
+              {days !== null && !overdue && !done && days <= 7 && (
+                <span className="ml-1 text-slate-400 font-normal">{days === 0 ? "hoy" : `${days}d`}</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Footer expediente / juzgado */}
+        {(task.expediente || task.juzgado) && (
+          <div className="flex flex-col gap-1 pt-2.5 border-t border-slate-100">
+            {task.expediente && (
+              <button
+                onPointerDown={e => e.stopPropagation()}
+                onClick={e => { e.stopPropagation(); task.expediente_id && navigate(`/dashboard/expedientes/${task.expediente_id}`); }}
+                className="flex items-center gap-1.5 text-[10px] text-slate-500 hover:text-indigo-600 font-medium text-left"
+              >
+                <Briefcase size={9} className="shrink-0" /> {task.expediente}
+              </button>
+            )}
+            {task.juzgado && (
+              <div className="flex items-start gap-1.5 text-[10px] text-slate-400">
+                <Flag size={9} className="shrink-0 mt-0.5" />
+                <span className="line-clamp-2 leading-snug">{task.juzgado}</span>
+              </div>
+            )}
+          </div>
         )}
       </div>
-
-      {/* Mini grid: cliente + fecha */}
-      <div className="grid grid-cols-2 gap-2">
-        <div className="bg-slate-50 border border-slate-100 rounded-lg p-2 flex flex-col gap-0.5">
-          <span className="text-[9px] font-bold text-slate-400 uppercase flex items-center gap-1">
-            <Users size={9} className="text-slate-300" /> Cliente
-          </span>
-          <span className="text-[10px] font-bold text-slate-700 truncate">{clientName(task)}</span>
-        </div>
-        <div className={`rounded-lg p-2 flex flex-col gap-0.5 border ${overdue && !done ? "bg-red-50/50 border-red-100" : "bg-slate-50 border-slate-100"}`}>
-          <span className={`text-[9px] font-bold uppercase flex items-center gap-1 ${overdue && !done ? "text-red-400" : "text-slate-400"}`}>
-            <Calendar size={9} className={overdue && !done ? "text-red-300" : "text-slate-300"} /> Límite
-          </span>
-          <span className={`text-[10px] font-bold truncate ${overdue && !done ? "text-red-600" : "text-slate-700"}`}>
-            {task.plazo ? fmtDate(task.plazo) : "Sin fecha"}
-            {days !== null && !overdue && days <= 7 && (
-              <span className="ml-1 text-slate-400">{days === 0 ? "hoy" : `${days}d`}</span>
-            )}
-          </span>
-        </div>
-      </div>
-
-      {/* Footer */}
-      {(task.expediente || task.juzgado) && (
-        <div className="flex flex-col gap-1.5 pt-2 border-t border-slate-100">
-          {task.expediente && (
-            <div className="flex items-center gap-1.5 text-[10px] font-medium text-slate-500">
-              <Briefcase size={10} className="text-slate-400 shrink-0" />
-              <span className="hover:text-indigo-600 hover:underline cursor-pointer truncate">{task.expediente}</span>
-            </div>
-          )}
-          {task.juzgado && (
-            <div className="flex items-start gap-1.5 text-[10px] font-medium text-slate-500">
-              <Flag size={10} className="text-slate-400 shrink-0 mt-0.5" />
-              <span className="line-clamp-2 leading-snug">{task.juzgado}</span>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
 
 // ── Kanban – tarjeta arrastrable ──────────────────────────────────────────────
-function KanbanCard({
-  task, onToggle, onEdit,
-}: {
+function KanbanCard({ task, onToggle, onEdit }: {
   task: Task;
   onToggle: (id: string, newEstado: string) => void;
-  onEdit: (t: Task) => void;
+  onEdit:   (t: Task) => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: task.id,
@@ -486,79 +517,96 @@ function KanbanCard({
   });
 
   return (
-    <div ref={setNodeRef} style={{ opacity: isDragging ? 0.25 : 1 }}>
-      <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing">
-        <KanbanCardContent task={task} onToggle={onToggle} onEdit={onEdit} isDragging={false} />
-      </div>
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      style={{ opacity: isDragging ? 0 : 1, touchAction: "none" }}
+      className="cursor-grab active:cursor-grabbing"
+    >
+      <KanbanCardContent task={task} onToggle={onToggle} onEdit={onEdit} />
     </div>
   );
 }
 
-// ── Kanban – columna con drop zone ────────────────────────────────────────────
-function KanbanLane({
-  id, title, tasks, onToggle, onEdit, onAddNew,
-}: {
+// ── Kanban – columna ─────────────────────────────────────────────────────────
+function KanbanLane({ id, title, tasks, onToggle, onEdit, onAddNew }: {
   id: string;
   title: string;
   tasks: Task[];
   onToggle: (id: string, newEstado: string) => void;
-  onEdit: (t: Task) => void;
+  onEdit:   (t: Task) => void;
   onAddNew: () => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
-
+  const col = KANBAN_COL[id as keyof typeof KANBAN_COL];
   const overdueCount = useMemo(() => tasks.filter(t => isOverdue(t.plazo, t.estado)).length, [tasks]);
 
-  const badgeCls = id === "pendiente"
-    ? "bg-amber-100 text-amber-700"
-    : id === "urgente"
-    ? "bg-red-100 text-red-700"
-    : "bg-emerald-100 text-emerald-700";
-
   return (
-    <div className={`w-[340px] flex-shrink-0 flex flex-col max-h-full rounded-2xl border overflow-hidden shadow-sm transition-all
-      ${isOver ? "border-indigo-300 shadow-[0_0_0_2px_rgba(99,102,241,0.2)]" : "border-slate-200 bg-slate-100/50"}
-    `}>
-      {/* Header */}
-      <div className="px-4 py-3 border-b border-slate-200/60 flex items-center justify-between bg-white/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="flex items-center gap-2 cursor-grab">
+    <div className="w-[320px] flex-shrink-0 flex flex-col rounded-2xl bg-slate-100/60 border border-slate-200 shadow-sm overflow-hidden"
+      style={{ maxHeight: "calc(100vh - 320px)", minHeight: 320 }}>
+
+      {/* Header con acento de color */}
+      <div style={{ borderTop: `3px solid ${col.accent}` }}
+        className="px-4 py-3 bg-white/70 backdrop-blur-sm border-b border-slate-200/60 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-2">
           <GripVertical size={14} className="text-slate-300" />
-          <h3 className="text-sm font-bold text-slate-800">{title}</h3>
-          <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${badgeCls}`}>{tasks.length}</span>
+          <span className="text-sm font-extrabold text-slate-800 tracking-tight">{title}</span>
+          <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${col.badgeCls}`}>{tasks.length}</span>
         </div>
-        <button className="w-6 h-6 rounded flex items-center justify-center text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition-colors">
-          <MoreHorizontal size={14} />
+        <button
+          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition-colors"
+          onPointerDown={e => e.stopPropagation()}
+          onClick={e => { e.stopPropagation(); onAddNew(); }}
+          title="Añadir tarea"
+        >
+          <Plus size={14} />
         </button>
       </div>
 
-      {/* Contenido */}
+      {/* Contenido con drop zone */}
       <div
         ref={setNodeRef}
-        className={`flex-1 overflow-y-auto p-3 flex flex-col gap-3 transition-colors ${isOver ? "bg-indigo-50/40" : ""}`}
+        className={`flex-1 overflow-y-auto p-3 flex flex-col gap-2.5 transition-colors
+          ${isOver ? "bg-indigo-50/50" : ""}`}
       >
         {overdueCount > 0 && (
-          <div className="bg-red-50 border border-red-200/60 rounded-xl px-3 py-2 flex items-center gap-2">
-            <AlertTriangle size={11} className="text-red-500 shrink-0" />
-            <span className="text-[10px] font-bold text-red-600 uppercase tracking-widest">{overdueCount} Vencidas</span>
+          <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200/70 rounded-xl shrink-0">
+            <AlertTriangle size={10} className="text-red-500 shrink-0" />
+            <span className="text-[10px] font-extrabold text-red-600 uppercase tracking-widest">
+              {overdueCount} {overdueCount === 1 ? "vencida" : "vencidas"}
+            </span>
           </div>
         )}
+
         {tasks.length === 0 ? (
-          <div className={`flex-1 flex items-center justify-center min-h-[140px] rounded-xl border-2 border-dashed text-xs font-medium transition-colors
-            ${isOver ? "border-indigo-300 bg-indigo-50/60 text-indigo-500" : "border-slate-300/70 bg-slate-50/50 text-slate-400"}
-          `}>
-            {isOver ? "Soltar aquí" : "Sin tareas"}
+          <div className={`flex-1 flex flex-col items-center justify-center gap-2 min-h-[160px] rounded-xl border-2 border-dashed transition-colors
+            ${isOver ? "border-indigo-300 bg-indigo-50/60" : "border-slate-200/80 bg-white/40"}`}>
+            {isOver ? (
+              <span className="text-xs font-bold text-indigo-500">Soltar aquí</span>
+            ) : (
+              <>
+                <span className="text-slate-300 text-2xl">·</span>
+                <span className="text-xs font-medium text-slate-400">Sin tareas</span>
+              </>
+            )}
           </div>
         ) : (
-          tasks.map(task => (
-            <KanbanCard key={task.id} task={task} onToggle={onToggle} onEdit={onEdit} />
+          tasks.map(t => (
+            <KanbanCard key={t.id} task={t} onToggle={onToggle} onEdit={onEdit} />
           ))
         )}
-        <button
-          onClick={onAddNew}
-          className="w-full py-2.5 border border-slate-200 rounded-xl text-slate-500 hover:bg-white hover:border-slate-300 hover:text-slate-700 hover:shadow-sm font-semibold text-sm transition-all flex items-center justify-center gap-2 group"
-        >
-          <Plus size={13} className="text-slate-400 group-hover:text-slate-500" /> Añadir tarea
-        </button>
+
+        {/* Añadir tarea al fondo */}
+        {tasks.length > 0 && (
+          <button
+            onPointerDown={e => e.stopPropagation()}
+            onClick={e => { e.stopPropagation(); onAddNew(); }}
+            className="w-full py-2.5 mt-0.5 border border-dashed border-slate-200 rounded-xl text-xs font-semibold text-slate-400 hover:text-slate-600 hover:border-slate-300 hover:bg-white/60 transition-all flex items-center justify-center gap-1.5"
+          >
+            <Plus size={12} /> Añadir tarea
+          </button>
+        )}
       </div>
     </div>
   );
@@ -894,6 +942,11 @@ export default function Tareas() {
 
   // Kanban – drag state
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
+
+  const kanbanSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor,   { activationConstraint: { delay: 250, tolerance: 5 } }),
+  );
 
   // Modal
   const [showModal, setShowModal] = useState(false);
@@ -1340,7 +1393,7 @@ export default function Tareas() {
           })()
         ) : view === "kanban" ? (
           <div className="p-5 overflow-x-auto">
-            <DndContext onDragStart={handleKanbanDragStart} onDragEnd={handleKanbanDragEnd}>
+            <DndContext sensors={kanbanSensors} onDragStart={handleKanbanDragStart} onDragEnd={handleKanbanDragEnd}>
               <div className="flex items-start gap-5 pb-3 min-h-[400px]">
                 <KanbanLane
                   id="pendiente"
