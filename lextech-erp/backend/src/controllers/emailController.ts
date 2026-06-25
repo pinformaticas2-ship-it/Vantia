@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import * as crypto from 'crypto';
 import pool from '../config/database';
-import { ImapClient, ImapConfig, ImapFolderInfo, syncInbox, testImapConnection } from '../utils/imap';
+import { ImapClient, ImapConfig, syncInbox, testImapConnection } from '../utils/imap';
 import { Pop3Config, syncPop3Inbox, testPop3Connection } from '../utils/pop3';
 import { sendEmail, SmtpConfig, MailMessage, testSmtpConnection } from '../utils/smtp';
 import { logActivityForReq } from './activityController';
@@ -359,7 +359,23 @@ export async function createAccount(req: Request, res: Response) {
       [uid, label, email, imap_host, inPort, Boolean(imap_secure),
        smtp_host, Number(smtp_port), Boolean(smtp_secure), username, enc, proto],
     );
-    return ok(res, { ...rows[0], smtp_warning: smtpWarning });
+    const created = rows[0];
+
+    // Register with EmailEngine (fire-and-forget)
+    if (proto === 'imap') {
+      import('../utils/emailEngineClient').then(({ isEmailEngineEnabled, eeRegisterAccount }) => {
+        if (!isEmailEngineEnabled()) return;
+        eeRegisterAccount({
+          account: created.id,
+          name: created.label,
+          email: created.email,
+          imap: { host: String(imap_host), port: inPort, secure: Boolean(imap_secure), auth: { user: String(username), pass: String(password) } },
+          smtp: { host: String(smtp_host), port: Number(smtp_port), secure: Boolean(smtp_secure), auth: { user: String(username), pass: String(password) } },
+        }).catch(() => {});
+      }).catch(() => {});
+    }
+
+    return ok(res, { ...created, smtp_warning: smtpWarning });
   } catch (e: any) { return err(res, e.message); }
 }
 
@@ -368,6 +384,11 @@ export async function deleteAccount(req: Request, res: Response) {
   if (!uid) return err(res, 'No autenticado', 401);
   const { id } = req.params;
   try {
+    // Remove from EmailEngine before DB delete (fire-and-forget)
+    import('../utils/emailEngineClient').then(({ isEmailEngineEnabled, eeDeleteAccount }) => {
+      if (isEmailEngineEnabled()) eeDeleteAccount(id).catch(() => {});
+    }).catch(() => {});
+
     const { rowCount } = await pool.query(
       `DELETE FROM email_accounts WHERE id=$1 AND user_id=$2`,
       [id, uid],
@@ -1304,6 +1325,69 @@ export async function getDrafts(req: Request, res: Response) {
       [uid],
     );
     return ok(res, rows);
+  } catch (e: any) { return err(res, e.message); }
+}
+
+// ── EmailEngine: body cache + attachment proxy ────────────────────────────────
+
+export async function getMessageBodyFromEngine(req: Request, res: Response) {
+  const uid = userId(req);
+  if (!uid) return err(res, 'No autenticado', 401);
+  const { id } = req.params;
+  try {
+    const { rows } = await pool.query(
+      `SELECT body_text, body_html, attachments_json, account_id, engine_msg_id
+         FROM emails WHERE id=$1 AND user_id=$2`,
+      [id, uid],
+    );
+    if (!rows.length) return err(res, 'Mensaje no encontrado', 404);
+    const row = rows[0];
+
+    let attachments: any[] = [];
+    try { attachments = row.attachments_json ? JSON.parse(row.attachments_json) : []; } catch { /**/ }
+
+    if (!row.body_html && !row.body_text && row.engine_msg_id && row.account_id) {
+      const { isEmailEngineEnabled, eeGetMessage } = await import('../utils/emailEngineClient');
+      if (isEmailEngineEnabled()) {
+        try {
+          const msg = await eeGetMessage(row.account_id, row.engine_msg_id);
+          const bodyHtml = msg?.html || msg?.text || null;
+          const bodyText = msg?.text || null;
+          const newAttachments = msg?.attachments || [];
+          await pool.query(
+            `UPDATE emails SET body_html=$1, body_text=$2, attachments_json=$3 WHERE id=$4`,
+            [bodyHtml, bodyText, newAttachments.length ? JSON.stringify(newAttachments) : null, id],
+          );
+          return ok(res, { body_html: bodyHtml, body_text: bodyText, attachments: newAttachments });
+        } catch { /**/ }
+      }
+    }
+
+    return ok(res, { body_html: row.body_html, body_text: row.body_text, attachments });
+  } catch (e: any) { return err(res, e.message); }
+}
+
+export async function downloadAttachment(req: Request, res: Response) {
+  const uid = userId(req);
+  if (!uid) return err(res, 'No autenticado', 401);
+  const { id, attachmentId } = req.params;
+  try {
+    const { rows } = await pool.query(
+      `SELECT account_id, engine_msg_id FROM emails WHERE id=$1 AND user_id=$2`,
+      [id, uid],
+    );
+    if (!rows.length) return err(res, 'Mensaje no encontrado', 404);
+    const { account_id, engine_msg_id } = rows[0];
+    if (!account_id || !engine_msg_id) return err(res, 'Adjunto no disponible via EmailEngine', 404);
+
+    const { isEmailEngineEnabled, eeGetAttachment } = await import('../utils/emailEngineClient');
+    if (!isEmailEngineEnabled()) return err(res, 'EmailEngine no configurado', 503);
+
+    const buffer = await eeGetAttachment(account_id, attachmentId);
+    res.setHeader('Content-Disposition', `attachment; filename="${attachmentId}"`);
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Length', String(buffer.length));
+    res.send(buffer);
   } catch (e: any) { return err(res, e.message); }
 }
 

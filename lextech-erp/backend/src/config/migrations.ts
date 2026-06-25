@@ -1356,6 +1356,21 @@ export async function runMigrations(): Promise<void> {
       `);
     } catch (_e: any) {}
 
+    // ── EmailEngine: columnas de integración ──────────────────────────────────
+    try {
+      await client.query(`ALTER TABLE emails ADD COLUMN IF NOT EXISTS engine_msg_id VARCHAR(200)`);
+      await client.query(`ALTER TABLE emails ADD COLUMN IF NOT EXISTS thread_id VARCHAR(500)`);
+      await client.query(`ALTER TABLE emails ADD COLUMN IF NOT EXISTS attachments_json TEXT`);
+      await client.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_emails_engine_msg_id
+          ON emails (engine_msg_id) WHERE engine_msg_id IS NOT NULL
+      `);
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_emails_thread_id
+          ON emails (thread_id) WHERE thread_id IS NOT NULL
+      `);
+    } catch (_e: any) {}
+
     // VACUUM ANALYZE para mantener las estadísticas de consulta frescas
     try {
       await client.query(`ANALYZE entities;`);

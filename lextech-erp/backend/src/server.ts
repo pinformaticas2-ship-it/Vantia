@@ -13,6 +13,7 @@ import expedientesRoutes from './routes/expedientes';
 import agendaRoutes from './routes/agenda';
 import chatRoutes           from './routes/chat';
 import emailRoutes          from './routes/email';
+import emailEngineWebhookRoute from './routes/emailEngineWebhook';
 import sharedTemplatesRoutes from './routes/sharedTemplates';
 import whatsappRoutes       from './routes/whatsapp';
 import documentImportRoutes from './routes/documentImport';
@@ -67,6 +68,9 @@ process.on('unhandledRejection', (reason) => {
 process.on('uncaughtException', (error) => {
   console.error('❌ Uncaught exception:', error);
 });
+
+// EmailEngine webhooks must be registered BEFORE Clerk middleware (no auth required)
+app.use('/api/email/webhook/engine', emailEngineWebhookRoute);
 
 // --- MIDDLEWARES GLOBALES ---
 app.use(clerkMiddleware());
@@ -241,5 +245,42 @@ runMigrations().then(() => {
       syncAllQuipuUsers().catch(() => {});
       setInterval(() => syncAllQuipuUsers().catch(() => {}), 30 * 60 * 1000);
     }, 30_000);
+
+    // EmailEngine startup: configure webhook and register existing IMAP accounts
+    const emailEngineUrl = process.env.EMAIL_ENGINE_URL;
+    if (emailEngineUrl) {
+      const publicUrl = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
+      setTimeout(async () => {
+        try {
+          const { eeHealthCheck, eeConfigureWebhook, eeRegisterAccount } = await import('./utils/emailEngineClient');
+          const { decryptPassword } = await import('./utils/emailCrypto');
+
+          const healthy = await eeHealthCheck();
+          if (!healthy) { console.warn('⚠️  EmailEngine no responde en', emailEngineUrl); return; }
+
+          await eeConfigureWebhook(`${publicUrl}/api/email/webhook/engine`);
+          console.log('✅ EmailEngine webhook configurado →', `${publicUrl}/api/email/webhook/engine`);
+
+          const { rows: accounts } = await pool.query(
+            `SELECT id, label, email, imap_host, imap_port, imap_secure,
+                    smtp_host, smtp_port, smtp_secure, username, password_enc
+               FROM email_accounts WHERE active=true AND COALESCE(protocol,'imap')='imap'`,
+          );
+          for (const acc of accounts) {
+            const pass = decryptPassword(acc.password_enc);
+            await eeRegisterAccount({
+              account: acc.id,
+              name: acc.label,
+              email: acc.email,
+              imap: { host: acc.imap_host, port: acc.imap_port, secure: acc.imap_secure, auth: { user: acc.username, pass } },
+              smtp: { host: acc.smtp_host, port: acc.smtp_port, secure: acc.smtp_secure, auth: { user: acc.username, pass } },
+            }).catch(() => {});
+          }
+          console.log(`✅ EmailEngine: ${accounts.length} cuenta(s) IMAP registradas`);
+        } catch (e: any) {
+          console.warn('⚠️  EmailEngine startup error:', e?.message || e);
+        }
+      }, 5_000);
+    }
   });
 });

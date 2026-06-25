@@ -25,6 +25,8 @@ import {
   logGmailSent,
   linkEmailToExpediente,
   emptyTrash,
+  getMessageBodyFromEngine,
+  downloadAttachment,
 } from '../controllers/emailController';
 
 const router = Router();
@@ -65,5 +67,9 @@ router.delete('/trash',           emptyTrash);
 
 // ── Asociar email a expediente ───────────────────────────────────────────────
 router.patch('/messages/:id/link', linkEmailToExpediente);
+
+// ── EmailEngine: body cache y adjuntos ───────────────────────────────────────
+router.get('/messages/:id/body',                        getMessageBodyFromEngine);
+router.get('/messages/:id/attachments/:attachmentId',   downloadAttachment);
 
 export default router;
