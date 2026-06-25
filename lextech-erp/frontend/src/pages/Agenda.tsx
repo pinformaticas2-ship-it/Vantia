@@ -70,6 +70,7 @@ interface AgendaEvent {
   external_provider?: string | null;
   external_id?: string | null;
   external_url?: string | null;
+  meet_url?: string | null;
 }
 
 interface AgendaOrganizationUser {
@@ -181,6 +182,15 @@ function buildGooglePayload(data: any) {
     payload.end = { dateTime: data.end_at || data.start_at };
   }
 
+  if (data.with_meet) {
+    payload.conferenceData = {
+      createRequest: {
+        requestId: `meet-${crypto.randomUUID()}`,
+        conferenceSolutionKey: { type: "hangoutsMeet" },
+      },
+    };
+  }
+
   return payload;
 }
 
@@ -250,6 +260,7 @@ const emptyForm = (date?: string) => {
     related_user_id: "",
     related_user_name: "",
     organization_context: "",
+    with_meet: false,
   };
 };
 
@@ -267,6 +278,7 @@ function EventModal({
   onDelete,
   saving,
   errorMsg,
+  gcalEnabled,
 }: {
   event: AgendaEvent | null;
   defaultDate: string | null;
@@ -278,6 +290,7 @@ function EventModal({
   onDelete: (id: string) => void;
   saving: boolean;
   errorMsg: string | null;
+  gcalEnabled?: boolean;
 }) {
   const [form, setForm] = useState(event
     ? {
@@ -295,6 +308,7 @@ function EventModal({
         related_user_id: event.related_user_id || "",
         related_user_name: event.related_user_name || "",
         organization_context: event.organization_context || "",
+        with_meet: false,
       }
     : (initialFormData || emptyForm(defaultDate || undefined))
   );
@@ -686,6 +700,45 @@ function EventModal({
                   </div>
                 </div>
               </div>
+            </div>
+
+            <div className="rounded-[28px] border border-emerald-100 bg-gradient-to-br from-white to-emerald-50/40 p-5 shadow-[0_16px_40px_rgba(15,23,42,0.05)]">
+              <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800">
+                <Video size={15} className="text-emerald-600" />
+                Videollamada
+              </div>
+              {event?.meet_url ? (
+                <div className="space-y-2">
+                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                    <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400 mb-1">Meet activo</div>
+                    <a
+                      href={event.meet_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 text-sm font-semibold text-emerald-700 hover:text-emerald-800 transition-colors"
+                    >
+                      <ExternalLink size={13} />
+                      Unirse a Meet
+                    </a>
+                  </div>
+                </div>
+              ) : (
+                <label className="flex items-center gap-3 cursor-pointer rounded-2xl border border-slate-200 bg-white px-4 py-3 hover:border-emerald-200 hover:bg-emerald-50/40 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={(form as any).with_meet}
+                    onChange={e => set("with_meet", e.target.checked)}
+                    className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-400"
+                  />
+                  <div>
+                    <div className="text-sm font-semibold text-slate-700">Crear videollamada</div>
+                    <div className="text-[11px] text-slate-400">Genera un enlace de Google Meet</div>
+                  </div>
+                </label>
+              )}
+              {!(event?.meet_url) && (form as any).with_meet && !gcalEnabled && (
+                <p className="mt-2 text-[11px] text-amber-600 font-medium">Conecta Google Calendar para generar el enlace.</p>
+              )}
             </div>
 
             <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_16px_40px_rgba(15,23,42,0.05)]">
@@ -1205,6 +1258,18 @@ function EventViewPopover({
               <img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_16dp.png" alt="Google Calendar" className="w-4 h-4 opacity-60" />
             )}
           </div>
+
+          {event.meet_url && (
+            <a
+              href={event.meet_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 w-full rounded-xl bg-emerald-600 px-3 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 transition-colors"
+            >
+              <Video size={14} />
+              Unirse a Meet
+            </a>
+          )}
         </div>
       </div>
     </>,
@@ -2086,7 +2151,8 @@ export default function Agenda() {
   }, [gcalToken]);
 
   const createGoogleCalendarEvent = useCallback(async (data: any) => {
-    return requestGoogleCalendar("/events", {
+    const path = data.with_meet ? "/events?conferenceDataVersion=1" : "/events";
+    return requestGoogleCalendar(path, {
       method: "POST",
       body: JSON.stringify(buildGooglePayload(data)),
     });
@@ -2530,6 +2596,10 @@ export default function Agenda() {
               end_at: savedEvent.end_at,
             });
 
+            const meetUrl = googleCreated?.hangoutLink
+              || googleCreated?.conferenceData?.entryPoints?.[0]?.uri
+              || null;
+
             const syncRes = await fetch(`/api/agenda/${savedEvent.id}`, {
               method: "PUT",
               headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -2539,6 +2609,7 @@ export default function Agenda() {
                 external_provider: "google",
                 external_id: googleCreated?.id,
                 external_url: googleCreated?.htmlLink,
+                meet_url: meetUrl,
               }),
             });
 
@@ -2546,7 +2617,9 @@ export default function Agenda() {
               const syncJson = await safeJson(syncRes);
               syncWarning = syncJson?.error || "El evento se guardo en el ERP, pero no se pudo registrar en Google.";
             } else {
-              setGcalNotice("Evento sincronizado tambien con Google Calendar.");
+              setGcalNotice(meetUrl
+                ? "Evento sincronizado con Google Calendar. ¡Enlace de Meet generado!"
+                : "Evento sincronizado tambien con Google Calendar.");
             }
           }
         } catch (syncError: any) {
@@ -3254,6 +3327,7 @@ export default function Agenda() {
           onDelete={handleDelete}
           saving={saving}
           errorMsg={errorMsg}
+          gcalEnabled={gcalEnabled}
         />
       )}
 

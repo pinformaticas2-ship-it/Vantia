@@ -197,7 +197,7 @@ export const createEvent = async (req: any, res: Response) => {
   const {
     title, description, start_at, end_at, all_day,
     type, status, expediente_id, cliente_id, related_user_id, related_user_name, organization_context, location, color,
-    source, external_provider, external_id, external_url,
+    source, external_provider, external_id, external_url, meet_url,
   } = req.body;
 
   if (!sanitizeTitle(title)) {
@@ -215,8 +215,8 @@ export const createEvent = async (req: any, res: Response) => {
       `INSERT INTO agenda_events
          (user_id, user_name, title, description, start_at, end_at, all_day,
           type, status, expediente_id, cliente_id, related_user_id, related_user_name, organization_context, location, color,
-          source, external_provider, external_id, external_url, task_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+          source, external_provider, external_id, external_url, meet_url, task_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
        RETURNING *`,
       [
         userId,
@@ -239,6 +239,7 @@ export const createEvent = async (req: any, res: Response) => {
         sanitizeText(external_provider),
         sanitizeText(external_id),
         sanitizeText(external_url),
+        sanitizeText(meet_url),
         null,
       ]
     );
@@ -292,7 +293,7 @@ export const updateEvent = async (req: any, res: Response) => {
   const {
     title, description, start_at, end_at, all_day,
     type, status, expediente_id, cliente_id, related_user_id, related_user_name, organization_context, location, color,
-    source, external_provider, external_id, external_url,
+    source, external_provider, external_id, external_url, meet_url,
   } = req.body;
 
   if (!sanitizeTitle(title)) {
@@ -329,8 +330,9 @@ export const updateEvent = async (req: any, res: Response) => {
          external_provider = $16,
          external_id = $17,
          external_url = $18,
+         meet_url = COALESCE($19, meet_url),
          updated_at = NOW()
-       WHERE id = $19
+       WHERE id = $20
        RETURNING *`,
       [
         sanitizeTitle(title),
@@ -351,6 +353,7 @@ export const updateEvent = async (req: any, res: Response) => {
         sanitizeText(external_provider),
         sanitizeText(external_id),
         sanitizeText(external_url),
+        sanitizeText(meet_url),
         id,
       ]
     );
