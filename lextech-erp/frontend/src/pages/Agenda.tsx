@@ -25,6 +25,7 @@ interface GCalEvent {
   end:   { dateTime?: string; date?: string };
   htmlLink: string;
   status: string;
+  hangoutLink?: string;
 }
 
 declare global {
@@ -865,6 +866,18 @@ function GoogleEventModal({
               <div className="w-[2px] shrink-0 self-stretch rounded-full mt-0.5 bg-blue-300" />
               <p className="leading-relaxed line-clamp-4">{description}</p>
             </div>
+          )}
+
+          {event.hangoutLink && (
+            <a
+              href={event.hangoutLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 w-full rounded-xl bg-emerald-600 px-3 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 transition-colors"
+            >
+              <Video size={14} />
+              Unirse a Meet
+            </a>
           )}
 
           <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
@@ -2326,6 +2339,7 @@ export default function Agenda() {
         start: ev.start,
         end: ev.end,
         htmlLink: ev.htmlLink,
+        hangoutLink: ev.hangoutLink,
         status: ev.status,
       }));
 
@@ -2380,6 +2394,7 @@ export default function Agenda() {
         start: ev.start,
         end: ev.end,
         htmlLink: ev.htmlLink,
+        hangoutLink: ev.hangoutLink,
         status: ev.status,
       }));
 

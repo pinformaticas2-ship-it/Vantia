@@ -55,6 +55,7 @@ const normalizeGoogleEvent = (raw: any) => {
     description: sanitizeText(raw?.description),
     location: sanitizeText(raw?.location),
     externalUrl: sanitizeText(raw?.htmlLink || raw?.external_url),
+    meetUrl: sanitizeText(raw?.hangoutLink || raw?.meet_url),
     status: raw?.status === 'cancelled' ? 'cancelado' : 'pendiente',
     type: raw?.type || 'reunion',
     expedienteId: raw?.expediente_id || null,
@@ -498,8 +499,8 @@ export const importGoogleEvents = async (req: any, res: Response) => {
         `INSERT INTO agenda_events
            (user_id, user_name, title, description, start_at, end_at, all_day,
             type, status, expediente_id, cliente_id, location, color,
-            source, external_provider, external_id, external_url)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+            source, external_provider, external_id, external_url, meet_url)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
          RETURNING *`,
         [
           userId,
@@ -519,6 +520,7 @@ export const importGoogleEvents = async (req: any, res: Response) => {
           'google',
           event.externalId,
           event.externalUrl,
+          event.meetUrl,
         ]
       );
 
@@ -608,8 +610,9 @@ export const syncGoogleEvents = async (req: any, res: Response) => {
              source = 'google',
              external_provider = 'google',
              external_url = $13,
+             meet_url = COALESCE($14, meet_url),
              updated_at = NOW()
-           WHERE id = $14
+           WHERE id = $15
            RETURNING *`,
           [
             userId,
@@ -625,6 +628,7 @@ export const syncGoogleEvents = async (req: any, res: Response) => {
             event.clienteId,
             event.location,
             event.externalUrl,
+            event.meetUrl,
             existing.rows[0].id,
           ]
         );
@@ -636,8 +640,8 @@ export const syncGoogleEvents = async (req: any, res: Response) => {
         `INSERT INTO agenda_events
            (user_id, user_name, title, description, start_at, end_at, all_day,
             type, status, expediente_id, cliente_id, location, color,
-            source, external_provider, external_id, external_url)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+            source, external_provider, external_id, external_url, meet_url)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
          RETURNING *`,
         [
           userId,
@@ -657,6 +661,7 @@ export const syncGoogleEvents = async (req: any, res: Response) => {
           'google',
           event.externalId,
           event.externalUrl,
+          event.meetUrl,
         ]
       );
       created.push(result.rows[0]);

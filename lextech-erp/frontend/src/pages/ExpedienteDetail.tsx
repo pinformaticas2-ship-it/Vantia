@@ -167,6 +167,7 @@ const DETAIL_TABS: { key: DetailTabKey; label: string; icon: any }[] = [
   { key: "actuacion",   label: "Actuaciones",            icon: ClipboardList },
   { key: "tareas",      label: "Tareas / Plazos",        icon: AlertTriangle },
   { key: "economico",   label: "Económico",              icon: Banknote },
+  { key: "notas",       label: "Notas",                  icon: StickyNote },
   { key: "correo",      label: "Correo",                 icon: Mail },
   { key: "historial",   label: "Historial expediente",   icon: Activity },
   { key: "cronologia",  label: "Cronología",             icon: Clock },
@@ -5210,7 +5211,7 @@ export default function ExpedienteDetail() {
               })}
               <div className="h-px w-full bg-slate-200 my-1.5" />
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-4 mt-1 mb-1">Acciones Rápidas</p>
-              <button className="text-slate-700 hover:bg-white hover:shadow-sm hover:text-slate-900 rounded-xl px-4 py-2.5 flex items-center gap-3 font-medium text-sm transition-all text-left">
+              <button onClick={() => setTab("notas")} className="text-slate-700 hover:bg-white hover:shadow-sm hover:text-slate-900 rounded-xl px-4 py-2.5 flex items-center gap-3 font-medium text-sm transition-all text-left">
                 <StickyNote size={14} className="text-amber-500 shrink-0" /> Notas
               </button>
               <button onClick={() => setTab("relacionados" as any)} className="text-slate-700 hover:bg-white hover:shadow-sm hover:text-slate-900 rounded-xl px-4 py-2.5 flex items-center gap-3 font-medium text-sm transition-all text-left">
