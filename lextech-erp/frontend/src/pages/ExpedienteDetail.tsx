@@ -4792,13 +4792,6 @@ function PanelIndicadoresExpediente({ expedienteId, onTabChange }: { expedienteI
           </div>
         )}
 
-        <div className="px-4 pb-4 space-y-2 border-t border-slate-100 pt-3 mt-1">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Acciones</p>
-          <button onClick={() => onTabChange('notas')}
-            className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors whitespace-nowrap">
-            🗒️ Notas
-          </button>
-        </div>
       </div>
     </aside>
   );
