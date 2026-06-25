@@ -488,7 +488,7 @@
   .agenda-google-topbar > div:first-child > div:first-child {
     background: rgba(171, 4, 51, 0.06);
     border: 1px solid rgba(171, 4, 51, 0.12);
-    border-radius: 18px;
+    border-radius: 8px;
     box-shadow: 0 10px 30px rgba(171, 4, 51, 0.08);
   }
 
@@ -497,7 +497,7 @@
   }
 
   .agenda-google-topbar button {
-    border-radius: 999px;
+    border-radius: 8px;
   }
 
   .agenda-google-topbar > div:last-child > div:first-child {
@@ -558,7 +558,7 @@
 
   .agenda-google-topbar .bg-red-50,
   .agenda-google-topbar .bg-emerald-50 {
-    border-radius: 999px;
+    border-radius: 8px;
   }
 
   .agenda-google-topbar .bg-red-50 {
