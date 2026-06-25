@@ -1977,23 +1977,25 @@ export default function ClientList() {
     <div className="flex flex-col h-full animate-in fade-in duration-300">
 
       {/* ── CABECERA ─────────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-white shrink-0">
-        <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-          <Users size={20} className="text-red-600" /> Gestión de Clientes
-        </h1>
+      <div className="px-6 py-4 border-b border-slate-100 bg-white flex items-center justify-between flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <Users size={20} className="text-red-600" />
+          <h1 className="text-xl font-bold text-slate-800">Gestión de Clientes</h1>
+        </div>
         <button
           onClick={() => fetchClients(true)}
-          className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-          title="Actualizar"
+          title="Refrescar"
+          className="p-1 rounded hover:bg-slate-50 text-slate-400 hover:text-slate-600 transition-colors"
         >
-          <RefreshCw size={14} />
+          <RefreshCw size={14} className={refreshSpin ? "animate-spin" : ""} />
         </button>
       </div>
 
       <div className="bg-white flex flex-col overflow-hidden flex-1 min-h-0">
 
         {/* ── BARRA DE ACCIONES ────────────────────────────────── */}
-        <div className="flex items-center gap-1 px-2.5 py-2 border-b border-slate-100 bg-slate-50/80 flex-wrap">
+        <div className="px-6 py-2.5 border-b border-slate-200 bg-slate-50 flex items-center flex-shrink-0 z-10 overflow-x-auto">
+          <div className="flex items-center gap-1.5 min-w-max pb-0.5">
 
           {/* ─ Alta ─ */}
           <AltaOptionsBtn
@@ -2017,7 +2019,7 @@ export default function ClientList() {
             onClick={() => selected && navigate(`/dashboard/clientes/${selected}?edit=1`)}
           />
 
-          <div className="w-px h-5 bg-slate-200 mx-0.5" />
+          <div className="w-px h-5 bg-slate-200 mx-1" />
 
           {/* ─ Enviar Correo ─ */}
           <DropdownBtn
@@ -2103,7 +2105,7 @@ export default function ClientList() {
             ]}
           />
 
-          <div className="w-px h-5 bg-slate-200 mx-0.5" />
+          <div className="w-px h-5 bg-slate-200 mx-1" />
 
           {/* ─ Sign ─ */}
           <ToolBtn
@@ -2125,7 +2127,7 @@ export default function ClientList() {
             ]}
           />
 
-          <div className="w-px h-5 bg-slate-200 mx-0.5" />
+          <div className="w-px h-5 bg-slate-200 mx-1" />
 
           {/* ─ Adjuntos ─ */}
           <ToolBtn
@@ -2153,7 +2155,7 @@ export default function ClientList() {
             onClick={() => navigate("/dashboard")}
           />
 
-          <div className="w-px h-5 bg-slate-200 mx-0.5" />
+          <div className="w-px h-5 bg-slate-200 mx-1" />
 
           {/* ─ Atajos ─ */}
           <AtajosButton modulo="Clientes" />
@@ -2299,10 +2301,11 @@ export default function ClientList() {
           </div>
 
           {/* ─ Indicador cliente seleccionado ─ */}
+          </div>
         </div>
 
         {/* ── BARRA DE FILTROS MULTICRITERIA ───────────────────── */}
-        <div className="px-4 py-2 border-b border-slate-100 bg-white">
+        <div className="px-6 py-2.5 border-b border-slate-200 bg-white">
           <div className="flex flex-col gap-1.5">
             {filters.map((filter, idx) => (
               <div key={filter.id} className="flex items-center gap-1.5 flex-wrap">
