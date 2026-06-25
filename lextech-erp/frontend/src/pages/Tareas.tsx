@@ -9,6 +9,7 @@ import {
   Loader2, Search, Filter, Trash2, Edit3, Flag,
   Briefcase, Users, Calendar, MoreHorizontal, GripVertical,
   ArrowUpDown, ChevronDown, ChevronUp, ZoomIn, ZoomOut,
+  AlignJustify, LayoutList, BarChart2, Zap,
 } from "lucide-react";
 import {
   DndContext, DragOverlay, useDraggable, useDroppable,
@@ -270,7 +271,7 @@ function TaskModal({
   );
 }
 
-// ── Vista Lista – fila estilo ClickUp ─────────────────────────────────────────
+// ── Vista Lista – fila ────────────────────────────────────────────────────────
 function TaskRow({
   task, onToggle, onEdit,
 }: {
@@ -282,89 +283,91 @@ function TaskRow({
   const overdue  = isOverdue(task.plazo, task.estado);
   const done     = task.estado === "completada";
   const tipoConf = TIPO_CONFIG[task.tipo] || TIPO_CONFIG.otro;
-  const prioConf = PRIO_CONFIG[task.prioridad] || PRIO_CONFIG.media;
   const days     = daysUntil(task.plazo);
 
   return (
-    <div
-      className={`group grid items-center gap-3 px-4 py-3 border-b border-slate-100 last:border-0 transition-colors
-        ${overdue && !done ? "bg-red-50/30 hover:bg-red-50/60" : "hover:bg-slate-50/70"}
-        ${done ? "opacity-55" : ""}
-      `}
-      style={{ gridTemplateColumns: "22px 6px 1fr 120px 130px 80px 32px" }}
-    >
-      {/* Completar */}
-      <button
-        onClick={e => { e.stopPropagation(); onToggle(task.id, done ? "pendiente" : "completada"); }}
-        className="flex items-center justify-center shrink-0 transition-colors text-slate-300 hover:text-emerald-500"
-      >
-        {done ? <CheckCircle2 size={17} className="text-emerald-500" /> : <Circle size={17} />}
-      </button>
-
-      {/* Prioridad barra */}
-      <div className={`h-5 w-1.5 rounded-full shrink-0 ${prioConf.bar}`} />
+    <div className={`group flex items-center border-b border-slate-100 last:border-0 transition-colors min-h-[58px]
+      ${overdue && !done ? "hover:bg-red-50/30" : done ? "opacity-60 hover:bg-slate-50/30" : "hover:bg-slate-50/50"}
+    `}>
+      {/* Checkbox */}
+      <div className="w-12 flex items-center justify-center shrink-0 py-3">
+        <button
+          onClick={e => { e.stopPropagation(); onToggle(task.id, done ? "pendiente" : "completada"); }}
+          className="text-slate-300 hover:text-emerald-500 transition-colors"
+        >
+          {done ? <CheckCircle2 size={16} className="text-emerald-500" /> : <Circle size={16} />}
+        </button>
+      </div>
 
       {/* Título + meta */}
-      <button onClick={() => onEdit(task)} className="text-left min-w-0">
-        <div className={`text-[13.5px] font-semibold leading-5 truncate ${done ? "line-through text-slate-400" : "text-slate-800"}`}>
+      <div className="flex-1 py-3 min-w-0 pr-4 cursor-pointer" onClick={() => onEdit(task)}>
+        <div className={`text-[13px] font-semibold leading-5 ${done ? "line-through text-slate-400" : "text-slate-800"}`}>
           {task.titulo}
         </div>
-        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+        <div className="flex items-center gap-3 mt-1 flex-wrap">
           <button
             onClickCapture={e => { e.stopPropagation(); task.client_id && navigate(`/dashboard/clientes/${task.client_id}`); }}
-            className="text-[10px] font-semibold text-blue-600 hover:underline"
+            className="flex items-center gap-1 text-[10px] font-semibold text-blue-600 hover:underline"
           >
-            {clientName(task)}
+            <Users size={9} /> {clientName(task)}
           </button>
           {(task.expediente || task.expediente_id) && (
             <button
               onClickCapture={e => { e.stopPropagation(); task.expediente_id && navigate(`/dashboard/expedientes/${task.expediente_id}`); }}
-              className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-violet-500 hover:underline"
+              className="flex items-center gap-1 text-[10px] font-semibold text-slate-500 hover:underline"
             >
-              <Briefcase size={8} /> {task.expediente || "Expediente"}
+              <Briefcase size={9} /> {task.expediente || "Expediente"}
             </button>
           )}
           {(task as any).etapa && (
-            <span className="text-[10px] font-bold text-indigo-600">🏷 {(task as any).etapa}</span>
+            <span className="flex items-center gap-1 text-[10px] font-medium text-indigo-600">
+              🏷 {(task as any).etapa}
+            </span>
           )}
           {(task as any).notas && (
-            <span className="text-[10px] text-amber-600 truncate max-w-[160px]">📝 {(task as any).notas}</span>
+            <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-1.5 py-0.5 max-w-[180px] truncate">
+              💬 {(task as any).notas}
+            </span>
           )}
         </div>
-      </button>
+      </div>
 
       {/* Tipo */}
-      <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full truncate text-center ${tipoConf.color}`}>
-        {tipoConf.label}
-      </span>
+      <div className="w-[140px] flex items-center justify-center shrink-0 px-2">
+        <span className={`text-[11px] font-semibold px-3 py-1 rounded-lg truncate ${tipoConf.color}`}>
+          {tipoConf.label}
+        </span>
+      </div>
 
       {/* Fecha límite */}
-      <div className={`text-xs font-medium flex items-center gap-1 ${
-        overdue && !done ? "text-red-600 font-bold" : days !== null && days <= 3 && !done ? "text-amber-600 font-bold" : "text-slate-500"
-      }`}>
-        {overdue && !done && <AlertTriangle size={10} />}
-        <span>{task.plazo ? fmtDate(task.plazo) : "—"}</span>
-        {days !== null && !overdue && !done && days <= 7 && (
-          <span className="text-slate-400 text-[10px]">{days === 0 ? "· hoy" : `· ${days}d`}</span>
+      <div className="w-[140px] flex items-center shrink-0 px-2">
+        {task.plazo ? (
+          <span className={`flex items-center gap-1 text-xs font-medium ${
+            overdue && !done ? "text-red-600 font-bold" :
+            days !== null && days <= 3 && !done ? "text-amber-600 font-bold" :
+            "text-slate-500"
+          }`}>
+            {overdue && !done && <AlertTriangle size={10} className="shrink-0" />}
+            {fmtDate(task.plazo)}
+            {days !== null && !overdue && !done && days <= 7 && (
+              <span className="text-slate-400 text-[10px]">{days === 0 ? "hoy" : `${days}d`}</span>
+            )}
+          </span>
+        ) : (
+          <span className="text-slate-300 text-xs">—</span>
         )}
       </div>
 
-      {/* Estado badge */}
-      <span className={`text-[10px] font-bold px-2 py-1 rounded-full text-center border ${
-        done ? "bg-emerald-50 text-emerald-600 border-emerald-200" :
-        task.estado === "urgente" ? "bg-red-50 text-red-600 border-red-200" :
-        "bg-amber-50 text-amber-600 border-amber-200"
-      }`}>
-        {ESTADO_CONFIG[task.estado]?.label}
-      </span>
-
-      {/* Acción editar */}
-      <button
-        onClick={() => onEdit(task)}
-        className="opacity-0 group-hover:opacity-100 h-7 w-7 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all shrink-0"
-      >
-        <Edit3 size={12} />
-      </button>
+      {/* Estado */}
+      <div className="w-[120px] flex items-center justify-center shrink-0 px-2 pr-4">
+        <span className={`text-[11px] font-semibold px-3 py-1 rounded-lg border ${
+          done ? "bg-emerald-50 text-emerald-600 border-emerald-200" :
+          task.estado === "urgente" ? "bg-red-50 text-red-600 border-red-200" :
+          "bg-amber-50 text-amber-600 border-amber-200"
+        }`}>
+          {ESTADO_CONFIG[task.estado]?.label}
+        </span>
+      </div>
     </div>
   );
 }
@@ -1085,270 +1088,284 @@ export default function Tareas() {
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-4 animate-in fade-in duration-500">
+    <div className="flex flex-col gap-5 animate-in fade-in duration-300">
 
-      {/* Cabecera */}
+      {/* ── Cabecera ── */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="h-9 w-9 bg-red-50 rounded-xl flex items-center justify-center">
-            <CheckCircle2 size={18} className="text-red-600" />
+        <div className="flex items-center gap-4">
+          <div className="w-11 h-11 rounded-xl bg-red-50 border border-red-100 flex items-center justify-center shrink-0">
+            <CheckCircle2 size={20} className="text-red-600" />
           </div>
           <div>
-            <h1 className="text-lg font-extrabold text-slate-900 leading-tight">Tareas y Plazos</h1>
-            <p className="text-xs text-slate-400">Solo tus tareas asignadas</p>
+            <h1 className="text-xl font-bold text-slate-800 leading-tight">Tareas y Plazos</h1>
+            <p className="text-xs font-medium text-slate-400 mt-0.5">Solo tus tareas asignadas</p>
           </div>
         </div>
         <button
           onClick={openNew}
-          className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm transition-colors"
+          className="flex items-center gap-2 px-5 h-10 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-sm shadow-red-600/20 transition-colors"
         >
-          <Plus size={13} /> Nueva tarea
+          <Plus size={14} /> Nueva tarea
         </button>
       </div>
 
-      {/* Stats */}
+      {/* ── Stats ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: "Vencidas",    val: stats.vencidas,    cls: "text-red-600",     bg: "bg-red-50 border-red-100"      },
-          { label: "Urgentes",    val: stats.urgentes,    cls: "text-orange-600",  bg: "bg-orange-50 border-orange-100"},
-          { label: "Pendientes",  val: stats.pendientes,  cls: "text-amber-600",   bg: "bg-amber-50 border-amber-100"  },
-          { label: "Completadas", val: stats.completadas, cls: "text-emerald-600", bg: "bg-emerald-50 border-emerald-100"},
-        ].map(s => (
-          <div key={s.label} className={`rounded-xl border px-4 py-3 ${s.bg}`}>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{s.label}</p>
-            <p className={`text-xl font-bold mt-0.5 ${s.cls}`}>{s.val}</p>
+        {([
+          { label: "VENCIDAS",    val: stats.vencidas,    cls: "text-red-600",     labelCls: "text-red-500",     bg: "bg-red-50",     border: "border-red-100",     Icon: AlertTriangle as React.FC<{ size?: number; className?: string; strokeWidth?: number }> },
+          { label: "URGENTES",    val: stats.urgentes,    cls: "text-orange-600",  labelCls: "text-orange-500",  bg: "bg-orange-50",  border: "border-orange-100",  Icon: Zap           as React.FC<{ size?: number; className?: string; strokeWidth?: number }> },
+          { label: "PENDIENTES",  val: stats.pendientes,  cls: "text-amber-600",   labelCls: "text-amber-500",   bg: "bg-amber-50",   border: "border-amber-100",   Icon: Clock         as React.FC<{ size?: number; className?: string; strokeWidth?: number }> },
+          { label: "COMPLETADAS", val: stats.completadas, cls: "text-emerald-600", labelCls: "text-emerald-500", bg: "bg-emerald-50", border: "border-emerald-100", Icon: CheckCircle2  as React.FC<{ size?: number; className?: string; strokeWidth?: number }> },
+        ] as const).map(s => (
+          <div key={s.label} className={`relative overflow-hidden rounded-xl border ${s.bg} ${s.border} px-5 py-4`}>
+            <p className={`text-[10px] font-bold uppercase tracking-widest ${s.labelCls}`}>{s.label}</p>
+            <p className={`text-3xl font-extrabold mt-1 ${s.cls}`}>{s.val}</p>
+            <s.Icon size={56} className={`absolute right-3 bottom-1 opacity-[0.08] ${s.cls}`} strokeWidth={1.5} />
           </div>
         ))}
       </div>
 
-      {/* Tabs + Vista + Búsqueda */}
-      <div className="flex items-center gap-2 flex-wrap">
-        {(["todas", "plazos"] as const).map(t => (
-          <button key={t} onClick={() => setTab(t)}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-colors ${
-              tab === t ? "bg-slate-800 text-white border-slate-800" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-            }`}>
-            {t === "todas" ? "Todas" : "Solo con plazo"}
-          </button>
-        ))}
+      {/* ── Panel principal ── */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
 
-        <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl p-1">
-          {([
-            { key: "list", label: "Lista" },
-            { key: "kanban", label: "Kanban" },
-            { key: "gantt", label: "Gantt" },
-          ] as const).map(option => (
-            <button key={option.key} onClick={() => setView(option.key)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                view === option.key ? "bg-slate-800 text-white" : "text-slate-500 hover:bg-slate-50"
+        {/* Toolbar */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 flex-wrap gap-2">
+          {/* Left: tabs + view selector */}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
+              {(["todas", "plazos"] as const).map(t => (
+                <button key={t} onClick={() => setTab(t)}
+                  className={`px-3.5 py-1.5 text-xs font-semibold rounded-md transition-colors ${
+                    tab === t ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100"
+                  }`}>
+                  {t === "todas" ? "Todas" : "Solo con plazo"}
+                </button>
+              ))}
+            </div>
+            <div className="w-px h-5 bg-slate-200" />
+            <div className="flex items-center gap-0.5 bg-slate-100 p-1 rounded-lg border border-slate-200/60">
+              {([
+                { key: "list",   label: "Lista",  Icon: AlignJustify },
+                { key: "kanban", label: "Kanban", Icon: LayoutList   },
+                { key: "gantt",  label: "Gantt",  Icon: BarChart2    },
+              ] as const).map(opt => (
+                <button key={opt.key} onClick={() => setView(opt.key as TaskView)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md transition-all ${
+                    view === opt.key
+                      ? "font-bold text-slate-800 bg-white shadow-sm border border-slate-200/50"
+                      : "font-medium text-slate-600 hover:text-slate-900"
+                  }`}>
+                  <opt.Icon size={12} /> {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Right: search + filter */}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 h-8">
+              <Search size={12} className="text-slate-400 shrink-0" />
+              <input
+                value={search} onChange={e => setSearch(e.target.value)}
+                placeholder="Buscar tarea o cliente..."
+                className="bg-transparent text-xs text-slate-700 placeholder-slate-400 focus:outline-none w-44"
+              />
+              {search && <button onClick={() => setSearch("")}><X size={11} className="text-slate-400" /></button>}
+            </div>
+            <button
+              onClick={() => setShowFilters(v => !v)}
+              className={`flex items-center gap-1.5 px-3 h-8 text-xs font-semibold border rounded-lg transition-colors ${
+                showFilters || hasFilter
+                  ? "bg-red-50 border-red-200 text-red-700"
+                  : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
               }`}>
-              {option.label}
+              <Filter size={11} /> Filtrar
+              {hasFilter && <span className="h-1.5 w-1.5 rounded-full bg-red-500" />}
             </button>
-          ))}
-        </div>
-
-        <div className="flex-1" />
-
-        <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-1.5">
-          <Search size={12} className="text-slate-400 shrink-0" />
-          <input
-            value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar tarea o cliente…"
-            className="bg-transparent text-xs text-slate-700 placeholder-slate-300 focus:outline-none w-40"
-          />
-          {search && <button onClick={() => setSearch("")}><X size={11} className="text-slate-400" /></button>}
-        </div>
-
-        <button
-          onClick={() => setShowFilters(v => !v)}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors ${
-            showFilters || hasFilter ? "bg-red-50 border-red-200 text-red-700" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-          }`}>
-          <Filter size={11} /> Filtrar
-          {hasFilter && <span className="h-1.5 w-1.5 rounded-full bg-red-500" />}
-        </button>
-      </div>
-
-      {/* Filtros expandibles */}
-      {showFilters && (
-        <div className="flex items-center gap-2 flex-wrap bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Estado:</span>
-            {["pendiente", "urgente", "completada"].map(e => (
-              <button key={e} onClick={() => setFilterEstado(filterEstado === e ? "" : e)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors ${
-                  filterEstado === e ? "bg-red-600 text-white border-red-600" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-                }`}>
-                {ESTADO_CONFIG[e]?.label}
-              </button>
-            ))}
           </div>
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Prioridad:</span>
-            {["alta","media","baja"].map(p => (
-              <button key={p} onClick={() => setFilterPrio(filterPrio === p ? "" : p)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors ${
-                  filterPrio === p ? "bg-red-600 text-white border-red-600" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-                }`}>
-                {PRIO_CONFIG[p]?.label}
+        </div>
+
+        {/* Filtros expandibles */}
+        {showFilters && (
+          <div className="flex items-center gap-2 flex-wrap px-5 py-3 bg-slate-50 border-b border-slate-100">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Estado:</span>
+              {["pendiente", "urgente", "completada"].map(e => (
+                <button key={e} onClick={() => setFilterEstado(filterEstado === e ? "" : e)}
+                  className={`px-2.5 py-1 rounded-md text-xs font-semibold border transition-colors ${
+                    filterEstado === e ? "bg-red-600 text-white border-red-600" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                  }`}>
+                  {ESTADO_CONFIG[e]?.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Prioridad:</span>
+              {["alta","media","baja"].map(p => (
+                <button key={p} onClick={() => setFilterPrio(filterPrio === p ? "" : p)}
+                  className={`px-2.5 py-1 rounded-md text-xs font-semibold border transition-colors ${
+                    filterPrio === p ? "bg-red-600 text-white border-red-600" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                  }`}>
+                  {PRIO_CONFIG[p]?.label}
+                </button>
+              ))}
+            </div>
+            {hasFilter && (
+              <button onClick={() => { setFilterEstado(""); setFilterTipo(""); setFilterPrio(""); setSearch(""); }}
+                className="ml-auto text-xs text-red-500 font-semibold hover:text-red-700">
+                Limpiar filtros
               </button>
-            ))}
+            )}
           </div>
-          {hasFilter && (
-            <button onClick={() => { setFilterEstado(""); setFilterTipo(""); setFilterPrio(""); setSearch(""); }}
-              className="ml-auto text-xs text-red-500 font-semibold hover:text-red-700">
-              Limpiar filtros
-            </button>
-          )}
-        </div>
-      )}
+        )}
 
-      {/* Contenido principal */}
-      {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <Spinner size="md" muted />
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400 border-2 border-dashed border-slate-200 rounded-2xl">
-          <CheckCircle2 size={32} className="opacity-20" />
-          <p className="font-semibold text-slate-500">
-            {hasFilter || tab === "plazos" ? "Sin tareas con esos filtros" : "No tienes tareas todavía"}
-          </p>
-          {!hasFilter && tab === "todas" && (
-            <button onClick={openNew} className="text-sm font-bold text-red-500 hover:underline">
-              + Crear primera tarea
-            </button>
-          )}
-        </div>
-      ) : view === "list" ? (
-        // ── Lista ClickUp-style ──────────────────────────────────────────────
-        (() => {
-          const overdueTasks    = listTasks.filter(t => isOverdue(t.plazo, t.estado));
-          const activeTasks     = listTasks.filter(t => !isOverdue(t.plazo, t.estado) && t.estado !== "completada");
-          const completedTasks  = listTasks.filter(t => t.estado === "completada");
+        {/* Contenido */}
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <Spinner size="md" muted />
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-3">
+            <CheckCircle2 size={36} className="text-slate-200" />
+            <p className="font-semibold text-slate-400">
+              {hasFilter || tab === "plazos" ? "Sin tareas con esos filtros" : "No tienes tareas todavía"}
+            </p>
+            {!hasFilter && tab === "todas" && (
+              <button onClick={openNew} className="text-sm font-bold text-red-500 hover:underline">
+                + Crear primera tarea
+              </button>
+            )}
+          </div>
+        ) : view === "list" ? (
+          (() => {
+            const overdueTasks   = listTasks.filter(t => isOverdue(t.plazo, t.estado));
+            const activeTasks    = listTasks.filter(t => !isOverdue(t.plazo, t.estado) && t.estado !== "completada");
+            const completedTasks = listTasks.filter(t => t.estado === "completada");
 
-          const SortBtn = ({ col, label }: { col: typeof listSortBy; label: string }) => (
-            <button onClick={() => toggleSort(col)}
-              className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 hover:text-slate-700 transition-colors">
-              {label}
-              <ArrowUpDown size={9} className={listSortBy === col ? "text-red-500" : ""} />
-              {listSortBy === col && (
-                <span className="text-red-500">{listSortDir === "asc" ? "↑" : "↓"}</span>
-              )}
-            </button>
-          );
+            const SortBtn = ({ col, label }: { col: typeof listSortBy; label: string }) => (
+              <button onClick={() => toggleSort(col)}
+                className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 hover:text-slate-700 transition-colors">
+                {label}
+                <ArrowUpDown size={9} className={listSortBy === col ? "text-red-500" : ""} />
+                {listSortBy === col && <span className="text-red-500">{listSortDir === "asc" ? "↑" : "↓"}</span>}
+              </button>
+            );
 
-          return (
-            <div className="rounded-[20px] border border-slate-200 bg-white overflow-hidden shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-              {/* Cabecera columnas */}
-              <div
-                className="grid items-center gap-3 px-4 py-2 bg-slate-50 border-b border-slate-200 sticky top-0 z-10"
-                style={{ gridTemplateColumns: "22px 6px 1fr 120px 130px 80px 32px" }}
-              >
-                <div />
-                <div />
-                <SortBtn col="titulo" label="Tarea" />
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Tipo</span>
-                <SortBtn col="plazo" label="Fecha límite" />
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Estado</span>
-                <div />
-              </div>
-
-              {/* Grupo Vencidas */}
-              {overdueTasks.length > 0 && (
-                <>
-                  <div className="flex items-center gap-2 px-4 py-2 bg-red-50 border-b border-red-100">
-                    <AlertTriangle size={11} className="text-red-500 shrink-0" />
-                    <span className="text-[10px] font-extrabold uppercase tracking-widest text-red-600">
-                      Vencidas · {overdueTasks.length}
-                    </span>
+            return (
+              <>
+                {/* Cabecera columnas */}
+                <div className="flex items-center px-4 py-2.5 bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
+                  <div className="w-12 shrink-0" />
+                  <div className="flex-1 pr-4"><SortBtn col="titulo" label="Tarea" /></div>
+                  <div className="w-[140px] text-center">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Tipo</span>
                   </div>
-                  {overdueTasks.map(t => <TaskRow key={t.id} task={t} onToggle={handleToggle} onEdit={openEdit} />)}
-                </>
-              )}
+                  <div className="w-[140px] px-2"><SortBtn col="plazo" label="Fecha límite" /></div>
+                  <div className="w-[120px] pr-4 text-center">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Estado</span>
+                  </div>
+                </div>
 
-              {/* Grupo Activas */}
-              {activeTasks.length > 0 && (
-                <>
-                  {overdueTasks.length > 0 && (
+                {/* Grupo Vencidas */}
+                {overdueTasks.length > 0 && (
+                  <>
+                    <div className="flex items-center gap-2 px-4 py-2 bg-red-50/70 border-b border-red-100">
+                      <AlertTriangle size={11} className="text-red-500 shrink-0" />
+                      <span className="text-[10px] font-extrabold uppercase tracking-widest text-red-600">
+                        Vencidas · {overdueTasks.length}
+                      </span>
+                    </div>
+                    <div className="border-l-[3px] border-red-400">
+                      {overdueTasks.map(t => <TaskRow key={t.id} task={t} onToggle={handleToggle} onEdit={openEdit} />)}
+                    </div>
+                  </>
+                )}
+
+                {/* Grupo Activas */}
+                {activeTasks.length > 0 && (
+                  <>
                     <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border-b border-slate-100">
                       <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500">
                         Activas · {activeTasks.length}
                       </span>
                     </div>
-                  )}
-                  {activeTasks.map(t => <TaskRow key={t.id} task={t} onToggle={handleToggle} onEdit={openEdit} />)}
-                </>
-              )}
+                    {activeTasks.map(t => <TaskRow key={t.id} task={t} onToggle={handleToggle} onEdit={openEdit} />)}
+                  </>
+                )}
 
-              {/* Grupo Completadas (colapsable) */}
-              {completedTasks.length > 0 && (
-                <>
-                  <button
-                    onClick={() => setShowCompletadas(v => !v)}
-                    className="w-full flex items-center gap-2 px-4 py-2 bg-emerald-50 border-y border-emerald-100 hover:bg-emerald-100/60 transition-colors"
-                  >
-                    <CheckCircle2 size={11} className="text-emerald-500 shrink-0" />
-                    <span className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-600 flex-1 text-left">
-                      Completadas · {completedTasks.length}
-                    </span>
-                    {showCompletadas ? <ChevronUp size={13} className="text-emerald-500" /> : <ChevronDown size={13} className="text-emerald-500" />}
-                  </button>
-                  {showCompletadas && completedTasks.map(t => (
-                    <TaskRow key={t.id} task={t} onToggle={handleToggle} onEdit={openEdit} />
-                  ))}
-                </>
-              )}
-            </div>
-          );
-        })()
-      ) : view === "kanban" ? (
-        // ── Kanban con drag & drop ───────────────────────────────────────────
-        <DndContext onDragStart={handleKanbanDragStart} onDragEnd={handleKanbanDragEnd}>
-          <div className="flex gap-4 overflow-x-auto pb-2">
-            <KanbanLane
-              id="pendiente"
-              title="Pendientes"
-              tone="bg-amber-50 text-amber-700"
-              tasks={filtered.filter(t => t.estado === "pendiente")}
-              onToggle={handleToggle}
-              onEdit={openEdit}
-              onAddNew={openNew}
-            />
-            <KanbanLane
-              id="urgente"
-              title="Urgentes"
-              tone="bg-red-50 text-red-700"
-              tasks={filtered.filter(t => t.estado === "urgente")}
-              onToggle={handleToggle}
-              onEdit={openEdit}
-              onAddNew={openNew}
-            />
-            <KanbanLane
-              id="completada"
-              title="Completadas"
-              tone="bg-emerald-50 text-emerald-700"
-              tasks={filtered.filter(t => t.estado === "completada")}
-              onToggle={handleToggle}
-              onEdit={openEdit}
-              onAddNew={openNew}
-            />
+                {/* Grupo Completadas (colapsable) */}
+                {completedTasks.length > 0 && (
+                  <>
+                    <button
+                      onClick={() => setShowCompletadas(v => !v)}
+                      className="w-full flex items-center gap-2 px-4 py-2 bg-emerald-50/80 border-y border-emerald-100 hover:bg-emerald-100/60 transition-colors"
+                    >
+                      <CheckCircle2 size={11} className="text-emerald-500 shrink-0" />
+                      <span className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-600 flex-1 text-left">
+                        Completadas · {completedTasks.length}
+                      </span>
+                      {showCompletadas
+                        ? <ChevronUp size={13} className="text-emerald-500" />
+                        : <ChevronDown size={13} className="text-emerald-500" />}
+                    </button>
+                    {showCompletadas && completedTasks.map(t => (
+                      <TaskRow key={t.id} task={t} onToggle={handleToggle} onEdit={openEdit} />
+                    ))}
+                  </>
+                )}
+              </>
+            );
+          })()
+        ) : view === "kanban" ? (
+          <div className="p-4">
+            <DndContext onDragStart={handleKanbanDragStart} onDragEnd={handleKanbanDragEnd}>
+              <div className="flex gap-4 overflow-x-auto pb-2">
+                <KanbanLane
+                  id="pendiente"
+                  title="Pendientes"
+                  tone="bg-amber-50 text-amber-700"
+                  tasks={filtered.filter(t => t.estado === "pendiente")}
+                  onToggle={handleToggle}
+                  onEdit={openEdit}
+                  onAddNew={openNew}
+                />
+                <KanbanLane
+                  id="urgente"
+                  title="Urgentes"
+                  tone="bg-red-50 text-red-700"
+                  tasks={filtered.filter(t => t.estado === "urgente")}
+                  onToggle={handleToggle}
+                  onEdit={openEdit}
+                  onAddNew={openNew}
+                />
+                <KanbanLane
+                  id="completada"
+                  title="Completadas"
+                  tone="bg-emerald-50 text-emerald-700"
+                  tasks={filtered.filter(t => t.estado === "completada")}
+                  onToggle={handleToggle}
+                  onEdit={openEdit}
+                  onAddNew={openNew}
+                />
+              </div>
+              <DragOverlay dropAnimation={{ duration: 180, easing: "ease" }}>
+                {activeDragTask ? (
+                  <KanbanCardContent
+                    task={activeDragTask}
+                    onToggle={handleToggle}
+                    onEdit={openEdit}
+                    isDragging
+                  />
+                ) : null}
+              </DragOverlay>
+            </DndContext>
           </div>
-          <DragOverlay dropAnimation={{ duration: 180, easing: "ease" }}>
-            {activeDragTask ? (
-              <KanbanCardContent
-                task={activeDragTask}
-                onToggle={handleToggle}
-                onEdit={openEdit}
-                isDragging
-              />
-            ) : null}
-          </DragOverlay>
-        </DndContext>
-      ) : (
-        // ── Gantt con drag ───────────────────────────────────────────────────
-        <GanttBoard tasks={filtered} onEdit={openEdit} onUpdatePlazo={handleUpdatePlazo} />
-      )}
+        ) : (
+          <div className="p-4">
+            <GanttBoard tasks={filtered} onEdit={openEdit} onUpdatePlazo={handleUpdatePlazo} />
+          </div>
+        )}
+      </div>
 
       {/* Modal */}
       {showModal && (
