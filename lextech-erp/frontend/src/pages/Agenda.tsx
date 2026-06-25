@@ -2992,46 +2992,52 @@ export default function Agenda() {
       </div>
 
       {/* ── Toolbar (controles del calendario) ───────────────── */}
-      <div className="flex items-center justify-between px-6 py-3 border-b border-slate-100 bg-white shrink-0">
+      <div className="flex items-center justify-between px-6 py-3 border-b border-slate-200 bg-white shrink-0">
         {/* Selector de vista */}
-        <div className="flex items-center bg-slate-100 rounded-xl p-1 gap-0.5 border border-slate-200/60">
+        <div className="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200/60 shadow-inner">
           <button
             onClick={() => setView("month")}
-            className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all duration-200 ${view === "month" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700 hover:bg-white/60"}`}
+            className={`px-4 py-1.5 text-xs rounded-md transition-all duration-200 ${view === "month" ? "font-bold text-slate-800 bg-white shadow-sm border border-slate-200/50" : "font-medium text-slate-600 hover:text-slate-900"}`}
           >
             Mes
           </button>
           <button
             onClick={() => setView("week")}
-            className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all duration-200 ${view === "week" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700 hover:bg-white/60"}`}
+            className={`px-4 py-1.5 text-xs rounded-md transition-all duration-200 ${view === "week" ? "font-bold text-slate-800 bg-white shadow-sm border border-slate-200/50" : "font-medium text-slate-600 hover:text-slate-900"}`}
           >
             Semana
           </button>
           <button
             onClick={() => setView("day")}
-            className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all duration-200 ${view === "day" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700 hover:bg-white/60"}`}
+            className={`px-4 py-1.5 text-xs rounded-md transition-all duration-200 ${view === "day" ? "font-bold text-slate-800 bg-white shadow-sm border border-slate-200/50" : "font-medium text-slate-600 hover:text-slate-900"}`}
           >
             Día
           </button>
         </div>
 
         {/* Navegación de fecha */}
-        <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl px-1">
-          <button onClick={navigatePrev} className="p-2 hover:text-red-600 rounded-lg transition-colors text-slate-500">
-            <ChevronLeft size={15} />
+        <div className="flex items-center gap-3">
+          <button
+            onClick={navigatePrev}
+            className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition-colors"
+          >
+            <ChevronLeft size={14} />
           </button>
-          <span className="font-bold text-slate-800 text-sm px-2 min-w-[150px] text-center">
+          <h2 className="text-sm font-bold text-slate-800 min-w-[160px] text-center">
             {navLabel}
-          </span>
-          <button onClick={navigateNext} className="p-2 hover:text-red-600 rounded-lg transition-colors text-slate-500">
-            <ChevronRight size={15} />
+          </h2>
+          <button
+            onClick={navigateNext}
+            className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition-colors"
+          >
+            <ChevronRight size={14} />
           </button>
         </div>
 
         {/* Hoy */}
         <button
           onClick={goToday}
-          className="px-4 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+          className="px-4 h-8 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-sm"
         >
           Hoy
         </button>
