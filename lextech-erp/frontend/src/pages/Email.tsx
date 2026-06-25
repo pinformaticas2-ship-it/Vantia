@@ -1301,14 +1301,14 @@ function Sidebar({
   );
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-white border-r border-slate-300/70">
-      {/* User info */}
-      <div className="px-4 pt-3 pb-3 border-b border-gray-100 flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <Avatar name={userName} email={userEmail} src={userAvatar} size={36} />
+    <div className="flex flex-col h-full min-h-0 bg-[#111827] border-r border-slate-800">
+      {/* User info + Compose */}
+      <div className="px-3 pt-3 pb-2 border-b border-slate-800 flex-shrink-0">
+        <div className="flex items-center gap-2 mb-2.5">
+          <Avatar name={userName} email={userEmail} src={userAvatar} size={30} />
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-gray-800 truncate">{userName}</p>
-            <p className="text-xs text-gray-400 truncate">
+            <p className="text-xs font-semibold text-slate-200 truncate leading-tight">{userName}</p>
+            <p className="text-[10.5px] text-slate-500 truncate leading-tight">
               {isImapActive
                 ? (imapAccounts.find(a => a.id === selectedImapAccountId)?.email || userEmail)
                 : (gmailProfile?.emailAddress || userEmail)}
@@ -1319,14 +1319,13 @@ function Sidebar({
         <button
           onClick={onCompose}
           disabled={!canUseMailbox}
-          className="mt-3 w-full flex items-center gap-2 bg-[#ab0433] hover:bg-[#8f022a] text-white text-sm font-medium px-4 py-2.5 rounded-full transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-50">
-          <Edit3 size={15} /> Redactar
+          className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-[#ab0433] to-[#c01040] hover:from-[#c01040] hover:to-[#ab0433] text-white text-xs font-semibold px-3 py-2 rounded-xl transition-all shadow-lg shadow-red-900/40 disabled:cursor-not-allowed disabled:opacity-40">
+          <Edit3 size={13} /> Redactar
         </button>
       </div>
 
-
-      {/* Folder list — PINNED solo si hay Gmail activo */}
-      <nav className="flex-1 overflow-y-auto py-2">
+      {/* Folder list */}
+      <nav className="flex-1 overflow-y-auto py-1.5">
         {visibleSystemFolders.map(({ key, label, icon: Icon }) => {
           const active = selectedFolder === key;
           const badge = key === 'INBOX'
@@ -1343,16 +1342,17 @@ function Sidebar({
               key={key}
               disabled={!canUseMailbox}
               onClick={() => onSelectFolder(key)}
-              className={`w-full flex items-center gap-3 px-4 py-2 text-sm transition-colors ${
+              className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] transition-colors rounded-lg mx-1 ${
                 active
-                  ? 'bg-red-50 text-[#ab0433] font-semibold'
-                  : 'text-gray-600 hover:bg-gray-50'
-              } disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent`}>
-              <Icon size={16} className={active ? 'text-[#ab0433]' : 'text-gray-400'} />
+                  ? 'bg-[#ab0433]/15 text-red-400 font-semibold border border-red-900/30'
+                  : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+              } disabled:cursor-not-allowed disabled:opacity-40`}
+              style={{ width: 'calc(100% - 8px)' }}>
+              <Icon size={14} className={active ? 'text-red-400' : 'text-slate-500'} />
               <span className="flex-1 text-left">{label}</span>
               {badge > 0 && (
-                <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${
-                  active ? 'bg-[#ab0433] text-white' : 'bg-gray-100 text-gray-600'
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                  active ? 'bg-red-500/20 text-red-400' : 'bg-slate-700 text-slate-400'
                 }`}>
                   {badge > 99 ? '99+' : badge}
                 </span>
@@ -1363,68 +1363,67 @@ function Sidebar({
 
         {/* User labels */}
         {isGmailActive && userLabels.length > 0 && (
-          <div className="mt-2 pt-2 border-t border-gray-100">
-            <div className="px-4 pb-1 flex items-center justify-between">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+          <div className="mt-2 pt-2 border-t border-slate-800">
+            <div className="px-3 pb-1 flex items-center justify-between">
+              <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider">
                 Carpetas
               </p>
               <button
                 type="button"
                 disabled={!canUseMailbox}
                 onClick={() => onCreateLabel()}
-                className="p-1 rounded-full text-gray-400 hover:text-[#ab0433] hover:bg-red-50 transition-colors disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+                className="p-1 rounded-full text-slate-600 hover:text-red-400 hover:bg-slate-800 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                 title="Crear carpeta">
-                <FolderPlus size={14} />
+                <FolderPlus size={12} />
               </button>
             </div>
             {userLabels.map(l => (
               <div
                 key={l.id}
-                className={`group w-full flex items-center gap-3 px-4 py-1.5 text-sm transition-colors ${
-                  selectedFolder === l.id ? 'bg-red-50 text-[#ab0433]' : 'text-gray-600 hover:bg-gray-50'
-                }`}>
+                className={`group w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] transition-colors rounded-lg mx-1 ${
+                  selectedFolder === l.id ? 'bg-[#ab0433]/15 text-red-400' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                }`}
+                style={{ width: 'calc(100% - 8px)' }}>
                 <button
                   type="button"
                   disabled={!canUseMailbox}
                   onClick={() => onSelectFolder(l.id)}
-                  className="flex flex-1 min-w-0 items-center gap-3 text-left disabled:cursor-not-allowed">
-                  <Folder size={14} className={selectedFolder === l.id ? 'text-[#ab0433]' : 'text-gray-400'} />
+                  className="flex flex-1 min-w-0 items-center gap-2.5 text-left disabled:cursor-not-allowed">
+                  <Folder size={12} className={selectedFolder === l.id ? 'text-red-400' : 'text-slate-600'} />
                   <span className="flex-1 truncate">{normalizeLabelName(l.name, l.id)}</span>
                   {l.messagesUnread ? (
-                    <span className="text-xs text-gray-400">{l.messagesUnread}</span>
+                    <span className="text-[10px] text-slate-600">{l.messagesUnread}</span>
                   ) : null}
                 </button>
                 <button
                   type="button"
                   disabled={!canUseMailbox}
                   onClick={() => onDeleteLabel(l.id)}
-                  className="opacity-0 group-hover:opacity-100 p-1 rounded-md text-gray-400 hover:text-[#ab0433] hover:bg-red-50 transition-all disabled:opacity-30 disabled:hover:bg-transparent"
+                  className="opacity-0 group-hover:opacity-100 p-1 rounded-md text-slate-600 hover:text-red-400 hover:bg-slate-700 transition-all disabled:opacity-30"
                   title="Borrar carpeta">
-                  <Trash2 size={14} />
+                  <Trash2 size={12} />
                 </button>
               </div>
             ))}
           </div>
         )}
         {userLabels.length === 0 && isGmailActive && (
-          <div className="mt-2 pt-2 border-t border-gray-100 px-4">
+          <div className="mt-2 pt-2 border-t border-slate-800 px-3">
             <button
               type="button"
               disabled={!canUseMailbox}
               onClick={() => onCreateLabel()}
-              className="w-full flex items-center gap-2 rounded-xl border border-dashed border-red-200 px-3 py-2 text-xs text-[#ab0433] hover:bg-red-50 transition-colors disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent">
-              <FolderPlus size={14} />
+              className="w-full flex items-center gap-2 rounded-xl border border-dashed border-slate-700 px-3 py-2 text-xs text-slate-500 hover:border-red-800/60 hover:text-red-400 transition-colors disabled:cursor-not-allowed disabled:opacity-50">
+              <FolderPlus size={13} />
               Crear primera carpeta
             </button>
           </div>
         )}
 
         {isGmailActive && extraGmailSystemLabels.length > 0 && (
-          <div className="mt-2 pt-2 border-t border-gray-100">
-            <div className="px-4 pb-1">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                Gmail
-              </p>
+          <div className="mt-2 pt-2 border-t border-slate-800">
+            <div className="px-3 pb-1">
+              <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider">Gmail</p>
             </div>
             {extraGmailSystemLabels.map((label) => (
               <button
@@ -1432,13 +1431,14 @@ function Sidebar({
                 type="button"
                 disabled={!canUseMailbox}
                 onClick={() => onSelectFolder(label.id)}
-                className={`w-full flex items-center gap-3 px-4 py-1.5 text-sm transition-colors ${
-                  selectedFolder === label.id ? 'bg-red-50 text-[#ab0433] font-medium' : 'text-gray-600 hover:bg-gray-50'
-                } disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent`}>
-                <Tag size={14} className={selectedFolder === label.id ? 'text-[#ab0433]' : 'text-gray-400'} />
+                className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] transition-colors rounded-lg mx-1 ${
+                  selectedFolder === label.id ? 'bg-[#ab0433]/15 text-red-400 font-medium' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                } disabled:cursor-not-allowed disabled:opacity-40`}
+                style={{ width: 'calc(100% - 8px)' }}>
+                <Tag size={12} className={selectedFolder === label.id ? 'text-red-400' : 'text-slate-600'} />
                 <span className="flex-1 truncate text-left">{normalizeLabelName(label.name, label.id)}</span>
                 {Number(label.messagesUnread ?? label.messagesTotal ?? 0) > 0 && (
-                  <span className="text-xs text-gray-400">
+                  <span className="text-[10px] text-slate-600">
                     {Number(label.messagesUnread ?? label.messagesTotal ?? 0)}
                   </span>
                 )}
@@ -1448,11 +1448,9 @@ function Sidebar({
         )}
 
         {isGmailActive && categoryLabels.length > 0 && (
-          <div className="mt-2 pt-2 border-t border-gray-100">
-            <div className="px-4 pb-1">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                Categorías
-              </p>
+          <div className="mt-2 pt-2 border-t border-slate-800">
+            <div className="px-3 pb-1">
+              <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider">Categorías</p>
             </div>
             {categoryLabels.map((label) => (
               <button
@@ -1460,13 +1458,14 @@ function Sidebar({
                 type="button"
                 disabled={!canUseMailbox}
                 onClick={() => onSelectFolder(label.id)}
-                className={`w-full flex items-center gap-3 px-4 py-1.5 text-sm transition-colors ${
-                  selectedFolder === label.id ? 'bg-red-50 text-[#ab0433] font-medium' : 'text-gray-600 hover:bg-gray-50'
-                } disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent`}>
-                <Tag size={14} className={selectedFolder === label.id ? 'text-[#ab0433]' : 'text-gray-400'} />
+                className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] transition-colors rounded-lg mx-1 ${
+                  selectedFolder === label.id ? 'bg-[#ab0433]/15 text-red-400 font-medium' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                } disabled:cursor-not-allowed disabled:opacity-40`}
+                style={{ width: 'calc(100% - 8px)' }}>
+                <Tag size={12} className={selectedFolder === label.id ? 'text-red-400' : 'text-slate-600'} />
                 <span className="flex-1 truncate text-left">{normalizeLabelName(label.name, label.id)}</span>
                 {Number(label.messagesUnread ?? label.messagesTotal ?? 0) > 0 && (
-                  <span className="text-xs text-gray-400">
+                  <span className="text-[10px] text-slate-600">
                     {Number(label.messagesUnread ?? label.messagesTotal ?? 0)}
                   </span>
                 )}
@@ -1476,84 +1475,81 @@ function Sidebar({
         )}
 
         {isGmailActive && (
-            <div className="mt-2 pt-2 border-t border-gray-100 px-4 space-y-1">
-              <button
-                type="button"
-                disabled={!canUseMailbox}
-                onClick={() => onSelectFolder('SCHEDULED')}
-                className="w-full flex items-center gap-2 rounded-lg px-2 py-2 text-xs text-gray-500 hover:bg-gray-50 hover:text-[#ab0433] transition-colors disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent">
-                <Send size={14} />
-                Gestionar suscripciones
-              </button>
-              <button
-                type="button"
-                disabled={!canUseMailbox}
-                onClick={() => onCreateLabel()}
-                className="w-full flex items-center gap-2 rounded-lg px-2 py-2 text-xs text-gray-500 hover:bg-gray-50 hover:text-[#ab0433] transition-colors disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent">
-                <Tag size={14} />
+          <div className="mt-2 pt-2 border-t border-slate-800 px-2 space-y-0.5">
+            <button
+              type="button"
+              disabled={!canUseMailbox}
+              onClick={() => onSelectFolder('SCHEDULED')}
+              className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-slate-600 hover:bg-slate-800 hover:text-slate-300 transition-colors disabled:cursor-not-allowed disabled:opacity-50">
+              <Send size={12} />
+              Gestionar suscripciones
+            </button>
+            <button
+              type="button"
+              disabled={!canUseMailbox}
+              onClick={() => onCreateLabel()}
+              className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-slate-600 hover:bg-slate-800 hover:text-slate-300 transition-colors disabled:cursor-not-allowed disabled:opacity-50">
+              <Tag size={12} />
               Gestionar etiquetas
             </button>
             <button
               type="button"
               onClick={() => onCreateLabel()}
-              className="w-full flex items-center gap-2 rounded-lg px-2 py-2 text-xs text-gray-500 hover:bg-gray-50 hover:text-[#ab0433] transition-colors">
-              <Plus size={14} />
+              className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-slate-600 hover:bg-slate-800 hover:text-slate-300 transition-colors">
+              <Plus size={12} />
               Nueva etiqueta
             </button>
           </div>
         )}
 
-        {/* Otras cuentas — Gmail + IMAP unificados */}
+        {/* Otras cuentas */}
         {(savedGmailProfiles.length > 0 || imapAccounts.length > 0) && (
-          <div className="mt-2 pt-2 border-t border-gray-100">
-            <div className="px-4 pb-1 flex items-center justify-between">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Otras cuentas</p>
+          <div className="mt-2 pt-2 border-t border-slate-800">
+            <div className="px-3 pb-1 flex items-center justify-between">
+              <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider">Otras cuentas</p>
             </div>
 
-            {/* Cuentas Gmail guardadas */}
             {savedGmailProfiles.map(profile => {
               const isActive = gmailConnected && gmailProfile?.emailAddress === profile.email && !selectedImapAccountId;
-              // Token válido pero viendo otra cuenta (IMAP activo) → cambio silencioso
               const tokenOk = gmailConnected && gmailProfile?.emailAddress === profile.email;
-              // Token expirado o es otra cuenta → necesita re-auth
               const needsReauth = !isActive && !tokenOk;
               return (
                 <div
                   key={profile.id}
-                  className={`group flex items-center gap-1 px-2 py-1 rounded-xl mx-2 transition-colors ${
-                    isActive ? 'bg-red-50' : 'hover:bg-gray-50'
+                  className={`group flex items-center gap-1 px-2 py-1 rounded-xl mx-1 transition-colors ${
+                    isActive ? 'bg-[#ab0433]/10' : 'hover:bg-slate-800'
                   }`}>
                   <button
                     type="button"
                     onClick={() => isActive ? onSelectGmail() : onReconnectGoogleProfile(profile)}
                     title={needsReauth ? 'Sesión expirada — haz clic para volver a conectar' : undefined}
-                    className="flex flex-1 items-center gap-2 min-w-0 px-2 py-1 text-left">
-                    <svg width={13} height={13} viewBox="0 0 24 24" className="flex-shrink-0">
+                    className="flex flex-1 items-center gap-2 min-w-0 px-1 py-1 text-left">
+                    <svg width={12} height={12} viewBox="0 0 24 24" className="flex-shrink-0">
                       <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                       <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
                       <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
                       <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                     </svg>
                     <div className="min-w-0 flex-1">
-                      <p className={`text-xs font-medium truncate ${isActive ? 'text-[#ab0433]' : 'text-gray-700'}`}>
+                      <p className={`text-[11px] font-medium truncate ${isActive ? 'text-red-400' : 'text-slate-400'}`}>
                         {profile.display_name || profile.email}
                       </p>
-                      <p className="text-[11px] text-gray-400 truncate">{profile.email}</p>
+                      <p className="text-[10px] text-slate-600 truncate">{profile.email}</p>
                     </div>
                     {isActive && <div className="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" />}
                     {needsReauth && (
-                      <AlertCircle size={12} className="text-orange-400 flex-shrink-0" title="Sesión expirada" />
+                      <AlertCircle size={11} className="text-orange-400 flex-shrink-0" title="Sesión expirada" />
                     )}
                   </button>
                   {isActive && (
                     <>
                       <button onClick={onSync} disabled={syncing} title="Sincronizar"
-                        className="opacity-0 group-hover:opacity-100 p-1 text-[#ab0433] hover:bg-red-100 rounded-md transition-all flex-shrink-0">
-                        <RefreshCw size={12} className={syncing ? 'animate-spin' : ''} />
+                        className="opacity-0 group-hover:opacity-100 p-1 text-red-400 hover:bg-slate-700 rounded-md transition-all flex-shrink-0">
+                        <RefreshCw size={11} className={syncing ? 'animate-spin' : ''} />
                       </button>
                       <button onClick={onDisconnectGmail} title="Desconectar"
-                        className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-600 hover:bg-red-100 rounded-md transition-all flex-shrink-0">
-                        <LogIn size={12} className="rotate-180" />
+                        className="opacity-0 group-hover:opacity-100 p-1 text-slate-500 hover:text-red-400 hover:bg-slate-700 rounded-md transition-all flex-shrink-0">
+                        <LogIn size={11} className="rotate-180" />
                       </button>
                     </>
                   )}
@@ -1562,12 +1558,12 @@ function Sidebar({
                       type="button"
                       onClick={(e) => { e.stopPropagation(); onDeleteGoogleProfile(profile.id); }}
                       title="Borrar cuenta guardada"
-                      className="opacity-0 group-hover:opacity-100 p-1 rounded-md text-gray-400 hover:text-[#ab0433] hover:bg-red-50 transition-all flex-shrink-0">
-                      <Trash2 size={14} />
+                      className="opacity-0 group-hover:opacity-100 p-1 rounded-md text-slate-600 hover:text-red-400 hover:bg-slate-700 transition-all flex-shrink-0">
+                      <Trash2 size={12} />
                     </button>
                   )}
                   {!isActive && !needsReauth && (
-                    <RotateCcw size={12} className="opacity-0 group-hover:opacity-100 text-gray-400 flex-shrink-0 mr-1" />
+                    <RotateCcw size={11} className="opacity-0 group-hover:opacity-100 text-slate-600 flex-shrink-0 mr-1" />
                   )}
                 </div>
               );
@@ -1577,25 +1573,25 @@ function Sidebar({
             {imapAccounts.map(acc => (
               <div
                 key={acc.id}
-                className={`group flex items-center gap-1 px-2 py-1 rounded-xl mx-2 transition-colors ${
-                  selectedImapAccountId === acc.id ? 'bg-red-50 text-[#ab0433]' : 'text-gray-600 hover:bg-gray-50'
+                className={`group flex items-center gap-1 px-2 py-1 rounded-xl mx-1 transition-colors ${
+                  selectedImapAccountId === acc.id ? 'bg-[#ab0433]/10 text-red-400' : 'text-slate-400 hover:bg-slate-800'
                 }`}>
                 <button
                   type="button"
                   onClick={() => onSelectImapAccount(acc.id)}
-                  className="flex flex-1 items-center gap-2 min-w-0 px-2 py-1 text-left">
-                  <div className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" />
+                  className="flex flex-1 items-center gap-2 min-w-0 px-1 py-1 text-left">
+                  <div className="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" />
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium truncate">{acc.label || acc.email}</p>
-                    <p className="text-[11px] text-gray-400 truncate">{acc.email}</p>
+                    <p className="text-[11px] font-medium truncate">{acc.label || acc.email}</p>
+                    <p className="text-[10px] text-slate-600 truncate">{acc.email}</p>
                   </div>
                 </button>
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); onDeleteImapAccount(acc.id); }}
                   title="Borrar cuenta"
-                  className="opacity-0 group-hover:opacity-100 p-1 rounded-md text-gray-400 hover:text-[#ab0433] hover:bg-red-50 transition-all flex-shrink-0">
-                  <Trash2 size={14} />
+                  className="opacity-0 group-hover:opacity-100 p-1 rounded-md text-slate-600 hover:text-red-400 hover:bg-slate-700 transition-all flex-shrink-0">
+                  <Trash2 size={12} />
                 </button>
               </div>
             ))}
@@ -1603,18 +1599,18 @@ function Sidebar({
         )}
 
         {selectedImapAccountId && (
-          <div className="mt-2 pt-2 border-t border-gray-100">
-            <div className="px-4 pb-1 flex items-center justify-between">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+          <div className="mt-2 pt-2 border-t border-slate-800">
+            <div className="px-3 pb-1 flex items-center justify-between">
+              <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider">
                 Carpetas IMAP
               </p>
               <button
                 type="button"
                 disabled={!canUseMailbox}
                 onClick={onCreateImapFolder}
-                className="p-1 rounded-full text-gray-400 hover:text-[#ab0433] hover:bg-red-50 transition-colors disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+                className="p-1 rounded-full text-slate-600 hover:text-red-400 hover:bg-slate-800 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
                 title="Crear carpeta IMAP">
-                <FolderPlus size={14} />
+                <FolderPlus size={12} />
               </button>
             </div>
             {imapFolders.length > 0 ? (
@@ -1624,17 +1620,18 @@ function Sidebar({
                   type="button"
                   disabled={!canUseMailbox}
                   onClick={() => onSelectFolder(folder.path)}
-                  className={`w-full flex items-center gap-3 px-4 py-1.5 text-sm transition-colors ${
+                  className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] transition-colors rounded-lg mx-1 ${
                     selectedFolder === folder.path
-                      ? 'bg-red-50 text-[#ab0433]'
-                      : 'text-gray-600 hover:bg-gray-50'
-                  } disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent`}>
-                  <Folder size={14} className={selectedFolder === folder.path ? 'text-[#ab0433]' : 'text-gray-400'} />
+                      ? 'bg-[#ab0433]/15 text-red-400'
+                      : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                  } disabled:cursor-not-allowed disabled:opacity-40`}
+                  style={{ width: 'calc(100% - 8px)' }}>
+                  <Folder size={12} className={selectedFolder === folder.path ? 'text-red-400' : 'text-slate-600'} />
                   <span className="truncate">{folder.name}</span>
                 </button>
               ))
             ) : (
-              <div className="px-4 py-2 text-xs text-gray-400">
+              <div className="px-4 py-2 text-xs text-slate-600">
                 No hay carpetas personalizadas en esta cuenta.
               </div>
             )}
@@ -1643,11 +1640,11 @@ function Sidebar({
       </nav>
 
       {/* Conectar cuenta */}
-      <div className="px-3 py-3 border-t border-gray-100 flex-shrink-0">
+      <div className="px-2 py-2 border-t border-slate-800 flex-shrink-0">
         <button
           onClick={onConnectAccount}
-          className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-500 hover:text-[#ab0433] hover:bg-red-50 rounded-lg transition-colors">
-          <Plus size={14} /> Conectar cuenta
+          className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-600 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-colors">
+          <Plus size={13} /> Conectar cuenta
         </button>
       </div>
     </div>
@@ -1849,7 +1846,7 @@ function EmailReader({
   ].filter(Boolean) as Array<{ label: string; className: string }>;
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-[#f6f8fb]">
+    <div className="flex flex-col h-full min-h-0 bg-[#f0f4f8]">
       <div className="flex items-center gap-1 px-4 py-3 border-b border-slate-200 bg-white flex-shrink-0">
         <button
           onClick={onBack}
@@ -2523,10 +2520,10 @@ function RibbonButton({ icon, label, onClick, disabled, danger }: RibbonBtn) {
       title={label}
       className={`group flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-xl text-[11px] font-medium transition-all min-w-[58px] border border-transparent
         ${disabled
-          ? 'opacity-35 cursor-not-allowed text-gray-400'
+          ? 'opacity-30 cursor-not-allowed text-slate-500'
           : danger
-            ? 'text-red-500 hover:bg-red-50 hover:border-red-100 hover:text-red-600 active:scale-95'
-            : 'text-gray-500 hover:bg-gray-50 hover:border-gray-200 hover:text-gray-800 active:scale-95'
+            ? 'text-red-400 hover:bg-red-900/20 hover:border-red-800/30 hover:text-red-300 active:scale-95'
+            : 'text-slate-400 hover:bg-slate-700/60 hover:border-slate-700 hover:text-slate-200 active:scale-95'
         }`}
     >
       <span className={`flex-shrink-0 transition-transform ${disabled ? '' : 'group-hover:scale-110'}`}>
@@ -2538,7 +2535,7 @@ function RibbonButton({ icon, label, onClick, disabled, danger }: RibbonBtn) {
 }
 
 function RibbonSep() {
-  return <div className="w-px bg-gray-200 mx-1.5 self-stretch my-2 rounded-full" />;
+  return <div className="w-px bg-slate-700 mx-1.5 self-stretch my-2 rounded-full" />;
 }
 
 interface RibbonBarProps {
@@ -2570,7 +2567,7 @@ function RibbonBar({
   const hasEmail = !!selectedEmail;
 
   return (
-    <div className="flex-shrink-0 bg-white border-b border-gray-200 shadow-sm select-none">
+    <div className="flex-shrink-0 bg-[#111827] border-b border-slate-800 select-none">
       {/* Tab strip */}
       <div className="flex items-end gap-0 px-3 pt-1.5">
         {(Object.keys(TAB_LABELS) as RibbonTab[]).map(tab => (
@@ -2579,18 +2576,17 @@ function RibbonBar({
             onClick={() => onTabChange(tab)}
             className={`relative px-4 py-1.5 text-[11px] font-semibold rounded-t-lg transition-all
               ${activeTab === tab
-                ? 'text-indigo-700 bg-indigo-50 border border-b-0 border-indigo-200 -mb-px z-10'
-                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}
+                ? 'text-slate-200 bg-[#1a2540] border border-b-0 border-slate-700 -mb-px z-10'
+                : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/60'}`}
           >
             {TAB_LABELS[tab]}
           </button>
         ))}
-        {/* Decorative bottom line that "connects" to the active tab */}
-        <div className="flex-1 border-b border-gray-200 mb-0 self-end" />
+        <div className="flex-1 border-b border-slate-800 mb-0 self-end" />
       </div>
 
       {/* Button toolbar */}
-      <div className="flex items-stretch gap-0 px-3 py-1.5 overflow-x-auto">
+      <div className="flex items-stretch gap-0 px-3 py-1.5 overflow-x-auto bg-[#0f1621]">
         {activeTab === 'inicio' && (<>
           <RibbonButton icon={<Edit3 size={17}/>}     label="Nuevo"           onClick={onCompose}  disabled={!hasActiveMailbox}/>
           <RibbonSep/>
@@ -4231,7 +4227,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
   return (
     // 73px = dashboard header (h-18 = 72px + 1px border-b)
     <div
-      className="flex flex-col bg-gray-50 overflow-hidden"
+      className="flex flex-col bg-[#0d1117] overflow-hidden"
       style={{ fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif", height: 'calc(100vh - 73px)' }}>
 
       {/* ── Ribbon ── */}
