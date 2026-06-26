@@ -1378,6 +1378,8 @@ function CsvImportHistoryView({
 }) {
   const PAGE_SIZE = 15;
   const [page, setPage] = useState(1);
+  const tableRef = useRef<HTMLDivElement>(null);
+  const goToPage = (p: number) => { setPage(p); tableRef.current?.scrollTo({ top: 0, behavior: "smooth" }); };
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
   const pageRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const from = rows.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
@@ -1442,7 +1444,7 @@ function CsvImportHistoryView({
       )}
 
       {/* Table */}
-      <div className="flex-1 overflow-auto animate-card-in-2">
+      <div ref={tableRef} className="flex-1 overflow-auto animate-card-in-2">
         <table className="w-full min-w-[1000px] text-left border-collapse">
           <thead className="sticky top-0 bg-white border-b border-slate-200 z-10 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
             <tr>
@@ -1531,7 +1533,7 @@ function CsvImportHistoryView({
         </span>
         <div className="flex items-center gap-1">
           <button
-            onClick={() => setPage(p => Math.max(1, p - 1))}
+            onClick={() => goToPage(Math.max(1, page - 1))}
             disabled={page === 1}
             className="w-8 h-8 flex items-center justify-center rounded-md border border-slate-200 text-slate-500 bg-white shadow-sm hover:bg-slate-50 transition-colors disabled:text-slate-300 disabled:cursor-not-allowed"
           >
@@ -1550,7 +1552,7 @@ function CsvImportHistoryView({
               ) : (
                 <button
                   key={p}
-                  onClick={() => setPage(p as number)}
+                  onClick={() => goToPage(p as number)}
                   className={`w-8 h-8 flex items-center justify-center rounded-md border font-bold text-xs shadow-sm transition-colors ${
                     p === page
                       ? "border-red-600 bg-red-600 text-white shadow-red-500/20"
@@ -1562,7 +1564,7 @@ function CsvImportHistoryView({
               )
             )}
           <button
-            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            onClick={() => goToPage(Math.min(totalPages, page + 1))}
             disabled={page === totalPages}
             className="w-8 h-8 flex items-center justify-center rounded-md border border-slate-200 text-slate-500 bg-white shadow-sm hover:bg-slate-50 transition-colors disabled:text-slate-300 disabled:cursor-not-allowed"
           >
