@@ -481,8 +481,8 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
       </div>
 
       {/* ── Cuerpo ── */}
-      <main className="flex-1 overflow-auto p-5 sm:p-7 bg-[#f4f6f8]">
-        <div className="max-w-[1600px] mx-auto flex flex-col xl:flex-row gap-8 lg:gap-10 items-start bg-white rounded-xl border border-slate-200 shadow-sm p-5 sm:p-7">
+      <main className="overflow-auto p-5 sm:p-7 bg-white">
+        <div className="max-w-[1600px] mx-auto flex flex-col xl:flex-row gap-8 lg:gap-10 items-start">
 
           {/* ── Columna izquierda ── */}
           <div className="flex-1 flex flex-col gap-7 w-full xl:pr-10 xl:border-r border-slate-200">
