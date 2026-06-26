@@ -1376,6 +1376,13 @@ function CsvImportHistoryView({
   onBack: () => void;
   onReload: () => void;
 }) {
+  const PAGE_SIZE = 15;
+  const [page, setPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const pageRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const from = rows.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const to = Math.min(page * PAGE_SIZE, rows.length);
+
   const statusBadge = (row: ImportBatch) => {
     const hasErrors = row.error_count > 0;
     if (hasErrors && row.completed_count > 0) return (
@@ -1466,7 +1473,7 @@ function CsvImportHistoryView({
                 </td>
               </tr>
             ) : (
-              rows.map((row) => {
+              pageRows.map((row) => {
                 const hasErrors = row.error_count > 0;
                 return (
                   <tr key={row.id} className={`group transition-colors ${
@@ -1518,23 +1525,46 @@ function CsvImportHistoryView({
       {/* Footer */}
       <div className="px-6 lg:px-8 py-4 border-t border-slate-200 bg-white flex flex-col sm:flex-row items-center justify-between gap-4 flex-shrink-0 animate-card-in-3">
         <span className="text-sm text-slate-500">
-          Mostrando <span className="font-bold text-slate-700">1</span> a{" "}
-          <span className="font-bold text-slate-700">{rows.length}</span> de{" "}
+          Mostrando <span className="font-bold text-slate-700">{from}</span> a{" "}
+          <span className="font-bold text-slate-700">{to}</span> de{" "}
           <span className="font-bold text-slate-700">{rows.length}</span> resultados
         </span>
         <div className="flex items-center gap-1">
           <button
-            disabled
-            className="w-8 h-8 flex items-center justify-center rounded-md border border-slate-200 text-slate-300 bg-white shadow-sm cursor-not-allowed"
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="w-8 h-8 flex items-center justify-center rounded-md border border-slate-200 text-slate-500 bg-white shadow-sm hover:bg-slate-50 transition-colors disabled:text-slate-300 disabled:cursor-not-allowed"
           >
             <ChevronLeft size={13} />
           </button>
-          <button className="w-8 h-8 flex items-center justify-center rounded-md border border-red-600 bg-red-600 text-white font-bold text-xs shadow-sm shadow-red-500/20">
-            1
-          </button>
+          {Array.from({ length: totalPages }, (_, i) => i + 1)
+            .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
+            .reduce<(number | "…")[]>((acc, p, idx, arr) => {
+              if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push("…");
+              acc.push(p);
+              return acc;
+            }, [])
+            .map((p, i) =>
+              p === "…" ? (
+                <span key={`ellipsis-${i}`} className="w-8 h-8 flex items-center justify-center text-slate-400 text-xs">…</span>
+              ) : (
+                <button
+                  key={p}
+                  onClick={() => setPage(p as number)}
+                  className={`w-8 h-8 flex items-center justify-center rounded-md border font-bold text-xs shadow-sm transition-colors ${
+                    p === page
+                      ? "border-red-600 bg-red-600 text-white shadow-red-500/20"
+                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  {p}
+                </button>
+              )
+            )}
           <button
-            disabled
-            className="w-8 h-8 flex items-center justify-center rounded-md border border-slate-200 bg-white text-slate-300 font-medium text-xs shadow-sm cursor-not-allowed"
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+            className="w-8 h-8 flex items-center justify-center rounded-md border border-slate-200 text-slate-500 bg-white shadow-sm hover:bg-slate-50 transition-colors disabled:text-slate-300 disabled:cursor-not-allowed"
           >
             <ChevronRight size={13} />
           </button>
