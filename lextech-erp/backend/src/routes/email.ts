@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { requireAuth } from '../middleware/auth';
-import { createClerkClient } from '@clerk/backend';
+import { verifyToken } from '@clerk/backend';
 import { addSSEClient } from '../utils/emailSSE';
 import {
   getAccounts,
@@ -39,8 +39,7 @@ router.get('/events', async (req: Request, res: Response) => {
   if (!token) { res.status(401).json({ error: 'Unauthorized' }); return; }
 
   try {
-    const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY! });
-    const payload = await clerk.verifyToken(token);
+    const payload = await verifyToken(token, { secretKey: process.env.CLERK_SECRET_KEY! });
     const userId = payload.sub;
 
     res.setHeader('Content-Type', 'text/event-stream');
