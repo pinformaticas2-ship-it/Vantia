@@ -1588,92 +1588,42 @@ function CsvFieldRow({
   invalid?: boolean;
   onChange: (id: string, value: string) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
+  const isMapped = field.selected !== CSV_UNASSIGNED;
   return (
-    <div className={`relative flex items-center justify-between gap-3 rounded-2xl px-4 py-3 ${
-      invalid
-        ? "border border-red-200 bg-red-50/70"
-        : "border border-slate-200 bg-white"
-    } ${open ? "z-40" : "z-0"}`}>
-      <div className="flex min-w-0 items-start gap-4">
-        <div className={`mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
-          invalid
-            ? "bg-red-100 text-red-600"
-            : field.required ? "bg-emerald-100 text-emerald-600" : "bg-slate-100 text-slate-500"
-        }`}>
-          {field.required ? <Check size={15} /> : <span className="text-xs">+</span>}
-        </div>
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-base font-semibold text-slate-900">{field.label}</p>
-            {field.required && (
-              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">
-                Obligatorio
-              </span>
-            )}
-          </div>
-          <p className="mt-1 text-sm text-slate-500">{field.help}</p>
-        </div>
+    <div className="grid grid-cols-12 gap-6 items-center py-3.5 border-b border-slate-100 last:border-0 px-4 hover:bg-slate-50/50 transition-colors">
+      <div className="col-span-5 flex flex-col">
+        <span className="text-sm font-semibold text-slate-800">
+          {field.label}
+          {field.required && <span className="text-red-500 ml-0.5"> *</span>}
+        </span>
+        {field.help && <span className="text-xs text-slate-500 mt-0.5">{field.help}</span>}
       </div>
-
-      <div className="flex min-w-[320px] items-center justify-end gap-3">
-        <div ref={menuRef} className="relative">
-          <button
-            type="button"
-            onClick={() => setOpen((prev) => !prev)}
-            className={`flex h-10 w-[180px] items-center justify-between rounded-xl px-3.5 text-sm font-medium shadow-sm outline-none transition-all ${
-              invalid
-                ? "border border-red-300 bg-white text-red-700 hover:border-red-400"
-                : "border border-slate-200 bg-white text-slate-900 hover:border-slate-300 hover:shadow"
-            }`}
-          >
-            <span>{field.selected}</span>
-            <ChevronDown size={16} className={`text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
-          </button>
-
-          {open && (
-            <div className="absolute right-0 top-[calc(100%+6px)] z-30 w-[180px] overflow-hidden rounded-2xl border border-slate-200 bg-white py-1 shadow-[0_12px_28px_rgba(15,23,42,0.12)]">
-              {options.map((option) => {
-                const isSelected = field.selected === option;
-                return (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => {
-                      onChange(field.id, option);
-                      setOpen(false);
-                    }}
-                    className={`mx-1 flex w-[calc(100%-8px)] items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition-colors ${
-                      isSelected
-                        ? "bg-amber-100/80 text-slate-900"
-                        : "text-slate-700 hover:bg-slate-50"
-                    }`}
-                  >
-                    <span>{option}</span>
-                    {isSelected ? <Check size={16} className="text-slate-700" /> : <span className="w-4" />}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-        <div className="min-w-[120px] text-right">
-          <span className={`text-sm ${invalid ? "font-semibold text-red-600" : "text-slate-500"}`}>{field.sample}</span>
-          {invalid && <p className="mt-1 text-xs font-semibold text-red-600">Campo obligatorio sin asignar</p>}
-        </div>
+      <div className="col-span-4 relative">
+        <select
+          value={field.selected}
+          onChange={(e) => onChange(field.id, e.target.value)}
+          className={`w-full pl-3.5 pr-9 py-2 rounded-lg text-sm appearance-none focus:outline-none transition-colors ${
+            isMapped
+              ? "bg-emerald-50 border border-emerald-300 text-emerald-800 font-semibold"
+              : invalid
+              ? "bg-white border border-amber-300 text-slate-700 focus:ring-1 focus:ring-amber-400 focus:border-amber-400"
+              : "bg-white border border-slate-300 text-slate-600 focus:ring-1 focus:ring-slate-400 focus:border-slate-400"
+          }`}
+        >
+          {options.map((opt) => (
+            <option key={opt} value={opt}>{opt}</option>
+          ))}
+        </select>
+        <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400" />
+      </div>
+      <div className="col-span-3 text-right">
+        {field.sample && field.sample !== "Sin detectar" ? (
+          <span className="text-xs font-mono text-slate-700 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded">
+            {field.sample}
+          </span>
+        ) : (
+          <span className="text-xs font-mono text-slate-400 italic">Sin detectar</span>
+        )}
       </div>
     </div>
   );
@@ -1704,20 +1654,21 @@ function CsvImportConfigureView({
   onFileChange: (file?: File | null) => void;
   inputRef: React.RefObject<HTMLInputElement>;
 }) {
+  const [showAllOptional, setShowAllOptional] = useState(false);
+  const OPTIONAL_PREVIEW = 4;
+
   const requiredFields = mappings.filter((item) => item.required);
   const optionalFields = mappings.filter((item) => !item.required);
   const assignedRequired = requiredFields.filter((item) => item.selected !== CSV_UNASSIGNED).length;
-  const canContinue = assignedRequired === requiredFields.length;
-  const missingRequiredFields = requiredFields.filter((item) => item.selected === CSV_UNASSIGNED);
-  const selectedHeaders = mappings
-    .map((item) => item.selected)
-    .filter((selected) => selected !== CSV_UNASSIGNED);
-  const unassignedHeaders = csvHeaders.filter((header) => !selectedHeaders.includes(header));
   const assignedOptional = optionalFields.filter((item) => item.selected !== CSV_UNASSIGNED).length;
+  const canContinue = assignedRequired === requiredFields.length;
   const mappingOptions = [CSV_UNASSIGNED, ...csvHeaders];
 
+  const visibleOptional = showAllOptional ? optionalFields : optionalFields.slice(0, OPTIONAL_PREVIEW);
+  const hiddenOptionalCount = optionalFields.length - OPTIONAL_PREVIEW;
+
   return (
-    <div className="p-5 space-y-4 animate-in fade-in duration-300">
+    <div className="flex-1 flex flex-col overflow-hidden animate-page-in">
       <input
         ref={inputRef}
         type="file"
@@ -1726,141 +1677,163 @@ function CsvImportConfigureView({
         onChange={(e) => onFileChange(e.target.files?.[0] ?? null)}
       />
 
-      <div className="flex items-center justify-between gap-4">
-        <BackButton onClick={onBack} />
-
-        <div className="flex items-center gap-3">
+      {/* Header */}
+      <div className="flex-shrink-0 px-6 lg:px-8 py-5 border-b border-slate-200 bg-white animate-card-in">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center shadow-sm flex-shrink-0">
+              <FileSpreadsheet size={20} className="text-white" />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold text-slate-900">Importar expedientes</h1>
+              <p className="text-sm text-slate-500">Configuración y mapeo de las columnas del archivo subido</p>
+            </div>
+          </div>
           <button
-            onClick={onOpenSettings}
-            className="rounded-xl border border-slate-200 bg-white p-2.5 text-slate-600 shadow-sm transition-colors hover:border-[#ab0433]/30 hover:bg-red-50 hover:text-[#ab0433]"
-            title="Configuracion"
+            onClick={onBack}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 flex-shrink-0"
           >
-            <Settings2 size={15} />
-          </button>
-          <button
-            onClick={onOpenHistory}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-[#ab0433]/30 hover:bg-red-50 hover:text-[#ab0433]"
-          >
-            <History size={15} />
-            Historial de importaciones
+            <ChevronLeft size={16} />
+            Volver a inicio
           </button>
         </div>
       </div>
 
-      <div>
-        <h1 className="text-base font-bold text-slate-900">Importar expedientes</h1>
-        <p className="mt-0.5 text-xs text-slate-500">Importa expedientes judiciales desde un archivo CSV</p>
-      </div>
-
-      <div className="py-2">
-        <div className="flex items-center justify-between relative max-w-3xl mx-auto">
-          <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-0.5 bg-slate-100 z-0" />
+      {/* Stepper */}
+      <div className="flex-shrink-0 bg-white border-b border-slate-200 py-4 shadow-sm animate-card-in-1">
+        <div className="flex items-center justify-between relative max-w-3xl mx-auto px-10">
+          <div className="absolute left-10 right-10 top-1/2 -translate-y-1/2 h-0.5 bg-slate-100 z-0" />
           <ImportStep step={1} label="Subir archivo" completed first />
           <ImportStep step={2} label="Configurar columnas" active />
           <ImportStep step={3} label="Revisar e Importar" last />
         </div>
       </div>
 
-      <div className="rounded-[18px] border border-slate-200 bg-white/80 p-3.5 shadow-sm">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-sm font-bold text-slate-900">Archivo seleccionado</p>
-            <p className="mt-0.5 text-xs text-slate-500">{fileName || "Sin archivo"} (0.00 MB)</p>
+      {/* File banner */}
+      <div className="flex-shrink-0 bg-slate-50 border-b border-slate-200 px-6 lg:px-8 py-3 animate-card-in-2">
+        <div className="flex items-center justify-between gap-4 max-w-[1200px] mx-auto">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-white border border-slate-200 rounded-lg flex items-center justify-center shadow-sm">
+              <FileSpreadsheet size={15} className="text-slate-500" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-800">{fileName || "Sin archivo"}</p>
+              <p className="text-xs text-slate-500">Archivo seleccionado</p>
+            </div>
           </div>
           <button
             onClick={onSelectFile}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-[#ab0433]/30 hover:bg-red-50 hover:text-[#ab0433]"
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-white"
           >
-            <RefreshCw size={14} />
+            <RefreshCw size={13} />
             Cambiar archivo
           </button>
         </div>
       </div>
 
-      <div className="space-y-3">
-        <div className="flex items-end justify-between gap-4">
-          <div>
-            <h2 className="text-sm font-semibold text-slate-900">Campos Obligatorios</h2>
-            <p className="mt-0.5 text-xs text-slate-500">
-              Estos campos son necesarios para crear los expedientes. Verifica que las columnas detectadas sean correctas.
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-[1200px] mx-auto px-6 lg:px-8 py-8 flex flex-col gap-10">
+
+          {/* Intro */}
+          <div className="animate-card-in">
+            <h2 className="text-xl font-bold text-slate-900">Conecta las columnas de tu archivo</h2>
+            <p className="mt-2 text-sm text-slate-500 max-w-2xl">
+              Indica qué columna de tu CSV corresponde a cada campo del sistema. Los campos obligatorios deben estar asignados para poder continuar. Hemos detectado automáticamente las columnas que mejor coinciden.
             </p>
           </div>
-          <p className="text-xs text-slate-500">{assignedRequired} de {requiredFields.length} asignados</p>
-        </div>
 
-        <div className="space-y-2">
-          {requiredFields.map((field) => (
-            <CsvFieldRow
-              key={field.id}
-              field={field}
-              options={mappingOptions}
-              invalid={field.selected === CSV_UNASSIGNED}
-              onChange={onChangeMapping}
-            />
-          ))}
+          {/* Required fields */}
+          <div className="animate-card-in-1">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-1.5">
+                <h3 className="text-base font-bold text-slate-900">Campos obligatorios</h3>
+                <span className="text-red-500 font-bold">*</span>
+              </div>
+              <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                assignedRequired === requiredFields.length
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                  : "bg-amber-50 text-amber-700 border border-amber-200"
+              }`}>
+                {assignedRequired} de {requiredFields.length} asignados
+              </span>
+            </div>
+            <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+              <div className="grid grid-cols-12 gap-6 py-3 border-b border-slate-200 bg-slate-50 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                <div className="col-span-5">Campo en Avalentia</div>
+                <div className="col-span-4">Columna en tu CSV</div>
+                <div className="col-span-3 text-right">Ejemplo de tus datos</div>
+              </div>
+              {requiredFields.map((field) => (
+                <CsvFieldRow
+                  key={field.id}
+                  field={field}
+                  options={mappingOptions}
+                  invalid={field.selected === CSV_UNASSIGNED}
+                  onChange={onChangeMapping}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Optional fields */}
+          <div className="animate-card-in-2">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-bold text-slate-900">Campos opcionales</h3>
+              <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                {assignedOptional} de {optionalFields.length} asignados
+              </span>
+            </div>
+            <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+              <div className="grid grid-cols-12 gap-6 py-3 border-b border-slate-200 bg-slate-50 px-4 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                <div className="col-span-5">Campo en Avalentia</div>
+                <div className="col-span-4">Columna en tu CSV</div>
+                <div className="col-span-3 text-right">Ejemplo de tus datos</div>
+              </div>
+              {visibleOptional.map((field) => (
+                <CsvFieldRow key={field.id} field={field} options={mappingOptions} onChange={onChangeMapping} />
+              ))}
+              {!showAllOptional && hiddenOptionalCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllOptional(true)}
+                  className="w-full py-3.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors border-t border-slate-100 flex items-center justify-center gap-2"
+                >
+                  <span className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold leading-none">+</span>
+                  Mostrar {hiddenOptionalCount} campos opcionales más
+                </button>
+              )}
+            </div>
+          </div>
+
         </div>
       </div>
 
-      <details className="overflow-visible rounded-2xl border border-dashed border-slate-300 bg-white/70 px-4 py-3">
-        <summary className="cursor-pointer list-none text-sm font-semibold text-slate-900">
-          Columnas del CSV sin asignar <span className="ml-1.5 text-xs font-normal text-slate-500">({unassignedHeaders.length} columnas)</span>
-        </summary>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {unassignedHeaders.map((item) => (
-            <span key={item} className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
-              {item}
-            </span>
-          ))}
-          {!unassignedHeaders.length && (
-            <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
-              Todas las columnas del CSV estan asignadas
-            </span>
-          )}
+      {/* Footer */}
+      <div className="flex-shrink-0 bg-white border-t border-slate-200 px-6 lg:px-8 py-4 shadow-sm">
+        <div className="flex items-center justify-between max-w-[1200px] mx-auto">
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50"
+          >
+            <ChevronLeft size={16} />
+            Atrás
+          </button>
+          <button
+            type="button"
+            onClick={onContinue}
+            disabled={!canContinue}
+            className={`inline-flex items-center gap-2 rounded-xl px-6 py-2.5 text-sm font-semibold shadow-sm transition-all ${
+              canContinue
+                ? "bg-slate-900 text-white hover:bg-slate-800 hover:shadow-md"
+                : "cursor-not-allowed bg-slate-200 text-slate-400 shadow-none"
+            }`}
+          >
+            Siguiente paso: Revisar
+            <ChevronRight size={16} />
+          </button>
         </div>
-      </details>
-
-      <details className="overflow-visible rounded-2xl border border-slate-200 bg-white/80 px-4 py-3" open>
-        <summary className="cursor-pointer list-none text-sm font-semibold text-slate-900">
-          Campos Opcionales <span className="ml-1.5 text-xs font-normal text-slate-500">({assignedOptional} de {optionalFields.length} asignados)</span>
-        </summary>
-        <div className="mt-4 space-y-2 overflow-visible">
-          {optionalFields.map((field) => (
-            <CsvFieldRow key={field.id} field={field} options={mappingOptions} onChange={onChangeMapping} />
-          ))}
-        </div>
-      </details>
-
-      {!canContinue && (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 shadow-sm">
-          <div className="flex items-start gap-3">
-            <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-600" />
-            <div>
-              <p className="text-sm font-semibold text-amber-900">
-                Faltan campos obligatorios por asignar antes de continuar
-              </p>
-              <p className="mt-1 text-sm text-amber-800">
-                Debes revisar estos campos: {missingRequiredFields.map((field) => field.label).join(", ")}.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="flex items-center justify-between border-t border-slate-200 pt-5">
-        <BackButton onClick={onBack} />
-        <button
-          type="button"
-          onClick={onContinue}
-          disabled={!canContinue}
-          className={`inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold shadow-sm transition-all ${
-            canContinue
-              ? "bg-[#ab0433] text-white hover:bg-[#92042c] hover:shadow"
-              : "cursor-not-allowed bg-slate-200 text-slate-400 shadow-none"
-          }`}
-        >
-          Continuar
-          <ChevronRight size={16} />
-        </button>
       </div>
     </div>
   );
