@@ -1169,7 +1169,7 @@ function CsvImportView({
   const [isDragging, setIsDragging] = useState(false);
 
   return (
-    <div className="animate-in fade-in duration-300">
+    <div className="flex-1 flex flex-col overflow-hidden animate-in fade-in duration-300">
       <input
         ref={inputRef}
         type="file"
@@ -1178,161 +1178,176 @@ function CsvImportView({
         onChange={(e) => onFileChange(e.target.files?.[0] ?? null)}
       />
 
-      {/* Header */}
-      <div className="px-6 sm:px-10 py-6 max-w-[1400px] mx-auto">
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
-          <div className="flex flex-col gap-3">
-            <button
-              onClick={onBack}
-              className="w-max px-3.5 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-md hover:bg-slate-50 transition-all shadow-sm flex items-center gap-1.5"
-            >
-              <ArrowLeft size={12} /> Volver
-            </button>
-            <div>
-              <h1 className="text-2xl font-extrabold text-slate-800 leading-tight">Importar expedientes</h1>
-              <p className="text-sm text-slate-500 mt-1">Importa expedientes judiciales de forma masiva desde un archivo CSV.</p>
-            </div>
+      {/* Module header */}
+      <div className="px-6 sm:px-8 py-5 bg-white border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 flex-shrink-0">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-lg bg-red-50 text-red-600 flex items-center justify-center border border-red-100 flex-shrink-0">
+            <FileSpreadsheet size={22} />
           </div>
-          <div className="flex items-center gap-3 self-start sm:self-auto pb-1">
-            <button
-              onClick={onOpenHistory}
-              className="px-4 py-2.5 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2"
-            >
-              <History size={14} className="text-slate-400" /> Historial de importaciones
-            </button>
-            <button
-              onClick={() => setShowNewModal(true)}
-              className="px-5 py-2.5 text-sm font-bold text-white bg-red-700 rounded-lg hover:bg-red-800 shadow-sm transition-all flex items-center gap-2"
-            >
-              <Plus size={14} /> Nuevo expediente
-            </button>
+          <div>
+            <h1 className="text-xl font-extrabold text-slate-800 leading-none tracking-tight mb-1">Importar expedientes</h1>
+            <p className="text-xs font-medium text-slate-500">Carga masiva desde archivo CSV (Paso 1 de 3)</p>
           </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onOpenHistory}
+            className="px-4 py-2.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-md hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2"
+          >
+            <History size={13} className="text-slate-400" /> Historial
+          </button>
+          <button
+            onClick={onBack}
+            className="px-4 py-2.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-md hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2"
+          >
+            <ArrowLeft size={13} /> Volver
+          </button>
         </div>
       </div>
 
-      <div className="max-w-[1400px] mx-auto px-6 sm:px-10 pb-12">
-
-        {/* Stepper */}
-        <div className="py-6 mb-6">
-          <div className="flex items-start justify-between relative max-w-2xl mx-auto">
-            <div className="absolute left-0 top-6 w-full h-0.5 bg-slate-100 z-0" />
-            <ImportStep icon={Upload} label="Subir archivo" active />
-            <ImportStep icon={SlidersHorizontal} label="Configurar" />
-            <ImportStep icon={Eye} label="Revisar" />
-          </div>
+      {/* Stepper */}
+      <div className="bg-white border-b border-slate-200 py-4 flex-shrink-0 shadow-sm">
+        <div className="flex items-center justify-between relative max-w-3xl mx-auto px-10">
+          <div className="absolute left-10 right-10 top-1/2 -translate-y-1/2 h-0.5 bg-slate-100 z-0" />
+          <ImportStep step={1} label="Subir archivo" active first />
+          <ImportStep step={2} label="Configurar columnas" />
+          <ImportStep step={3} label="Revisar e Importar" last />
         </div>
+      </div>
 
-        {/* Dropzone */}
-        <div
-          onClick={onSelectFile}
-          onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-          onDragEnter={(e) => { e.preventDefault(); setIsDragging(true); }}
-          onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDragging(false); }}
-          onDrop={(e) => {
-            e.preventDefault();
-            setIsDragging(false);
-            const file = e.dataTransfer.files[0];
-            if (file) onFileChange(file);
-          }}
-          className={`flex flex-col items-center justify-center w-full py-16 px-4 border-2 border-dashed rounded-2xl transition-colors cursor-pointer group mb-10 ${
-            isDragging
-              ? "border-red-400 bg-red-50/50"
-              : fileName
-              ? "border-emerald-300 bg-emerald-50/30"
-              : "border-slate-300 bg-slate-50 hover:border-red-300 hover:bg-red-50/30"
-          }`}
-        >
-          <div className={`w-16 h-16 mb-5 rounded-full bg-white shadow-sm flex items-center justify-center border border-slate-100 transition-transform group-hover:scale-110 ${
-            fileName ? "text-emerald-500" : "text-red-500"
-          }`}>
-            <Upload size={24} />
-          </div>
-          <h3 className="mb-1.5 text-lg font-bold text-slate-800 text-center">
-            {fileName ? fileName : "Haz click para seleccionar o arrastra tu archivo CSV"}
-          </h3>
-          <p className="text-sm text-slate-500 text-center">
-            Máximo 10MB · Usa la plantilla correcta para evitar errores
-          </p>
-        </div>
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
+        <div className="max-w-[1500px] mx-auto w-full flex flex-col xl:flex-row gap-6 items-stretch">
 
-        {/* Two-column grid */}
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-10">
-
-          {/* Plantillas */}
-          <div className="flex flex-col gap-5">
-            <div className="flex items-center gap-2">
-              <FileSpreadsheet size={18} className="text-emerald-600" />
-              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Plantillas para Excel</h3>
+          {/* LEFT: Dropzone card */}
+          <div className="flex-1 flex flex-col bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden min-h-[400px]">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2 bg-slate-50/80">
+              <Upload size={14} className="text-slate-400" />
+              <h3 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Cargar Archivo de Datos</h3>
             </div>
-            <p className="text-sm text-slate-600 leading-relaxed -mt-2">
-              Descarga una plantilla, rellénala en Excel y súbela aquí. Los archivos incluyen filas de ejemplo — bórralas antes de subir tus datos reales.
-            </p>
-            <div className="flex flex-col gap-3">
-              <button
-                onClick={() => downloadCsvTemplate("basica")}
-                className="group flex items-start gap-4 p-4 rounded-xl border border-slate-200 bg-white hover:border-emerald-300 hover:shadow-sm transition-all text-left"
+            <div className="flex-1 p-6 flex items-center justify-center">
+              <div
+                onClick={onSelectFile}
+                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                onDragEnter={(e) => { e.preventDefault(); setIsDragging(true); }}
+                onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDragging(false); }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDragging(false);
+                  const file = e.dataTransfer.files[0];
+                  if (file) onFileChange(file);
+                }}
+                className={`relative flex flex-col items-center justify-center w-full h-full min-h-[300px] border-2 border-dashed rounded-lg cursor-pointer transition-colors group ${
+                  isDragging
+                    ? "border-red-400 bg-red-50/50"
+                    : fileName
+                    ? "border-emerald-300 bg-emerald-50/20"
+                    : "border-slate-300 bg-slate-50 hover:border-red-300 hover:bg-red-50/40"
+                }`}
               >
-                <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0 group-hover:bg-emerald-100 transition-colors">
-                  <Download size={16} />
+                <div className={`w-20 h-20 mb-6 rounded-full bg-white shadow-sm flex items-center justify-center border border-slate-100 transition-all group-hover:scale-110 ${
+                  fileName ? "text-emerald-500" : "text-red-500 group-hover:text-red-600"
+                }`}>
+                  <FileSpreadsheet size={32} />
                 </div>
-                <div className="flex flex-col gap-1">
-                  <span className="text-sm font-bold text-slate-800 group-hover:text-emerald-700 transition-colors">Plantilla básica</span>
-                  <span className="text-xs text-slate-500 leading-snug">Campos esenciales: referencia, juzgado, procedimiento, cliente, parte contraria.</span>
-                </div>
-              </button>
-              <button
-                onClick={() => downloadCsvTemplate("completa")}
-                className="group flex items-start gap-4 p-4 rounded-xl border border-slate-200 bg-white hover:border-emerald-300 hover:shadow-sm transition-all text-left"
-              >
-                <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0 group-hover:bg-emerald-100 transition-colors">
-                  <FileSpreadsheet size={16} />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <span className="text-sm font-bold text-slate-800 group-hover:text-emerald-700 transition-colors">Plantilla completa</span>
-                  <span className="text-xs text-slate-500 leading-snug">Todos los campos: año, NIG, procurador, estado, observaciones y más.</span>
-                </div>
-              </button>
-            </div>
-          </div>
-
-          {/* Formato Esperado */}
-          <div className="flex flex-col gap-5">
-            <div className="flex items-center gap-2">
-              <ListChecks size={18} className="text-slate-400" />
-              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Formato Esperado</h3>
-            </div>
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 flex flex-col gap-3 flex-1">
-              <p className="text-sm text-slate-600 leading-relaxed">
-                Tu archivo CSV debe contener las siguientes columnas. El delimitador puede ser coma{" "}
-                <code className="bg-white border border-slate-200 px-1.5 py-0.5 rounded text-xs font-mono">,</code>{" "}
-                o punto y coma{" "}
-                <code className="bg-white border border-slate-200 px-1.5 py-0.5 rounded text-xs font-mono">;</code>.
-              </p>
-              <ul className="flex flex-col gap-2 mt-1">
-                {([
-                  ["Referencia", "(ID del expediente)"],
-                  ["Número de procedimiento", ""],
-                  ["Tipo de juzgado", ""],
-                  ["Número de juzgado", ""],
-                  ["Población / Municipio", ""],
-                  ["Tipo de procedimiento", ""],
-                ] as [string, string][]).map(([name, note]) => (
-                  <li key={name} className="flex items-center gap-2.5 text-sm text-slate-600">
-                    <Check size={11} className="text-slate-300 shrink-0" />
-                    <span><span className="font-medium text-slate-700">{name}</span>{note ? ` ${note}` : ""}</span>
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-2 flex items-start gap-2 border-t border-slate-200 pt-3">
-                <AlertCircle size={13} className="text-blue-400 mt-0.5 shrink-0" />
-                <p className="text-xs text-slate-500 italic">
-                  Las columnas se detectarán automáticamente y podrás ajustarlas en el siguiente paso.
+                <h3 className="mb-2 text-xl font-bold text-slate-800 text-center">
+                  {fileName ? fileName : "Selecciona o arrastra aquí tu CSV"}
+                </h3>
+                <p className="text-sm text-slate-500 text-center max-w-md">
+                  El archivo no debe superar los 10MB. Asegúrate de haber rellenado los datos utilizando alguna de nuestras plantillas.
                 </p>
+                {!fileName && (
+                  <div className="mt-8 px-6 py-2 bg-white border border-slate-200 rounded-md text-sm font-semibold text-slate-700 shadow-sm group-hover:border-red-300 group-hover:text-red-600 transition-colors">
+                    Explorar archivos
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
+          {/* RIGHT: Templates + Format */}
+          <div className="w-full xl:w-[450px] flex flex-col gap-6 flex-shrink-0">
+
+            {/* Plantillas */}
+            <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2 bg-slate-50/80">
+                <FileSpreadsheet size={14} className="text-emerald-600" />
+                <h3 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Plantillas para Excel</h3>
+              </div>
+              <div className="p-6 flex flex-col gap-4">
+                <p className="text-xs text-slate-500">Descarga, rellena en Excel y sube el archivo en el panel izquierdo. Borra las filas de ejemplo antes de importar.</p>
+                <button
+                  onClick={() => downloadCsvTemplate("basica")}
+                  className="group flex items-start gap-4 p-4 rounded-lg border border-slate-200 bg-white hover:border-emerald-300 hover:bg-emerald-50/30 transition-all shadow-sm text-left"
+                >
+                  <div className="w-10 h-10 rounded-md bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0 group-hover:bg-emerald-200 transition-colors">
+                    <Download size={16} />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-bold text-slate-800 group-hover:text-emerald-700 transition-colors">Plantilla básica</span>
+                    <span className="text-[11px] text-slate-500 mt-1 leading-relaxed">Campos esenciales: ref., juzgado, procedimiento, cliente, contrario.</span>
+                  </div>
+                </button>
+                <button
+                  onClick={() => downloadCsvTemplate("completa")}
+                  className="group flex items-start gap-4 p-4 rounded-lg border border-slate-200 bg-white hover:border-emerald-300 hover:bg-emerald-50/30 transition-all shadow-sm text-left"
+                >
+                  <div className="w-10 h-10 rounded-md bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0 group-hover:bg-emerald-200 transition-colors">
+                    <Download size={16} />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-bold text-slate-800 group-hover:text-emerald-700 transition-colors">Plantilla completa</span>
+                    <span className="text-[11px] text-slate-500 mt-1 leading-relaxed">Todos los campos disponibles del expediente listos para importar.</span>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            {/* Formato Esperado */}
+            <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden flex-1">
+              <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2 bg-slate-50/80">
+                <ListChecks size={14} className="text-slate-400" />
+                <h3 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Formato Esperado</h3>
+              </div>
+              <div className="p-6 flex flex-col gap-4">
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  El separador de columnas puede ser coma{" "}
+                  <code className="bg-slate-100 border border-slate-200 px-1 rounded text-slate-800 font-bold">,</code>{" "}
+                  o punto y coma{" "}
+                  <code className="bg-slate-100 border border-slate-200 px-1 rounded text-slate-800 font-bold">;</code>.
+                </p>
+                <ul className="flex flex-col gap-3 text-xs text-slate-600">
+                  <li className="flex items-center gap-2.5"><Check size={10} className="text-emerald-500 shrink-0" /> <strong>Referencia</strong> (ID interno)</li>
+                  <li className="flex items-center gap-2.5"><Check size={10} className="text-emerald-500 shrink-0" /> Número de procedimiento</li>
+                  <li className="flex items-center gap-2.5"><Check size={10} className="text-emerald-500 shrink-0" /> Tipo y Número de juzgado</li>
+                  <li className="flex items-center gap-2.5"><Check size={10} className="text-emerald-500 shrink-0" /> Población / Municipio</li>
+                </ul>
+                <div className="mt-2 p-3 bg-blue-50 border border-blue-100 rounded-md flex items-start gap-2.5">
+                  <AlertCircle size={12} className="text-blue-500 mt-0.5 shrink-0" />
+                  <p className="text-[11px] text-blue-700 leading-snug">Podrás revisar y vincular las columnas manualmente en el <strong>Paso 2</strong>.</p>
+                </div>
+              </div>
+            </div>
+
+          </div>
         </div>
+      </div>
+
+      {/* Footer */}
+      <div className="bg-white border-t border-slate-200 px-6 sm:px-10 py-4 flex items-center justify-between flex-shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.02)]">
+        <button
+          onClick={onBack}
+          className="px-5 py-2.5 text-sm font-semibold text-slate-400 bg-slate-50 border border-slate-200 rounded-md hover:bg-slate-100 transition-colors"
+        >
+          Cancelar
+        </button>
+        <button
+          disabled={!fileName}
+          onClick={onSelectFile}
+          className="px-6 py-2.5 text-sm font-bold text-white bg-slate-800 hover:bg-black rounded-md shadow-sm transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Siguiente paso: Configurar <ArrowRight size={13} />
+        </button>
       </div>
 
       {showNewModal && (
@@ -1642,12 +1657,12 @@ function CsvImportConfigureView({
         <p className="mt-0.5 text-xs text-slate-500">Importa expedientes judiciales desde un archivo CSV</p>
       </div>
 
-      <div className="py-4">
-        <div className="flex items-start justify-between relative max-w-2xl mx-auto">
-          <div className="absolute left-0 top-6 w-full h-0.5 bg-slate-100 z-0" />
-          <ImportStep icon={Check} label="Subir archivo" completed />
-          <ImportStep icon={SlidersHorizontal} label="Configurar" active />
-          <ImportStep icon={Eye} label="Revisar" />
+      <div className="py-2">
+        <div className="flex items-center justify-between relative max-w-3xl mx-auto">
+          <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-0.5 bg-slate-100 z-0" />
+          <ImportStep step={1} label="Subir archivo" completed first />
+          <ImportStep step={2} label="Configurar columnas" active />
+          <ImportStep step={3} label="Revisar e Importar" last />
         </div>
       </div>
 
@@ -1816,12 +1831,12 @@ function CsvImportReviewView({
         <p className="mt-0.5 text-xs text-slate-500">Importa expedientes judiciales desde un archivo CSV</p>
       </div>
 
-      <div className="py-4">
-        <div className="flex items-start justify-between relative max-w-2xl mx-auto">
-          <div className="absolute left-0 top-6 w-full h-0.5 bg-slate-100 z-0" />
-          <ImportStep icon={Check} label="Subir archivo" completed />
-          <ImportStep icon={Check} label="Configurar" completed />
-          <ImportStep icon={Eye} label="Revisar" active />
+      <div className="py-2">
+        <div className="flex items-center justify-between relative max-w-3xl mx-auto">
+          <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-0.5 bg-slate-100 z-0" />
+          <ImportStep step={1} label="Subir archivo" completed first />
+          <ImportStep step={2} label="Configurar columnas" completed />
+          <ImportStep step={3} label="Revisar e Importar" active last />
         </div>
       </div>
 
@@ -3658,30 +3673,39 @@ function DocumentImportVerifyView({
 
 
 function ImportStep({
-  icon: Icon,
+  step,
   label,
   active = false,
   completed = false,
+  first = false,
+  last = false,
+  icon: _icon,
+  connector: _connector,
 }: {
-  icon: any;
+  step: number;
   label: string;
   active?: boolean;
   completed?: boolean;
+  first?: boolean;
+  last?: boolean;
+  icon?: any;
   connector?: boolean;
 }) {
   return (
-    <div className="relative z-10 flex flex-col items-center gap-3">
-      <div className={`w-12 h-12 rounded-full flex items-center justify-center border-4 border-white transition-colors ${
+    <div className={`relative z-10 flex items-center gap-3 bg-white ${
+      first ? "pr-4" : last ? "pl-4" : "px-4"
+    }`}>
+      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${
         completed
-          ? "bg-emerald-500 text-white shadow-md shadow-emerald-200 ring-1 ring-emerald-200"
+          ? "bg-emerald-500 text-white shadow-md shadow-emerald-200"
           : active
-          ? "bg-red-700 text-white shadow-md shadow-red-500/30 ring-1 ring-red-100"
-          : "bg-slate-100 text-slate-400 ring-1 ring-slate-200"
+          ? "bg-red-600 text-white shadow-md shadow-red-500/30"
+          : "bg-slate-50 border-2 border-slate-200 text-slate-400"
       }`}>
-        <Icon size={18} />
+        {completed ? <Check size={13} /> : step}
       </div>
-      <span className={`text-xs font-bold whitespace-nowrap ${
-        completed ? "text-emerald-600" : active ? "text-red-700" : "text-slate-400"
+      <span className={`text-sm font-bold hidden sm:block whitespace-nowrap ${
+        completed ? "text-emerald-600" : active ? "text-slate-800" : "text-slate-400"
       }`}>{label}</span>
     </div>
   );
