@@ -1,4 +1,5 @@
 ﻿import React, { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Spinner } from "./Spinner";
 import {
   FolderOpen, FolderPlus, Loader2, Paperclip, Activity, FileSpreadsheet,
@@ -416,9 +417,8 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
 
   const HeaderIcon = editId ? FolderOpen : FolderPlus;
 
-  return (
-    <>
-    <div className="fixed inset-0 z-50 flex flex-col bg-white overflow-hidden">
+  const modal = (
+    <div className="fixed inset-0 z-[9999] flex flex-col bg-white overflow-hidden" style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0 }}>
 
       {/* ── Cabecera ── */}
       <div className="px-6 sm:px-8 py-4 bg-white border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 flex-shrink-0">
@@ -841,6 +841,7 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
         </div>
       )}
     </div>
-    </>
   );
+
+  return createPortal(modal, document.body);
 }
