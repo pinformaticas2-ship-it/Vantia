@@ -844,10 +844,12 @@ function DropdownToolBtn({
   label,
   disabled = false,
   items,
+  onDefaultClick,
 }: {
   icon: any;
   label: string;
   disabled?: boolean;
+  onDefaultClick?: () => void;
   items: {
     label: string;
     icon?: any;
@@ -858,28 +860,30 @@ function DropdownToolBtn({
 }) {
   const [open, setOpen] = useState(false);
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
-  const btnRef = useRef<HTMLButtonElement>(null);
+  const chevronRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const openMenu = () => {
-    if (disabled || !btnRef.current) return;
-    const r = btnRef.current.getBoundingClientRect();
-    setMenuPos({ top: r.bottom + 8, left: r.left });
+    if (disabled || !chevronRef.current) return;
+    const r = chevronRef.current.getBoundingClientRect();
+    setMenuPos({ top: r.bottom + 8, left: r.left - 160 });
     setOpen(true);
   };
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (
-        btnRef.current && !btnRef.current.contains(e.target as Node) &&
+        chevronRef.current && !chevronRef.current.contains(e.target as Node) &&
         menuRef.current && !menuRef.current.contains(e.target as Node)
-      ) {
-        setOpen(false);
-      }
+      ) setOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  const baseCls = disabled
+    ? "text-slate-300 cursor-not-allowed border-slate-100 bg-white"
+    : "text-slate-600 bg-white hover:bg-slate-50 border-slate-200";
 
   const menu = (
     <div
@@ -932,24 +936,26 @@ function DropdownToolBtn({
   );
 
   return (
-    <div className="relative shrink-0">
+    <div className={`flex items-stretch shrink-0 rounded-lg border shadow-sm overflow-hidden transition-all active:scale-[0.98] ${disabled ? "border-slate-100" : "border-slate-200"}`}>
+      {/* Área principal: acción directa (o abre el menú si no hay defaultOnClick) */}
       <button
-        ref={btnRef}
         type="button"
-        onClick={openMenu}
         disabled={disabled}
-        className={`
-          flex items-center gap-0 rounded-lg text-[11px] font-semibold transition-all active:scale-[0.98] border overflow-hidden shadow-sm
-          ${disabled ? "text-slate-300 cursor-not-allowed border-slate-100 bg-white" : "text-slate-600 bg-white hover:bg-slate-50 border-slate-200"}
-        `}
+        onClick={onDefaultClick ?? openMenu}
+        className={`flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold transition-colors ${baseCls} border-0`}
       >
-        <span className="flex items-center gap-1.5 px-2.5 py-1.5">
-          <Icon size={13} />
-          <span className="hidden sm:inline whitespace-nowrap">{label}</span>
-        </span>
-        <span className={`px-1.5 py-1.5 border-l ${disabled ? "border-slate-100" : "border-slate-200 hover:bg-slate-100"}`}>
-          <ChevronDown size={10} />
-        </span>
+        <Icon size={13} />
+        <span className="hidden sm:inline whitespace-nowrap">{label}</span>
+      </button>
+      {/* Separador + flecha: siempre abre el menú */}
+      <button
+        ref={chevronRef}
+        type="button"
+        disabled={disabled}
+        onClick={openMenu}
+        className={`flex items-center justify-center px-1.5 border-l text-[11px] font-semibold transition-colors ${disabled ? "border-slate-100 text-slate-200 cursor-not-allowed" : "border-slate-200 text-slate-400 hover:bg-slate-100 hover:text-slate-600"}`}
+      >
+        <ChevronDown size={10} />
       </button>
       {open && typeof document !== "undefined" && createPortal(menu, document.body)}
     </div>
@@ -5913,7 +5919,9 @@ export default function ExpedienteList() {
               <div className="w-px h-5 bg-slate-200 mx-1" />
 
               {/* Correo, WhatsApp */}
-              <DropdownToolBtn icon={Mail} label="Enviar Correo" disabled={!selected} items={[
+              <DropdownToolBtn icon={Mail} label="Enviar Correo" disabled={!selected}
+                onDefaultClick={() => { if (!selectedExp) return; const params = new URLSearchParams({ compose: '1', subject: `Expediente ${selectedExp.anio}/${selectedExp.num_exp} - ${selectedExp.descripcion || ''}`, ...(selectedExp.cliente_email ? { to: selectedExp.cliente_email } : {}), expediente_id: selectedExp.id }); navigate(`/dashboard/correo?${params.toString()}`); }}
+                items={[
                 { label: "Nuevo", icon: Mail, onClick: () => { if (!selectedExp) return; const params = new URLSearchParams({ compose: '1', subject: `Expediente ${selectedExp.anio}/${selectedExp.num_exp} - ${selectedExp.descripcion || ''}`, ...(selectedExp.cliente_email ? { to: selectedExp.cliente_email } : {}), expediente_id: selectedExp.id }); navigate(`/dashboard/correo?${params.toString()}`); } },
                 { label: "Con Plantilla", icon: FileText, onClick: () => { if (!selectedExp) return; const params = new URLSearchParams({ compose: '1', subject: `Expediente ${selectedExp.anio}/${selectedExp.num_exp} - ${selectedExp.descripcion || ''}`, ...(selectedExp.cliente_email ? { to: selectedExp.cliente_email } : {}), expediente_id: selectedExp.id, open_templates: '1' }); navigate(`/dashboard/correo?${params.toString()}`); } },
                 { divider: true, label: '' },
