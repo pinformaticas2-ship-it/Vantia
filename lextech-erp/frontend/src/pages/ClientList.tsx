@@ -560,22 +560,21 @@ function ToolBtn({
   );
 }
 
-// ── Botón con dropdown (posición fixed para evitar overflow clip) ──
+// ── Botón con dropdown ─────────────────────────────────────────
 function DropdownBtn({
-  icon: Icon, label, items, disabled = false, onDefaultClick,
+  icon: Icon, label, items, disabled = false,
 }: {
   icon: any; label: string; disabled?: boolean;
-  onDefaultClick?: () => void;
   items: { label: string; icon?: any; onClick: () => void; divider?: boolean }[];
 }) {
   const [open, setOpen] = useState(false);
-  const chevronRef = useRef<HTMLButtonElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (
-        chevronRef.current && !chevronRef.current.contains(e.target as Node) &&
+        btnRef.current && !btnRef.current.contains(e.target as Node) &&
         menuRef.current && !menuRef.current.contains(e.target as Node)
       ) setOpen(false);
     };
@@ -583,34 +582,20 @@ function DropdownBtn({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const handleOpenMenu = () => {
-    if (disabled) return;
-    setOpen(o => !o);
-  };
-
-  const baseCls = disabled
-    ? "text-slate-300 cursor-not-allowed border-slate-100 bg-white"
-    : "text-slate-600 bg-white hover:bg-slate-50 border-slate-200";
-
   return (
-    <div className={`flex items-stretch shrink-0 rounded-lg border shadow-sm overflow-hidden transition-all active:scale-[0.98] ${disabled ? "border-slate-100" : "border-slate-200"}`}>
-      {/* Área principal: acción directa */}
+    <div className="relative shrink-0">
       <button
+        ref={btnRef}
+        onClick={() => { if (!disabled) setOpen(o => !o); }}
         disabled={disabled}
         title={label}
-        onClick={onDefaultClick ?? handleOpenMenu}
-        className={`flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold transition-colors border-0 ${baseCls}`}
+        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-colors border shadow-sm active:scale-[0.98]
+          ${open && !disabled ? "bg-red-50 border-red-300 text-red-700" : ""}
+          ${disabled ? "text-slate-300 cursor-not-allowed border-slate-100 bg-white" : !open ? "text-slate-600 bg-white hover:bg-slate-100 border-slate-200" : ""}
+        `}
       >
         <Icon size={13} />
         <span className="hidden sm:inline whitespace-nowrap">{label}</span>
-      </button>
-      {/* Flecha: siempre abre menú */}
-      <button
-        ref={chevronRef}
-        disabled={disabled}
-        onClick={handleOpenMenu}
-        className={`flex items-center justify-center px-1.5 border-l text-[11px] transition-colors ${disabled ? "border-slate-100 text-slate-200 cursor-not-allowed" : "border-slate-200 text-slate-400 hover:bg-slate-100 hover:text-slate-600"}`}
-      >
         <ChevronDownSmall size={10} />
       </button>
 
@@ -2030,7 +2015,6 @@ export default function ClientList() {
           <DropdownBtn
             icon={Mail} label="Enviar Correo"
             disabled={!selected}
-            onDefaultClick={() => selectedClient?.email && window.open(`mailto:${selectedClient.email}`)}
             items={[
               {
                 label: "Nuevo",
