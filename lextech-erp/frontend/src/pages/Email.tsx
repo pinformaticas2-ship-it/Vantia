@@ -1674,7 +1674,7 @@ function EmailItem({
     <a
       href={`/dashboard/correo?openEmail=${encodeURIComponent(email.id)}`}
       onClick={(e) => { e.preventDefault(); onClick(); }}
-      onDoubleClick={(e) => { e.preventDefault(); onDoubleClick(); }}
+      onDoubleClick={(e) => { e.preventDefault(); window.open(`/dashboard/correo?openEmail=${encodeURIComponent(email.id)}`, '_blank'); }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       className={`relative flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors duration-150 border-b border-slate-100 ${
