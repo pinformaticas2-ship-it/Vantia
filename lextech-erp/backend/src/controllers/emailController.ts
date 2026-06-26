@@ -6,6 +6,7 @@ import { Pop3Config, syncPop3Inbox, testPop3Connection } from '../utils/pop3';
 import { sendEmail, SmtpConfig, MailMessage, testSmtpConnection } from '../utils/smtp';
 import { dispatchEmail, getSendingProvider } from '../utils/mailer';
 import { logActivityForReq } from './activityController';
+import { emitEmailEvent } from '../utils/emailSSE';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -1139,6 +1140,7 @@ export async function sendMail(req: Request, res: Response) {
         expediente_id || null,
       ],
     );
+    emitEmailEvent(uid, { type: 'messageSent', accountId: acc.id, folder: 'Sent' });
 
     // Delete draft if any
     if (draft_id) {

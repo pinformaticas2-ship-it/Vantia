@@ -4182,8 +4182,12 @@ export default function Email() {
     const nextDrafts = removeLocalDraft(draftId);
     setDraftCount((gmailLabels.find((label) => label.id === 'DRAFT')?.messagesTotal || 0) + nextDrafts.length);
     setCompose(null);
-    if (selectedFolder === 'SENT') loadEmails(true);
-    if (selectedFolder === 'DRAFTS') loadEmails(true);
+    if (selectedFolder === 'SENT') {
+      loadEmails(true);
+    } else {
+      setSelectedFolder('SENT');
+      // useEffect [selectedFolder] llamará loadEmails(true) automáticamente
+    }
   };
 
   const replyTo = (email: ParsedEmail, all = false) => {
