@@ -450,12 +450,12 @@ function parseImapEmail(row: ImapApiEmail): ParsedEmail {
     to: row.to_emails || '',
     cc: row.cc_emails || '',
     subject: row.subject || '(Sin asunto)',
-    snippet: row.snippet || '',
+    snippet: decodeQP(row.snippet || ''),
     date: row.sent_at || new Date().toISOString(),
     isRead: Boolean(row.is_read),
     isStarred: Boolean(row.is_starred),
-    bodyHtml: row.body_html || '',
-    bodyText: row.body_text || '',
+    bodyHtml: decodeQP(row.body_html || ''),
+    bodyText: decodeQP(row.body_text || ''),
     hasAttachments: Boolean(row.has_attachments),
     source: 'imap',
     isPinned: readPinnedEmailIds().includes(String(row.id)),
@@ -1812,7 +1812,7 @@ function EmailReader({
   const [detailsOpen, setDetailsOpen] = useState(false);
 
   const srcDoc = useMemo(
-    () => buildEmailDoc(email.bodyHtml, email.bodyText),
+    () => buildEmailDoc(decodeQP(email.bodyHtml || ''), decodeQP(email.bodyText || '')),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [email.id, email.bodyHtml, email.bodyText],
   );
