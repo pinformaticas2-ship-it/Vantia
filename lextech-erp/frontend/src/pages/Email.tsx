@@ -1674,7 +1674,7 @@ function EmailItem({
     <a
       href={`/dashboard/correo?openEmail=${encodeURIComponent(email.id)}`}
       onClick={(e) => { e.preventDefault(); onClick(); }}
-      onDoubleClick={(e) => { e.preventDefault(); window.open(`/dashboard/correo?openEmail=${encodeURIComponent(email.id)}`, '_blank'); }}
+      onDoubleClick={(e) => { e.preventDefault(); window.open(`/dashboard/correo?openEmail=${encodeURIComponent(email.id)}&solo=1`, '_blank'); }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       className={`relative flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors duration-150 border-b border-slate-100 ${
@@ -3047,6 +3047,7 @@ export default function Email() {
   const [showTemplates, setShowTemplates]       = useState(false);
   const [showGroups, setShowGroups]             = useState(false);
   const pendingOpenEmailId    = searchParams.get('openEmail');
+  const soloMode              = searchParams.get('solo') === '1';
   const pendingReply          = searchParams.get('reply');
   const pendingComposeTo      = searchParams.get('to');
   const pendingComposeSubj    = searchParams.get('subject');
@@ -4217,6 +4218,50 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
   const hasActiveMailbox = activeProvider !== 'none';
 
   // ── Render ────────────────────────────────────────────────────────────────
+  // ── Solo mode: full-window email reader (opened via double-click in new tab) ──
+  if (soloMode) {
+    if (!selectedEmail) {
+      return (
+        <div className="flex items-center justify-center h-screen bg-[#f0f4f8]">
+          <Spinner size="lg" />
+        </div>
+      );
+    }
+    return (
+      <div className="flex flex-col bg-[#f0f4f8] overflow-hidden" style={{ height: '100vh', fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}>
+        <EmailReader
+          email={selectedEmail}
+          onReply={() => replyTo(selectedEmail)}
+          onReplyAll={() => replyTo(selectedEmail, true)}
+          onForward={() => forwardEmail(selectedEmail)}
+          onDelete={() => deleteEmail(selectedEmail.id)}
+          onStar={() => toggleStar(selectedEmail.id, selectedEmail.isStarred)}
+          onBack={() => window.close()}
+          onPin={() => togglePinned(selectedEmail)}
+          onRestore={selectedEmail.labelIds.includes('TRASH') ? () => restoreEmail(selectedEmail) : undefined}
+          onAssignLabel={(labelId) => assignEmailToLabel(selectedEmail, labelId)}
+          onCreateLabel={createUserLabel}
+          userLabels={gmailLabels.filter((label) => label.type === 'user')}
+          bodyLoading={bodyLoadingId === selectedEmail.id}
+        />
+        {compose && (
+          <ComposeWindow
+            data={compose}
+            fromEmail={activeProvider === 'imap' ? (currentImapAccount?.email || userEmail) : (gmailProfile?.emailAddress || userEmail)}
+            fromName={userName}
+            gmail={activeProvider === 'gmail' ? gmail : null}
+            accountId={activeProvider === 'imap' ? (currentImapAccount?.id ?? null) : null}
+            getToken={tokenGetter}
+            onClose={handleCloseCompose}
+            onSent={handleComposeSent}
+            autoOpenTemplates={false}
+            autoOpenAttachments={false}
+          />
+        )}
+      </div>
+    );
+  }
+
   return (
     // 73px = dashboard header (h-18 = 72px + 1px border-b)
     <div
