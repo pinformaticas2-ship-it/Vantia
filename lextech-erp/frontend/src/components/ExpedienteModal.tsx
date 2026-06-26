@@ -424,10 +424,10 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
   }, []);
 
   const modal = (
-    <div className="fixed inset-0 z-[9999] flex flex-col bg-white overflow-hidden" style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0 }}>
+    <div className="fixed inset-0 z-[9999] flex flex-col bg-white overflow-hidden animate-modal-in" style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0 }}>
 
       {/* ── Cabecera ── */}
-      <div className="px-6 sm:px-8 py-4 bg-white border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 flex-shrink-0">
+      <div className="px-6 sm:px-8 py-4 bg-white border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 flex-shrink-0 animate-card-in">
         <div className="flex items-center gap-4">
           <div className="w-11 h-11 rounded-lg bg-red-50 text-red-600 flex items-center justify-center border border-red-100 flex-shrink-0">
             <HeaderIcon size={20} />
@@ -491,7 +491,7 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
         <div className="max-w-[1600px] mx-auto flex flex-col xl:flex-row gap-8 lg:gap-10 xl:items-stretch">
 
           {/* ── Columna izquierda ── */}
-          <div className="flex-1 flex flex-col gap-7 w-full xl:pr-10 xl:border-r border-slate-200">
+          <div className="flex-1 flex flex-col gap-7 w-full xl:pr-10 xl:border-r border-slate-200 animate-card-in-1">
 
             {/* IDENTIFICACIÓN */}
             <div>
@@ -688,7 +688,7 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
           </div>
 
           {/* ── Columna derecha: Partes ── */}
-          <div className="w-full xl:w-[380px] flex-shrink-0 flex flex-col gap-7">
+          <div className="w-full xl:w-[380px] flex-shrink-0 flex flex-col gap-7 animate-card-in-2">
             <div>
               <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2">
                 <Users size={15} className="text-slate-400" /> Partes Implicadas

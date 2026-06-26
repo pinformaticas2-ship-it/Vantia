@@ -1169,7 +1169,7 @@ function CsvImportView({
   const [isDragging, setIsDragging] = useState(false);
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden animate-in fade-in duration-300">
+    <div className="flex-1 flex flex-col overflow-hidden animate-page-in">
       <input
         ref={inputRef}
         type="file"
@@ -1220,7 +1220,7 @@ function CsvImportView({
         <div className="max-w-[1500px] mx-auto w-full flex flex-col xl:flex-row gap-6 items-stretch">
 
           {/* LEFT: Dropzone card */}
-          <div className="flex-1 flex flex-col bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden min-h-[400px]">
+          <div className="flex-1 flex flex-col bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden min-h-[400px] animate-card-in-1">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2 bg-slate-50/80">
               <Upload size={14} className="text-slate-400" />
               <h3 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Cargar Archivo de Datos</h3>
@@ -1269,7 +1269,7 @@ function CsvImportView({
           <div className="w-full xl:w-[450px] flex flex-col gap-6 flex-shrink-0">
 
             {/* Plantillas */}
-            <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden animate-card-in-2">
               <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2 bg-slate-50/80">
                 <FileSpreadsheet size={14} className="text-emerald-600" />
                 <h3 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Plantillas para Excel</h3>
@@ -1304,7 +1304,7 @@ function CsvImportView({
             </div>
 
             {/* Formato Esperado */}
-            <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden flex-1">
+            <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden flex-1 animate-card-in-3">
               <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2 bg-slate-50/80">
                 <ListChecks size={14} className="text-slate-400" />
                 <h3 className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Formato Esperado</h3>
