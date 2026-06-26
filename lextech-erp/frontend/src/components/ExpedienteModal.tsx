@@ -1,8 +1,8 @@
 ﻿import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Spinner } from "./Spinner";
 import {
-  FolderOpen, Loader2, Paperclip, Activity, FileSpreadsheet,
-  Users, ClipboardList, MoreHorizontal,
+  FolderOpen, FolderPlus, Loader2, Paperclip, Activity, FileSpreadsheet,
+  Users, ClipboardList, MoreHorizontal, Coins, Scale, ArrowLeft,
   Upload, Trash2, Eye, Download, ExternalLink, Maximize2, AlertTriangle,
 } from "lucide-react";
 import AppSelect from "./AppSelect";
@@ -122,9 +122,9 @@ const TIPOS_ASUNTO_GROUPS: Array<{ label: string; items: string[] }> = [
 ];
 
 // ── Estilos de formulario ─────────────────────────────────────
-export const lbl   = "text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5 block";
-export const inp   = "w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm text-slate-700 focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100 bg-white";
-export const inpRO = "w-full border border-slate-100 rounded-lg px-2.5 py-1.5 text-sm text-slate-400 bg-slate-50 cursor-default";
+export const lbl   = "text-xs font-bold text-slate-500 uppercase tracking-wider";
+export const inp   = "w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-md text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-red-500 focus:border-red-500 transition-colors";
+export const inpRO = "w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-md text-sm text-slate-500 cursor-not-allowed font-medium";
 
 // ── SecCard ───────────────────────────────────────────────────
 export function SecCard({ title, icon: Icon, children, cols = 3 }: {
@@ -403,8 +403,8 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
   onClose: () => void;
   saving: boolean;
 }) {
-  const [form, setForm]     = useState(initial);
-  const [tab, setTab]       = useState<TabKey>("notas");
+  const [form, setForm]       = useState(initial);
+  const [tab, setTab]         = useState<TabKey>("notas");
   const [showAdj, setShowAdj] = useState(false);
   const set = (k: string, v: any) => setForm(p => ({ ...p, [k]: v }));
 
@@ -414,269 +414,297 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
     set("cliente_nombre", c ? `${c.first_name || ""} ${c.last_name || ""}`.trim() : "");
   };
 
+  const HeaderIcon = editId ? FolderOpen : FolderPlus;
+
   return (
     <>
-    <div className="fixed inset-0 z-50 flex flex-col bg-slate-50">
+    <div className="fixed inset-0 z-50 flex flex-col bg-white overflow-hidden">
 
       {/* ── Cabecera ── */}
-      <div className="shrink-0 bg-white border-b border-slate-200 px-5 py-3 flex items-center gap-3 shadow-sm">
-        <div className="flex items-center gap-2.5 mr-2">
-          <div className="p-2 bg-red-50 rounded-xl">
-            <FolderOpen size={16} className="text-red-600" />
+      <div className="px-6 sm:px-8 py-4 bg-white border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 flex-shrink-0">
+        <div className="flex items-center gap-4">
+          <div className="w-11 h-11 rounded-lg bg-red-50 text-red-600 flex items-center justify-center border border-red-100 flex-shrink-0">
+            <HeaderIcon size={20} />
           </div>
-          <div>
-            <h1 className="text-sm font-bold text-slate-900 leading-tight">
+          <div className="flex flex-col justify-center">
+            <h1 className="text-lg font-extrabold text-slate-800 leading-none tracking-tight mb-1">
               {editId
                 ? `Expediente ${form.anio}/${(form as any).num_exp || "—"}`
                 : "Nuevo expediente"}
             </h1>
-            <p className="text-[10px] text-slate-400">
+            <p className="text-xs font-medium text-slate-500">
               {form.descripcion || "Rellena los datos del expediente"}
             </p>
           </div>
         </div>
 
-        <div className="w-px h-6 bg-slate-200 mx-1" />
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => onSave(form)}
+            disabled={saving || !form.descripcion.trim() || !form.cliente_id}
+            className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-40 border border-red-700 rounded-md shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-red-500/50 active:scale-[0.98]"
+          >
+            {saving && <Loader2 size={13} className="animate-spin" />}
+            {editId ? "Guardar cambios" : "Crear expediente"}
+          </button>
+          <button onClick={onClose}
+            className="px-4 py-2.5 text-sm font-semibold text-slate-600 bg-white hover:bg-slate-50 border border-slate-200 rounded-md shadow-sm transition-colors focus:outline-none">
+            Cancelar
+          </button>
 
-        <button
-          onClick={() => onSave(form)}
-          disabled={saving || !form.descripcion.trim() || !form.cliente_id}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-40 rounded-xl shadow-sm active:scale-95 transition-all">
-          {saving && <Loader2 size={13} className="animate-spin" />}
-          {editId ? "Guardar cambios" : "Crear expediente"}
-        </button>
-        <button onClick={onClose}
-          className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors">
-          Cancelar
-        </button>
+          <div className="w-px h-6 bg-slate-200 mx-1 hidden md:block" />
 
-        <div className="w-px h-6 bg-slate-200 mx-1" />
+          <button
+            onClick={() => editId && setShowAdj(true)}
+            disabled={!editId}
+            title={!editId ? "Guarda el expediente primero" : "Adjuntos"}
+            className={`hidden md:flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
+              editId ? "text-slate-600 hover:bg-slate-100" : "text-slate-400 opacity-50 cursor-not-allowed"
+            }`}
+          >
+            <Paperclip size={12} /> Adjuntos
+          </button>
+          <button disabled className="hidden md:flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-400 opacity-50 cursor-not-allowed">
+            <Activity size={12} /> Historial
+          </button>
+          <button disabled className="hidden md:flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-400 opacity-50 cursor-not-allowed">
+            <FileSpreadsheet size={12} /> Económico
+          </button>
 
-        <button
-          onClick={() => editId && setShowAdj(true)}
-          disabled={!editId}
-          title={!editId ? "Guarda el expediente primero" : "Adjuntos"}
-          className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-            editId ? "text-slate-600 hover:bg-slate-100 cursor-pointer" : "text-slate-300 cursor-not-allowed"
-          }`}
-        >
-          <Paperclip size={12} /> Adjuntos
-        </button>
-        <button className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
-          <Activity size={12} /> Historial
-        </button>
-        <button className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
-          <FileSpreadsheet size={12} /> Económico
-        </button>
+          <div className="w-px h-6 bg-slate-200 mx-1 hidden lg:block" />
 
-        <div className="ml-auto">
-          <BackButton onClick={onClose} />
+          <button onClick={onClose}
+            className="px-4 py-2 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-md hover:bg-slate-50 transition-all shadow-sm flex items-center gap-1.5 focus:outline-none">
+            <ArrowLeft size={12} /> Volver
+          </button>
         </div>
       </div>
 
       {/* ── Cuerpo ── */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <main className="flex-1 min-h-0 overflow-y-auto p-5 sm:p-7 bg-white">
+        <div className="max-w-[1600px] mx-auto flex flex-col xl:flex-row gap-8 lg:gap-10 xl:items-stretch">
 
-        {/* Columna izquierda */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-2 min-w-0">
+          {/* ── Columna izquierda ── */}
+          <div className="flex-1 flex flex-col gap-7 w-full xl:pr-10 xl:border-r border-slate-200">
 
-          <SecCard title="Identificación" icon={FolderOpen} cols={4}>
+            {/* IDENTIFICACIÓN */}
             <div>
-              <label className={lbl}>Núm. Exp</label>
-              <input value={(form as any).num_exp || (editId ? "—" : "Auto")} readOnly className={inpRO} />
-            </div>
-            <div>
-              <label className={lbl}>Año</label>
-              <input type="number" value={form.anio}
-                onChange={e => set("anio", parseInt(e.target.value) || new Date().getFullYear())}
-                className={inp} min={2000} max={2100} />
-            </div>
-            <div>
-              <label className={lbl}>Fecha Alta</label>
-              <input type="date" value={form.fecha_inicio}
-                onChange={e => set("fecha_inicio", e.target.value)} className={inp} />
-            </div>
-            <div>
-              <label className={lbl}>Estado</label>
-              <AppSelect value={form.estado} onChange={e => set("estado", e.target.value)} searchable searchPlaceholder="Buscar estado...">
-                {Object.entries(ESTADOS).map(([k, v]) => (
-                  <option key={k} value={k}>{v.label}</option>
-                ))}
-              </AppSelect>
-            </div>
-            <div className="col-span-2">
-              <label className={lbl}>Descripción Expediente *</label>
-              <input value={form.descripcion} onChange={e => set("descripcion", e.target.value)}
-                placeholder="Ej: Reclamación de cantidad contra BBVA" className={inp} />
-            </div>
-            <div className="col-span-2">
-              <label className={lbl}>Tipo de Expediente</label>
-              <AppSelect value={form.tipo} onChange={e => set("tipo", e.target.value)} searchable searchPlaceholder="Buscar tipo de expediente...">
-                {Object.entries(TIPOS).map(([k, v]) => (
-                  <option key={k} value={k}>{v.label}</option>
-                ))}
-              </AppSelect>
-            </div>
-            <div className="col-span-2">
-              <label className={lbl}>Tipos de Asunto</label>
-              <AppSelect value={form.tipos_asunto} onChange={e => set("tipos_asunto", e.target.value)} searchable searchPlaceholder="Buscar tipo de asunto...">
-                <option value="">— Seleccionar —</option>
-                <option value="CIVIL">CIVIL</option>
-                <option value="PENAL">PENAL</option>
-                <option value="SOCIAL">SOCIAL</option>
-                <option value="CONTENCIOSO - ADMINISTRATIVO">CONTENCIOSO - ADMINISTRATIVO</option>
-                <option value="EXTRAJUDICIAL">EXTRAJUDICIAL</option>
-                <option value="DERECHO BANCARIO">DERECHO BANCARIO</option>
-                <option value="FAMILIA">FAMILIA</option>
-                <option value="VÍA ADMINISTRATIVA">VÍA ADMINISTRATIVA</option>
-                <option value="HERENCIA">HERENCIA</option>
-                <option value="MENORES">MENORES</option>
-                <option value="VIOLENCIA DE GÉNERO">VIOLENCIA DE GÉNERO</option>
-                <option value="CONCURSAL">CONCURSAL</option>
-                <option value="MERCANTIL">MERCANTIL</option>
-                <option value="MEDIDAS DE APOYO A PERSONAS CON DISCAPACIDAD">MEDIDAS DE APOYO A PERSONAS CON DISCAPACIDAD</option>
-                <option value="USURA Y TRANSPARENCIA - MICROCREDITOS">USURA Y TRANSPARENCIA - MICROCREDITOS</option>
-                <option value="FECHA_FIN_PLAZO_CONTESTAR_DEMANDA">FECHA_FIN_PLAZO_CONTESTAR_DEMANDA</option>
-                <option value="CONTESTACIÓN A LA DEMANDA">CONTESTACIÓN A LA DEMANDA</option>
-                <option value="PLAZO_APELACION">PLAZO_APELACION</option>
-                <option value="DEMANDA ODH">DEMANDA ODH</option>
-                <option value="DEMANDA UT">DEMANDA UT</option>
-              </AppSelect>
-              <p className="mt-1 text-[11px] text-slate-400">
-                Puedes escribir para filtrar y encontrar el asunto mas rapido.
-              </p>
-            </div>
-            <div>
-              <label className={lbl}>Etapa</label>
-              <AppSelect value={form.etapa} onChange={e => set("etapa", e.target.value)} searchable searchPlaceholder="Buscar etapa...">
-                {ETAPAS.map(et => <option key={et} value={et}>{et || "— Seleccionar —"}</option>)}
-              </AppSelect>
-            </div>
-            <div>
-              <label className={lbl}>Fecha Cierre</label>
-              <input type="date" value={form.fecha_cierre}
-                onChange={e => set("fecha_cierre", e.target.value)} className={inp} />
-            </div>
-          </SecCard>
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2">
+                <FolderOpen size={15} className="text-slate-400" /> Identificación
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-5">
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Núm. Exp</label>
+                  <input value={(form as any).num_exp || (editId ? "—" : "Auto")} readOnly className={inpRO} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Año</label>
+                  <input type="number" value={form.anio}
+                    onChange={e => set("anio", parseInt(e.target.value) || new Date().getFullYear())}
+                    className={inp} min={2000} max={2100} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Fecha Alta</label>
+                  <input type="date" value={form.fecha_inicio}
+                    onChange={e => set("fecha_inicio", e.target.value)} className={inp} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Estado</label>
+                  <AppSelect value={form.estado} onChange={e => set("estado", e.target.value)} searchable searchPlaceholder="Buscar estado...">
+                    {Object.entries(ESTADOS).map(([k, v]) => (
+                      <option key={k} value={k}>{v.label}</option>
+                    ))}
+                  </AppSelect>
+                </div>
 
-          <SecCard title="Procedimiento judicial" icon={Users} cols={3}>
-            <div>
-              <label className={lbl}>Tipo de Procedimiento</label>
-              <input value={form.tipo_proc} onChange={e => set("tipo_proc", e.target.value)}
-                placeholder="Monitorio, Ordinario…" className={inp} />
-            </div>
-            <div>
-              <label className={lbl}>Juzgado / Tribunal</label>
-              <input value={form.juzgado} onChange={e => set("juzgado", e.target.value)}
-                placeholder="Juzgado de 1ª Inst. nº 3 de Madrid" className={inp} />
-            </div>
-            <div>
-              <label className={lbl}>Procurador Propio</label>
-              <input value={form.procurador} onChange={e => set("procurador", e.target.value)}
-                placeholder="Nombre del procurador" className={inp} />
-            </div>
-            <div>
-              <label className={lbl}>N.I.G.</label>
-              <input value={form.nig} onChange={e => set("nig", e.target.value)}
-                placeholder="2809042120240001302" className={inp} />
-            </div>
-            <div>
-              <label className={lbl}>Núm. Autos</label>
-              <input value={form.num_autos} onChange={e => set("num_autos", e.target.value)}
-                placeholder="1302/2024" className={inp} />
-            </div>
-          </SecCard>
+                <div className="flex flex-col gap-2 md:col-span-2">
+                  <label className={lbl}>Descripción Expediente <span className="text-red-500">*</span></label>
+                  <input value={form.descripcion} onChange={e => set("descripcion", e.target.value)}
+                    placeholder="Ej: Reclamación de cantidad contra BBVA" className={inp} />
+                </div>
+                <div className="flex flex-col gap-2 md:col-span-2">
+                  <label className={lbl}>Tipo de Expediente</label>
+                  <AppSelect value={form.tipo} onChange={e => set("tipo", e.target.value)} searchable searchPlaceholder="Buscar tipo...">
+                    {Object.entries(TIPOS).map(([k, v]) => (
+                      <option key={k} value={k}>{v.label}</option>
+                    ))}
+                  </AppSelect>
+                </div>
 
-          <SecCard title="Cuantías económicas" icon={ClipboardList} cols={4}>
-            <div>
-              <label className={lbl}>Cuantía Principal (€)</label>
-              <input type="number" value={form.cuantia_principal}
-                onChange={e => set("cuantia_principal", e.target.value)}
-                placeholder="0.00" step="0.01" className={inp} />
-            </div>
-            <div>
-              <label className={lbl}>Intereses (€)</label>
-              <input type="number" value={form.intereses}
-                onChange={e => set("intereses", e.target.value)}
-                placeholder="0.00" step="0.01" className={inp} />
-            </div>
-            <div>
-              <label className={lbl}>Costas (€)</label>
-              <input type="number" value={form.costas}
-                onChange={e => set("costas", e.target.value)}
-                placeholder="0.00" step="0.01" className={inp} />
-            </div>
-            <div>
-              <label className={lbl}>Cuantía Total (€)</label>
-              <input type="number" value={form.cuantia_total}
-                onChange={e => set("cuantia_total", e.target.value)}
-                placeholder="0.00" step="0.01" className={inp} />
-            </div>
-            <div>
-              <label className={lbl}>Importe (€)</label>
-              <input type="number" value={form.importe}
-                onChange={e => set("importe", e.target.value)}
-                placeholder="0.00" step="0.01" className={inp} />
-            </div>
-            <div className="flex items-end pb-0.5">
-              <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer select-none font-medium">
-                <input type="checkbox"
-                  checked={form.indeterminado === true || form.indeterminado === "true"}
-                  onChange={e => set("indeterminado", e.target.checked)}
-                  className="rounded border-slate-300 text-red-600 focus:ring-red-400" />
-                Cuantía indeterminada
-              </label>
-            </div>
-          </SecCard>
-
-          <SecCard title="Referencias y datos internos" icon={MoreHorizontal} cols={4}>
-            <div>
-              <label className={lbl}>Ref. Propia</label>
-              <input value={form.ref_propia} onChange={e => set("ref_propia", e.target.value)}
-                placeholder="2024-CIVIL-001" className={inp} />
-            </div>
-            <div>
-              <label className={lbl}>Ref. Expediente</label>
-              <input value={form.ref_expediente} onChange={e => set("ref_expediente", e.target.value)}
-                placeholder="REF-EXP-001" className={inp} />
-            </div>
-            <div>
-              <label className={lbl}>Centro</label>
-              <input value={form.centro} onChange={e => set("centro", e.target.value)}
-                placeholder="Oficina / Centro" className={inp} />
-            </div>
-            <div>
-              <label className={lbl}>Color</label>
-              <AppSelect value={form.color} onChange={e => set("color", e.target.value)}>
-                {COLORES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-              </AppSelect>
-            </div>
-          </SecCard>
-
-        </div>
-
-        {/* Columna derecha */}
-        <div className="w-80 shrink-0 flex flex-col border-l border-slate-200 bg-white overflow-hidden">
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
-
-            <div className="flex items-center gap-2 mb-1">
-              <Users size={13} className="text-slate-400" />
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Partes</span>
-            </div>
-
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 overflow-hidden">
-              <div className="px-3 py-2 bg-emerald-50 border-b border-emerald-100 flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">Cliente</span>
+                <div className="flex flex-col gap-2 md:col-span-2">
+                  <label className={lbl}>Tipos de Asunto</label>
+                  <AppSelect value={form.tipos_asunto} onChange={e => set("tipos_asunto", e.target.value)} searchable searchPlaceholder="Buscar tipo de asunto...">
+                    <option value="">— Seleccionar —</option>
+                    <option value="CIVIL">CIVIL</option>
+                    <option value="PENAL">PENAL</option>
+                    <option value="SOCIAL">SOCIAL</option>
+                    <option value="CONTENCIOSO - ADMINISTRATIVO">CONTENCIOSO - ADMINISTRATIVO</option>
+                    <option value="EXTRAJUDICIAL">EXTRAJUDICIAL</option>
+                    <option value="DERECHO BANCARIO">DERECHO BANCARIO</option>
+                    <option value="FAMILIA">FAMILIA</option>
+                    <option value="VÍA ADMINISTRATIVA">VÍA ADMINISTRATIVA</option>
+                    <option value="HERENCIA">HERENCIA</option>
+                    <option value="MENORES">MENORES</option>
+                    <option value="VIOLENCIA DE GÉNERO">VIOLENCIA DE GÉNERO</option>
+                    <option value="CONCURSAL">CONCURSAL</option>
+                    <option value="MERCANTIL">MERCANTIL</option>
+                    <option value="MEDIDAS DE APOYO A PERSONAS CON DISCAPACIDAD">MEDIDAS DE APOYO A PERSONAS CON DISCAPACIDAD</option>
+                    <option value="USURA Y TRANSPARENCIA - MICROCREDITOS">USURA Y TRANSPARENCIA - MICROCREDITOS</option>
+                    <option value="FECHA_FIN_PLAZO_CONTESTAR_DEMANDA">FECHA_FIN_PLAZO_CONTESTAR_DEMANDA</option>
+                    <option value="CONTESTACIÓN A LA DEMANDA">CONTESTACIÓN A LA DEMANDA</option>
+                    <option value="PLAZO_APELACION">PLAZO_APELACION</option>
+                    <option value="DEMANDA ODH">DEMANDA ODH</option>
+                    <option value="DEMANDA UT">DEMANDA UT</option>
+                  </AppSelect>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Puedes escribir para filtrar y encontrar el asunto más rápido.</p>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Etapa</label>
+                  <AppSelect value={form.etapa} onChange={e => set("etapa", e.target.value)} searchable searchPlaceholder="Buscar etapa...">
+                    {ETAPAS.map(et => <option key={et} value={et}>{et || "— Seleccionar —"}</option>)}
+                  </AppSelect>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Fecha Cierre</label>
+                  <input type="date" value={form.fecha_cierre}
+                    onChange={e => set("fecha_cierre", e.target.value)} className={inp} />
+                </div>
               </div>
-              <div className="p-3 space-y-2.5">
-                <div>
-                  <label className={lbl}>Nombre <span className="text-red-500">*</span></label>
+            </div>
+
+            {/* PROCEDIMIENTO JUDICIAL */}
+            <div className="pt-6 border-t border-slate-100">
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2">
+                <Scale size={15} className="text-slate-400" /> Procedimiento Judicial
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-5">
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Tipo de Procedimiento</label>
+                  <input value={form.tipo_proc} onChange={e => set("tipo_proc", e.target.value)}
+                    placeholder="Monitorio, Ordinario…" className={inp} />
+                </div>
+                <div className="flex flex-col gap-2 md:col-span-2">
+                  <label className={lbl}>Juzgado / Tribunal</label>
+                  <input value={form.juzgado} onChange={e => set("juzgado", e.target.value)}
+                    placeholder="Juzgado de 1ª Inst. nº 3 de Madrid" className={inp} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>N.I.G.</label>
+                  <input value={form.nig} onChange={e => set("nig", e.target.value)}
+                    placeholder="2809042120240001302" className={`${inp} font-mono`} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Núm. Autos</label>
+                  <input value={form.num_autos} onChange={e => set("num_autos", e.target.value)}
+                    placeholder="1302/2024" className={`${inp} font-mono`} />
+                </div>
+              </div>
+            </div>
+
+            {/* CUANTÍAS ECONÓMICAS */}
+            <div className="pt-6 border-t border-slate-100">
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2">
+                <Coins size={15} className="text-slate-400" /> Cuantías Económicas
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-5">
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Cuantía Principal (€)</label>
+                  <input type="number" value={form.cuantia_principal}
+                    onChange={e => set("cuantia_principal", e.target.value)}
+                    placeholder="0.00" step="0.01" className={`${inp} text-right`} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Intereses (€)</label>
+                  <input type="number" value={form.intereses}
+                    onChange={e => set("intereses", e.target.value)}
+                    placeholder="0.00" step="0.01" className={`${inp} text-right`} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Costas (€)</label>
+                  <input type="number" value={form.costas}
+                    onChange={e => set("costas", e.target.value)}
+                    placeholder="0.00" step="0.01" className={`${inp} text-right`} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Cuantía Total (€)</label>
+                  <input value={form.cuantia_total} readOnly
+                    placeholder="0.00" className={`${inpRO} text-right font-bold`} />
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Importe (€)</label>
+                  <input type="number" value={form.importe}
+                    onChange={e => set("importe", e.target.value)}
+                    placeholder="0.00" step="0.01" className={`${inp} text-right`} />
+                </div>
+                <div className="flex items-end pb-1 md:col-span-3">
+                  <label className="flex items-center gap-2.5 cursor-pointer group w-max">
+                    <input type="checkbox"
+                      checked={form.indeterminado === true || form.indeterminado === "true"}
+                      onChange={e => set("indeterminado", e.target.checked)}
+                      className="w-4 h-4 border border-slate-300 rounded text-red-600 focus:ring-1 focus:ring-red-500 cursor-pointer" />
+                    <span className="text-sm font-medium text-slate-600 group-hover:text-slate-900 transition-colors">Cuantía indeterminada</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* REFERENCIAS Y DATOS INTERNOS */}
+            <div className="pt-6 border-t border-slate-100">
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2">
+                <MoreHorizontal size={15} className="text-slate-400" /> Referencias y Datos Internos
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-5">
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Ref. Propia</label>
+                  <input value={form.ref_propia} onChange={e => set("ref_propia", e.target.value)}
+                    placeholder="2024-CIVIL-001" className={`${inp} font-mono`} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Ref. Expediente</label>
+                  <input value={form.ref_expediente} onChange={e => set("ref_expediente", e.target.value)}
+                    placeholder="REF-EXP-001" className={`${inp} font-mono`} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Centro</label>
+                  <input value={form.centro} onChange={e => set("centro", e.target.value)}
+                    placeholder="Oficina / Centro" className={inp} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Color</label>
+                  <AppSelect value={form.color} onChange={e => set("color", e.target.value)}>
+                    {COLORES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                  </AppSelect>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          {/* ── Columna derecha: Partes ── */}
+          <div className="w-full xl:w-[380px] flex-shrink-0 flex flex-col gap-7">
+            <div>
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2">
+                <Users size={15} className="text-slate-400" /> Partes Implicadas
+              </h3>
+
+              <div className="flex flex-col gap-6">
+
+                {/* Cliente */}
+                <div className="flex flex-col gap-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                      <label className={`${lbl} text-slate-700`}>Cliente <span className="text-red-500">*</span></label>
+                    </div>
+                  </div>
                   <AppSelect
                     value={form.cliente_id}
                     onChange={e => handleClienteChange(e.target.value)}
                     required
                     variant="emerald"
+                    searchable
+                    searchPlaceholder="Buscar cliente..."
                   >
                     <option value="" disabled>— Selecciona un cliente —</option>
                     {clientes.map((c: any) => (
@@ -686,47 +714,89 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
                     ))}
                   </AppSelect>
                 </div>
-              </div>
-            </div>
 
-            <div className="rounded-xl border border-red-200 bg-red-50/30 overflow-hidden">
-              <div className="px-3 py-2 bg-red-50 border-b border-red-100 flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-red-400" />
-                <span className="text-[10px] font-bold text-red-700 uppercase tracking-wider">Parte Contraria</span>
-              </div>
-              <div className="p-3">
-                <label className={lbl}>Nombre / Razón social</label>
-                <input value={form.contrario} onChange={e => set("contrario", e.target.value)}
-                  placeholder="Nombre de la parte contraria"
-                  className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm text-slate-700 focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100 bg-white" />
-              </div>
-            </div>
+                <div className="w-full h-px bg-slate-100" />
 
-            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden mt-1">
-              <div className="px-3 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
-                <Activity size={13} className="text-slate-400" />
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Indicadores</span>
-              </div>
-              <div className="px-3 py-2">
-                {([
-                  ["Días sin actuaciones", "0 días", "text-slate-700"],
-                  ["Total cobrado",        "0 €",    "text-emerald-600"],
-                  ["Imp. Cobros Pdtes.",   "0 €",    "text-amber-600"],
-                  ["Total Prov. Recibidas","0 €",    "text-slate-600"],
-                  ["Nº Exptes Relac.",     "0",      "text-blue-600"],
-                  ["Saldo Total Exp",      "0 €",    "text-slate-700"],
-                  ["Pdte. Facturar",       "0 €",    "text-red-600"],
-                ] as [string, string, string][]).map(([label, value, color]) => (
-                  <div key={label} className="flex justify-between items-center py-1.5 border-b border-slate-100 last:border-0">
-                    <span className="text-xs text-slate-500">{label}</span>
-                    <span className={`text-xs font-bold ${color}`}>{value}</span>
+                {/* Parte Contraria */}
+                <div className="flex flex-col gap-2.5">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
+                    <label className={`${lbl} text-slate-700`}>Parte Contraria</label>
                   </div>
-                ))}
+                  <input value={form.contrario} onChange={e => set("contrario", e.target.value)}
+                    placeholder="Nombre / Razón Social" className={inp} />
+                </div>
+
+                <div className="w-full h-px bg-slate-100" />
+
+                {/* Abogado */}
+                <div className="flex flex-col gap-2.5">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                    <label className={`${lbl} text-slate-700`}>Abogado</label>
+                  </div>
+                  <input value={(form as any).abogado_propio || ""} onChange={e => set("abogado_propio", e.target.value)}
+                    placeholder="Nombre del abogado" className={inp} />
+                </div>
+
+                <div className="w-full h-px bg-slate-100" />
+
+                {/* Procurador */}
+                <div className="flex flex-col gap-2.5">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-purple-500" />
+                    <label className={`${lbl} text-slate-700`}>Procurador</label>
+                  </div>
+                  <input value={form.procurador} onChange={e => set("procurador", e.target.value)}
+                    placeholder="Nombre del procurador" className={inp} />
+                </div>
+
               </div>
             </div>
+
+            {/* Observaciones */}
+            <div className="flex-1 flex flex-col gap-2 min-h-[120px]">
+              <div className="w-full h-px bg-slate-100" />
+              <div className="pt-1 flex flex-col gap-2 flex-1">
+                <label className={lbl}>Observaciones / Notas</label>
+                <textarea
+                  value={form.observaciones}
+                  onChange={e => set("observaciones", e.target.value)}
+                  placeholder="Notas internas del expediente…"
+                  className="flex-1 w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-md text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-red-500 focus:border-red-500 transition-colors resize-none placeholder:text-slate-400 min-h-[100px]"
+                />
+              </div>
+            </div>
+
+            {/* Indicadores (solo edición) */}
+            {editId && (
+              <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden">
+                <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
+                  <Activity size={13} className="text-slate-400" />
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Indicadores</span>
+                </div>
+                <div className="px-4 py-2">
+                  {([
+                    ["Días sin actuaciones", "0 días", "text-slate-700"],
+                    ["Total cobrado",        "0 €",    "text-emerald-600"],
+                    ["Imp. Cobros Pdtes.",   "0 €",    "text-amber-600"],
+                    ["Total Prov. Recibidas","0 €",    "text-slate-600"],
+                    ["Nº Exptes Relac.",     "0",      "text-blue-600"],
+                    ["Saldo Total Exp",      "0 €",    "text-slate-700"],
+                    ["Pdte. Facturar",       "0 €",    "text-red-600"],
+                  ] as [string, string, string][]).map(([label, value, color]) => (
+                    <div key={label} className="flex justify-between items-center py-2 border-b border-slate-100 last:border-0">
+                      <span className="text-xs text-slate-500">{label}</span>
+                      <span className={`text-xs font-bold ${color}`}>{value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
+
         </div>
-      </div>
+      </main>
 
       {/* ── Panel inferior (solo en edición) ── */}
       {editId && (
@@ -753,7 +823,7 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
                 value={form.observaciones}
                 onChange={e => set("observaciones", e.target.value)}
                 placeholder="Escribe aquí las notas internas del expediente…"
-                className="w-full h-full text-sm text-slate-700 border border-slate-200 rounded-lg px-3 py-2.5 focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100 resize-none placeholder:text-slate-300"
+                className="w-full h-full text-sm text-slate-700 border border-slate-200 rounded-lg px-3 py-2.5 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 resize-none placeholder:text-slate-300"
               />
             ) : tab === "adjuntos" ? (
               <AdjuntosPanel
