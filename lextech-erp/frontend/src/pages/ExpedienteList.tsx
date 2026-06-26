@@ -10,7 +10,7 @@ import {
   X, ChevronUp, ChevronDown, ListFilter, ExternalLink,
   Edit3, Trash2, FileSpreadsheet, Printer, MoreHorizontal,
   Users, Activity, Mail, MessageSquare, MessageCircle, Paperclip,
-  AlertTriangle, ClipboardList, ChevronRight, Star,
+  AlertTriangle, ClipboardList, ChevronRight, ChevronLeft, Star,
   Palette, Zap, Bell, Copy, GitMerge, Smartphone,
   Bug, History, TrendingUp, UserMinus, Pencil, PenLine, Bookmark, BarChart2,
   AlignJustify, LayoutList, ListChecks, Upload, Eye, Settings2, SlidersHorizontal, Check, Search, CheckCircle2,
@@ -1376,108 +1376,171 @@ function CsvImportHistoryView({
   onBack: () => void;
   onReload: () => void;
 }) {
+  const statusBadge = (row: ImportBatch) => {
+    const hasErrors = row.error_count > 0;
+    if (hasErrors && row.completed_count > 0) return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+        <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" /> Parcial
+      </span>
+    );
+    if (hasErrors) return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-bold bg-red-50 text-red-700 border border-red-200">
+        <div className="w-1.5 h-1.5 rounded-full bg-red-500" /> Con errores
+      </span>
+    );
+    if (row.status === "processing" || row.status === "reviewing" || row.status === "configuring") return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
+        <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" /> {importStatusMeta(row.status).label}
+      </span>
+    );
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
+        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Completada
+      </span>
+    );
+  };
+
   return (
-    <div className="p-5 space-y-4 animate-in fade-in duration-300">
-      <div className="flex items-center justify-between gap-4">
+    <div className="flex-1 flex flex-col overflow-hidden animate-page-in">
+
+      {/* Header */}
+      <div className="px-6 lg:px-8 py-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 flex-shrink-0 border-b border-slate-200 animate-card-in">
         <div>
-          <h1 className="text-base font-bold text-slate-900">Historial de importaciones</h1>
-          <p className="mt-0.5 text-xs text-slate-500">
-            Historial de todas las importaciones de expedientes realizadas
-          </p>
+          <h1 className="text-2xl font-extrabold text-slate-800 leading-tight">Historial de importaciones</h1>
+          <p className="text-sm text-slate-500 mt-1">Historial de todas las importaciones de expedientes realizadas</p>
         </div>
-        <BackButton onClick={onBack} />
+        <button
+          onClick={onBack}
+          className="w-max px-5 py-2.5 text-sm font-semibold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:text-slate-900 transition-all shadow-sm flex items-center gap-2"
+        >
+          <ArrowLeft size={14} /> Volver
+        </button>
       </div>
 
-      <div className="rounded-[20px] border border-slate-200 bg-white/90 p-4 shadow-sm">
-        <div className="flex items-center justify-between gap-4 border-b border-slate-100 pb-3">
-          <div>
-            <h2 className="text-sm font-semibold text-slate-900">Importaciones recientes</h2>
-            <p className="mt-0.5 text-xs text-slate-500">
-              Lista de todas las importaciones realizadas en el sistema
-            </p>
-          </div>
+      {/* Toolbar */}
+      <div className="px-6 lg:px-8 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 flex-shrink-0 animate-card-in-1">
+        <h3 className="text-sm font-bold text-slate-800">Importaciones recientes</h3>
+        <button
+          onClick={onReload}
+          className="px-4 py-2 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-md hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2"
+        >
+          <RefreshCw size={13} className="text-slate-400" /> Actualizar
+        </button>
+      </div>
+
+      {error && (
+        <div className="px-6 lg:px-8 py-3 bg-red-50 border-b border-red-200 text-sm text-red-700 flex-shrink-0">
+          {error}
+        </div>
+      )}
+
+      {/* Table */}
+      <div className="flex-1 overflow-auto animate-card-in-2">
+        <table className="w-full min-w-[1000px] text-left border-collapse">
+          <thead className="sticky top-0 bg-white border-b border-slate-200 z-10 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+            <tr>
+              <th className="pl-6 lg:pl-8 pr-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Fecha</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">ID</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Estado</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Total</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Completados</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Errores</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Pendientes</th>
+              <th className="pr-6 lg:pr-8 pl-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Acciones</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {loading ? (
+              <tr>
+                <td colSpan={8} className="px-6 py-20 text-center text-slate-400">
+                  <div className="flex items-center justify-center gap-3">
+                    <Loader2 size={18} className="animate-spin" />
+                    <span>Cargando importaciones...</span>
+                  </div>
+                </td>
+              </tr>
+            ) : rows.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="px-6 py-20 text-center text-slate-400">
+                  No hay importaciones registradas
+                </td>
+              </tr>
+            ) : (
+              rows.map((row) => {
+                const hasErrors = row.error_count > 0;
+                return (
+                  <tr key={row.id} className={`group transition-colors ${
+                    hasErrors ? "bg-red-50/30 hover:bg-red-50/50" : "hover:bg-slate-50/80"
+                  }`}>
+                    <td className="pl-6 lg:pl-8 pr-6 py-4 whitespace-nowrap text-[13px] text-slate-700 font-medium">
+                      {fmtDateTime(row.created_at)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-[13px] text-slate-500 font-mono">
+                      {row.id.slice(0, 8)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {statusBadge(row)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-[13px] text-slate-600 font-semibold">
+                      {row.total_count}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-[13px] text-emerald-600 font-semibold">
+                      {row.completed_count}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {row.error_count > 0 ? (
+                        <span className="text-[13px] text-red-600 font-bold flex items-center gap-1.5">
+                          {row.error_count} <AlertCircle size={11} />
+                        </span>
+                      ) : (
+                        <span className="text-[13px] text-slate-400 font-medium">0</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-[13px] text-slate-400 font-medium">
+                      {row.pending_count}
+                    </td>
+                    <td className="pr-6 lg:pr-8 pl-6 py-4 whitespace-nowrap">
+                      <button
+                        className="flex items-center gap-2 text-[13px] font-medium text-slate-500 hover:text-red-600 transition-colors"
+                        title={row.notes || row.file_name}
+                      >
+                        <Eye size={13} /> {row.file_name}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Footer */}
+      <div className="px-6 lg:px-8 py-4 border-t border-slate-200 bg-white flex flex-col sm:flex-row items-center justify-between gap-4 flex-shrink-0 animate-card-in-3">
+        <span className="text-sm text-slate-500">
+          Mostrando <span className="font-bold text-slate-700">1</span> a{" "}
+          <span className="font-bold text-slate-700">{rows.length}</span> de{" "}
+          <span className="font-bold text-slate-700">{rows.length}</span> resultados
+        </span>
+        <div className="flex items-center gap-1">
           <button
-            onClick={onReload}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-[#ab0433]/30 hover:bg-red-50 hover:text-[#ab0433]"
+            disabled
+            className="w-8 h-8 flex items-center justify-center rounded-md border border-slate-200 text-slate-300 bg-white shadow-sm cursor-not-allowed"
           >
-            <RefreshCw size={14} />
-            Actualizar
+            <ChevronLeft size={13} />
+          </button>
+          <button className="w-8 h-8 flex items-center justify-center rounded-md border border-red-600 bg-red-600 text-white font-bold text-xs shadow-sm shadow-red-500/20">
+            1
+          </button>
+          <button
+            disabled
+            className="w-8 h-8 flex items-center justify-center rounded-md border border-slate-200 bg-white text-slate-300 font-medium text-xs shadow-sm cursor-not-allowed"
+          >
+            <ChevronRight size={13} />
           </button>
         </div>
-
-        {error && (
-          <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {error}
-          </div>
-        )}
-
-        <div className="mt-5 overflow-x-auto">
-          <table className="min-w-full text-left">
-            <thead>
-              <tr className="border-b border-slate-200 text-sm text-slate-900">
-                <th className="px-4 py-4 font-semibold">Fecha</th>
-                <th className="px-4 py-4 font-semibold">ID</th>
-                <th className="px-4 py-4 font-semibold">Estado</th>
-                <th className="px-4 py-4 font-semibold">Total</th>
-                <th className="px-4 py-4 font-semibold">Completados</th>
-                <th className="px-4 py-4 font-semibold">Errores</th>
-                <th className="px-4 py-4 font-semibold">Pendientes</th>
-                <th className="px-4 py-4 font-semibold">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={8} className="px-4 py-16 text-center text-slate-400">
-                    <div className="flex items-center justify-center gap-3">
-                      <Loader2 size={18} className="animate-spin" />
-                      <span>Cargando importaciones...</span>
-                    </div>
-                  </td>
-                </tr>
-              ) : rows.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-4 py-16 text-center text-slate-400">
-                    No hay importaciones registradas
-                  </td>
-                </tr>
-              ) : (
-                rows.map((row) => {
-                  const meta = importStatusMeta(row.status);
-                  return (
-                    <tr key={row.id} className="border-b border-slate-100 last:border-b-0">
-                      <td className="px-4 py-4 text-sm text-slate-600">{fmtDateTime(row.created_at)}</td>
-                      <td className="px-4 py-4 text-sm font-medium text-slate-800">{row.id.slice(0, 8)}</td>
-                      <td className="px-4 py-4">
-                        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${meta.className}`}>
-                          {meta.label}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 text-sm text-slate-700">{row.total_count}</td>
-                      <td className="px-4 py-4 text-sm text-slate-700">{row.completed_count}</td>
-                      <td className="px-4 py-4 text-sm text-slate-700">{row.error_count}</td>
-                      <td className="px-4 py-4 text-sm text-slate-700">{row.pending_count}</td>
-                      <td className="px-4 py-4">
-                        <button
-                          className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-[#ab0433] transition-colors hover:bg-red-50"
-                          title={row.notes || row.file_name}
-                        >
-                          <Eye size={13} />
-                          {row.file_name}
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <p className="mt-4 text-xs text-slate-500">
-          Se muestran los ultimos {rows.length} lotes de importacion
-        </p>
       </div>
+
     </div>
   );
 }
