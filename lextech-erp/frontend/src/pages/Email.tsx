@@ -51,6 +51,16 @@ const API = (() => {
   return 'http://localhost:4000/api';
 })();
 
+// Decoded Quoted-Printable encoding (e.g. =C3=A1 → á) used in email signatures
+function decodeQP(input: string): string {
+  return input
+    .replace(/=\r?\n/g, '')
+    .replace(/((?:=[0-9A-Fa-f]{2})+)/g, (match) => {
+      const bytes = (match.match(/=[0-9A-Fa-f]{2}/g) || []).map(b => parseInt(b.slice(1), 16));
+      try { return new TextDecoder('utf-8').decode(new Uint8Array(bytes)); } catch { return match; }
+    });
+}
+
 // Extend Window for Gmail GIS (avoid conflict with Agenda's declaration)
 interface GmailGIS {
   accounts: {
@@ -621,7 +631,7 @@ function ComposeWindow({
 
   useEffect(() => {
     fetchSharedTemplates('email_signature', getToken).then(rows =>
-      setSignatures(rows.map(r => ({ id: r.id, name: r.name, html: (r.data as any).html || '', isDefault: r.is_default })))
+      setSignatures(rows.map(r => ({ id: r.id, name: r.name, html: decodeQP((r.data as any).html || ''), isDefault: r.is_default })))
     );
     fetchSharedTemplates('email_template', getToken).then(rows =>
       setTemplates(rows.map(r => ({ id: r.id, name: r.name, subject: (r.data as any).subject || '', html: (r.data as any).html || '' })))
@@ -2630,7 +2640,7 @@ function SignaturesPanel({ onClose, onSelect, getToken }: { onClose: () => void;
 
   useEffect(() => {
     fetchSharedTemplates('email_signature', getToken).then(rows => {
-      setSigs(rows.map(r => ({ id: r.id, name: r.name, html: (r.data as any).html || '', isDefault: r.is_default })));
+      setSigs(rows.map(r => ({ id: r.id, name: r.name, html: decodeQP((r.data as any).html || ''), isDefault: r.is_default })));
       setLoading(false);
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -3058,6 +3068,7 @@ export default function Email() {
   const selectedEmailRef = useRef<ParsedEmail | null>(null);
   const emailRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const refreshInFlightRef = useRef(false);
+  const triggerRefreshRef = useRef<(() => void) | null>(null);
   const loadEmailsGenRef = useRef(0);        // cancela respuestas de carpetas anteriores
   const bodyLoadingRef = useRef<string | null>(null); // id del correo cuyo body está cargando
   const [bodyLoadingId, setBodyLoadingId] = useState<string | null>(null);
@@ -3770,6 +3781,8 @@ export default function Email() {
       }
     };
 
+    triggerRefreshRef.current = () => void doRefresh(false, false);
+
     const getIntervalMs = () => document.visibilityState === 'visible'
       ? (currentImapAccount ? 30_000 : 60_000)
       : 180_000;
@@ -3792,6 +3805,35 @@ export default function Email() {
       document.removeEventListener('visibilitychange', onFocus);
     };
   }, [currentImapAccount, gmail, imapSystemFolderMap, loadEmails, mapFolderToImapApi, selectedFolder, tokenGetter]);
+
+  // ── SSE: recepción inmediata via EmailEngine webhook ─────────────────────
+  useEffect(() => {
+    if (!hasActiveMailbox) return;
+    let es: EventSource | null = null;
+    let closed = false;
+
+    getToken().then(token => {
+      if (!token || closed) return;
+      es = new EventSource(`${API}/email/events?token=${encodeURIComponent(token)}`);
+
+      es.onmessage = (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (data.type === 'messageNew') {
+            triggerRefreshRef.current?.();
+          }
+        } catch { /**/ }
+      };
+
+      es.onerror = () => { es?.close(); };
+    });
+
+    return () => {
+      closed = true;
+      es?.close();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasActiveMailbox]);
 
   // ── Open email (full body fetch) ──────────────────────────────────────────
   const openEmail = useCallback(async (email: ParsedEmail) => {

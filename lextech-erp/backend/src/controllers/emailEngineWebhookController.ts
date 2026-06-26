@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import pool from '../config/database';
+import { emitEmailEvent } from '../utils/emailSSE';
 
 const API_TOKEN = process.env.EMAIL_ENGINE_TOKEN || '';
 
@@ -58,6 +59,7 @@ export async function handleEngineWebhook(req: Request, res: Response) {
             msg.attachments?.length ? JSON.stringify(msg.attachments) : null,
           ],
         );
+        emitEmailEvent(userId, { type: 'messageNew', accountId, folder: msg.path || 'INBOX' });
         break;
       }
       case 'messageSeen':
