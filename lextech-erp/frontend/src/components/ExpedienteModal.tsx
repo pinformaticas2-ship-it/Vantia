@@ -418,7 +418,7 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
 
   return (
     <>
-    <div className="fixed inset-0 z-50 flex flex-col bg-white">
+    <div className="fixed inset-0 z-50 flex flex-col bg-white overflow-hidden">
 
       {/* ── Cabecera ── */}
       <div className="px-6 sm:px-8 py-4 bg-white border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 flex-shrink-0">
@@ -481,8 +481,8 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
       </div>
 
       {/* ── Cuerpo ── */}
-      <main className="overflow-auto p-5 sm:p-7 bg-white">
-        <div className="max-w-[1600px] mx-auto flex flex-col xl:flex-row gap-8 lg:gap-10 items-start">
+      <main className="flex-1 min-h-0 overflow-y-auto p-5 sm:p-7 bg-white">
+        <div className="max-w-[1600px] mx-auto flex flex-col xl:flex-row gap-8 lg:gap-10 xl:items-stretch">
 
           {/* ── Columna izquierda ── */}
           <div className="flex-1 flex flex-col gap-7 w-full xl:pr-10 xl:border-r border-slate-200">
@@ -682,7 +682,7 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
           </div>
 
           {/* ── Columna derecha: Partes ── */}
-          <div className="w-full xl:w-[380px] flex-shrink-0 flex flex-col gap-7 xl:sticky xl:top-6 self-start">
+          <div className="w-full xl:w-[380px] flex-shrink-0 flex flex-col gap-7">
             <div>
               <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2">
                 <Users size={15} className="text-slate-400" /> Partes Implicadas
@@ -751,6 +751,20 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
                     placeholder="Nombre del procurador" className={inp} />
                 </div>
 
+              </div>
+            </div>
+
+            {/* Observaciones */}
+            <div className="flex-1 flex flex-col gap-2 min-h-[120px]">
+              <div className="w-full h-px bg-slate-100" />
+              <div className="pt-1 flex flex-col gap-2 flex-1">
+                <label className={lbl}>Observaciones / Notas</label>
+                <textarea
+                  value={form.observaciones}
+                  onChange={e => set("observaciones", e.target.value)}
+                  placeholder="Notas internas del expediente…"
+                  className="flex-1 w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-md text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-red-500 focus:border-red-500 transition-colors resize-none placeholder:text-slate-400 min-h-[100px]"
+                />
               </div>
             </div>
 
