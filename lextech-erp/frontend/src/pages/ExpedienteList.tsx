@@ -1531,7 +1531,7 @@ function CsvImportHistoryView({
           <span className="font-bold text-slate-700">{to}</span> de{" "}
           <span className="font-bold text-slate-700">{rows.length}</span> resultados
         </span>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 sm:mr-16">
           <button
             onClick={() => goToPage(Math.max(1, page - 1))}
             disabled={page === 1}
