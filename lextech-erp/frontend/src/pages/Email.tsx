@@ -3808,7 +3808,7 @@ export default function Email() {
 
   // ── SSE: recepción inmediata via EmailEngine webhook ─────────────────────
   useEffect(() => {
-    if (!hasActiveMailbox) return;
+    if (activeProvider === 'none') return;
     let es: EventSource | null = null;
     let closed = false;
 
@@ -3833,7 +3833,7 @@ export default function Email() {
       es?.close();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasActiveMailbox]);
+  }, [activeProvider]);
 
   // ── Open email (full body fetch) ──────────────────────────────────────────
   const openEmail = useCallback(async (email: ParsedEmail) => {
