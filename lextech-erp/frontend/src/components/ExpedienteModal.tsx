@@ -481,18 +481,18 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
       </div>
 
       {/* ── Cuerpo ── */}
-      <main className="flex-1 overflow-auto p-6 sm:p-10 lg:p-12 bg-white">
-        <div className="max-w-[1600px] mx-auto flex flex-col xl:flex-row gap-12 lg:gap-16 items-start">
+      <main className="flex-1 overflow-auto p-5 sm:p-7 bg-white">
+        <div className="max-w-[1600px] mx-auto flex flex-col xl:flex-row gap-8 lg:gap-10 items-start">
 
           {/* ── Columna izquierda ── */}
-          <div className="flex-1 flex flex-col gap-10 w-full xl:pr-12 xl:border-r border-slate-200">
+          <div className="flex-1 flex flex-col gap-7 w-full xl:pr-10 xl:border-r border-slate-200">
 
             {/* IDENTIFICACIÓN */}
             <div>
-              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-6 flex items-center gap-2">
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2">
                 <FolderOpen size={15} className="text-slate-400" /> Identificación
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-x-8 gap-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-5">
                 <div className="flex flex-col gap-2">
                   <label className={lbl}>Núm. Exp</label>
                   <input value={(form as any).num_exp || (editId ? "—" : "Auto")} readOnly className={inpRO} />
@@ -573,11 +573,11 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
             </div>
 
             {/* PROCEDIMIENTO JUDICIAL */}
-            <div className="pt-8 border-t border-slate-100">
-              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-6 flex items-center gap-2">
+            <div className="pt-6 border-t border-slate-100">
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2">
                 <Scale size={15} className="text-slate-400" /> Procedimiento Judicial
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-5">
                 <div className="flex flex-col gap-2">
                   <label className={lbl}>Tipo de Procedimiento</label>
                   <input value={form.tipo_proc} onChange={e => set("tipo_proc", e.target.value)}
@@ -602,11 +602,11 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
             </div>
 
             {/* CUANTÍAS ECONÓMICAS */}
-            <div className="pt-8 border-t border-slate-100">
-              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-6 flex items-center gap-2">
+            <div className="pt-6 border-t border-slate-100">
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2">
                 <Coins size={15} className="text-slate-400" /> Cuantías Económicas
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-x-8 gap-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-5">
                 <div className="flex flex-col gap-2">
                   <label className={lbl}>Cuantía Principal (€)</label>
                   <input type="number" value={form.cuantia_principal}
@@ -650,11 +650,11 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
             </div>
 
             {/* REFERENCIAS Y DATOS INTERNOS */}
-            <div className="pt-8 border-t border-slate-100 mb-10">
-              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-6 flex items-center gap-2">
+            <div className="pt-6 border-t border-slate-100">
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2">
                 <MoreHorizontal size={15} className="text-slate-400" /> Referencias y Datos Internos
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-x-8 gap-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-5">
                 <div className="flex flex-col gap-2">
                   <label className={lbl}>Ref. Propia</label>
                   <input value={form.ref_propia} onChange={e => set("ref_propia", e.target.value)}
@@ -682,9 +682,9 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
           </div>
 
           {/* ── Columna derecha: Partes ── */}
-          <div className="w-full xl:w-[380px] flex-shrink-0 flex flex-col gap-10 xl:sticky xl:top-6 self-start">
+          <div className="w-full xl:w-[380px] flex-shrink-0 flex flex-col gap-7 xl:sticky xl:top-6 self-start">
             <div>
-              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-6 flex items-center gap-2">
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2">
                 <Users size={15} className="text-slate-400" /> Partes Implicadas
               </h3>
 
