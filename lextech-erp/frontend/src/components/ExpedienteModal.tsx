@@ -417,6 +417,12 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
 
   const HeaderIcon = editId ? FolderOpen : FolderPlus;
 
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
   const modal = (
     <div className="fixed inset-0 z-[9999] flex flex-col bg-white overflow-hidden" style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0 }}>
 
