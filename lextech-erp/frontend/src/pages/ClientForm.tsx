@@ -5,7 +5,7 @@ import { useNavigate, useParams, Link, useSearchParams } from "react-router-dom"
 import {
   Save, X, ScanLine, Upload, Image as ImageIcon,
   Loader2, Sparkles, RotateCcw, AlertTriangle, CheckCircle2,
-  Camera, Edit3, Users, MapPin, Phone, Briefcase, BarChart2,
+  Camera, Edit3, Users, MapPin, Phone, Briefcase, MessageSquare, ChevronLeft,
 } from "lucide-react";
 import { safeJson } from "../lib/api";
 import BackButton from "../components/BackButton";
@@ -259,6 +259,7 @@ const EMPTY_FORM = {
   commercial_communications: "No",
   center: "",
   photo_url: "",
+  observaciones: "",
 };
 
 export default function ClientForm() {
@@ -1329,591 +1330,327 @@ export default function ClientForm() {
     </div>
   );
 
+  const inputCls = (field: string) =>
+    `w-full px-3.5 py-2.5 bg-white border rounded-md text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-red-500 focus:border-red-500 transition-colors ${
+      isInvalid(field) ? "border-red-400 ring-1 ring-red-100 bg-red-50/30" : h(field) ? "border-emerald-400 ring-1 ring-emerald-100 bg-emerald-50/30" : "border-slate-300"
+    }`;
+  const lbl = "text-xs font-bold text-slate-500 uppercase tracking-wider";
+
   return (
-    <div className="flex gap-6 animate-in fade-in duration-500 bg-slate-50 -m-6 p-6 min-h-screen">
+    <form onSubmit={handleSubmit} className="h-full flex flex-col overflow-hidden animate-page-in">
 
-      {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ COLUMNA PRINCIPAL ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
-      <form onSubmit={handleSubmit} className="flex-1 min-w-0 space-y-4">
-
-        {/* Cabecera */}
-        <div className={`bg-white border border-slate-200 rounded-xl ${isDniFlow || isLinkFlow ? "px-5 py-5" : "px-4 py-3"}`}>
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="flex min-w-0 items-start gap-3">
-              <Link to={isEdit ? `/dashboard/clientes/${id}` : "/dashboard/clientes"} className="shrink-0">
-                <BackButton />
-              </Link>
-              <div className="flex min-w-0 items-center gap-2.5">
-                <div className={`shrink-0 flex items-center justify-center rounded-lg border border-red-100 bg-red-50 text-red-600 ${isDniFlow || isLinkFlow ? "h-10 w-10" : "h-8 w-8"}`}>
-                  {isDniFlow ? <ScanLine size={18} /> : <Users size={isDniFlow || isLinkFlow ? 18 : 15} className="text-red-600" />}
-                </div>
-                <div className="min-w-0">
-                  <h1 className={`${isDniFlow || isLinkFlow ? "text-[17px]" : "text-sm"} font-bold text-slate-800 leading-tight truncate`}>
-                    {isEdit
-                      ? "Editar cliente"
-                      : isDniFlow
-                      ? "Dar de alta clientes con DNI"
-                      : isLinkFlow
-                      ? "Dar de alta clientes con enlace"
-                      : "Nuevo cliente"}
-                  </h1>
-                  <p className={`${isDniFlow || isLinkFlow ? "text-sm mt-1" : "text-[11px]"} text-slate-400`}>
-                    {isEdit
-                      ? "Modifica los datos y pulsa Guardar cambios"
-                      : isDniFlow
-                      ? "Sube anverso y reverso del DNI para detectar automáticamente la identidad y revisar los datos del cliente."
-                      : isLinkFlow
-                      ? "Usa una referencia web para iniciar la ficha y completa después la información del cliente."
-                      : "Ficha de alta · todos los campos son editables"}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="ml-auto flex items-center gap-2">
-              <Link to={isEdit ? `/dashboard/clientes/${id}` : "/dashboard/clientes"}>
-                <button type="button" className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-slate-500 transition-colors hover:bg-slate-100">
-                  <X size={14} /> Cancelar
-                </button>
-              </Link>
-              <button
-                type="submit"
-                disabled={loading || showSuccess}
-                className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-1.5 text-sm font-bold text-white shadow-sm shadow-red-200 transition-all hover:bg-red-700 disabled:opacity-60 active:scale-95"
-              >
-                {loading
-                  ? <><Loader2 size={13} className="animate-spin" /> Guardando...</>
-                  : <><Save size={13} /> {isEdit ? "Guardar cambios" : "Guardar"}</>
-                }
-              </button>
-            </div>
+      {/* HEADER */}
+      <div className="px-6 sm:px-8 py-5 bg-white border-b border-slate-200 flex-shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-card-in">
+        <div className="flex items-center gap-4">
+          <Link to={isEdit ? `/dashboard/clientes/${id}` : "/dashboard/clientes"} className="shrink-0">
+            <button type="button" className="flex items-center gap-1.5 text-slate-500 hover:text-slate-800 text-xs font-semibold px-3 py-2 rounded-md bg-white border border-transparent hover:border-slate-200 hover:bg-slate-50 transition-all">
+              <ChevronLeft size={13} /> Volver
+            </button>
+          </Link>
+          <div className="h-8 w-px bg-slate-200 hidden sm:block" />
+          <div className="w-10 h-10 rounded-lg bg-red-50 text-red-600 flex items-center justify-center border border-red-100 flex-shrink-0">
+            <Users size={18} />
           </div>
-        </div>
-
-        {showSuccess && (
-          <div className="flex items-center gap-3 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-700 text-sm font-medium">
-            <CheckCircle2 size={18} className="shrink-0" />
-            {isEdit ? "¡Cambios guardados! Volviendo a la ficha..." : "¡Cliente registrado! Redirigiendo..."}
-          </div>
-        )}
-        {error && (
-          <div className="flex items-center gap-3 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
-            <AlertTriangle size={18} className="shrink-0" /> {error}
-          </div>
-        )}
-
-        {isDniFlow && (
-          <div className="rounded-[24px] border border-slate-200 bg-white px-6 py-5 shadow-sm">
-            <h2 className="text-sm font-semibold text-slate-900">Lectura inteligente del DNI</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Esta pantalla está orientada a importar primero la identidad del cliente desde su DNI y después revisar manualmente la ficha antes de guardar.
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2 text-[11px] text-slate-500">
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1">Anverso + reverso recomendado</span>
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1">Mejor con buena luz</span>
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1">Revisa los datos antes de guardar</span>
-            </div>
-          </div>
-        )}
-
-        {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ SCANNER DNI (solo en alta) ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
-        {!isEdit && createMode !== "manual" && (
-          <div className="rounded-[24px] border border-slate-200 bg-white px-6 py-5 shadow-sm">
-            {createMode === "dni" && (
-              <div>
-                <input
-                  ref={frontInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={e => e.target.files?.[0] && handleDniFile("front", e.target.files[0])}
-                />
-                <input
-                  ref={backInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={e => e.target.files?.[0] && handleDniFile("back", e.target.files[0])}
-                />
-
-                <div className="rounded-[24px] border border-slate-200 bg-slate-50 px-6 py-6">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <h4 className="text-sm font-semibold text-slate-900">Importar datos desde DNI</h4>
-                      <p className="mt-1 text-sm text-slate-500">
-                        Vista asistida de lectura, similar a la importación de expedientes, pero centrada en anverso y reverso del DNI.
-                      </p>
-                    </div>
-                    <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-600">
-                      {scanMeta?.source || "OpenAI / Gemini + Tesseract"}
-                    </span>
-                  </div>
-
-                  <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.9fr)]">
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <button
-                        type="button"
-                        onClick={() => frontInputRef.current?.click()}
-                        onDrop={handleDrop}
-                        onDragOver={e => { e.preventDefault(); setIsDragOver(true); }}
-                        onDragLeave={() => setIsDragOver(false)}
-                        className={`group relative min-h-[220px] overflow-hidden rounded-[24px] border-2 text-left transition-all ${
-                          dniFrontImage
-                            ? "border-slate-200 bg-slate-950"
-                            : isDragOver
-                            ? "scale-[1.01] border-[#ab0433]/45 bg-red-50"
-                            : "border-dashed border-slate-200 bg-white hover:border-[#ab0433]/35 hover:bg-red-50/40"
-                        }`}
-                      >
-                        {dniFrontImage ? (
-                          <>
-                            <img src={dniFrontImage} alt="DNI anverso" className="absolute inset-0 h-full w-full object-cover" />
-                            <div className="absolute inset-x-0 top-0 flex items-center justify-between bg-gradient-to-b from-black/70 via-black/35 to-transparent px-3 py-3">
-                              <span className="rounded-full border border-white/15 bg-black/45 px-2.5 py-1 text-[11px] font-semibold text-white">Anverso</span>
-                              <button
-                                type="button"
-                                onClick={(e) => { e.stopPropagation(); void rotateDniSide("front"); }}
-                                className="rounded-full border border-white/15 bg-black/45 px-2.5 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-[#ab0433]"
-                              >
-                                Girar
-                              </button>
-                            </div>
-                          </>
-                        ) : (
-                          <div className="flex h-full min-h-[220px] flex-col items-center justify-center gap-3 px-6 text-center">
-                            <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-400 shadow-sm">
-                              <ImageIcon size={24} />
-                            </div>
-                            <div>
-                              <p className="text-sm font-semibold text-slate-800">Subir anverso del DNI</p>
-                              <p className="mt-1 text-xs leading-5 text-slate-500">
-                                Foto frontal, completa y con buena luz.
-                              </p>
-                            </div>
-                          </div>
-                        )}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => backInputRef.current?.click()}
-                        className={`group relative min-h-[220px] overflow-hidden rounded-[24px] border-2 text-left transition-all ${
-                          dniBackImage
-                            ? "border-slate-200 bg-slate-950"
-                            : "border-dashed border-slate-200 bg-white hover:border-[#ab0433]/35 hover:bg-red-50/40"
-                        }`}
-                      >
-                        {dniBackImage ? (
-                          <>
-                            <img src={dniBackImage} alt="DNI reverso" className="absolute inset-0 h-full w-full object-cover" />
-                            <div className="absolute inset-x-0 top-0 flex items-center justify-between bg-gradient-to-b from-black/70 via-black/35 to-transparent px-3 py-3">
-                              <span className="rounded-full border border-white/15 bg-black/45 px-2.5 py-1 text-[11px] font-semibold text-white">Reverso</span>
-                              <button
-                                type="button"
-                                onClick={(e) => { e.stopPropagation(); void rotateDniSide("back"); }}
-                                className="rounded-full border border-white/15 bg-black/45 px-2.5 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-[#ab0433]"
-                              >
-                                Girar
-                              </button>
-                            </div>
-                          </>
-                        ) : (
-                          <div className="flex h-full min-h-[220px] flex-col items-center justify-center gap-3 px-6 text-center">
-                            <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-400 shadow-sm">
-                              <ImageIcon size={24} />
-                            </div>
-                            <div>
-                              <p className="text-sm font-semibold text-slate-800">Subir reverso del DNI</p>
-                              <p className="mt-1 text-xs leading-5 text-slate-500">
-                                Recomendado para domicilio, código postal y provincia.
-                              </p>
-                            </div>
-                          </div>
-                        )}
-                      </button>
-                    </div>
-
-                    <div className="rounded-[24px] border border-slate-200 bg-white px-4 py-4">
-                      <p className="text-sm font-semibold text-slate-900">
-                        {dniFrontImage || dniBackImage ? "Fotos listas para procesar" : "Añade las fotos para comenzar"}
-                      </p>
-                      <p className="mt-1 text-xs leading-5 text-slate-500">
-                        El anverso aporta la identidad básica. El reverso ayuda con domicilio, población, código postal y provincia.
-                      </p>
-
-                      {scanError && (
-                        <div className="mt-4 flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 px-3 py-3 text-xs text-red-700">
-                          <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-                          <span>{scanError}</span>
-                        </div>
-                      )}
-
-                      {scanDone && !scanError && (
-                        <div className="mt-4 space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-xs text-emerald-800">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Sparkles size={13} />
-                            <span className="font-semibold">{filledFields.size} campos aplicados al formulario.</span>
-                            {typeof scanMeta?.fieldCount === "number" && scanMeta.fieldCount > filledFields.size && (
-                              <span className="text-emerald-700/90">Detectados {scanMeta.fieldCount}, pero algunos ya tenían valor.</span>
-                            )}
-                            {typeof scanMeta?.confidence === "number" && (
-                              <span className="text-emerald-700/90">Confianza OCR {scanMeta.confidence}%</span>
-                            )}
-                          </div>
-                          {scanMeta?.usedAi === false && (
-                            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-700">
-                              Este intento se ha hecho solo con Tesseract. Si no entra la capa de IA, la detección de nombre, sexo y fecha suele ser bastante peor.
-                            </div>
-                          )}
-                          {scanMeta?.model && (
-                            <div className="text-[11px] text-emerald-700/90">Modelo usado: {scanMeta.model}</div>
-                          )}
-                          {Array.isArray(scanMeta?.detectedFields) && scanMeta.detectedFields.length > 0 && (
-                            <div className="flex flex-wrap gap-2">
-                              {scanMeta.detectedFields.map((field) => (
-                                <span
-                                  key={field.key}
-                                  className={`rounded-full border px-2 py-1 ${
-                                    filledFields.has(field.key)
-                                      ? "border-emerald-300 bg-emerald-100 text-emerald-800"
-                                      : "border-slate-200 bg-white text-slate-600"
-                                  }`}
-                                  title={`${String(field.value)}${field.source ? ` • ${field.source}` : ""}`}
-                                >
-                                  {OCR_FIELD_LABELS[field.key] || field.key}: {String(field.value)}
-                                  {field.source ? ` · ${field.source}` : ""}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                          <div className="text-[11px] text-emerald-700/90">
-                            Cada chip indica de dónde sale el dato: OCR, OCR / MRZ, OpenAI vision o Gemini vision.
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="mt-4 flex flex-wrap gap-2 text-[11px] text-slate-500">
-                        <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1">Mejor con fondo liso</span>
-                        <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1">Sin reflejos ni sombras</span>
-                        <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1">Documento recto y completo</span>
-                        <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1">Anverso + reverso recomendado</span>
-                      </div>
-
-                      <div className="mt-5 flex flex-wrap gap-2">
-                        {!dniFrontImage && !dniBackImage ? (
-                          <button
-                            type="button"
-                            onClick={() => frontInputRef.current?.click()}
-                            className="inline-flex items-center gap-2 rounded-2xl bg-[#ab0433] px-4 py-2 text-sm font-bold text-white shadow-lg shadow-red-200 transition-colors hover:bg-[#92042c]"
-                          >
-                            <Upload size={15} />
-                            Subir anverso
-                          </button>
-                        ) : (
-                          <>
-                            <button
-                              type="button"
-                              onClick={handleScanDNI}
-                              disabled={scanning || scanDone}
-                              className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-bold transition-all ${
-                                scanning || scanDone
-                                  ? "cursor-not-allowed bg-slate-200 text-slate-500"
-                                  : "bg-[#ab0433] text-white shadow-lg shadow-red-200 hover:bg-[#92042c]"
-                              }`}
-                            >
-                              {scanning ? <><Loader2 size={15} className="animate-spin" /> Leyendo...</> : scanDone ? <><CheckCircle2 size={15} /> Completado</> : <><ScanLine size={15} /> Escanear DNI</>}
-                            </button>
-                            {!dniBackImage && (
-                              <button
-                                type="button"
-                                onClick={() => backInputRef.current?.click()}
-                                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100"
-                              >
-                                <Upload size={15} />
-                                Añadir reverso
-                              </button>
-                            )}
-                            {scanDone && (
-                              <button
-                                type="button"
-                                onClick={handleScanDNI}
-                                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100"
-                              >
-                                <RotateCcw size={15} />
-                                Re-escanear
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={clearDni}
-                              className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-500 transition-colors hover:bg-slate-100"
-                            >
-                              <X size={15} />
-                              Limpiar
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {createMode === "link" && (
-              <div>
-                <div className="rounded-[24px] border border-slate-200 bg-slate-50 px-6 py-6">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <h4 className="text-sm font-semibold text-slate-900">Crear cliente desde enlace</h4>
-                      <p className="mt-1 text-sm text-slate-500">
-                        Usa este modo cuando quieras iniciar la ficha a partir de una URL de referencia, formulario externo o enlace de contacto.
-                      </p>
-                    </div>
-                    <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-600">
-                      Referencia web
-                    </span>
-                  </div>
-
-                  <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(280px,0.85fr)]">
-                    <div className="rounded-[24px] border border-slate-200 bg-white px-5 py-5 shadow-sm">
-                      <div className="flex items-start gap-3">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-amber-100 bg-amber-50 text-amber-600">
-                          <Upload size={18} />
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-slate-900">Pega el enlace de referencia</p>
-                          <p className="mt-1 text-xs leading-5 text-slate-500">
-                            Lo guardaremos en el campo de página web para que puedas completar manualmente el resto de la ficha.
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="mt-4">
-                        <F label="Enlace">
-                          <I
-                            type="url"
-                            name="website"
-                            value={form.website}
-                            onChange={handleChange}
-                            placeholder="https://..."
-                          />
-                        </F>
-                      </div>
-                    </div>
-
-                    <div className="rounded-[24px] border border-slate-200 bg-white px-4 py-4 shadow-sm">
-                      <p className="text-sm font-semibold text-slate-900">Qué hace este modo</p>
-                      <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-500">
-                        <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1">Inicio rápido</span>
-                        <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1">Referencia compartible</span>
-                        <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1">Completar después</span>
-                      </div>
-                      <p className="mt-4 text-xs leading-6 text-slate-500">
-                        Después podrás seguir rellenando la ficha del cliente manualmente. Este modo está pensado para no perder la referencia inicial.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {isDniFlow && (
-          <div className="px-1">
-            <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-slate-400">Datos del cliente</p>
-            <h3 className="mt-1 text-sm font-bold text-slate-800">Revisión de la ficha detectada</h3>
-          </div>
-        )}
-
-        {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ FOTO DE PERFIL + IDENTIFICACIÃƒÆ’Ã¢â‚¬Å“N ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
-        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-          <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
-            <Users size={13} className="text-slate-400" />
-            <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Identificación</h3>
-          </div>
-          <div className="p-4 flex gap-5">
-            {/* Avatar */}
-            <div className="shrink-0">
-              <div
-                onClick={() => photoInputRef.current?.click()}
-                className="h-20 w-20 rounded-xl border-2 border-dashed border-slate-200 hover:border-red-400 flex flex-col items-center justify-center cursor-pointer overflow-hidden transition-all group bg-slate-50 hover:bg-red-50"
-              >
-                {photoPreview
-                  ? <img src={photoPreview} alt="Foto" className="w-full h-full object-cover" />
-                  : <><Camera size={20} className="text-slate-300 group-hover:text-red-400 transition-colors" /><p className="text-[9px] text-slate-300 mt-1">Foto</p></>
-                }
-              </div>
-              <input ref={photoInputRef} type="file" accept="image/*" className="hidden"
-                onChange={e => e.target.files?.[0] && handlePhoto(e.target.files[0])} />
-            </div>
-
-            <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-3">
-              <F label="Tipo documento" required invalid={isInvalid("document_type")}>
-                <S name="document_type" value={form.document_type} onChange={handleChange} highlight={h("document_type")} invalid={isInvalid("document_type")}>
-                  <option>DNI</option><option>NIE</option><option>Pasaporte</option><option>CIF</option><option>Otro</option>
-                </S>
-              </F>
-              <F label="NIF / CIF" required invalid={isInvalid("nif_cif")}>
-                <I name="nif_cif" value={form.nif_cif} onChange={handleChange} placeholder="12345678Z" highlight={h("nif_cif")} invalid={isInvalid("nif_cif")} required />
-                {nifDupEntity && (
-                  <Link to={`/dashboard/clientes/${nifDupEntity.id}`} className="mt-1.5 flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 hover:bg-amber-100 transition-colors">
-                    <AlertTriangle size={12} className="shrink-0 text-amber-500" />
-                    <span>Ya existe: <span className="underline">{nifDupEntity.first_name} {nifDupEntity.last_name || nifDupEntity.commercial_name || ""}</span> · Ver ficha →</span>
-                  </Link>
-                )}
-              </F>
-              <F label="Tipo cliente" required invalid={isInvalid("type")}>
-                <S name="type" value={form.type} onChange={handleChange} invalid={isInvalid("type")}>
-                  <option value="CLIENTE">Cliente</option>
-                  <option value="CONTRARIO">Contrario</option>
-                  <option value="JUZGADO">Juzgado</option>
-                  <option value="PERITO">Perito</option>
-                  <option value="PROVEEDOR">Proveedor</option>
-                </S>
-              </F>
-              <F label="Naturaleza jurídica">
-                <S name="legal_nature" value={form.legal_nature} onChange={handleChange}>
-                  <option value="">—</option>
-                  <option>Física</option><option>Jurídica</option><option>Autónomo</option>
-                </S>
-              </F>
-
-              <F label="Nombre / Razón social" required invalid={isInvalid("first_name")}>
-                <I name="first_name" value={form.first_name} onChange={handleChange} placeholder="Nombre" highlight={h("first_name")} invalid={isInvalid("first_name")} required className="md:col-span-2" />
-              </F>
-              <F label="Apellidos" required invalid={isInvalid("last_name")}>
-                <I name="last_name" value={form.last_name} onChange={handleChange} placeholder="Apellidos" highlight={h("last_name")} invalid={isInvalid("last_name")} required />
-              </F>
-              <F label="Nombre comercial">
-                <I name="commercial_name" value={form.commercial_name} onChange={handleChange} placeholder="Ej: Transportes S.L." />
-              </F>
-              <F label="Sexo">
-                <S name="gender" value={form.gender} onChange={handleChange} highlight={h("gender")}>
-                  <option value="">—</option><option value="M">Masculino</option><option value="F">Femenino</option><option value="O">Otro</option>
-                </S>
-              </F>
-
-              <F label="Fecha nacimiento">
-                <I type="date" name="birth_date" value={form.birth_date} onChange={handleChange} highlight={h("birth_date")} />
-              </F>
-              <F label="Edad">
-                <I value={age !== null ? `${age} años` : ""} readOnly className="bg-slate-50 text-slate-400 cursor-default border-slate-100" />
-              </F>
-              <F label="Nacionalidad">
-                <I name="nationality" value={form.nationality} onChange={handleChange} highlight={h("nationality")} />
-              </F>
-              <F label="País de expedición">
-                <S name="expedition_country" value={form.expedition_country} onChange={handleChange} highlight={h("expedition_country")}>
-                  {PAISES.map(p => <option key={p}>{p}</option>)}
-                </S>
-              </F>
-            </div>
-          </div>
-        </div>
-
-        {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ DIRECCIÃƒÆ’Ã¢â‚¬Å“N ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
-        <Section title="Dirección" icon={MapPin}>
-          <div className="col-span-2 md:col-span-2">
-            <F label="Dirección"><I name="address_street" value={form.address_street} onChange={handleChange} placeholder="Calle, número, piso..." highlight={h("address_street")} /></F>
-          </div>
-          <F label="Población">
-            <I name="address_town" value={form.address_town} onChange={handleChange} placeholder="Ciudad" highlight={h("address_town")} />
-          </F>
-          <F label="Código postal">
-            <I name="address_cp" value={form.address_cp} onChange={handleChange} placeholder="28000" highlight={h("address_cp")} />
-          </F>
-          <F label="Provincia">
-            <S name="address_province" value={form.address_province} onChange={handleChange} highlight={h("address_province")}>
-              <option value="">— Selecciona —</option>
-              {PROVINCIAS.map(p => <option key={p}>{p}</option>)}
-            </S>
-          </F>
-          <F label="País">
-            <S name="address_country" value={form.address_country} onChange={handleChange} highlight={h("address_country")}>
-              {PAISES.map(p => <option key={p}>{p}</option>)}
-            </S>
-          </F>
-        </Section>
-
-        {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ CONTACTO ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
-        <Section title="Contacto" icon={Phone}>
-          <div className="col-span-2">
-            <F label="Correo electrónico"><I type="email" name="email" value={form.email} onChange={handleChange} placeholder="cliente@email.com" /></F>
-          </div>
-          <F label="Teléfono"><I name="phone_1" value={form.phone_1} onChange={handleChange} placeholder="900 000 000" /></F>
-          <F label="Móvil"><I name="phone_mobile" value={form.phone_mobile} onChange={handleChange} placeholder="600 000 000" /></F>
-          <F label="Teléfono 2"><I name="phone_2" value={form.phone_2} onChange={handleChange} placeholder="—" /></F>
-          <F label="Teléfono 3"><I name="phone_3" value={form.phone_3} onChange={handleChange} placeholder="—" /></F>
-          <F label="Fax"><I name="phone_fax" value={form.phone_fax} onChange={handleChange} placeholder="—" /></F>
-          <div className="col-span-2 md:col-span-3">
-            <F label="Página web"><I name="website" value={form.website} onChange={handleChange} placeholder="https://www.empresa.com" /></F>
-          </div>
-        </Section>
-        {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ ADMINISTRACIÃƒÆ’Ã¢â‚¬Å“N ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
-        <Section title="Administración" icon={Briefcase}>
-          <F label="Estado">
-            <S name="client_status" value={form.client_status} onChange={handleChange}>
-              <option>Alta</option><option>Baja</option><option>Suspendido</option><option>Potencial</option>
-            </S>
-          </F>
-          <F label="Fecha alta">
-            <I type="date" name="date_alta" value={form.date_alta} onChange={handleChange} />
-          </F>
-          <F label="Fecha baja">
-            <I type="date" name="date_baja" value={form.date_baja} onChange={handleChange} />
-          </F>
-          <F label="Centro">
-            <I name="center" value={form.center} onChange={handleChange} placeholder="—" />
-          </F>
-          <F label="LOPD">
-            <S name="lopd" value={form.lopd} onChange={handleChange}>
-              <option>Pendiente</option><option>Firmado</option><option>Rechazado</option><option>No aplica</option>
-            </S>
-          </F>
-          <F label="Comunicaciones comerciales">
-            <S name="commercial_communications" value={form.commercial_communications} onChange={handleChange}>
-              <option>No</option><option>Sí</option>
-            </S>
-          </F>
-        </Section>
-
-        {filledFields.size > 0 && (
-          <div className="flex items-center gap-2 p-3 bg-emerald-50 rounded-xl border border-emerald-100 text-xs text-emerald-700">
-            <Sparkles size={14} className="shrink-0 text-emerald-500" />
-            Los campos resaltados en verde fueron rellenados por el OCR. Revísalos antes de guardar.
-          </div>
-        )}
-      </form>
-
-      {/* ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ PANEL INDICADORES ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ */}
-      <aside className="w-52 shrink-0 space-y-4">
-        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden sticky top-6">
-          <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
-            <BarChart2 size={13} className="text-slate-400" />
-            <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Indicadores</h3>
-          </div>
-          <div className="px-4 py-3">
-            <Indicador label="Expedientes" value="—" />
-            <Indicador label="Expedientes abiertos" value="—" />
-            <Indicador label="Días sin actuaciones" value="—" />
-            <Indicador label="Actuaciones atrasadas" value="—" />
-            <Indicador label="Días morosidad" value="—" />
-            <Indicador label="Domicilio económico" value="No" color="text-red-500" />
-            <Indicador label="Domicilio historial" value="No" color="text-red-500" />
-          </div>
-          <div className="px-4 pb-3">
-            <p className="text-[10px] text-slate-300 italic">
-              {isEdit ? "Vuelve a la ficha para ver los indicadores" : "Disponible tras guardar el cliente"}
+          <div className="flex flex-col justify-center">
+            <h1 className="text-xl font-extrabold text-slate-800 leading-none tracking-tight mb-0.5">
+              {isEdit ? "Editar cliente" : "Nuevo cliente"}
+            </h1>
+            <p className="text-[11px] font-medium text-slate-500">
+              {isEdit ? "Modifica los datos y pulsa Guardar cambios" : "Rellena la ficha de alta del cliente"}
             </p>
           </div>
         </div>
-      </aside>
+        <div className="flex items-center gap-2 flex-wrap">
+          {showSuccess && (
+            <span className="flex items-center gap-1.5 text-emerald-600 text-xs font-semibold">
+              <CheckCircle2 size={14} /> {isEdit ? "¡Cambios guardados!" : "¡Cliente registrado!"}
+            </span>
+          )}
+          {error && (
+            <span className="max-w-xs truncate flex items-center gap-1.5 text-red-600 text-xs">
+              <AlertTriangle size={14} className="shrink-0" /> {error}
+            </span>
+          )}
+          <Link to={isEdit ? `/dashboard/clientes/${id}` : "/dashboard/clientes"}>
+            <button type="button" className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-slate-600 bg-white hover:bg-slate-50 border border-slate-200 rounded-md shadow-sm transition-colors">
+              <X size={14} className="text-slate-400" /> Cancelar
+            </button>
+          </Link>
+          <button type="submit" disabled={loading || showSuccess}
+            className="flex items-center gap-2 px-6 py-2.5 text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 border border-red-700 rounded-md shadow-sm transition-all active:scale-[0.98]">
+            {loading
+              ? <><Loader2 size={13} className="animate-spin" /> Guardando...</>
+              : <><Save size={13} /> {isEdit ? "Guardar cambios" : "Guardar"}</>}
+          </button>
+        </div>
+      </div>
+
+      {/* BODY */}
+      <main className="flex-1 min-h-0 overflow-y-auto p-6 sm:p-10 lg:p-12 bg-white animate-card-in-1">
+        <div className="max-w-[1600px] mx-auto flex flex-col xl:flex-row gap-12 lg:gap-16 items-start">
+
+          {/* SECCIONES */}
+          <div className="flex-1 flex flex-col gap-10 w-full xl:pr-12 xl:border-r border-slate-200">
+
+            {/* IDENTIFICACION */}
+            <div>
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-6 flex items-center gap-2">
+                <Users size={16} className="text-slate-400" /> Identificación
+              </h3>
+
+              <div className="flex flex-col md:flex-row gap-6 lg:gap-8 mb-6">
+                <div className="flex-shrink-0">
+                  <div
+                    onClick={() => photoInputRef.current?.click()}
+                    className="w-24 h-24 flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 hover:bg-slate-100 hover:border-slate-400 cursor-pointer transition-all group overflow-hidden"
+                  >
+                    {photoPreview
+                      ? <img src={photoPreview} alt="Foto" className="w-full h-full object-cover" />
+                      : <>
+                          <Camera size={22} className="text-slate-300 group-hover:text-slate-500 mb-1.5 transition-colors" />
+                          <span className="text-[10px] font-bold text-slate-400 group-hover:text-slate-600 transition-colors uppercase tracking-wide">Foto</span>
+                        </>
+                    }
+                  </div>
+                  <input ref={photoInputRef} type="file" accept="image/*" className="hidden"
+                    onChange={e => e.target.files?.[0] && handlePhoto(e.target.files[0])} />
+                </div>
+                <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-6">
+                  <div className="flex flex-col gap-2">
+                    <label className={`${lbl}${isInvalid("document_type") ? " text-red-500" : ""}`}>Tipo Documento <span className="text-red-500">*</span></label>
+                    <select name="document_type" value={form.document_type} onChange={handleChange} className={inputCls("document_type")}>
+                      <option>DNI</option><option>NIE</option><option>Pasaporte</option><option>CIF</option><option>Otro</option>
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className={`${lbl}${isInvalid("nif_cif") ? " text-red-500" : ""}`}>NIF / CIF <span className="text-red-500">*</span></label>
+                    <input name="nif_cif" value={form.nif_cif} onChange={handleChange} placeholder="12345678Z" className={`${inputCls("nif_cif")} font-mono`} />
+                    {nifDupEntity && (
+                      <Link to={`/dashboard/clientes/${nifDupEntity.id}`} className="mt-1 flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-amber-800 hover:bg-amber-100 transition-colors">
+                        <AlertTriangle size={11} className="shrink-0 text-amber-500" /> Ya existe · Ver ficha →
+                      </Link>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className={`${lbl}${isInvalid("type") ? " text-red-500" : ""}`}>Tipo Cliente <span className="text-red-500">*</span></label>
+                    <select name="type" value={form.type} onChange={handleChange} className={inputCls("type")}>
+                      <option value="CLIENTE">Cliente</option>
+                      <option value="CONTRARIO">Contrario</option>
+                      <option value="JUZGADO">Juzgado</option>
+                      <option value="PERITO">Perito</option>
+                      <option value="PROVEEDOR">Proveedor</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-6">
+                <div className="flex flex-col gap-2">
+                  <label className={`${lbl}${isInvalid("first_name") ? " text-red-500" : ""}`}>Nombre / Razón Social <span className="text-red-500">*</span></label>
+                  <input name="first_name" value={form.first_name} onChange={handleChange} placeholder="Nombre" className={inputCls("first_name")} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={`${lbl}${isInvalid("last_name") ? " text-red-500" : ""}`}>Apellidos <span className="text-red-500">*</span></label>
+                  <input name="last_name" value={form.last_name} onChange={handleChange} placeholder="Apellidos" className={inputCls("last_name")} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Nombre Comercial</label>
+                  <input name="commercial_name" value={form.commercial_name} onChange={handleChange} placeholder="Ej: Transportes S.L." className={inputCls("commercial_name")} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Naturaleza Jurídica</label>
+                  <select name="legal_nature" value={form.legal_nature} onChange={handleChange} className={inputCls("legal_nature")}>
+                    <option value="">— Seleccionar —</option>
+                    <option>Física</option><option>Jurídica</option><option>Autónomo</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Sexo</label>
+                  <select name="gender" value={form.gender} onChange={handleChange} className={inputCls("gender")}>
+                    <option value="">— Seleccionar —</option>
+                    <option value="M">Masculino</option><option value="F">Femenino</option><option value="O">Otro</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Fecha Nacimiento</label>
+                  <input type="date" name="birth_date" value={form.birth_date} onChange={handleChange} className={inputCls("birth_date")} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Edad</label>
+                  <input value={age !== null ? `${age} años` : ""} readOnly className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-md text-sm text-slate-500 cursor-not-allowed" />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Nacionalidad</label>
+                  <input name="nationality" value={form.nationality} onChange={handleChange} className={inputCls("nationality")} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>País de Expedición</label>
+                  <select name="expedition_country" value={form.expedition_country} onChange={handleChange} className={inputCls("expedition_country")}>
+                    {PAISES.map(p => <option key={p}>{p}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* DIRECCION */}
+            <div className="pt-8 border-t border-slate-100">
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-6 flex items-center gap-2">
+                <MapPin size={16} className="text-slate-400" /> Dirección Principal
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-6">
+                <div className="flex flex-col gap-2 md:col-span-3">
+                  <label className={lbl}>Dirección</label>
+                  <input name="address_street" value={form.address_street} onChange={handleChange} placeholder="Calle, número, piso, puerta..." className={inputCls("address_street")} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Población</label>
+                  <input name="address_town" value={form.address_town} onChange={handleChange} placeholder="Ciudad" className={inputCls("address_town")} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Código Postal</label>
+                  <input name="address_cp" value={form.address_cp} onChange={handleChange} placeholder="28000" className={`${inputCls("address_cp")} font-mono`} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Provincia</label>
+                  <select name="address_province" value={form.address_province} onChange={handleChange} className={inputCls("address_province")}>
+                    <option value="">— Selecciona —</option>
+                    {PROVINCIAS.map(p => <option key={p}>{p}</option>)}
+                  </select>
+                </div>
+                <div className="flex flex-col gap-2 md:col-span-3">
+                  <label className={lbl}>País</label>
+                  <select name="address_country" value={form.address_country} onChange={handleChange} className={inputCls("address_country")}>
+                    {PAISES.map(p => <option key={p}>{p}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* CONTACTO */}
+            <div className="pt-8 border-t border-slate-100">
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-6 flex items-center gap-2">
+                <Phone size={16} className="text-slate-400" /> Contacto
+              </h3>
+              <div className="mb-5 rounded-md border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs text-slate-500">
+                Indica al menos <span className="font-semibold text-slate-700">un móvil, teléfono o correo electrónico</span> para guardar el cliente.
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-6">
+                <div className="flex flex-col gap-2 md:col-span-3">
+                  <label className={lbl}>Correo Electrónico</label>
+                  <input type="email" name="email" value={form.email} onChange={handleChange} placeholder="cliente@email.com" className={inputCls("email")} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Teléfono</label>
+                  <input name="phone_1" value={form.phone_1} onChange={handleChange} placeholder="900 000 000" className={inputCls("phone_1")} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Móvil</label>
+                  <input name="phone_mobile" value={form.phone_mobile} onChange={handleChange} placeholder="600 000 000" className={inputCls("phone_mobile")} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Fax</label>
+                  <input name="phone_fax" value={form.phone_fax} onChange={handleChange} placeholder="—" className={inputCls("phone_fax")} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Teléfono 2</label>
+                  <input name="phone_2" value={form.phone_2} onChange={handleChange} placeholder="—" className={inputCls("phone_2")} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Teléfono 3</label>
+                  <input name="phone_3" value={form.phone_3} onChange={handleChange} placeholder="—" className={inputCls("phone_3")} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Página Web</label>
+                  <input name="website" value={form.website} onChange={handleChange} placeholder="https://www.empresa.com" className={inputCls("website")} />
+                </div>
+              </div>
+            </div>
+
+            {/* ADMINISTRACION */}
+            <div className="pt-8 border-t border-slate-100">
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-6 flex items-center gap-2">
+                <Briefcase size={16} className="text-slate-400" /> Administración
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-6">
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Estado</label>
+                  <select name="client_status" value={form.client_status} onChange={handleChange} className={inputCls("client_status")}>
+                    <option>Alta</option><option>Baja</option><option>Suspendido</option><option>Potencial</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Fecha Alta</label>
+                  <input type="date" name="date_alta" value={form.date_alta} onChange={handleChange} className={inputCls("date_alta")} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Fecha Baja</label>
+                  <input type="date" name="date_baja" value={form.date_baja} onChange={handleChange} className={inputCls("date_baja")} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Centro</label>
+                  <input name="center" value={form.center} onChange={handleChange} placeholder="—" className={inputCls("center")} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>LOPD</label>
+                  <select name="lopd" value={form.lopd} onChange={handleChange} className={inputCls("lopd")}>
+                    <option>Pendiente</option><option>Firmado</option><option>Rechazado</option><option>No aplica</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={lbl}>Comunicaciones Comerciales</label>
+                  <select name="commercial_communications" value={form.commercial_communications} onChange={handleChange} className={inputCls("commercial_communications")}>
+                    <option>No</option><option>Sí</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          {/* PANEL DERECHO */}
+          <div className="w-full xl:w-[400px] flex-shrink-0 flex flex-col gap-10 xl:sticky xl:top-6 animate-card-in-2">
+
+            <div>
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-6 flex items-center gap-2">
+                <MessageSquare size={16} className="text-slate-400" /> Observaciones / Notas
+              </h3>
+              <div className="flex flex-col gap-2">
+                <textarea
+                  name="observaciones"
+                  value={(form as any).observaciones || ""}
+                  onChange={e => setForm(p => ({ ...p, observaciones: e.target.value }))}
+                  rows={14}
+                  placeholder="Añade notas internas o información relevante sobre este cliente..."
+                  className="w-full px-4 py-3 bg-white border border-slate-300 rounded-md text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-red-500 focus:border-red-500 transition-colors resize-none"
+                />
+                <p className="text-[10px] text-slate-400 text-right">Estas notas son privadas y solo visibles internamente.</p>
+              </div>
+            </div>
+
+            {invalidFields.size > 0 && (
+              <div className="rounded-md border border-red-100 bg-red-50 p-3.5 text-xs text-red-600">
+                <p className="font-bold mb-1">{invalidFields.size} campo{invalidFields.size !== 1 ? "s" : ""} requerido{invalidFields.size !== 1 ? "s" : ""}</p>
+                {Array.from(invalidFields).slice(0, 4).map(f => (
+                  <p key={f} className="text-red-500">· {CLIENT_ERROR_LABELS[f] || f}</p>
+                ))}
+              </div>
+            )}
+            {filledFields.size > 0 && (
+              <div className="flex items-center gap-2 rounded-md border border-emerald-100 bg-emerald-50 p-3.5 text-xs text-emerald-700">
+                <Sparkles size={11} className="text-emerald-500 shrink-0" />
+                {filledFields.size} campos detectados por el escáner OCR
+              </div>
+            )}
+
+          </div>
+
+        </div>
+      </main>
 
       <style>{`
         @keyframes scan { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }
         .animate-scan { animation: scan 1.2s linear infinite; }
       `}</style>
-    </div>
+    </form>
   );
 }
