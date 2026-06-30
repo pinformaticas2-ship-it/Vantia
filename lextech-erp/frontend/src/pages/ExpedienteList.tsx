@@ -1595,11 +1595,17 @@ function CsvFieldRow({
 
   const isMapped = field.selected !== CSV_UNASSIGNED;
 
+  const [openUpward, setOpenUpward] = useState(false);
+
   useEffect(() => {
     if (!open) return;
     if (btnRef.current) {
       const r = btnRef.current.getBoundingClientRect();
-      setPos({ top: r.bottom + 4, left: r.left, width: r.width });
+      const MENU_MAX_H = 248; // max-h-60 = 240px + 8px padding
+      const spaceBelow = window.innerHeight - r.bottom;
+      const goUp = spaceBelow < MENU_MAX_H && r.top > MENU_MAX_H;
+      setOpenUpward(goUp);
+      setPos({ top: goUp ? r.top - 4 : r.bottom + 4, left: r.left, width: r.width });
     }
     const onDown = (e: MouseEvent) => {
       if (!menuRef.current?.contains(e.target as Node) && !btnRef.current?.contains(e.target as Node)) {
@@ -1644,7 +1650,15 @@ function CsvFieldRow({
         {open && createPortal(
           <div
             ref={menuRef}
-            style={{ position: "fixed", top: pos.top, left: pos.left, width: pos.width, zIndex: 9999 }}
+            style={{
+              position: "fixed",
+              left: pos.left,
+              width: pos.width,
+              zIndex: 9999,
+              ...(openUpward
+                ? { bottom: window.innerHeight - pos.top }
+                : { top: pos.top }),
+            }}
             className="bg-white rounded-xl border border-slate-200 shadow-[0_8px_32px_rgba(15,23,42,0.14)] overflow-hidden py-1"
           >
             <div className="max-h-60 overflow-y-auto">
