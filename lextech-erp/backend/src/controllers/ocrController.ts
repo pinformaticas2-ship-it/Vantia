@@ -329,6 +329,7 @@ function extractSpanishDniMrz(lines: string[]) {
       birth_date: birthDate,
       gender,
       nif_cif: normalizeNifNie(nifCandidate),
+      nationality: null,
       document_type: 'DNI',
     };
   }
@@ -571,7 +572,7 @@ function extractMrzData(lines: string[]) {
     !/^\d/.test(line),
   );
   if (nameLineIndex === -1) {
-    return { first_name: null, last_name: null, birth_date: null, gender: null, nif_cif: null, document_type: null };
+    return { first_name: null, last_name: null, birth_date: null, gender: null, nif_cif: null, document_type: null, nationality: null };
   }
 
   const nameLine = normalized[nameLineIndex];
@@ -595,6 +596,7 @@ function extractMrzData(lines: string[]) {
     gender,
     nif_cif: normalizeNifNie(nifCandidate),
     document_type: identityLine.includes('NIE') ? 'NIE' : 'DNI',
+    nationality: null,
   };
 }
 
