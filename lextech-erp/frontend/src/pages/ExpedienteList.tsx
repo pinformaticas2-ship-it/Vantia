@@ -3247,11 +3247,11 @@ function fmtDateHuman(str: string) {
 }
 
 // ── Sección del panel derecho ──────────────────────────────────────────────────
-function PanelSection({ title, onAdd, children }: { title: string; onAdd?: () => void; children: React.ReactNode }) {
+function PanelSection({ title, onAdd, titleExtra, children }: { title: string; onAdd?: () => void; titleExtra?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="border-b border-slate-100 last:border-0">
       <div className="flex items-center justify-between px-4 pt-4 pb-2">
-        <span className="text-xs font-bold text-slate-800">{title}</span>
+        <span className="flex items-center gap-1 text-xs font-bold text-slate-800">{title}{titleExtra}</span>
         {onAdd && (
           <button type="button" onClick={onAdd}
             className="flex items-center justify-center w-5 h-5 rounded-full border border-slate-300 text-slate-500 hover:border-[#ab0433] hover:text-[#ab0433] transition-colors">
@@ -3464,12 +3464,80 @@ function DocumentImportVerifyView({
 
   const canAccept = !saving && safeDescripcion.trim() && (safeClienteId || safeClienteNombre.trim());
 
+  const [highlightTerm, setHighlightTerm] = useState<string | null>(null);
+  const [forceTextMode, setForceTextMode] = useState(false);
+  const textViewRef = useRef<HTMLDivElement>(null);
+
+  const activateHighlight = (term: string) => {
+    if (!term.trim() || !textPreview) return;
+    setHighlightTerm(term);
+    setForceTextMode(true);
+    setTimeout(() => {
+      const el = textViewRef.current?.querySelector("[data-hl-first]") as HTMLElement | null;
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 50);
+  };
+
+  const EyeBtn = ({ term }: { term: string }) => {
+    if (!term?.trim() || !textPreview) return null;
+    const active = highlightTerm === term && forceTextMode;
+    return (
+      <button
+        type="button"
+        title="Ver en el documento"
+        onClick={() => activateHighlight(term)}
+        className={`inline-flex items-center rounded p-0.5 transition-colors flex-shrink-0 ${
+          active ? "text-amber-500 bg-amber-50" : "text-slate-300 hover:text-amber-400 hover:bg-amber-50"
+        }`}
+      >
+        <Eye size={10} />
+      </button>
+    );
+  };
+
+  const renderHighlightedText = (text: string, term: string | null) => {
+    if (!term?.trim()) return <>{text}</>;
+    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const parts = text.split(new RegExp(`(${escaped})`, "gi"));
+    let first = true;
+    return (
+      <>
+        {parts.map((part, i) => {
+          if (part.toLowerCase() === term.toLowerCase()) {
+            const isFirst = first;
+            first = false;
+            return (
+              <mark key={i} {...(isFirst ? { "data-hl-first": "true" } : {})}
+                className="bg-amber-200 text-amber-900 rounded px-0.5 font-semibold not-italic">
+                {part}
+              </mark>
+            );
+          }
+          return part;
+        })}
+      </>
+    );
+  };
+
   // Visor del documento
   const renderPreview = () => {
-    if (mimeType === "application/pdf" && previewUrl) {
-      return <iframe title={fileName} src={previewUrl} className="w-full h-full rounded-none border-0 bg-white" />;
+    if (!forceTextMode && mimeType === "application/pdf" && previewUrl) {
+      return (
+        <div className="relative w-full h-full">
+          <iframe title={fileName} src={previewUrl} className="w-full h-full rounded-none border-0 bg-white" />
+          {textPreview && (
+            <button
+              type="button"
+              onClick={() => setForceTextMode(true)}
+              className="absolute top-3 right-3 inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold bg-white/95 border border-slate-200 rounded-lg shadow hover:bg-white transition-colors"
+            >
+              <Eye size={11} /> Ver texto extraído
+            </button>
+          )}
+        </div>
+      );
     }
-    if (mimeType.startsWith("image/") && previewUrl) {
+    if (!forceTextMode && mimeType.startsWith("image/") && previewUrl) {
       return (
         <div className="flex h-full w-full items-center justify-center bg-slate-100 p-6">
           <img src={previewUrl} alt={fileName} className="max-h-full max-w-full rounded-xl object-contain shadow-xl" />
@@ -3477,18 +3545,40 @@ function DocumentImportVerifyView({
       );
     }
     return (
-      <div className="h-full overflow-auto p-6">
-        <div className="flex items-center justify-between gap-3 mb-4">
+      <div ref={textViewRef} className="h-full overflow-auto p-6">
+        <div className="flex items-center justify-between gap-3 mb-4 flex-wrap gap-y-2">
           <p className="text-sm font-semibold text-slate-900">{fileName}</p>
-          {previewUrl && (
-            <a href={previewUrl} target="_blank" rel="noreferrer"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#ab0433]">
-              <ExternalLink size={12} /> Abrir archivo
-            </a>
-          )}
+          <div className="flex items-center gap-2">
+            {forceTextMode && previewUrl && (mimeType === "application/pdf" || mimeType.startsWith("image/")) && (
+              <button
+                type="button"
+                onClick={() => { setForceTextMode(false); setHighlightTerm(null); }}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+              >
+                <ArrowLeft size={11} /> Ver documento
+              </button>
+            )}
+            {previewUrl && (
+              <a href={previewUrl} target="_blank" rel="noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#ab0433]">
+                <ExternalLink size={12} /> Abrir archivo
+              </a>
+            )}
+          </div>
         </div>
-        <pre className="whitespace-pre-wrap rounded-2xl bg-white border border-slate-200 p-4 text-xs text-slate-700">
-          {textPreview || "No hay previsualización disponible para este documento."}
+        {highlightTerm && (
+          <div className="mb-3 flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs font-medium text-amber-800">
+            <Eye size={12} />
+            <span>Resaltando: <span className="font-bold">"{highlightTerm}"</span></span>
+            <button type="button" onClick={() => setHighlightTerm(null)} className="ml-auto text-amber-400 hover:text-amber-700 transition-colors">
+              <X size={12} />
+            </button>
+          </div>
+        )}
+        <pre className="whitespace-pre-wrap rounded-2xl bg-white border border-slate-200 p-4 text-xs text-slate-700 font-mono leading-relaxed">
+          {textPreview
+            ? renderHighlightedText(textPreview, highlightTerm)
+            : "No hay previsualización disponible para este documento."}
         </pre>
       </div>
     );
@@ -3570,11 +3660,11 @@ function DocumentImportVerifyView({
           <PanelSection title="Detalles del procedimiento">
             <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 mt-1">
               <div>
-                <p className={lbl}>Tipo procedimiento</p>
+                <p className={`${lbl} flex items-center gap-1`}>Tipo procedimiento <EyeBtn term={safeTipoProc} /></p>
                 <input value={safeTipoProc} onChange={e => onChange("tipo_proc", e.target.value)} className={inp} />
               </div>
               <div>
-                <p className={lbl}>Juzgado</p>
+                <p className={`${lbl} flex items-center gap-1`}>Juzgado <EyeBtn term={safeJuzgado} /></p>
                 <input value={safeJuzgado} onChange={e => onChange("juzgado", e.target.value)} className={inp} />
               </div>
               <div>
@@ -3584,15 +3674,15 @@ function DocumentImportVerifyView({
                 </AppSelect>
               </div>
               <div>
-                <p className={lbl}>Tipo asunto</p>
+                <p className={`${lbl} flex items-center gap-1`}>Tipo asunto <EyeBtn term={safeTipoAsunto} /></p>
                 <input value={safeTipoAsunto} onChange={e => onChange("tipos_asunto", e.target.value)} className={inp} placeholder="Civil, Penal…" />
               </div>
               <div>
-                <p className={lbl}>NIG</p>
+                <p className={`${lbl} flex items-center gap-1`}>NIG <EyeBtn term={safeNig} /></p>
                 <input value={safeNig} onChange={e => onChange("nig", e.target.value)} className={inp} />
               </div>
               <div>
-                <p className={lbl}>Núm. procedimiento</p>
+                <p className={`${lbl} flex items-center gap-1`}>Núm. procedimiento <EyeBtn term={safeNumAutos} /></p>
                 <input value={safeNumAutos} onChange={e => onChange("num_autos", e.target.value)} className={inp} />
               </div>
             </div>
@@ -3601,6 +3691,7 @@ function DocumentImportVerifyView({
           {/* Descripción */}
           <PanelSection title="Descripción del expediente">
             <div className="mt-1">
+              <p className={`${lbl} flex items-center gap-1 mb-1`}>Descripción <EyeBtn term={safeDescripcion} /></p>
               <input value={safeDescripcion} onChange={e => onChange("descripcion", e.target.value)} className={inp}
                 placeholder="Resumen del expediente…" />
             </div>
@@ -3640,7 +3731,7 @@ function DocumentImportVerifyView({
           </PanelSection>
 
           {/* Demandantes */}
-          <PanelSection title="Demandantes" onAdd={addDemandante}>
+          <PanelSection title="Demandantes" onAdd={addDemandante} titleExtra={<EyeBtn term={demandantesList.filter(Boolean).join(" ")} />}>
             <datalist id={`doc-import-clients-${item.id}`}>
               {clientOptions.map(o => <option key={o.value} value={o.label} />)}
             </datalist>
@@ -3660,7 +3751,7 @@ function DocumentImportVerifyView({
           </PanelSection>
 
           {/* Demandados */}
-          <PanelSection title="Demandados" onAdd={addDemandado}>
+          <PanelSection title="Demandados" onAdd={addDemandado} titleExtra={<EyeBtn term={demandadosList.filter(Boolean).join(" ")} />}>
             {demandadosList.length === 0 ? (
               <PartyRow
                 color="red"
@@ -3706,7 +3797,7 @@ function DocumentImportVerifyView({
               <div>
                 <p className={`${lbl} flex items-center gap-1`}>
                   <span className="inline-block w-2 h-2 rounded-full bg-red-400 shrink-0" />
-                  Abogado contrario
+                  Abogado contrario <EyeBtn term={safeAbogadoContrario} />
                 </p>
                 <input
                   value={safeAbogadoContrario}
@@ -3720,7 +3811,7 @@ function DocumentImportVerifyView({
               <div>
                 <p className={`${lbl} flex items-center gap-1`}>
                   <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-                  Procurador propio
+                  Procurador propio <EyeBtn term={safeProcurador} />
                 </p>
                 <input
                   value={safeProcurador}
@@ -3734,7 +3825,7 @@ function DocumentImportVerifyView({
               <div>
                 <p className={`${lbl} flex items-center gap-1`}>
                   <span className="inline-block w-2 h-2 rounded-full bg-red-400 shrink-0" />
-                  Procurador contrario
+                  Procurador contrario <EyeBtn term={safeProcuradorContrario} />
                 </p>
                 <input
                   value={safeProcuradorContrario}
@@ -3751,15 +3842,15 @@ function DocumentImportVerifyView({
           <PanelSection title="Más datos">
             <div className="grid grid-cols-2 gap-x-3 gap-y-2.5 mt-1">
               <div>
-                <p className={lbl}>Ref. expediente</p>
+                <p className={`${lbl} flex items-center gap-1`}>Ref. expediente <EyeBtn term={safeRefExpediente} /></p>
                 <input value={safeRefExpediente} onChange={e => onChange("ref_expediente", e.target.value)} className={inp} />
               </div>
               <div>
-                <p className={lbl}>Cuantía principal</p>
+                <p className={`${lbl} flex items-center gap-1`}>Cuantía principal <EyeBtn term={safeCuantiaPrincipal} /></p>
                 <input type="number" value={safeCuantiaPrincipal} onChange={e => onChange("cuantia_principal", e.target.value)} className={inp} />
               </div>
               <div>
-                <p className={lbl}>Centro</p>
+                <p className={`${lbl} flex items-center gap-1`}>Centro <EyeBtn term={safeCentro} /></p>
                 <input value={safeCentro} onChange={e => onChange("centro", e.target.value)} className={inp} />
               </div>
               <div>
