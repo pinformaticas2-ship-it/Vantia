@@ -1612,18 +1612,15 @@ export default function ClientList() {
 
   // ── Render: carga ──────────────────────────────────────────
   if (loading) return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh]">
+    <div className="flex-1 flex flex-col items-center justify-center gap-4 text-slate-400">
       <Spinner size="xl" label="Cargando clientes..." />
     </div>
   );
 
   // ── Render: error ──────────────────────────────────────────
   if (error) return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-bold text-slate-900 flex items-center gap-3">
-        <Users className="text-red-600" /> Gestión de Clientes
-      </h1>
-      <div className="flex items-center gap-3 p-5 bg-red-50 border border-red-200 rounded-xl text-red-700">
+    <div className="flex-1 flex flex-col items-center justify-center p-10">
+      <div className="w-full max-w-md flex items-center gap-3 p-5 bg-red-50 border border-red-200 rounded-xl text-red-700">
         <AlertCircle size={20} className="shrink-0" />
         <div className="flex-1">
           <p className="font-bold text-sm">Error de conexión con el backend</p>
@@ -1964,27 +1961,40 @@ export default function ClientList() {
       onMoveAllToAvailable={moveAllClientColumnsToAvailable}
       onClose={() => setShowColumnModal(false)}
     />
-    <div className="flex flex-col h-full animate-in fade-in duration-300">
+    <div className="flex-1 flex flex-col overflow-hidden animate-page-in">
 
       {/* ── CABECERA ─────────────────────────────────────────── */}
-      <div className="px-6 py-4 border-b border-slate-100 bg-white flex items-center justify-between flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <Users size={20} className="text-red-600" />
-          <h1 className="text-xl font-bold text-slate-800">Gestión de Clientes</h1>
+      <div className="px-6 lg:px-8 py-5 border-b border-slate-200 bg-white flex-shrink-0 z-10 animate-card-in">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-red-50 border border-red-100">
+              <Users size={18} className="text-red-600" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-lg font-extrabold text-slate-900 leading-tight">Gestión de Clientes</h1>
+              <p className="text-xs text-slate-500 mt-0.5">
+                <span className="font-semibold text-slate-700">{stats.total}</span> clientes
+                {" · "}
+                <span className="font-semibold text-emerald-600">{stats.activos}</span> activos
+                {" · "}
+                <span className="font-semibold text-red-500">{stats.bajas}</span> bajas
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={handleRefresh}
+            title="Refrescar datos"
+            className="shrink-0 p-2 rounded-lg border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-300 hover:bg-red-50 transition-all"
+          >
+            <RefreshCw size={14} className={refreshSpin ? "animate-spin" : ""} />
+          </button>
         </div>
-        <button
-          onClick={() => fetchClients(true)}
-          title="Refrescar"
-          className="p-1 rounded hover:bg-slate-50 text-slate-400 hover:text-slate-600 transition-colors"
-        >
-          <RefreshCw size={14} className={refreshSpin ? "animate-spin" : ""} />
-        </button>
       </div>
 
       <div className="bg-white flex flex-col overflow-hidden flex-1 min-h-0">
 
         {/* ── BARRA DE ACCIONES ────────────────────────────────── */}
-        <div className="px-6 py-2.5 border-b border-slate-200 bg-slate-50 flex items-center flex-shrink-0 z-10 overflow-x-auto">
+        <div className="px-6 py-2.5 border-b border-slate-200 bg-slate-50 flex items-center flex-shrink-0 z-10 overflow-x-auto animate-card-in-1">
           <div className="flex items-center gap-1.5 min-w-max pb-0.5">
 
           {/* ─ Alta ─ */}
@@ -2295,7 +2305,7 @@ export default function ClientList() {
         </div>
 
         {/* ── BARRA DE FILTROS MULTICRITERIA ───────────────────── */}
-        <div className="px-6 py-2.5 border-b border-slate-200 bg-white">
+        <div className="px-6 py-2.5 border-b border-slate-200 bg-white animate-card-in-2">
           <div className="flex flex-col gap-1.5">
             {filters.map((filter, idx) => (
               <div key={filter.id} className="flex items-center gap-1.5 flex-wrap">
