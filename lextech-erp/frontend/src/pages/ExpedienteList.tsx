@@ -24,7 +24,7 @@ import BackButton from "../components/BackButton";
 import { UndoToast } from "../components/UndoToast";
 import { useUndoDelete } from "../lib/useUndoDelete";
 
-type ViewMode = "list" | "detail" | "multiselect" | "csvImport" | "csvImportConfigure" | "csvImportReview" | "csvImportComplete" | "csvImportHistory" | "csvImportErrorDetail" | "documentImport" | "documentImportVerify";
+type ViewMode = "list" | "detail" | "multiselect" | "csvImport" | "csvImportConfigure" | "csvImportReview" | "csvImportComplete" | "csvImportHistory" | "csvImportErrorDetail" | "documentImport" | "documentImportVerify" | "documentImportHistory";
 import { safeJson, resolveApiUrl, resolveUploadUrl } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
 import { TIPOS, ESTADOS, EXP_EMPTY, ExpedienteModal, lbl, inp } from "../components/ExpedienteModal";
@@ -2833,6 +2833,7 @@ function DocumentImportView({
   onVerifyItem,
   onDeleteBatch,
   onReviewBatch,
+  onOpenHistory,
   inputRef,
 }: {
   zipFile: File | null;
@@ -2862,6 +2863,7 @@ function DocumentImportView({
   onVerifyItem: (item: DocumentImportItem) => void;
   onDeleteBatch: (batchId: string) => void;
   onReviewBatch: (batch: ImportBatch) => void;
+  onOpenHistory: () => void;
   inputRef: React.RefObject<HTMLInputElement>;
 }) {
   const navigate = useNavigate();
@@ -3136,7 +3138,7 @@ function DocumentImportView({
               </div>
             ) : history.length === 0 ? (
               <div className="text-sm text-slate-400 py-10 text-center">Aún no hay importaciones registradas.</div>
-            ) : history.map((batch) => (
+            ) : history.slice(0, 5).map((batch) => (
               <div key={batch.id} className="bg-white border border-slate-200 p-4 rounded-lg shadow-sm flex items-center justify-between group hover:border-slate-300 transition-colors">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 border ${
@@ -3181,6 +3183,20 @@ function DocumentImportView({
               </div>
             ))}
           </div>
+
+          {history.length > 0 && (
+            <div className="flex-shrink-0 px-4 py-3 border-t border-slate-100 bg-white">
+              <button
+                type="button"
+                onClick={onOpenHistory}
+                className="w-full flex items-center justify-center gap-2 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-lg transition-colors"
+              >
+                <History size={12} />
+                Ver todo el historial
+                {history.length > 5 && <span className="ml-1 px-1.5 py-0.5 text-[10px] font-bold bg-slate-100 text-slate-500 rounded-full">{history.length}</span>}
+              </button>
+            </div>
+          )}
         </div>
 
       </div>
@@ -3860,6 +3876,133 @@ function Th({ label, sk, sort, dir, onSort, className = "" }: {
         )}
       </span>
     </th>
+  );
+}
+
+// ── DocumentImportHistoryView ─────────────────────────────────────────────
+function DocumentImportHistoryView({
+  history,
+  loading,
+  error,
+  onBack,
+  onReload,
+  onReviewBatch,
+  onDeleteBatch,
+}: {
+  history: ImportBatch[];
+  loading: boolean;
+  error: string | null;
+  onBack: () => void;
+  onReload: () => void;
+  onReviewBatch: (batch: ImportBatch) => void;
+  onDeleteBatch: (batchId: string) => void;
+}) {
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden animate-page-in">
+
+      {/* Header */}
+      <div className="flex-shrink-0 px-6 lg:px-10 py-6 border-b border-slate-200 bg-white animate-card-in">
+        <div className="flex flex-col gap-3">
+          <button
+            onClick={onBack}
+            className="w-max inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-all shadow-sm"
+          >
+            <ChevronLeft size={13} />
+            Volver a Importar
+          </button>
+          <div>
+            <h1 className="text-2xl font-extrabold text-slate-800 leading-tight">Historial de importaciones</h1>
+            <p className="text-sm text-slate-500 mt-1">Todos los lotes importados desde documentos.</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Toolbar */}
+      <div className="flex-shrink-0 px-6 lg:px-10 py-3 border-b border-slate-100 bg-slate-50/80 flex items-center justify-between animate-card-in-1">
+        <p className="text-sm font-semibold text-slate-700">
+          {loading ? "Cargando..." : `${history.length} lote${history.length !== 1 ? "s" : ""} registrado${history.length !== 1 ? "s" : ""}`}
+        </p>
+        <button
+          onClick={onReload}
+          className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-all shadow-sm"
+        >
+          <RefreshCw size={12} className="text-slate-400" />
+          Actualizar
+        </button>
+      </div>
+
+      {error && (
+        <div className="flex-shrink-0 px-6 lg:px-10 py-3 bg-red-50 border-b border-red-200 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      {/* List */}
+      <div className="flex-1 overflow-y-auto p-6 lg:p-10 bg-[#f4f6f8] animate-card-in-2">
+        {loading ? (
+          <div className="flex items-center justify-center gap-3 text-sm text-slate-400 py-20">
+            <Loader2 size={18} className="animate-spin" />
+            Cargando historial...
+          </div>
+        ) : history.length === 0 ? (
+          <div className="text-sm text-slate-400 py-20 text-center">Aún no hay importaciones documentales registradas.</div>
+        ) : (
+          <div className="flex flex-col gap-3 max-w-3xl mx-auto">
+            {history.map((batch) => (
+              <div key={batch.id} className="bg-white border border-slate-200 px-5 py-4 rounded-xl shadow-sm flex items-center justify-between group hover:border-slate-300 transition-colors">
+                <div className="flex items-center gap-4 min-w-0">
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 border ${
+                    batch.status === "completed"
+                      ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                      : batch.status === "failed"
+                      ? "bg-red-50 text-red-500 border-red-100"
+                      : "bg-amber-50 text-amber-600 border-amber-100"
+                  }`}>
+                    <FileText size={16} />
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <p className="text-sm font-bold text-slate-800 truncate">{batch.file_name}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {new Date(batch.created_at).toLocaleString("es-ES")}
+                      {" · "}
+                      <span className="font-medium text-slate-700">{batch.completed_count}/{batch.total_count} creados</span>
+                      {batch.error_count > 0 && (
+                        <span className="text-red-500 ml-1">· {batch.error_count} error{batch.error_count !== 1 ? "es" : ""}</span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2.5 pl-4 flex-shrink-0">
+                  {(batch.status === "reviewing" || batch.status === "processing") && (
+                    <button
+                      onClick={() => onReviewBatch(batch)}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 border border-amber-200 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition-colors"
+                    >
+                      <Eye size={12} />
+                      Revisar
+                    </button>
+                  )}
+                  <span className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md border ${
+                    batch.status === "completed" ? "bg-emerald-50 text-emerald-700 border-emerald-100"
+                    : batch.status === "failed" ? "bg-red-50 text-red-700 border-red-100"
+                    : "bg-amber-50 text-amber-700 border-amber-200"
+                  }`}>
+                    {batchStatusLabel(batch.status)}
+                  </span>
+                  <button
+                    onClick={() => onDeleteBatch(batch.id)}
+                    title="Eliminar del historial"
+                    className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -5480,6 +5623,7 @@ export default function ExpedienteList() {
         onVerifyItem={openDocumentImportVerify}
         onDeleteBatch={handleDeleteBatch}
         onReviewBatch={handleReviewBatch}
+        onOpenHistory={() => switchView("documentImportHistory")}
         inputRef={documentImportInputRef}
       />
     );
@@ -5503,6 +5647,20 @@ export default function ExpedienteList() {
           setDocumentImportRepresentaA(value);
         }}
         onAccept={handleAcceptDocumentImportItem}
+      />
+    );
+  }
+
+  if (viewMode === "documentImportHistory") {
+    return (
+      <DocumentImportHistoryView
+        history={documentImportHistory}
+        loading={documentImportHistoryLoading}
+        error={documentImportHistoryError}
+        onBack={() => switchView("documentImport")}
+        onReload={() => fetchDocumentImportHistory()}
+        onReviewBatch={handleReviewBatch}
+        onDeleteBatch={handleDeleteBatch}
       />
     );
   }
