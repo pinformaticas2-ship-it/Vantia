@@ -292,6 +292,7 @@ export default function ClientForm() {
   const [isDragOver, setIsDragOver] = useState(false);
   const [scanMeta, setScanMeta]   = useState<ScanMeta>(null);
   const [dniReviewEditable, setDniReviewEditable] = useState(false);
+  const [cpSuggestions, setCpSuggestions] = useState<string[]>([]);
   const [dniStep, setDniStep] = useState<"scan" | "complete">("scan");
   const [createMode, setCreateMode] = useState<"manual" | "dni" | "link">(() => {
     const mode = searchParams.get("mode");
@@ -674,6 +675,7 @@ export default function ClientForm() {
       });
       setFilledFields(filled);
       setScanMeta(meta);
+      setCpSuggestions(Array.isArray(meta?.address_cp_suggestions) ? meta.address_cp_suggestions : []);
       setScanDone(true);
     } catch (err: any) {
       setScanError(err.message);
@@ -1221,7 +1223,24 @@ export default function ClientForm() {
                 <I name="address_town" value={form.address_town} onChange={handleChange} placeholder="Ciudad" highlight={h("address_town")} />
               </F>
               <F label="Código postal">
-                <I name="address_cp" value={form.address_cp} onChange={handleChange} placeholder="28000" highlight={h("address_cp")} />
+                <>
+                  <I
+                    name="address_cp"
+                    value={form.address_cp}
+                    onChange={handleChange}
+                    placeholder="28000"
+                    highlight={h("address_cp")}
+                    list={cpSuggestions.length > 0 ? "cp-suggestions-list" : undefined}
+                  />
+                  {cpSuggestions.length > 0 && (
+                    <datalist id="cp-suggestions-list">
+                      {cpSuggestions.map(cp => <option key={cp} value={cp} />)}
+                    </datalist>
+                  )}
+                  {cpSuggestions.length > 1 && !form.address_cp && (
+                    <p className="mt-1 text-[11px] text-slate-500">Selecciona el CP de la lista o escríbelo manualmente</p>
+                  )}
+                </>
               </F>
               <F label="Provincia">
                 <S name="address_province" value={form.address_province} onChange={handleChange} highlight={h("address_province")}>

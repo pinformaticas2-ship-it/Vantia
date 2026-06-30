@@ -993,6 +993,27 @@ ${ocrText.slice(0, 5000)}
   return null;
 }
 
+async function fetchPostalCodeSuggestions(town: string, province?: string | null): Promise<string[]> {
+  try {
+    const query = province ? `${town}, ${province}, España` : `${town}, España`;
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&limit=5&countrycodes=es`;
+    const resp = await fetch(url, {
+      headers: { 'User-Agent': 'VantiaERP/1.0 (lextech-erp)' },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!resp.ok) return [];
+    const data = await resp.json() as any[];
+    const codes = new Set<string>();
+    for (const item of data) {
+      const postcode = String(item?.address?.postcode || '').trim();
+      if (postcode && isSpanishPostalCode(postcode)) codes.add(postcode);
+    }
+    return Array.from(codes).slice(0, 5);
+  } catch {
+    return [];
+  }
+}
+
 function countExtractedFields(data: DniScanData) {
   return Object.values(data).filter(Boolean).length;
 }
@@ -1064,8 +1085,15 @@ export const scanDNI = async (req: any, res: Response) => {
       const label = uploadedFiles[index]?.fieldname || path.basename(uploadedFiles[index]?.path || `imagen-${index + 1}`);
       return `[${label}]\n${result.text}`;
     }).join('\n\n');
-    const frontBirthSide = uploadedFiles.find((file) => isFrontSideFile(file));
-    const frontBirthFocused = frontBirthSide ? await runTesseractBirthDateScan(frontBirthSide.path) : null;
+    // Escaneo enfocado de fecha de nacimiento: preferir anverso marcado, pero si no existe intentar todos los archivos
+    const frontFile = uploadedFiles.find(isFrontSideFile);
+    const birthScanFiles = frontFile ? [frontFile] : uploadedFiles;
+    const birthFocusedResults = await Promise.all(birthScanFiles.map(f => runTesseractBirthDateScan(f.path)));
+    const frontBirthFocused = {
+      birth_date: pickLikelyBirthDate(
+        birthFocusedResults.map(r => r.birth_date).filter((d): d is string => Boolean(d)),
+      ),
+    };
 
     const openAiResult = await runOpenAIScan(uploadedFiles, mergedText);
     const geminiResult = await runGeminiScan(uploadedFiles, mergedText);
@@ -1132,6 +1160,16 @@ export const scanDNI = async (req: any, res: Response) => {
       ),
     };
 
+    // Si no se detectó CP pero sí la población, buscar sugerencias por Nominatim
+    let cpSuggestions: string[] = [];
+    if (!extracted.address_cp && extracted.address_town) {
+      cpSuggestions = await fetchPostalCodeSuggestions(extracted.address_town, extracted.address_province);
+      // Si solo hay una opción, rellenar automáticamente
+      if (cpSuggestions.length === 1) {
+        extracted = { ...extracted, address_cp: cpSuggestions[0] };
+      }
+    }
+
     const fieldSources = Object.keys(extracted).reduce<Partial<Record<keyof DniScanData, string>>>((acc, key) => {
       const typedKey = key as keyof DniScanData;
       const value = extracted[typedKey];
@@ -1180,6 +1218,7 @@ export const scanDNI = async (req: any, res: Response) => {
         scannedSides: uploadedFiles.length,
         detectedFields: buildDetectedFields(extracted, fieldSources),
         model: openAiResult?.model || geminiResult?.model || null,
+        address_cp_suggestions: cpSuggestions,
       },
     });
   } catch (error: any) {
