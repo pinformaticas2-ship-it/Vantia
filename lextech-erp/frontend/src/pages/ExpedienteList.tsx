@@ -1588,7 +1588,33 @@ function CsvFieldRow({
   invalid?: boolean;
   onChange: (id: string, value: string) => void;
 }) {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
+
   const isMapped = field.selected !== CSV_UNASSIGNED;
+
+  useEffect(() => {
+    if (!open) return;
+    if (btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 4, left: r.left, width: r.width });
+    }
+    const onDown = (e: MouseEvent) => {
+      if (!menuRef.current?.contains(e.target as Node) && !btnRef.current?.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const onScroll = () => setOpen(false);
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("scroll", onScroll, true);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("scroll", onScroll, true);
+    };
+  }, [open]);
+
   return (
     <div className="grid grid-cols-12 gap-6 items-center py-3.5 border-b border-slate-100 last:border-0 px-4 hover:bg-slate-50/50 transition-colors">
       <div className="col-span-5 flex flex-col">
@@ -1598,23 +1624,52 @@ function CsvFieldRow({
         </span>
         {field.help && <span className="text-xs text-slate-500 mt-0.5">{field.help}</span>}
       </div>
-      <div className="col-span-4 relative">
-        <select
-          value={field.selected}
-          onChange={(e) => onChange(field.id, e.target.value)}
-          className={`w-full pl-3.5 pr-9 py-2 rounded-lg text-sm appearance-none focus:outline-none transition-colors ${
+      <div className="col-span-4">
+        <button
+          ref={btnRef}
+          type="button"
+          onClick={() => setOpen(v => !v)}
+          className={`w-full flex items-center justify-between pl-3.5 pr-3 py-2 rounded-lg text-sm transition-all text-left ${
             isMapped
-              ? "bg-emerald-50 border border-emerald-300 text-emerald-800 font-semibold"
+              ? "bg-emerald-50 border border-emerald-300 text-emerald-800 font-semibold hover:border-emerald-400"
               : invalid
-              ? "bg-white border border-amber-300 text-slate-700 focus:ring-1 focus:ring-amber-400 focus:border-amber-400"
-              : "bg-white border border-slate-300 text-slate-600 focus:ring-1 focus:ring-slate-400 focus:border-slate-400"
-          }`}
+              ? "bg-white border border-amber-300 text-slate-700 hover:border-amber-400"
+              : "bg-white border border-slate-300 text-slate-600 hover:border-slate-400"
+          } ${open ? "ring-2 ring-slate-900/10" : ""}`}
         >
-          {options.map((opt) => (
-            <option key={opt} value={opt}>{opt}</option>
-          ))}
-        </select>
-        <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400" />
+          <span className="truncate">{field.selected}</span>
+          <ChevronDown size={13} className={`ml-2 flex-shrink-0 text-slate-400 transition-transform duration-150 ${open ? "rotate-180" : ""}`} />
+        </button>
+
+        {open && createPortal(
+          <div
+            ref={menuRef}
+            style={{ position: "fixed", top: pos.top, left: pos.left, width: pos.width, zIndex: 9999 }}
+            className="bg-white rounded-xl border border-slate-200 shadow-[0_8px_32px_rgba(15,23,42,0.14)] overflow-hidden py-1"
+          >
+            <div className="max-h-60 overflow-y-auto">
+              {options.map((opt) => {
+                const isSelected = field.selected === opt;
+                return (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => { onChange(field.id, opt); setOpen(false); }}
+                    className={`w-full flex items-center justify-between gap-3 px-3.5 py-2.5 text-sm text-left transition-colors ${
+                      isSelected
+                        ? "bg-slate-900 text-white"
+                        : "text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    <span className="truncate">{opt}</span>
+                    {isSelected && <Check size={13} className="flex-shrink-0 opacity-90" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>,
+          document.body
+        )}
       </div>
       <div className="col-span-3 text-right">
         {field.sample && field.sample !== "Sin detectar" ? (
