@@ -2050,7 +2050,7 @@ function EmailReader({
                       title="email-body"
                       srcDoc={srcDoc}
                       onLoad={handleIframeLoad}
-                      sandbox="allow-same-origin allow-popups"
+                      sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
                       style={{ width: '100%', height: iframeH, border: 'none', display: 'block', background: 'white' }}
                     />
                   )}
