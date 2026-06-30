@@ -570,6 +570,7 @@ function DropdownBtn({
   const [open, setOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -582,11 +583,20 @@ function DropdownBtn({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  const handleOpen = () => {
+    if (disabled) return;
+    if (btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 4, left: r.left });
+    }
+    setOpen(o => !o);
+  };
+
   return (
     <div className="relative shrink-0">
       <button
         ref={btnRef}
-        onClick={() => { if (!disabled) setOpen(o => !o); }}
+        onClick={handleOpen}
         disabled={disabled}
         title={label}
         className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-colors border active:scale-[0.97]
@@ -599,10 +609,11 @@ function DropdownBtn({
         <ChevronDownSmall size={10} />
       </button>
 
-      {open && (
+      {open && createPortal(
         <div
           ref={menuRef}
-          className="absolute left-0 top-full z-[9999] mt-1 min-w-[220px] max-w-[280px] bg-white border border-slate-200 rounded-xl shadow-2xl shadow-slate-300/40 py-1.5 max-h-[72vh] overflow-y-auto"
+          style={{ top: pos.top, left: pos.left }}
+          className="fixed z-[9999] min-w-[220px] max-w-[280px] bg-white border border-slate-200 rounded-xl shadow-2xl shadow-slate-300/40 py-1.5 max-h-[72vh] overflow-y-auto"
         >
           {items.map((item, i) =>
             item.divider ? (
@@ -618,7 +629,8 @@ function DropdownBtn({
               </button>
             )
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -637,6 +649,7 @@ function AltaOptionsBtn({
   const btnRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -677,7 +690,13 @@ function AltaOptionsBtn({
     <div ref={wrapRef} className="relative shrink-0">
       <button
         ref={btnRef}
-        onClick={() => setOpen((prev) => !prev)}
+        onClick={() => {
+          if (btnRef.current) {
+            const r = btnRef.current.getBoundingClientRect();
+            setPos({ top: r.bottom + 4, left: r.left });
+          }
+          setOpen(prev => !prev);
+        }}
         className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-all select-none whitespace-nowrap border active:scale-[0.97] ${
           open
             ? "bg-red-700 text-white border-red-700"
@@ -689,10 +708,11 @@ function AltaOptionsBtn({
         <ChevronDownSmall size={10} className={`transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
-      {open && (
+      {open && createPortal(
         <div
           ref={menuRef}
-          className="absolute left-0 top-full z-50 mt-2 w-[330px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.18)]"
+          style={{ top: pos.top, left: pos.left }}
+          className="fixed z-[9999] w-[330px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.18)]"
         >
           <div className="border-b border-slate-100 bg-slate-50/80 px-4 py-3">
             <p className="text-sm font-semibold text-slate-600">Elige cómo quieres agregar clientes</p>
@@ -714,7 +734,8 @@ function AltaOptionsBtn({
               </button>
             ))}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -1066,6 +1087,8 @@ export default function ClientList() {
   const [showOpciones, setShowOpciones] = useState(false);
   const [showColumnModal, setShowColumnModal] = useState(false);
   const opcionesRef = useRef<HTMLDivElement>(null);
+  const opcionesMenuRef = useRef<HTMLDivElement>(null);
+  const [opcionesPos, setOpcionesPos] = useState({ top: 0, right: 0 });
   const [showAdjuntos, setShowAdjuntos] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<Record<ClientListColumnKey, boolean>>(() => {
     try {
@@ -1081,7 +1104,10 @@ export default function ClientList() {
   // Cerrar Opciones al clicar fuera
   React.useEffect(() => {
     function outside(e: MouseEvent) {
-      if (opcionesRef.current && !opcionesRef.current.contains(e.target as Node)) {
+      if (
+        opcionesRef.current && !opcionesRef.current.contains(e.target as Node) &&
+        !opcionesMenuRef.current?.contains(e.target as Node)
+      ) {
         setShowOpciones(false);
       }
     }
@@ -2147,12 +2173,18 @@ export default function ClientList() {
           {/* ─ Opciones ─ */}
           <div className="relative" ref={opcionesRef}>
             <button
-              onClick={() => setShowOpciones(v => !v)}
+              onClick={() => {
+                if (opcionesRef.current) {
+                  const r = opcionesRef.current.getBoundingClientRect();
+                  setOpcionesPos({ top: r.bottom + 8, right: window.innerWidth - r.right });
+                }
+                setShowOpciones(v => !v);
+              }}
               className={`inline-flex items-center gap-1.5 whitespace-nowrap px-3 py-2 rounded-lg text-xs font-semibold transition-all border active:scale-[0.97] ${showOpciones ? "bg-red-50 border-red-300 text-red-700" : "text-slate-600 hover:bg-slate-50 hover:border-slate-300 border-slate-200 bg-white"}`}>
               <MoreHorizontal size={13} /> <span className="hidden sm:inline">Opciones</span> <ChevronDown size={10} />
             </button>
-            {showOpciones && (
-              <div className="absolute right-0 top-full mt-2 z-50 w-[290px] bg-white border border-slate-200 rounded-2xl shadow-[0_24px_60px_rgba(15,23,42,0.18)] py-1.5 overflow-visible">
+            {showOpciones && createPortal(
+              <div ref={opcionesMenuRef} style={{ top: opcionesPos.top, right: opcionesPos.right }} className="fixed z-[9999] w-[290px] bg-white border border-slate-200 rounded-2xl shadow-[0_24px_60px_rgba(15,23,42,0.18)] py-1.5 overflow-visible">
 
                 {/* Grupo 1 */}
                 <button onClick={() => { alert("Seleccionar opciones favoritas"); setShowOpciones(false); }}
@@ -2280,7 +2312,8 @@ export default function ClientList() {
                   </div>
                 </div>
 
-              </div>
+              </div>,
+              document.body
             )}
           </div>
 
