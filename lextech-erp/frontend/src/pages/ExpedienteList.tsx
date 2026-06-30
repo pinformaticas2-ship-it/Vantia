@@ -2884,7 +2884,7 @@ function DocumentImportView({
   }));
 
   return (
-    <div className="p-5 space-y-4 animate-in fade-in duration-300">
+    <div className="flex-1 flex flex-col overflow-hidden animate-page-in">
       <input
         ref={inputRef}
         type="file"
@@ -2893,313 +2893,287 @@ function DocumentImportView({
         onChange={(e) => onFileChange(e.target.files?.[0] ?? null)}
       />
 
-      <div className="flex items-center gap-4">
-        <BackButton label="Volver a Expedientes" onClick={onBack} />
-      </div>
-
-      <div>
-        <h1 className="text-base font-bold text-slate-900">Importar Expedientes desde Documentos</h1>
-        <p className="mt-0.5 text-xs text-slate-500">Sube tus archivos para crear nuevos expedientes automáticamente.</p>
-      </div>
-
-      <section className="rounded-[20px] border border-slate-200 bg-white px-4 py-4 shadow-sm">
-        <h2 className="text-sm font-semibold text-slate-900">Configuración de Asignación (Opcional)</h2>
-        <p className="mt-0.5 text-xs text-slate-500">
-          Puedes asignar automáticamente los expedientes creados a otras organizaciones.
-        </p>
-
-        <button
-          type="button"
-          onClick={onToggleAutoAssign}
-          className="mt-4 inline-flex items-center gap-3 text-left"
-        >
-          <span
-            className={`relative inline-flex h-6 w-10 shrink-0 rounded-full transition-colors ${
-              autoAssignOrganizations ? "bg-[#ab0433]" : "bg-slate-200"
-            }`}
+      {/* Header */}
+      <div className="flex-shrink-0 px-6 lg:px-10 py-6 border-b border-slate-200 bg-white z-10 animate-card-in">
+        <div className="flex flex-col gap-3">
+          <button
+            onClick={onBack}
+            className="w-max inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-all shadow-sm"
           >
-            <span
-              className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
-                autoAssignOrganizations ? "translate-x-[18px]" : "translate-x-0.5"
-              }`}
-            />
-          </span>
-          <span className="text-sm font-semibold text-slate-900">Asignar automáticamente organizaciones</span>
-        </button>
-
-        {autoAssignOrganizations && (
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <PrettyAssignSelect
-              label="Cliente"
-              placeholder="Seleccionar cliente..."
-              value={selectedClientId}
-              options={clientOptions}
-              emptyMessage="No hay clientes disponibles"
-              searchablePlaceholder="Buscar por nombre o ID..."
-              onChange={onChangeClient}
-            />
-
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-semibold text-slate-900">Procurador</span>
-              <input
-                type="text"
-                value={selectedProcurador}
-                onChange={(e) => onChangeProcurador(e.target.value)}
-                placeholder="Escribir procurador..."
-                className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-[15px] text-slate-700 shadow-sm outline-none transition-all placeholder:text-slate-400 focus:border-[#ab0433]/35 focus:ring-4 focus:ring-[#ab0433]/10"
-              />
-            </label>
-          </div>
-        )}
-      </section>
-
-      <section className="rounded-[20px] border border-slate-200 bg-white px-4 py-4 shadow-sm">
-        <h2 className="text-sm font-semibold text-slate-900">Importar Expedientes</h2>
-        <p className="mt-0.5 text-xs text-slate-500">
-          Sube un archivo ZIP que contenga documentos del expediente. Cada documento se procesará como un nuevo expediente.
-        </p>
-
-        <ZipDropArea
-          zipFileName={zipFileName}
-          onSelectFile={onSelectFile}
-          onFileChange={onFileChange}
-        />
-
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <ChevronLeft size={13} />
+            Volver a Expedientes
+          </button>
           <div>
-            <p className="text-sm font-semibold text-slate-900">
-              {zipFile ? "Archivo listo para importar" : "Selecciona un ZIP para comenzar"}
-            </p>
-            <p className="mt-1 text-xs text-slate-500">
-              {zipFile
-                ? `${zipFile.name} · ${(zipFile.size / (1024 * 1024)).toFixed(2)} MB`
-                : "El sistema extraerá texto de cada documento y creará un expediente por archivo."}
-            </p>
-            {importError && (
-              <p className="mt-2 text-xs font-medium text-red-600">{importError}</p>
-            )}
-            {importBusy && (
-              <div className="mt-3 w-full max-w-md">
-                <div className="mb-1 flex items-center justify-between text-[11px] font-medium text-slate-500">
-                  <span>{uploadStage === "uploading" ? "Subiendo ZIP..." : "Procesando documentos..."}</span>
-                  <span>{uploadStage === "uploading" ? `${uploadProgress}%` : "Servidor trabajando"}</span>
-                </div>
-                <div className="h-2.5 overflow-hidden rounded-full bg-slate-200">
-                  <div
-                    className={`h-full rounded-full transition-all duration-300 ${uploadStage === "uploading" ? "bg-[#ab0433]" : "bg-amber-500 animate-pulse"}`}
-                    style={{ width: `${uploadStage === "uploading" ? Math.max(uploadProgress, 6) : 100}%` }}
+            <h1 className="text-2xl font-extrabold text-slate-800 leading-tight">Importar Expedientes desde Documentos</h1>
+            <p className="text-sm text-slate-500 mt-1">Sube tus archivos ZIP para crear nuevos expedientes automáticamente.</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Two-column layout */}
+      <div className="flex-1 flex flex-col lg:flex-row gap-6 p-6 lg:p-10 overflow-hidden bg-[#f4f6f8]">
+
+        {/* Left column — scrolls if content overflows */}
+        <div className="flex-1 flex flex-col gap-6 overflow-y-auto min-w-0 animate-card-in-1">
+
+          {/* Config card */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex-shrink-0">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2 bg-slate-50/50">
+              <SlidersHorizontal size={14} className="text-slate-400" />
+              <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Configuración de Asignación (Opcional)</h3>
+            </div>
+            <div className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-bold text-slate-800">Asignar automáticamente organizaciones</p>
+                <p className="text-xs text-slate-500 mt-1">Puedes asignar automáticamente los expedientes creados a otras organizaciones.</p>
+              </div>
+              <button
+                type="button"
+                onClick={onToggleAutoAssign}
+                className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors ${autoAssignOrganizations ? "bg-red-600" : "bg-slate-200"}`}
+              >
+                <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${autoAssignOrganizations ? "translate-x-[22px]" : "translate-x-0.5"}`} />
+              </button>
+            </div>
+            {autoAssignOrganizations && (
+              <div className="px-6 pb-6 pt-4 grid gap-4 md:grid-cols-2 border-t border-slate-100">
+                <PrettyAssignSelect
+                  label="Cliente"
+                  placeholder="Seleccionar cliente..."
+                  value={selectedClientId}
+                  options={clientOptions}
+                  emptyMessage="No hay clientes disponibles"
+                  searchablePlaceholder="Buscar por nombre o ID..."
+                  onChange={onChangeClient}
+                />
+                <label className="block">
+                  <span className="mb-1.5 block text-sm font-semibold text-slate-900">Procurador</span>
+                  <input
+                    type="text"
+                    value={selectedProcurador}
+                    onChange={(e) => onChangeProcurador(e.target.value)}
+                    placeholder="Escribir procurador..."
+                    className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-[15px] text-slate-700 shadow-sm outline-none transition-all placeholder:text-slate-400 focus:border-[#ab0433]/35 focus:ring-4 focus:ring-[#ab0433]/10"
                   />
-                </div>
+                </label>
               </div>
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={onStartImport}
-            disabled={!zipFile || importBusy}
-            className={`inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-bold transition-all ${
-              !zipFile || importBusy
-                ? "cursor-not-allowed bg-slate-200 text-slate-400"
-                : "bg-[#ab0433] text-white shadow-lg shadow-red-200 hover:bg-[#92042c]"
-            }`}
-          >
-            {importBusy ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
-            {importBusy ? "Importando documentos..." : "Procesar ZIP e importar"}
-          </button>
-        </div>
-      </section>
-
-      {successNotice && (
-        <section className="rounded-[24px] border border-emerald-200 bg-emerald-50 px-6 py-4 shadow-sm">
-          <div className="flex items-center gap-3 text-sm font-medium text-emerald-800">
-            <CheckCircle2 size={18} />
-            <span>{successNotice}</span>
-          </div>
-        </section>
-      )}
-
-      {(activeBatch || activeItems.length > 0) && (
-        <section className="rounded-[20px] border border-slate-200 bg-white px-4 py-4 shadow-sm">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-3">
-                <h2 className="text-sm font-semibold text-slate-900">Última importación</h2>
-                {activeBatch && (activeBatch.pending_count ?? 0) > 0 && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-800">
-                    {activeBatch.pending_count} pendiente{(activeBatch.pending_count ?? 0) !== 1 ? "s" : ""}
-                  </span>
+          {/* Import card */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col flex-shrink-0">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2 bg-slate-50/50">
+              <Upload size={14} className="text-slate-400" />
+              <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Importar Expedientes</h3>
+            </div>
+            <div className="p-6 flex flex-col">
+              <p className="text-sm text-slate-500 mb-2">Sube un archivo ZIP que contenga documentos del expediente. Cada documento se procesará como un nuevo expediente.</p>
+              <ZipDropArea zipFileName={zipFileName} onSelectFile={onSelectFile} onFileChange={onFileChange} />
+            </div>
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-bold text-slate-800">
+                  {zipFile ? "Archivo listo para importar" : "Selecciona un ZIP para comenzar"}
+                </p>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {zipFile
+                    ? `${zipFile.name} · ${(zipFile.size / (1024 * 1024)).toFixed(2)} MB`
+                    : "El sistema extraerá texto de cada documento."}
+                </p>
+                {importError && <p className="mt-1 text-xs font-medium text-red-600">{importError}</p>}
+                {importBusy && (
+                  <div className="mt-2 w-full max-w-xs">
+                    <div className="mb-1 flex items-center justify-between text-[11px] font-medium text-slate-500">
+                      <span>{uploadStage === "uploading" ? "Subiendo ZIP..." : "Procesando documentos..."}</span>
+                      <span>{uploadStage === "uploading" ? `${uploadProgress}%` : "Servidor trabajando"}</span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+                      <div
+                        className={`h-full rounded-full transition-all duration-300 ${uploadStage === "uploading" ? "bg-red-600" : "bg-amber-500 animate-pulse"}`}
+                        style={{ width: `${uploadStage === "uploading" ? Math.max(uploadProgress, 6) : 100}%` }}
+                      />
+                    </div>
+                  </div>
                 )}
               </div>
-              <p className="mt-1 text-sm text-slate-500">
-                Estado del lote y expedientes creados a partir de tus documentos.
-              </p>
+              <button
+                type="button"
+                onClick={onStartImport}
+                disabled={!zipFile || importBusy}
+                className={`inline-flex items-center gap-2 px-6 py-2.5 text-sm font-bold rounded-lg transition-colors flex-shrink-0 ${
+                  !zipFile || importBusy
+                    ? "bg-slate-300 text-white cursor-not-allowed"
+                    : "bg-red-600 hover:bg-red-700 text-white shadow-sm"
+                }`}
+              >
+                {importBusy ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
+                {importBusy ? "Importando documentos..." : "Procesar ZIP e importar"}
+              </button>
             </div>
-            {activeBatch && (
-              <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
-                activeBatch.status === "completed"
-                  ? "bg-emerald-50 text-emerald-700"
-                  : activeBatch.status === "failed"
-                  ? "bg-red-50 text-red-700"
-                  : "bg-amber-50 text-amber-700"
-              }`}>
-                {batchStatusLabel(activeBatch.status)}
-              </span>
-            )}
           </div>
 
-          {activeBatch && (
-            <div className="mt-4 grid gap-2.5 md:grid-cols-4">
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <p className="text-[10px] uppercase tracking-wide text-slate-400">Archivo</p>
-                <p className="mt-0.5 text-xs font-semibold text-slate-900 break-all">{activeBatch.file_name}</p>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <p className="text-[10px] uppercase tracking-wide text-slate-400">Total</p>
-                <p className="mt-0.5 text-base font-bold text-slate-900">{activeBatch.total_count || 0}</p>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <p className="text-[10px] uppercase tracking-wide text-slate-400">Creados</p>
-                <p className="mt-0.5 text-base font-bold text-emerald-600">{activeBatch.completed_count || 0}</p>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <p className="text-[10px] uppercase tracking-wide text-slate-400">Errores</p>
-                <p className="mt-0.5 text-base font-bold text-red-600">{activeBatch.error_count || 0}</p>
+          {/* Success notice */}
+          {successNotice && (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 shadow-sm flex-shrink-0">
+              <div className="flex items-center gap-3 text-sm font-medium text-emerald-800">
+                <CheckCircle2 size={16} />
+                <span>{successNotice}</span>
               </div>
             </div>
           )}
 
-          <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">
-            <div className="grid grid-cols-[88px_minmax(0,1.3fr)_120px_minmax(0,1.2fr)_120px] gap-3 bg-slate-50 px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-slate-500">
-              <span>Fila</span>
-              <span>Documento</span>
-              <span>Estado</span>
-              <span>Resultado</span>
-              <span>Acción</span>
-            </div>
-
-            {activeItems.length === 0 ? (
-              <div className="px-4 py-6 text-sm text-slate-400">Todavía no hay elementos para mostrar.</div>
-            ) : (
-              activeItems.map((item) => {
-                const fileName = item.payload?.fileName || item.reference || `Documento ${item.row_number}`;
-                const expedienteLabel = item.anio && item.num_exp
-                  ? `${item.anio}/${item.num_exp}`
-                  : item.descripcion || "Expediente creado";
-                return (
-                  <div key={item.id} className="grid grid-cols-[88px_minmax(0,1.3fr)_120px_minmax(0,1.2fr)_120px] gap-3 border-t border-slate-100 px-4 py-3 text-sm">
-                    <span className="font-mono text-slate-500">{item.row_number}</span>
-                    <div className="min-w-0">
-                      <p className="truncate font-medium text-slate-800">{fileName}</p>
-                      {item.descripcion && <p className="truncate text-xs text-slate-400">{item.descripcion}</p>}
-                    </div>
-                    <span className={`inline-flex h-fit items-center rounded-full px-2.5 py-1 text-xs font-semibold ${
-                      item.status === "completed"
-                        ? "bg-emerald-50 text-emerald-700"
-                        : item.status === "uploaded"
-                        ? "bg-amber-50 text-amber-700"
-                        : "bg-red-50 text-red-700"
-                    }`}>
-                      {item.status === "completed" ? "Creado" : item.status === "uploaded" ? "Pendiente" : "Error"}
+          {/* Active batch */}
+          {(activeBatch || activeItems.length > 0) && (
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex-shrink-0">
+              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <div className="flex items-center gap-3">
+                  <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Última importación</h3>
+                  {activeBatch && (activeBatch.pending_count ?? 0) > 0 && (
+                    <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">
+                      {activeBatch.pending_count} pendiente{(activeBatch.pending_count ?? 0) !== 1 ? "s" : ""}
                     </span>
-                    <div className="min-w-0">
-                      {item.status === "completed" ? (
-                        <p className="truncate text-slate-700">{expedienteLabel}</p>
-                      ) : item.status === "uploaded" ? (
-                        <p className="truncate text-amber-700">Documento listo para revisión y verificación</p>
-                      ) : (
-                        <p className="truncate text-red-600">{item.payload?.userError || item.error_message || "No se pudo procesar"}</p>
-                      )}
+                  )}
+                </div>
+                {activeBatch && (
+                  <span className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md border ${
+                    activeBatch.status === "completed" ? "bg-emerald-50 text-emerald-700 border-emerald-100"
+                    : activeBatch.status === "failed" ? "bg-red-50 text-red-700 border-red-100"
+                    : "bg-amber-50 text-amber-700 border-amber-200"
+                  }`}>
+                    {batchStatusLabel(activeBatch.status)}
+                  </span>
+                )}
+              </div>
+              {activeBatch && (
+                <div className="px-6 py-4 grid gap-2.5 grid-cols-4 border-b border-slate-100">
+                  {[
+                    { label: "Archivo", value: activeBatch.file_name, cls: "text-xs font-semibold text-slate-900 break-all" },
+                    { label: "Total", value: String(activeBatch.total_count || 0), cls: "text-base font-bold text-slate-900" },
+                    { label: "Creados", value: String(activeBatch.completed_count || 0), cls: "text-base font-bold text-emerald-600" },
+                    { label: "Errores", value: String(activeBatch.error_count || 0), cls: "text-base font-bold text-red-600" },
+                  ].map(({ label, value, cls }) => (
+                    <div key={label} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                      <p className="text-[10px] uppercase tracking-wide text-slate-400">{label}</p>
+                      <p className={`mt-0.5 ${cls}`}>{value}</p>
                     </div>
-                    <div>
-                      {(item.status === "uploaded" || item.status === "failed") && (
-                        <button
-                          type="button"
-                          onClick={() => onVerifyItem(item)}
-                          className="mb-1 inline-flex items-center gap-1 text-xs font-semibold text-[#ab0433] hover:text-[#92042c]"
-                        >
-                          <Eye size={12} />
-                          {item.status === "uploaded" ? "Verificar" : "Revisar"}
-                        </button>
-                      )}
-                      {item.created_expediente_id ? (
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/dashboard/expedientes/${item.created_expediente_id}`)}
-                          className="inline-flex items-center gap-1 text-xs font-semibold text-[#ab0433] hover:text-[#92042c]"
-                        >
-                          <ExternalLink size={12} />
-                          Abrir
-                        </button>
-                      ) : (
-                        <span className="text-xs text-slate-300">—</span>
-                      )}
+                  ))}
+                </div>
+              )}
+              <div className="overflow-x-auto">
+                <div className="grid grid-cols-[88px_minmax(0,1.3fr)_110px_minmax(0,1.2fr)_110px] gap-3 bg-slate-50 px-4 py-3 text-[11px] font-bold uppercase tracking-wide text-slate-500 min-w-[560px]">
+                  <span>Fila</span><span>Documento</span><span>Estado</span><span>Resultado</span><span>Acción</span>
+                </div>
+                {activeItems.length === 0 ? (
+                  <div className="px-4 py-6 text-sm text-slate-400">Todavía no hay elementos para mostrar.</div>
+                ) : activeItems.map((item) => {
+                  const fileName = item.payload?.fileName || item.reference || `Documento ${item.row_number}`;
+                  const expedienteLabel = item.anio && item.num_exp ? `${item.anio}/${item.num_exp}` : item.descripcion || "Expediente creado";
+                  return (
+                    <div key={item.id} className="grid grid-cols-[88px_minmax(0,1.3fr)_110px_minmax(0,1.2fr)_110px] gap-3 border-t border-slate-100 px-4 py-3 text-sm min-w-[560px]">
+                      <span className="font-mono text-slate-500">{item.row_number}</span>
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-slate-800">{fileName}</p>
+                        {item.descripcion && <p className="truncate text-xs text-slate-400">{item.descripcion}</p>}
+                      </div>
+                      <span className={`inline-flex h-fit items-center rounded-full px-2.5 py-1 text-xs font-semibold ${
+                        item.status === "completed" ? "bg-emerald-50 text-emerald-700"
+                        : item.status === "uploaded" ? "bg-amber-50 text-amber-700"
+                        : "bg-red-50 text-red-700"
+                      }`}>
+                        {item.status === "completed" ? "Creado" : item.status === "uploaded" ? "Pendiente" : "Error"}
+                      </span>
+                      <div className="min-w-0">
+                        {item.status === "completed" ? <p className="truncate text-slate-700">{expedienteLabel}</p>
+                        : item.status === "uploaded" ? <p className="truncate text-amber-700">Listo para revisión</p>
+                        : <p className="truncate text-red-600">{item.payload?.userError || item.error_message || "No se pudo procesar"}</p>}
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        {(item.status === "uploaded" || item.status === "failed") && (
+                          <button type="button" onClick={() => onVerifyItem(item)} className="inline-flex items-center gap-1 text-xs font-semibold text-[#ab0433] hover:text-[#92042c]">
+                            <Eye size={12} />{item.status === "uploaded" ? "Verificar" : "Revisar"}
+                          </button>
+                        )}
+                        {item.created_expediente_id ? (
+                          <button type="button" onClick={() => navigate(`/dashboard/expedientes/${item.created_expediente_id}`)} className="inline-flex items-center gap-1 text-xs font-semibold text-[#ab0433] hover:text-[#92042c]">
+                            <ExternalLink size={12} />Abrir
+                          </button>
+                        ) : <span className="text-xs text-slate-300">—</span>}
+                      </div>
                     </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </section>
-      )}
-
-      <section className="rounded-[20px] border border-slate-200 bg-white px-4 py-4 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-semibold text-slate-900">Historial reciente</h2>
-            <p className="mt-0.5 text-xs text-slate-500">Últimos lotes importados desde documentos.</p>
-          </div>
-          <button
-            type="button"
-            onClick={onReloadHistory}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50"
-          >
-            <RefreshCw size={12} />
-            Recargar
-          </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
-        {historyError && <p className="mt-4 text-sm text-red-600">{historyError}</p>}
-        {loadingHistory ? (
-          <div className="mt-5 flex items-center gap-2 text-sm text-slate-400">
-            <Loader2 size={16} className="animate-spin" />
-            Cargando historial...
+        {/* Right: History panel */}
+        <div className="w-full lg:w-[450px] xl:w-[500px] flex-shrink-0 flex flex-col bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden min-h-[400px] lg:min-h-0 animate-card-in-2">
+          <div className="flex-shrink-0 px-6 py-4 border-b border-slate-200 bg-slate-50/80 flex items-center justify-between">
+            <div>
+              <h2 className="text-[13px] font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                <History size={14} className="text-slate-400" />
+                Historial reciente
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">Últimos lotes procesados.</p>
+            </div>
+            <button
+              type="button"
+              onClick={onReloadHistory}
+              className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-all shadow-sm"
+            >
+              <RefreshCw size={12} className="text-slate-400" />
+              Recargar
+            </button>
           </div>
-        ) : history.length === 0 ? (
-          <p className="mt-5 text-sm text-slate-400">Aún no hay importaciones documentales registradas.</p>
-        ) : (
-          <div className="mt-5 space-y-3">
-            {history.map((batch) => (
-              <div key={batch.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 px-4 py-3">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-slate-900">{batch.file_name}</p>
-                  <p className="mt-1 text-xs text-slate-400">
-                    {new Date(batch.created_at).toLocaleString("es-ES")} · {batch.completed_count}/{batch.total_count} creados
-                  </p>
+
+          <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-2.5 bg-slate-50/30">
+            {historyError && <p className="text-sm text-red-600 px-2 py-1">{historyError}</p>}
+            {loadingHistory ? (
+              <div className="flex items-center justify-center gap-2 text-sm text-slate-400 py-10">
+                <Loader2 size={15} className="animate-spin" />
+                Cargando historial...
+              </div>
+            ) : history.length === 0 ? (
+              <div className="text-sm text-slate-400 py-10 text-center">Aún no hay importaciones registradas.</div>
+            ) : history.map((batch) => (
+              <div key={batch.id} className="bg-white border border-slate-200 p-4 rounded-lg shadow-sm flex items-center justify-between group hover:border-slate-300 transition-colors">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 border ${
+                    batch.status === "completed"
+                      ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                      : "bg-amber-50 text-amber-600 border-amber-100"
+                  }`}>
+                    <FileText size={15} />
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <p className="text-sm font-bold text-slate-800 truncate">{batch.file_name}</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      {new Date(batch.created_at).toLocaleString("es-ES")} · <span className="font-medium text-slate-700">{batch.completed_count}/{batch.total_count} creados</span>
+                    </p>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-2.5 pl-3 flex-shrink-0">
                   {(batch.status === "reviewing" || batch.status === "processing") && (
                     <button
                       onClick={() => onReviewBatch(batch)}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 border border-amber-200 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition-colors"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 border border-amber-200 px-2.5 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition-colors"
                     >
-                      <Eye size={12} />
+                      <Eye size={11} />
                       Revisar
                     </button>
                   )}
-                  <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
-                    batch.status === "completed"
-                      ? "bg-emerald-50 text-emerald-700"
-                      : batch.status === "failed"
-                      ? "bg-red-50 text-red-700"
-                      : "bg-amber-50 text-amber-700"
+                  <span className={`px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md border ${
+                    batch.status === "completed" ? "bg-emerald-50 text-emerald-700 border-emerald-100"
+                    : batch.status === "failed" ? "bg-red-50 text-red-700 border-red-100"
+                    : "bg-amber-50 text-amber-700 border-amber-200"
                   }`}>
                     {batchStatusLabel(batch.status)}
                   </span>
                   <button
                     onClick={() => onDeleteBatch(batch.id)}
-                    className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                    title="Eliminar este lote"
+                    title="Eliminar del historial"
+                    className="text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
                   >
                     <Trash2 size={14} />
                   </button>
@@ -3207,8 +3181,9 @@ function DocumentImportView({
               </div>
             ))}
           </div>
-        )}
-      </section>
+        </div>
+
+      </div>
     </div>
   );
 }
