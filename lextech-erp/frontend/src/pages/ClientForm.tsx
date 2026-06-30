@@ -5,7 +5,7 @@ import { useNavigate, useParams, Link, useSearchParams } from "react-router-dom"
 import {
   Save, X, ScanLine, Upload, Image as ImageIcon,
   Loader2, Sparkles, RotateCcw, AlertTriangle, CheckCircle2,
-  Camera, Edit3, Users, MapPin, Phone, Briefcase, MessageSquare, ChevronLeft,
+  Camera, Edit3, Users, MapPin, Phone, Briefcase, MessageSquare, ChevronLeft, ChevronRight, Info,
 } from "lucide-react";
 import { safeJson } from "../lib/api";
 import BackButton from "../components/BackButton";
@@ -769,34 +769,41 @@ export default function ClientForm() {
     </div>
   );
 
-  if (isDniFlow) return (
-    <div className="animate-in fade-in duration-500 bg-slate-50 -m-6 min-h-screen p-6">
-      <form onSubmit={handleSubmit} className="mx-auto max-w-[1440px] space-y-6">
-        <div className="rounded-[24px] border border-slate-200 bg-white px-6 py-5 shadow-sm">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <Link to="/dashboard/clientes">
-                <BackButton />
+
+  if (isDniFlow) {
+    const inputClsDni = (field: string) =>
+      `w-full px-3.5 py-2.5 bg-white border rounded-md text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-red-500 focus:border-red-500 transition-colors ${
+        isInvalid(field) ? "border-red-400 ring-1 ring-red-100 bg-red-50/30" : h(field) ? "border-emerald-400 ring-1 ring-emerald-100 bg-emerald-50/30" : "border-slate-300"
+      }`;
+    const lblDni = "text-xs font-bold text-slate-500 uppercase tracking-wider";
+
+    return (
+      <div className="animate-in fade-in duration-500 bg-white flex flex-col h-full overflow-hidden">
+        <form onSubmit={handleSubmit} className="h-full flex flex-col overflow-hidden">
+
+          {/* HEADER */}
+          <div className="px-6 sm:px-8 py-5 bg-white border-b border-slate-200 flex-shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <Link to="/dashboard/clientes" className="shrink-0">
+                <button type="button" className="flex items-center gap-1.5 text-slate-500 hover:text-slate-800 text-xs font-semibold px-3 py-2 rounded-md bg-white border border-transparent hover:border-slate-200 hover:bg-slate-50 transition-all">
+                  <ChevronLeft size={13} /> Volver
+                </button>
               </Link>
-              <div className="flex items-start gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-red-100 bg-red-50 text-red-600">
+              <div className="w-px h-6 bg-slate-200 hidden sm:block" />
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-red-100 bg-red-50 text-red-600 shrink-0">
                   <ScanLine size={18} />
                 </div>
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-slate-400">Alta de clientes</p>
-                  <h1 className="mt-1 text-base font-semibold leading-tight text-slate-900">Dar de alta clientes con DNI</h1>
-                  <p className="mt-1 text-sm text-slate-500">
-                    {dniStep === "scan"
-                      ? "Sube anverso y reverso del DNI, revisa la identidad detectada y continúa al alta asistida."
-                      : "Completa los datos de contacto y administración. La identidad personal ya viene preparada desde el escaneo."}
-                  </p>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-slate-400">Alta de clientes</p>
+                  <h1 className="text-xl font-bold text-slate-900">Lectura inteligente de DNI</h1>
                 </div>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <Link to="/dashboard/clientes">
-                <button type="button" className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-slate-500 transition-colors hover:bg-slate-100">
-                  <X size={14} /> Cancelar
+                <button type="button" className="flex items-center gap-1.5 text-slate-500 hover:text-slate-800 text-xs font-semibold px-3 py-2 rounded-md bg-white border border-transparent hover:border-slate-200 hover:bg-slate-50 transition-all">
+                  <X size={13} /> Cancelar
                 </button>
               </Link>
               {dniStep === "scan" ? (
@@ -804,531 +811,554 @@ export default function ClientForm() {
                   type="button"
                   onClick={() => setDniStep("complete")}
                   disabled={!scanDone || !!scanError || !form.first_name || !form.nif_cif}
-                  className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-1.5 text-sm font-bold text-white shadow-sm shadow-red-200 transition-all hover:bg-red-700 disabled:opacity-60"
+                  className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white shadow-sm shadow-red-200 transition-all hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Save size={13} /> Continuar
+                  Continuar <ChevronRight size={14} />
                 </button>
               ) : (
                 <>
                   <button
                     type="button"
                     onClick={() => setDniStep("scan")}
-                    className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-1.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100"
+                    className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100"
                   >
-                    <Edit3 size={13} /> Volver a revisión
+                    <ChevronLeft size={14} /> Volver a revisión
                   </button>
                   <button
                     type="submit"
                     disabled={loading || showSuccess || !form.first_name || !form.nif_cif}
-                    className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-1.5 text-sm font-bold text-white shadow-sm shadow-red-200 transition-all hover:bg-red-700 disabled:opacity-60"
+                    className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white shadow-sm shadow-red-200 transition-all hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {loading
-                      ? <><Loader2 size={13} className="animate-spin" /> Guardando...</>
-                      : <><Save size={13} /> Guardar cliente</>}
+                    {loading ? <><Loader2 size={14} className="animate-spin" /> Guardando...</> : <><Save size={14} /> Guardar cliente</>}
                   </button>
                 </>
               )}
             </div>
           </div>
-        </div>
 
-        {showSuccess && (
-          <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-medium text-emerald-700">
-            <CheckCircle2 size={18} className="shrink-0" />
-            ¡Cliente registrado! Redirigiendo...
-          </div>
-        )}
-        {error && (
-          <div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-            <AlertTriangle size={18} className="shrink-0" /> {error}
-          </div>
-        )}
+          {/* HIDDEN FILE INPUTS */}
+          <input ref={frontInputRef} type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && handleDniFile("front", e.target.files[0])} />
+          <input ref={backInputRef} type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && handleDniFile("back", e.target.files[0])} />
 
-        <section className="rounded-[24px] border border-slate-200 bg-white px-6 py-5 shadow-sm">
-          <h2 className="text-sm font-semibold text-slate-900">
-            {dniStep === "scan" ? "Paso 1 · Lectura inteligente del DNI" : "Paso 2 · Completar alta del cliente"}
-          </h2>
-          <p className="mt-1 text-sm text-slate-500">
-            {dniStep === "scan"
-              ? "Primero importa el DNI y verifica los datos personales detectados. Cuando estén bien, pulsa Continuar."
-              : "Ahora completa solo los datos que faltan para el alta. La identidad personal detectada se conserva arriba."}
-          </p>
-        </section>
+          {/* BODY */}
+          <main className="flex-1 min-h-0 overflow-y-auto p-6 sm:p-10 lg:p-12 bg-white">
+            <div className="max-w-[1400px] mx-auto space-y-10">
 
-        <input
-          ref={frontInputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={e => e.target.files?.[0] && handleDniFile("front", e.target.files[0])}
-        />
-        <input
-          ref={backInputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={e => e.target.files?.[0] && handleDniFile("back", e.target.files[0])}
-        />
-
-        {dniStep === "scan" && (
-        <section className="rounded-[24px] border border-slate-200 bg-white px-6 py-6 shadow-sm">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 className="text-sm font-semibold text-slate-900">Importar DNI</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Carga anverso y reverso para detectar identidad, fecha de nacimiento y datos de domicilio.
-              </p>
-            </div>
-            <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold text-slate-600">
-              {scanMeta?.source || "OpenAI / Gemini + Tesseract"}
-            </span>
-          </div>
-
-          <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(340px,0.85fr)]">
-            <div className="grid gap-4 md:grid-cols-2">
-              <button
-                type="button"
-                onClick={() => frontInputRef.current?.click()}
-                onDrop={handleDrop}
-                onDragOver={e => { e.preventDefault(); setIsDragOver(true); }}
-                onDragLeave={() => setIsDragOver(false)}
-                className={`group relative min-h-[260px] overflow-hidden rounded-[28px] border-2 text-left transition-all ${
-                  dniFrontImage
-                    ? "border-slate-200 bg-slate-950"
-                    : isDragOver
-                    ? "scale-[1.01] border-[#ab0433]/45 bg-red-50"
-                    : "border-dashed border-slate-200 bg-slate-50 hover:border-[#ab0433]/35 hover:bg-red-50/40"
-                }`}
-              >
-                {dniFrontImage ? (
-                  <>
-                    <img src={dniFrontImage} alt="DNI anverso" className="absolute inset-0 h-full w-full object-cover" />
-                    <div className="absolute inset-x-0 top-0 flex items-center justify-between bg-gradient-to-b from-black/70 via-black/35 to-transparent px-4 py-4">
-                      <span className="rounded-full border border-white/15 bg-black/45 px-3 py-1 text-[11px] font-semibold text-white">Anverso</span>
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); void rotateDniSide("front"); }}
-                        className="rounded-full border border-white/15 bg-black/45 px-3 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-[#ab0433]"
-                      >
-                        Girar
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex h-full min-h-[260px] flex-col items-center justify-center gap-4 px-8 text-center">
-                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-400 shadow-sm">
-                      <ImageIcon size={28} />
-                    </div>
-                    <div>
-                      <p className="text-xl font-bold text-slate-800">Subir anverso del DNI</p>
-                      <p className="mt-2 text-sm leading-6 text-slate-500">
-                        Foto frontal, completa, sin reflejos y con buena luz.
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => backInputRef.current?.click()}
-                className={`group relative min-h-[260px] overflow-hidden rounded-[28px] border-2 text-left transition-all ${
-                  dniBackImage
-                    ? "border-slate-200 bg-slate-950"
-                    : "border-dashed border-slate-200 bg-slate-50 hover:border-[#ab0433]/35 hover:bg-red-50/40"
-                }`}
-              >
-                {dniBackImage ? (
-                  <>
-                    <img src={dniBackImage} alt="DNI reverso" className="absolute inset-0 h-full w-full object-cover" />
-                    <div className="absolute inset-x-0 top-0 flex items-center justify-between bg-gradient-to-b from-black/70 via-black/35 to-transparent px-4 py-4">
-                      <span className="rounded-full border border-white/15 bg-black/45 px-3 py-1 text-[11px] font-semibold text-white">Reverso</span>
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); void rotateDniSide("back"); }}
-                        className="rounded-full border border-white/15 bg-black/45 px-3 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-[#ab0433]"
-                      >
-                        Girar
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex h-full min-h-[260px] flex-col items-center justify-center gap-4 px-8 text-center">
-                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-400 shadow-sm">
-                      <ImageIcon size={28} />
-                    </div>
-                    <div>
-                      <p className="text-xl font-bold text-slate-800">Subir reverso del DNI</p>
-                      <p className="mt-2 text-sm leading-6 text-slate-500">
-                        Recomendado para domicilio, código postal y provincia.
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </button>
-            </div>
-
-            <div className="rounded-[28px] border border-slate-200 bg-slate-50 px-5 py-5">
-              <p className="text-base font-bold text-slate-900">
-                {dniFrontImage || dniBackImage ? "Fotos listas para procesar" : "Añade las fotos para comenzar"}
-              </p>
-              <p className="mt-1 text-sm leading-6 text-slate-500">
-                El anverso aporta la identidad básica. El reverso ayuda con domicilio, población, código postal y provincia.
-              </p>
-
-              {scanError && (
-                <div className="mt-4 flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 px-3 py-3 text-xs text-red-700">
-                  <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-                  <span>{scanError}</span>
+              {showSuccess && (
+                <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-medium text-emerald-700">
+                  <CheckCircle2 size={18} className="shrink-0" /> ¡Cliente registrado! Redirigiendo...
+                </div>
+              )}
+              {error && (
+                <div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  <AlertTriangle size={18} className="shrink-0" /> {error}
                 </div>
               )}
 
-              {scanDone && !scanError && (
-                <div className="mt-4 space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-xs text-emerald-800">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Sparkles size={13} />
-                    <span className="font-semibold">{filledFields.size} campos aplicados al alta.</span>
-                    {typeof scanMeta?.fieldCount === "number" && scanMeta.fieldCount > filledFields.size && (
-                      <span className="text-emerald-700/90">Detectados {scanMeta.fieldCount}, pero algunos ya tenían valor.</span>
-                    )}
-                    {typeof scanMeta?.confidence === "number" && (
-                      <span className="text-emerald-700/90">Confianza OCR {scanMeta.confidence}%</span>
-                    )}
-                  </div>
-                  {scanMeta?.model && (
-                    <div className="text-[11px] text-emerald-700/90">Modelo usado: {scanMeta.model}</div>
-                  )}
-                  {Array.isArray(scanMeta?.detectedFields) && scanMeta.detectedFields.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {scanMeta.detectedFields.map((field) => (
-                        <span
-                          key={field.key}
-                          className={`rounded-full border px-2 py-1 ${
-                            filledFields.has(field.key)
-                              ? "border-emerald-300 bg-emerald-100 text-emerald-800"
-                              : "border-slate-200 bg-white text-slate-600"
-                          }`}
-                        >
-                          {OCR_FIELD_LABELS[field.key] || field.key}: {String(field.value)}
-                          {field.source ? ` · ${field.source}` : ""}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="mt-4 flex flex-wrap gap-2 text-[11px] text-slate-500">
-                <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1">Anverso + reverso recomendado</span>
-                <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1">Sin reflejos</span>
-                <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1">Documento recto y completo</span>
+              {/* Step header */}
+              <div>
+                <h2 className="text-base font-bold text-slate-900">
+                  {dniStep === "scan" ? "Paso 1 · Importación de documento" : "Paso 2 · Completar alta del cliente"}
+                </h2>
+                <p className="mt-1.5 text-sm text-slate-500">
+                  {dniStep === "scan"
+                    ? "Sube las imágenes del anverso y reverso del DNI. El sistema leerá automáticamente los datos de identidad y domicilio."
+                    : "Los datos de identidad ya están cargados. Completa la información de contacto y administración para finalizar el alta."}
+                </p>
               </div>
 
-              <div className="mt-5 flex flex-wrap gap-2">
-                {!dniFrontImage && !dniBackImage ? (
-                  <button
-                    type="button"
-                    onClick={() => frontInputRef.current?.click()}
-                    className="inline-flex items-center gap-2 rounded-2xl bg-[#ab0433] px-4 py-2 text-sm font-bold text-white shadow-lg shadow-red-200 transition-colors hover:bg-[#92042c]"
-                  >
-                    <Upload size={15} />
-                    Subir anverso
-                  </button>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={handleScanDNI}
-                      disabled={scanning || scanDone}
-                      className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-bold transition-all ${
-                        scanning || scanDone
-                          ? "cursor-not-allowed bg-slate-200 text-slate-500"
-                          : "bg-[#ab0433] text-white shadow-lg shadow-red-200 hover:bg-[#92042c]"
-                      }`}
-                    >
-                      {scanning ? <><Loader2 size={15} className="animate-spin" /> Leyendo...</> : scanDone ? <><CheckCircle2 size={15} /> Completado</> : <><ScanLine size={15} /> Escanear DNI</>}
-                    </button>
-                    {!dniBackImage && (
+              {dniStep === "scan" && (
+                <>
+                  {/* SUBIR IMÁGENES */}
+                  <div>
+                    <div className="flex items-center gap-3 mb-6">
+                      <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Subir imágenes</h3>
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-[11px] font-semibold text-indigo-700">
+                        <Sparkles size={11} /> {scanMeta?.source || "OpenAI / Gemini + Tesseract"}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                      {/* Anverso */}
+                      <button
+                        type="button"
+                        onClick={() => frontInputRef.current?.click()}
+                        onDrop={handleDrop}
+                        onDragOver={e => { e.preventDefault(); setIsDragOver(true); }}
+                        onDragLeave={() => setIsDragOver(false)}
+                        className={`relative min-h-[280px] overflow-hidden rounded-2xl border-2 text-left transition-all ${
+                          dniFrontImage
+                            ? "border-slate-200 bg-slate-950"
+                            : isDragOver
+                            ? "scale-[1.01] border-indigo-300 bg-indigo-50/50"
+                            : "border-dashed border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-slate-100/50"
+                        }`}
+                      >
+                        {dniFrontImage ? (
+                          <>
+                            <img src={dniFrontImage} alt="DNI anverso" className="absolute inset-0 h-full w-full object-cover" />
+                            <div className="absolute inset-x-0 top-0 flex items-center justify-between bg-gradient-to-b from-black/70 via-black/35 to-transparent px-4 py-4">
+                              <span className="rounded-full border border-white/15 bg-black/45 px-3 py-1 text-[11px] font-semibold text-white">Anverso</span>
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); void rotateDniSide("front"); }}
+                                className="rounded-full border border-white/15 bg-black/45 px-3 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-[#ab0433]"
+                              >
+                                Girar
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex h-full min-h-[280px] flex-col items-center justify-center gap-4 px-8 text-center">
+                            <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 shadow-sm">
+                              <ImageIcon size={24} />
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-slate-800">Anverso del DNI</p>
+                              <p className="mt-1.5 text-xs leading-5 text-slate-500">Foto frontal, completa, sin reflejos</p>
+                            </div>
+                            <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm">
+                              <Upload size={12} /> Seleccionar archivo
+                            </span>
+                          </div>
+                        )}
+                      </button>
+
+                      {/* Reverso */}
                       <button
                         type="button"
                         onClick={() => backInputRef.current?.click()}
-                        className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100"
+                        className={`relative min-h-[280px] overflow-hidden rounded-2xl border-2 text-left transition-all ${
+                          dniBackImage
+                            ? "border-slate-200 bg-slate-950"
+                            : "border-dashed border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-slate-100/50"
+                        }`}
                       >
-                        <Upload size={15} />
-                        Añadir reverso
+                        {dniBackImage ? (
+                          <>
+                            <img src={dniBackImage} alt="DNI reverso" className="absolute inset-0 h-full w-full object-cover" />
+                            <div className="absolute inset-x-0 top-0 flex items-center justify-between bg-gradient-to-b from-black/70 via-black/35 to-transparent px-4 py-4">
+                              <span className="rounded-full border border-white/15 bg-black/45 px-3 py-1 text-[11px] font-semibold text-white">Reverso</span>
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); void rotateDniSide("back"); }}
+                                className="rounded-full border border-white/15 bg-black/45 px-3 py-1 text-[11px] font-semibold text-white transition-colors hover:bg-[#ab0433]"
+                              >
+                                Girar
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex h-full min-h-[280px] flex-col items-center justify-center gap-4 px-8 text-center">
+                            <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 shadow-sm">
+                              <ImageIcon size={24} />
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-slate-800">Reverso del DNI</p>
+                              <p className="mt-1.5 text-xs leading-5 text-slate-500">Recomendado para domicilio y código postal</p>
+                            </div>
+                            <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm">
+                              <Upload size={12} /> Seleccionar archivo
+                            </span>
+                          </div>
+                        )}
                       </button>
-                    )}
-                    {scanDone && (
-                      <button
-                        type="button"
-                        onClick={handleScanDNI}
-                        className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100"
-                      >
-                        <RotateCcw size={15} />
-                        Re-escanear
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={clearDni}
-                      className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-500 transition-colors hover:bg-slate-100"
-                    >
-                      <X size={15} />
-                      Limpiar
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        </section>
-        )}
 
-        <section className="rounded-[24px] border border-slate-200 bg-white px-6 py-6 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-slate-400">Datos detectados</p>
-              <h2 className="mt-1 text-sm font-semibold text-slate-900">
-                {dniStep === "scan"
-                  ? dniReviewEditable ? "Verificación editable del cliente" : "Resumen del cliente"
-                  : "Identidad personal detectada"}
-              </h2>
-            </div>
-            {dniStep === "scan" ? (
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-400">
-                  {dniReviewEditable
-                    ? "Corrige o completa cualquier campo antes de continuar."
-                    : "Si algo no está bien, abre la verificación editable."}
-                </span>
-                {scanDone && !scanError && (
-                  <button
-                    type="button"
-                    onClick={() => setDniReviewEditable((prev) => !prev)}
-                    className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-semibold transition-colors ${
-                      dniReviewEditable
-                        ? "border border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
-                        : "bg-[#ab0433] text-white shadow-lg shadow-red-200 hover:bg-[#92042c]"
-                    }`}
-                  >
-                    <Edit3 size={15} />
-                    {dniReviewEditable ? "Cerrar verificación" : "Editar y verificar"}
-                  </button>
-                )}
-              </div>
-            ) : (
-              <div className="text-xs text-slate-400">
-                Los datos personales vienen del escáner y aquí ya no necesitas volver a rellenarlos.
-              </div>
-            )}
-          </div>
+                      {/* Panel de consejos */}
+                      <div className="rounded-2xl border border-blue-100 bg-blue-50/50 px-6 py-6 flex flex-col gap-4">
+                        <p className="text-sm font-bold text-slate-800">Consejos para mejores resultados</p>
+                        <ul className="space-y-3 text-xs text-slate-600">
+                          <li className="flex items-start gap-2">
+                            <span className="mt-0.5 h-4 w-4 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-[10px] font-bold shrink-0">1</span>
+                            Fotografía el DNI sobre un fondo oscuro y uniforme
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="mt-0.5 h-4 w-4 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-[10px] font-bold shrink-0">2</span>
+                            Evita reflejos de luz o destello sobre el documento
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="mt-0.5 h-4 w-4 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-[10px] font-bold shrink-0">3</span>
+                            El texto debe ser completamente legible y nítido
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="mt-0.5 h-4 w-4 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-[10px] font-bold shrink-0">4</span>
+                            Incluye los 4 bordes del documento en la imagen
+                          </li>
+                        </ul>
 
-          {dniStep === "scan" ? (
-            !dniReviewEditable ? (
-              <>
-                <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  <SummaryCard label="Tipo documento" value={form.document_type} highlight={h("document_type")} />
-                  <SummaryCard label="NIF / CIF" value={form.nif_cif} highlight={h("nif_cif")} />
-                  <SummaryCard label="Nombre" value={form.first_name} highlight={h("first_name")} />
-                  <SummaryCard label="Apellidos" value={form.last_name} highlight={h("last_name")} />
-                  <SummaryCard label="Fecha nacimiento" value={form.birth_date} highlight={h("birth_date")} />
-                  <SummaryCard label="Sexo" value={form.gender === "M" ? "Masculino" : form.gender === "F" ? "Femenino" : form.gender === "O" ? "Otro" : ""} highlight={h("gender")} />
-                  <SummaryCard label="Nacionalidad" value={form.nationality} highlight={h("nationality")} />
-                  <SummaryCard label="País expedición" value={form.expedition_country} highlight={h("expedition_country")} />
-                  <SummaryCard label="Dirección" value={form.address_street} highlight={h("address_street")} />
-                  <SummaryCard label="Población" value={form.address_town} highlight={h("address_town")} />
-                  <SummaryCard label="Código postal" value={form.address_cp} highlight={h("address_cp")} />
-                  <SummaryCard label="Provincia" value={form.address_province} highlight={h("address_province")} />
-                </div>
+                        <div className="mt-auto pt-2 flex flex-col gap-2">
+                          {!dniFrontImage && !dniBackImage ? (
+                            <button
+                              type="button"
+                              onClick={() => frontInputRef.current?.click()}
+                              className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#ab0433] px-4 py-2.5 text-sm font-bold text-white shadow-sm shadow-red-200 transition-colors hover:bg-[#92042c]"
+                            >
+                              <Upload size={14} /> Comenzar con el anverso
+                            </button>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                onClick={handleScanDNI}
+                                disabled={scanning || scanDone}
+                                className={`w-full inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all ${
+                                  scanning || scanDone
+                                    ? "cursor-not-allowed bg-slate-100 text-slate-400"
+                                    : "bg-[#ab0433] text-white shadow-sm shadow-red-200 hover:bg-[#92042c]"
+                                }`}
+                              >
+                                {scanning
+                                  ? <><Loader2 size={14} className="animate-spin" /> Leyendo DNI...</>
+                                  : scanDone
+                                  ? <><CheckCircle2 size={14} /> Lectura completada</>
+                                  : <><ScanLine size={14} /> Escanear DNI</>}
+                              </button>
+                              <div className="flex gap-2">
+                                {!dniBackImage && (
+                                  <button
+                                    type="button"
+                                    onClick={() => backInputRef.current?.click()}
+                                    className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                                  >
+                                    <Upload size={12} /> Añadir reverso
+                                  </button>
+                                )}
+                                {scanDone && (
+                                  <button
+                                    type="button"
+                                    onClick={handleScanDNI}
+                                    className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                                  >
+                                    <RotateCcw size={12} /> Re-escanear
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={clearDni}
+                                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-500 transition-colors hover:bg-slate-50"
+                                >
+                                  <X size={12} /> Limpiar
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </div>
 
-                <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
-                  El siguiente paso no te pedirá de nuevo los datos personales. Si necesitas corregirlos antes, pulsa <span className="font-semibold text-slate-700">Editar y verificar</span>.
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="mt-5 grid gap-4">
-                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                    <F label="Tipo documento" required invalid={isInvalid("document_type")}>
-                      <S name="document_type" value={form.document_type} onChange={handleChange} highlight={h("document_type")} invalid={isInvalid("document_type")}>
-                        <option>DNI</option><option>NIE</option><option>Pasaporte</option><option>CIF</option><option>Otro</option>
-                      </S>
-                    </F>
-                    <F label="NIF / CIF" required invalid={isInvalid("nif_cif")}>
-                      <I name="nif_cif" value={form.nif_cif} onChange={handleChange} placeholder="12345678Z" highlight={h("nif_cif")} invalid={isInvalid("nif_cif")} required />
-                      {nifDupEntity && (
-                        <Link to={`/dashboard/clientes/${nifDupEntity.id}`} className="mt-1.5 flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 hover:bg-amber-100 transition-colors">
-                          <AlertTriangle size={12} className="shrink-0 text-amber-500" />
-                          <span>Ya existe: <span className="underline">{nifDupEntity.first_name} {nifDupEntity.last_name || nifDupEntity.commercial_name || ""}</span> · Ver ficha →</span>
-                        </Link>
-                      )}
-                    </F>
-                    <F label="Nombre" required invalid={isInvalid("first_name")}>
-                      <I name="first_name" value={form.first_name} onChange={handleChange} placeholder="Nombre" highlight={h("first_name")} invalid={isInvalid("first_name")} required />
-                    </F>
-                    <F label="Apellidos" required invalid={isInvalid("last_name")}>
-                      <I name="last_name" value={form.last_name} onChange={handleChange} placeholder="Apellidos" highlight={h("last_name")} invalid={isInvalid("last_name")} required />
-                    </F>
-
-                    <F label="Fecha nacimiento">
-                      <I type="date" name="birth_date" value={form.birth_date} onChange={handleChange} highlight={h("birth_date")} />
-                    </F>
-                    <F label="Sexo">
-                      <S name="gender" value={form.gender} onChange={handleChange} highlight={h("gender")}>
-                        <option value="">—</option><option value="M">Masculino</option><option value="F">Femenino</option><option value="O">Otro</option>
-                      </S>
-                    </F>
-                    <F label="Nacionalidad">
-                      <I name="nationality" value={form.nationality} onChange={handleChange} highlight={h("nationality")} />
-                    </F>
-                    <F label="País expedición">
-                      <S name="expedition_country" value={form.expedition_country} onChange={handleChange} highlight={h("expedition_country")}>
-                        {PAISES.map((p) => <option key={p}>{p}</option>)}
-                      </S>
-                    </F>
+                        {scanError && (
+                          <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-3 text-xs text-red-700">
+                            <AlertTriangle size={13} className="mt-0.5 shrink-0" />
+                            <span>{scanError}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </div>
 
-                <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
-                  Revisa solo la identidad personal antes de continuar. Los campos con <span className="font-semibold text-slate-700">*</span> son obligatorios. El resto del alta se completará en el siguiente paso.
-                </div>
-              </>
-            )
-          ) : (
-            <>
-              <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <SummaryCard label="Tipo documento" value={form.document_type} highlight={h("document_type")} />
-                <SummaryCard label="NIF / CIF" value={form.nif_cif} highlight={h("nif_cif")} />
-                <SummaryCard label="Nombre" value={form.first_name} highlight={h("first_name")} />
-                <SummaryCard label="Apellidos" value={form.last_name} highlight={h("last_name")} />
-                <SummaryCard label="Fecha nacimiento" value={form.birth_date} highlight={h("birth_date")} />
-                <SummaryCard label="Sexo" value={form.gender === "M" ? "Masculino" : form.gender === "F" ? "Femenino" : form.gender === "O" ? "Otro" : ""} highlight={h("gender")} />
-                <SummaryCard label="Nacionalidad" value={form.nationality} highlight={h("nationality")} />
-                <SummaryCard label="País expedición" value={form.expedition_country} highlight={h("expedition_country")} />
-              </div>
+                  {/* RESUMEN DEL CLIENTE */}
+                  <div className="pt-8 border-t border-slate-100">
+                    <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Resumen del cliente</h3>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {scanDone ? "Datos detectados por el lector IA. Revisa antes de continuar." : "Los datos aparecerán aquí tras el escaneo del documento."}
+                        </p>
+                      </div>
+                      {scanDone && !scanError && (
+                        <button
+                          type="button"
+                          onClick={() => setDniReviewEditable((prev) => !prev)}
+                          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                        >
+                          <Edit3 size={13} />
+                          {dniReviewEditable ? "Cerrar verificación" : "Abrir verificación editable"}
+                        </button>
+                      )}
+                    </div>
 
-              <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
-                Estos datos personales vienen del lector y ya se mantendrán al guardar el cliente.
-              </div>
-            </>
-          )}
-        </section>
+                    {!dniReviewEditable ? (
+                      <div className="bg-slate-50/50 border border-slate-100 rounded-2xl p-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-0">
+                          {[
+                            { label: "Tipo documento", key: "document_type", value: form.document_type },
+                            { label: "NIF / CIF", key: "nif_cif", value: form.nif_cif },
+                            { label: "Nombre", key: "first_name", value: form.first_name },
+                            { label: "Apellidos", key: "last_name", value: form.last_name },
+                            { label: "Fecha nacimiento", key: "birth_date", value: form.birth_date },
+                            { label: "Sexo", key: "gender", value: form.gender === "M" ? "Masculino" : form.gender === "F" ? "Femenino" : form.gender === "O" ? "Otro" : form.gender },
+                            { label: "Nacionalidad", key: "nationality", value: form.nationality },
+                            { label: "País expedición", key: "expedition_country", value: form.expedition_country },
+                            { label: "Dirección", key: "address_street", value: form.address_street },
+                            { label: "Población", key: "address_town", value: form.address_town },
+                            { label: "Código postal", key: "address_cp", value: form.address_cp },
+                            { label: "Provincia", key: "address_province", value: form.address_province },
+                          ].map(({ label, key, value }) => (
+                            <div key={key} className="flex flex-col gap-1 border-b border-slate-200/60 py-3">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{label}</span>
+                              {value ? (
+                                <span className={`text-sm font-semibold ${h(key) ? "text-emerald-700" : "text-slate-800"}`}>{value}</span>
+                              ) : (
+                                <span className="text-sm italic text-slate-400">Pendiente de detectar</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-x-8 gap-y-6">
+                        <div>
+                          <label className={lblDni}>Tipo documento *</label>
+                          <select name="document_type" value={form.document_type} onChange={handleChange} className={`${inputClsDni("document_type")} mt-2`}>
+                            <option>DNI</option><option>NIE</option><option>Pasaporte</option><option>CIF</option><option>Otro</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className={lblDni}>NIF / CIF *</label>
+                          <input name="nif_cif" value={form.nif_cif} onChange={handleChange} placeholder="12345678Z" className={`${inputClsDni("nif_cif")} mt-2`} />
+                          {nifDupEntity && (
+                            <Link to={`/dashboard/clientes/${nifDupEntity.id}`} className="mt-1.5 flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 hover:bg-amber-100 transition-colors">
+                              <AlertTriangle size={12} className="shrink-0 text-amber-500" />
+                              <span>Ya existe: <span className="underline">{nifDupEntity.first_name} {nifDupEntity.last_name || nifDupEntity.commercial_name || ""}</span> · Ver ficha →</span>
+                            </Link>
+                          )}
+                        </div>
+                        <div>
+                          <label className={lblDni}>Nombre *</label>
+                          <input name="first_name" value={form.first_name} onChange={handleChange} placeholder="Nombre" className={`${inputClsDni("first_name")} mt-2`} />
+                        </div>
+                        <div>
+                          <label className={lblDni}>Apellidos *</label>
+                          <input name="last_name" value={form.last_name} onChange={handleChange} placeholder="Apellidos" className={`${inputClsDni("last_name")} mt-2`} />
+                        </div>
+                        <div>
+                          <label className={lblDni}>Fecha nacimiento</label>
+                          <input type="date" name="birth_date" value={form.birth_date} onChange={handleChange} className={`${inputClsDni("birth_date")} mt-2`} />
+                        </div>
+                        <div>
+                          <label className={lblDni}>Sexo</label>
+                          <select name="gender" value={form.gender} onChange={handleChange} className={`${inputClsDni("gender")} mt-2`}>
+                            <option value="">—</option><option value="M">Masculino</option><option value="F">Femenino</option><option value="O">Otro</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className={lblDni}>Nacionalidad</label>
+                          <input name="nationality" value={form.nationality} onChange={handleChange} className={`${inputClsDni("nationality")} mt-2`} />
+                        </div>
+                        <div>
+                          <label className={lblDni}>País expedición</label>
+                          <select name="expedition_country" value={form.expedition_country} onChange={handleChange} className={`${inputClsDni("expedition_country")} mt-2`}>
+                            {PAISES.map((p) => <option key={p}>{p}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                    )}
 
-        {dniStep === "complete" && (
-          <>
-            <Section title="Dirección" icon={MapPin}>
-              <div className="col-span-2 md:col-span-2">
-                <F label="Dirección"><I name="address_street" value={form.address_street} onChange={handleChange} placeholder="Calle, número, piso..." highlight={h("address_street")} /></F>
-              </div>
-              <F label="Población">
-                <I name="address_town" value={form.address_town} onChange={handleChange} placeholder="Ciudad" highlight={h("address_town")} />
-              </F>
-              <F label="Código postal">
+                    {scanDone && !scanError && filledFields.size > 0 && (
+                      <div className="mt-6 flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3">
+                        <Sparkles size={13} className="shrink-0 text-emerald-500" />
+                        <span>{filledFields.size} campos aplicados automáticamente.{typeof scanMeta?.confidence === "number" ? ` Confianza OCR: ${scanMeta.confidence}%.` : ""}</span>
+                      </div>
+                    )}
+
+                    <div className="mt-6 flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-xs text-slate-500">
+                      <Info size={14} className="shrink-0 mt-0.5 text-slate-400" />
+                      <span>El siguiente paso no te pedirá de nuevo los datos personales. Si necesitas corregirlos, usa <span className="font-semibold text-slate-700">Abrir verificación editable</span> antes de continuar.</span>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {dniStep === "complete" && (
                 <>
-                  <I
-                    name="address_cp"
-                    value={form.address_cp}
-                    onChange={handleChange}
-                    placeholder="28000"
-                    highlight={h("address_cp")}
-                    list={cpSuggestions.length > 0 ? "cp-suggestions-list" : undefined}
-                  />
-                  {cpSuggestions.length > 0 && (
-                    <datalist id="cp-suggestions-list">
-                      {cpSuggestions.map(cp => <option key={cp} value={cp} />)}
-                    </datalist>
-                  )}
-                  {cpSuggestions.length > 1 && !form.address_cp && (
-                    <p className="mt-1 text-[11px] text-slate-500">Selecciona el CP de la lista o escríbelo manualmente</p>
+                  {/* Identity summary read-only */}
+                  <div className="pt-4 border-t border-slate-100">
+                    <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                      <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Identidad personal detectada</h3>
+                      <p className="text-xs text-slate-500">Los datos personales vienen del escáner y ya están listos.</p>
+                    </div>
+                    <div className="bg-slate-50/50 border border-slate-100 rounded-2xl p-6">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-8 gap-y-0">
+                        {[
+                          { label: "Tipo documento", key: "document_type", value: form.document_type },
+                          { label: "NIF / CIF", key: "nif_cif", value: form.nif_cif },
+                          { label: "Nombre", key: "first_name", value: form.first_name },
+                          { label: "Apellidos", key: "last_name", value: form.last_name },
+                          { label: "Fecha nacimiento", key: "birth_date", value: form.birth_date },
+                          { label: "Sexo", key: "gender", value: form.gender === "M" ? "Masculino" : form.gender === "F" ? "Femenino" : form.gender === "O" ? "Otro" : form.gender },
+                          { label: "Nacionalidad", key: "nationality", value: form.nationality },
+                          { label: "País expedición", key: "expedition_country", value: form.expedition_country },
+                        ].map(({ label, key, value }) => (
+                          <div key={key} className="flex flex-col gap-1 border-b border-slate-200/60 py-3">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{label}</span>
+                            {value ? (
+                              <span className={`text-sm font-semibold ${h(key) ? "text-emerald-700" : "text-slate-800"}`}>{value}</span>
+                            ) : (
+                              <span className="text-sm italic text-slate-400">—</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Dirección */}
+                  <div className="pt-8 border-t border-slate-100">
+                    <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-6">Dirección</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-x-8 gap-y-6">
+                      <div className="md:col-span-2">
+                        <label className={lblDni}>Dirección</label>
+                        <input name="address_street" value={form.address_street} onChange={handleChange} placeholder="Calle, número, piso..." className={`${inputClsDni("address_street")} mt-2`} />
+                      </div>
+                      <div>
+                        <label className={lblDni}>Población</label>
+                        <input name="address_town" value={form.address_town} onChange={handleChange} placeholder="Ciudad" className={`${inputClsDni("address_town")} mt-2`} />
+                      </div>
+                      <div>
+                        <label className={lblDni}>Código postal</label>
+                        <input
+                          name="address_cp"
+                          value={form.address_cp}
+                          onChange={handleChange}
+                          placeholder="28000"
+                          list={cpSuggestions.length > 0 ? "cp-suggestions-list" : undefined}
+                          className={`${inputClsDni("address_cp")} mt-2`}
+                        />
+                        {cpSuggestions.length > 0 && (
+                          <datalist id="cp-suggestions-list">
+                            {cpSuggestions.map(cp => <option key={cp} value={cp} />)}
+                          </datalist>
+                        )}
+                        {cpSuggestions.length > 1 && !form.address_cp && (
+                          <p className="mt-1 text-[11px] text-slate-500">Selecciona el CP de la lista o escríbelo manualmente</p>
+                        )}
+                      </div>
+                      <div>
+                        <label className={lblDni}>Provincia</label>
+                        <select name="address_province" value={form.address_province} onChange={handleChange} className={`${inputClsDni("address_province")} mt-2`}>
+                          <option value="">— Selecciona —</option>
+                          {PROVINCIAS.map((p) => <option key={p}>{p}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className={lblDni}>País</label>
+                        <select name="address_country" value={form.address_country} onChange={handleChange} className={`${inputClsDni("address_country")} mt-2`}>
+                          {PAISES.map((p) => <option key={p}>{p}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Contacto */}
+                  <div className="pt-8 border-t border-slate-100">
+                    <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-6">Contacto</h3>
+                    <div className="mb-5 flex items-start gap-3 rounded-xl border border-amber-100 bg-amber-50/50 px-4 py-3 text-xs text-amber-700">
+                      <AlertTriangle size={13} className="shrink-0 mt-0.5 text-amber-500" />
+                      <span>Debes indicar al menos <strong>un móvil, teléfono o correo electrónico</strong> para poder guardar el cliente.</span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-x-8 gap-y-6">
+                      <div className="md:col-span-2">
+                        <label className={lblDni}>Correo electrónico</label>
+                        <input type="email" name="email" value={form.email} onChange={handleChange} placeholder="cliente@email.com" className={`${inputClsDni("email")} mt-2`} />
+                      </div>
+                      <div>
+                        <label className={lblDni}>Teléfono</label>
+                        <input name="phone_1" value={form.phone_1} onChange={handleChange} placeholder="900 000 000" className={`${inputClsDni("phone_1")} mt-2`} />
+                      </div>
+                      <div>
+                        <label className={lblDni}>Móvil</label>
+                        <input name="phone_mobile" value={form.phone_mobile} onChange={handleChange} placeholder="600 000 000" className={`${inputClsDni("phone_mobile")} mt-2`} />
+                      </div>
+                      <div>
+                        <label className={lblDni}>Teléfono 2</label>
+                        <input name="phone_2" value={form.phone_2} onChange={handleChange} placeholder="—" className={`${inputClsDni("phone_2")} mt-2`} />
+                      </div>
+                      <div>
+                        <label className={lblDni}>Teléfono 3</label>
+                        <input name="phone_3" value={form.phone_3} onChange={handleChange} placeholder="—" className={`${inputClsDni("phone_3")} mt-2`} />
+                      </div>
+                      <div>
+                        <label className={lblDni}>Fax</label>
+                        <input name="phone_fax" value={form.phone_fax} onChange={handleChange} placeholder="—" className={`${inputClsDni("phone_fax")} mt-2`} />
+                      </div>
+                      <div className="md:col-span-3">
+                        <label className={lblDni}>Página web</label>
+                        <input name="website" value={form.website} onChange={handleChange} placeholder="https://www.empresa.com" className={`${inputClsDni("website")} mt-2`} />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Administración */}
+                  <div className="pt-8 border-t border-slate-100">
+                    <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-6">Administración</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-x-8 gap-y-6">
+                      <div>
+                        <label className={lblDni}>Tipo cliente</label>
+                        <select name="type" value={form.type} onChange={handleChange} className={`${inputClsDni("type")} mt-2`}>
+                          <option value="CLIENTE">Cliente</option>
+                          <option value="CONTRARIO">Contrario</option>
+                          <option value="JUZGADO">Juzgado</option>
+                          <option value="PERITO">Perito</option>
+                          <option value="PROVEEDOR">Proveedor</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className={lblDni}>Naturaleza jurídica</label>
+                        <select name="legal_nature" value={form.legal_nature} onChange={handleChange} className={`${inputClsDni("legal_nature")} mt-2`}>
+                          <option value="">—</option>
+                          <option>Física</option><option>Jurídica</option><option>Autónomo</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className={lblDni}>Nombre comercial</label>
+                        <input name="commercial_name" value={form.commercial_name} onChange={handleChange} placeholder="Ej: Transportes S.L." className={`${inputClsDni("commercial_name")} mt-2`} />
+                      </div>
+                      <div>
+                        <label className={lblDni}>Estado</label>
+                        <select name="client_status" value={form.client_status} onChange={handleChange} className={`${inputClsDni("client_status")} mt-2`}>
+                          <option>Alta</option><option>Baja</option><option>Suspendido</option><option>Potencial</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className={lblDni}>Fecha alta</label>
+                        <input type="date" name="date_alta" value={form.date_alta} onChange={handleChange} className={`${inputClsDni("date_alta")} mt-2`} />
+                      </div>
+                      <div>
+                        <label className={lblDni}>Fecha baja</label>
+                        <input type="date" name="date_baja" value={form.date_baja} onChange={handleChange} className={`${inputClsDni("date_baja")} mt-2`} />
+                      </div>
+                      <div>
+                        <label className={lblDni}>Centro</label>
+                        <input name="center" value={form.center} onChange={handleChange} placeholder="—" className={`${inputClsDni("center")} mt-2`} />
+                      </div>
+                      <div>
+                        <label className={lblDni}>LOPD</label>
+                        <select name="lopd" value={form.lopd} onChange={handleChange} className={`${inputClsDni("lopd")} mt-2`}>
+                          <option>Pendiente</option><option>Firmado</option><option>Rechazado</option><option>No aplica</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className={lblDni}>Comunicaciones comerciales</label>
+                        <select name="commercial_communications" value={form.commercial_communications} onChange={handleChange} className={`${inputClsDni("commercial_communications")} mt-2`}>
+                          <option>No</option><option>Sí</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {filledFields.size > 0 && (
+                    <div className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-xs text-emerald-700">
+                      <Sparkles size={14} className="shrink-0 text-emerald-500" />
+                      Los campos resaltados en verde vienen del escáner del DNI. Aquí solo completas o corriges el resto antes de guardar.
+                    </div>
                   )}
                 </>
-              </F>
-              <F label="Provincia">
-                <S name="address_province" value={form.address_province} onChange={handleChange} highlight={h("address_province")}>
-                  <option value="">— Selecciona —</option>
-                  {PROVINCIAS.map((p) => <option key={p}>{p}</option>)}
-                </S>
-              </F>
-              <F label="País">
-                <S name="address_country" value={form.address_country} onChange={handleChange} highlight={h("address_country")}>
-                  {PAISES.map((p) => <option key={p}>{p}</option>)}
-                </S>
-              </F>
-            </Section>
+              )}
 
-            <Section title="Contacto" icon={Phone}>
-              <div className="col-span-2 md:col-span-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
-                Debes indicar al menos <span className="font-semibold text-slate-700">un móvil, teléfono o correo electrónico</span> para poder guardar el cliente.
-              </div>
-              <div className="col-span-2">
-                <F label="Correo electrónico"><I type="email" name="email" value={form.email} onChange={handleChange} placeholder="cliente@email.com" /></F>
-              </div>
-              <F label="Teléfono"><I name="phone_1" value={form.phone_1} onChange={handleChange} placeholder="900 000 000" /></F>
-              <F label="Móvil"><I name="phone_mobile" value={form.phone_mobile} onChange={handleChange} placeholder="600 000 000" /></F>
-              <F label="Teléfono 2"><I name="phone_2" value={form.phone_2} onChange={handleChange} placeholder="—" /></F>
-              <F label="Teléfono 3"><I name="phone_3" value={form.phone_3} onChange={handleChange} placeholder="—" /></F>
-              <F label="Fax"><I name="phone_fax" value={form.phone_fax} onChange={handleChange} placeholder="—" /></F>
-              <div className="col-span-2 md:col-span-3">
-                <F label="Página web"><I name="website" value={form.website} onChange={handleChange} placeholder="https://www.empresa.com" /></F>
-              </div>
-            </Section>
-
-            <Section title="Administración" icon={Briefcase}>
-              <F label="Tipo cliente">
-                <S name="type" value={form.type} onChange={handleChange}>
-                  <option value="CLIENTE">Cliente</option>
-                  <option value="CONTRARIO">Contrario</option>
-                  <option value="JUZGADO">Juzgado</option>
-                  <option value="PERITO">Perito</option>
-                  <option value="PROVEEDOR">Proveedor</option>
-                </S>
-              </F>
-              <F label="Naturaleza jurídica">
-                <S name="legal_nature" value={form.legal_nature} onChange={handleChange}>
-                  <option value="">—</option>
-                  <option>Física</option><option>Jurídica</option><option>Autónomo</option>
-                </S>
-              </F>
-              <F label="Nombre comercial">
-                <I name="commercial_name" value={form.commercial_name} onChange={handleChange} placeholder="Ej: Transportes S.L." />
-              </F>
-              <F label="Estado">
-                <S name="client_status" value={form.client_status} onChange={handleChange}>
-                  <option>Alta</option><option>Baja</option><option>Suspendido</option><option>Potencial</option>
-                </S>
-              </F>
-              <F label="Fecha alta">
-                <I type="date" name="date_alta" value={form.date_alta} onChange={handleChange} />
-              </F>
-              <F label="Fecha baja">
-                <I type="date" name="date_baja" value={form.date_baja} onChange={handleChange} />
-              </F>
-              <F label="Centro">
-                <I name="center" value={form.center} onChange={handleChange} placeholder="—" />
-              </F>
-              <F label="LOPD">
-                <S name="lopd" value={form.lopd} onChange={handleChange}>
-                  <option>Pendiente</option><option>Firmado</option><option>Rechazado</option><option>No aplica</option>
-                </S>
-              </F>
-              <F label="Comunicaciones comerciales">
-                <S name="commercial_communications" value={form.commercial_communications} onChange={handleChange}>
-                  <option>No</option><option>Sí</option>
-                </S>
-              </F>
-            </Section>
-
-            {filledFields.size > 0 && (
-              <div className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-xs text-emerald-700">
-                <Sparkles size={14} className="shrink-0 text-emerald-500" />
-                Los campos resaltados en verde vienen del escáner del DNI. Aquí solo completas o corriges el resto antes de guardar.
-              </div>
-            )}
-          </>
-        )}
-      </form>
-    </div>
-  );
+            </div>
+          </main>
+        </form>
+      </div>
+    );
+  }
 
   const inputCls = (field: string) =>
     `w-full px-3.5 py-2.5 bg-white border rounded-md text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-red-500 focus:border-red-500 transition-colors ${
