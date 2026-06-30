@@ -1085,6 +1085,7 @@ export default function ClientList() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());    // vista multiselect
   const [showSelectionDropdown, setShowSelectionDropdown] = useState(false); // dropdown lista seleccionados
   const [showOpciones, setShowOpciones] = useState(false);
+  const [opcionesSubMenu, setOpcionesSubMenu] = useState<string | null>(null);
   const [showColumnModal, setShowColumnModal] = useState(false);
   const opcionesRef = useRef<HTMLDivElement>(null);
   const opcionesMenuRef = useRef<HTMLDivElement>(null);
@@ -1109,6 +1110,7 @@ export default function ClientList() {
         !opcionesMenuRef.current?.contains(e.target as Node)
       ) {
         setShowOpciones(false);
+        setOpcionesSubMenu(null);
       }
     }
     document.addEventListener("mousedown", outside);
@@ -2178,6 +2180,7 @@ export default function ClientList() {
                   const r = opcionesRef.current.getBoundingClientRect();
                   setOpcionesPos({ top: r.bottom + 8, right: window.innerWidth - r.right });
                 }
+                setOpcionesSubMenu(null);
                 setShowOpciones(v => !v);
               }}
               className={`inline-flex items-center gap-1.5 whitespace-nowrap px-3 py-2 rounded-lg text-xs font-semibold transition-all border active:scale-[0.97] ${showOpciones ? "bg-red-50 border-red-300 text-red-700" : "text-slate-600 hover:bg-slate-50 hover:border-slate-300 border-slate-200 bg-white"}`}>
@@ -2208,58 +2211,66 @@ export default function ClientList() {
                 <div className="h-px bg-slate-100 my-1.5" />
 
                 {/* Ir a → submenú */}
-                <div className="relative group/ira">
-                  <button className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
+                <div className="relative">
+                  <button
+                    onClick={() => setOpcionesSubMenu(s => s === "ira" ? null : "ira")}
+                    className={`w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs transition-colors ${opcionesSubMenu === "ira" ? "bg-red-50 text-red-700" : "text-slate-700 hover:bg-red-50 hover:text-red-700"}`}>
                     <span className="flex items-center gap-2.5"><ExternalLink size={12} className="text-slate-400" /> Ir a</span>
-                    <ChevronRight size={11} className="text-slate-300" />
+                    <ChevronRight size={11} className={`text-slate-300 transition-transform ${opcionesSubMenu === "ira" ? "rotate-90" : ""}`} />
                   </button>
-                  <div className="absolute left-full -ml-px top-[-1px] z-50 bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[180px] py-1.5 hidden group-hover/ira:block">
-                    <button onClick={() => { selected && navigate(`/dashboard/clientes/${selected}`); setShowOpciones(false); }}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                      <Users size={12} className="text-slate-400" /> Ir a Ficha Cliente
-                    </button>
-                    <button onClick={() => { selected && navigate(`/dashboard/clientes/${selected}#expedientes`); setShowOpciones(false); }}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                      <ClipboardList size={12} className="text-slate-400" /> Ir a Expedientes
-                    </button>
-                    <button onClick={() => { selected && navigate(`/dashboard/clientes/${selected}#notas`); setShowOpciones(false); }}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                      <Paperclip size={12} className="text-slate-400" /> Ir a Notas
-                    </button>
-                  </div>
+                  {opcionesSubMenu === "ira" && (
+                    <div className="border-t border-slate-100 bg-slate-50/60 py-0.5">
+                      <button onClick={() => { selected && navigate(`/dashboard/clientes/${selected}`); setShowOpciones(false); setOpcionesSubMenu(null); }}
+                        className="w-full flex items-center gap-2.5 pl-8 pr-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
+                        <Users size={12} className="text-slate-400" /> Ir a Ficha Cliente
+                      </button>
+                      <button onClick={() => { selected && navigate(`/dashboard/clientes/${selected}#expedientes`); setShowOpciones(false); setOpcionesSubMenu(null); }}
+                        className="w-full flex items-center gap-2.5 pl-8 pr-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
+                        <ClipboardList size={12} className="text-slate-400" /> Ir a Expedientes
+                      </button>
+                      <button onClick={() => { selected && navigate(`/dashboard/clientes/${selected}#notas`); setShowOpciones(false); setOpcionesSubMenu(null); }}
+                        className="w-full flex items-center gap-2.5 pl-8 pr-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
+                        <Paperclip size={12} className="text-slate-400" /> Ir a Notas
+                      </button>
+                    </div>
+                  )}
                 </div>
 
-                <div className="relative group/color">
-                  <button className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
+                <div className="relative">
+                  <button
+                    onClick={() => setOpcionesSubMenu(s => s === "color" ? null : "color")}
+                    className={`w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs transition-colors ${opcionesSubMenu === "color" ? "bg-red-50 text-red-700" : "text-slate-700 hover:bg-red-50 hover:text-red-700"}`}>
                     <span className="flex items-center gap-2.5">
                       <Palette size={12} className="text-slate-400" /> Asignar Color
                     </span>
-                    <ChevronRight size={11} className="text-slate-300" />
+                    <ChevronRight size={11} className={`text-slate-300 transition-transform ${opcionesSubMenu === "color" ? "rotate-90" : ""}`} />
                   </button>
-                  <div className="absolute right-full -mr-px top-[-1px] z-50 hidden min-w-[190px] rounded-xl border border-slate-200 bg-white py-1.5 shadow-2xl group-hover/color:block">
-                    {[
-                      { value: "ninguno", label: "Sin color", dot: "bg-slate-300" },
-                      { value: "azul", label: "Azul suave", dot: "bg-sky-400" },
-                      { value: "verde", label: "Verde suave", dot: "bg-emerald-400" },
-                      { value: "amarillo", label: "Amarillo suave", dot: "bg-amber-400" },
-                      { value: "naranja", label: "Naranja suave", dot: "bg-orange-400" },
-                      { value: "rojo", label: "Rojo suave", dot: "bg-rose-400" },
-                      { value: "morado", label: "Morado suave", dot: "bg-violet-400" },
-                    ].map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() => assignClientColor(option.value)}
-                        className="flex w-full items-center justify-between gap-2.5 px-3.5 py-2 text-left text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-700"
-                      >
-                        <span className="flex items-center gap-2.5">
-                          <span className={`h-2.5 w-2.5 rounded-full ${option.dot}`} />
-                          {option.label}
-                        </span>
-                        {(selectedClient?.color || "ninguno") === option.value && <Check size={11} className="text-red-500" />}
-                      </button>
-                    ))}
-                  </div>
+                  {opcionesSubMenu === "color" && (
+                    <div className="border-t border-slate-100 bg-slate-50/60 py-0.5">
+                      {[
+                        { value: "ninguno", label: "Sin color", dot: "bg-slate-300" },
+                        { value: "azul", label: "Azul suave", dot: "bg-sky-400" },
+                        { value: "verde", label: "Verde suave", dot: "bg-emerald-400" },
+                        { value: "amarillo", label: "Amarillo suave", dot: "bg-amber-400" },
+                        { value: "naranja", label: "Naranja suave", dot: "bg-orange-400" },
+                        { value: "rojo", label: "Rojo suave", dot: "bg-rose-400" },
+                        { value: "morado", label: "Morado suave", dot: "bg-violet-400" },
+                      ].map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => { assignClientColor(option.value); setOpcionesSubMenu(null); }}
+                          className="flex w-full items-center justify-between gap-2.5 pl-8 pr-3.5 py-2 text-left text-xs text-slate-700 transition-colors hover:bg-red-50 hover:text-red-700"
+                        >
+                          <span className="flex items-center gap-2.5">
+                            <span className={`h-2.5 w-2.5 rounded-full ${option.dot}`} />
+                            {option.label}
+                          </span>
+                          {(selectedClient?.color || "ninguno") === option.value && <Check size={11} className="text-red-500" />}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="h-px bg-slate-100 my-1.5" />
@@ -2295,21 +2306,25 @@ export default function ClientList() {
                 </button>
 
                 {/* Versión Antigua → submenú */}
-                <div className="relative group/ver">
-                  <button className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
+                <div className="relative">
+                  <button
+                    onClick={() => setOpcionesSubMenu(s => s === "ver" ? null : "ver")}
+                    className={`w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs transition-colors ${opcionesSubMenu === "ver" ? "bg-red-50 text-red-700" : "text-slate-700 hover:bg-red-50 hover:text-red-700"}`}>
                     <span className="flex items-center gap-2.5"><History size={12} className="text-slate-400" /> Versión Antigua</span>
-                    <ChevronRight size={11} className="text-slate-300" />
+                    <ChevronRight size={11} className={`text-slate-300 transition-transform ${opcionesSubMenu === "ver" ? "rotate-90" : ""}`} />
                   </button>
-                  <div className="absolute left-full -ml-px top-[-1px] z-50 bg-white border border-slate-200 rounded-xl shadow-2xl min-w-[180px] py-1.5 hidden group-hover/ver:block">
-                    <button onClick={() => alert("Ver historial de versiones")}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                      <History size={12} className="text-slate-400" /> Ver historial versiones
-                    </button>
-                    <button onClick={() => alert("Comparar versión")}
-                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
-                      <RefreshCw size={12} className="text-slate-400" /> Comparar versión
-                    </button>
-                  </div>
+                  {opcionesSubMenu === "ver" && (
+                    <div className="border-t border-slate-100 bg-slate-50/60 py-0.5">
+                      <button onClick={() => { alert("Ver historial de versiones"); setOpcionesSubMenu(null); }}
+                        className="w-full flex items-center gap-2.5 pl-8 pr-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
+                        <History size={12} className="text-slate-400" /> Ver historial versiones
+                      </button>
+                      <button onClick={() => { alert("Comparar versión"); setOpcionesSubMenu(null); }}
+                        className="w-full flex items-center gap-2.5 pl-8 pr-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
+                        <RefreshCw size={12} className="text-slate-400" /> Comparar versión
+                      </button>
+                    </div>
+                  )}
                 </div>
 
               </div>,
