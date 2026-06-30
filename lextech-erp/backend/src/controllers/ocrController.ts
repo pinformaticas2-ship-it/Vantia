@@ -336,6 +336,84 @@ function extractSpanishDniMrz(lines: string[]) {
   return null;
 }
 
+// ── MRZ TD1 — TIE / Permiso de Residencia (3 líneas × 30 chars) ──────────────
+function extractTieMrz(lines: string[]) {
+  const normalized = lines
+    .map((line) => line.replace(/\s+/g, '').replace(/[^A-Z0-9<]/g, ''))
+    .filter(Boolean);
+
+  for (let index = 0; index <= normalized.length - 3; index += 1) {
+    const line1 = normalized[index];
+    const line2 = normalized[index + 1];
+    const line3 = normalized[index + 2];
+
+    // TIE line1: I + R/< + {nie_number} + ... (≥28 chars, NOT IDESP/I<ESP handled by Spanish DNI parser)
+    const isTieLine1 = /^I[^D<]/.test(line1) && line1.length >= 28;
+    const looksLikeLine2 = /\d{6}[MF<]\d{6}/.test(line2);
+    const looksLikeLine3 = line3.includes('<<') && /[A-Z]{2,}/.test(line3);
+
+    if (!isTieLine1 || !looksLikeLine2 || !looksLikeLine3) continue;
+
+    const parsedName = parseMrzNameLine(line3);
+    const birthGenderMatch = line2.match(/(\d{6})([MF<])\d{6}[0-9<]([A-Z]{3})/);
+    const birthDate = birthGenderMatch ? parseDateCandidate(birthGenderMatch[1]) : null;
+    const gender = birthGenderMatch ? normalizeGender(birthGenderMatch[2]) : null;
+    const natCode = birthGenderMatch?.[3];
+    const nieCandidate = line1.match(/([XYZ][0-9OQISBZ]{7}[A-Z])/)?.[1];
+
+    return {
+      last_name: parsedName.last_name,
+      first_name: parsedName.first_name,
+      birth_date: birthDate,
+      gender,
+      nif_cif: normalizeNifNie(nieCandidate),
+      nationality: natCode === 'ESP' ? 'Española' : (natCode && natCode !== '<<<' ? smartTitleCase(natCode) : null),
+      document_type: 'TIE',
+    };
+  }
+
+  return null;
+}
+
+// ── MRZ TD3 — Pasaporte (2 líneas × 44 chars) ────────────────────────────────
+function extractPassportMrz(lines: string[]) {
+  const normalized = lines
+    .map((line) => line.replace(/\s+/g, '').replace(/[^A-Z0-9<]/g, ''))
+    .filter(Boolean);
+
+  for (let index = 0; index <= normalized.length - 2; index += 1) {
+    const line1 = normalized[index];
+    const line2 = normalized[index + 1];
+
+    // Passport line1: P<{country}{surname}<<{given}... (≥44 chars)
+    if (!line1.startsWith('P<') || line1.length < 40) continue;
+    if (!/\d{6}[MF<]\d{6}/.test(line2)) continue;
+
+    // Skip 5-char prefix P<{3-letter country} before the name
+    const namePart = line1.slice(5);
+    const parsedName = parseMrzNameLine(namePart);
+
+    const birthGenderMatch = line2.match(/(\d{6})([MF<])\d{6}[0-9<]([A-Z]{3})/);
+    const birthDate = birthGenderMatch ? parseDateCandidate(birthGenderMatch[1]) : null;
+    const gender = birthGenderMatch ? normalizeGender(birthGenderMatch[2]) : null;
+    const natCode = birthGenderMatch?.[3];
+    // Passport number is positions 0-8 of line2
+    const passportNo = line2.slice(0, 9).replace(/<+$/g, '') || null;
+
+    return {
+      last_name: parsedName.last_name,
+      first_name: parsedName.first_name,
+      birth_date: birthDate,
+      gender,
+      nif_cif: passportNo,
+      nationality: natCode === 'ESP' ? 'Española' : (natCode && natCode !== '<<<' ? smartTitleCase(natCode) : null),
+      document_type: 'Pasaporte',
+    };
+  }
+
+  return null;
+}
+
 function extractDateCandidates(raw: string | null | undefined) {
   if (!raw) return [];
   // Aplicar corrección OCR antes de buscar fechas
@@ -474,6 +552,12 @@ function extractRightSideBirthDate(text: string) {
 function extractMrzData(lines: string[]) {
   const spanishMrz = extractSpanishDniMrz(lines);
   if (spanishMrz) return spanishMrz;
+
+  const tieMrz = extractTieMrz(lines);
+  if (tieMrz) return tieMrz;
+
+  const passportMrz = extractPassportMrz(lines);
+  if (passportMrz) return passportMrz;
 
   const normalized = lines
     .map((line) => line.replace(/\s+/g, '').replace(/[^A-Z0-9<]/g, ''))
@@ -716,26 +800,59 @@ function parseDNIText(raw: string): DniScanData {
     smartTitleCase(domicilioTail) ||
     smartTitleCase(text.match(/(?:LOCALIDAD|MUNICIPIO|LUGAR DE NACIMIENTO|POBLACION)\s*[:\-]?\s*([A-ZÑ ]{3,50})/)?.[1]) ||
     null;
-  const document_type = text.includes('NIE') ? 'NIE' : text.includes('PASAPORTE') ? 'Pasaporte' : 'DNI';
+  // Detección de tipo de documento mejorada (NIE verde, TIE, Pasaporte, DNI)
+  const textDocType =
+    text.includes('PERMISO DE RESIDENCIA') || text.includes('TARJETA DE IDENTIDAD DE EXTRANJERO') || text.includes('RESIDENCE PERMIT') ? 'TIE' :
+    text.includes('CERTIFICADO DE REGISTRO DE CIUDADANO') || text.includes('REGISTRO CENTRAL DE EXTRANJEROS') ? 'NIE' :
+    text.includes('PASAPORTE') || text.includes('PASSPORT') ? 'Pasaporte' :
+    text.includes('NIE') ? 'NIE' :
+    'DNI';
+
+  // NIE verde (Certificado de Registro): formato especial con "Nacido:" y "NIE XXXXXXXB"
+  const nieGreenNif = text.match(/\bNIE\s+([XYZ][0-9OQISBZ]{7}[A-Z])/)?.[1];
+  const nieGreenBirth = pickLikelyBirthDate(
+    extractDateCandidates(text.match(/NACIDO\s*[:\-]?\s*([0-9\/.\- ]{6,12})/)?.[1]),
+  );
+  const nieGreenNationality = smartTitleCase(text.match(/NACIONALIDAD\s*[:\-]?\s*([A-ZÑ ]{3,30})/)?.[1]);
+  const nieGreenName = text.match(/D\.\s*\/\s*D[ªa]\s*[:\-]?\s*(.{3,60})/)?.[1];
+  const nieGreenParsedName = nieGreenName ? cleanupName(nieGreenName) : null;
+
+  // TIE: NIE puede aparecer como "NIE: X1234567P" o en MRZ
+  const tieNif = text.match(/\bNIE\s*[:\-]?\s*([XYZ][0-9OQISBZ]{7}[A-Z])/)?.[1];
+
+  // Pasaporte: número en formato alfanumérico (Nº PASAPORTE o PASSPORT NO)
+  const passportNo = text.match(/(?:N[oº°]\s*PASAPORTE|PASSPORT\s*N[oO°]?|NUMBER)\s*[:\-]?\s*([A-Z]{1,3}[0-9]{6,7})/)?.[1];
+
+  const nif_cif = pickBest(
+    textDocType === 'NIE' ? normalizeNifNie(nieGreenNif) : null,
+    textDocType === 'TIE' ? normalizeNifNie(tieNif) : null,
+    textDocType === 'Pasaporte' ? passportNo : null,
+    mrzData.nif_cif,
+    Array.from(candidates)[0] || null,
+  );
+
+  const nationality = pickBest(
+    mrzData.nationality,
+    nieGreenNationality,
+    labeledNationality ? smartTitleCase(labeledNationality) : null,
+    text.includes('ESPANA') || text.includes('ESP') ? 'Española' : null,
+    smartTitleCase(text.match(/(?:NACIONALIDAD|NATIONALITY)\s*[:\-]?\s*([A-ZÑ ]{3,30})/)?.[1]),
+  );
 
   return {
-    first_name: pickBest(freeTextFirstName, mrzData.first_name),
+    first_name: pickBest(nieGreenParsedName, freeTextFirstName, mrzData.first_name),
     last_name: pickBest(freeTextLastName, mrzData.last_name),
-    nif_cif: pickBest(mrzData.nif_cif, Array.from(candidates)[0] || null),
-    birth_date: birthDate,
+    nif_cif,
+    birth_date: pickBest(birthDate, nieGreenBirth),
     address_town: addressTown,
     address_street: smartTitleCase(domicilioStreet) || parseAddressStreet(text),
     address_cp: domicilioPostalCode || parsePostalCode(text, { strictSpanish: true }),
     address_province: parseProvince(domicilioTail || domicilioText) || parseProvince(text),
     address_country: text.includes('ESPANA') || text.includes('ESP') ? 'España' : null,
     gender: pickBest(mrzData.gender, normalizeGender(labeledGender), normalizeGender(text.match(/(?:SEXO|SEX)\s*[:\-]?\s*([MF])/i)?.[1])),
-    nationality: labeledNationality
-      ? smartTitleCase(labeledNationality)
-      : text.includes('ESPANA') || text.includes('ESP')
-        ? 'Española'
-        : smartTitleCase(text.match(/(?:NACIONALIDAD|NATIONALITY)\s*[:\-]?\s*([A-ZÑ ]{3,30})/)?.[1]),
+    nationality,
     expedition_country: text.includes('ESPANA') || text.includes('ESP') ? 'España' : null,
-    document_type: pickBest(mrzData.document_type, document_type),
+    document_type: pickBest(mrzData.document_type, textDocType),
   };
 }
 async function runTesseractScan(filePath: string) {
@@ -807,16 +924,22 @@ Devuelve SOLO JSON válido con este formato exacto:
 Reglas:
 - birth_date en YYYY-MM-DD.
 - gender solo "M" o "F".
-- document_type: "DNI", "NIE" o "Pasaporte".
-- nif_cif sin espacios.
+- document_type: "DNI", "NIE", "TIE" o "Pasaporte". Elige el más adecuado:
+  · "DNI": Documento Nacional de Identidad español (fondo rosa/rojo, MRZ "IDESP").
+  · "NIE": Certificado Verde de Registro de Ciudadano de la UE (tarjeta verde/blanca, formato papel, pone "NIE XXXXXXXB" y "Nacido:").
+  · "TIE": Tarjeta de Identidad de Extranjero / Permiso de Residencia (tarjeta plástica tipo DNI, "PERMISO DE RESIDENCIA", MRZ empieza con "IR" o "I<ESP").
+  · "Pasaporte": Pasaporte (libreta/booklet, MRZ empieza con "P<ESP").
+- nif_cif: Para DNI es el número DNI (12345678Z). Para NIE y TIE es el NIE (X1234567P, Y..., Z...). Para Pasaporte es el número de pasaporte (ej. ZAB000221).
 - address_country y expedition_country pueden ser "España".
 - No inventes datos.
-- Da prioridad máxima a detectar correctamente: first_name, last_name, document_type, gender y birth_date.
-- En el anverso del DNI español, la fecha de nacimiento suele estar en la parte derecha junto a la etiqueta "NACIMIENTO", normalmente en formato DD MM AAAA.
-- No confundas la fecha de nacimiento con "EMISION" ni con "VALIDEZ".
-- La fecha de nacimiento (birth_date) está en el ANVERSO del DNI, a la DERECHA, bajo la etiqueta "NACIMIENTO", en formato DD MM AAAA (día mes año separados por espacios). Devuélvela siempre en formato YYYY-MM-DD.
-- El código postal (address_cp) son exactamente 5 dígitos que aparecen en la dirección del REVERSO del DNI, antes del nombre del municipio. Ej: "03300 Orihuela". Es OBLIGATORIO extraerlo si aparece.
-- Si dudas entre dejar un campo vacío o inventarlo, déjalo vacío, EXCEPTO para birth_date y address_cp que debes intentar extraer siempre.
+- Da prioridad máxima a detectar correctamente: first_name, last_name, document_type, nif_cif, gender y birth_date.
+- DNI/TIE anverso: fecha nacimiento bajo etiqueta "NACIMIENTO" o "BIRTH DATE", formato DD MM AAAA. Devuélvela en YYYY-MM-DD.
+- NIE verde: fecha nacimiento tras "Nacido:" en formato DD/MM/AAAA. El NIE aparece como "NIE XXXXXXXB".
+- TIE: el NIE puede aparecer en el anverso como "NIE: X1234567P" o en el MRZ (línea que empieza por IR).
+- Pasaporte: el número de pasaporte está en el anverso (Nº pasaporte) y en la primera línea del MRZ.
+- El código postal (address_cp) son exactamente 5 dígitos que aparecen en la dirección del REVERSO, antes del municipio. Ej: "03300 Orihuela". Extráelo si aparece.
+- No confundas la fecha de nacimiento con "EMISION", "VALIDEZ" ni "CADUCIDAD".
+- Si dudas entre dejar un campo vacío o inventarlo, déjalo vacío, EXCEPTO birth_date, nif_cif y document_type que debes extraer siempre.
 - Las imágenes pueden venir giradas; interprétalas igualmente.
 
 Texto OCR auxiliar:
@@ -923,15 +1046,24 @@ Devuelve SOLO JSON válido con este formato exacto:
 Reglas:
 - birth_date en YYYY-MM-DD.
 - gender solo "M" o "F".
-- document_type: "DNI", "NIE" o "Pasaporte".
+- document_type: "DNI", "NIE", "TIE" o "Pasaporte". Elige el más adecuado:
+  · "DNI": Documento Nacional de Identidad español (fondo rosa/rojo, MRZ "IDESP").
+  · "NIE": Certificado Verde de Registro de Ciudadano de la UE (tarjeta/papel verde, pone "NIE XXXXXXXB" y "Nacido:").
+  · "TIE": Tarjeta de Identidad de Extranjero / Permiso de Residencia (tarjeta plástica tipo DNI, "PERMISO DE RESIDENCIA", MRZ empieza con "IR" o "I<ESP").
+  · "Pasaporte": Pasaporte (libreta, MRZ empieza con "P<ESP").
+- nif_cif: Para DNI es el número DNI (12345678Z). Para NIE y TIE es el NIE (X1234567P). Para Pasaporte es el número de pasaporte.
 - nif_cif sin espacios.
 - address_country y expedition_country pueden ser "España".
 - No inventes datos.
-- Da prioridad máxima a detectar correctamente: first_name, last_name, document_type, gender, birth_date, nif_cif y address_cp.
-- En el anverso del DNI español, la fecha de nacimiento (birth_date) está en la parte DERECHA bajo la etiqueta "NACIMIENTO", en formato DD MM AAAA. Devuélvela en YYYY-MM-DD. NUNCA la confundas con "EMISION" ni "VALIDEZ".
-- El código postal (address_cp) son 5 dígitos en la dirección del reverso del DNI, antes del municipio. Ej: "03300 Orihuela" → address_cp = "03300".
-- Si ves MRZ o texto manuscrito útil, aprovéchalo.
-- Si dudas entre dejar un campo vacío o inventarlo, déjalo vacío, EXCEPTO birth_date y address_cp que debes extraer si son visibles.
+- Da prioridad máxima a detectar: first_name, last_name, document_type, nif_cif, gender, birth_date, address_cp.
+- DNI/TIE anverso: birth_date bajo "NACIMIENTO" o "BIRTH DATE", formato DD MM AAAA → YYYY-MM-DD.
+- NIE verde: birth_date tras "Nacido:" (DD/MM/AAAA). NIE como "NIE XXXXXXXB".
+- TIE: NIE en anverso como "NIE: X1234567P" o en la MRZ (línea IR...).
+- Pasaporte: número de pasaporte en el anverso y primera línea MRZ (P<ESP...).
+- address_cp: 5 dígitos en la dirección del reverso, antes del municipio. Ej: "03300 Orihuela" → "03300".
+- NUNCA confundas birth_date con "EMISION", "VALIDEZ" o "CADUCIDAD".
+- Si ves MRZ, úsalo — es la fuente más fiable.
+- Si dudas, deja vacío, EXCEPTO birth_date, nif_cif y document_type.
 
 Texto OCR auxiliar:
 ---
@@ -1118,7 +1250,7 @@ export const scanDNI = async (req: any, res: Response) => {
       address_country: smartTitleCase(extracted.address_country || 'España'),
       nationality: smartTitleCase(extracted.nationality),
       expedition_country: smartTitleCase(extracted.expedition_country || 'España'),
-      document_type: extracted.document_type || 'DNI',
+      document_type: ['DNI', 'NIE', 'TIE', 'Pasaporte'].includes(extracted.document_type || '') ? extracted.document_type : 'DNI',
     };
     extracted = {
       ...extracted,

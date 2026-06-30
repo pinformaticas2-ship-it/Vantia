@@ -1151,7 +1151,7 @@ export default function ClientForm() {
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                     <F label="Tipo documento" required invalid={isInvalid("document_type")}>
                       <S name="document_type" value={form.document_type} onChange={handleChange} highlight={h("document_type")} invalid={isInvalid("document_type")}>
-                        <option>DNI</option><option>NIE</option><option>Pasaporte</option><option>CIF</option><option>Otro</option>
+                        <option>DNI</option><option>NIE</option><option>TIE</option><option>Pasaporte</option><option>CIF</option><option>Otro</option>
                       </S>
                     </F>
                     <F label="NIF / CIF" required invalid={isInvalid("nif_cif")}>
@@ -1419,7 +1419,7 @@ export default function ClientForm() {
                   <div className="flex flex-col gap-2">
                     <label className={`${lbl}${isInvalid("document_type") ? " text-red-500" : ""}`}>Tipo Documento <span className="text-red-500">*</span></label>
                     <select name="document_type" value={form.document_type} onChange={handleChange} className={inputCls("document_type")}>
-                      <option>DNI</option><option>NIE</option><option>Pasaporte</option><option>CIF</option><option>Otro</option>
+                      <option>DNI</option><option>NIE</option><option>TIE</option><option>Pasaporte</option><option>CIF</option><option>Otro</option>
                     </select>
                   </div>
                   <div className="flex flex-col gap-2">
