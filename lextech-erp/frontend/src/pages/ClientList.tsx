@@ -543,14 +543,14 @@ function ToolBtn({
       disabled={disabled}
       title={label}
       className={`
-        flex items-center gap-1.5 whitespace-nowrap px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all active:scale-[0.98] shadow-sm
+        inline-flex items-center gap-1.5 whitespace-nowrap px-3 py-2 rounded-lg text-xs font-semibold transition-all active:scale-[0.97] border
         ${disabled
-          ? "text-slate-300 cursor-not-allowed bg-white border border-slate-100"
+          ? "text-slate-300 cursor-not-allowed bg-white border-slate-100"
           : primary
-            ? "bg-red-600 text-white hover:bg-red-700 border border-red-600 shadow-red-100"
+            ? "bg-red-600 text-white hover:bg-red-700 border-red-600 shadow-sm shadow-red-200"
             : danger
-              ? "text-red-600 bg-white hover:bg-red-50 border border-red-200"
-              : "text-slate-600 bg-white hover:bg-slate-50 border border-slate-200"
+              ? "text-red-600 bg-white hover:bg-red-50 border-red-200"
+              : "text-slate-600 bg-white hover:bg-slate-50 hover:border-slate-300 border-slate-200"
         }
       `}
     >
@@ -589,9 +589,9 @@ function DropdownBtn({
         onClick={() => { if (!disabled) setOpen(o => !o); }}
         disabled={disabled}
         title={label}
-        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-colors border shadow-sm active:scale-[0.98]
+        className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-colors border active:scale-[0.97]
           ${open && !disabled ? "bg-red-50 border-red-300 text-red-700" : ""}
-          ${disabled ? "text-slate-300 cursor-not-allowed border-slate-100 bg-white" : !open ? "text-slate-600 bg-white hover:bg-slate-100 border-slate-200" : ""}
+          ${disabled ? "text-slate-300 cursor-not-allowed border-slate-100 bg-white" : !open ? "text-slate-600 bg-white hover:bg-slate-50 hover:border-slate-300 border-slate-200" : ""}
         `}
       >
         <Icon size={13} />
@@ -602,7 +602,7 @@ function DropdownBtn({
       {open && (
         <div
           ref={menuRef}
-          className="absolute left-0 top-full z-[9999] mt-2 min-w-[220px] max-w-[280px] bg-white border border-slate-200 rounded-2xl shadow-2xl shadow-slate-300/40 py-1.5 max-h-[72vh] overflow-y-auto"
+          className="absolute left-0 top-full z-[9999] mt-1 min-w-[220px] max-w-[280px] bg-white border border-slate-200 rounded-xl shadow-2xl shadow-slate-300/40 py-1.5 max-h-[72vh] overflow-y-auto"
         >
           {items.map((item, i) =>
             item.divider ? (
@@ -678,10 +678,10 @@ function AltaOptionsBtn({
       <button
         ref={btnRef}
         onClick={() => setOpen((prev) => !prev)}
-        className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all select-none whitespace-nowrap shadow-sm ${
+        className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-all select-none whitespace-nowrap border active:scale-[0.97] ${
           open
-            ? "bg-red-800 text-white shadow-sm"
-            : "bg-red-700 text-white hover:bg-red-800 active:scale-[0.98]"
+            ? "bg-red-700 text-white border-red-700"
+            : "bg-red-600 text-white border-red-600 hover:bg-red-700 hover:border-red-700"
         }`}
       >
         <Plus size={13} />
@@ -1612,21 +1612,21 @@ export default function ClientList() {
 
   // ── Render: carga ──────────────────────────────────────────
   if (loading) return (
-    <div className="flex-1 flex flex-col items-center justify-center gap-4 text-slate-400">
+    <div className="w-full min-h-[60vh] flex flex-col items-center justify-center gap-4">
       <Spinner size="xl" label="Cargando clientes..." />
     </div>
   );
 
   // ── Render: error ──────────────────────────────────────────
   if (error) return (
-    <div className="flex-1 flex flex-col items-center justify-center p-10">
-      <div className="w-full max-w-md flex items-center gap-3 p-5 bg-red-50 border border-red-200 rounded-xl text-red-700">
-        <AlertCircle size={20} className="shrink-0" />
-        <div className="flex-1">
+    <div className="w-full min-h-[60vh] flex flex-col items-center justify-center p-10">
+      <div className="w-full max-w-md flex items-start gap-3 p-5 bg-red-50 border border-red-200 rounded-xl text-red-700">
+        <AlertCircle size={20} className="shrink-0 mt-0.5" />
+        <div className="flex-1 min-w-0">
           <p className="font-bold text-sm">Error de conexión con el backend</p>
-          <p className="text-xs mt-0.5 font-mono">{error}</p>
+          <p className="text-xs mt-0.5 font-mono break-all">{error}</p>
         </div>
-        <button onClick={() => fetchClients()} className="flex items-center gap-2 text-xs font-bold px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700">
+        <button onClick={() => fetchClients()} className="shrink-0 flex items-center gap-2 text-xs font-bold px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
           <RefreshCw size={12} /> Reintentar
         </button>
       </div>
@@ -1932,22 +1932,6 @@ export default function ClientList() {
       </div>,
       document.body
     )}
-    {showQuickTaskModal && selectedClient && (
-      <QuickTaskModal
-        client={selectedClient}
-        form={quickTaskForm}
-        setForm={setQuickTaskForm}
-        saving={quickTaskSaving}
-        errorMsg={quickTaskError}
-        onClose={() => {
-          setShowQuickTaskModal(false);
-          setQuickTaskError(null);
-          setQuickTaskForm(QUICK_TASK_EMPTY());
-        }}
-        onSave={handleQuickTaskSave}
-        getToken={getToken}
-      />
-    )}
     <ColumnVisibilityModal
       open={showColumnModal}
       title="Modificar columnas del listado"
@@ -1961,7 +1945,7 @@ export default function ClientList() {
       onMoveAllToAvailable={moveAllClientColumnsToAvailable}
       onClose={() => setShowColumnModal(false)}
     />
-    <div className="flex-1 flex flex-col overflow-hidden animate-page-in">
+    <div className="h-full flex flex-col overflow-hidden animate-page-in">
 
       {/* ── CABECERA ─────────────────────────────────────────── */}
       <div className="px-6 lg:px-8 py-5 border-b border-slate-200 bg-white flex-shrink-0 z-10 animate-card-in">
@@ -2164,8 +2148,8 @@ export default function ClientList() {
           <div className="relative" ref={opcionesRef}>
             <button
               onClick={() => setShowOpciones(v => !v)}
-              className={`flex items-center gap-1.5 whitespace-nowrap px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all shadow-sm border ${showOpciones ? "bg-red-50 border-red-300 text-red-700" : "text-slate-600 hover:bg-slate-50 border-slate-200 bg-white"}`}>
-              <MoreHorizontal size={13} /> Opciones <ChevronDown size={10} />
+              className={`inline-flex items-center gap-1.5 whitespace-nowrap px-3 py-2 rounded-lg text-xs font-semibold transition-all border active:scale-[0.97] ${showOpciones ? "bg-red-50 border-red-300 text-red-700" : "text-slate-600 hover:bg-slate-50 hover:border-slate-300 border-slate-200 bg-white"}`}>
+              <MoreHorizontal size={13} /> <span className="hidden sm:inline">Opciones</span> <ChevronDown size={10} />
             </button>
             {showOpciones && (
               <div className="absolute right-0 top-full mt-2 z-50 w-[290px] bg-white border border-slate-200 rounded-2xl shadow-[0_24px_60px_rgba(15,23,42,0.18)] py-1.5 overflow-visible">
@@ -2398,14 +2382,6 @@ export default function ClientList() {
                       </button>
                     </div>
 
-                    {/* ── Botón refrescar ── */}
-                    <button
-                      onClick={handleRefresh}
-                      title="Refrescar datos"
-                      className="p-1.5 rounded-lg border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-300 hover:bg-red-50 transition-all"
-                    >
-                      <RefreshCw size={13} className={refreshSpin ? "animate-spin" : ""} />
-                    </button>
                   </div>
                 )}
               </div>
@@ -2430,7 +2406,7 @@ export default function ClientList() {
                   <div className="absolute top-full left-0 mt-1 z-20 bg-white border border-slate-200 rounded-lg shadow-lg min-w-[200px] max-h-48 overflow-y-auto py-1">
                     {filtered.filter(c => selectedIds.has(c.id)).map(c => (
                       <div key={c.id} className="px-3 py-1.5 text-slate-600 hover:bg-slate-50 truncate">
-                        {c.nombre} {c.apellidos ?? ""}
+                        {c.first_name} {c.last_name ?? ""}
                       </div>
                     ))}
                   </div>
@@ -2829,25 +2805,25 @@ export default function ClientList() {
         )}
 
         {/* ── BARRA DE ESTADO INFERIOR ─────────────────────────── */}
-        <div className="flex items-center gap-6 px-4 py-2 border-t border-slate-100 bg-slate-50/60 text-[11px] text-slate-500 shrink-0">
-          <span>
-            <span className="font-semibold text-slate-700">Núm. Clientes:</span>{" "}
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1 px-4 py-2 border-t border-slate-100 bg-slate-50/60 text-[11px] text-slate-500 shrink-0 overflow-x-auto">
+          <span className="whitespace-nowrap">
+            <span className="font-semibold text-slate-700">Clientes:</span>{" "}
             <span className="font-mono">{stats.total.toLocaleString("es-ES")}</span>
           </span>
-          <span>
-            <span className="font-semibold text-emerald-600">Total Activos:</span>{" "}
+          <span className="whitespace-nowrap">
+            <span className="font-semibold text-emerald-600">Activos:</span>{" "}
             <span className="font-mono">{stats.activos.toLocaleString("es-ES")}</span>
           </span>
-          <span>
+          <span className="whitespace-nowrap">
             <span className="font-semibold text-red-500">% Bajas:</span>{" "}
             <span className="font-mono">{stats.pctBaja.replace(".", ",")}%</span>
           </span>
           {hasActiveFilters && (
-            <span className="text-amber-600 font-medium">
-              ↳ Mostrando {filtered.length} de {clients.length} con filtros activos
+            <span className="text-amber-600 font-medium whitespace-nowrap">
+              Filtrado: {filtered.length} de {clients.length}
             </span>
           )}
-          <span className="ml-auto text-slate-300">
+          <span className="ml-auto text-slate-300 whitespace-nowrap hidden lg:inline">
             Doble clic para abrir · Enter abre seleccionado · Ctrl+F para filtrar
           </span>
         </div>
