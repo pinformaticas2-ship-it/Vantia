@@ -302,7 +302,6 @@ export default function ClientForm() {
   const linkedExpedienteId = searchParams.get("expediente_id") || "";
 
   const [form, setForm] = useState({ ...EMPTY_FORM });
-  const [activeSection, setActiveSection] = useState("identificacion");
 
   useEffect(() => {
     if (isEdit) return;
@@ -701,7 +700,6 @@ export default function ClientForm() {
     const validationError = validateClientForm();
     if (validationError) {
       setError(validationError);
-      setActiveSection("identificacion");
       return;
     }
     const payload = buildClientPayload();
@@ -1312,13 +1310,6 @@ export default function ClientForm() {
     </div>
   );
 
-  const NAV_SECTIONS = [
-    { id: "identificacion", label: "Identificación", icon: Users },
-    { id: "direccion",      label: "Dirección",      icon: MapPin },
-    { id: "contacto",       label: "Contacto",       icon: Phone },
-    { id: "administracion", label: "Administración", icon: Briefcase },
-  ] as const;
-
   return (
     <form onSubmit={handleSubmit} className="h-full flex flex-col overflow-hidden animate-page-in">
 
@@ -1369,51 +1360,17 @@ export default function ClientForm() {
       </div>
 
       {/* ── BODY ── */}
-      <div className="flex-1 flex overflow-hidden">
+      <main className="flex-1 min-h-0 overflow-y-auto p-5 sm:p-7 bg-[#f4f6f8]">
+        <div className="max-w-[1400px] mx-auto flex flex-col xl:flex-row gap-8 xl:items-start">
 
-        {/* ── NAV LATERAL ── */}
-        <aside className="w-44 flex-shrink-0 border-r border-slate-200 bg-white py-4 px-2 flex flex-col overflow-y-auto animate-card-in-1">
-          <p className="px-3 mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">Secciones</p>
-          {NAV_SECTIONS.map(sec => (
-            <button
-              key={sec.id}
-              type="button"
-              onClick={() => setActiveSection(sec.id)}
-              className={`relative flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all text-left mb-0.5 ${
-                activeSection === sec.id
-                  ? "bg-white text-red-600 shadow-sm ring-1 ring-slate-200"
-                  : "text-slate-500 hover:bg-slate-50 hover:text-slate-700"
-              }`}
-            >
-              {activeSection === sec.id && (
-                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-red-500 rounded-r-full" />
-              )}
-              <sec.icon size={13} className={activeSection === sec.id ? "text-red-500" : "text-slate-400"} />
-              {sec.label}
-            </button>
-          ))}
-          {invalidFields.size > 0 && (
-            <div className="mt-4 mx-1 p-2.5 rounded-lg bg-red-50 border border-red-100 text-xs text-red-600">
-              <p className="font-bold mb-1">{invalidFields.size} campo{invalidFields.size !== 1 ? "s" : ""} requerido{invalidFields.size !== 1 ? "s" : ""}</p>
-              {Array.from(invalidFields).slice(0, 4).map(f => (
-                <p key={f} className="text-red-500">· {CLIENT_ERROR_LABELS[f] || f}</p>
-              ))}
-            </div>
-          )}
-          {filledFields.size > 0 && (
-            <div className="mt-3 mx-1 p-2.5 rounded-lg bg-emerald-50 border border-emerald-100 text-xs text-emerald-700 flex items-center gap-1.5">
-              <Sparkles size={11} className="text-emerald-500 shrink-0" />
-              {filledFields.size} campos del OCR
-            </div>
-          )}
-        </aside>
+          {/* ── SECCIONES ── */}
+          <div className="flex-1 flex flex-col gap-7 animate-card-in-1">
 
-        {/* ── CONTENIDO PRINCIPAL ── */}
-        <main className="flex-1 overflow-y-auto p-6 bg-[#f4f6f8]">
-          <div className="max-w-3xl space-y-4 animate-card-in-1">
-
-            {/* ── IDENTIFICACIÓN ── */}
-            {activeSection === "identificacion" && (
+            {/* IDENTIFICACIÓN */}
+            <div>
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2">
+                <Users size={15} className="text-slate-400" /> Identificación
+              </h3>
               <div className="space-y-4">
                 <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                   <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
@@ -1507,10 +1464,13 @@ export default function ClientForm() {
                   </div>
                 </div>
               </div>
-            )}
+            </div>
 
-            {/* ── DIRECCIÓN ── */}
-            {activeSection === "direccion" && (
+            {/* DIRECCIÓN */}
+            <div className="pt-6 border-t border-slate-100">
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2">
+                <MapPin size={15} className="text-slate-400" /> Dirección
+              </h3>
               <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                 <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
                   <MapPin size={13} className="text-slate-400" />
@@ -1539,10 +1499,13 @@ export default function ClientForm() {
                   </F>
                 </div>
               </div>
-            )}
+            </div>
 
-            {/* ── CONTACTO ── */}
-            {activeSection === "contacto" && (
+            {/* CONTACTO */}
+            <div className="pt-6 border-t border-slate-100">
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2">
+                <Phone size={15} className="text-slate-400" /> Contacto
+              </h3>
               <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                 <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
                   <Phone size={13} className="text-slate-400" />
@@ -1565,10 +1528,13 @@ export default function ClientForm() {
                   </div>
                 </div>
               </div>
-            )}
+            </div>
 
-            {/* ── ADMINISTRACIÓN ── */}
-            {activeSection === "administracion" && (
+            {/* ADMINISTRACIÓN */}
+            <div className="pt-6 border-t border-slate-100">
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2">
+                <Briefcase size={15} className="text-slate-400" /> Administración
+              </h3>
               <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
                 <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
                   <Briefcase size={13} className="text-slate-400" />
@@ -1601,36 +1567,50 @@ export default function ClientForm() {
                   </F>
                 </div>
               </div>
+            </div>
+
+          </div>
+
+          {/* ── PANEL DERECHO ── */}
+          <div className="w-full xl:w-[280px] flex-shrink-0 flex flex-col gap-4 animate-card-in-2">
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+              <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+                <BarChart2 size={13} className="text-slate-400" />
+                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Indicadores</h3>
+              </div>
+              <div className="px-4 py-3">
+                <Indicador label="Expedientes" value="—" />
+                <Indicador label="Exp. abiertos" value="—" />
+                <Indicador label="Días sin actuac." value="—" />
+                <Indicador label="Actuac. atrasadas" value="—" />
+                <Indicador label="Días morosidad" value="—" />
+                <Indicador label="Dom. económico" value="No" color="text-red-500" />
+                <Indicador label="Dom. historial" value="No" color="text-red-500" />
+              </div>
+              <div className="px-4 pb-3">
+                <p className="text-[10px] text-slate-300 italic">
+                  {isEdit ? "Vuelve a la ficha para ver indicadores" : "Disponible tras guardar el cliente"}
+                </p>
+              </div>
+            </div>
+            {invalidFields.size > 0 && (
+              <div className="rounded-xl border border-red-100 bg-red-50 p-3 text-xs text-red-600">
+                <p className="font-bold mb-1">{invalidFields.size} campo{invalidFields.size !== 1 ? "s" : ""} requerido{invalidFields.size !== 1 ? "s" : ""}</p>
+                {Array.from(invalidFields).slice(0, 4).map(f => (
+                  <p key={f} className="text-red-500">· {CLIENT_ERROR_LABELS[f] || f}</p>
+                ))}
+              </div>
             )}
-
+            {filledFields.size > 0 && (
+              <div className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-xs text-emerald-700">
+                <Sparkles size={11} className="text-emerald-500 shrink-0" />
+                {filledFields.size} campos del OCR
+              </div>
+            )}
           </div>
-        </main>
 
-        {/* ── INDICADORES ── */}
-        <aside className="w-52 flex-shrink-0 border-l border-slate-200 bg-white py-4 px-3 overflow-y-auto animate-card-in-2">
-          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-            <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
-              <BarChart2 size={13} className="text-slate-400" />
-              <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Indicadores</h3>
-            </div>
-            <div className="px-4 py-3">
-              <Indicador label="Expedientes" value="—" />
-              <Indicador label="Exp. abiertos" value="—" />
-              <Indicador label="Días sin actuac." value="—" />
-              <Indicador label="Actuac. atrasadas" value="—" />
-              <Indicador label="Días morosidad" value="—" />
-              <Indicador label="Dom. económico" value="No" color="text-red-500" />
-              <Indicador label="Dom. historial" value="No" color="text-red-500" />
-            </div>
-            <div className="px-4 pb-3">
-              <p className="text-[10px] text-slate-300 italic">
-                {isEdit ? "Vuelve a la ficha para ver indicadores" : "Disponible tras guardar el cliente"}
-              </p>
-            </div>
-          </div>
-        </aside>
-
-      </div>
+        </div>
+      </main>
 
       <style>{`
         @keyframes scan { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }
