@@ -1777,7 +1777,7 @@ function buildEmailDoc(bodyHtml?: string | null, bodyText?: string | null): stri
     || (bodyText
       ? `<pre style="font-family:inherit;white-space:pre-wrap;word-break:break-word;margin:0;padding:0">${bodyText.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre>`
       : '<p style="color:#9ca3af;font-style:italic;margin:0">Sin contenido</p>');
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><base target="_blank">
 <style>
   html,body{margin:0;padding:0}
   body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:14.5px;color:#1f2937;line-height:1.75;background:#fff;word-break:break-word;overflow-wrap:break-word}
