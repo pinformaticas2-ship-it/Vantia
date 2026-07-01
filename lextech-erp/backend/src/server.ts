@@ -22,7 +22,6 @@ import clientInviteRoutes   from './routes/clientInvite';
 import facturacionRoutes    from './routes/facturacion';
 import quipuRoutes          from './routes/quipu';
 import { syncAllQuipuUsers } from './controllers/quipuController';
-import { scheduleTaskReminderJob } from './jobs/taskReminderJob';
 import { clerkMiddleware } from '@clerk/express';
 import { runMigrations } from './config/migrations';
 import { startLocalFilesWatcher } from './watchers/localFilesWatcher';
@@ -246,9 +245,6 @@ runMigrations().then(() => {
       syncAllQuipuUsers().catch(() => {});
       setInterval(() => syncAllQuipuUsers().catch(() => {}), 30 * 60 * 1000);
     }, 30_000);
-
-    // Task reminder emails: daily digest at 08:00 via Resend
-    scheduleTaskReminderJob();
 
     // EmailEngine startup: configure webhook and register existing IMAP accounts
     const emailEngineUrl = process.env.EMAIL_ENGINE_URL;
