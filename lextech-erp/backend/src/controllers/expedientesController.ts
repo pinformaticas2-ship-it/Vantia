@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import pool from '../config/database';
-import { logActivityForReq } from './activityController';
+import { logActivityForReq, resolveUserName } from './activityController';
 
 function reqUserName(req: any): string {
   const c = req.auth?.sessionClaims;
@@ -871,6 +871,23 @@ export const getExpedienteHistorial = async (req: any, res: Response) => {
     if (exp.fecha_cierre) {
       const cierreTs = exp.updated_at || (exp.fecha_cierre + 'T23:59:59.000Z');
       events.push({ type: 'cierre', timestamp: cierreTs, title: 'Expediente cerrado', user_name: null });
+    }
+
+    // ── Resolver IDs de Clerk a nombres legibles ─────────────────────────────
+    const clerkIdRe = /^user_[A-Za-z0-9]+$/;
+    const uniqueIds = [...new Set(
+      events.map(e => e.user_name).filter((u): u is string => typeof u === 'string' && clerkIdRe.test(u))
+    )];
+    if (uniqueIds.length > 0) {
+      const pairs = await Promise.all(
+        uniqueIds.map(uid => resolveUserName(uid).then(name => [uid, name] as [string, string]).catch(() => [uid, uid] as [string, string]))
+      );
+      const nameMap: Record<string, string> = Object.fromEntries(pairs);
+      for (const ev of events) {
+        if (typeof ev.user_name === 'string' && nameMap[ev.user_name]) {
+          ev.user_name = nameMap[ev.user_name];
+        }
+      }
     }
 
     events.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
