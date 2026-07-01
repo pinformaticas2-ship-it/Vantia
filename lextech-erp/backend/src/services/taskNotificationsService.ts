@@ -1,9 +1,14 @@
 import { Resend } from 'resend';
 import { createClerkClient } from '@clerk/backend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
 const APP_URL    = process.env.PUBLIC_URL || 'http://localhost:5173';
+
+let _resend: Resend | null = null;
+function getResend(): Resend {
+  if (!_resend) _resend = new Resend(process.env.RESEND_API_KEY);
+  return _resend;
+}
 
 let _clerk: ReturnType<typeof createClerkClient> | null = null;
 function getClerk() {
@@ -261,7 +266,7 @@ export async function sendTaskDigest(
 
   const subject = `⚖️ Vantia: ${subjectParts.join(' · ')} — ${new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}`;
 
-  await resend.emails.send({
+  await getResend().emails.send({
     from: FROM_EMAIL,
     to:   toEmail,
     subject,
