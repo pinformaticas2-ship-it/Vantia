@@ -46,6 +46,12 @@ import {
   ChevronRight,
   Copy,
   ClipboardPaste,
+  Lock,
+  Unlock,
+  FolderPlus,
+  FileX,
+  FileText,
+  MessageSquare,
 } from "lucide-react";
 import { safeJson, resolveApiUrl } from "../lib/api";
 import { Spinner } from "../components/Spinner";
@@ -5602,62 +5608,195 @@ export default function ExpedienteDetail() {
             )}
 
             {tab === "historial" && (() => {
-              const TYPE_CFG: Record<string, { label: string; dot: string; badge: string }> = {
-                alta:     { label: "Alta",       dot: "bg-emerald-500", badge: "bg-emerald-100 text-emerald-700" },
-                cierre:   { label: "Cierre",     dot: "bg-red-500",     badge: "bg-red-100 text-red-700" },
-                nota:     { label: "Nota",       dot: "bg-amber-400",   badge: "bg-amber-100 text-amber-700" },
-                tarea:    { label: "Tarea",      dot: "bg-blue-500",    badge: "bg-blue-100 text-blue-700" },
-                actuacion:{ label: "Actuación",  dot: "bg-purple-500",  badge: "bg-purple-100 text-purple-700" },
-                cambio:   { label: "Cambio",     dot: "bg-slate-400",   badge: "bg-slate-100 text-slate-600" },
+              type HistIcon = React.FC<{ size?: number; className?: string }>;
+              const TYPE_CFG: Record<string, { label: string; Icon: HistIcon; iconBg: string; iconColor: string; badge: string }> = {
+                alta:                    { label: "Alta",                Icon: FolderPlus   as HistIcon, iconBg: "bg-emerald-100",  iconColor: "text-emerald-600",  badge: "bg-emerald-50 text-emerald-700 border-emerald-200"  },
+                cierre:                  { label: "Cierre",              Icon: Lock         as HistIcon, iconBg: "bg-red-100",      iconColor: "text-red-600",      badge: "bg-red-50 text-red-700 border-red-200"              },
+                reapertura:              { label: "Reapertura",          Icon: Unlock       as HistIcon, iconBg: "bg-emerald-100",  iconColor: "text-emerald-600",  badge: "bg-emerald-50 text-emerald-700 border-emerald-200"  },
+                cambio:                  { label: "Cambio",              Icon: Edit3        as HistIcon, iconBg: "bg-slate-100",    iconColor: "text-slate-500",    badge: "bg-slate-50 text-slate-600 border-slate-200"        },
+                nota:                    { label: "Nota",                Icon: StickyNote   as HistIcon, iconBg: "bg-amber-100",    iconColor: "text-amber-600",    badge: "bg-amber-50 text-amber-700 border-amber-200"        },
+                nota_eliminada:          { label: "Nota eliminada",      Icon: Trash2       as HistIcon, iconBg: "bg-slate-100",    iconColor: "text-slate-400",    badge: "bg-slate-50 text-slate-500 border-slate-200"        },
+                tarea:                   { label: "Tarea",               Icon: CheckCircle2 as HistIcon, iconBg: "bg-blue-100",     iconColor: "text-blue-600",     badge: "bg-blue-50 text-blue-700 border-blue-200"           },
+                tarea_completada:        { label: "Tarea completada",    Icon: CheckCircle2 as HistIcon, iconBg: "bg-emerald-100",  iconColor: "text-emerald-600",  badge: "bg-emerald-50 text-emerald-700 border-emerald-200"  },
+                actuacion:               { label: "Actuación",           Icon: Scale        as HistIcon, iconBg: "bg-purple-100",   iconColor: "text-purple-600",   badge: "bg-purple-50 text-purple-700 border-purple-200"     },
+                archivo:                 { label: "Archivo adjunto",     Icon: Paperclip    as HistIcon, iconBg: "bg-indigo-100",   iconColor: "text-indigo-600",   badge: "bg-indigo-50 text-indigo-700 border-indigo-200"     },
+                archivo_eliminado:       { label: "Archivo eliminado",   Icon: FileX        as HistIcon, iconBg: "bg-red-100",      iconColor: "text-red-500",      badge: "bg-red-50 text-red-600 border-red-200"              },
+                adjunto_tarea:           { label: "Adjunto actuación",   Icon: FileText     as HistIcon, iconBg: "bg-violet-100",   iconColor: "text-violet-600",   badge: "bg-violet-50 text-violet-700 border-violet-200"     },
+                adjunto_tarea_eliminado: { label: "Adjunto eliminado",   Icon: FileX        as HistIcon, iconBg: "bg-red-100",      iconColor: "text-red-400",      badge: "bg-red-50 text-red-500 border-red-100"              },
+                factura:                 { label: "Factura",             Icon: Banknote     as HistIcon, iconBg: "bg-green-100",    iconColor: "text-green-600",    badge: "bg-green-50 text-green-700 border-green-200"        },
+                presupuesto:             { label: "Presupuesto",         Icon: ClipboardList as HistIcon,iconBg: "bg-teal-100",     iconColor: "text-teal-600",     badge: "bg-teal-50 text-teal-700 border-teal-200"           },
+                correo:                  { label: "Correo",              Icon: Mail         as HistIcon, iconBg: "bg-sky-100",      iconColor: "text-sky-600",      badge: "bg-sky-50 text-sky-700 border-sky-200"              },
+                correo_borrador:         { label: "Borrador correo",     Icon: MessageSquare as HistIcon,iconBg: "bg-slate-100",    iconColor: "text-slate-500",    badge: "bg-slate-50 text-slate-500 border-slate-200"        },
+                agenda:                  { label: "Evento agenda",       Icon: Calendar     as HistIcon, iconBg: "bg-orange-100",   iconColor: "text-orange-600",   badge: "bg-orange-50 text-orange-700 border-orange-200"     },
               };
-              const fmtFull = (d: string) => new Date(d).toLocaleString("es-ES", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" });
-              const fmtShort = (d: string) => {
-                const hasTime = d.length > 10 && d.includes("T");
-                return new Date(d).toLocaleString("es-ES", {
-                  day: "2-digit", month: "short", year: "numeric",
-                  ...(hasTime ? { hour: "2-digit", minute: "2-digit" } : {}),
-                });
-              };
+
+              const fmtFull   = (d: string) => new Date(d).toLocaleString("es-ES", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+              const fmtTime   = (d: string) => { const dt = new Date(d); return isNaN(dt.getTime()) ? "" : dt.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }); };
+              const fmtDay    = (d: string) => new Date(d).toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+              const fmtMini   = (d: string) => new Date(d).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" });
+              const fmtBytes  = (b: number) => b < 1024 ? `${b} B` : b < 1048576 ? `${(b / 1024).toFixed(0)} KB` : `${(b / 1048576).toFixed(1)} MB`;
+              const fmtEuros  = (v: any) => v != null ? Number(v).toLocaleString("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }) : null;
+              const dayKey    = (d: string) => new Date(d).toLocaleDateString("es-ES", { year: "numeric", month: "2-digit", day: "2-digit" });
+
               if (historialLoading) return (
                 <div className="flex items-center justify-center py-16">
                   <Spinner size="sm" muted label="Cargando historial…" />
                 </div>
               );
               if (!historial || historial.length === 0) return <EmptyTab icon={Activity} label="Sin historial por ahora" />;
+
+              // Group by day
+              const groups: { day: string; label: string; events: any[] }[] = [];
+              for (const ev of historial) {
+                const day = dayKey(ev.timestamp);
+                const last = groups[groups.length - 1];
+                if (last?.day === day) last.events.push(ev);
+                else groups.push({ day, label: fmtDay(ev.timestamp), events: [ev] });
+              }
+
               return (
-                <div className="px-1 py-2">
-                  <ol className="relative border-l border-slate-200 ml-3 space-y-0">
-                    {historial.map((ev, i) => {
-                      const cfg = TYPE_CFG[ev.type] || TYPE_CFG.cambio;
+                <div className="px-1 py-3 space-y-5">
+                  {/* Summary bar */}
+                  <div className="flex items-center gap-2 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-slate-500 font-medium flex-wrap">
+                    <Activity size={11} className="text-slate-400 shrink-0" />
+                    <span className="font-bold text-slate-700">{historial.length}</span> eventos registrados
+                    <span className="text-slate-300">·</span>
+                    {Object.entries(
+                      historial.reduce((acc: Record<string, number>, ev) => { acc[ev.type] = (acc[ev.type] || 0) + 1; return acc; }, {})
+                    ).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([type, count]) => {
+                      const cfg = TYPE_CFG[type] || TYPE_CFG.cambio;
                       return (
-                        <li key={i} className="ml-6 pb-7 last:pb-0">
-                          <span className={`absolute -left-[7px] mt-1.5 h-3 w-3 rounded-full border-2 border-white ${cfg.dot}`} />
-                          <div className="flex flex-wrap items-start gap-2">
-                            <span className={`mt-0.5 shrink-0 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${cfg.badge}`}>
-                              {cfg.label}
-                            </span>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm text-slate-800 leading-snug">{ev.title}</p>
-                              <div className="flex flex-wrap items-center gap-3 mt-1">
-                                <time className="text-[11px] text-slate-400" title={fmtFull(ev.timestamp)}>
-                                  {fmtShort(ev.timestamp)}
-                                </time>
-                                {ev.user_name && (
-                                  <span className="text-[11px] text-slate-400">· {ev.user_name}</span>
-                                )}
-                                {ev.meta?.estado && (
-                                  <span className="text-[11px] text-slate-400">· Estado: {ev.meta.estado}</span>
-                                )}
-                                {ev.meta?.plazo && (
-                                  <span className="text-[11px] text-slate-400">· Plazo: {fmtShort(ev.meta.plazo)}</span>
+                        <span key={type} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[10px] font-bold ${cfg.badge}`}>
+                          {count} {cfg.label}
+                        </span>
+                      );
+                    })}
+                  </div>
+
+                  {groups.map(group => (
+                    <div key={group.day}>
+                      {/* Day separator */}
+                      <div className="flex items-center gap-3 mb-3 sticky top-0 z-10 bg-white/90 backdrop-blur-sm py-1 -mx-1 px-1">
+                        <div className="h-px flex-1 bg-slate-100" />
+                        <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-widest shrink-0 capitalize">
+                          {group.label}
+                        </span>
+                        <div className="h-px flex-1 bg-slate-100" />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        {group.events.map((ev, i) => {
+                          const cfg = TYPE_CFG[ev.type] || TYPE_CFG.cambio;
+                          const { Icon } = cfg;
+                          const timeStr = fmtTime(ev.timestamp);
+                          const isLast  = i === group.events.length - 1;
+
+                          return (
+                            <div key={i} className="flex gap-3 group/ev">
+                              {/* Icon + connector */}
+                              <div className="flex flex-col items-center shrink-0 pt-0.5">
+                                <div className={`w-7 h-7 rounded-full flex items-center justify-center border ${cfg.iconBg} border-white shadow-sm shrink-0`}>
+                                  <Icon size={13} className={cfg.iconColor} />
+                                </div>
+                                {!isLast && <div className="w-px flex-1 bg-slate-100 mt-1 min-h-[10px]" />}
+                              </div>
+
+                              {/* Card */}
+                              <div className={`flex-1 min-w-0 pb-2 ${isLast ? "" : ""}`}>
+                                <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                                  <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md border ${cfg.badge}`}>
+                                    {cfg.label}
+                                  </span>
+                                  {timeStr && (
+                                    <time className="text-[11px] font-mono font-bold text-slate-400" title={fmtFull(ev.timestamp)}>
+                                      {timeStr}
+                                    </time>
+                                  )}
+                                  {ev.user_name && (
+                                    <span className="flex items-center gap-1 text-[11px] text-slate-400">
+                                      <User size={9} className="shrink-0" /> {ev.user_name}
+                                    </span>
+                                  )}
+                                </div>
+
+                                <p className="text-[13px] text-slate-800 font-semibold leading-snug">{ev.title}</p>
+
+                                {/* Metadata chips */}
+                                {ev.meta && (
+                                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                    {ev.meta.size_bytes != null && (
+                                      <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md font-medium">
+                                        {fmtBytes(Number(ev.meta.size_bytes))}
+                                      </span>
+                                    )}
+                                    {ev.meta.category && ev.meta.category !== 'adjunto' && (
+                                      <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md font-medium capitalize">
+                                        {ev.meta.category}
+                                      </span>
+                                    )}
+                                    {ev.meta.priority && ev.meta.priority !== 'normal' && (
+                                      <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold border ${
+                                        ev.meta.priority === 'urgente' ? 'bg-red-50 text-red-700 border-red-200' :
+                                        ev.meta.priority === 'alta'    ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                                        'bg-slate-50 text-slate-600 border-slate-200'
+                                      }`}>
+                                        Prioridad {ev.meta.priority}
+                                      </span>
+                                    )}
+                                    {ev.meta.estado && (
+                                      <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold border ${
+                                        ev.meta.estado === 'completada' || ev.meta.estado === 'pagada'  ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                        ev.meta.estado === 'urgente'    || ev.meta.estado === 'vencida'  ? 'bg-red-50 text-red-700 border-red-200' :
+                                        ev.meta.estado === 'pendiente'                                   ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                        'bg-slate-50 text-slate-600 border-slate-200'
+                                      }`}>
+                                        {ev.meta.estado}
+                                      </span>
+                                    )}
+                                    {fmtEuros(ev.meta.total) && (
+                                      <span className="text-[10px] bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-md font-bold">
+                                        {fmtEuros(ev.meta.total)}
+                                      </span>
+                                    )}
+                                    {ev.meta.plazo && (
+                                      <span className="text-[10px] bg-blue-50 text-blue-600 border border-blue-200 px-2 py-0.5 rounded-md font-medium">
+                                        📅 {fmtMini(ev.meta.plazo)}
+                                      </span>
+                                    )}
+                                    {ev.meta.tipo && ev.meta.tipo !== 'otro' && (
+                                      <span className="text-[10px] bg-purple-50 text-purple-600 border border-purple-200 px-2 py-0.5 rounded-md font-medium">
+                                        {(ev.meta.tipo as string).replace(/_/g, ' ')}
+                                      </span>
+                                    )}
+                                    {ev.meta.task_titulo && (
+                                      <span className="text-[10px] bg-violet-50 text-violet-600 border border-violet-200 px-2 py-0.5 rounded-md font-medium max-w-[220px] truncate">
+                                        📋 {ev.meta.task_titulo}
+                                      </span>
+                                    )}
+                                    {ev.meta.from && (
+                                      <span className="text-[10px] bg-sky-50 text-sky-600 border border-sky-200 px-2 py-0.5 rounded-md font-medium max-w-[200px] truncate">
+                                        De: {ev.meta.from}
+                                      </span>
+                                    )}
+                                    {ev.meta.type && (
+                                      <span className="text-[10px] bg-orange-50 text-orange-600 border border-orange-200 px-2 py-0.5 rounded-md font-medium capitalize">
+                                        {ev.meta.type}
+                                      </span>
+                                    )}
+                                    {ev.meta.snippet && (
+                                      <span className="text-[10px] text-slate-400 italic block w-full mt-0.5 truncate max-w-[280px]">
+                                        "{ev.meta.snippet.toString().slice(0, 90)}{ev.meta.snippet.toString().length > 90 ? '…' : ''}"
+                                      </span>
+                                    )}
+                                  </div>
                                 )}
                               </div>
                             </div>
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ol>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               );
             })()}

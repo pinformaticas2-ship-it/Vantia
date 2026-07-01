@@ -666,7 +666,10 @@ export const updateExpediente = async (req: any, res: Response) => {
 export const getExpedienteHistorial = async (req: any, res: Response) => {
   const { id } = req.params;
   try {
-    const [expRes, actRes, notesRes, tasksRes] = await Promise.all([
+    const [
+      expRes, actRes, filesRes, notesRes, tasksRes,
+      taskFilesRes, facturasRes, presupuestosRes, emailsRes, agendaRes, taskActRes,
+    ] = await Promise.all([
       pool.query(
         `SELECT id, anio, num_exp, descripcion, estado, created_at, updated_at, fecha_inicio, fecha_cierre FROM expedientes WHERE id=$1`,
         [id]
@@ -677,11 +680,52 @@ export const getExpedienteHistorial = async (req: any, res: Response) => {
         [id]
       ),
       pool.query(
-        `SELECT content, category, created_by, created_at FROM notes WHERE expediente_id=$1 ORDER BY created_at ASC`,
+        `SELECT original_name, document_name, category, size_bytes, mimetype, created_by, created_at
+         FROM client_files WHERE client_id=$1 ORDER BY created_at ASC`,
         [id]
       ),
       pool.query(
-        `SELECT titulo, tipo, estado, plazo, created_at FROM client_tasks WHERE expediente_id=$1 ORDER BY created_at ASC`,
+        `SELECT content, category, priority, created_by, created_at FROM notes WHERE expediente_id=$1 ORDER BY created_at ASC`,
+        [id]
+      ),
+      pool.query(
+        `SELECT id, titulo, tipo, estado, plazo, created_at, updated_at FROM client_tasks WHERE expediente_id=$1 ORDER BY created_at ASC`,
+        [id]
+      ),
+      pool.query(
+        `SELECT tf.original_name, tf.document_name, tf.size_bytes, tf.mimetype, tf.created_by, tf.created_at, ct.titulo AS task_titulo
+         FROM task_files tf
+         JOIN client_tasks ct ON tf.task_id = ct.id
+         WHERE ct.expediente_id = $1
+         ORDER BY tf.created_at ASC`,
+        [id]
+      ),
+      pool.query(
+        `SELECT num, contacto, total, estado, fecha, created_by, created_at
+         FROM facturacion_facturas WHERE expediente_id=$1 ORDER BY created_at ASC`,
+        [id]
+      ),
+      pool.query(
+        `SELECT num, contacto, total, estado, fecha, created_by, created_at
+         FROM facturacion_presupuestos WHERE expediente_id=$1 ORDER BY created_at ASC`,
+        [id]
+      ),
+      pool.query(
+        `SELECT subject, from_email, from_name, to_emails, snippet, is_draft, sent_at, created_at
+         FROM emails WHERE expediente_id=$1 ORDER BY COALESCE(sent_at, created_at) ASC LIMIT 200`,
+        [id]
+      ),
+      pool.query(
+        `SELECT title, description, type, status, start_at, end_at, user_name, created_at
+         FROM agenda_events WHERE expediente_id=$1 ORDER BY start_at ASC`,
+        [id]
+      ),
+      pool.query(
+        `SELECT al.user_name, al.action_type, al.event_type, al.created_at, ct.titulo AS task_titulo
+         FROM activity_log al
+         JOIN client_tasks ct ON al.entity_id = ct.id
+         WHERE ct.expediente_id = $1 AND al.entity_type = 'TASK'
+         ORDER BY al.created_at ASC`,
         [id]
       ),
     ]);
@@ -690,26 +734,141 @@ export const getExpedienteHistorial = async (req: any, res: Response) => {
     const exp = expRes.rows[0];
     const events: any[] = [];
 
+    // ── Alta del expediente ──────────────────────────────────────────────────
     events.push({
       type: 'alta',
       timestamp: exp.fecha_inicio || exp.created_at,
-      title: 'Expediente dado de alta',
+      title: `Expediente ${exp.anio}/${exp.num_exp} dado de alta`,
       user_name: null,
     });
 
+    // ── Activity log directo del expediente ─────────────────────────────────
+    // Skip entries that are now covered by dedicated table queries
+    const SKIP_PATTERN = /^(Archivo subido:|Nota añadida:|Nota eliminada:|Adjuntos añadidos|Expediente creado:)/i;
     for (const a of actRes.rows) {
-      events.push({ type: 'cambio', timestamp: a.created_at, title: a.action_type, user_name: a.user_name });
+      if (SKIP_PATTERN.test(a.action_type)) continue;
+      let type = 'cambio';
+      if (/Archivo eliminado:/i.test(a.action_type))  type = 'archivo_eliminado';
+      else if (/reapert/i.test(a.action_type))        type = 'reapertura';
+      events.push({ type, timestamp: a.created_at, title: a.action_type, user_name: a.user_name });
     }
+
+    // ── Archivos adjuntos directos al expediente ─────────────────────────────
+    for (const f of filesRes.rows) {
+      events.push({
+        type: 'archivo',
+        timestamp: f.created_at,
+        title: f.document_name || f.original_name,
+        user_name: f.created_by,
+        meta: { size_bytes: f.size_bytes, category: f.category, mimetype: f.mimetype },
+      });
+    }
+
+    // ── Notas ────────────────────────────────────────────────────────────────
     for (const n of notesRes.rows) {
-      const preview = n.content.length > 100 ? n.content.slice(0, 100) + '…' : n.content;
-      events.push({ type: 'nota', timestamp: n.created_at, title: preview, user_name: n.created_by, meta: { category: n.category } });
+      const preview = n.content.length > 120 ? n.content.slice(0, 120) + '…' : n.content;
+      events.push({
+        type: 'nota',
+        timestamp: n.created_at,
+        title: preview,
+        user_name: n.created_by,
+        meta: { category: n.category, priority: n.priority },
+      });
     }
+
+    // ── Tareas y actuaciones ─────────────────────────────────────────────────
+    const ACTUACION_TIPOS = new Set(['plazo_procesal', 'vista_juicio', 'notificacion', 'escrito', 'diligencia']);
     for (const t of tasksRes.rows) {
-      events.push({ type: t.tipo === 'actuacion' ? 'actuacion' : 'tarea', timestamp: t.created_at, title: t.titulo, user_name: null, meta: { estado: t.estado, plazo: t.plazo } });
+      const isAct = ACTUACION_TIPOS.has(t.tipo);
+      events.push({
+        type: isAct ? 'actuacion' : 'tarea',
+        timestamp: t.created_at,
+        title: t.titulo,
+        user_name: null,
+        meta: { estado: t.estado, plazo: t.plazo, tipo: t.tipo },
+      });
+      // If completed, add a completion event at the updated_at time
+      if (t.estado === 'completada' && t.updated_at && String(t.updated_at) !== String(t.created_at)) {
+        events.push({
+          type: 'tarea_completada',
+          timestamp: t.updated_at,
+          title: `Completada: ${t.titulo}`,
+          user_name: null,
+          meta: { tipo: t.tipo },
+        });
+      }
     }
+
+    // ── Archivos adjuntos a tareas de este expediente ────────────────────────
+    for (const tf of taskFilesRes.rows) {
+      events.push({
+        type: 'adjunto_tarea',
+        timestamp: tf.created_at,
+        title: tf.document_name || tf.original_name,
+        user_name: tf.created_by,
+        meta: { task_titulo: tf.task_titulo, size_bytes: tf.size_bytes, mimetype: tf.mimetype },
+      });
+    }
+
+    // ── Activity log de tareas (solo eliminaciones de adjuntos) ─────────────
+    for (const a of taskActRes.rows) {
+      if (/Adjunto eliminado/i.test(a.action_type)) {
+        events.push({
+          type: 'adjunto_tarea_eliminado',
+          timestamp: a.created_at,
+          title: a.action_type,
+          user_name: a.user_name,
+          meta: { task_titulo: a.task_titulo },
+        });
+      }
+    }
+
+    // ── Facturas ─────────────────────────────────────────────────────────────
+    for (const f of facturasRes.rows) {
+      events.push({
+        type: 'factura',
+        timestamp: f.created_at,
+        title: `Factura ${f.num} — ${f.contacto}`,
+        user_name: f.created_by,
+        meta: { total: f.total, estado: f.estado, num: f.num },
+      });
+    }
+
+    // ── Presupuestos ─────────────────────────────────────────────────────────
+    for (const p of presupuestosRes.rows) {
+      events.push({
+        type: 'presupuesto',
+        timestamp: p.created_at,
+        title: `Presupuesto ${p.num} — ${p.contacto}`,
+        user_name: p.created_by,
+        meta: { total: p.total, estado: p.estado, num: p.num },
+      });
+    }
+
+    // ── Correos asociados ─────────────────────────────────────────────────────
+    for (const e of emailsRes.rows) {
+      events.push({
+        type: e.is_draft ? 'correo_borrador' : 'correo',
+        timestamp: e.sent_at || e.created_at,
+        title: e.subject || '(sin asunto)',
+        user_name: e.from_name || e.from_email,
+        meta: { from: e.from_email, to: e.to_emails, snippet: e.snippet, is_draft: e.is_draft },
+      });
+    }
+
+    // ── Eventos de agenda ─────────────────────────────────────────────────────
+    for (const a of agendaRes.rows) {
+      events.push({
+        type: 'agenda',
+        timestamp: a.start_at,
+        title: a.title,
+        user_name: a.user_name,
+        meta: { type: a.type, status: a.status, end_at: a.end_at },
+      });
+    }
+
+    // ── Cierre ───────────────────────────────────────────────────────────────
     if (exp.fecha_cierre) {
-      // Use updated_at (full timestamp) when the expediente was last saved as "cerrado".
-      // Fall back to end-of-day on fecha_cierre so it sorts after same-day events.
       const cierreTs = exp.updated_at || (exp.fecha_cierre + 'T23:59:59.000Z');
       events.push({ type: 'cierre', timestamp: cierreTs, title: 'Expediente cerrado', user_name: null });
     }
