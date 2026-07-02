@@ -610,9 +610,14 @@ export const chatVantia = async (req: any, res: Response) => {
       '\n\n' + moduleInstructions(moduleId) +
       entityCtx;
 
-    // Construir el historial de conversación (sin turno simulado de sistema)
+    // Gemini exige que el primer turno sea siempre "user".
+    // El historial guardado puede empezar con el saludo del modelo, lo eliminamos.
+    const cleanHistory: any[] = [...history];
+    while (cleanHistory.length > 0 && cleanHistory[0].role === 'model') cleanHistory.shift();
+
+    // Construir el historial de conversación
     let contents: any[] = [
-      ...history.map((h: any) => ({ role: h.role, parts: [{ text: h.text }] })),
+      ...cleanHistory.map((h: any) => ({ role: h.role, parts: [{ text: h.text }] })),
       { role: 'user', parts: [{ text: message }] },
     ];
 
