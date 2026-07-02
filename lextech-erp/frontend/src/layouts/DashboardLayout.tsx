@@ -9,6 +9,8 @@ import {
   Menu, Search, X, Bell, ShieldCheck, Calendar,
   MessageCircle, Bot, Send, ChevronRight, ChevronLeft, Loader2, History, CheckCircle2,
   MessageSquare, LogOut, Mail, Library, Receipt, Mic, Sparkles, ChevronsUpDown,
+  MoreVertical, ThumbsUp, ThumbsDown, RotateCcw, Copy, MoreHorizontal,
+  Paperclip, Pen, AlertTriangle, RefreshCw,
 } from "lucide-react";
 import { UserButton, useUser, useAuth, useClerk } from "@clerk/clerk-react";
 import { getDeviceId, safeJson, waitForClientIp } from "../lib/api";
@@ -134,12 +136,12 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [retryText, setRetryText] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Cargar historial al abrir el chat o cambiar de módulo
   useEffect(() => {
     if (!open) return;
-
     const fetchHistory = async () => {
       setLoading(true);
       try {
@@ -151,26 +153,14 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
         if (res.ok && data.history && data.history.length > 0) {
           setMessages(data.history);
         } else {
-          // Si no hay historial, mostrar el saludo inicial
-          setMessages([
-            {
-              role: 'model',
-              text: `¡Hola! Soy VantIA — ${getVantIALabel(pathname)}. ¿En qué puedo ayudarte?`,
-            },
-          ]);
+          setMessages([{ role: "model", text: `¡Hola! Soy VantIA — ${getVantIALabel(pathname)}. ¿En qué puedo ayudarte?` }]);
         }
       } catch (err) {
-        setMessages([
-          {
-            role: 'model',
-            text: `❌ No pude cargar el historial. ${err instanceof Error ? err.message : ''}`,
-          },
-        ]);
+        setMessages([{ role: "model", text: `❌ No pude cargar el historial. ${err instanceof Error ? err.message : ""}` }]);
       } finally {
         setLoading(false);
       }
     };
-
     fetchHistory();
   }, [open, pathname, getToken]);
 
@@ -178,105 +168,210 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
+  const autoResize = (el: HTMLTextAreaElement) => {
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 100)}px`;
+  };
+
+  const callApi = async (text: string, history: ChatMsg[]): Promise<string> => {
+    const token = await getToken({ skipCache: true });
+    const historyForApi = history.length === 1 && history[0].role === "model" ? [] : history;
+    const res = await fetch("/api/vantia/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ message: text, history: historyForApi, systemPrompt: getVantIAContext(pathname), moduleId: pathname }),
+    });
+    const data = await safeJson(res);
+    if (!res.ok) throw new Error(data.error || "Error en la API de VantIA");
+    return data.reply as string;
+  };
+
   const send = async () => {
     const text = input.trim();
     if (!text || loading) return;
     setInput("");
+    if (textareaRef.current) { textareaRef.current.style.height = "44px"; }
     const newHistory: ChatMsg[] = [...messages, { role: "user", text }];
     setMessages(newHistory);
     setLoading(true);
     try {
-      const token = await getToken({ skipCache: true });
-      // El historial que se envía a Gemini no debe contener el saludo inicial si es el único mensaje.
-      const historyForApi = messages.length === 1 && messages[0].role === 'model'
-        ? []
-        : messages;
-
-      const res = await fetch("/api/vantia/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          message: text,
-          history: historyForApi,
-          systemPrompt: getVantIAContext(pathname),
-          moduleId: pathname, // Enviar el `pathname` para que el backend sepa dónde guardar
-        }),
-      });
-      const data = await safeJson(res);
-      if (!res.ok) throw new Error(data.error || "Error en la API de VantIA");
-      setMessages([...newHistory, { role: "model", text: data.reply }]);
+      const reply = await callApi(text, messages);
+      setMessages([...newHistory, { role: "model", text: reply }]);
+      setRetryText("");
     } catch (err: any) {
+      setRetryText(text);
       setMessages([...newHistory, { role: "model", text: `❌ ${err.message}` }]);
     } finally {
       setLoading(false);
     }
   };
 
+  const retryLast = async () => {
+    if (!retryText || loading) return;
+    const text = retryText;
+    const prevMessages = messages.slice(0, -2);
+    const withUser: ChatMsg[] = [...prevMessages, { role: "user", text }];
+    setMessages(withUser);
+    setLoading(true);
+    setRetryText("");
+    try {
+      const reply = await callApi(text, prevMessages);
+      setMessages([...withUser, { role: "model", text: reply }]);
+    } catch (err: any) {
+      setRetryText(text);
+      setMessages([...withUser, { role: "model", text: `❌ ${err.message}` }]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2">
+    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
 
       {/* Panel de chat */}
       {open && (
-        <div className="w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden"
-             style={{ height: "460px" }}>
+        <div className="w-[360px] bg-white rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.18)] flex flex-col overflow-hidden border border-slate-200/60 origin-bottom-right" style={{ height: "580px" }}>
 
           {/* Header */}
-          <div className="bg-[#ab0433] px-4 py-3 flex items-center justify-between shrink-0">
-            <div className="flex items-center gap-2">
-              <div className="h-7 w-7 bg-white/20 rounded-lg flex items-center justify-center">
-                <Bot size={14} className="text-white" />
+          <div className="bg-gradient-to-r from-[#b91c1c] to-[#dc2626] px-5 py-4 flex items-center justify-between shrink-0 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <div className="w-10 h-10 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center backdrop-blur-sm">
+                  <Bot size={18} className="text-white" />
+                </div>
+                <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-emerald-400 border-2 border-[#dc2626] rounded-full" />
               </div>
               <div>
-                <p className="text-white text-sm font-bold leading-none">VantIA</p>
-                <p className="text-white/75 text-[10px]">{getVantIALabel(pathname)}</p>
+                <h2 className="text-sm font-bold text-white leading-tight">VantIA</h2>
+                <p className="text-[11px] text-red-100 font-medium tracking-wide">{getVantIALabel(pathname)}</p>
               </div>
             </div>
-            <button onClick={() => setOpen(false)} className="text-white/70 hover:text-white">
-              <X size={16} />
-            </button>
+            <div className="flex items-center gap-1">
+              <button className="w-8 h-8 flex items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors focus:outline-none">
+                <MoreVertical size={14} />
+              </button>
+              <button onClick={() => setOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors focus:outline-none">
+                <X size={16} />
+              </button>
+            </div>
           </div>
 
           {/* Mensajes */}
-          <div className="flex-1 overflow-y-auto p-3 space-y-2">
-            {messages.map((msg, i) => (
-              <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[88%] px-3 py-2 rounded-2xl text-xs leading-relaxed whitespace-pre-wrap ${
-                  msg.role === "user"
-                    ? "bg-[#ab0433] text-white rounded-br-sm"
-                    : "bg-neutral-100 text-neutral-700 rounded-bl-sm"
-                }`}>
-                  {msg.text}
+          <div
+            className="flex-1 overflow-y-auto p-5 flex flex-col gap-5 bg-[#f8fafc]"
+            style={{ scrollbarWidth: "thin", scrollbarColor: "#cbd5e1 transparent" }}
+          >
+            <div className="flex justify-center">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-100/80 px-3 py-1 rounded-full border border-slate-200/50">
+                Hoy
+              </span>
+            </div>
+
+            {messages.map((msg, i) => {
+              const isError = msg.text.startsWith("❌");
+
+              if (msg.role === "model" && isError) {
+                return (
+                  <div key={i} className="flex justify-center">
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-3 shadow-sm max-w-[95%]">
+                      <AlertTriangle size={14} className="text-red-500 mt-0.5 shrink-0" />
+                      <div className="flex flex-col gap-1.5">
+                        <p className="text-xs font-semibold text-red-800 leading-snug">Error al conectar con el motor de IA.</p>
+                        <p className="text-[10px] text-red-600/80 leading-snug">{msg.text.replace(/^❌\s*/, "")}</p>
+                        {retryText && (
+                          <button
+                            onClick={retryLast}
+                            className="mt-1 w-max text-[10px] font-bold uppercase tracking-wider text-red-600 hover:text-red-800 bg-white border border-red-200 hover:border-red-300 px-3 py-1.5 rounded-md shadow-sm transition-all focus:outline-none flex items-center gap-1.5"
+                          >
+                            <RefreshCw size={10} /> Reintentar
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              if (msg.role === "model") {
+                return (
+                  <div key={i} className="flex items-start gap-2.5 max-w-[95%] group">
+                    <div className="w-7 h-7 rounded-lg bg-red-100 text-red-600 flex items-center justify-center shrink-0 border border-red-200/50 mt-0.5">
+                      <Bot size={12} />
+                    </div>
+                    <div className="flex flex-col gap-1.5 min-w-0">
+                      <div className="bg-white border border-slate-200 text-slate-700 px-4 py-3 rounded-2xl rounded-tl-sm shadow-sm text-[13px] leading-relaxed w-max max-w-full whitespace-pre-wrap break-words">
+                        {msg.text}
+                      </div>
+                      <div className="flex items-center gap-3.5 ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                        <button className="text-slate-400 hover:text-slate-700 transition-colors focus:outline-none" title="Me gusta"><ThumbsUp size={11} /></button>
+                        <button className="text-slate-400 hover:text-slate-700 transition-colors focus:outline-none" title="No me gusta"><ThumbsDown size={11} /></button>
+                        <button className="text-slate-400 hover:text-slate-700 transition-colors focus:outline-none" title="Regenerar"><RotateCcw size={11} /></button>
+                        <button onClick={() => navigator.clipboard.writeText(msg.text)} className="text-slate-400 hover:text-slate-700 transition-colors focus:outline-none" title="Copiar"><Copy size={11} /></button>
+                        <button className="text-slate-400 hover:text-slate-700 transition-colors focus:outline-none" title="Más"><MoreHorizontal size={11} /></button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <div key={i} className="flex flex-col items-end gap-1.5 max-w-[85%] self-end group">
+                  <div className="bg-[#dc2626] text-white px-4 py-2.5 rounded-2xl rounded-tr-sm shadow-md shadow-red-500/20 text-[13px] font-medium whitespace-pre-wrap break-words">
+                    {msg.text}
+                  </div>
+                  <div className="flex items-center gap-3.5 mr-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                    <button onClick={() => navigator.clipboard.writeText(msg.text)} className="text-slate-400 hover:text-slate-700 transition-colors focus:outline-none" title="Copiar"><Copy size={11} /></button>
+                    <button className="text-slate-400 hover:text-slate-700 transition-colors focus:outline-none" title="Editar"><Pen size={11} /></button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
+
             {loading && (
-              <div className="flex justify-start">
-                <div className="bg-neutral-100 px-3 py-2 rounded-2xl rounded-bl-sm flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 bg-neutral-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                  <span className="w-1.5 h-1.5 bg-neutral-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                  <span className="w-1.5 h-1.5 bg-neutral-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+              <div className="flex items-end gap-2.5 max-w-[90%]">
+                <div className="w-7 h-7 rounded-lg bg-red-100 text-red-600 flex items-center justify-center shrink-0 border border-red-200/50">
+                  <Bot size={12} />
+                </div>
+                <div className="bg-white border border-slate-200 px-4 py-3.5 rounded-2xl rounded-tl-sm shadow-sm flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: "0ms" }} />
+                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: "150ms" }} />
+                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: "300ms" }} />
                 </div>
               </div>
             )}
+
             <div ref={bottomRef} />
           </div>
 
-          {/* Input */}
-          <div className="border-t border-slate-100 p-2 flex gap-2 shrink-0">
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()}
-              placeholder="Escribe tu consulta..."
-              className="flex-1 text-xs bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-[#ab0433]/20 focus:border-[#ab0433]/30"
-            />
-            <button
-              onClick={send}
-              disabled={!input.trim() || loading}
-              className="h-8 w-8 bg-[#ab0433] disabled:opacity-40 text-white rounded-xl flex items-center justify-center hover:bg-[#92042c] transition-colors"
-            >
-              <Send size={12} />
-            </button>
+          {/* Footer / Input */}
+          <div className="bg-white px-4 py-4 border-t border-slate-200/80 shrink-0 shadow-[0_-4px_10px_rgba(0,0,0,0.02)]">
+            <div className="flex items-end gap-3">
+              <button className="w-9 h-9 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors shrink-0 mb-0.5 focus:outline-none">
+                <Paperclip size={14} />
+              </button>
+              <div className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl transition-all focus-within:border-red-400 focus-within:ring-2 focus-within:ring-red-500/20 focus-within:bg-white shadow-inner">
+                <textarea
+                  ref={textareaRef}
+                  rows={1}
+                  value={input}
+                  onChange={(e) => { setInput(e.target.value); autoResize(e.target); }}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+                  placeholder="Escribe tu consulta..."
+                  className="w-full bg-transparent text-[13px] text-slate-800 placeholder-slate-400 px-4 py-3 focus:outline-none resize-none overflow-hidden"
+                  style={{ minHeight: "44px", maxHeight: "100px" }}
+                />
+              </div>
+              <button
+                onClick={send}
+                disabled={!input.trim() || loading}
+                className="w-10 h-10 rounded-full bg-[#dc2626] hover:bg-[#b91c1c] disabled:opacity-40 text-white flex items-center justify-center shrink-0 shadow-md shadow-red-500/20 transition-all mb-0.5 active:scale-95 focus:outline-none"
+              >
+                <Send size={13} className="-translate-x-[1px] translate-y-[1px]" />
+              </button>
+            </div>
+            <p className="text-center text-[9px] text-slate-400 font-medium mt-3">
+              La IA puede cometer errores. Verifica la información.
+            </p>
           </div>
         </div>
       )}
@@ -284,14 +379,14 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
       {/* Botón flotante VantIA */}
       <button
         onClick={() => setOpen((v) => !v)}
-        className={`h-12 w-12 rounded-2xl shadow-xl flex items-center justify-center transition-all active:scale-95 ${
+        className={`h-14 w-14 rounded-full shadow-xl flex items-center justify-center transition-all active:scale-95 ${
           open
             ? "bg-neutral-800 shadow-neutral-900/30"
-            : "bg-[#ab0433] shadow-red-700/30 hover:shadow-red-700/50 hover:scale-105"
+            : "bg-[#dc2626] shadow-red-700/30 hover:shadow-red-700/50 hover:scale-105"
         }`}
         title="VantIA — Asistente IA"
       >
-        {open ? <X size={18} className="text-white" /> : <Bot size={20} className="text-white" />}
+        {open ? <X size={18} className="text-white" /> : <Bot size={22} className="text-white" />}
       </button>
     </div>
   );
