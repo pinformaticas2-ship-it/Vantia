@@ -71,16 +71,9 @@ process.on('uncaughtException', (error) => {
   console.error('❌ Uncaught exception:', error);
 });
 
-// EmailEngine webhooks must be registered BEFORE Clerk middleware (no auth required)
-app.use('/api/email/webhook/engine', emailEngineWebhookRoute);
-
 // --- MIDDLEWARES GLOBALES ---
-app.use(clerkMiddleware());
-app.use(helmet({
-  crossOriginResourcePolicy: false,
-  frameguard: false,           // elimina X-Frame-Options para permitir framing cross-origin
-  contentSecurityPolicy: false, // elimina CSP que bloquea frame-ancestors
-}));
+// CORS debe ir PRIMERO — antes de Clerk y cualquier auth.
+// Los preflight OPTIONS no llevan token y Clerk los bloquearía si va antes.
 app.use(cors({
   origin: (origin, callback) => {
     if (isCorsAllowed(origin)) {
@@ -92,6 +85,16 @@ app.use(cors({
   },
   credentials: true,
 }));
+app.use(helmet({
+  crossOriginResourcePolicy: false,
+  frameguard: false,
+  contentSecurityPolicy: false,
+}));
+
+// EmailEngine webhooks sin auth — registrar antes de Clerk
+app.use('/api/email/webhook/engine', emailEngineWebhookRoute);
+
+app.use(clerkMiddleware());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
