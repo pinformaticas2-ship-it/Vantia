@@ -4104,26 +4104,43 @@ function FieldDropdown({ value, onChange, options }: {
   options: { value: string; label: string }[];
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
+  const btnRef = useRef<HTMLButtonElement>(null);
   const selected = options.find(o => o.value === value);
+
   useEffect(() => {
     if (!open) return;
-    const handle = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    const handle = (e: MouseEvent) => {
+      if (btnRef.current && !btnRef.current.contains(e.target as Node)) setOpen(false);
+    };
     document.addEventListener("mousedown", handle);
     return () => document.removeEventListener("mousedown", handle);
   }, [open]);
+
+  const handleOpen = () => {
+    if (btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + window.scrollY + 4, left: r.left + window.scrollX, width: r.width });
+    }
+    setOpen(o => !o);
+  };
+
   return (
-    <div ref={ref} className="relative">
+    <div className="relative">
       <button
+        ref={btnRef}
         type="button"
-        onClick={() => setOpen(o => !o)}
+        onClick={handleOpen}
         className="flex items-center gap-1.5 text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white text-slate-600 min-w-[160px] hover:border-slate-300 focus:outline-none focus:border-red-400 transition-colors select-none"
       >
         <span className="flex-1 text-left truncate">{selected?.label ?? "Elegir…"}</span>
         <ChevronDown size={11} className={`shrink-0 text-slate-400 transition-transform duration-150 ${open ? "rotate-180" : ""}`} />
       </button>
-      {open && (
-        <ul className="absolute left-0 top-full mt-1 z-50 w-52 rounded-2xl border border-slate-100 bg-white shadow-2xl py-1.5 overflow-hidden">
+      {open && createPortal(
+        <ul
+          style={{ top: pos.top, left: pos.left, minWidth: pos.width }}
+          className="fixed z-[9999] w-52 rounded-2xl border border-slate-100 bg-white shadow-2xl py-1.5 overflow-hidden"
+        >
           {options.map(o => (
             <li
               key={o.value}
@@ -4133,7 +4150,8 @@ function FieldDropdown({ value, onChange, options }: {
               {o.label}
             </li>
           ))}
-        </ul>
+        </ul>,
+        document.body
       )}
     </div>
   );
