@@ -565,6 +565,46 @@ async function callTool(name: string, args: Record<string, any>, userId: string)
   }
 }
 
+// ── GET /api/vantia/conversations ────────────────────────────────────────────
+export const listConversations = async (req: Request, res: Response) => {
+  // @ts-ignore
+  const userId = req.auth?.userId;
+  if (!userId) return res.status(401).json({ success: false });
+  try {
+    const result = await pool.query(
+      `SELECT id, module_id, title,
+              history->0->>'text' AS first_message,
+              updated_at, created_at
+       FROM vantia_chat_history
+       WHERE user_id = $1 AND module_id LIKE 'chat-ia:%'
+       ORDER BY updated_at DESC`,
+      [userId]
+    );
+    res.json({ success: true, conversations: result.rows });
+  } catch (err) {
+    console.error('❌ Error listing conversations:', err);
+    res.status(500).json({ success: false, error: 'Error interno del servidor.' });
+  }
+};
+
+// ── DELETE /api/vantia/conversations/:id ─────────────────────────────────────
+export const deleteConversation = async (req: Request, res: Response) => {
+  // @ts-ignore
+  const userId = req.auth?.userId;
+  const { id } = req.params;
+  if (!userId) return res.status(401).json({ success: false });
+  try {
+    await pool.query(
+      'DELETE FROM vantia_chat_history WHERE id = $1 AND user_id = $2',
+      [id, userId]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('❌ Error deleting conversation:', err);
+    res.status(500).json({ success: false, error: 'Error interno del servidor.' });
+  }
+};
+
 // ── GET /api/vantia/chat/history ──────────────────────────────────────────────
 export const getChatHistory = async (req: Request, res: Response) => {
   const { moduleId } = req.query;
@@ -680,16 +720,21 @@ export const chatVantia = async (req: any, res: Response) => {
     if (!reply) reply = 'He procesado la consulta pero no pude generar una respuesta. Inténtalo de nuevo.';
     res.json({ success: true, reply });
 
-    // Guardar historial en segundo plano
+    // Guardar historial en segundo plano (con título automático en primer mensaje)
+    const isChatIa = moduleId.startsWith('chat-ia:');
+    const autoTitle = (isChatIa && history.length === 0) ? message.slice(0, 100) : null;
     pool.query(
-      `INSERT INTO vantia_chat_history (user_id, module_id, history)
-       VALUES ($1,$2,$3)
-       ON CONFLICT (user_id, module_id) DO UPDATE SET history=EXCLUDED.history, updated_at=NOW()`,
+      `INSERT INTO vantia_chat_history (user_id, module_id, history, title)
+       VALUES ($1,$2,$3,$4)
+       ON CONFLICT (user_id, module_id) DO UPDATE SET
+         history = EXCLUDED.history,
+         updated_at = NOW(),
+         title = COALESCE(vantia_chat_history.title, EXCLUDED.title)`,
       [userId, moduleId, JSON.stringify([
         ...history,
         { role: 'user',  text: message },
         { role: 'model', text: reply },
-      ])]
+      ]), autoTitle]
     ).catch(() => {});
 
   } catch (error: any) {

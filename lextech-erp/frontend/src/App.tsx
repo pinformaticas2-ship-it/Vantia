@@ -28,6 +28,7 @@ import AltaConEnlace from './pages/AltaConEnlace';
 import FormularioCliente from './pages/FormularioCliente';
 import Facturacion from './pages/Facturacion';
 import Configuracion from './pages/Configuracion';
+import ChatIA from './pages/ChatIA';
 
 export default function App() {
   return (
@@ -62,7 +63,7 @@ export default function App() {
             <Route path="facturacion/facturas/nueva" element={<Facturacion />} />
             <Route path="facturacion/facturas/:facturaId/editar" element={<Facturacion />} />
             <Route path="plaud-ia" element={<ModuloEnCarga nombre="Plaud IA" />} />
-            <Route path="chat-ia" element={<ModuloEnCarga nombre="Chat IA" />} />
+            <Route path="chat-ia" element={<ChatIA />} />
             <Route path="config" element={<Configuracion />} />
           </Route>
 

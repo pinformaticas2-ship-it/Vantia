@@ -1374,6 +1374,11 @@ export async function runMigrations(): Promise<void> {
       `);
     } catch (_e: any) {}
 
+    // ── vantia_chat_history: añadir columna title ────────────────────────────
+    try {
+      await client.query(`ALTER TABLE vantia_chat_history ADD COLUMN IF NOT EXISTS title VARCHAR(255);`);
+    } catch (_e: any) {}
+
     // VACUUM ANALYZE para mantener las estadísticas de consulta frescas
     try {
       await client.query(`ANALYZE entities;`);
