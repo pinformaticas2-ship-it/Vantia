@@ -46,18 +46,20 @@ const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
   .map((o) => o.trim())
   .filter(Boolean);
 
-const allowedPatterns = (
-  process.env.CORS_ALLOWED_PATTERNS || '.vercel.app,localhost,127.0.0.1'
-)
-  .split(',')
-  .map((p) => p.trim())
-  .filter(Boolean);
+// Patrones siempre activos (independiente de env vars)
+const HARDCODED_PATTERNS = ['.vercel.app', 'localhost', '127.0.0.1'];
+const allowedPatterns = [
+  ...HARDCODED_PATTERNS,
+  ...(process.env.CORS_ALLOWED_PATTERNS || '')
+    .split(',')
+    .map((p) => p.trim())
+    .filter(Boolean),
+];
 
 function isCorsAllowed(origin: string | undefined): boolean {
   if (!origin) return true;                          // mismo origen / curl
   if (allowedOrigins.length === 0) return true;      // modo permisivo total
   if (allowedOrigins.includes(origin)) return true;  // coincidencia exacta
-  // Coincidencia por sufijo: ".vercel.app" cubre *cualquier* subdominio
   return allowedPatterns.some((pattern) => origin.includes(pattern));
 }
 
