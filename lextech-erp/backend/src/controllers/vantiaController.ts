@@ -63,7 +63,7 @@ async function buildEntityContext(moduleId: string, userId: string): Promise<str
         ),
         pool.query(
           `SELECT
-             (SELECT COUNT(*)::int FROM expedientes WHERE client_id=$1)                          AS expedientes,
+             (SELECT COUNT(*)::int FROM expedientes WHERE cliente_id=$1)                         AS expedientes,
              (SELECT COUNT(*)::int FROM client_tasks WHERE client_id=$1 AND estado!='completada') AS tareas,
              (SELECT COUNT(*)::int FROM notes WHERE client_id=$1)                                AS notas,
              (SELECT COUNT(*)::int FROM client_files WHERE client_id=$1)                         AS archivos`,
@@ -86,7 +86,7 @@ async function buildEntityContext(moduleId: string, userId: string): Promise<str
           `SELECT e.anio, e.num_exp, e.descripcion, e.estado, e.fecha_inicio, e.fecha_cierre,
                   ent.commercial_name, ent.first_name, ent.last_name
            FROM expedientes e
-           LEFT JOIN entities ent ON e.client_id = ent.id
+           LEFT JOIN entities ent ON e.cliente_id = ent.id
            WHERE e.id=$1`, [entityId]
         ),
         pool.query(
@@ -324,7 +324,7 @@ async function callTool(name: string, args: Record<string, any>, userId: string)
                  COUNT(exp.id)::int AS num_expedientes,
                  COUNT(exp.id) FILTER (WHERE exp.estado NOT IN ('cerrado','archivado'))::int AS expedientes_activos
           FROM entities e
-          LEFT JOIN expedientes exp ON exp.client_id = e.id
+          LEFT JOIN expedientes exp ON exp.cliente_id = e.id
           WHERE (e.commercial_name ILIKE $1
              OR CONCAT(COALESCE(e.first_name,''),' ',COALESCE(e.last_name,'')) ILIKE $1
              OR e.nif_cif ILIKE $1 OR e.email ILIKE $1)
@@ -362,7 +362,7 @@ async function callTool(name: string, args: Record<string, any>, userId: string)
                  COUNT(exp.id)::int AS num_expedientes,
                  COUNT(exp.id) FILTER (WHERE exp.estado NOT IN ('cerrado','archivado'))::int AS expedientes_activos
           FROM entities e
-          LEFT JOIN expedientes exp ON exp.client_id = e.id
+          LEFT JOIN expedientes exp ON exp.cliente_id = e.id
           ${conds.length ? 'WHERE ' + conds.join(' AND ') : ''}
           GROUP BY e.id
           ${havingConds.length ? 'HAVING ' + havingConds.join(' AND ') : ''}
@@ -398,7 +398,7 @@ async function callTool(name: string, args: Record<string, any>, userId: string)
           clienteNombre = found.rows[0].nombre;
         }
         if (!clienteId) return { error: 'Se requiere cliente_id o cliente_nombre' };
-        const conds = ['e.client_id=$1'], params: any[] = [clienteId];
+        const conds = ['e.cliente_id=$1'], params: any[] = [clienteId];
         let pi = 2;
         if (args.estado) { conds.push(`e.estado=$${pi++}`); params.push(args.estado); }
         const r = await pool.query(`
@@ -436,7 +436,7 @@ async function callTool(name: string, args: Record<string, any>, userId: string)
         const conds: string[] = [], params: any[] = [];
         let pi = 1;
         if (args.estado)     { conds.push(`e.estado=$${pi++}`); params.push(args.estado); }
-        if (args.cliente_id) { conds.push(`e.client_id=$${pi++}`); params.push(args.cliente_id); }
+        if (args.cliente_id) { conds.push(`e.cliente_id=$${pi++}`); params.push(args.cliente_id); }
         if (args.busqueda)   {
           conds.push(`(e.descripcion ILIKE $${pi} OR CONCAT(e.anio::text,'/',e.num_exp::text) ILIKE $${pi} OR ent.commercial_name ILIKE $${pi} OR CONCAT(ent.first_name,' ',ent.last_name) ILIKE $${pi})`);
           params.push(`%${args.busqueda}%`); pi++;
@@ -446,7 +446,7 @@ async function callTool(name: string, args: Record<string, any>, userId: string)
           SELECT e.id, e.anio, e.num_exp, e.descripcion, e.estado, e.fecha_inicio, e.fecha_cierre,
                  COALESCE(ent.commercial_name, CONCAT(ent.first_name,' ',ent.last_name)) AS cliente
           FROM expedientes e
-          LEFT JOIN entities ent ON ent.id = e.client_id
+          LEFT JOIN entities ent ON ent.id = e.cliente_id
           ${conds.length ? 'WHERE ' + conds.join(' AND ') : ''}
           ORDER BY e.created_at DESC LIMIT $${pi}
         `, params);
