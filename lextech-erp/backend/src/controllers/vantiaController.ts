@@ -610,13 +610,16 @@ export const chatVantia = async (req: any, res: Response) => {
       '\n\n' + moduleInstructions(moduleId) +
       entityCtx;
 
-    // Gemini exige que el primer turno sea siempre "user".
-    // El historial guardado puede empezar con el saludo del modelo, lo eliminamos.
+    // Gemini exige turnos alternados user/model y que el primero sea user.
+    // Eliminamos turnos model del inicio del historial guardado (ej: saludo inicial).
     const cleanHistory: any[] = [...history];
     while (cleanHistory.length > 0 && cleanHistory[0].role === 'model') cleanHistory.shift();
 
-    // Construir el historial de conversación
+    // Inyectamos el system prompt como primer turno user + confirmación model
+    // (enfoque más compatible con todas las versiones de Gemini)
     let contents: any[] = [
+      { role: 'user',  parts: [{ text: fullSystemPrompt }] },
+      { role: 'model', parts: [{ text: 'Entendido. Soy VantIA, listo para ayudarte.' }] },
       ...cleanHistory.map((h: any) => ({ role: h.role, parts: [{ text: h.text }] })),
       { role: 'user', parts: [{ text: message }] },
     ];
@@ -631,7 +634,6 @@ export const chatVantia = async (req: any, res: Response) => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            system_instruction: { parts: [{ text: fullSystemPrompt }] },
             contents,
             tools: TOOLS,
             generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },
@@ -691,7 +693,8 @@ export const chatVantia = async (req: any, res: Response) => {
     ).catch(() => {});
 
   } catch (error: any) {
-    console.error('❌ VantIA error:', error?.message || String(error));
-    res.status(500).json({ success: false, error: 'Error al conectar con el motor de IA.' });
+    const msg = error?.message || String(error);
+    console.error('❌ VantIA error:', msg);
+    res.status(500).json({ success: false, error: msg });
   }
 };
