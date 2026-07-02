@@ -479,7 +479,7 @@ export const chatVantia = async (req: any, res: Response) => {
     // Bucle agéntico — Gemini puede encadenar varias llamadas a herramientas
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
       const geminiRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -493,7 +493,9 @@ export const chatVantia = async (req: any, res: Response) => {
 
       if (!geminiRes.ok) {
         const err: any = await geminiRes.json().catch(() => ({}));
-        throw new Error(err?.error?.message || `HTTP ${geminiRes.status}`);
+        const msg = err?.error?.message || `HTTP ${geminiRes.status}`;
+        console.error(`❌ Gemini API error (round ${round}):`, geminiRes.status, msg, JSON.stringify(err?.error || {}));
+        throw new Error(msg);
       }
 
       const data: any  = await geminiRes.json();
