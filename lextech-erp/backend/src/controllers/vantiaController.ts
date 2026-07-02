@@ -144,7 +144,7 @@ const TOOLS = [{
     },
     {
       name: 'buscar_clientes',
-      description: 'Busca clientes por nombre, empresa o NIF/CIF. Devuelve nombre, tipo, email y teléfono.',
+      description: 'Busca clientes por nombre, empresa o NIF/CIF. Incluye número de expedientes por cliente. Úsalo cuando el usuario da un nombre/NIF concreto.',
       parameters: {
         type: 'object',
         properties: {
@@ -155,38 +155,67 @@ const TOOLS = [{
       },
     },
     {
-      name: 'listar_expedientes',
-      description: 'Lista expedientes del despacho. Filtros: estado (activo/cerrado/suspendido/archivado) y texto libre.',
+      name: 'listar_clientes',
+      description: 'Lista clientes del despacho con ordenación y filtros. Usa esta herramienta para "últimos clientes", "clientes con expedientes", "todos los clientes", etc. Incluye conteo de expedientes activos por cliente.',
       parameters: {
         type: 'object',
         properties: {
-          estado:   { type: 'string',  description: "activo | cerrado | suspendido | archivado" },
-          busqueda: { type: 'string',  description: 'Texto en número de expediente o descripción' },
-          limit:    { type: 'integer', description: 'Máximo resultados (por defecto 10)' },
+          ordenar_por:      { type: 'string',  description: 'reciente (por fecha de alta, más nuevos primero) | nombre (alfabético). Por defecto: reciente' },
+          con_expedientes:  { type: 'boolean', description: 'true para mostrar solo clientes que tienen al menos un expediente' },
+          sin_expedientes:  { type: 'boolean', description: 'true para mostrar solo clientes sin ningún expediente' },
+          tipo:             { type: 'string',  description: 'CLIENTE | PROVEEDOR | CONTACTO — filtra por tipo de entidad' },
+          limit:            { type: 'integer', description: 'Máximo resultados (por defecto 10, máximo 30)' },
+        },
+      },
+    },
+    {
+      name: 'expedientes_cliente',
+      description: 'Muestra todos los expedientes de un cliente concreto, con estado, descripción y fechas.',
+      parameters: {
+        type: 'object',
+        properties: {
+          cliente_id:   { type: 'string', description: 'UUID del cliente (usar si se conoce)' },
+          cliente_nombre: { type: 'string', description: 'Nombre del cliente para buscarlo primero si no se tiene el UUID' },
+          estado:       { type: 'string', description: 'Filtrar por estado: activo | cerrado | suspendido | archivado' },
+        },
+      },
+    },
+    {
+      name: 'listar_expedientes',
+      description: 'Lista expedientes del despacho. Filtros: estado (activo/cerrado/suspendido/archivado), cliente concreto y texto libre. Incluye nombre del cliente.',
+      parameters: {
+        type: 'object',
+        properties: {
+          estado:     { type: 'string',  description: 'activo | cerrado | suspendido | archivado' },
+          busqueda:   { type: 'string',  description: 'Texto en número de expediente, descripción o nombre del cliente' },
+          cliente_id: { type: 'string',  description: 'UUID del cliente para filtrar sus expedientes' },
+          limit:      { type: 'integer', description: 'Máximo resultados (por defecto 10)' },
         },
       },
     },
     {
       name: 'obtener_tareas',
-      description: 'Tareas y actuaciones del usuario. Filtros: estado y si solo quiere las vencidas.',
+      description: 'Tareas y actuaciones del usuario. Filtros: estado, vencidas, y expediente concreto.',
       parameters: {
         type: 'object',
         properties: {
-          estado:        { type: 'string',  description: 'pendiente | urgente | completada' },
-          solo_vencidas: { type: 'boolean', description: 'true para ver solo tareas con plazo vencido' },
-          limit:         { type: 'integer', description: 'Máximo resultados (por defecto 10)' },
+          estado:         { type: 'string',  description: 'pendiente | urgente | completada' },
+          solo_vencidas:  { type: 'boolean', description: 'true para ver solo tareas con plazo vencido' },
+          expediente_id:  { type: 'string',  description: 'UUID del expediente para filtrar sus tareas' },
+          limit:          { type: 'integer', description: 'Máximo resultados (por defecto 10)' },
         },
       },
     },
     {
       name: 'listar_facturas',
-      description: 'Facturas del sistema. Filtros: estado y texto libre.',
+      description: 'Facturas del sistema. Filtros: estado, cliente y texto libre.',
       parameters: {
         type: 'object',
         properties: {
-          estado:   { type: 'string',  description: 'pendiente | pagada | vencida | cancelada' },
-          busqueda: { type: 'string',  description: 'Número de factura o nombre del contacto' },
-          limit:    { type: 'integer', description: 'Máximo resultados (por defecto 10)' },
+          estado:     { type: 'string',  description: 'pendiente | pagada | vencida | cancelada' },
+          busqueda:   { type: 'string',  description: 'Número de factura o nombre del contacto' },
+          cliente_id: { type: 'string',  description: 'UUID del cliente para ver sus facturas' },
+          limit:      { type: 'integer', description: 'Máximo resultados (por defecto 10)' },
         },
       },
     },
@@ -226,14 +255,15 @@ const TOOLS = [{
     },
     {
       name: 'buscar_notas',
-      description: 'Busca notas internas por contenido.',
+      description: 'Busca notas internas por contenido, cliente o expediente.',
       parameters: {
         type: 'object',
         properties: {
-          query: { type: 'string',  description: 'Texto a buscar' },
-          limit: { type: 'integer', description: 'Máximo resultados (por defecto 8)' },
+          query:         { type: 'string',  description: 'Texto a buscar en el contenido de la nota' },
+          cliente_id:    { type: 'string',  description: 'UUID del cliente para ver sus notas' },
+          expediente_id: { type: 'string',  description: 'UUID del expediente para ver sus notas' },
+          limit:         { type: 'integer', description: 'Máximo resultados (por defecto 8)' },
         },
-        required: ['query'],
       },
     },
     {
@@ -287,19 +317,113 @@ async function callTool(name: string, args: Record<string, any>, userId: string)
       case 'buscar_clientes': {
         const q = `%${args.query ?? ''}%`, limit = Math.min(Number(args.limit) || 8, 20);
         const r = await pool.query(`
-          SELECT id, first_name, last_name, commercial_name, nif_cif, email, phone, type, created_at
-          FROM entities
-          WHERE commercial_name ILIKE $1
-             OR CONCAT(COALESCE(first_name,''),' ',COALESCE(last_name,'')) ILIKE $1
-             OR nif_cif ILIKE $1 OR email ILIKE $1
-          ORDER BY COALESCE(commercial_name, first_name) NULLS LAST LIMIT $2
+          SELECT e.id, e.first_name, e.last_name, e.commercial_name, e.nif_cif, e.email, e.phone, e.type, e.created_at,
+                 COUNT(exp.id)::int AS num_expedientes,
+                 COUNT(exp.id) FILTER (WHERE exp.estado NOT IN ('cerrado','archivado'))::int AS expedientes_activos
+          FROM entities e
+          LEFT JOIN expedientes exp ON exp.client_id = e.id
+          WHERE (e.commercial_name ILIKE $1
+             OR CONCAT(COALESCE(e.first_name,''),' ',COALESCE(e.last_name,'')) ILIKE $1
+             OR e.nif_cif ILIKE $1 OR e.email ILIKE $1)
+          GROUP BY e.id
+          ORDER BY COALESCE(e.commercial_name, e.first_name) NULLS LAST LIMIT $2
         `, [q, limit]);
         return {
           total: r.rowCount,
           clientes: r.rows.map(c => ({
             id: c.id,
             nombre: c.commercial_name || `${c.first_name || ''} ${c.last_name || ''}`.trim(),
-            nif: c.nif_cif, email: c.email, telefono: c.phone, tipo: c.type, alta: c.created_at,
+            nif: c.nif_cif, email: c.email, telefono: c.phone, tipo: c.type,
+            alta: c.created_at,
+            num_expedientes: c.num_expedientes,
+            expedientes_activos: c.expedientes_activos,
+          })),
+        };
+      }
+
+      case 'listar_clientes': {
+        const limit = Math.min(Number(args.limit) || 10, 30);
+        const conds: string[] = [];
+        const params: any[] = [];
+        let pi = 1;
+        if (args.tipo) { conds.push(`e.type=$${pi++}`); params.push(args.tipo); }
+        const havingConds: string[] = [];
+        if (args.con_expedientes)  havingConds.push('COUNT(exp.id) > 0');
+        if (args.sin_expedientes)  havingConds.push('COUNT(exp.id) = 0');
+        const orderSql = args.ordenar_por === 'nombre'
+          ? 'COALESCE(e.commercial_name, e.first_name) ASC NULLS LAST'
+          : 'e.created_at DESC';
+        params.push(limit);
+        const r = await pool.query(`
+          SELECT e.id, e.first_name, e.last_name, e.commercial_name, e.nif_cif, e.email, e.phone, e.type, e.created_at,
+                 COUNT(exp.id)::int AS num_expedientes,
+                 COUNT(exp.id) FILTER (WHERE exp.estado NOT IN ('cerrado','archivado'))::int AS expedientes_activos
+          FROM entities e
+          LEFT JOIN expedientes exp ON exp.client_id = e.id
+          ${conds.length ? 'WHERE ' + conds.join(' AND ') : ''}
+          GROUP BY e.id
+          ${havingConds.length ? 'HAVING ' + havingConds.join(' AND ') : ''}
+          ORDER BY ${orderSql}
+          LIMIT $${pi}
+        `, params);
+        return {
+          total: r.rowCount,
+          ordenado_por: args.ordenar_por || 'reciente',
+          clientes: r.rows.map(c => ({
+            id: c.id,
+            nombre: c.commercial_name || `${c.first_name || ''} ${c.last_name || ''}`.trim(),
+            nif: c.nif_cif, email: c.email, telefono: c.phone, tipo: c.type,
+            alta: c.created_at,
+            num_expedientes: c.num_expedientes,
+            expedientes_activos: c.expedientes_activos,
+          })),
+        };
+      }
+
+      case 'expedientes_cliente': {
+        let clienteId = args.cliente_id;
+        let clienteNombre = '—';
+        if (!clienteId && args.cliente_nombre) {
+          const q = `%${args.cliente_nombre}%`;
+          const found = await pool.query(
+            `SELECT id, COALESCE(commercial_name, CONCAT(first_name,' ',last_name)) AS nombre
+             FROM entities WHERE commercial_name ILIKE $1 OR CONCAT(first_name,' ',last_name) ILIKE $1 LIMIT 1`,
+            [q]
+          );
+          if (!found.rows.length) return { error: `No se encontró cliente con nombre "${args.cliente_nombre}"` };
+          clienteId = found.rows[0].id;
+          clienteNombre = found.rows[0].nombre;
+        }
+        if (!clienteId) return { error: 'Se requiere cliente_id o cliente_nombre' };
+        const conds = ['e.client_id=$1'], params: any[] = [clienteId];
+        let pi = 2;
+        if (args.estado) { conds.push(`e.estado=$${pi++}`); params.push(args.estado); }
+        const r = await pool.query(`
+          SELECT e.id, e.anio, e.num_exp, e.descripcion, e.estado, e.fecha_inicio, e.fecha_cierre,
+                 e.juzgado, e.tipo_proc,
+                 COUNT(t.id) FILTER (WHERE t.estado!='completada')::int AS tareas_pendientes,
+                 COUNT(f.id)::int AS num_archivos
+          FROM expedientes e
+          LEFT JOIN client_tasks t ON t.expediente_id = e.id
+          LEFT JOIN client_files f ON f.client_id = e.id
+          WHERE ${conds.join(' AND ')}
+          GROUP BY e.id
+          ORDER BY e.fecha_inicio DESC NULLS LAST
+        `, params);
+        if (!clienteNombre || clienteNombre === '—') {
+          const cn = await pool.query(
+            `SELECT COALESCE(commercial_name, CONCAT(first_name,' ',last_name)) AS nombre FROM entities WHERE id=$1`, [clienteId]
+          );
+          clienteNombre = cn.rows[0]?.nombre || clienteId;
+        }
+        return {
+          cliente: clienteNombre,
+          total: r.rowCount,
+          expedientes: r.rows.map(e => ({
+            id: e.id, ref: `${e.anio}/${e.num_exp}`, descripcion: e.descripcion,
+            estado: e.estado, inicio: e.fecha_inicio, cierre: e.fecha_cierre,
+            juzgado: e.juzgado, tipo_proc: e.tipo_proc,
+            tareas_pendientes: e.tareas_pendientes, archivos: e.num_archivos,
           })),
         };
       }
@@ -308,15 +432,22 @@ async function callTool(name: string, args: Record<string, any>, userId: string)
         const limit = Math.min(Number(args.limit) || 10, 30);
         const conds: string[] = [], params: any[] = [];
         let pi = 1;
-        if (args.estado)   { conds.push(`e.estado=$${pi++}`); params.push(args.estado); }
-        if (args.busqueda) { conds.push(`(e.descripcion ILIKE $${pi} OR CONCAT(e.anio::text,'/',e.num_exp::text) ILIKE $${pi})`); params.push(`%${args.busqueda}%`); pi++; }
+        if (args.estado)     { conds.push(`e.estado=$${pi++}`); params.push(args.estado); }
+        if (args.cliente_id) { conds.push(`e.client_id=$${pi++}`); params.push(args.cliente_id); }
+        if (args.busqueda)   {
+          conds.push(`(e.descripcion ILIKE $${pi} OR CONCAT(e.anio::text,'/',e.num_exp::text) ILIKE $${pi} OR ent.commercial_name ILIKE $${pi} OR CONCAT(ent.first_name,' ',ent.last_name) ILIKE $${pi})`);
+          params.push(`%${args.busqueda}%`); pi++;
+        }
         params.push(limit);
         const r = await pool.query(`
-          SELECT e.id, e.anio, e.num_exp, e.descripcion, e.estado, e.fecha_inicio, e.fecha_cierre
-          FROM expedientes e ${conds.length ? 'WHERE ' + conds.join(' AND ') : ''}
+          SELECT e.id, e.anio, e.num_exp, e.descripcion, e.estado, e.fecha_inicio, e.fecha_cierre,
+                 COALESCE(ent.commercial_name, CONCAT(ent.first_name,' ',ent.last_name)) AS cliente
+          FROM expedientes e
+          LEFT JOIN entities ent ON ent.id = e.client_id
+          ${conds.length ? 'WHERE ' + conds.join(' AND ') : ''}
           ORDER BY e.created_at DESC LIMIT $${pi}
         `, params);
-        return { total: r.rowCount, expedientes: r.rows.map(e => ({ id: e.id, ref: `${e.anio}/${e.num_exp}`, descripcion: e.descripcion, estado: e.estado, inicio: e.fecha_inicio, cierre: e.fecha_cierre })) };
+        return { total: r.rowCount, expedientes: r.rows.map(e => ({ id: e.id, ref: `${e.anio}/${e.num_exp}`, descripcion: e.descripcion, estado: e.estado, cliente: e.cliente, inicio: e.fecha_inicio, cierre: e.fecha_cierre })) };
       }
 
       case 'obtener_tareas': {
@@ -324,6 +455,7 @@ async function callTool(name: string, args: Record<string, any>, userId: string)
         const conds = ['created_by=$1'], params: any[] = [userId];
         let pi = 2;
         if (args.estado)        { conds.push(`estado=$${pi++}`); params.push(args.estado); }
+        if (args.expediente_id) { conds.push(`expediente_id=$${pi++}`); params.push(args.expediente_id); }
         if (args.solo_vencidas) conds.push(`(plazo<NOW() AND estado!='completada')`);
         params.push(limit);
         const r = await pool.query(`
@@ -339,10 +471,11 @@ async function callTool(name: string, args: Record<string, any>, userId: string)
         const limit = Math.min(Number(args.limit) || 10, 30);
         const conds: string[] = [], params: any[] = [];
         let pi = 1;
-        if (args.estado)   { conds.push(`estado=$${pi++}`); params.push(args.estado); }
-        if (args.busqueda) { conds.push(`(num ILIKE $${pi} OR contacto ILIKE $${pi})`); params.push(`%${args.busqueda}%`); pi++; }
+        if (args.estado)     { conds.push(`f.estado=$${pi++}`); params.push(args.estado); }
+        if (args.cliente_id) { conds.push(`f.entity_id=$${pi++}`); params.push(args.cliente_id); }
+        if (args.busqueda)   { conds.push(`(f.num ILIKE $${pi} OR f.contacto ILIKE $${pi})`); params.push(`%${args.busqueda}%`); pi++; }
         params.push(limit);
-        const r = await pool.query(`SELECT num,contacto,total,estado,fecha,vencimiento FROM facturacion_facturas ${conds.length ? 'WHERE '+conds.join(' AND ') : ''} ORDER BY fecha DESC LIMIT $${pi}`, params);
+        const r = await pool.query(`SELECT f.num,f.contacto,f.total,f.estado,f.fecha,f.vencimiento FROM facturacion_facturas f ${conds.length ? 'WHERE '+conds.join(' AND ') : ''} ORDER BY f.fecha DESC LIMIT $${pi}`, params);
         return { total: r.rowCount, facturas: r.rows.map(f => ({ num: f.num, contacto: f.contacto, total_eur: Number(f.total).toFixed(2), estado: f.estado, fecha: f.fecha, vencimiento: f.vencimiento })) };
       }
 
@@ -380,12 +513,20 @@ async function callTool(name: string, args: Record<string, any>, userId: string)
       }
 
       case 'buscar_notas': {
-        const q = `%${args.query ?? ''}%`, limit = Math.min(Number(args.limit) || 8, 20);
+        const limit = Math.min(Number(args.limit) || 8, 20);
+        const conds: string[] = [], params: any[] = [];
+        let pi = 1;
+        if (args.query)         { conds.push(`n.content ILIKE $${pi++}`); params.push(`%${args.query}%`); }
+        if (args.cliente_id)    { conds.push(`n.client_id=$${pi++}`); params.push(args.cliente_id); }
+        if (args.expediente_id) { conds.push(`n.expediente_id=$${pi++}`); params.push(args.expediente_id); }
+        params.push(limit);
         const r = await pool.query(`
-          SELECT n.content, n.category, n.priority, n.created_at, e.commercial_name AS client_name
+          SELECT n.content, n.category, n.priority, n.created_at,
+                 COALESCE(e.commercial_name, CONCAT(e.first_name,' ',e.last_name)) AS client_name
           FROM notes n LEFT JOIN entities e ON n.client_id=e.id
-          WHERE n.content ILIKE $1 ORDER BY n.created_at DESC LIMIT $2
-        `, [q, limit]);
+          ${conds.length ? 'WHERE ' + conds.join(' AND ') : ''}
+          ORDER BY n.created_at DESC LIMIT $${pi}
+        `, params);
         return { total: r.rowCount, notas: r.rows.map(n => ({ contenido: n.content.length > 200 ? n.content.slice(0,200)+'…' : n.content, categoria: n.category, prioridad: n.priority, cliente: n.client_name, fecha: n.created_at })) };
       }
 
