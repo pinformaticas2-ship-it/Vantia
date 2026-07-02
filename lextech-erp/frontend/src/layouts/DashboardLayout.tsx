@@ -1161,6 +1161,7 @@ export default function DashboardLayout() {
                   '/dashboard/trazabilidad',
                   '/dashboard/agenda',
                   '/dashboard/chat',
+                  '/dashboard/chat-ia',
                   '/dashboard/whatsapp',
                 ].includes(location.pathname) ||
                 location.pathname.startsWith('/dashboard/facturacion')

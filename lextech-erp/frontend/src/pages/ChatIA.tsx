@@ -2,12 +2,49 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth, useUser } from '@clerk/clerk-react';
 import {
   Plus, Trash2, Copy, RotateCcw, ThumbsUp, ThumbsDown,
-  Paperclip, Mic, Link2, Send, MessageSquare, Sparkles,
-  ChevronDown, MoreHorizontal,
+  Paperclip, Link2, Send, MessageSquare, Sparkles, MoreHorizontal,
 } from 'lucide-react';
 import { resolveApiUrl } from '../lib/api';
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ─── Keyframe styles ──────────────────────────────────────────────────────────
+
+const STYLES = `
+  @keyframes cia-slideLeft  { from { opacity:0; transform:translateX(-18px) } to { opacity:1; transform:none } }
+  @keyframes cia-slideRight { from { opacity:0; transform:translateX(18px)  } to { opacity:1; transform:none } }
+  @keyframes cia-fadeUp     { from { opacity:0; transform:translateY(14px)  } to { opacity:1; transform:none } }
+  @keyframes cia-scaleIn    { from { opacity:0; transform:scale(0.82)       } to { opacity:1; transform:scale(1) } }
+  @keyframes cia-spin       { to { transform:rotate(360deg) } }
+  @keyframes cia-shimmer    { 0%{background-position:-600px 0} 100%{background-position:600px 0} }
+  @keyframes cia-wave       { 0%,60%,100%{transform:translateY(0);opacity:.35} 30%{transform:translateY(-7px);opacity:1} }
+  @keyframes cia-ring       { 0%{transform:scale(1);opacity:.7} 100%{transform:scale(2.4);opacity:0} }
+  @keyframes cia-fadeIn     { from{opacity:0} to{opacity:1} }
+  @keyframes cia-loadbar    { 0%{width:8%} 40%{width:55%} 70%{width:78%} 100%{width:92%} }
+
+  .cia-msg-ai   { animation: cia-slideLeft  .3s cubic-bezier(.25,.46,.45,.94) both }
+  .cia-msg-user { animation: cia-slideRight .3s cubic-bezier(.25,.46,.45,.94) both }
+  .cia-fade-up  { animation: cia-fadeUp     .4s cubic-bezier(.25,.46,.45,.94) both }
+  .cia-scale-in { animation: cia-scaleIn    .5s cubic-bezier(.34,1.56,.64,1)  both }
+  .cia-fade-in  { animation: cia-fadeIn     .5s ease both }
+  .cia-spin     { animation: cia-spin 1.5s linear infinite }
+  .cia-shimmer  {
+    background: linear-gradient(90deg,#e2e8f0 25%,#f8fafc 50%,#e2e8f0 75%);
+    background-size: 1200px 100%;
+    animation: cia-shimmer 1.6s ease-in-out infinite;
+  }
+  .cia-wave-dot { animation: cia-wave 1.3s infinite }
+  .cia-loadbar  { animation: cia-loadbar 4s ease-out forwards }
+  .cia-ring::after {
+    content:'';position:absolute;inset:0;border-radius:50%;
+    background:#22c55e;animation:cia-ring 1.8s ease-out infinite;
+  }
+  .cia-conv { animation: cia-fadeUp .32s cubic-bezier(.25,.46,.45,.94) both }
+  .cia-prompt-card { animation: cia-fadeUp .5s cubic-bezier(.25,.46,.45,.94) both }
+  .cia-topbar { animation: cia-fadeIn .4s ease both }
+  .cia-input-bar { animation: cia-fadeUp .4s .15s cubic-bezier(.25,.46,.45,.94) both }
+  .cia-sidebar { animation: cia-slideLeft .4s cubic-bezier(.25,.46,.45,.94) both }
+`;
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Conversation {
   id: string;
@@ -23,297 +60,249 @@ interface Message {
   ts: Date;
 }
 
-// ── Simple markdown renderer ──────────────────────────────────────────────────
+// ─── Markdown renderer ────────────────────────────────────────────────────────
 
-function inlineMarkdown(text: string): React.ReactNode {
-  const parts = text.split(/(\*\*[^*\n]+\*\*|\*[^*\n]+\*|`[^`\n]+`)/);
-  return parts.map((part, i) => {
-    if (part.startsWith('**') && part.endsWith('**'))
-      return <strong key={i} className="font-semibold text-slate-900">{part.slice(2, -2)}</strong>;
-    if (part.startsWith('*') && part.endsWith('*'))
-      return <em key={i} className="italic">{part.slice(1, -1)}</em>;
-    if (part.startsWith('`') && part.endsWith('`'))
-      return <code key={i} className="bg-slate-100 text-red-600 px-1 py-0.5 rounded text-[0.8em] font-mono">{part.slice(1, -1)}</code>;
-    return part;
+function inline(text: string): React.ReactNode {
+  return text.split(/(\*\*[^*\n]+\*\*|\*[^*\n]+\*|`[^`\n]+`)/).map((p, i) => {
+    if (p.startsWith('**') && p.endsWith('**'))
+      return <strong key={i} className="font-semibold text-slate-900">{p.slice(2,-2)}</strong>;
+    if (p.startsWith('*') && p.endsWith('*'))
+      return <em key={i}>{p.slice(1,-1)}</em>;
+    if (p.startsWith('`') && p.endsWith('`'))
+      return <code key={i} className="bg-slate-100 text-red-600 px-1 py-0.5 rounded text-[.82em] font-mono">{p.slice(1,-1)}</code>;
+    return p;
   });
 }
 
-function renderMarkdown(text: string): React.ReactNode {
+function renderMd(text: string): React.ReactNode {
   const lines = text.split('\n');
-  const nodes: React.ReactNode[] = [];
+  const out: React.ReactNode[] = [];
   let i = 0;
-
   while (i < lines.length) {
-    const line = lines[i];
-
-    // Fenced code block
-    if (line.startsWith('```')) {
-      const codeLines: string[] = [];
-      i++;
-      while (i < lines.length && !lines[i].startsWith('```')) {
-        codeLines.push(lines[i]);
-        i++;
-      }
-      nodes.push(
-        <pre key={`code-${i}`} className="bg-slate-900 text-slate-100 rounded-xl p-4 my-3 overflow-x-auto text-sm font-mono leading-relaxed">
-          <code>{codeLines.join('\n')}</code>
-        </pre>
-      );
-      i++;
-      continue;
-    }
-
-    if (line.startsWith('### ')) {
-      nodes.push(<h3 key={i} className="text-base font-semibold text-slate-800 mt-4 mb-1.5">{inlineMarkdown(line.slice(4))}</h3>);
+    const l = lines[i];
+    if (l.startsWith('```')) {
+      const code: string[] = []; i++;
+      while (i < lines.length && !lines[i].startsWith('```')) { code.push(lines[i]); i++; }
+      out.push(<pre key={i} className="bg-slate-900 text-slate-100 rounded-xl p-4 my-3 overflow-x-auto text-sm font-mono leading-relaxed"><code>{code.join('\n')}</code></pre>);
       i++; continue;
     }
-    if (line.startsWith('## ')) {
-      nodes.push(<h2 key={i} className="text-lg font-semibold text-slate-800 mt-5 mb-2">{inlineMarkdown(line.slice(3))}</h2>);
-      i++; continue;
-    }
-    if (line.startsWith('# ')) {
-      nodes.push(<h1 key={i} className="text-xl font-bold text-slate-900 mt-5 mb-2">{inlineMarkdown(line.slice(2))}</h1>);
-      i++; continue;
-    }
-
-    // Bullet list
-    if (/^[-*•]\s/.test(line)) {
+    if (l.startsWith('### ')) { out.push(<h3 key={i} className="text-sm font-semibold text-slate-800 mt-3.5 mb-1">{inline(l.slice(4))}</h3>); i++; continue; }
+    if (l.startsWith('## '))  { out.push(<h2 key={i} className="text-base font-semibold text-slate-800 mt-4 mb-1.5">{inline(l.slice(3))}</h2>); i++; continue; }
+    if (l.startsWith('# '))   { out.push(<h1 key={i} className="text-lg font-bold text-slate-900 mt-4 mb-2">{inline(l.slice(2))}</h1>); i++; continue; }
+    if (/^[-*•]\s/.test(l)) {
       const items: string[] = [];
-      while (i < lines.length && /^[-*•]\s/.test(lines[i])) {
-        items.push(lines[i].replace(/^[-*•]\s/, ''));
-        i++;
-      }
-      nodes.push(
-        <ul key={`ul-${i}`} className="my-2 space-y-1 ml-1">
-          {items.map((it, j) => (
-            <li key={j} className="flex gap-2 text-slate-700 leading-relaxed">
-              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-red-400" />
-              <span>{inlineMarkdown(it)}</span>
-            </li>
-          ))}
-        </ul>
-      );
+      while (i < lines.length && /^[-*•]\s/.test(lines[i])) { items.push(lines[i].replace(/^[-*•]\s/,'')); i++; }
+      out.push(<ul key={i} className="my-2 space-y-1">{items.map((it,j) => <li key={j} className="flex gap-2 text-slate-700 leading-relaxed"><span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-red-400"/><span>{inline(it)}</span></li>)}</ul>);
       continue;
     }
-
-    // Numbered list
-    if (/^\d+\.\s/.test(line)) {
+    if (/^\d+\.\s/.test(l)) {
       const items: string[] = [];
-      let num = 1;
-      while (i < lines.length && /^\d+\.\s/.test(lines[i])) {
-        items.push(lines[i].replace(/^\d+\.\s/, ''));
-        i++; num++;
-      }
-      nodes.push(
-        <ol key={`ol-${i}`} className="my-2 space-y-1 ml-1">
-          {items.map((it, j) => (
-            <li key={j} className="flex gap-2 text-slate-700 leading-relaxed">
-              <span className="shrink-0 text-red-500 font-medium text-sm">{j + 1}.</span>
-              <span>{inlineMarkdown(it)}</span>
-            </li>
-          ))}
-        </ol>
-      );
+      while (i < lines.length && /^\d+\.\s/.test(lines[i])) { items.push(lines[i].replace(/^\d+\.\s/,'')); i++; }
+      out.push(<ol key={i} className="my-2 space-y-1">{items.map((it,j) => <li key={j} className="flex gap-2 text-slate-700 leading-relaxed"><span className="shrink-0 text-red-500 font-semibold text-sm">{j+1}.</span><span>{inline(it)}</span></li>)}</ol>);
       continue;
     }
-
-    // Blockquote
-    if (line.startsWith('> ')) {
-      nodes.push(
-        <blockquote key={i} className="border-l-4 border-red-300 pl-4 my-2 text-slate-600 italic bg-red-50 py-2 rounded-r-lg">
-          {inlineMarkdown(line.slice(2))}
-        </blockquote>
-      );
+    if (l.startsWith('> ')) {
+      out.push(<blockquote key={i} className="border-l-4 border-red-300 pl-4 py-1.5 my-2 text-slate-600 italic bg-red-50/60 rounded-r-lg">{inline(l.slice(2))}</blockquote>);
       i++; continue;
     }
-
-    // Horizontal rule
-    if (/^[-*_]{3,}$/.test(line.trim())) {
-      nodes.push(<hr key={i} className="border-slate-200 my-4" />);
-      i++; continue;
-    }
-
-    // Empty line
-    if (line.trim() === '') {
-      i++; continue;
-    }
-
-    // Paragraph
-    nodes.push(
-      <p key={i} className="text-slate-700 leading-relaxed mb-1">
-        {inlineMarkdown(line)}
-      </p>
-    );
+    if (/^[-*_]{3,}$/.test(l.trim())) { out.push(<hr key={i} className="border-slate-200 my-4"/>); i++; continue; }
+    if (l.trim()==='') { i++; continue; }
+    out.push(<p key={i} className="text-slate-700 leading-relaxed mb-0.5">{inline(l)}</p>);
     i++;
   }
-
-  return <>{nodes}</>;
+  return <>{out}</>;
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function groupByDate(convs: Conversation[]): { label: string; items: Conversation[] }[] {
-  const now = new Date();
+function groupByDate(convs: Conversation[]) {
+  const now   = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const yesterday = new Date(today.getTime() - 86400000);
-  const week = new Date(today.getTime() - 7 * 86400000);
-
-  const todayItems    = convs.filter(c => new Date(c.updated_at) >= today);
-  const yesterItems   = convs.filter(c => new Date(c.updated_at) >= yesterday && new Date(c.updated_at) < today);
-  const weekItems     = convs.filter(c => new Date(c.updated_at) >= week      && new Date(c.updated_at) < yesterday);
-  const olderItems    = convs.filter(c => new Date(c.updated_at) < week);
-
-  const groups: { label: string; items: Conversation[] }[] = [];
-  if (todayItems.length)  groups.push({ label: 'Hoy',             items: todayItems });
-  if (yesterItems.length) groups.push({ label: 'Ayer',            items: yesterItems });
-  if (weekItems.length)   groups.push({ label: 'Últimos 7 días',  items: weekItems });
-  if (olderItems.length)  groups.push({ label: 'Anteriores',      items: olderItems });
-  return groups;
+  const yest  = new Date(today.getTime()-86400000);
+  const week  = new Date(today.getTime()-7*86400000);
+  const g = (label: string, items: Conversation[]) => items.length ? [{label,items}] : [];
+  return [
+    ...g('Hoy',            convs.filter(c=>new Date(c.updated_at)>=today)),
+    ...g('Ayer',           convs.filter(c=>new Date(c.updated_at)>=yest  && new Date(c.updated_at)<today)),
+    ...g('Últimos 7 días', convs.filter(c=>new Date(c.updated_at)>=week  && new Date(c.updated_at)<yest)),
+    ...g('Anteriores',     convs.filter(c=>new Date(c.updated_at)<week)),
+  ];
 }
 
-function convTitle(c: Conversation): string {
-  return c.title || c.first_message?.slice(0, 60) || 'Nueva conversación';
+const convTitle = (c: Conversation) =>
+  c.title || c.first_message?.slice(0,60) || 'Nueva conversación';
+
+// ─── Loading screen ───────────────────────────────────────────────────────────
+
+function LoadingScreen() {
+  return (
+    <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white">
+      <div className="flex flex-col items-center gap-6">
+        {/* Spinning ring + logo */}
+        <div className="relative flex items-center justify-center">
+          <div className="absolute h-24 w-24 rounded-full border-4 border-red-100" />
+          <div
+            className="absolute h-24 w-24 rounded-full border-4 border-transparent border-t-red-600 cia-spin"
+            style={{ animationDuration: '1s' }}
+          />
+          <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-red-600 to-red-900 flex items-center justify-center shadow-xl shadow-red-200">
+            <Sparkles className="h-8 w-8 text-white" />
+          </div>
+        </div>
+
+        {/* Text */}
+        <div className="text-center">
+          <p className="text-lg font-semibold text-slate-800">VantIA</p>
+          <p className="text-sm text-slate-400 mt-0.5">Iniciando asistente legal…</p>
+        </div>
+
+        {/* Progress bar */}
+        <div className="w-48 h-1 bg-slate-100 rounded-full overflow-hidden">
+          <div className="h-full bg-gradient-to-r from-red-500 to-red-700 rounded-full cia-loadbar" />
+        </div>
+      </div>
+    </div>
+  );
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
+// ─── Shimmer skeleton ─────────────────────────────────────────────────────────
+
+function ShimmerLine({ w = 'w-full', h = 'h-4' }: { w?: string; h?: string }) {
+  return <div className={`${w} ${h} rounded-lg cia-shimmer`} />;
+}
+
+// ─── Suggestion prompts ───────────────────────────────────────────────────────
+
+const PROMPTS = [
+  { icon: '📋', label: 'Expediente reciente',   text: 'Resume el expediente más reciente del despacho' },
+  { icon: '✍️', label: 'Redactar contrato',     text: 'Redacta un contrato de arrendamiento de vivienda' },
+  { icon: '📊', label: 'Estadísticas',           text: 'Muéstrame las estadísticas actuales del despacho' },
+  { icon: '⚖️', label: 'Proceso monitorio',     text: 'Explícame paso a paso el proceso monitorio' },
+  { icon: '📝', label: 'Escrito de demanda',    text: 'Ayúdame a redactar un escrito de demanda ordinaria' },
+  { icon: '🔍', label: 'Jurisprudencia',        text: 'Busca jurisprudencia del TS sobre cláusulas abusivas' },
+];
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function ChatIA() {
-  const { getToken }  = useAuth();
-  const { user }      = useUser();
+  const { getToken } = useAuth();
+  const { user }     = useUser();
 
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [conversations,  setConversations]  = useState<Conversation[]>([]);
   const [activeModuleId, setActiveModuleId] = useState<string | null>(null);
-  const [activeId, setActiveId] = useState<string | null>(null); // DB row id
-  const [messages, setMessages]   = useState<Message[]>([]);
-  const [input, setInput]         = useState('');
-  const [sending, setSending]     = useState(false);
-  const [sidebarLoading, setSidebarLoading] = useState(true);
+  const [activeId,       setActiveId]       = useState<string | null>(null);
+  const [messages,       setMessages]       = useState<Message[]>([]);
+  const [input,          setInput]          = useState('');
+  const [sending,        setSending]        = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [historyLoading, setHistoryLoading] = useState(false);
-  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [copiedIdx,      setCopiedIdx]      = useState<number | null>(null);
+  const [deletingId,     setDeletingId]     = useState<string | null>(null);
+  const [ready,          setReady]          = useState(false);   // controls entrance animation
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const textareaRef    = useRef<HTMLTextAreaElement>(null);
+  const bottomRef   = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // ── Load conversations list ───────────────────────────────────────────────
+  // ── Load conversations ──────────────────────────────────────────────────────
 
   const loadConversations = useCallback(async () => {
-    setSidebarLoading(true);
     try {
       const token = await getToken();
-      const res = await fetch(resolveApiUrl('/api/vantia/conversations'), {
+      const res   = await fetch(resolveApiUrl('/api/vantia/conversations'), {
         headers: { Authorization: `Bearer ${token}` },
       });
-      const data = await res.json();
+      const data  = await res.json();
       if (data.success) setConversations(data.conversations);
-    } catch { /* ignore */ } finally {
-      setSidebarLoading(false);
+    } catch { /**/ } finally {
+      setInitialLoading(false);
+      setTimeout(() => setReady(true), 80);   // tiny delay so CSS transition fires
     }
   }, [getToken]);
 
   useEffect(() => { loadConversations(); }, [loadConversations]);
 
-  // ── Scroll to bottom ──────────────────────────────────────────────────────
+  // ── Scroll to bottom ────────────────────────────────────────────────────────
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, sending]);
 
-  // ── Auto-resize textarea ──────────────────────────────────────────────────
+  // ── Auto-resize textarea ────────────────────────────────────────────────────
 
   const autoResize = (el: HTMLTextAreaElement) => {
     el.style.height = 'auto';
-    el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+    el.style.height = Math.min(el.scrollHeight, 152) + 'px';
   };
+  useEffect(() => { if (textareaRef.current) autoResize(textareaRef.current); }, [input]);
 
-  useEffect(() => {
-    if (textareaRef.current) autoResize(textareaRef.current);
-  }, [input]);
-
-  // ── Load conversation history ─────────────────────────────────────────────
+  // ── Open conversation ───────────────────────────────────────────────────────
 
   const openConversation = async (conv: Conversation) => {
+    if (activeModuleId === conv.module_id) return;
     setActiveModuleId(conv.module_id);
     setActiveId(conv.id);
     setMessages([]);
     setHistoryLoading(true);
     try {
       const token = await getToken();
-      const res = await fetch(
+      const res   = await fetch(
         resolveApiUrl(`/api/vantia/chat/history?moduleId=${encodeURIComponent(conv.module_id)}`),
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      const data = await res.json();
+      const data  = await res.json();
       if (data.success) {
-        setMessages((data.history as { role: string; text: string }[]).map(h => ({
-          role: h.role as 'user' | 'model',
-          text: h.text,
-          ts: new Date(),
+        setMessages((data.history as {role:string;text:string}[]).map(h => ({
+          role: h.role as 'user'|'model', text: h.text, ts: new Date(),
         })));
       }
-    } catch { /* ignore */ } finally {
-      setHistoryLoading(false);
-    }
+    } catch { /**/ } finally { setHistoryLoading(false); }
   };
 
-  // ── New conversation ──────────────────────────────────────────────────────
+  // ── New conversation ────────────────────────────────────────────────────────
 
-  const newConversation = () => {
-    const uuid = crypto.randomUUID();
-    const moduleId = `chat-ia:${uuid}`;
+  const newConversation = (prefillText?: string) => {
+    const moduleId = `chat-ia:${crypto.randomUUID()}`;
     setActiveModuleId(moduleId);
     setActiveId(null);
     setMessages([]);
-    setInput('');
-    textareaRef.current?.focus();
+    if (prefillText) setInput(prefillText);
+    setTimeout(() => textareaRef.current?.focus(), 50);
   };
 
-  // ── Delete conversation ───────────────────────────────────────────────────
+  // ── Delete conversation ─────────────────────────────────────────────────────
 
-  const deleteConversation = async (conv: Conversation, e: React.MouseEvent) => {
+  const handleDelete = async (conv: Conversation, e: React.MouseEvent) => {
     e.stopPropagation();
     setDeletingId(conv.id);
     try {
       const token = await getToken();
       await fetch(resolveApiUrl(`/api/vantia/conversations/${conv.id}`), {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
+        method: 'DELETE', headers: { Authorization: `Bearer ${token}` },
       });
       setConversations(prev => prev.filter(c => c.id !== conv.id));
-      if (activeId === conv.id) {
-        setActiveModuleId(null);
-        setActiveId(null);
-        setMessages([]);
-      }
-    } catch { /* ignore */ } finally {
-      setDeletingId(null);
-    }
+      if (activeId === conv.id) { setActiveModuleId(null); setActiveId(null); setMessages([]); }
+    } catch { /**/ } finally { setDeletingId(null); }
   };
 
-  // ── Send message ──────────────────────────────────────────────────────────
+  // ── Send message ────────────────────────────────────────────────────────────
 
   const sendMessage = async () => {
     const text = input.trim();
     if (!text || sending) return;
 
     let moduleId = activeModuleId;
-    if (!moduleId) {
-      const uuid = crypto.randomUUID();
-      moduleId = `chat-ia:${uuid}`;
-      setActiveModuleId(moduleId);
-    }
+    if (!moduleId) { moduleId = `chat-ia:${crypto.randomUUID()}`; setActiveModuleId(moduleId); }
 
-    const isNewConv = messages.length === 0;
-    const userMsg: Message = { role: 'user', text, ts: new Date() };
+    const isNew         = messages.length === 0;
     const historyToSend = messages.map(m => ({ role: m.role, text: m.text }));
 
-    setMessages(prev => [...prev, userMsg]);
+    setMessages(prev => [...prev, { role: 'user', text, ts: new Date() }]);
     setInput('');
     setSending(true);
 
     try {
       const token = await getToken();
-      const res = await fetch(resolveApiUrl('/api/vantia/chat'), {
+      const res   = await fetch(resolveApiUrl('/api/vantia/chat'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ message: text, history: historyToSend, moduleId }),
@@ -321,32 +310,24 @@ export default function ChatIA() {
       const data = await res.json();
 
       if (data.success) {
-        const aiMsg: Message = { role: 'model', text: data.reply, ts: new Date() };
-        setMessages(prev => [...prev, aiMsg]);
+        setMessages(prev => [...prev, { role: 'model', text: data.reply, ts: new Date() }]);
 
-        // Update or add to conversations list
-        if (isNewConv) {
-          const newConv: Conversation = {
-            id: '',
-            module_id: moduleId,
-            title: text.slice(0, 100),
-            first_message: text,
-            updated_at: new Date().toISOString(),
+        if (isNew) {
+          const stub: Conversation = {
+            id: '', module_id: moduleId!, title: text.slice(0,100),
+            first_message: text, updated_at: new Date().toISOString(),
           };
-          setConversations(prev => [newConv, ...prev]);
-          // Refresh to get the real id
+          setConversations(prev => [stub, ...prev]);
           setTimeout(async () => {
             const tok = await getToken();
-            const r = await fetch(resolveApiUrl('/api/vantia/conversations'), {
-              headers: { Authorization: `Bearer ${tok}` },
-            });
-            const d = await r.json();
+            const r   = await fetch(resolveApiUrl('/api/vantia/conversations'), { headers: { Authorization: `Bearer ${tok}` } });
+            const d   = await r.json();
             if (d.success) {
               setConversations(d.conversations);
               const found = (d.conversations as Conversation[]).find(c => c.module_id === moduleId);
               if (found) setActiveId(found.id);
             }
-          }, 500);
+          }, 700);
         } else {
           setConversations(prev => prev.map(c =>
             c.module_id === moduleId ? { ...c, updated_at: new Date().toISOString() } : c
@@ -359,28 +340,23 @@ export default function ChatIA() {
           ts: new Date(),
         }]);
       }
-    } catch (err: any) {
+    } catch {
       setMessages(prev => [...prev, {
         role: 'model',
-        text: '⚠️ Error de conexión. Comprueba tu conexión a internet e inténtalo de nuevo.',
+        text: '⚠️ Error de conexión. Comprueba tu red e inténtalo de nuevo.',
         ts: new Date(),
       }]);
-    } finally {
-      setSending(false);
-    }
+    } finally { setSending(false); }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
+  const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   };
 
   const copyText = (text: string, idx: number) => {
     navigator.clipboard.writeText(text).then(() => {
       setCopiedIdx(idx);
-      setTimeout(() => setCopiedIdx(null), 1500);
+      setTimeout(() => setCopiedIdx(null), 1600);
     });
   };
 
@@ -388,26 +364,21 @@ export default function ChatIA() {
     if (messages.length < 2 || sending) return;
     const lastUser = [...messages].reverse().find(m => m.role === 'user');
     if (!lastUser) return;
-    const historyWithoutLast = messages.slice(0, -2).map(m => ({ role: m.role, text: m.text }));
-    setMessages(prev => prev.slice(0, -1));
+    const histWoLast = messages.slice(0,-2).map(m => ({role:m.role, text:m.text}));
+    setMessages(prev => prev.slice(0,-1));
     setSending(true);
     try {
       const token = await getToken();
-      const res = await fetch(resolveApiUrl('/api/vantia/chat'), {
+      const res   = await fetch(resolveApiUrl('/api/vantia/chat'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ message: lastUser.text, history: historyWithoutLast, moduleId: activeModuleId }),
+        body: JSON.stringify({ message: lastUser.text, history: histWoLast, moduleId: activeModuleId }),
       });
       const data = await res.json();
-      if (data.success) {
+      if (data.success)
         setMessages(prev => [...prev, { role: 'model', text: data.reply, ts: new Date() }]);
-      }
-    } catch { /* ignore */ } finally {
-      setSending(false);
-    }
+    } catch { /**/ } finally { setSending(false); }
   };
-
-  // ── User avatar ───────────────────────────────────────────────────────────
 
   const userInitials = user?.firstName
     ? (user.firstName[0] + (user.lastName?.[0] || '')).toUpperCase()
@@ -415,302 +386,358 @@ export default function ChatIA() {
 
   const groups = groupByDate(conversations);
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex h-full bg-white overflow-hidden" style={{ height: 'calc(100vh - 64px)' }}>
+    <>
+      <style>{STYLES}</style>
 
-      {/* ── Left Sidebar ────────────────────────────────────────────────── */}
-      <aside className="w-72 shrink-0 flex flex-col border-r border-slate-200 bg-slate-50">
+      <div className="flex h-full bg-white overflow-hidden relative">
 
-        {/* Header */}
-        <div className="px-4 pt-5 pb-4 border-b border-slate-200">
-          <div className="flex items-center gap-2.5 mb-4">
-            <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center shrink-0">
-              <Sparkles className="h-4 w-4 text-white" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-slate-800 leading-tight">VantIA</p>
-              <p className="text-[10px] text-slate-400 leading-tight">Legal Pro</p>
-            </div>
-          </div>
+        {/* ── Initial loading screen ─────────────────────────────────────── */}
+        {initialLoading && <LoadingScreen />}
 
-          <button
-            onClick={newConversation}
-            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white text-sm font-medium rounded-xl py-2.5 px-4 transition-all shadow-sm"
-          >
-            <Plus className="h-4 w-4" />
-            Nuevo Chat
-          </button>
-        </div>
-
-        {/* Conversation list */}
-        <div className="flex-1 overflow-y-auto px-2 py-3">
-          {sidebarLoading ? (
-            <div className="flex flex-col gap-2 px-2">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="h-14 bg-slate-200 rounded-xl animate-pulse" />
-              ))}
-            </div>
-          ) : conversations.length === 0 ? (
-            <div className="text-center py-8 text-slate-400">
-              <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-40" />
-              <p className="text-xs">Sin conversaciones aún</p>
-            </div>
-          ) : (
-            groups.map(group => (
-              <div key={group.label} className="mb-4">
-                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-3 mb-1">
-                  {group.label}
-                </p>
-                {group.items.map(conv => (
-                  <button
-                    key={conv.module_id}
-                    onClick={() => openConversation(conv)}
-                    className={`group w-full text-left px-3 py-2.5 rounded-xl mb-0.5 transition-all flex items-start justify-between gap-2 ${
-                      activeModuleId === conv.module_id
-                        ? 'bg-red-50 border border-red-100 shadow-sm'
-                        : 'hover:bg-white hover:shadow-sm border border-transparent'
-                    }`}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-sm truncate leading-tight ${
-                        activeModuleId === conv.module_id ? 'text-red-700 font-medium' : 'text-slate-700'
-                      }`}>
-                        {convTitle(conv)}
-                      </p>
-                      <p className="text-[10px] text-slate-400 mt-0.5">
-                        {new Date(conv.updated_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
-                      </p>
-                    </div>
-                    <button
-                      onClick={e => deleteConversation(conv, e)}
-                      disabled={deletingId === conv.id}
-                      className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-red-100 hover:text-red-600 text-slate-400 transition-all shrink-0 mt-0.5"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </button>
-                ))}
+        {/* ── Sidebar ──────────────────────────────────────────────────────── */}
+        <aside
+          className="w-64 shrink-0 flex flex-col border-r border-slate-100 bg-slate-50 cia-sidebar"
+          style={{ opacity: ready ? 1 : 0, transition: 'opacity .35s ease' }}
+        >
+          {/* Brand header */}
+          <div className="px-4 pt-5 pb-4">
+            <div className="flex items-center gap-2.5 mb-4">
+              <div className="relative h-8 w-8 rounded-xl bg-gradient-to-br from-red-600 to-red-900 flex items-center justify-center shrink-0 shadow-md shadow-red-200">
+                <Sparkles className="h-3.5 w-3.5 text-white" />
+                {/* green online dot */}
+                <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-white" />
               </div>
-            ))
-          )}
-        </div>
-      </aside>
-
-      {/* ── Right Panel ─────────────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col relative overflow-hidden">
-
-        {/* Topbar */}
-        <div className="absolute top-0 left-0 right-0 z-20 bg-white/90 backdrop-blur-sm border-b border-slate-200 px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center">
-              <Sparkles className="h-4 w-4 text-white" />
-            </div>
-            <div>
-              <h1 className="text-sm font-semibold text-slate-800">VantIA Legal Pro</h1>
-              <div className="flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
-                <span className="text-[10px] text-slate-400">En línea · Gemini 2.5 Flash</span>
+              <div>
+                <p className="text-sm font-bold text-slate-800 leading-tight tracking-tight">VantIA</p>
+                <p className="text-[10px] text-slate-400 leading-tight">Legal Pro · Gemini 2.5</p>
               </div>
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {activeModuleId && messages.length > 0 && (
-              <button
-                onClick={() => {
-                  const text = messages.map(m => `${m.role === 'user' ? 'Tú' : 'VantIA'}: ${m.text}`).join('\n\n');
-                  navigator.clipboard.writeText(text);
-                }}
-                className="text-xs text-slate-500 hover:text-slate-800 border border-slate-200 hover:border-slate-300 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5"
-              >
-                <Copy className="h-3.5 w-3.5" />
-                Copiar todo
-              </button>
-            )}
-            <button className="text-xs text-slate-500 hover:text-slate-800 border border-slate-200 hover:border-slate-300 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5">
-              <MoreHorizontal className="h-3.5 w-3.5" />
-              Más
+
+            <button
+              onClick={() => newConversation()}
+              className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 active:scale-[.97] text-white text-sm font-medium rounded-xl py-2.5 px-4 transition-all duration-150 shadow-sm shadow-red-200"
+            >
+              <Plus className="h-4 w-4" />
+              Nuevo Chat
             </button>
           </div>
-        </div>
 
-        {/* Messages area */}
-        <div className="flex-1 overflow-y-auto pt-20 pb-44 px-4">
-          <div className="max-w-3xl mx-auto">
+          <div className="h-px bg-slate-100 mx-4" />
 
-            {/* Welcome screen */}
-            {!activeModuleId && (
-              <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
-                <div className="h-20 w-20 rounded-3xl bg-gradient-to-br from-red-600 to-red-900 flex items-center justify-center mb-6 shadow-xl shadow-red-200">
-                  <Sparkles className="h-10 w-10 text-white" />
-                </div>
-                <h2 className="text-2xl font-bold text-slate-800 mb-2">¿En qué puedo ayudarte?</h2>
-                <p className="text-slate-500 text-sm max-w-sm mb-8">
-                  Soy VantIA, tu asistente jurídico inteligente. Puedo redactar documentos, analizar expedientes, resolver dudas legales y mucho más.
-                </p>
-                <div className="grid grid-cols-2 gap-3 w-full max-w-lg">
-                  {[
-                    { icon: '📋', text: 'Resume el expediente más reciente' },
-                    { icon: '✍️', text: 'Redacta un contrato de arrendamiento' },
-                    { icon: '📊', text: 'Muéstrame las estadísticas del despacho' },
-                    { icon: '⚖️', text: 'Explica el proceso monitorio' },
-                  ].map(({ icon, text }) => (
-                    <button
-                      key={text}
-                      onClick={() => { setInput(text); newConversation(); textareaRef.current?.focus(); }}
-                      className="text-left px-4 py-3 rounded-xl border border-slate-200 hover:border-red-200 hover:bg-red-50 text-sm text-slate-600 hover:text-red-700 transition-all bg-white shadow-sm"
-                    >
-                      <span className="mr-2">{icon}</span>{text}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* History loading */}
-            {historyLoading && (
-              <div className="space-y-4 mt-4">
-                {[1, 2, 3].map(i => (
-                  <div key={i} className={`flex gap-3 ${i % 2 === 0 ? 'flex-row-reverse' : ''}`}>
-                    <div className="h-8 w-8 rounded-full bg-slate-200 animate-pulse shrink-0" />
-                    <div className={`h-16 rounded-2xl bg-slate-100 animate-pulse ${i % 2 === 0 ? 'w-48' : 'w-72'}`} />
+          {/* Conversation list */}
+          <div className="flex-1 overflow-y-auto px-2 py-3 space-y-4">
+            {initialLoading ? (
+              <div className="space-y-2 px-1">
+                {[80,65,90,55,72].map((w,i) => (
+                  <div key={i} className="flex flex-col gap-1.5 px-2 py-2.5 rounded-xl">
+                    <ShimmerLine w={`w-[${w}%]`} h="h-3" />
+                    <ShimmerLine w="w-16" h="h-2.5" />
                   </div>
                 ))}
               </div>
-            )}
-
-            {/* Messages */}
-            {!historyLoading && messages.map((msg, idx) => (
-              <div key={idx} className={`flex gap-3 mb-6 group ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
-
-                {/* Avatar */}
-                {msg.role === 'model' ? (
-                  <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-red-600 to-red-900 flex items-center justify-center shrink-0 shadow-md shadow-red-200 mt-1">
-                    <Sparkles className="h-4.5 w-4.5 text-white" />
-                  </div>
-                ) : (
-                  <div className="h-9 w-9 rounded-xl bg-slate-700 flex items-center justify-center shrink-0 text-white text-xs font-bold mt-1">
-                    {userInitials}
-                  </div>
-                )}
-
-                {/* Bubble */}
-                <div className="flex flex-col gap-1.5 max-w-[75%]">
-                  {msg.role === 'model' ? (
-                    <div className="bg-white rounded-2xl rounded-tl-sm px-5 py-4 shadow-sm border border-slate-100">
-                      <div className="prose-ai text-sm">{renderMarkdown(msg.text)}</div>
-                    </div>
-                  ) : (
-                    <div className="bg-gradient-to-br from-red-600 to-red-700 text-white rounded-2xl rounded-tr-sm px-5 py-3.5 shadow-sm">
-                      <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.text}</p>
-                    </div>
-                  )}
-
-                  {/* Actions */}
-                  <div className={`flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                    <button
-                      onClick={() => copyText(msg.text, idx)}
-                      className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
-                      title="Copiar"
-                    >
-                      <Copy className="h-3.5 w-3.5" />
-                    </button>
-                    {msg.role === 'model' && (
-                      <>
+            ) : conversations.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 text-slate-400 cia-fade-up">
+                <div className="h-12 w-12 rounded-2xl bg-slate-100 flex items-center justify-center mb-3">
+                  <MessageSquare className="h-5 w-5 opacity-40" />
+                </div>
+                <p className="text-xs font-medium">Sin conversaciones</p>
+                <p className="text-[10px] text-slate-300 mt-0.5">Empieza un nuevo chat</p>
+              </div>
+            ) : (
+              groups.map(group => (
+                <div key={group.label}>
+                  <p className="text-[9.5px] font-bold text-slate-400 uppercase tracking-widest px-3 mb-1.5">
+                    {group.label}
+                  </p>
+                  {group.items.map((conv, idx) => {
+                    const active = activeModuleId === conv.module_id;
+                    return (
+                      <button
+                        key={conv.module_id}
+                        onClick={() => openConversation(conv)}
+                        className={`cia-conv group w-full text-left px-3 py-2.5 rounded-xl mb-0.5 transition-all duration-150 flex items-center justify-between gap-2 ${
+                          active
+                            ? 'bg-white shadow-sm border border-slate-200'
+                            : 'hover:bg-white/70 hover:shadow-sm border border-transparent'
+                        }`}
+                        style={{ animationDelay: `${idx * 40}ms` }}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {active && (
+                            <span className="h-1.5 w-1.5 rounded-full bg-red-500 shrink-0" />
+                          )}
+                          <div className="min-w-0">
+                            <p className={`text-[13px] truncate leading-tight font-medium ${
+                              active ? 'text-red-700' : 'text-slate-600'
+                            }`}>
+                              {convTitle(conv)}
+                            </p>
+                            <p className="text-[10px] text-slate-400 mt-0.5">
+                              {new Date(conv.updated_at).toLocaleDateString('es-ES', { day:'2-digit', month:'short' })}
+                            </p>
+                          </div>
+                        </div>
                         <button
-                          onClick={regenerate}
-                          className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
-                          title="Regenerar"
+                          onClick={e => handleDelete(conv, e)}
+                          disabled={deletingId === conv.id}
+                          className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-red-50 hover:text-red-500 text-slate-300 transition-all shrink-0"
                         >
-                          <RotateCcw className="h-3.5 w-3.5" />
+                          {deletingId === conv.id
+                            ? <span className="block h-3.5 w-3.5 rounded-full border-2 border-slate-300 border-t-red-500 cia-spin" />
+                            : <Trash2 className="h-3.5 w-3.5" />
+                          }
                         </button>
-                        <button className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-green-600 transition-colors" title="Buena respuesta">
-                          <ThumbsUp className="h-3.5 w-3.5" />
-                        </button>
-                        <button className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-red-500 transition-colors" title="Mala respuesta">
-                          <ThumbsDown className="h-3.5 w-3.5" />
-                        </button>
-                      </>
-                    )}
-                    {copiedIdx === idx && (
-                      <span className="text-[10px] text-green-600 font-medium px-1">¡Copiado!</span>
-                    )}
-                  </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              ))
+            )}
+          </div>
+        </aside>
+
+        {/* ── Main chat panel ───────────────────────────────────────────────── */}
+        <div
+          className="flex-1 flex flex-col relative overflow-hidden bg-white"
+          style={{ opacity: ready ? 1 : 0, transition: 'opacity .4s ease' }}
+        >
+
+          {/* Topbar */}
+          <div className="cia-topbar shrink-0 flex items-center justify-between px-6 py-3 border-b border-slate-100 bg-white/90 backdrop-blur-sm z-10">
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-red-600 to-red-900 flex items-center justify-center shadow-md shadow-red-100">
+                <Sparkles className="h-4 w-4 text-white" />
+              </div>
+              <div>
+                <h1 className="text-sm font-bold text-slate-800 leading-tight">VantIA Legal Pro</h1>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="relative h-1.5 w-1.5 inline-block cia-ring">
+                    <span className="block h-1.5 w-1.5 rounded-full bg-green-500" />
+                  </span>
+                  <span className="text-[10px] text-slate-400">En línea · Gemini 2.5 Flash</span>
                 </div>
               </div>
-            ))}
+            </div>
 
-            {/* Typing indicator */}
-            {sending && (
-              <div className="flex gap-3 mb-6">
-                <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-red-600 to-red-900 flex items-center justify-center shrink-0 shadow-md shadow-red-200 mt-1">
-                  <Sparkles className="h-4 w-4 text-white" />
-                </div>
-                <div className="bg-white rounded-2xl rounded-tl-sm px-5 py-4 shadow-sm border border-slate-100">
-                  <div className="flex items-center gap-1.5 h-5">
-                    {[0, 1, 2].map(i => (
-                      <span
-                        key={i}
-                        className="h-2 w-2 rounded-full bg-red-400 animate-bounce"
-                        style={{ animationDelay: `${i * 150}ms` }}
-                      />
+            <div className="flex items-center gap-2">
+              {activeModuleId && messages.length > 0 && (
+                <button
+                  onClick={() => navigator.clipboard.writeText(
+                    messages.map(m => `${m.role==='user'?'Tú':'VantIA'}: ${m.text}`).join('\n\n')
+                  )}
+                  className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 border border-slate-200 hover:border-slate-300 px-3 py-1.5 rounded-lg transition-all hover:bg-slate-50 active:scale-95"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                  Copiar chat
+                </button>
+              )}
+              <button className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 border border-slate-200 hover:border-slate-300 px-3 py-1.5 rounded-lg transition-all hover:bg-slate-50 active:scale-95">
+                <MoreHorizontal className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Messages scroll area */}
+          <div className="flex-1 overflow-y-auto">
+            <div className="max-w-3xl mx-auto px-4 py-6">
+
+              {/* ── Welcome ──────────────────────────────────────────────── */}
+              {!activeModuleId && !initialLoading && (
+                <div className="flex flex-col items-center justify-center min-h-[calc(100vh-260px)] text-center">
+                  {/* Animated logo */}
+                  <div className="relative mb-7 cia-scale-in">
+                    <div className="absolute inset-0 rounded-3xl bg-red-500/10 blur-2xl scale-150" />
+                    <div className="relative h-20 w-20 rounded-3xl bg-gradient-to-br from-red-500 to-red-900 flex items-center justify-center shadow-2xl shadow-red-300/40">
+                      <Sparkles className="h-9 w-9 text-white" />
+                    </div>
+                  </div>
+
+                  <h2 className="text-2xl font-bold text-slate-800 mb-2 cia-fade-up" style={{animationDelay:'.12s'}}>
+                    ¿En qué puedo ayudarte?
+                  </h2>
+                  <p className="text-sm text-slate-400 max-w-xs mb-8 cia-fade-up" style={{animationDelay:'.2s'}}>
+                    Tu asistente jurídico con acceso real a los datos del despacho.
+                  </p>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 w-full max-w-xl">
+                    {PROMPTS.map(({ icon, label, text }, i) => (
+                      <button
+                        key={text}
+                        onClick={() => { newConversation(text); }}
+                        className="cia-prompt-card text-left px-4 py-3.5 rounded-2xl border border-slate-200 hover:border-red-200 hover:bg-red-50/50 hover:shadow-sm bg-white transition-all duration-150 active:scale-[.97] group"
+                        style={{ animationDelay: `${.24 + i*.05}s` }}
+                      >
+                        <span className="text-xl block mb-1.5">{icon}</span>
+                        <span className="text-xs font-semibold text-slate-700 group-hover:text-red-700 transition-colors leading-tight block">
+                          {label}
+                        </span>
+                      </button>
                     ))}
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            <div ref={messagesEndRef} />
-          </div>
-        </div>
-
-        {/* ── Floating input bar ────────────────────────────────────────── */}
-        <div className="absolute bottom-0 left-0 right-0 px-4 pb-5 pt-3 bg-gradient-to-t from-white via-white to-transparent pointer-events-none">
-          <div className="max-w-3xl mx-auto pointer-events-auto">
-            <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
-              <div className="flex items-end gap-2 px-4 py-3">
-                <button className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors shrink-0 mb-0.5">
-                  <Paperclip className="h-4.5 w-4.5" />
-                </button>
-
-                <textarea
-                  ref={textareaRef}
-                  rows={1}
-                  value={input}
-                  onChange={e => { setInput(e.target.value); autoResize(e.target); }}
-                  onKeyDown={handleKeyDown}
-                  placeholder={activeModuleId ? 'Escribe un mensaje… (Intro para enviar, Mayús+Intro para salto de línea)' : 'Escribe para iniciar una conversación…'}
-                  className="flex-1 resize-none outline-none text-sm text-slate-700 placeholder:text-slate-400 leading-relaxed bg-transparent py-0.5"
-                  style={{ maxHeight: 160, overflowY: 'auto' }}
-                  disabled={sending}
-                />
-
-                <div className="flex items-center gap-1.5 shrink-0 mb-0.5">
-                  <button className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors" title="Vincular a expediente">
-                    <Link2 className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={sendMessage}
-                    disabled={!input.trim() || sending}
-                    className="p-2.5 rounded-xl bg-gradient-to-br from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
-                  >
-                    <Send className="h-4 w-4" />
-                  </button>
+              {/* ── History loading skeletons ─────────────────────────── */}
+              {historyLoading && (
+                <div className="space-y-5 mt-2">
+                  {[{r:false,w:'72%'},{r:true,w:'55%'},{r:false,w:'80%'},{r:true,w:'45%'}].map(({r,w},i) => (
+                    <div key={i} className={`flex gap-3 ${r?'flex-row-reverse':''}`}>
+                      <div className="h-8 w-8 rounded-xl cia-shimmer shrink-0 mt-1" />
+                      <div className={`rounded-2xl cia-shimmer h-16`} style={{width:w}} />
+                    </div>
+                  ))}
                 </div>
-              </div>
+              )}
 
-              {/* Footer disclaimer */}
-              <div className="px-4 pb-2 flex items-center justify-center">
-                <p className="text-[10px] text-slate-400 text-center">
-                  VantIA puede cometer errores. Verifica la información importante antes de actuar.
-                </p>
+              {/* ── Messages ─────────────────────────────────────────── */}
+              {!historyLoading && messages.map((msg, idx) => (
+                <div
+                  key={idx}
+                  className={`flex gap-3 mb-5 group ${msg.role==='user'?'flex-row-reverse':''} ${
+                    msg.role==='user'?'cia-msg-user':'cia-msg-ai'
+                  }`}
+                >
+                  {/* Avatar */}
+                  {msg.role === 'model' ? (
+                    <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-red-500 to-red-900 flex items-center justify-center shrink-0 shadow-sm shadow-red-200 mt-1">
+                      <Sparkles className="h-3.5 w-3.5 text-white" />
+                    </div>
+                  ) : (
+                    <div className="h-8 w-8 rounded-xl bg-slate-700 flex items-center justify-center shrink-0 text-white text-[11px] font-bold mt-1">
+                      {userInitials}
+                    </div>
+                  )}
+
+                  {/* Bubble + actions */}
+                  <div className={`flex flex-col gap-1 max-w-[76%] ${msg.role==='user'?'items-end':''}`}>
+                    {msg.role === 'model' ? (
+                      <div className="bg-white rounded-2xl rounded-tl-sm px-5 py-4 shadow-sm border border-slate-100/80 text-sm">
+                        {renderMd(msg.text)}
+                      </div>
+                    ) : (
+                      <div className="bg-gradient-to-br from-red-600 to-red-700 text-white rounded-2xl rounded-tr-sm px-5 py-3.5 shadow-sm">
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.text}</p>
+                      </div>
+                    )}
+
+                    {/* Hover actions */}
+                    <div className={`flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150 ${msg.role==='user'?'flex-row-reverse':''}`}>
+                      <button onClick={() => copyText(msg.text, idx)}
+                        className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-300 hover:text-slate-600 transition-colors active:scale-95"
+                        title="Copiar">
+                        <Copy className="h-3.5 w-3.5" />
+                      </button>
+                      {msg.role === 'model' && idx === messages.length - 1 && (
+                        <button onClick={regenerate}
+                          className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-300 hover:text-slate-600 transition-colors active:scale-95"
+                          title="Regenerar">
+                          <RotateCcw className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                      {msg.role === 'model' && (
+                        <>
+                          <button className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-300 hover:text-green-500 transition-colors active:scale-95" title="Útil">
+                            <ThumbsUp className="h-3.5 w-3.5" />
+                          </button>
+                          <button className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-300 hover:text-red-400 transition-colors active:scale-95" title="No útil">
+                            <ThumbsDown className="h-3.5 w-3.5" />
+                          </button>
+                        </>
+                      )}
+                      {copiedIdx === idx && (
+                        <span className="text-[10px] text-green-600 font-medium px-1.5 py-0.5 bg-green-50 rounded-md">
+                          ¡Copiado!
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {/* ── Typing indicator ────────────────────────────────── */}
+              {sending && (
+                <div className="flex gap-3 mb-5 cia-msg-ai">
+                  <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-red-500 to-red-900 flex items-center justify-center shrink-0 shadow-sm shadow-red-200 mt-1">
+                    <Sparkles className="h-3.5 w-3.5 text-white" />
+                  </div>
+                  <div className="bg-white rounded-2xl rounded-tl-sm px-5 py-4 shadow-sm border border-slate-100/80">
+                    <div className="flex items-center gap-1.5 h-5">
+                      {[0,1,2].map(i => (
+                        <span
+                          key={i}
+                          className="cia-wave-dot h-2 w-2 rounded-full bg-gradient-to-b from-red-400 to-red-600 inline-block"
+                          style={{ animationDelay: `${i*180}ms` }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div ref={bottomRef} />
+            </div>
+          </div>
+
+          {/* ── Input bar ─────────────────────────────────────────────────── */}
+          <div className="cia-input-bar shrink-0 px-4 pb-4 pt-2 bg-gradient-to-t from-white via-white/95 to-transparent">
+            <div className="max-w-3xl mx-auto">
+              <div className={`bg-white rounded-2xl border transition-all duration-200 shadow-sm ${
+                input ? 'border-red-300 shadow-red-100/50' : 'border-slate-200 hover:border-slate-300'
+              }`}>
+                <div className="flex items-end gap-2 px-4 py-3">
+                  <button className="p-2 rounded-xl text-slate-300 hover:text-slate-500 hover:bg-slate-100 transition-colors active:scale-95 shrink-0 mb-0.5">
+                    <Paperclip className="h-4 w-4" />
+                  </button>
+
+                  <textarea
+                    ref={textareaRef}
+                    rows={1}
+                    value={input}
+                    onChange={e => { setInput(e.target.value); autoResize(e.target); }}
+                    onKeyDown={handleKey}
+                    placeholder={activeModuleId
+                      ? 'Escribe un mensaje… (↵ enviar · ⇧↵ nueva línea)'
+                      : 'Inicia una conversación con VantIA…'}
+                    className="flex-1 resize-none bg-transparent outline-none text-sm text-slate-700 placeholder:text-slate-300 leading-relaxed py-0.5"
+                    style={{ maxHeight: 152, overflowY: 'auto' }}
+                    disabled={sending}
+                  />
+
+                  <div className="flex items-center gap-1.5 shrink-0 mb-0.5">
+                    <button className="p-2 rounded-xl text-slate-300 hover:text-slate-500 hover:bg-slate-100 transition-colors active:scale-95" title="Vincular expediente">
+                      <Link2 className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={sendMessage}
+                      disabled={!input.trim() || sending}
+                      className={`p-2.5 rounded-xl text-white transition-all duration-150 active:scale-90 ${
+                        input.trim() && !sending
+                          ? 'bg-gradient-to-br from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 shadow-sm shadow-red-200 hover:shadow-md'
+                          : 'bg-slate-200 cursor-not-allowed'
+                      }`}
+                    >
+                      {sending
+                        ? <span className="block h-4 w-4 rounded-full border-2 border-white/40 border-t-white cia-spin" />
+                        : <Send className="h-4 w-4" />
+                      }
+                    </button>
+                  </div>
+                </div>
+
+                <div className="px-4 pb-2.5">
+                  <p className="text-[10px] text-slate-300 text-center">
+                    VantIA puede cometer errores · Verifica información crítica antes de actuar
+                  </p>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
+        </div>
       </div>
-    </div>
+    </>
   );
 }
