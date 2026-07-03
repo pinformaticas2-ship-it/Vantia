@@ -3370,8 +3370,6 @@ export default function Chat() {
   const pollCycleRef = useRef(0);
   // Ref que siempre refleja el canal activo actual (para stale-closure checks en polls async)
   const canalActivoIdRef = useRef<string | null>(null);
-  // Scroll: pendiente de bajar al fondo tras commit de React
-  const pendingScrollToBottomRef = useRef(false);
   // Scroll: restaurar posición tras loadMore (guardamos scrollHeight previo)
   const scrollRestoreRef = useRef<number | null>(null);
   const activePollMs = isPageVisible ? 700 : 1800;
@@ -3639,9 +3637,9 @@ export default function Chat() {
         }
         if (msgs.length) lastAt.current = msgs[msgs.length-1].created_at;
         if (msgs.length<60) setHasMore(false);
-        // Evaluar scroll DESPUÉS del fetch (no antes) para no forzar scroll si el usuario subió durante la espera
+        // Scroll evaluado DESPUÉS del fetch: si el usuario subió mientras cargaba, atBottom es false → no se fuerza
         if (isFirstLoad || atBottom.current) {
-          pendingScrollToBottomRef.current = true;
+          setTimeout(() => scrollToBottom("instant"), 0);
         }
         await fetch(`/api/chat/canales/${canal.id}/leido`, { method:"PUT", headers: h });
         clearUnread(canal.id, canal.dm_target_user_id);
@@ -3698,6 +3696,8 @@ export default function Chat() {
       if (canalActivoIdRef.current !== expectedCanalId) return;
       if (!res.ok || !d.data?.length) return;
       const nuevos: Mensaje[] = d.data;
+      // Capturar atBottom ANTES de setMensajes para no leer un valor potencialmente stale después del await
+      const wasAtBottom = atBottom.current;
       let freshCount = 0;
       setMensajes(prev => {
         const ids = new Set(prev.map(m=>m.id));
@@ -3718,8 +3718,8 @@ export default function Chat() {
         ultimo_mensaje_autor: latestMsg.user_name,
         ultimo_mensaje_at: latestMsg.created_at,
       } : c));
-      if (atBottom.current) {
-        pendingScrollToBottomRef.current = true;
+      if (wasAtBottom) {
+        setTimeout(() => scrollToBottom("instant"), 0);
         await fetch(`/api/chat/canales/${expectedCanalId}/leido`, { method:"PUT", headers: h });
         clearUnread(expectedCanalId, canalActivoDmTargetId);
         void refreshUnread();
@@ -3741,8 +3741,7 @@ export default function Chat() {
       setNewMsgCount(0);
     } else {
       el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-      // Para smooth no marcamos atBottom inmediatamente: el viewport tarda 300-500ms en llegar.
-      // El listener onScroll detectará cuándo llega al fondo y actualizará atBottom.
+      atBottom.current = true;
       setNewMsgCount(0);
     }
   };
@@ -3788,23 +3787,12 @@ export default function Chat() {
   // Mantener ref del canal activo actualizada para stale-closure checks en polls async
   useEffect(() => { canalActivoIdRef.current = canalActivoId; }, [canalActivoId]);
 
-  // ── Scroll sincronizado con el DOM (useLayoutEffect = después del commit, antes de pintar)
+  // ── Restaurar posición de scroll tras loadMore (antes de pintar, para evitar salto visible)
   useLayoutEffect(() => {
+    if (scrollRestoreRef.current === null) return;
     const el = listRef.current;
-    if (!el) return;
-    // 1) Restaurar posición tras loadMore (previene salto al top)
-    if (scrollRestoreRef.current !== null) {
-      el.scrollTop = el.scrollHeight - scrollRestoreRef.current;
-      scrollRestoreRef.current = null;
-      return; // no bajar al fondo si estábamos cargando más
-    }
-    // 2) Bajar al fondo tras enviar/recibir mensajes
-    if (pendingScrollToBottomRef.current) {
-      el.scrollTop = el.scrollHeight;
-      atBottom.current = true;
-      setNewMsgCount(0);
-      pendingScrollToBottomRef.current = false;
-    }
+    if (el) el.scrollTop = el.scrollHeight - scrollRestoreRef.current;
+    scrollRestoreRef.current = null;
   }, [mensajes]);
 
   // ── Effects: carga inicial — usa los refs para no depender de fetchCanales (estable con hdr)
@@ -3895,7 +3883,6 @@ export default function Chat() {
     // Resetear flags de inflight para que el nuevo canal pueda hacer su primer fetch/poll sin esperar al anterior
     fetchMensajesInFlightRef.current = false;
     pollMensajesInFlightRef.current = false;
-    pendingScrollToBottomRef.current = false;
     scrollRestoreRef.current = null;
     setIsSwitchingChat(true);
     setFreshIncomingMessageIds(new Set());
@@ -3963,7 +3950,7 @@ export default function Chat() {
       ultimo_mensaje_autor: newMsg.user_name,
       ultimo_mensaje_at: newMsg.created_at,
     } : c));
-    pendingScrollToBottomRef.current = true;
+    setTimeout(() => scrollToBottom("instant"), 0);
     setReplyTo(null);
     clearUnread(canalActivo.id, canalActivo.dm_target_user_id);
     void refreshUnread();
