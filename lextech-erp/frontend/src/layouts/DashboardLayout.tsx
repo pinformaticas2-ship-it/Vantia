@@ -754,10 +754,12 @@ export default function DashboardLayout() {
   const activeUserIdRef    = useRef<string | null>(null);
 
   // ── Module transition loading screen ──────────────────────────────────────
-  const [moduleTransitionVisible, setModuleTransitionVisible] = useState(false);
-  const [transitionMeta, setTransitionMeta] = useState<{ name: string; desc: string; Icon: any } | null>(null);
+  const [overlayMounted,  setOverlayMounted]  = useState(false);
+  const [overlayExiting,  setOverlayExiting]  = useState(false);
+  const [transitionMeta,  setTransitionMeta]  = useState<{ name: string; desc: string; Icon: any } | null>(null);
   const prevModuleBaseRef = useRef<string | null>(null);
-  const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const exitTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const unmountTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const getModuleBase = (p: string) => {
     const parts = p.split('/').filter(Boolean);
@@ -766,19 +768,24 @@ export default function DashboardLayout() {
 
   useEffect(() => {
     const base = getModuleBase(location.pathname);
-    // Skip on first mount
     if (prevModuleBaseRef.current === null) { prevModuleBaseRef.current = base; return; }
-    // Skip if same module (e.g. navigating clientes → clientes/123)
     if (prevModuleBaseRef.current === base) return;
     prevModuleBaseRef.current = base;
 
     const found = MODULES.find(m => m.path === base) ?? MODULES.find(m => m.path !== '/dashboard' && base.startsWith(m.path));
     if (!found) return;
 
-    if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current);
+    // Cancel any in-flight timers from a previous navigation
+    if (exitTimerRef.current)    clearTimeout(exitTimerRef.current);
+    if (unmountTimerRef.current) clearTimeout(unmountTimerRef.current);
+
     setTransitionMeta({ name: found.name, desc: found.desc, Icon: found.icon });
-    setModuleTransitionVisible(true);
-    transitionTimerRef.current = setTimeout(() => setModuleTransitionVisible(false), 620);
+    setOverlayExiting(false);
+    setOverlayMounted(true);
+
+    // Start exit transition at 400ms, unmount after 400+240+30=670ms
+    exitTimerRef.current    = setTimeout(() => setOverlayExiting(true),  400);
+    unmountTimerRef.current = setTimeout(() => { setOverlayMounted(false); setOverlayExiting(false); }, 670);
   }, [location.pathname]);
 
   // ── Detectar cambio de sesión Clerk (mismo navegador, cuentas distintas) ──
@@ -1180,13 +1187,13 @@ export default function DashboardLayout() {
         {/* Contenido */}
         <div id="dashboard-content" className="relative z-10 flex-1 overflow-y-auto bg-slate-50">
 
-          {/* Module loading screen — se muestra brevemente al cambiar de módulo */}
-          {transitionMeta && (
+          {/* Module loading screen — se monta al cambiar de módulo y se desmonta tras la animación de salida */}
+          {overlayMounted && transitionMeta && (
             <ModuleLoadingScreen
               name={transitionMeta.name}
               desc={transitionMeta.desc}
               Icon={transitionMeta.Icon}
-              visible={moduleTransitionVisible}
+              exiting={overlayExiting}
             />
           )}
 
