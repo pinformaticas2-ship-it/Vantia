@@ -14,7 +14,6 @@ import {
 } from "lucide-react";
 import { UserButton, useUser, useAuth, useClerk } from "@clerk/clerk-react";
 import { getDeviceId, safeJson, waitForClientIp } from "../lib/api";
-import { ModuleLoadingScreen } from "../components/ModuleLoadingScreen";
 import { useChatUnread } from "../contexts/ChatUnreadContext";
 import { useEmailUnread } from "../contexts/EmailUnreadContext";
 import { useWhatsAppUnread, WA_LAST_SEEN_KEY } from "../contexts/WhatsAppUnreadContext";
@@ -753,41 +752,6 @@ export default function DashboardLayout() {
   const prevChatUnreadRef  = useRef(-1);
   const activeUserIdRef    = useRef<string | null>(null);
 
-  // ── Module transition loading screen ──────────────────────────────────────
-  const [overlayMounted,  setOverlayMounted]  = useState(false);
-  const [overlayExiting,  setOverlayExiting]  = useState(false);
-  const [transitionMeta,  setTransitionMeta]  = useState<{ name: string; desc: string; Icon: any } | null>(null);
-  const prevModuleBaseRef = useRef<string | null>(null);
-  const exitTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const unmountTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const getModuleBase = (p: string) => {
-    const parts = p.split('/').filter(Boolean);
-    return parts.length >= 2 ? `/${parts[0]}/${parts[1]}` : p;
-  };
-
-  useEffect(() => {
-    const base = getModuleBase(location.pathname);
-    if (prevModuleBaseRef.current === null) { prevModuleBaseRef.current = base; return; }
-    if (prevModuleBaseRef.current === base) return;
-    prevModuleBaseRef.current = base;
-
-    const found = MODULES.find(m => m.path === base) ?? MODULES.find(m => m.path !== '/dashboard' && base.startsWith(m.path));
-    if (!found) return;
-
-    // Cancel any in-flight timers from a previous navigation
-    if (exitTimerRef.current)    clearTimeout(exitTimerRef.current);
-    if (unmountTimerRef.current) clearTimeout(unmountTimerRef.current);
-
-    setTransitionMeta({ name: found.name, desc: found.desc, Icon: found.icon });
-    setOverlayExiting(false);
-    setOverlayMounted(true);
-
-    // Start exit transition at 400ms, unmount after 400+240+30=670ms
-    exitTimerRef.current    = setTimeout(() => setOverlayExiting(true),  400);
-    unmountTimerRef.current = setTimeout(() => { setOverlayMounted(false); setOverlayExiting(false); }, 670);
-  }, [location.pathname]);
-
   // ── Detectar cambio de sesión Clerk (mismo navegador, cuentas distintas) ──
   useEffect(() => {
     if (!user?.id) return;
@@ -1186,17 +1150,6 @@ export default function DashboardLayout() {
 
         {/* Contenido */}
         <div id="dashboard-content" className="relative z-10 flex-1 overflow-y-auto bg-slate-50">
-
-          {/* Module loading screen — se monta al cambiar de módulo y se desmonta tras la animación de salida */}
-          {overlayMounted && transitionMeta && (
-            <ModuleLoadingScreen
-              name={transitionMeta.name}
-              desc={transitionMeta.desc}
-              Icon={transitionMeta.Icon}
-              exiting={overlayExiting}
-            />
-          )}
-
           <div
             key={location.pathname}
             className={
