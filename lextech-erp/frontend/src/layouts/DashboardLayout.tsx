@@ -1186,6 +1186,7 @@ export default function DashboardLayout() {
         {/* Contenido */}
         <div id="dashboard-content" className="relative z-10 flex-1 overflow-y-auto bg-slate-50">
           <div
+            key={getModuleBase(location.pathname)}
             className={
               (
                 [
