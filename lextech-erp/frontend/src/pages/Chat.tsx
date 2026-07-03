@@ -1,5 +1,5 @@
 ﻿import React, {
-  useEffect, useState, useRef, useCallback, useMemo,
+  useEffect, useLayoutEffect, useState, useRef, useCallback, useMemo,
 } from "react";
 import { Spinner } from "../components/Spinner";
 import { useAuth, useUser } from "@clerk/clerk-react";
@@ -284,6 +284,7 @@ function areCanalesEquivalent(a: Canal[], b: Canal[]) {
       canal.id === other.id &&
       canal.nombre === other.nombre &&
       canal.tipo === other.tipo &&
+      canal.no_leidos === other.no_leidos &&
       canal.ultimo_mensaje === other.ultimo_mensaje &&
       canal.ultimo_mensaje_at === other.ultimo_mensaje_at &&
       canal.total_miembros === other.total_miembros &&
@@ -2776,7 +2777,12 @@ function MessageInput({ canalId, canalNombre, replyTo, editingMsg, miembros, cur
   const { getToken } = useAuth();
 
   useEffect(() => {
-    if (editingMsg) { setText(editingMsg.contenido); taRef.current?.focus(); }
+    if (editingMsg) {
+      setText(editingMsg.contenido);
+      taRef.current?.focus();
+    } else {
+      setText("");
+    }
   }, [editingMsg?.id]);
 
   useEffect(() => () => {
@@ -3362,6 +3368,12 @@ export default function Chat() {
   const pollMensajesInFlightRef = useRef(false);
   const loadMoreInFlightRef = useRef(false);
   const pollCycleRef = useRef(0);
+  // Ref que siempre refleja el canal activo actual (para stale-closure checks en polls async)
+  const canalActivoIdRef = useRef<string | null>(null);
+  // Scroll: pendiente de bajar al fondo tras commit de React
+  const pendingScrollToBottomRef = useRef(false);
+  // Scroll: restaurar posición tras loadMore (guardamos scrollHeight previo)
+  const scrollRestoreRef = useRef<number | null>(null);
   const activePollMs = isPageVisible ? 700 : 1800;
   const sidebarPollMs = isPageVisible ? 1400 : 3200;
   const typingPollMs = isPageVisible ? 1200 : 2600;
@@ -3474,7 +3486,7 @@ export default function Chat() {
     const res = await fetch(`/api/chat/canales/${canalId}/typing`, { headers: h });
     const d = await safeJson(res);
     if (!res.ok) return;
-    const nextTyping = d.data || [];
+    const nextTyping = (d.data || []).filter((u: TypingUser) => u.user_id !== currentUserId);
     setTypingUsers(prev => {
       if (
         prev.length === nextTyping.length &&
@@ -3608,9 +3620,9 @@ export default function Chat() {
   const fetchMensajes = useCallback(async (canal: Canal) => {
     if (fetchMensajesInFlightRef.current) return;
     fetchMensajesInFlightRef.current = true;
-    setLoadingMsgs(mensajesCountRef.current === 0);
+    const isFirstLoad = mensajesCountRef.current === 0;
+    setLoadingMsgs(isFirstLoad);
     setHasMore(true); lastAt.current=null;
-    const shouldStickToBottom = mensajesCountRef.current === 0 || atBottom.current;
     try {
       const h = await hdr();
       const res = await fetch(`/api/chat/canales/${canal.id}/mensajes`, { headers: h });
@@ -3618,14 +3630,18 @@ export default function Chat() {
       if (res.ok) {
         const msgs: Mensaje[] = d.data||[];
         setMensajes(prev => (areMensajesEquivalent(prev, msgs) ? prev : msgs));
-        setFirstUnreadMarkerId(() => {
-          if (initialUnreadCount <= 0 || initialUnreadCount > msgs.length) return null;
-          return msgs[msgs.length - initialUnreadCount]?.id ?? null;
-        });
+        // firstUnreadMarkerId solo se fija en la primera carga del canal (no en full-syncs)
+        if (isFirstLoad) {
+          setFirstUnreadMarkerId(() => {
+            if (initialUnreadCount <= 0 || initialUnreadCount > msgs.length) return null;
+            return msgs[msgs.length - initialUnreadCount]?.id ?? null;
+          });
+        }
         if (msgs.length) lastAt.current = msgs[msgs.length-1].created_at;
         if (msgs.length<60) setHasMore(false);
-        if (shouldStickToBottom) {
-          setTimeout(() => scrollToBottom("instant"), 80);
+        // Evaluar scroll DESPUÉS del fetch (no antes) para no forzar scroll si el usuario subió durante la espera
+        if (isFirstLoad || atBottom.current) {
+          pendingScrollToBottomRef.current = true;
         }
         await fetch(`/api/chat/canales/${canal.id}/leido`, { method:"PUT", headers: h });
         clearUnread(canal.id, canal.dm_target_user_id);
@@ -3670,12 +3686,16 @@ export default function Chat() {
   // ── Poll mensajes
   const pollMensajes = useCallback(async () => {
     if (!canalActivoId || !lastAt.current || fetchMensajesInFlightRef.current || pollMensajesInFlightRef.current) return;
+    // Capturar el canal esperado al inicio para detectar cambios durante el await
+    const expectedCanalId = canalActivoId;
     pollMensajesInFlightRef.current = true;
     try {
       const h = await hdr();
       const since = encodeURIComponent(lastAt.current);
-      const res = await fetch(`/api/chat/canales/${canalActivoId}/mensajes?since=${since}`, { headers: h });
+      const res = await fetch(`/api/chat/canales/${expectedCanalId}/mensajes?since=${since}`, { headers: h });
       const d = await safeJson(res);
+      // Si el canal cambió durante el await, descartar resultados (evita BUG-2: contaminación entre canales)
+      if (canalActivoIdRef.current !== expectedCanalId) return;
       if (!res.ok || !d.data?.length) return;
       const nuevos: Mensaje[] = d.data;
       let freshCount = 0;
@@ -3692,16 +3712,16 @@ export default function Chat() {
       if (freshCount === 0) return;
       const latestMsg = nuevos[nuevos.length-1];
       lastAt.current = latestMsg.created_at;
-      setCanales(prev => prev.map(c => c.id === canalActivoId ? {
+      setCanales(prev => prev.map(c => c.id === expectedCanalId ? {
         ...c,
         ultimo_mensaje: latestMsg.contenido,
         ultimo_mensaje_autor: latestMsg.user_name,
         ultimo_mensaje_at: latestMsg.created_at,
       } : c));
       if (atBottom.current) {
-        setTimeout(() => scrollToBottom("instant"), 60);
-        await fetch(`/api/chat/canales/${canalActivoId}/leido`, { method:"PUT", headers: h });
-        clearUnread(canalActivoId, canalActivoDmTargetId);
+        pendingScrollToBottomRef.current = true;
+        await fetch(`/api/chat/canales/${expectedCanalId}/leido`, { method:"PUT", headers: h });
+        clearUnread(expectedCanalId, canalActivoDmTargetId);
         void refreshUnread();
       } else if (!notificationsPaused) {
         setNewMsgCount(c=>c+freshCount);
@@ -3717,11 +3737,14 @@ export default function Chat() {
     if (!el) return;
     if (behavior === "instant") {
       el.scrollTop = el.scrollHeight;
+      atBottom.current = true;
+      setNewMsgCount(0);
     } else {
       el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+      // Para smooth no marcamos atBottom inmediatamente: el viewport tarda 300-500ms en llegar.
+      // El listener onScroll detectará cuándo llega al fondo y actualizará atBottom.
+      setNewMsgCount(0);
     }
-    atBottom.current = true;
-    setNewMsgCount(0);
   };
   const onScroll = () => {
     const el = listRef.current; if (!el) return;
@@ -3742,10 +3765,9 @@ export default function Chat() {
         const older: Mensaje[] = d.data||[];
         if (!older.length) setHasMore(false);
         else {
-          const el = listRef.current;
-          const prevH = el?.scrollHeight||0;
+          // Guardar scrollHeight antes de añadir mensajes; useLayoutEffect lo restaurará tras el commit
+          scrollRestoreRef.current = listRef.current?.scrollHeight ?? null;
           setMensajes(prev=>[...older,...prev]);
-          setTimeout(()=>{ if(el) el.scrollTop = el.scrollHeight-prevH; },0);
         }
       }
     } finally {
@@ -3763,6 +3785,27 @@ export default function Chat() {
   useEffect(() => { fetchMiembrosRef.current = fetchMiembros; }, [fetchMiembros]);
   useEffect(() => { fetchTypingUsersRef.current = fetchTypingUsers; }, [fetchTypingUsers]);
   useEffect(() => { pollMensajesRef.current = pollMensajes; }, [pollMensajes]);
+  // Mantener ref del canal activo actualizada para stale-closure checks en polls async
+  useEffect(() => { canalActivoIdRef.current = canalActivoId; }, [canalActivoId]);
+
+  // ── Scroll sincronizado con el DOM (useLayoutEffect = después del commit, antes de pintar)
+  useLayoutEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    // 1) Restaurar posición tras loadMore (previene salto al top)
+    if (scrollRestoreRef.current !== null) {
+      el.scrollTop = el.scrollHeight - scrollRestoreRef.current;
+      scrollRestoreRef.current = null;
+      return; // no bajar al fondo si estábamos cargando más
+    }
+    // 2) Bajar al fondo tras enviar/recibir mensajes
+    if (pendingScrollToBottomRef.current) {
+      el.scrollTop = el.scrollHeight;
+      atBottom.current = true;
+      setNewMsgCount(0);
+      pendingScrollToBottomRef.current = false;
+    }
+  }, [mensajes]);
 
   // ── Effects: carga inicial — usa los refs para no depender de fetchCanales (estable con hdr)
   useEffect(() => {
@@ -3798,20 +3841,6 @@ export default function Chat() {
     };
   }, [activeFullSyncEvery, canalActivo, canalActivoId, activePollMs, typingPollMs]);
   useEffect(() => {
-    if (pollRef.current) {
-      clearInterval(pollRef.current);
-      pollRef.current = setInterval(() => {
-        pollCycleRef.current += 1;
-        if (canalActivo && pollCycleRef.current % activeFullSyncEvery === 0) {
-          void fetchMensajesRef.current(canalActivo);
-        } else {
-          void pollMensajesRef.current();
-        }
-        if (canalActivoId) void fetchMiembrosRef.current(canalActivoId);
-      }, activePollMs);
-    }
-  }, [activeFullSyncEvery, activePollMs, canalActivo, canalActivoId]);
-  useEffect(() => {
     if (!canalActivo || !typingPollRef.current) return;
     clearInterval(typingPollRef.current);
     typingPollRef.current = setInterval(() => { void fetchTypingUsersRef.current(canalActivo.id); }, typingPollMs);
@@ -3839,18 +3868,6 @@ export default function Chat() {
     };
   }, [authLoaded, userLoaded, currentUserId, refreshUnread, canalActivoId]);
 
-  // Cuando el contexto detecta un canal con no-leídos que no está en la lista local
-  // (caso DM recibido antes de que fetchCanales corra) → refrescar inmediatamente
-  useEffect(() => {
-    if (!canalActivo) return;
-    const syncInterval = window.setInterval(() => {
-      if (!document.hidden && !fetchMensajesInFlightRef.current && !loadMoreInFlightRef.current) {
-        void fetchMensajesRef.current(canalActivo);
-      }
-    }, 4000);
-    return () => window.clearInterval(syncInterval);
-  }, [canalActivoId]);
-
   const lastMissingFetchRef = useRef(0);
   useEffect(() => {
     if (!unreadLoaded) return;
@@ -3875,6 +3892,11 @@ export default function Chat() {
 
   const seleccionar = (c: Canal) => {
     if (canalActivo?.id===c.id) return;
+    // Resetear flags de inflight para que el nuevo canal pueda hacer su primer fetch/poll sin esperar al anterior
+    fetchMensajesInFlightRef.current = false;
+    pollMensajesInFlightRef.current = false;
+    pendingScrollToBottomRef.current = false;
+    scrollRestoreRef.current = null;
     setIsSwitchingChat(true);
     setFreshIncomingMessageIds(new Set());
     atBottom.current = true;
@@ -3928,24 +3950,23 @@ export default function Chat() {
       method:"POST", headers: h, body: JSON.stringify(body),
     });
     const d = await safeJson(res);
-    if (res.ok) {
-      const newMsg: Mensaje = { ...d.data, reacciones: null, reply_to: replyId ? mensajes.find(m=>m.id===replyId)||null : null };
-      setMensajes(prev=>{
-        const exists = prev.find(m=>m.id===newMsg.id);
-        return exists ? prev.map(m=>m.id===newMsg.id?newMsg:m) : [...prev, newMsg];
-      });
-      lastAt.current = newMsg.created_at;
-      setCanales(prev => prev.map(c => c.id === canalActivo.id ? {
-        ...c,
-        ultimo_mensaje: newMsg.contenido,
-        ultimo_mensaje_autor: newMsg.user_name,
-        ultimo_mensaje_at: newMsg.created_at,
-      } : c));
-      setTimeout(() => scrollToBottom("instant"), 60);
-      setReplyTo(null);
-      clearUnread(canalActivo.id, canalActivo.dm_target_user_id);
-      void refreshUnread();
-    }
+    if (!res.ok) throw new Error(d?.error || "Error al enviar el mensaje");
+    const newMsg: Mensaje = { ...d.data, reacciones: null, reply_to: replyId ? mensajes.find(m=>m.id===replyId)||null : null };
+    setMensajes(prev=>{
+      const exists = prev.find(m=>m.id===newMsg.id);
+      return exists ? prev.map(m=>m.id===newMsg.id?newMsg:m) : [...prev, newMsg];
+    });
+    lastAt.current = newMsg.created_at;
+    setCanales(prev => prev.map(c => c.id === canalActivo.id ? {
+      ...c,
+      ultimo_mensaje: newMsg.contenido,
+      ultimo_mensaje_autor: newMsg.user_name,
+      ultimo_mensaje_at: newMsg.created_at,
+    } : c));
+    pendingScrollToBottomRef.current = true;
+    setReplyTo(null);
+    clearUnread(canalActivo.id, canalActivo.dm_target_user_id);
+    void refreshUnread();
   };
 
   const handleReact = async (msgId: string, emoji: string) => {
@@ -4643,6 +4664,7 @@ export default function Chat() {
                   </div>
 
                   <MessageInput
+                    key={canalActivo.id}
                     canalId={canalActivo.id}
                     canalNombre={canalActivo.nombre}
                     replyTo={replyTo}
