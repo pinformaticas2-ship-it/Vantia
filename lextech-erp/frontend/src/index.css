@@ -773,14 +773,8 @@
   }
 
   .module-page {
-    animation: module-enter 280ms cubic-bezier(0.22, 1, 0.36, 1);
-    will-change: transform, opacity;
     position: relative;
     z-index: 1;
-  }
-
-  .module-page > * {
-    animation: module-rise 320ms cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   .motion-card {
@@ -833,11 +827,6 @@
     transition: background-color 180ms cubic-bezier(0.22, 1, 0.36, 1);
   }
 
-  .module-page > *:nth-child(1) { animation-delay: 0ms; }
-  .module-page > *:nth-child(2) { animation-delay: 35ms; }
-  .module-page > *:nth-child(3) { animation-delay: 70ms; }
-  .module-page > *:nth-child(4) { animation-delay: 105ms; }
-  .module-page > *:nth-child(5) { animation-delay: 140ms; }
 
   .document-upload-mark {
     filter: drop-shadow(0 12px 26px rgba(15, 23, 42, 0.06));
@@ -951,28 +940,6 @@
   50% {
     opacity: 0.8;
     transform: translateX(calc(var(--erp-line-shift-x, 0px) + 10px));
-  }
-}
-
-@keyframes module-enter {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes module-rise {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
   }
 }
 
