@@ -132,39 +132,6 @@ function groupByDate(convs: Conversation[]) {
 const convTitle = (c: Conversation) =>
   c.title || c.first_message?.slice(0,60) || 'Nueva conversación';
 
-// ─── Loading screen ───────────────────────────────────────────────────────────
-
-function LoadingScreen() {
-  return (
-    <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white">
-      <div className="flex flex-col items-center gap-6">
-        {/* Spinning ring + logo */}
-        <div className="relative flex items-center justify-center">
-          <div className="absolute h-24 w-24 rounded-full border-4 border-red-100" />
-          <div
-            className="absolute h-24 w-24 rounded-full border-4 border-transparent border-t-red-600 cia-spin"
-            style={{ animationDuration: '1s' }}
-          />
-          <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-red-600 to-red-900 flex items-center justify-center shadow-xl shadow-red-200">
-            <Sparkles className="h-8 w-8 text-white" />
-          </div>
-        </div>
-
-        {/* Text */}
-        <div className="text-center">
-          <p className="text-lg font-semibold text-slate-800">VantIA</p>
-          <p className="text-sm text-slate-400 mt-0.5">Iniciando asistente legal…</p>
-        </div>
-
-        {/* Progress bar */}
-        <div className="w-48 h-1 bg-slate-100 rounded-full overflow-hidden">
-          <div className="h-full bg-gradient-to-r from-red-500 to-red-700 rounded-full cia-loadbar" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ─── Shimmer skeleton ─────────────────────────────────────────────────────────
 
 function ShimmerLine({ w = 'w-full', h = 'h-4' }: { w?: string; h?: string }) {
@@ -198,7 +165,6 @@ export default function ChatIA() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [copiedIdx,      setCopiedIdx]      = useState<number | null>(null);
   const [deletingId,     setDeletingId]     = useState<string | null>(null);
-  const [ready,          setReady]          = useState(false);   // controls entrance animation
 
   const bottomRef   = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -215,7 +181,6 @@ export default function ChatIA() {
       if (data.success) setConversations(data.conversations);
     } catch { /**/ } finally {
       setInitialLoading(false);
-      setTimeout(() => setReady(true), 80);   // tiny delay so CSS transition fires
     }
   }, [getToken]);
 
@@ -394,14 +359,8 @@ export default function ChatIA() {
 
       <div className="flex h-full bg-white overflow-hidden relative">
 
-        {/* ── Initial loading screen ─────────────────────────────────────── */}
-        {initialLoading && <LoadingScreen />}
-
         {/* ── Sidebar ──────────────────────────────────────────────────────── */}
-        <aside
-          className="w-64 shrink-0 flex flex-col border-r border-slate-100 bg-slate-50 cia-sidebar"
-          style={{ opacity: ready ? 1 : 0, transition: 'opacity .35s ease' }}
-        >
+        <aside className="w-64 shrink-0 flex flex-col border-r border-slate-100 bg-slate-50 cia-sidebar">
           {/* Brand header */}
           <div className="px-4 pt-5 pb-4">
             <div className="flex items-center gap-2.5 mb-4">
@@ -500,10 +459,7 @@ export default function ChatIA() {
         </aside>
 
         {/* ── Main chat panel ───────────────────────────────────────────────── */}
-        <div
-          className="flex-1 flex flex-col relative overflow-hidden bg-white"
-          style={{ opacity: ready ? 1 : 0, transition: 'opacity .4s ease' }}
-        >
+        <div className="flex-1 flex flex-col relative overflow-hidden bg-white">
 
           {/* Topbar */}
           <div className="cia-topbar shrink-0 flex items-center justify-between px-6 py-3 border-b border-slate-100 bg-white/90 backdrop-blur-sm z-10">

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { UserButton, useUser, useAuth, useClerk } from "@clerk/clerk-react";
 import { getDeviceId, safeJson, waitForClientIp } from "../lib/api";
+import { ModuleLoadingScreen } from "../components/ModuleLoadingScreen";
 import { useChatUnread } from "../contexts/ChatUnreadContext";
 import { useEmailUnread } from "../contexts/EmailUnreadContext";
 import { useWhatsAppUnread, WA_LAST_SEEN_KEY } from "../contexts/WhatsAppUnreadContext";
@@ -752,6 +753,34 @@ export default function DashboardLayout() {
   const prevChatUnreadRef  = useRef(-1);
   const activeUserIdRef    = useRef<string | null>(null);
 
+  // ── Module transition loading screen ──────────────────────────────────────
+  const [moduleTransitionVisible, setModuleTransitionVisible] = useState(false);
+  const [transitionMeta, setTransitionMeta] = useState<{ name: string; desc: string; Icon: any } | null>(null);
+  const prevModuleBaseRef = useRef<string | null>(null);
+  const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const getModuleBase = (p: string) => {
+    const parts = p.split('/').filter(Boolean);
+    return parts.length >= 2 ? `/${parts[0]}/${parts[1]}` : p;
+  };
+
+  useEffect(() => {
+    const base = getModuleBase(location.pathname);
+    // Skip on first mount
+    if (prevModuleBaseRef.current === null) { prevModuleBaseRef.current = base; return; }
+    // Skip if same module (e.g. navigating clientes → clientes/123)
+    if (prevModuleBaseRef.current === base) return;
+    prevModuleBaseRef.current = base;
+
+    const found = MODULES.find(m => m.path === base) ?? MODULES.find(m => m.path !== '/dashboard' && base.startsWith(m.path));
+    if (!found) return;
+
+    if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current);
+    setTransitionMeta({ name: found.name, desc: found.desc, Icon: found.icon });
+    setModuleTransitionVisible(true);
+    transitionTimerRef.current = setTimeout(() => setModuleTransitionVisible(false), 620);
+  }, [location.pathname]);
+
   // ── Detectar cambio de sesión Clerk (mismo navegador, cuentas distintas) ──
   useEffect(() => {
     if (!user?.id) return;
@@ -1150,6 +1179,17 @@ export default function DashboardLayout() {
 
         {/* Contenido */}
         <div id="dashboard-content" className="relative z-10 flex-1 overflow-y-auto bg-slate-50">
+
+          {/* Module loading screen — se muestra brevemente al cambiar de módulo */}
+          {transitionMeta && (
+            <ModuleLoadingScreen
+              name={transitionMeta.name}
+              desc={transitionMeta.desc}
+              Icon={transitionMeta.Icon}
+              visible={moduleTransitionVisible}
+            />
+          )}
+
           <div
             key={location.pathname}
             className={
