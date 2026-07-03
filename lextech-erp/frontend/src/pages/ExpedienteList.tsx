@@ -6599,7 +6599,7 @@ export default function ExpedienteList() {
                       </div>
                     </td>
                   </tr>
-                ) : filtered.map(exp => {
+                ) : filtered.map((exp, rowIdx) => {
                   const isSel      = selected === exp.id;
                   const tipoConf   = TIPOS[exp.tipo]   || TIPOS.otro;
                   const estadoConf = ESTADOS[exp.estado] || ESTADOS.abierto;
@@ -6609,8 +6609,9 @@ export default function ExpedienteList() {
                       key={exp.id}
                       onClick={() => setSelected(isSel ? null : exp.id)}
                       onDoubleClick={() => navigate(`/dashboard/expedientes/${exp.id}`)}
-                      className={`border-b border-slate-50 cursor-pointer transition-colors group
+                      className={`border-b border-slate-50 cursor-pointer transition-colors group${rowIdx < 12 ? ' anim-fade-up' : ''}
                         ${isSel ? colorStyle.rowSelected : colorStyle.row}`}
+                      style={rowIdx < 12 ? { animationDelay: `${rowIdx * 35}ms` } : undefined}
                     >
                       {/* Año */}
                       {visibleColumns.anio && <td className={`pl-4 pr-3 py-3 font-mono relative ${isSel ? colorStyle.yearSelected : colorStyle.year}`}>

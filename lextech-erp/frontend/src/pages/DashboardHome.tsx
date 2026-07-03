@@ -186,7 +186,7 @@ function WidgetPickerModal({ visible, onClose, onSave }: { visible: string[]; on
 }
 
 // ── Sortable wrapper ──────────────────────────────────────────────────────────
-function SortableWidget({ id, children, className }: { id: string; children: (handle: ReactNode) => ReactNode; className?: string }) {
+function SortableWidget({ id, children, className, animDelay = 0 }: { id: string; children: (handle: ReactNode) => ReactNode; className?: string; animDelay?: number }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -195,6 +195,7 @@ function SortableWidget({ id, children, className }: { id: string; children: (ha
     boxShadow: isDragging ? "0 8px 24px rgba(15,23,42,0.12)" : undefined,
     zIndex: isDragging ? 50 : undefined,
     cursor: isDragging ? "grabbing" : undefined,
+    animationDelay: `${animDelay}ms`,
   };
   const handle = (
     <button
@@ -205,7 +206,7 @@ function SortableWidget({ id, children, className }: { id: string; children: (ha
       <GripVertical size={14} />
     </button>
   );
-  return <div ref={setNodeRef} style={style} className={className}>{children(handle)}</div>;
+  return <div ref={setNodeRef} style={style} className={`anim-fade-up ${className ?? ''}`}>{children(handle)}</div>;
 }
 
 // ── Billing period selector ───────────────────────────────────────────────────
@@ -1048,10 +1049,10 @@ export default function DashboardHome() {
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-6">
 
       {/* CABECERA */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 anim-fade-up">
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-semibold text-slate-900">
@@ -1151,8 +1152,8 @@ export default function DashboardHome() {
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd} autoScroll={false}>
           <SortableContext items={orderedVisible} strategy={rectSortingStrategy}>
             <div className={`grid gap-6 items-start grid-cols-1 ${isCollapsed ? "lg:grid-cols-3" : "xl:grid-cols-3"} md:grid-cols-2`}>
-              {orderedVisible.map((id) => (
-                <SortableWidget key={id} id={id}>
+              {orderedVisible.map((id, idx) => (
+                <SortableWidget key={id} id={id} animDelay={Math.min(idx, 8) * 70}>
                   {(handle) => renderWidget(id, handle)}
                 </SortableWidget>
               ))}

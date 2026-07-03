@@ -5125,10 +5125,10 @@ export default function ExpedienteDetail() {
   };
 
   return (
-    <div className="flex flex-col h-full animate-in fade-in duration-500 overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden">
 
       {/* ── Sticky header ── */}
-      <div className="px-6 sm:px-8 py-4 bg-white border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 flex-shrink-0 shadow-sm z-20">
+      <div className="anim-fade-up px-6 sm:px-8 py-4 bg-white border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 flex-shrink-0 shadow-sm z-20">
         <div className="flex items-center gap-4 min-w-0">
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500 to-red-600 text-white flex items-center justify-center shadow-md shadow-red-500/20 flex-shrink-0">
             <FolderOpen size={22} />
@@ -5185,7 +5185,7 @@ export default function ExpedienteDetail() {
         <div className={`w-full p-6 sm:p-8 flex flex-col gap-8 items-start ${isCollapsed ? "md:flex-row" : "lg:flex-row"}`}>
 
           {/* Columna 1: Nav vertical */}
-          <div className={`w-full flex-shrink-0 ${isCollapsed ? "md:w-56 md:sticky md:top-6" : "lg:w-56 lg:sticky lg:top-6"}`}>
+          <div className={`anim-fade-up w-full flex-shrink-0 ${isCollapsed ? "md:w-56 md:sticky md:top-6" : "lg:w-56 lg:sticky lg:top-6"}`} style={{ animationDelay: '60ms' }}>
             <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 mb-3">Secciones del Expediente</h3>
             <nav className="flex flex-col gap-0.5">
               {DETAIL_TABS.slice(0, 8).map((tabItem) => {
@@ -5227,7 +5227,7 @@ export default function ExpedienteDetail() {
           </div>
 
           {/* Columna 2: Contenido principal */}
-          <div className="flex-1 min-w-0 flex flex-col gap-6 w-full">
+          <div className="anim-fade-up flex-1 min-w-0 flex flex-col gap-6 w-full" style={{ animationDelay: '130ms' }}>
             {exp.estado === "cerrado" && !editing && (
               <div className="flex items-center gap-3 px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm text-slate-500 shadow-sm">
                 <X size={15} className="shrink-0 text-slate-400" />
@@ -6018,7 +6018,7 @@ export default function ExpedienteDetail() {
 
           {/* Columna 3: Panel indicadores */}
           {id && (
-            <div className={`w-full flex-shrink-0 ${isCollapsed ? "md:w-[280px] md:sticky md:top-6" : "lg:w-[280px] xl:w-[300px] lg:sticky lg:top-6"}`}>
+            <div className={`anim-fade-up w-full flex-shrink-0 ${isCollapsed ? "md:w-[280px] md:sticky md:top-6" : "lg:w-[280px] xl:w-[300px] lg:sticky lg:top-6"}`} style={{ animationDelay: '200ms' }}>
               <PanelIndicadoresExpediente
                 expedienteId={id}
                 onTabChange={(t) => setTab(t as any)}

@@ -780,6 +780,13 @@
     background: inherit;
   }
 
+  /* ── Animaciones reutilizables (estilo ChatIA) ─────────────────────────── */
+  @keyframes anim-fade-up { from { opacity:0; transform:translateY(14px) } to { opacity:1; transform:none } }
+  @keyframes anim-fade-in { from { opacity:0 } to { opacity:1 } }
+
+  .anim-fade-up  { animation: anim-fade-up .38s cubic-bezier(.25,.46,.45,.94) both }
+  .anim-fade-in  { animation: anim-fade-in .38s ease both }
+
   .module-page {
     animation: module-enter 280ms cubic-bezier(0.22, 1, 0.36, 1);
     will-change: transform, opacity;
