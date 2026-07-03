@@ -16,7 +16,7 @@ const sizeConfig = {
 
 export function Spinner({ size = 'md', muted = false, label, className = '' }: SpinnerProps) {
   const { barH, barW, gap } = sizeConfig[size];
-  const color = muted ? 'rgba(148,163,184,0.75)' : '#ab0433';
+  const color = muted ? 'rgba(148,163,184,0.75)' : 'var(--accent-from)';
 
   return (
     <div className={`flex flex-col items-center gap-2.5 ${className}`}>
