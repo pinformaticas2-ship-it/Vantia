@@ -234,13 +234,13 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
         <div className="w-[360px] bg-white rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.18)] flex flex-col overflow-hidden border border-slate-200/60 origin-bottom-right" style={{ height: "580px" }}>
 
           {/* Header */}
-          <div className="bg-gradient-to-r from-[#b91c1c] to-[#dc2626] px-5 py-4 flex items-center justify-between shrink-0 shadow-sm">
+          <div className="bg-gradient-to-r from-red-700 to-red-600 px-5 py-4 flex items-center justify-between shrink-0 shadow-sm">
             <div className="flex items-center gap-3">
               <div className="relative">
                 <div className="w-10 h-10 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center backdrop-blur-sm">
                   <Bot size={18} className="text-white" />
                 </div>
-                <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-emerald-400 border-2 border-[#dc2626] rounded-full" />
+                <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-emerald-400 border-2 border-red-600 rounded-full" />
               </div>
               <div>
                 <h2 className="text-sm font-bold text-white leading-tight">VantIA</h2>
@@ -317,7 +317,7 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
 
               return (
                 <div key={i} className="flex flex-col items-end gap-1.5 max-w-[85%] self-end group">
-                  <div className="bg-[#dc2626] text-white px-4 py-2.5 rounded-2xl rounded-tr-sm shadow-md shadow-red-500/20 text-[13px] font-medium whitespace-pre-wrap break-words">
+                  <div className="bg-red-600 text-white px-4 py-2.5 rounded-2xl rounded-tr-sm shadow-md shadow-red-500/20 text-[13px] font-medium whitespace-pre-wrap break-words">
                     {msg.text}
                   </div>
                   <div className="flex items-center gap-3.5 mr-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
@@ -365,7 +365,7 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
               <button
                 onClick={send}
                 disabled={!input.trim() || loading}
-                className="w-10 h-10 rounded-full bg-[#dc2626] hover:bg-[#b91c1c] disabled:opacity-40 text-white flex items-center justify-center shrink-0 shadow-md shadow-red-500/20 transition-all mb-0.5 active:scale-95 focus:outline-none"
+                className="w-10 h-10 rounded-full bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white flex items-center justify-center shrink-0 shadow-md shadow-red-500/20 transition-all mb-0.5 active:scale-95 focus:outline-none"
               >
                 <Send size={13} className="-translate-x-[1px] translate-y-[1px]" />
               </button>
@@ -383,7 +383,7 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
         className={`h-14 w-14 rounded-full shadow-xl flex items-center justify-center transition-all active:scale-95 ${
           open
             ? "bg-neutral-800 shadow-neutral-900/30"
-            : "bg-[#dc2626] shadow-red-700/30 hover:shadow-red-700/50 hover:scale-105"
+            : "bg-red-600 shadow-red-700/30 hover:shadow-red-700/50 hover:scale-105"
         }`}
         title="VantIA — Asistente IA"
       >
