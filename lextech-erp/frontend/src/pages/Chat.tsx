@@ -2586,7 +2586,7 @@ function MensajeItem({ msg, prevMsg, currentUserId, isHighlighted, isFreshIncomi
     <div id={`msg-${msg.id}`}
       onMouseEnter={()=>setHover(true)}
       onMouseLeave={()=>{ if (!showEmoji) setHover(false); }}
-      className={`relative group px-4 transition-all duration-300 ${isHighlighted?"bg-yellow-50":"hover:bg-slate-50"} ${!sameAuthor?"mt-3 pt-1":""} ${
+      className={`relative group -mx-1 px-5 transition-all duration-300 ${isHighlighted?"bg-yellow-50":"hover:bg-slate-50"} ${!sameAuthor?"mt-2 py-1.5":""} ${
         isFreshIncoming ? "animate-in fade-in slide-in-from-bottom-2" : ""
       }`}>
       <div className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
@@ -2639,13 +2639,13 @@ function MensajeItem({ msg, prevMsg, currentUserId, isHighlighted, isFreshIncomi
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
-          className={`relative rounded-[1.35rem] border px-3 py-2.5 transition-all duration-300 touch-pan-y select-none ${
+          className={`relative rounded-2xl border px-3.5 py-2.5 transition-all duration-300 touch-pan-y select-none ${
             isMe
-              ? "border-red-100 bg-gradient-to-br from-red-50 via-white to-white shadow-[0_12px_30px_-22px_rgba(171,4,51,0.35)]"
-              : "border-slate-200 bg-white shadow-[0_12px_30px_-24px_rgba(15,23,42,0.22)]"
+              ? "border-red-100 bg-red-50/70 shadow-sm"
+              : "border-transparent bg-transparent shadow-none"
           } ${
             isFreshIncoming && !isMe
-              ? "translate-y-0 scale-[1.01] bg-gradient-to-br from-red-50 via-white to-white ring-1 ring-red-100 shadow-[0_14px_40px_-22px_rgba(220,38,38,0.45)]"
+              ? "translate-y-0 scale-[1.01] bg-red-50/60 ring-1 ring-red-100 shadow-sm"
               : ""
           }`}
           style={{ transform: `translateX(${dragOffset}px)` }}
@@ -3193,18 +3193,18 @@ function CanalItem({ canal, activo, onClick, unreadCount = 0 }: { canal: Canal; 
   const hasUnread = unreadCount > 0 && !activo;
   return (
     <button onClick={onClick}
-      className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-left transition-all duration-200 text-xs ${
-        activo ? "bg-[#ab0433] text-white shadow-lg shadow-red-950/30 font-semibold -translate-y-[1px]" :
-        hasUnread ? "text-white bg-slate-800/70 hover:bg-slate-700/80 shadow-sm" :
-        "text-slate-400 hover:bg-slate-800/70 hover:text-slate-200 font-medium"
+      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all duration-200 text-sm ${
+        activo ? "border border-red-200 bg-white text-slate-800 shadow-sm ring-1 ring-red-100" :
+        hasUnread ? "border border-slate-200 bg-white text-slate-800 shadow-sm" :
+        "border border-transparent text-slate-500 hover:bg-white hover:text-slate-800 hover:border-slate-200"
       }`}>
       {canal.tipo==="privado"
-        ? <Lock size={12} className={`shrink-0 ${hasUnread?"text-white":"text-slate-500"}`}/>
-        : <Hash size={12} className={`shrink-0 ${hasUnread?"text-white":"text-slate-500"}`}/>
+        ? <Lock size={13} className={`shrink-0 ${activo || hasUnread ? "text-red-500" : "text-slate-400"}`}/>
+        : <Hash size={13} className={`shrink-0 ${activo || hasUnread ? "text-red-500" : "text-slate-400"}`}/>
       }
-      <span className={`flex-1 truncate ${hasUnread?"font-bold":"font-medium"}`}>{canal.nombre}</span>
-      {hasUnread&&(
-        <span className="shrink-0 bg-[#ab0433] text-white rounded-full min-w-[16px] h-4 flex items-center justify-center px-1 text-[10px] font-bold">
+      <span className={`flex-1 truncate ${activo || hasUnread ? "font-semibold" : "font-medium"}`}>{canal.nombre}</span>
+      {hasUnread && (
+        <span className="shrink-0 bg-[#dc2626] text-white rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 text-[10px] font-bold">
           {unreadCount>99?"99+":unreadCount}
         </span>
       )}
@@ -3223,26 +3223,24 @@ function UserDMItem({ user: u, dmCanal, activo, loading, onClick, unreadCount = 
   const displayRole = u.role_label?.trim() || "Colaborador";
   return (
     <button onClick={onClick} disabled={loading}
-      className={`w-full flex items-center gap-2.5 px-2.5 py-2.5 rounded-xl text-left transition-all duration-200 text-xs group ${
-        activo ? "bg-[#ab0433] text-white shadow-lg shadow-red-950/30 -translate-y-[1px]" :
-        hasUnread ? "text-white bg-slate-800/70 hover:bg-slate-700/80 shadow-sm" :
-        "text-slate-400 hover:bg-slate-800/70 hover:text-slate-200"
+      className={`relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all duration-200 text-xs group ${
+        activo ? "bg-white text-slate-800 border border-slate-200 shadow-sm" :
+        hasUnread ? "bg-white text-slate-800 border border-slate-200 shadow-sm" :
+        "text-slate-500 hover:bg-white hover:text-slate-800 border border-transparent hover:border-slate-200"
       }`}>
+      {activo && <span className="absolute left-0 top-1/2 h-8 w-1 -translate-y-1/2 rounded-r-full bg-[#dc2626]" />}
       <div className="relative shrink-0">
         <Av url={u.avatar_url} name={displayName} size={6}/>
-        <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 ${activo?"border-red-600":"border-slate-900"} ${st.color}`}/>
+        <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 ${activo ? "border-white" : "border-slate-50"} ${st.color}`}/>
       </div>
       <div className="min-w-0 flex-1">
-        <p className={`truncate text-sm ${hasUnread ? "font-bold text-white" : "font-medium"}`}>{displayName}</p>
-        <p className={`truncate text-[11px] ${activo || hasUnread ? "text-white/75" : "text-slate-500 group-hover:text-slate-300"}`}>{displayRole}</p>
+        <p className={`truncate text-sm ${activo || hasUnread ? "font-bold text-slate-800" : "font-medium"}`}>{displayName}</p>
+        <p className={`truncate text-[11px] ${activo || hasUnread ? "text-slate-400" : "text-slate-400 group-hover:text-slate-500"}`}>{displayRole}</p>
       </div>
       {loading && <Loader2 size={10} className="animate-spin shrink-0 opacity-60"/>}
       {hasUnread && (
         <div className="shrink-0 flex items-center gap-1">
-          <MessageSquare size={11} className={activo ? "text-white" : "text-red-400"} />
-          <span className={`rounded-full min-w-[16px] h-4 flex items-center justify-center px-1 text-[10px] font-bold ${
-            activo ? "bg-white text-[#ab0433]" : "bg-[#ab0433] text-white"
-          }`}>
+          <span className="rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 text-[10px] font-bold bg-[#dc2626] text-white">
             {safeUnreadCount>99?"99+":safeUnreadCount}
           </span>
         </div>
@@ -3333,6 +3331,8 @@ export default function Chat() {
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
   const [freshIncomingMessageIds, setFreshIncomingMessageIds] = useState<Set<string>>(new Set());
   const [composerHeight, setComposerHeight] = useState(112);
+  const [messageSearchOpen, setMessageSearchOpen] = useState(false);
+  const [messageSearchQ, setMessageSearchQ] = useState("");
 
   // Búsqueda de canales en sidebar
   const [canalQ, setCanalQ]               = useState("");
@@ -3442,6 +3442,11 @@ export default function Chat() {
       // ignorar errores de persistencia
     }
   }, [dmOrder]);
+
+  useEffect(() => {
+    setMessageSearchOpen(false);
+    setMessageSearchQ("");
+  }, [canalActivoId]);
 
   useEffect(() => {
     mensajesCountRef.current = mensajes.length;
@@ -4226,6 +4231,12 @@ export default function Chat() {
   const activeChatSubtitle = canalActivo?.tipo === "directo"
     ? activeDirectUser?.role_label?.trim() || "Colaborador"
     : canalActivo?.descripcion || null;
+  const activeChatAvatarUrl = canalActivo?.tipo === "directo"
+    ? activeDirectUser?.avatar_url || canalActivo?.dm_target_avatar_url || null
+    : null;
+  const activeChatStatusLabel = canalActivo?.tipo === "directo"
+    ? "Disponible"
+    : `${canalActivo?.total_miembros || 0} miembro${(canalActivo?.total_miembros || 0) === 1 ? "" : "s"}`;
   const resolveDisplayName = useCallback((userId?: string | null, name?: string | null, isSelf = false) => {
     if (isSelf || (userId && userId === currentUserId)) return "T\u00FA";
     const knownUser = userId ? sysUsersById.get(userId) : null;
@@ -4243,16 +4254,26 @@ export default function Chat() {
     return buildTypingLabel(names);
   }, [currentUserId, resolveDisplayName, typingUsers]);
 
+  const filteredMensajes = useMemo(() => {
+    const term = messageSearchQ.trim().toLowerCase();
+    if (!term) return mensajes;
+    return mensajes.filter((m) => (
+      m.contenido?.toLowerCase().includes(term) ||
+      m.user_name?.toLowerCase().includes(term) ||
+      m.reply_to?.contenido?.toLowerCase().includes(term)
+    ));
+  }, [mensajes, messageSearchQ]);
+
   const mensajesConSep = useMemo(()=>{
     const r: (Mensaje|{__sep:true;key:string;date:string})[] = [];
     let lastD = "";
-    for (const m of mensajes) {
+    for (const m of filteredMensajes) {
       const d = new Date(m.created_at).toDateString();
       if (d!==lastD) { r.push({__sep:true, key:`s${m.id}`, date:m.created_at}); lastD=d; }
       r.push(m);
     }
     return r;
-  }, [mensajes]);
+  }, [filteredMensajes]);
 
   const firstUnreadMessageId = firstUnreadMarkerId;
 
@@ -4260,21 +4281,21 @@ export default function Chat() {
   // RENDER
   // ══════════════════════════════════════════════════════════════════════════
   return (
-    <div className="flex h-full min-h-0 overflow-hidden bg-gradient-to-br from-white via-slate-50 to-slate-100 animate-in fade-in duration-300">
+    <div className="flex h-full min-h-0 overflow-hidden bg-white animate-in fade-in duration-300">
 
       {/* ══ SIDEBAR ══════════════════════════════════════════════════════════ */}
-      <aside className="w-64 shrink-0 flex min-h-0 flex-col bg-[radial-gradient(circle_at_top,_rgba(239,68,68,0.2),_transparent_28%),linear-gradient(180deg,_#0f172a_0%,_#111827_46%,_#020617_100%)] overflow-hidden border-r border-white/10">
+      <aside className="w-72 shrink-0 flex min-h-0 flex-col overflow-hidden border-r border-slate-200 bg-slate-50">
 
         {/* Workspace header — estilo Slack */}
-        <div className="flex items-center justify-between px-3 py-3 border-b border-white/10 shrink-0">
-          <button className="flex items-center gap-2 min-w-0 flex-1 hover:bg-white/5 rounded-xl px-2.5 py-2 transition-all duration-200 group">
-            <div className="w-9 h-9 rounded-2xl bg-[#ab0433] flex items-center justify-center shrink-0 shadow-lg shadow-red-950/30 text-white font-bold text-sm">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 shrink-0 bg-white">
+          <button className="flex items-center gap-2 min-w-0 flex-1 hover:bg-slate-100 rounded-xl px-2.5 py-2 transition-all duration-200 group">
+            <div className="w-8 h-8 rounded-xl bg-[#dc2626] flex items-center justify-center shrink-0 text-white font-bold text-sm">
               V
             </div>
             <div className="flex-1 min-w-0 text-left">
               <div className="flex items-center gap-1">
-                <span className="text-white font-bold text-sm truncate leading-none">Despacho</span>
-                <ChevronDown size={13} className="text-slate-400 group-hover:text-slate-300 shrink-0"/>
+                <span className="text-slate-800 font-bold text-sm truncate leading-none">Despacho Principal</span>
+                <ChevronDown size={13} className="text-slate-400 group-hover:text-slate-600 shrink-0"/>
               </div>
               {totalUnread > 0 && (
                 <p className="text-slate-400 text-[10px] leading-none mt-0.5">{totalUnread} sin leer</p>
@@ -4282,28 +4303,28 @@ export default function Chat() {
             </div>
           </button>
           <button title="Nuevo mensaje" onClick={()=>setShowCrear(true)}
-            className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all duration-200 shrink-0 border border-white/10">
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-white border border-slate-200 text-slate-500 hover:text-red-600 hover:border-red-200 transition-all duration-200 shrink-0 shadow-sm">
             <Pencil size={15}/>
           </button>
         </div>
         {/* Buscador de canales + crear */}
-        <div className="px-3 py-3 border-b border-white/10 shrink-0">
+        <div className="px-4 py-4 border-b border-slate-200 shrink-0 bg-slate-50">
           <div className="flex gap-1.5">
             <div className="flex-1 relative">
               {canalSearching
-                ?<Loader2 size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 animate-spin"/>
-                :<Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500"/>
+                ?<Loader2 size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 animate-spin"/>
+                :<Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/>
               }
               <input
                 value={canalQ}
                 onChange={e=>setCanalQ(e.target.value)}
-                placeholder="Buscar canales…"
-              className="w-full bg-white/5 hover:bg-white/[0.07] border border-white/10 text-slate-200 text-xs pl-7 pr-2 py-2.5 rounded-xl outline-none placeholder-slate-500 focus:ring-2 focus:ring-[#ab0433]/30 focus:border-[#ab0433]/30 transition-all"
+                placeholder="Buscar personas, canales..."
+              className="w-full bg-white border border-slate-200 text-slate-700 text-xs pl-8 pr-3 py-2.5 rounded-md outline-none placeholder-slate-400 focus:ring-2 focus:ring-red-500/20 focus:border-red-400 transition-all shadow-sm"
               />
-              {canalQ&&<button onClick={()=>{setCanalQ("");setCanalResults([]);}} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"><X size={11}/></button>}
+              {canalQ&&<button onClick={()=>{setCanalQ("");setCanalResults([]);}} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"><X size={11}/></button>}
             </div>
             <button onClick={()=>setShowCrear(true)} title="Crear canal"
-              className="w-9 h-9 flex items-center justify-center bg-[#ab0433] hover:bg-[#92042c] text-white rounded-xl transition-all duration-200 shrink-0 shadow-lg shadow-red-950/30">
+              className="w-9 h-9 flex items-center justify-center bg-[#dc2626] hover:bg-[#b91c1c] text-white rounded-md transition-all duration-200 shrink-0 shadow-sm">
               <Plus size={14}/>
             </button>
           </div>
@@ -4335,7 +4356,7 @@ export default function Chat() {
 
         {/* Lista de canales */}
         {!canalQ.trim()&&(
-          <nav className="min-h-0 flex-1 overflow-y-auto py-1 px-2 space-y-0.5">
+          <nav className="min-h-0 flex-1 overflow-y-auto py-3 px-3 space-y-5">
 
             {/* ── Canales ── */}
             <div className="pt-2">
@@ -4343,9 +4364,9 @@ export default function Chat() {
                 const totalUnreadCanales = [...canalesPublicos,...canalesPrivados].reduce((acc,c)=>acc+getUnreadCountForCanal(c),0);
                 return (
                   <button onClick={()=>setSecOpen(s=>({...s,canales:!s.canales}))}
-                    className="w-full flex items-center gap-1.5 px-2 py-1 text-slate-400 hover:text-slate-200 text-[11px] font-semibold transition-colors rounded-md hover:bg-slate-800/50 group">
+                    className="w-full flex items-center gap-1.5 px-2 py-1 text-slate-400 hover:text-slate-600 text-[10px] font-bold uppercase tracking-wider transition-colors rounded-md group">
                     <ChevronDown size={13} className={`transition-transform shrink-0 ${secOpen.canales?"":"−rotate-90"}`}/>
-                    <Layers size={12} className="shrink-0 text-slate-500 group-hover:text-slate-300"/>
+                    <Layers size={12} className="shrink-0 text-slate-400 group-hover:text-slate-600"/>
                     <span className="flex-1 text-left">Canales</span>
                     {!secOpen.canales && totalUnreadCanales>0 && (
                       <span className="shrink-0 bg-[#ab0433] text-white rounded-full min-w-[16px] h-4 flex items-center justify-center px-1 text-[10px] font-bold">
@@ -4356,7 +4377,7 @@ export default function Chat() {
                 );
               })()}
               {secOpen.canales&&(
-                <div className="mt-0.5 space-y-px">
+                <div className="mt-1 space-y-1">
                   {[...canalesPublicos,...canalesPrivados].map(c=>(
                     <CanalItem
                       key={c.id}
@@ -4371,9 +4392,9 @@ export default function Chat() {
                   )}
                   {/* Añadir canales */}
                   <button onClick={()=>setShowCrear(true)}
-                    className="w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-slate-500 hover:text-slate-300 hover:bg-slate-800/50 transition-colors text-xs group">
-                    <div className="w-5 h-5 rounded-md bg-slate-700 group-hover:bg-slate-600 flex items-center justify-center shrink-0 transition-colors">
-                      <Plus size={11} className="text-slate-400 group-hover:text-slate-200"/>
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-white hover:border-slate-200 border border-transparent transition-colors text-sm group">
+                    <div className="w-5 h-5 rounded bg-slate-200 group-hover:bg-slate-300 flex items-center justify-center shrink-0 transition-colors">
+                      <Plus size={11} className="text-slate-500 group-hover:text-slate-700"/>
                     </div>
                     Añadir canales
                   </button>
@@ -4387,9 +4408,9 @@ export default function Chat() {
                 const totalUnreadDMs = dmConversationEntries.reduce((acc, entry) => acc + entry.unreadCount, 0);
                 return (
                   <button onClick={()=>setSecOpen(s=>({...s,dms:!s.dms}))}
-                    className="w-full flex items-center gap-1.5 px-2 py-1 text-slate-400 hover:text-slate-200 text-[11px] font-semibold transition-colors rounded-md hover:bg-slate-800/50 group">
+                    className="w-full flex items-center gap-1.5 px-2 py-1 text-slate-400 hover:text-slate-600 text-[10px] font-bold uppercase tracking-wider transition-colors rounded-md group">
                     <ChevronDown size={13} className={`transition-transform shrink-0 ${secOpen.dms?"":"−rotate-90"}`}/>
-                    <MessagesSquare size={12} className="shrink-0 text-slate-500 group-hover:text-slate-300"/>
+                    <MessagesSquare size={12} className="shrink-0 text-slate-400 group-hover:text-slate-600"/>
                     <span className="flex-1 text-left">Mensajes directos</span>
                     {!secOpen.dms && totalUnreadDMs>0 && (
                       <span className="shrink-0 bg-[#ab0433] text-white rounded-full min-w-[16px] h-4 flex items-center justify-center px-1 text-[10px] font-bold">
@@ -4400,7 +4421,7 @@ export default function Chat() {
                 );
               })()}
               {secOpen.dms&&(
-                <div className="mt-0.5 space-y-px">
+                <div className="mt-1 space-y-1">
                   {dmConversationEntries.length===0 && dmProspectUsers.length===0 && (
                     <p className="text-slate-600 text-xs px-4 py-1">Cargando usuarios…</p>
                   )}
@@ -4429,9 +4450,9 @@ export default function Chat() {
                     />
                   ))}
                   {/* Invitar a otros */}
-                  <button className="w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-slate-500 hover:text-slate-300 hover:bg-slate-800/50 transition-colors text-xs group">
-                    <div className="w-5 h-5 rounded-md bg-slate-700 group-hover:bg-slate-600 flex items-center justify-center shrink-0 transition-colors">
-                      <UserPlus size={11} className="text-slate-400 group-hover:text-slate-200"/>
+                  <button className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-white border border-transparent hover:border-slate-200 transition-colors text-sm group">
+                    <div className="w-7 h-7 rounded-md bg-slate-200 group-hover:bg-slate-300 flex items-center justify-center shrink-0 transition-colors">
+                      <UserPlus size={11} className="text-slate-500 group-hover:text-slate-700"/>
                     </div>
                     Invitar a otros
                   </button>
@@ -4442,15 +4463,15 @@ export default function Chat() {
         )}
 
         {/* Footer usuario */}
-        <div className="px-3 py-3 border-t border-slate-700/50 shrink-0 relative">
+        <div className="px-3 py-3 border-t border-slate-200 shrink-0 relative bg-white">
           <button ref={statusButtonRef} onClick={()=>setShowStatus(v=>!v)}
-            className="w-full flex items-center gap-2.5 p-2 rounded-xl hover:bg-slate-800 transition-all duration-150 active:scale-[0.985] group">
+            className="w-full flex items-center gap-2.5 p-2 rounded-xl hover:bg-slate-100 transition-all duration-150 active:scale-[0.985] group">
             <div className="relative shrink-0">
               <Av url={user?.imageUrl} name={user?.fullName||"Tú"} size={8}/>
-              <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-slate-900 ${displayedStatusColorClass}`}/>
+              <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${displayedStatusColorClass}`}/>
             </div>
             <div className="flex-1 min-w-0 text-left">
-              <p className="text-white text-xs font-semibold truncate">{user?.fullName||"Tú"}</p>
+              <p className="text-slate-800 text-xs font-semibold truncate">{user?.fullName||"Tú"}</p>
               <div className="flex items-center gap-1 text-slate-400 text-[10px]">
                 <p className="truncate">{displayedStatusLabel}</p>
                 {notificationsPaused ? (
@@ -4460,7 +4481,7 @@ export default function Chat() {
                 )}
               </div>
             </div>
-            <Settings size={13} className="text-slate-600 group-hover:text-slate-400 transition-colors shrink-0"/>
+            <Settings size={13} className="text-slate-400 group-hover:text-slate-600 transition-colors shrink-0"/>
           </button>
           {showStatus&&(
             <StatusSelector
@@ -4515,18 +4536,26 @@ export default function Chat() {
         ):(
           <>
             {/* Canal header */}
-            <div className={`flex items-center gap-3 px-5 py-3.5 border-b border-slate-200/80 shrink-0 bg-white transition-all duration-200 ${isSwitchingChat ? "translate-y-1 opacity-70" : "translate-y-0 opacity-100"}`}>
+            <div className={`flex items-center gap-3 px-6 py-3.5 border-b border-slate-200 shrink-0 bg-white shadow-sm transition-all duration-200 ${isSwitchingChat ? "translate-y-1 opacity-70" : "translate-y-0 opacity-100"}`}>
               <div className="flex items-center gap-2 flex-1 min-w-0">
-                {canalActivo.tipo==="privado"
-                  ?<Lock size={16} className="text-slate-400 shrink-0"/>
-                  :canalActivo.tipo==="directo"
-                  ?<MessageSquare size={16} className="text-slate-400 shrink-0"/>
-                  :<Hash size={16} className="text-slate-400 shrink-0"/>}
+                {canalActivo.tipo==="directo" ? (
+                  <div className="relative shrink-0">
+                    <Av url={activeChatAvatarUrl} name={activeChatTitle} size={9} />
+                    <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white bg-emerald-500" />
+                  </div>
+                ) : (
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-500 shrink-0">
+                    {canalActivo.tipo==="privado"
+                      ? <Lock size={16} className="text-slate-400 shrink-0"/>
+                      : <Hash size={16} className="text-slate-400 shrink-0"/>}
+                  </div>
+                )}
                 <div className="min-w-0">
                   <p className="truncate font-bold text-slate-800 text-sm">{activeChatTitle}</p>
-                  {canalActivo.tipo==="directo" && activeChatSubtitle && (
-                    <p className="truncate text-[11px] text-slate-400">{activeChatSubtitle}</p>
-                  )}
+                  <div className="flex items-center gap-1.5">
+                    {canalActivo.tipo === "directo" && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}
+                    <p className="truncate text-[11px] text-slate-400">{canalActivo.tipo==="directo" ? activeChatStatusLabel : activeChatSubtitle}</p>
+                  </div>
                 </div>
                 {canalActivo.tipo!=="directo"&&(
                   <span className="hidden sm:flex items-center gap-0.5 text-slate-400 text-xs bg-slate-100 px-2 py-0.5 rounded-full shrink-0">
@@ -4541,6 +4570,13 @@ export default function Chat() {
                 )}
               </div>
               <div className="relative flex items-center gap-0.5 shrink-0">
+                <button
+                  onClick={() => setMessageSearchOpen((prev) => !prev)}
+                  title="Buscar en la conversación"
+                  className={`p-2 rounded-xl transition-all duration-200 ${messageSearchOpen ? "bg-slate-100 text-slate-700 shadow-sm" : "text-slate-400 hover:bg-slate-100 hover:text-slate-700"}`}
+                >
+                  <Search size={15}/>
+                </button>
                 <button onClick={()=>setRightPanel(v=>v==="pinned"?null:"pinned")} title="Mensajes fijados"
                   className={`p-2 rounded-xl transition-all duration-200 ${rightPanel==="pinned"?"bg-red-50 text-red-500 shadow-sm":"text-slate-400 hover:bg-slate-100 hover:text-slate-700"}`}>
                   <Pin size={15}/>
@@ -4570,23 +4606,65 @@ export default function Chat() {
                 )}
               </div>
             </div>
+            {messageSearchOpen && (
+              <div className="shrink-0 border-b border-slate-200 bg-white px-6 py-3">
+                <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 shadow-sm">
+                  <Search size={14} className="shrink-0 text-slate-400" />
+                  <input
+                    value={messageSearchQ}
+                    onChange={(e) => setMessageSearchQ(e.target.value)}
+                    placeholder="Buscar en esta conversación..."
+                    className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
+                  />
+                  {messageSearchQ && (
+                    <button
+                      onClick={() => setMessageSearchQ("")}
+                      className="rounded-full p-1 text-slate-400 transition hover:bg-white hover:text-slate-600"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
+                <p className="mt-2 text-xs text-slate-400">
+                  {messageSearchQ.trim()
+                    ? `${filteredMensajes.length} resultado${filteredMensajes.length === 1 ? "" : "s"} en la conversación`
+                    : "Busca por texto, autor o contenido citado"}
+                </p>
+              </div>
+            )}
 
             {/* Messages + right panels */}
             <div className={`flex min-h-0 flex-1 overflow-hidden transition-all duration-200 ${isSwitchingChat ? "opacity-70 translate-y-2" : "opacity-100 translate-y-0"}`}>
               {/* Messages list */}
               <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-                <div ref={listRef} onScroll={onScroll} style={{ scrollbarGutter: "stable" }} className="flex-1 overflow-y-auto pb-1 pr-2 bg-[radial-gradient(circle_at_top,_rgba(248,113,113,0.08),_transparent_22%),linear-gradient(180deg,_transparent,_rgba(248,250,252,0.75))]">
+                <div ref={listRef} onScroll={onScroll} style={{ scrollbarGutter: "stable" }} className="flex-1 overflow-y-auto pb-1 pr-2 bg-white">
                   {loadingMore&&<div className="flex items-center justify-center py-2"><Spinner size="sm" muted /></div>}
-                  {!hasMore&&mensajes.length>0&&(
-                    <p className="text-center text-xs text-slate-300 py-3 select-none">
-                      ― Inicio de #{canalActivo.nombre} ―
-                    </p>
+                  {!messageSearchQ.trim() && !hasMore && mensajes.length>0&&(
+                    <div className="px-6 pb-2 pt-8 text-center">
+                      <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full border border-slate-100 bg-slate-50">
+                        <Av url={activeChatAvatarUrl} name={activeChatTitle} size={16} />
+                      </div>
+                      <h3 className="text-lg font-bold text-slate-800">{activeChatTitle}</h3>
+                      <p className="mx-auto mt-2 max-w-sm text-sm text-slate-500">
+                        {canalActivo.tipo === "directo"
+                          ? `Este es el principio del historial de mensajes directos con ${activeChatTitle}.`
+                          : `Este es el principio del historial del canal #${canalActivo.nombre}.`}
+                      </p>
+                    </div>
                   )}
                   {loadingMsgs?(
                     <div className="flex flex-col items-center justify-center h-40 gap-3">
                       <div className="rounded-2xl bg-white/90 px-5 py-4 shadow-sm border border-slate-200 flex flex-col items-center gap-2">
                         <Spinner size="md" muted label="Cargando mensajes…" />
                       </div>
+                    </div>
+                  ):filteredMensajes.length===0 && messageSearchQ.trim()?(
+                    <div className="flex flex-col items-center justify-center h-full py-16 px-8 gap-3 text-center">
+                      <div className="flex h-16 w-16 items-center justify-center rounded-3xl border border-slate-200 bg-slate-50">
+                        <Search size={24} className="text-slate-400" />
+                      </div>
+                      <p className="text-base font-semibold text-slate-700">Sin resultados en esta conversación</p>
+                      <p className="max-w-sm text-sm text-slate-500">Prueba con otro nombre, una frase distinta o limpia la búsqueda para volver al historial completo.</p>
                     </div>
                   ):mensajes.length===0?(
                     <div className="flex flex-col items-center justify-center h-full py-16 px-8 gap-4 text-center animate-in fade-in zoom-in-95 duration-300">
