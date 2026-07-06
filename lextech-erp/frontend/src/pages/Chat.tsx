@@ -3364,6 +3364,7 @@ export default function Chat() {
   const usersRequestRef = useRef<Promise<void> | null>(null);
   const prevUnreadDMsRef = useRef<Record<string, number>>({});
   const mensajesCountRef = useRef(0);
+  const mensajesIdsRef = useRef<Set<string>>(new Set());
   const fetchMensajesInFlightRef = useRef(false);
   const pollMensajesInFlightRef = useRef(false);
   const loadMoreInFlightRef = useRef(false);
@@ -3447,7 +3448,8 @@ export default function Chat() {
 
   useEffect(() => {
     mensajesCountRef.current = mensajes.length;
-  }, [mensajes.length]);
+    mensajesIdsRef.current = new Set(mensajes.map(m => m.id));
+  }, [mensajes]);
 
   useEffect(() => {
     const node = composerRef.current;
@@ -3619,12 +3621,15 @@ export default function Chat() {
     if (fetchMensajesInFlightRef.current) return;
     fetchMensajesInFlightRef.current = true;
     const isFirstLoad = mensajesCountRef.current === 0;
+    const expectedCanalId = canal.id;
     setLoadingMsgs(isFirstLoad);
     setHasMore(true); lastAt.current=null;
     try {
       const h = await hdr();
       const res = await fetch(`/api/chat/canales/${canal.id}/mensajes`, { headers: h });
       const d = await safeJson(res);
+      // Si el canal cambió durante el await, descartar (evita contaminar el canal nuevo con mensajes del anterior)
+      if (canalActivoIdRef.current !== expectedCanalId) return;
       if (res.ok) {
         const msgs: Mensaje[] = d.data||[];
         setMensajes(prev => (areMensajesEquivalent(prev, msgs) ? prev : msgs));
@@ -3647,7 +3652,7 @@ export default function Chat() {
       }
     } finally {
       fetchMensajesInFlightRef.current = false;
-      setLoadingMsgs(false);
+      if (canalActivoIdRef.current === expectedCanalId) setLoadingMsgs(false);
     }
   }, [clearUnread, hdr, initialUnreadCount, refreshUnread]);
 
@@ -3696,20 +3701,24 @@ export default function Chat() {
       if (canalActivoIdRef.current !== expectedCanalId) return;
       if (!res.ok || !d.data?.length) return;
       const nuevos: Mensaje[] = d.data;
-      // Capturar atBottom ANTES de setMensajes para no leer un valor potencialmente stale después del await
+      // Calcular mensajes realmente nuevos usando el ref (sincrono) — NO dentro del updater
+      // porque los updaters de useState se ejecutan de forma asíncrona en React 18 y
+      // no se puede leer una variable local seteada dentro del updater inmediatamente después.
+      const fresh = nuevos.filter(m => !mensajesIdsRef.current.has(m.id));
+      if (fresh.length === 0) return;
+      // Capturar atBottom ANTES de setMensajes para no leer un valor potencialmente stale
       const wasAtBottom = atBottom.current;
-      let freshCount = 0;
+      // Actualizar el ref de IDs inmediatamente para evitar doble-proceso en polls concurrentes
+      fresh.forEach(m => mensajesIdsRef.current.add(m.id));
       setMensajes(prev => {
-        const ids = new Set(prev.map(m=>m.id));
-        const fresh = nuevos.filter(m=>!ids.has(m.id));
-        freshCount = fresh.length;
+        const prevIds = new Set(prev.map(m=>m.id));
+        const actualFresh = nuevos.filter(m=>!prevIds.has(m.id));
         const incomingFreshIds = notificationsPaused
           ? []
-          : fresh.filter(m => m.user_id !== currentUserId).map(m => m.id);
+          : actualFresh.filter(m => m.user_id !== currentUserId).map(m => m.id);
         if (incomingFreshIds.length) markFreshIncomingMessages(incomingFreshIds);
-        return fresh.length ? [...prev, ...fresh] : prev;
+        return actualFresh.length ? [...prev, ...actualFresh] : prev;
       });
-      if (freshCount === 0) return;
       const latestMsg = nuevos[nuevos.length-1];
       lastAt.current = latestMsg.created_at;
       setCanales(prev => prev.map(c => c.id === expectedCanalId ? {
@@ -3724,7 +3733,7 @@ export default function Chat() {
         clearUnread(expectedCanalId, canalActivoDmTargetId);
         void refreshUnread();
       } else if (!notificationsPaused) {
-        setNewMsgCount(c=>c+freshCount);
+        setNewMsgCount(c=>c + fresh.length);
       }
     } finally {
       pollMensajesInFlightRef.current = false;
@@ -3884,6 +3893,7 @@ export default function Chat() {
     fetchMensajesInFlightRef.current = false;
     pollMensajesInFlightRef.current = false;
     scrollRestoreRef.current = null;
+    mensajesIdsRef.current = new Set();
     setIsSwitchingChat(true);
     setFreshIncomingMessageIds(new Set());
     atBottom.current = true;
