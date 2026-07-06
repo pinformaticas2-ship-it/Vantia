@@ -376,6 +376,40 @@ export async function getConversacionesExpediente(req: Request, res: Response) {
         .map((u: any) => [u.user_id, u.user_name])
     );
     const enriched = await Promise.all(sesiones.map(async (s: any) => {
+      const { rows: memberRows } = await pool.query(
+        `SELECT user_id, user_name
+         FROM chat_miembros
+         WHERE canal_id = $1
+         ORDER BY joined_at ASC NULLS LAST, user_name ASC`,
+        [s.canal_id]
+      );
+      const memberNames = Array.from(
+        new Set(
+          memberRows
+            .map((member: any) => {
+              const candidates = [
+                clerkNames.get(member.user_id),
+                member.user_name,
+              ].map((value: any) => (typeof value === 'string' ? value.trim() : ''));
+              return candidates.find(value => value && value.toLowerCase() !== 'sin nombre') || '';
+            })
+            .filter(Boolean)
+        )
+      );
+      const canalNombreResuelto =
+        s.canal_tipo === 'dm' && memberNames.length
+          ? memberNames.join(' · ')
+          : s.canal_nombre;
+      const iniciadoPorNombre =
+        [
+          clerkNames.get(s.iniciado_por),
+          ...memberRows
+            .filter((member: any) => member.user_id === s.iniciado_por)
+            .map((member: any) => member.user_name),
+        ]
+          .map((value: any) => (typeof value === 'string' ? value.trim() : ''))
+          .find(value => value && value.toLowerCase() !== 'sin nombre') || 'Sin nombre';
+
       const params = [s.canal_id, s.iniciado_at];
       let cutoffSql = '';
       if (s.cerrado_at) {
@@ -409,6 +443,8 @@ export async function getConversacionesExpediente(req: Request, res: Response) {
       );
       return {
         ...s,
+        canal_nombre: canalNombreResuelto,
+        iniciado_por_nombre: iniciadoPorNombre,
         total_mensajes: msgs.length,
         mensajes: msgs.map((msg: any) => {
           const authorCandidates = [

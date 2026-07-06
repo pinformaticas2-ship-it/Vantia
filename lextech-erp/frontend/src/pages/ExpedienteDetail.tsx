@@ -4811,6 +4811,7 @@ interface SesionConv {
   canal_id: string;
   canal_nombre: string;
   iniciado_por: string;
+  iniciado_por_nombre?: string | null;
   iniciado_at: string;
   cerrado_at: string | null;
   total_mensajes?: number;
@@ -4944,6 +4945,7 @@ function ConversacionesTab({ expedienteId }: { expedienteId: string }) {
                   )}
                 </div>
                 <div className="text-xs text-slate-400 mt-0.5">
+                  {s.iniciado_por_nombre ? `Asociado por ${s.iniciado_por_nombre} · ` : ""}
                   {(s.total_mensajes ?? s.mensajes.length)} mensaje{(s.total_mensajes ?? s.mensajes.length) !== 1 ? 's' : ''}
                 </div>
               </div>
