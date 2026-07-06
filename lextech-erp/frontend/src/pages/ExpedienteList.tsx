@@ -1169,7 +1169,7 @@ function CsvImportView({
   const [isDragging, setIsDragging] = useState(false);
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden animate-page-in">
+    <div className="flex-1 h-full min-h-0 flex flex-col overflow-hidden animate-page-in">
       <input
         ref={inputRef}
         type="file"
@@ -1216,7 +1216,7 @@ function CsvImportView({
       </div>
 
       {/* Scrollable content */}
-      <div className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
+      <div className="modules-scrollbar flex-1 min-h-0 overflow-auto p-4 sm:p-6 lg:p-8">
         <div className="max-w-[1500px] mx-auto w-full flex flex-col xl:flex-row gap-6 items-stretch">
 
           {/* LEFT: Dropzone card */}
@@ -1410,7 +1410,7 @@ function CsvImportHistoryView({
   };
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden animate-page-in">
+    <div className="flex-1 h-full min-h-0 flex flex-col overflow-hidden animate-page-in">
 
       {/* Header */}
       <div className="px-6 lg:px-8 py-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 flex-shrink-0 border-b border-slate-200 animate-card-in">
@@ -1444,7 +1444,7 @@ function CsvImportHistoryView({
       )}
 
       {/* Table */}
-      <div ref={tableRef} className="flex-1 overflow-auto animate-card-in-2">
+      <div ref={tableRef} className="modules-scrollbar flex-1 min-h-0 overflow-auto animate-card-in-2">
         <table className="w-full min-w-[1000px] text-left border-collapse">
           <thead className="sticky top-0 bg-white border-b border-slate-200 z-10 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
             <tr>
@@ -1737,7 +1737,7 @@ function CsvImportConfigureView({
   const hiddenOptionalCount = optionalFields.length - OPTIONAL_PREVIEW;
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden animate-page-in">
+    <div className="flex-1 h-full min-h-0 flex flex-col overflow-hidden animate-page-in">
       <input
         ref={inputRef}
         type="file"
@@ -2913,10 +2913,10 @@ function DocumentImportView({
       </div>
 
       {/* Two-column layout */}
-      <div className="flex-1 flex flex-col lg:flex-row gap-6 p-6 lg:p-10 overflow-hidden bg-[#f4f6f8]">
+      <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-6 overflow-hidden bg-[#f4f6f8] p-6 lg:p-10">
 
         {/* Left column — scrolls if content overflows */}
-        <div className="flex-1 flex flex-col gap-6 overflow-y-auto min-w-0 animate-card-in-1">
+        <div className="modules-scrollbar flex-1 min-h-0 min-w-0 flex flex-col gap-6 overflow-y-auto animate-card-in-1">
 
           {/* Config card */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex-shrink-0">
@@ -3989,7 +3989,7 @@ function DocumentImportHistoryView({
   onDeleteBatch: (batchId: string) => void;
 }) {
   return (
-    <div className="flex-1 flex flex-col overflow-hidden animate-page-in">
+    <div className="flex-1 h-full min-h-0 flex flex-col overflow-hidden animate-page-in">
 
       {/* Header */}
       <div className="flex-shrink-0 px-6 lg:px-10 py-6 border-b border-slate-200 bg-white animate-card-in">
@@ -4029,7 +4029,7 @@ function DocumentImportHistoryView({
       )}
 
       {/* List */}
-      <div className="flex-1 overflow-y-auto p-6 lg:p-10 bg-[#f4f6f8] animate-card-in-2">
+      <div className="modules-scrollbar flex-1 min-h-0 overflow-y-auto bg-[#f4f6f8] p-6 lg:p-10 animate-card-in-2">
         {loading ? (
           <div className="flex items-center justify-center gap-3 text-sm text-slate-400 py-20">
             <Loader2 size={18} className="animate-spin" />

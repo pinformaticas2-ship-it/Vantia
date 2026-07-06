@@ -1991,7 +1991,7 @@ export default function ClientList() {
       onMoveAllToAvailable={moveAllClientColumnsToAvailable}
       onClose={() => setShowColumnModal(false)}
     />
-    <div className="h-full flex flex-col overflow-hidden animate-page-in">
+    <div className="h-full min-h-0 flex flex-col overflow-hidden animate-page-in">
 
       {/* ── CABECERA ─────────────────────────────────────────── */}
       <div className="px-6 lg:px-8 py-5 border-b border-slate-200 bg-white flex-shrink-0 z-10 animate-card-in">
@@ -2498,7 +2498,7 @@ export default function ClientList() {
             VISTA LISTA — tabla densa compacta
         ══════════════════════════════════════════════════════ */}
         {viewMode === "list" && (
-          <div className="overflow-auto flex-1">
+          <div className="modules-scrollbar flex-1 min-h-0 overflow-auto">
             <table className="w-full text-left text-sm min-w-[900px]">
               <thead className="bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
                 <tr>
@@ -2641,7 +2641,7 @@ export default function ClientList() {
             VISTA DETALLE — tarjetas horizontales completas
         ══════════════════════════════════════════════════════ */}
         {viewMode === "detail" && (
-          <div className="overflow-auto flex-1 p-4">
+          <div className="modules-scrollbar flex-1 min-h-0 overflow-auto p-4">
             {filtered.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-40 gap-3 text-slate-400">
                 <Users size={36} className="opacity-15" />
@@ -2764,7 +2764,7 @@ export default function ClientList() {
             VISTA MULTISELECT — cuadrícula de tarjetas con checkbox
         ══════════════════════════════════════════════════════ */}
         {viewMode === "multiselect" && (
-          <div className="overflow-auto flex-1 p-4">
+          <div className="modules-scrollbar flex-1 min-h-0 overflow-auto p-4">
             {/* Cabecera de selección rápida */}
             <div className="flex items-center gap-3 mb-3 px-1">
               <button
