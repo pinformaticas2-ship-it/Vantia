@@ -369,21 +369,57 @@ export async function getConversacionesExpediente(req: Request, res: Response) {
       [id]
     );
     // Para cada sesión, traer un snippet del primer y último mensaje
+    const systemUsers = await getCachedSystemUsers();
+    const clerkNames = new Map(
+      systemUsers
+        .filter((u: any) => u?.user_id)
+        .map((u: any) => [u.user_id, u.user_name])
+    );
     const enriched = await Promise.all(sesiones.map(async (s: any) => {
       const params = [s.canal_id, s.iniciado_at];
       let cutoffSql = '';
       if (s.cerrado_at) {
         params.push(s.cerrado_at);
-        cutoffSql = `AND created_at <= $3`;
+        cutoffSql = `AND m.created_at <= $3`;
       }
       const { rows: msgs } = await pool.query(
-        `SELECT id, user_name, contenido, tipo, image_url, file_url, file_name, gif_url, created_at
-         FROM chat_mensajes
-         WHERE canal_id = $1 AND created_at >= $2 ${cutoffSql} AND deleted_at IS NULL
-         ORDER BY created_at ASC`,
+        `SELECT
+           m.id,
+           m.user_id,
+           m.user_name,
+           m.contenido,
+           m.tipo,
+           m.image_url,
+           m.file_url,
+           m.file_name,
+           m.gif_url,
+           m.created_at,
+           cm.user_name AS member_user_name
+         FROM chat_mensajes m
+         LEFT JOIN LATERAL (
+           SELECT user_name
+           FROM chat_miembros cm
+           WHERE cm.canal_id = m.canal_id AND cm.user_id = m.user_id
+           ORDER BY cm.joined_at DESC NULLS LAST
+           LIMIT 1
+         ) cm ON TRUE
+         WHERE m.canal_id = $1 AND m.created_at >= $2 ${cutoffSql} AND m.deleted_at IS NULL
+         ORDER BY m.created_at ASC`,
         params
       );
-      return { ...s, total_mensajes: msgs.length, mensajes: msgs };
+      return {
+        ...s,
+        total_mensajes: msgs.length,
+        mensajes: msgs.map((msg: any) => {
+          const authorCandidates = [
+            clerkNames.get(msg.user_id),
+            msg.member_user_name,
+            msg.user_name,
+          ].map((value: any) => (typeof value === 'string' ? value.trim() : ''));
+          const autor_nombre = authorCandidates.find(value => value && value.toLowerCase() !== 'sin nombre') || 'Sin nombre';
+          return { ...msg, autor_nombre };
+        }),
+      };
     }));
     return ok(res, enriched);
   } catch (e: any) { return err(res, e.message); }
@@ -467,7 +503,24 @@ export async function deleteMensaje(req: Request, res: Response) {
   if (!userId) return err(res, 'No autenticado', 401);
   const { id } = req.params;
   try {
-    await pool.query(`UPDATE chat_mensajes SET deleted_at = NOW() WHERE id = $1 AND user_id = $2`, [id, userId]);
+    const { rows } = await pool.query(
+      `SELECT id, canal_id, user_id FROM chat_mensajes WHERE id = $1 AND deleted_at IS NULL`,
+      [id]
+    );
+    if (!rows.length) return err(res, 'Mensaje no encontrado', 404);
+
+    const message = rows[0];
+    if (message.user_id !== userId) {
+      const { rows: membershipRows } = await pool.query(
+        `SELECT role FROM chat_miembros WHERE canal_id = $1 AND user_id = $2`,
+        [message.canal_id, userId]
+      );
+      if (membershipRows[0]?.role !== 'admin') {
+        return err(res, 'Sin permisos para borrar este mensaje', 403);
+      }
+    }
+
+    await pool.query(`UPDATE chat_mensajes SET deleted_at = NOW() WHERE id = $1`, [id]);
     return ok(res, { id });
   } catch (e: any) {
     return err(res, e.message);
@@ -811,22 +864,41 @@ function getClerk2() {
 
 const _usersCache = { data: [] as any[], exp: 0 };
 
+function mapClerkUserSummary(u: any) {
+  return {
+    user_id: u.id,
+    user_name: [u.firstName, u.lastName].filter(Boolean).join(' ').trim() || u.emailAddresses?.[0]?.emailAddress || u.username || 'Sin nombre',
+    avatar_url: u.imageUrl || null,
+    email: u.emailAddresses?.[0]?.emailAddress || null,
+    role_label: (u.publicMetadata?.role as string) || 'Colaborador',
+  };
+}
+
+async function getCachedSystemUsers() {
+  if (_usersCache.exp > Date.now()) return _usersCache.data;
+  try {
+    const list = await getClerk2().users.getUserList({ limit: 200 });
+    const users = (list.data || []).map(mapClerkUserSummary);
+    _usersCache.data = users;
+    _usersCache.exp = Date.now() + 60_000;
+    return users;
+  } catch {
+    const { rows } = await pool.query(`
+      SELECT DISTINCT ON (user_id) user_id, user_name, avatar_url, role_label
+      FROM chat_miembros ORDER BY user_id, user_name ASC
+    `);
+    _usersCache.data = rows;
+    _usersCache.exp = Date.now() + 30_000;
+    return rows;
+  }
+}
+
 /** GET /api/chat/usuarios — todos los usuarios de Clerk (caché 60s) */
 export async function getSystemUsers(req: Request, res: Response) {
   const userId = (req as any).auth?.userId;
   if (!userId) return err(res, 'No autenticado', 401);
   try {
-    if (_usersCache.exp > Date.now()) return ok(res, _usersCache.data);
-    const list = await getClerk2().users.getUserList({ limit: 200 });
-    const users = (list.data || []).map((u: any) => ({
-      user_id: u.id,
-      user_name: [u.firstName, u.lastName].filter(Boolean).join(' ').trim() || u.emailAddresses?.[0]?.emailAddress || u.username || 'Sin nombre',
-      avatar_url: u.imageUrl || null,
-      email: u.emailAddresses?.[0]?.emailAddress || null,
-      role_label: (u.publicMetadata?.role as string) || 'Colaborador',
-    }));
-    _usersCache.data = users; _usersCache.exp = Date.now() + 60_000;
-    return ok(res, users);
+    return ok(res, await getCachedSystemUsers());
   } catch (e: any) {
     // Fallback: devolver los usuarios conocidos desde chat_miembros
     const { rows } = await pool.query(`

@@ -4816,6 +4816,7 @@ interface SesionConv {
   total_mensajes?: number;
   mensajes: Array<{
     id: string;
+    user_id?: string | null;
     contenido: string;
     user_name?: string | null;
     autor_nombre?: string | null;
@@ -4830,9 +4831,12 @@ function ConversacionesTab({ expedienteId }: { expedienteId: string }) {
   const [sesiones, setSesiones] = useState<SesionConv[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState("");
 
-  useEffect(() => {
+  const loadSesiones = useCallback(() => {
     setLoading(true);
+    setActionError("");
     getToken({ skipCache: true })
       .then((t: string) =>
         fetch(`/api/expedientes/${expedienteId}/conversaciones`, {
@@ -4843,7 +4847,11 @@ function ConversacionesTab({ expedienteId }: { expedienteId: string }) {
       .then((d: any) => setSesiones(d?.data ?? []))
       .catch(() => setSesiones([]))
       .finally(() => setLoading(false));
-  }, [expedienteId]);
+  }, [expedienteId, getToken]);
+
+  useEffect(() => {
+    loadSesiones();
+  }, [loadSesiones]);
 
   const toggleExpand = (id: string) => {
     setExpandedIds(prev => {
@@ -4858,6 +4866,35 @@ function ConversacionesTab({ expedienteId }: { expedienteId: string }) {
       day: '2-digit', month: '2-digit', year: 'numeric',
       hour: '2-digit', minute: '2-digit',
     });
+
+  const handleDeleteMessage = async (messageId: string) => {
+    const confirmed = window.confirm('¿Seguro que quieres borrar este mensaje de la conversación asociada?');
+    if (!confirmed) return;
+    setDeletingMessageId(messageId);
+    setActionError("");
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(resolveApiUrl(`/api/chat/mensajes/${messageId}`), {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await safeJson(res);
+      if (!res.ok) {
+        throw new Error(data?.error || "No se pudo borrar el mensaje");
+      }
+      setSesiones(prev =>
+        prev.map(sesion => ({
+          ...sesion,
+          total_mensajes: Math.max(0, (sesion.total_mensajes ?? sesion.mensajes.length) - (sesion.mensajes.some(m => m.id === messageId) ? 1 : 0)),
+          mensajes: sesion.mensajes.filter(m => m.id !== messageId),
+        }))
+      );
+    } catch (e: any) {
+      setActionError(e?.message || "No se pudo borrar el mensaje");
+    } finally {
+      setDeletingMessageId(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -4879,6 +4916,11 @@ function ConversacionesTab({ expedienteId }: { expedienteId: string }) {
 
   return (
     <div className="space-y-3 py-1">
+      {actionError && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {actionError}
+        </div>
+      )}
       {sesiones.map(s => {
         const expanded = expandedIds.has(s.id);
         return (
@@ -4936,6 +4978,16 @@ function ConversacionesTab({ expedienteId }: { expedienteId: string }) {
                           <p className="text-sm text-slate-700 break-words">{m.contenido}</p>
                         )}
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteMessage(m.id)}
+                        disabled={deletingMessageId === m.id}
+                        className="self-start inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-500 transition hover:border-red-200 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-60"
+                        title="Borrar mensaje"
+                      >
+                        {deletingMessageId === m.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                        Borrar
+                      </button>
                     </div>
                   ))
                 )}
