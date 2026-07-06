@@ -2577,8 +2577,9 @@ function MensajeItem({ msg, prevMsg, currentUserId, isHighlighted, isFreshIncomi
   };
 
   if (msg.deleted_at) return (
-    <div className={`px-4 py-0.5 text-slate-400 italic text-xs ${!sameAuthor?"mt-2":""}`}>
-      Mensaje eliminado
+    <div className={`flex gap-3 items-center px-4 py-0.5 ${!sameAuthor ? "mt-3" : ""}`}>
+      <div className="w-9 shrink-0" />
+      <span className="text-slate-400 italic text-xs">Mensaje eliminado</span>
     </div>
   );
 
@@ -2586,20 +2587,39 @@ function MensajeItem({ msg, prevMsg, currentUserId, isHighlighted, isFreshIncomi
     <div id={`msg-${msg.id}`}
       onMouseEnter={()=>setHover(true)}
       onMouseLeave={()=>{ if (!showEmoji) setHover(false); }}
-      className={`relative group -mx-1 px-5 transition-all duration-300 ${isHighlighted?"bg-yellow-50":"hover:bg-slate-50"} ${!sameAuthor?"mt-2 py-1.5":""} ${
-        isFreshIncoming ? "animate-in fade-in slide-in-from-bottom-2" : ""
+      className={`relative group px-4 transition-colors duration-100 ${isHighlighted?"bg-yellow-50":"hover:bg-slate-50/80"} ${!sameAuthor?"mt-3 pt-2 pb-1":"py-0.5"} ${
+        isFreshIncoming ? "animate-in fade-in slide-in-from-bottom-1" : ""
       }`}>
-      <div className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
-        <div className={`flex max-w-[min(42rem,85%)] flex-col ${isMe ? "items-end" : "items-start"}`}>
-          {/* Author row */}
-          {!sameAuthor&&(
-            <div className={`flex items-center gap-2.5 mb-0.5 ${isMe ? "flex-row-reverse" : ""}`}>
-              <Av
-                url={resolveAvatarUrl?.(msg.user_id, msg.avatar_url, isMe) ?? msg.avatar_url}
-                name={resolveDisplayName(msg.user_id, msg.user_name, isMe)}
-                size={9}
-              />
-              <span className="font-bold text-slate-800 text-sm">{resolveDisplayName(msg.user_id, msg.user_name, isMe)}</span>
+      {/* Drag reply hint */}
+      {dragMagnitude > 6 && (
+        <div className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 z-20 flex items-center gap-1 rounded-full border border-red-100 bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-600 shadow-sm">
+          <CornerDownRight size={12} className={dragReplyReady ? "text-red-700" : "text-red-400"} />
+          <span>{dragReplyReady ? "Respondiendo..." : "Arrastra para responder"}</span>
+        </div>
+      )}
+
+      <div className="flex gap-3 items-start">
+        {/* Avatar o timestamp compacto */}
+        <div className="w-9 shrink-0 flex items-start justify-center pt-0.5">
+          {!sameAuthor ? (
+            <Av
+              url={resolveAvatarUrl?.(msg.user_id, msg.avatar_url, isMe) ?? msg.avatar_url}
+              name={resolveDisplayName(msg.user_id, msg.user_name, isMe)}
+              size={9}
+            />
+          ) : (
+            <span className={`text-[10px] text-slate-400 leading-none mt-1.5 transition-opacity ${hover ? "opacity-100" : "opacity-0"}`}>
+              {fmtTime(msg.created_at)}
+            </span>
+          )}
+        </div>
+
+        {/* Contenido del mensaje */}
+        <div className="flex-1 min-w-0">
+          {/* Fila autor */}
+          {!sameAuthor && (
+            <div className="flex items-baseline gap-2 mb-0.5">
+              <span className="font-bold text-slate-800 text-[15px]">{resolveDisplayName(msg.user_id, msg.user_name, isMe)}</span>
               {isMe&&<span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded font-semibold">{"T\u00FA"}</span>}
               <span className="text-xs text-slate-400">{fmtTime(msg.created_at)}</span>
               {isMe && showReadReceipt && (
@@ -2616,75 +2636,51 @@ function MensajeItem({ msg, prevMsg, currentUserId, isHighlighted, isFreshIncomi
             </div>
           )}
 
-          {/* Message body */}
-          <div className={`relative ${isMe ? "pr-[46px]" : "pl-[46px]"}`}>
-        <div
-          className={`pointer-events-none absolute top-1/2 z-0 flex -translate-y-1/2 items-center gap-1 rounded-full border border-red-100 bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-600 shadow-sm transition-all duration-200 ${
-            isMe ? "right-full mr-3" : "left-full ml-3"
-          } ${dragMagnitude > 6 ? "opacity-100" : "opacity-0"}`}
-        >
-          <CornerDownRight size={12} className={dragReplyReady ? "text-red-700" : "text-red-400"} />
-          <span>{dragReplyReady ? "Respondiendo..." : "Arrastra para responder"}</span>
-        </div>
-        {/* Reply quote */}
-        {msg.reply_to&&(
-          <div className="flex items-start gap-1.5 mb-1 pl-2 border-l-2 border-slate-300 bg-slate-100/60 rounded-r py-1 pr-2">
-            <CornerDownRight size={10} className="text-slate-400 mt-0.5 shrink-0"/>
-            <span className="text-xs font-semibold text-slate-500">{resolveDisplayName(msg.reply_to.user_id, msg.reply_to.user_name, msg.reply_to.user_id === currentUserId)}</span>
-            <span className="text-xs text-slate-400 line-clamp-1 ml-1">{msg.reply_to.contenido}</span>
-          </div>
-        )}
-        <div
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerUp}
-          className={`relative rounded-2xl border px-3.5 py-2.5 transition-all duration-300 touch-pan-y select-none ${
-            isMe
-              ? "border-red-100 bg-red-50/70 shadow-sm"
-              : "border-transparent bg-transparent shadow-none"
-          } ${
-            isFreshIncoming && !isMe
-              ? "translate-y-0 scale-[1.01] bg-red-50/60 ring-1 ring-red-100 shadow-sm"
-              : ""
-          }`}
-          style={{ transform: `translateX(${dragOffset}px)` }}
-        >
-          {/* Content */}
-          {imageSrc && (
-            <>
-              <button
-                type="button"
-                onClick={() => setShowImageLightbox(true)}
-                className="group/image mt-1 block overflow-hidden rounded-2xl border border-slate-200 shadow-sm transition hover:shadow-md"
-                aria-label="Ampliar imagen adjunta"
-              >
-                <img
-                  src={imageSrc}
-                  alt="Imagen adjunta"
-                  className="max-w-[320px] rounded-2xl object-cover transition duration-200 group-hover/image:scale-[1.01]"
-                  loading="lazy"
-                />
-              </button>
-              {showImageLightbox && (
-                <ImageLightbox
-                  src={imageSrc}
-                  alt="Imagen adjunta"
-                  authorName={resolveDisplayName(msg.user_id, msg.user_name, isMe)}
-                  authorAvatarUrl={resolveAvatarUrl?.(msg.user_id, msg.avatar_url, isMe) ?? msg.avatar_url}
-                  createdAt={msg.created_at}
-                  fileName={msg.image_url?.split("/").pop()?.split("?")[0] || undefined}
-                  onClose={() => setShowImageLightbox(false)}
-                />
-              )}
-            </>
+          {/* Cita de respuesta */}
+          {msg.reply_to && (
+            <div className="flex items-start gap-1.5 mb-1.5 pl-2 border-l-2 border-slate-300 bg-slate-100/60 rounded-r py-1 pr-2">
+              <CornerDownRight size={10} className="text-slate-400 mt-0.5 shrink-0"/>
+              <span className="text-xs font-semibold text-slate-500">{resolveDisplayName(msg.reply_to.user_id, msg.reply_to.user_name, msg.reply_to.user_id === currentUserId)}</span>
+              <span className="text-xs text-slate-400 line-clamp-1 ml-1">{msg.reply_to.contenido}</span>
+            </div>
           )}
-          {msg.gif_url
-            ?<img src={msg.gif_url} alt="GIF" className="max-w-[240px] rounded-xl mt-1 border border-slate-200 shadow-sm"/>
-            : msg.contenido !== IMAGE_PLACEHOLDER_TEXT && <p className="whitespace-pre-wrap text-slate-700 text-sm leading-relaxed break-words">{renderText(msg.contenido)}</p>
-          }
-          {/* Reactions */}
-          {reactions.length>0&&(
+
+          {/* Cuerpo con soporte drag-to-reply */}
+          <div
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
+            className="touch-pan-y"
+            style={{ transform: `translateX(${dragOffset}px)`, transition: dragOffset === 0 ? "transform 0.15s ease" : "none" }}
+          >
+            {imageSrc && (
+              <>
+                <button type="button" onClick={() => setShowImageLightbox(true)}
+                  className="group/image mt-1 block overflow-hidden rounded-xl border border-slate-200 shadow-sm transition hover:shadow-md"
+                  aria-label="Ampliar imagen adjunta">
+                  <img src={imageSrc} alt="Imagen adjunta" className="max-w-[320px] rounded-xl object-cover transition duration-200 group-hover/image:scale-[1.01]" loading="lazy" />
+                </button>
+                {showImageLightbox && (
+                  <ImageLightbox src={imageSrc} alt="Imagen adjunta"
+                    authorName={resolveDisplayName(msg.user_id, msg.user_name, isMe)}
+                    authorAvatarUrl={resolveAvatarUrl?.(msg.user_id, msg.avatar_url, isMe) ?? msg.avatar_url}
+                    createdAt={msg.created_at}
+                    fileName={msg.image_url?.split("/").pop()?.split("?")[0] || undefined}
+                    onClose={() => setShowImageLightbox(false)} />
+                )}
+              </>
+            )}
+            {msg.gif_url
+              ? <img src={msg.gif_url} alt="GIF" className="max-w-[240px] rounded-xl mt-1 border border-slate-200 shadow-sm"/>
+              : msg.contenido !== IMAGE_PLACEHOLDER_TEXT && (
+                <p className="whitespace-pre-wrap text-slate-700 text-[15px] leading-relaxed break-words">{renderText(msg.contenido)}</p>
+              )
+            }
+          </div>
+
+          {/* Reacciones */}
+          {reactions.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1.5">
               {reactions.map(r=>(
                 <button key={r.emoji} onClick={()=>onReact(msg.id,r.emoji)} title={r.names.join(", ")}
@@ -2695,36 +2691,29 @@ function MensajeItem({ msg, prevMsg, currentUserId, isHighlighted, isFreshIncomi
               ))}
             </div>
           )}
-          {sameAuthor && (
-            <div className={`mt-2 flex items-center gap-2 text-[10px] ${isMe ? "justify-end text-slate-400" : "justify-start text-slate-400"}`}>
-              <span>{fmtTime(msg.created_at)}</span>
-            </div>
-          )}
-        </div>
-          </div>
         </div>
       </div>
 
       {/* Hover toolbar */}
-      {(hover || showEmoji)&&(
-        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-0.5 bg-white border border-slate-200 rounded-xl shadow-lg px-1 py-0.5 z-10">
+      {(hover || showEmoji) && (
+        <div className="absolute right-4 -top-4 flex items-center gap-0.5 bg-white border border-slate-200 rounded-lg shadow-md px-1 py-0.5 z-20">
           <div className="relative">
             <button ref={emojiButtonRef} onClick={()=>setShowEmoji(v=>!v)} title="Reaccionar"
-              className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"><Smile size={14}/></button>
+              className="p-1.5 hover:bg-slate-100 rounded-md text-slate-400 hover:text-slate-600 transition-colors"><Smile size={14}/></button>
             {showEmoji&&<EmojiPicker anchorRef={emojiButtonRef} align="right" onPick={e=>{onReact(msg.id,e);setShowEmoji(false);setHover(false);}} onClose={()=>{setShowEmoji(false);setHover(false);}}/>}
           </div>
           <button onClick={()=>onReply(msg)} title="Responder"
-            className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"><CornerDownRight size={14}/></button>
+            className="p-1.5 hover:bg-slate-100 rounded-md text-slate-400 hover:text-slate-600 transition-colors"><CornerDownRight size={14}/></button>
           <button onClick={()=>onFavorite(msg.id)} title={isFavorite ? "Quitar de favoritos" : "Guardar en favoritos"}
-            className={`p-1.5 rounded-lg transition-colors ${isFavorite ? "bg-amber-50 text-amber-500 hover:bg-amber-100" : "text-slate-400 hover:bg-slate-100 hover:text-amber-500"}`}><Star size={14} className={isFavorite ? "fill-amber-300" : ""}/></button>
+            className={`p-1.5 rounded-md transition-colors ${isFavorite ? "bg-amber-50 text-amber-500 hover:bg-amber-100" : "text-slate-400 hover:bg-slate-100 hover:text-amber-500"}`}><Star size={14} className={isFavorite ? "fill-amber-300" : ""}/></button>
           <button onClick={()=>onPin(msg.id)} title="Fijar"
-            className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"><Pin size={14}/></button>
-          {isMe&&(
+            className="p-1.5 hover:bg-slate-100 rounded-md text-slate-400 hover:text-slate-600 transition-colors"><Pin size={14}/></button>
+          {isMe && (
             <>
               <button onClick={()=>onEdit(msg)} title="Editar"
-                className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"><Edit3 size={14}/></button>
+                className="p-1.5 hover:bg-slate-100 rounded-md text-slate-400 hover:text-slate-600 transition-colors"><Edit3 size={14}/></button>
               <button onClick={()=>onDelete(msg.id)} title="Eliminar"
-                className="p-1.5 hover:bg-red-50 rounded-lg text-slate-400 hover:text-red-500 transition-colors"><Trash2 size={14}/></button>
+                className="p-1.5 hover:bg-red-50 rounded-md text-slate-400 hover:text-red-500 transition-colors"><Trash2 size={14}/></button>
             </>
           )}
         </div>
@@ -3257,16 +3246,16 @@ function CanalSearchResult({ c, onJoin, onSelect, joining }: {
   onJoin:()=>void; onSelect:()=>void;
 }) {
   return (
-    <div className="flex items-center gap-2 px-2 py-2 hover:bg-slate-800/60 rounded-lg transition-colors">
-      <div className="w-7 h-7 rounded-lg bg-slate-700 flex items-center justify-center shrink-0">
-        <Hash size={13} className="text-slate-400"/>
+    <div className="flex items-center gap-2 px-2 py-2 hover:bg-slate-100 rounded-lg transition-colors">
+      <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+        <Hash size={13} className="text-slate-500"/>
       </div>
       <div className="flex-1 min-w-0 cursor-pointer" onClick={c.ya_unido?onSelect:undefined}>
-        <p className="text-slate-200 text-xs font-semibold truncate">#{c.nombre}</p>
-        <p className="text-slate-500 text-[10px] truncate">{c.total_miembros} miembros{c.descripcion?` · ${c.descripcion}`:""}</p>
+        <p className="text-slate-700 text-xs font-semibold truncate">#{c.nombre}</p>
+        <p className="text-slate-400 text-[10px] truncate">{c.total_miembros} miembros{c.descripcion?` · ${c.descripcion}`:""}</p>
       </div>
       {c.ya_unido
-        ?<button onClick={onSelect} className="shrink-0 text-[10px] text-slate-400 hover:text-slate-200 font-semibold px-2 py-0.5 rounded hover:bg-slate-700 transition-colors">Abrir</button>
+        ?<button onClick={onSelect} className="shrink-0 text-[10px] text-slate-500 hover:text-slate-700 font-semibold px-2 py-0.5 rounded hover:bg-slate-200 transition-colors">Abrir</button>
         :<button onClick={onJoin} disabled={joining}
           className="shrink-0 flex items-center gap-0.5 text-[10px] bg-[#ab0433]/90 hover:bg-[#ab0433] text-white font-bold px-2 py-0.5 rounded transition-colors disabled:opacity-50">
           {joining?<Loader2 size={10} className="animate-spin"/>:<Plus size={10}/>}
