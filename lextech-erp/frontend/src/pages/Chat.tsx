@@ -3374,7 +3374,6 @@ export default function Chat() {
   const activePollMs = isPageVisible ? 700 : 1800;
   const sidebarPollMs = isPageVisible ? 1400 : 3200;
   const typingPollMs = isPageVisible ? 1200 : 2600;
-  const activeFullSyncEvery = isPageVisible ? 3 : 2;
   const canalActivoId = canalActivo?.id ?? null;
   const canalActivoDmTargetId = canalActivo?.dm_target_user_id ?? null;
 
@@ -3825,19 +3824,17 @@ export default function Chat() {
     if (typingPollRef.current) clearInterval(typingPollRef.current);
     pollRef.current = setInterval(() => {
       pollCycleRef.current += 1;
-      if (pollCycleRef.current % activeFullSyncEvery === 0) {
-        void fetchMensajesRef.current(canalActivoRef.current!);
-      } else {
-        void pollMensajesRef.current();
+      void pollMensajesRef.current();
+      if (pollCycleRef.current % 4 === 0) {
+        void fetchMiembrosRef.current(canalActivoId);
       }
-      void fetchMiembrosRef.current(canalActivoId);
     }, activePollMs);
     typingPollRef.current = setInterval(() => { void fetchTypingUsersRef.current(canalActivoId); }, typingPollMs);
     return ()=>{
       if(pollRef.current) clearInterval(pollRef.current);
       if(typingPollRef.current) clearInterval(typingPollRef.current);
     };
-  }, [activeFullSyncEvery, canalActivoId, activePollMs, typingPollMs]);
+  }, [canalActivoId, activePollMs, typingPollMs]);
   useEffect(() => {
     if (!canalActivoId || !typingPollRef.current) return;
     clearInterval(typingPollRef.current);
@@ -4263,10 +4260,10 @@ export default function Chat() {
   // RENDER
   // ══════════════════════════════════════════════════════════════════════════
   return (
-    <div className="flex h-full overflow-hidden bg-gradient-to-br from-white via-slate-50 to-slate-100 animate-in fade-in duration-300">
+    <div className="flex h-full min-h-0 overflow-hidden bg-gradient-to-br from-white via-slate-50 to-slate-100 animate-in fade-in duration-300">
 
       {/* ══ SIDEBAR ══════════════════════════════════════════════════════════ */}
-      <aside className="w-64 shrink-0 flex flex-col bg-[radial-gradient(circle_at_top,_rgba(239,68,68,0.2),_transparent_28%),linear-gradient(180deg,_#0f172a_0%,_#111827_46%,_#020617_100%)] overflow-hidden border-r border-white/10">
+      <aside className="w-64 shrink-0 flex min-h-0 flex-col bg-[radial-gradient(circle_at_top,_rgba(239,68,68,0.2),_transparent_28%),linear-gradient(180deg,_#0f172a_0%,_#111827_46%,_#020617_100%)] overflow-hidden border-r border-white/10">
 
         {/* Workspace header — estilo Slack */}
         <div className="flex items-center justify-between px-3 py-3 border-b border-white/10 shrink-0">
@@ -4338,7 +4335,7 @@ export default function Chat() {
 
         {/* Lista de canales */}
         {!canalQ.trim()&&(
-          <nav className="flex-1 overflow-y-auto py-1 px-2 space-y-0.5">
+          <nav className="min-h-0 flex-1 overflow-y-auto py-1 px-2 space-y-0.5">
 
             {/* ── Canales ── */}
             <div className="pt-2">
@@ -4575,10 +4572,10 @@ export default function Chat() {
             </div>
 
             {/* Messages + right panels */}
-            <div className={`flex flex-1 overflow-hidden transition-all duration-200 ${isSwitchingChat ? "opacity-70 translate-y-2" : "opacity-100 translate-y-0"}`}>
+            <div className={`flex min-h-0 flex-1 overflow-hidden transition-all duration-200 ${isSwitchingChat ? "opacity-70 translate-y-2" : "opacity-100 translate-y-0"}`}>
               {/* Messages list */}
-              <div className="flex-1 flex flex-col min-w-0 relative overflow-hidden">
-                <div ref={listRef} onScroll={onScroll} style={{ scrollbarGutter: "stable" }} className="flex-1 overflow-y-auto pb-1 bg-[radial-gradient(circle_at_top,_rgba(248,113,113,0.08),_transparent_22%),linear-gradient(180deg,_transparent,_rgba(248,250,252,0.75))]">
+              <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+                <div ref={listRef} onScroll={onScroll} style={{ scrollbarGutter: "stable" }} className="flex-1 overflow-y-auto pb-1 pr-2 bg-[radial-gradient(circle_at_top,_rgba(248,113,113,0.08),_transparent_22%),linear-gradient(180deg,_transparent,_rgba(248,250,252,0.75))]">
                   {loadingMore&&<div className="flex items-center justify-center py-2"><Spinner size="sm" muted /></div>}
                   {!hasMore&&mensajes.length>0&&(
                     <p className="text-center text-xs text-slate-300 py-3 select-none">

@@ -1064,7 +1064,7 @@ export default function DashboardLayout() {
 
   return (
     <SidebarContext.Provider value={{ isCollapsed }}>
-    <div className="erp-shell min-h-screen flex font-sans antialiased text-neutral-900">
+    <div className="erp-shell flex h-screen overflow-hidden font-sans antialiased text-neutral-900">
 
       {latestUnread && !location.pathname.startsWith("/dashboard/correo") && (
         <EmailToast
@@ -1170,10 +1170,10 @@ export default function DashboardLayout() {
         </header>
 
         {/* Contenido */}
-        <div id="dashboard-content" className={`relative z-10 flex-1 bg-slate-50 ${isFullPage ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+        <div id="dashboard-content" className={`relative z-10 flex-1 min-h-0 bg-slate-50 ${isFullPage ? 'overflow-hidden' : 'overflow-y-auto'}`}>
           <div
             key={getModuleBase(location.pathname)}
-            className={isFullPage ? 'w-full h-full module-page' : 'max-w-[1600px] mx-auto p-4 md:p-8 module-page'}>
+            className={isFullPage ? 'h-full min-h-0 w-full module-page' : 'max-w-[1600px] mx-auto p-4 md:p-8 module-page'}>
             <Outlet />
           </div>
         </div>
