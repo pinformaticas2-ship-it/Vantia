@@ -647,9 +647,6 @@ function areCanalDetailsEquivalent(a: Canal | null, b: Canal | null) {
     a.tipo === b.tipo &&
     a.total_miembros === b.total_miembros &&
     a.archivado === b.archivado &&
-    a.ultimo_mensaje === b.ultimo_mensaje &&
-    a.ultimo_mensaje_autor === b.ultimo_mensaje_autor &&
-    a.ultimo_mensaje_at === b.ultimo_mensaje_at &&
     a.dm_target_user_id === b.dm_target_user_id &&
     a.dm_target_user_name === b.dm_target_user_name &&
     a.dm_target_avatar_url === b.dm_target_avatar_url
@@ -3369,8 +3366,9 @@ export default function Chat() {
   const pollMensajesInFlightRef = useRef(false);
   const loadMoreInFlightRef = useRef(false);
   const pollCycleRef = useRef(0);
-  // Ref que siempre refleja el canal activo actual (para stale-closure checks en polls async)
+  // Refs que siempre reflejan el canal activo actual (para stale-closure checks en polls async)
   const canalActivoIdRef = useRef<string | null>(null);
+  const canalActivoRef   = useRef<Canal | null>(null);
   // Scroll: restaurar posición tras loadMore (guardamos scrollHeight previo)
   const scrollRestoreRef = useRef<number | null>(null);
   const activePollMs = isPageVisible ? 700 : 1800;
@@ -3793,8 +3791,9 @@ export default function Chat() {
   useEffect(() => { fetchMiembrosRef.current = fetchMiembros; }, [fetchMiembros]);
   useEffect(() => { fetchTypingUsersRef.current = fetchTypingUsers; }, [fetchTypingUsers]);
   useEffect(() => { pollMensajesRef.current = pollMensajes; }, [pollMensajes]);
-  // Mantener ref del canal activo actualizada para stale-closure checks en polls async
+  // Mantener refs del canal activo actualizadas para stale-closure checks en polls async
   useEffect(() => { canalActivoIdRef.current = canalActivoId; }, [canalActivoId]);
+  useEffect(() => { canalActivoRef.current   = canalActivo;   }, [canalActivo]);
 
   // ── Restaurar posición de scroll tras loadMore (antes de pintar, para evitar salto visible)
   useLayoutEffect(() => {
@@ -3812,39 +3811,39 @@ export default function Chat() {
   // El intervalo de polling de canales se monta UNA sola vez y nunca se resetea
   // Los no-leídos se sincronizan desde ChatUnreadContext (App.tsx) — sin poll duplicado aquí
   useEffect(() => {
-    if (!canalActivo) {
+    if (!canalActivoId) {
       setTypingUsers([]);
       return;
     }
     pollCycleRef.current = 0;
-    void fetchMensajesRef.current(canalActivo);
-    void fetchMiembrosRef.current(canalActivo.id);
-    void fetchTypingUsersRef.current(canalActivo.id);
+    void fetchMensajesRef.current(canalActivoRef.current!);
+    void fetchMiembrosRef.current(canalActivoId);
+    void fetchTypingUsersRef.current(canalActivoId);
     if (pollRef.current) clearInterval(pollRef.current);
     if (typingPollRef.current) clearInterval(typingPollRef.current);
     pollRef.current = setInterval(() => {
       pollCycleRef.current += 1;
       if (pollCycleRef.current % activeFullSyncEvery === 0) {
-        void fetchMensajesRef.current(canalActivo);
+        void fetchMensajesRef.current(canalActivoRef.current!);
       } else {
         void pollMensajesRef.current();
       }
-      void fetchMiembrosRef.current(canalActivo.id);
+      void fetchMiembrosRef.current(canalActivoId);
     }, activePollMs);
-    typingPollRef.current = setInterval(() => { void fetchTypingUsersRef.current(canalActivo.id); }, typingPollMs);
+    typingPollRef.current = setInterval(() => { void fetchTypingUsersRef.current(canalActivoId); }, typingPollMs);
     return ()=>{
       if(pollRef.current) clearInterval(pollRef.current);
       if(typingPollRef.current) clearInterval(typingPollRef.current);
     };
-  }, [activeFullSyncEvery, canalActivo, canalActivoId, activePollMs, typingPollMs]);
+  }, [activeFullSyncEvery, canalActivoId, activePollMs, typingPollMs]);
   useEffect(() => {
-    if (!canalActivo || !typingPollRef.current) return;
+    if (!canalActivoId || !typingPollRef.current) return;
     clearInterval(typingPollRef.current);
-    typingPollRef.current = setInterval(() => { void fetchTypingUsersRef.current(canalActivo.id); }, typingPollMs);
+    typingPollRef.current = setInterval(() => { void fetchTypingUsersRef.current(canalActivoId); }, typingPollMs);
   }, [canalActivoId, typingPollMs]);
   useEffect(() => {
-    if (rightPanel === "members" && canalActivo) void fetchMiembros(canalActivo.id);
-  }, [rightPanel, canalActivo, fetchMiembros]);
+    if (rightPanel === "members" && canalActivoId) void fetchMiembros(canalActivoId);
+  }, [rightPanel, canalActivoId, fetchMiembros]);
   useEffect(() => {
     if (!authLoaded || !userLoaded || !currentUserId) return;
     const handleForegroundRefresh = () => {
@@ -3853,8 +3852,8 @@ export default function Chat() {
         fetchCanalesRef.current(),
         fetchSysUsersRef.current(),
         refreshUnread(),
-        canalActivo ? fetchTypingUsersRef.current(canalActivo.id) : Promise.resolve(),
-        canalActivo ? (lastAt.current ? pollMensajesRef.current() : fetchMensajesRef.current(canalActivo)) : Promise.resolve(),
+        canalActivoId ? fetchTypingUsersRef.current(canalActivoId) : Promise.resolve(),
+        canalActivoId ? (lastAt.current ? pollMensajesRef.current() : fetchMensajesRef.current(canalActivoRef.current!)) : Promise.resolve(),
       ]);
     };
     window.addEventListener("focus", handleForegroundRefresh);
