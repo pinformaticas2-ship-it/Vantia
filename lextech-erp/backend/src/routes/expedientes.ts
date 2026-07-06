@@ -32,6 +32,7 @@ import {
   deleteApunte,
 } from '../controllers/apuntesController';
 import { getEmailsByExpediente } from '../controllers/emailController';
+import { getConversacionesExpediente } from '../controllers/chatController';
 import noteRoutes from './noteRoutes';
 
 const router = Router();
@@ -61,6 +62,7 @@ router.put('/:id/notificaciones/:nid',     requireAuth, updateNotificacion);
 router.delete('/:id/notificaciones/:nid',  requireAuth, deleteNotificacion);
 
 router.get('/:id/emails',                 requireAuth, getEmailsByExpediente);
+router.get('/:id/conversaciones',         requireAuth, getConversacionesExpediente);
 router.get('/:id/apuntes',                requireAuth, listApuntes);
 router.post('/:id/apuntes',               requireAuth, createApunte);
 router.put('/:id/apuntes/:apunteId',      requireAuth, updateApunte);

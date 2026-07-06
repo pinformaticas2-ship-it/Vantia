@@ -12,7 +12,7 @@ import {
   Link2, List, ListOrdered, Code, AlignLeft, Paperclip, Mic,
   Video, Pencil, ChevronUp, Layers, MessagesSquare, Star, Download,
   Share2, ExternalLink, Copy, Minus, RotateCcw, Sparkles, Clock3, Eye,
-  PawPrint, UtensilsCrossed, Trophy, Flag, User, FileText, File as FileIcon, type LucideIcon,
+  PawPrint, UtensilsCrossed, Trophy, Flag, User, FileText, File as FileIcon, Briefcase, type LucideIcon,
 } from "lucide-react";
 import { safeJson, resolveUploadUrl } from "../lib/api";
 import { createPortal } from "react-dom";
@@ -50,6 +50,11 @@ interface Mensaje {
   reply_to: Mensaje | null;
   reacciones: { emoji: string; user_id: string; user_name: string }[] | null;
   editado: boolean; deleted_at: string | null; created_at: string;
+}
+interface SesionExpediente {
+  id: string; canal_id: string; expediente_id: string;
+  expediente_ref: string | null; iniciado_por: string;
+  iniciado_at: string; cerrado_at: string | null;
 }
 interface SysUser {
   user_id: string; user_name: string; avatar_url: string | null;
@@ -3349,6 +3354,8 @@ export default function Chat() {
   const [sysUsers, setSysUsers]           = useState<SysUser[]>([]);
   const [loadingMsgs, setLoadingMsgs]     = useState(false);
   const [rightPanel, setRightPanel]       = useState<"members"|"pinned"|"favorites"|null>(null);
+  const [sesionExpediente, setSesionExpediente] = useState<SesionExpediente|null>(null);
+  const [showExpSearchModal, setShowExpSearchModal] = useState(false);
   const [favoriteIds, setFavoriteIds]     = useState<Set<string>>(new Set());
   const [replyTo, setReplyTo]             = useState<Mensaje|null>(null);
   const [editingMsg, setEditingMsg]       = useState<Mensaje|null>(null);
@@ -3964,6 +3971,7 @@ export default function Chat() {
     setCanalActivo(c);
     setMensajes([]); setReplyTo(null); setEditingMsg(null);
     setRightPanel(null); setNewMsgCount(0);
+    setSesionExpediente(null);
   };
 
   useEffect(() => {
@@ -3984,6 +3992,31 @@ export default function Chat() {
     }
     void fetchFavorites(canalActivo.id);
   }, [canalActivoId, fetchFavorites]);
+
+  useEffect(() => {
+    if (!canalActivoId) { setSesionExpediente(null); return; }
+    hdr().then(h => fetch(`/api/chat/canales/${canalActivoId}/sesion-expediente`, { headers: h }))
+      .then(r => r.json())
+      .then(d => setSesionExpediente(d?.data ?? null))
+      .catch(() => setSesionExpediente(null));
+  }, [canalActivoId]);
+
+  const iniciarSesionExpediente = async (expId: string, expRef: string) => {
+    if (!canalActivo) return;
+    const h = await hdr();
+    const res = await fetch(`/api/chat/canales/${canalActivo.id}/sesion-expediente`, {
+      method: "POST", headers: h, body: JSON.stringify({ expediente_id: expId, expediente_ref: expRef }),
+    });
+    const d = await res.json();
+    if (res.ok) setSesionExpediente(d.data);
+  };
+
+  const cerrarSesionExpediente = async () => {
+    if (!canalActivo) return;
+    const h = await hdr();
+    await fetch(`/api/chat/canales/${canalActivo.id}/sesion-expediente`, { method: "DELETE", headers: h });
+    setSesionExpediente(null);
+  };
 
   const handleSend = async (
     text: string, gifUrl?: string, replyId?: string, editId?: string,
@@ -4648,6 +4681,12 @@ export default function Chat() {
                   className={`p-2 rounded-xl transition-all duration-200 ${rightPanel==="members"?"bg-slate-100 text-slate-700 shadow-sm":"text-slate-400 hover:bg-slate-100 hover:text-slate-700"}`}>
                   <Users size={15}/>
                 </button>
+                <button
+                  onClick={() => sesionExpediente ? cerrarSesionExpediente() : setShowExpSearchModal(true)}
+                  title={sesionExpediente ? `Desasociar expediente ${sesionExpediente.expediente_ref || ""}` : "Asociar a expediente"}
+                  className={`p-2 rounded-xl transition-all duration-200 ${sesionExpediente ? "bg-amber-50 text-amber-600 shadow-sm ring-1 ring-amber-200" : "text-slate-400 hover:bg-slate-100 hover:text-amber-600"}`}>
+                  <Briefcase size={15}/>
+                </button>
                 <button onClick={()=>setShowChannelMenu(v=>!v)} title="Acciones del canal"
                   className={`p-2 rounded-xl transition-all duration-200 ${showChannelMenu?"bg-slate-100 text-slate-700 shadow-sm":"text-slate-400 hover:bg-slate-100 hover:text-slate-700"}`}>
                   <MoreHorizontal size={15}/>
@@ -4665,6 +4704,19 @@ export default function Chat() {
                 )}
               </div>
             </div>
+            {sesionExpediente && (
+              <div className="shrink-0 flex items-center gap-3 border-b border-amber-200 bg-amber-50 px-4 py-2">
+                <Briefcase size={13} className="text-amber-600 shrink-0"/>
+                <span className="text-xs text-amber-800 font-medium flex-1 min-w-0 truncate">
+                  Registrando para <strong>{sesionExpediente.expediente_ref || "expediente"}</strong>
+                  {" · "}<span className="font-normal text-amber-600">desde {new Date(sesionExpediente.iniciado_at).toLocaleTimeString("es-ES", { hour:"2-digit", minute:"2-digit" })}</span>
+                </span>
+                <button onClick={cerrarSesionExpediente}
+                  className="shrink-0 text-[11px] font-semibold text-amber-700 hover:text-red-600 bg-white border border-amber-200 hover:border-red-200 px-2 py-0.5 rounded-lg transition-colors">
+                  Cerrar registro
+                </button>
+              </div>
+            )}
             {messageSearchOpen && (
               <div className="shrink-0 border-b border-slate-200 bg-white px-6 py-3">
                 <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 shadow-sm">
@@ -4857,6 +4909,100 @@ export default function Chat() {
           onCreate={async (c)=>{ await fetchCanales(); setShowCrear(false); seleccionar(c); }}
         />
       )}
+
+      {/* Modal asociar expediente */}
+      {showExpSearchModal && (
+        <ExpedienteSearchModal
+          getToken={getToken}
+          onSelect={(id, ref) => { void iniciarSesionExpediente(id, ref); setShowExpSearchModal(false); }}
+          onClose={() => setShowExpSearchModal(false)}
+        />
+      )}
     </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MODAL BUSCAR EXPEDIENTE
+// ══════════════════════════════════════════════════════════════════════════════
+function ExpedienteSearchModal({ getToken, onSelect, onClose }: {
+  getToken: () => Promise<string | null>;
+  onSelect: (id: string, ref: string) => void;
+  onClose: () => void;
+}) {
+  const [q, setQ] = useState("");
+  const [results, setResults] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { inputRef.current?.focus(); }, []);
+
+  useEffect(() => {
+    if (!q.trim()) { setResults([]); return; }
+    const t = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const tok = await getToken();
+        const res = await fetch(`/api/expedientes?q=${encodeURIComponent(q)}&limit=20`, {
+          headers: tok ? { Authorization: `Bearer ${tok}` } : undefined,
+        });
+        const d = await res.json();
+        setResults(d?.data?.rows ?? d?.data ?? []);
+      } catch { setResults([]); }
+      finally { setLoading(false); }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [q, getToken]);
+
+  return createPortal(
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-200">
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-100">
+          <Briefcase size={16} className="text-amber-500 shrink-0"/>
+          <span className="font-bold text-slate-800 flex-1">Asociar a expediente</span>
+          <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-100 text-slate-400"><X size={15}/></button>
+        </div>
+        <div className="px-4 pt-3 pb-2">
+          <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+            <Search size={14} className="text-slate-400 shrink-0"/>
+            <input ref={inputRef} value={q} onChange={e=>setQ(e.target.value)}
+              placeholder="Buscar por referencia, cliente, descripción..."
+              className="flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder-slate-400"/>
+            {loading && <Loader2 size={13} className="animate-spin text-slate-400 shrink-0"/>}
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto max-h-72 px-2 pb-3">
+          {results.length === 0 && q.trim() && !loading && (
+            <p className="text-center text-xs text-slate-400 py-6">Sin resultados para "{q}"</p>
+          )}
+          {results.length === 0 && !q.trim() && (
+            <p className="text-center text-xs text-slate-400 py-6">Escribe para buscar un expediente</p>
+          )}
+          {results.map(exp => {
+            const ref = exp.ref_propia || exp.ref_expediente || `${exp.anio}/${String(exp.num_exp).padStart(4,"0")}`;
+            const titulo = exp.descripcion || exp.cliente_nombre || "Sin descripción";
+            return (
+              <button key={exp.id} onClick={() => onSelect(exp.id, ref)}
+                className="w-full flex items-start gap-3 px-3 py-2.5 rounded-xl hover:bg-amber-50 transition-colors text-left group">
+                <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center shrink-0 mt-0.5">
+                  <Briefcase size={14}/>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-slate-800 truncate">{ref}</p>
+                  <p className="text-xs text-slate-500 truncate">{titulo}</p>
+                  {exp.cliente_nombre && exp.descripcion && (
+                    <p className="text-[10px] text-slate-400 truncate">{exp.cliente_nombre}</p>
+                  )}
+                </div>
+                <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                  exp.estado === "abierto" ? "text-emerald-700 bg-emerald-50 border-emerald-200" : "text-slate-500 bg-slate-100 border-slate-200"
+                }`}>{exp.estado}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }

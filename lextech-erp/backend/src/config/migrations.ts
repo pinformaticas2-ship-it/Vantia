@@ -785,6 +785,17 @@ export async function runMigrations(): Promise<void> {
         PRIMARY KEY (canal_id, user_id)
       );
     `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS chat_expediente_sesiones (
+        id              UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        canal_id        UUID         NOT NULL REFERENCES chat_canales(id) ON DELETE CASCADE,
+        expediente_id   UUID         NOT NULL,
+        expediente_ref  VARCHAR(200),
+        iniciado_por    VARCHAR(150) NOT NULL,
+        iniciado_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        cerrado_at      TIMESTAMPTZ
+      );
+    `);
     for (const idx of [
       `CREATE INDEX IF NOT EXISTS idx_chat_mensajes_canal    ON chat_mensajes (canal_id, created_at DESC)`,
       `CREATE INDEX IF NOT EXISTS idx_chat_mensajes_reply    ON chat_mensajes (reply_to_id)`,
@@ -794,6 +805,8 @@ export async function runMigrations(): Promise<void> {
       `CREATE INDEX IF NOT EXISTS idx_chat_favoritos_user    ON chat_favoritos (user_id, favorito_at DESC)`,
       `CREATE INDEX IF NOT EXISTS idx_chat_favoritos_canal   ON chat_favoritos (canal_id, favorito_at DESC)`,
       `CREATE INDEX IF NOT EXISTS idx_chat_typing_canal      ON chat_typing_status (canal_id, updated_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_chat_exp_sesiones_exp  ON chat_expediente_sesiones (expediente_id, iniciado_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_chat_exp_sesiones_can  ON chat_expediente_sesiones (canal_id, iniciado_at DESC)`,
     ]) {
       try { await client.query(idx); } catch (_e: any) {}
     }

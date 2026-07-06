@@ -162,21 +162,22 @@ const Indicador = ({
   </div>
 );
 
-type DetailTabKey = "perfil" | TabKey | "relacionados" | "actuacion" | "economico" | "agenda" | "cronologia" | "correo";
+type DetailTabKey = "perfil" | TabKey | "relacionados" | "actuacion" | "economico" | "agenda" | "cronologia" | "correo" | "conversaciones";
 
 const DETAIL_TABS: { key: DetailTabKey; label: string; icon: any }[] = [
-  { key: "perfil",      label: "Datos",                  icon: User },
-  { key: "clientes",    label: "Propio",                 icon: Users },
-  { key: "contrarios",  label: "Contrarios",             icon: Users },
-  { key: "adjuntos",    label: "Adjuntos",               icon: Paperclip },
-  { key: "agenda",      label: "Agenda",                 icon: Calendar },
-  { key: "actuacion",   label: "Actuaciones",            icon: ClipboardList },
-  { key: "tareas",      label: "Tareas / Plazos",        icon: AlertTriangle },
-  { key: "economico",   label: "Económico",              icon: Banknote },
-  { key: "notas",       label: "Notas",                  icon: StickyNote },
-  { key: "correo",      label: "Correo",                 icon: Mail },
-  { key: "historial",   label: "Historial expediente",   icon: Activity },
-  { key: "cronologia",  label: "Cronología",             icon: Clock },
+  { key: "perfil",          label: "Datos",                  icon: User },
+  { key: "clientes",        label: "Propio",                 icon: Users },
+  { key: "contrarios",      label: "Contrarios",             icon: Users },
+  { key: "adjuntos",        label: "Adjuntos",               icon: Paperclip },
+  { key: "agenda",          label: "Agenda",                 icon: Calendar },
+  { key: "actuacion",       label: "Actuaciones",            icon: ClipboardList },
+  { key: "tareas",          label: "Tareas / Plazos",        icon: AlertTriangle },
+  { key: "economico",       label: "Económico",              icon: Banknote },
+  { key: "notas",           label: "Notas",                  icon: StickyNote },
+  { key: "correo",          label: "Correo",                 icon: Mail },
+  { key: "conversaciones",  label: "Conversaciones",         icon: MessageSquare },
+  { key: "historial",       label: "Historial expediente",   icon: Activity },
+  { key: "cronologia",      label: "Cronología",             icon: Clock },
 ];
 
 const NOTIF_TIPOS = [
@@ -4804,6 +4805,149 @@ function PanelIndicadoresExpediente({ expedienteId, onTabChange }: { expedienteI
   );
 }
 
+// ─── ConversacionesTab ────────────────────────────────────────────────────────
+interface SesionConv {
+  id: string;
+  canal_id: string;
+  canal_nombre: string;
+  iniciado_por: string;
+  iniciado_at: string;
+  cerrado_at: string | null;
+  total_mensajes?: number;
+  mensajes: Array<{
+    id: string;
+    contenido: string;
+    user_name?: string | null;
+    autor_nombre?: string | null;
+    created_at: string;
+    tipo: string;
+    file_name?: string | null;
+  }>;
+}
+
+function ConversacionesTab({ expedienteId }: { expedienteId: string }) {
+  const { getToken } = useAuth();
+  const [sesiones, setSesiones] = useState<SesionConv[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    setLoading(true);
+    getToken({ skipCache: true })
+      .then((t: string) =>
+        fetch(`/api/expedientes/${expedienteId}/conversaciones`, {
+          headers: { Authorization: `Bearer ${t}` },
+        })
+      )
+      .then((r: Response) => r.json())
+      .then((d: any) => setSesiones(d?.data ?? []))
+      .catch(() => setSesiones([]))
+      .finally(() => setLoading(false));
+  }, [expedienteId]);
+
+  const toggleExpand = (id: string) => {
+    setExpandedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const fmt = (iso: string) =>
+    new Date(iso).toLocaleString('es-ES', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    });
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16 text-slate-400 text-sm">
+        Cargando conversaciones…
+      </div>
+    );
+  }
+
+  if (!sesiones.length) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+        <MessageSquare size={40} className="mb-3 opacity-30" />
+        <p className="text-sm font-medium">Sin conversaciones registradas</p>
+        <p className="text-xs mt-1">Asocia este expediente desde el chat para registrar conversaciones.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3 py-1">
+      {sesiones.map(s => {
+        const expanded = expandedIds.has(s.id);
+        return (
+          <div key={s.id} className="border border-slate-200 rounded-xl overflow-hidden">
+            <button
+              onClick={() => toggleExpand(s.id)}
+              className="w-full flex items-center gap-3 px-4 py-3 bg-white hover:bg-slate-50 transition-colors text-left"
+            >
+              <MessageSquare size={15} className="text-amber-500 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-medium text-slate-800 text-sm truncate">{s.canal_nombre}</span>
+                  <span className="text-[11px] text-slate-400 shrink-0">{fmt(s.iniciado_at)}</span>
+                  {s.cerrado_at && (
+                    <span className="text-[11px] text-slate-400 shrink-0">→ {fmt(s.cerrado_at)}</span>
+                  )}
+                  {!s.cerrado_at && (
+                    <span className="text-[10px] font-medium text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
+                      En curso
+                    </span>
+                  )}
+                </div>
+                <div className="text-xs text-slate-400 mt-0.5">
+                  {(s.total_mensajes ?? s.mensajes.length)} mensaje{(s.total_mensajes ?? s.mensajes.length) !== 1 ? 's' : ''}
+                </div>
+              </div>
+              <svg
+                className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`}
+                fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {expanded && (
+              <div className="border-t border-slate-100 bg-slate-50/50 divide-y divide-slate-100">
+                {s.mensajes.length === 0 ? (
+                  <div className="px-4 py-3 text-xs text-slate-400 italic">Sin mensajes en este período.</div>
+                ) : (
+                  s.mensajes.map(m => (
+                    <div key={m.id} className="flex gap-3 px-4 py-2.5">
+                      <div className="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center text-[11px] font-bold text-slate-500 shrink-0">
+                        {((m.autor_nombre || m.user_name || '?')[0] || '?').toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-2 mb-0.5">
+                          <span className="font-semibold text-[13px] text-slate-800">{m.autor_nombre || m.user_name || 'Desconocido'}</span>
+                          <span className="text-[11px] text-slate-400">
+                            {new Date(m.created_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        {m.tipo === 'archivo' ? (
+                          <span className="text-xs text-slate-500 italic">📎 {m.file_name || 'Archivo adjunto'}</span>
+                        ) : (
+                          <p className="text-sm text-slate-700 break-words">{m.contenido}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function ExpedienteDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -5605,6 +5749,10 @@ export default function ExpedienteDetail() {
                 expedienteRef={exp.ref_expediente || `${exp.anio}/${exp.num_exp}`}
                 locked={exp?.estado === "cerrado"}
               />
+            )}
+
+            {tab === "conversaciones" && (
+              <ConversacionesTab expedienteId={id!} />
             )}
 
             {tab === "historial" && (() => {

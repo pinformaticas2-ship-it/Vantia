@@ -306,6 +306,89 @@ export async function uploadChatFile(req: Request, res: Response) {
   }, 201);
 }
 
+// ── Sesiones de expediente ────────────────────────────────────────────────────
+
+export async function getSesionExpediente(req: Request, res: Response) {
+  const userId = (req as any).auth?.userId;
+  if (!userId) return err(res, 'No autenticado', 401);
+  const { id } = req.params;
+  try {
+    const { rows } = await pool.query(
+      `SELECT * FROM chat_expediente_sesiones WHERE canal_id = $1 AND cerrado_at IS NULL ORDER BY iniciado_at DESC LIMIT 1`,
+      [id]
+    );
+    return ok(res, rows[0] || null);
+  } catch (e: any) { return err(res, e.message); }
+}
+
+export async function iniciarSesionExpediente(req: Request, res: Response) {
+  const userId = (req as any).auth?.userId;
+  if (!userId) return err(res, 'No autenticado', 401);
+  const { id } = req.params;
+  const { expediente_id, expediente_ref } = req.body;
+  if (!expediente_id) return err(res, 'expediente_id requerido', 400);
+  try {
+    // Cerrar sesión activa previa si existe
+    await pool.query(
+      `UPDATE chat_expediente_sesiones SET cerrado_at = NOW() WHERE canal_id = $1 AND cerrado_at IS NULL`,
+      [id]
+    );
+    const { rows } = await pool.query(
+      `INSERT INTO chat_expediente_sesiones (canal_id, expediente_id, expediente_ref, iniciado_por)
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [id, expediente_id, expediente_ref || null, userId]
+    );
+    return ok(res, rows[0], 201);
+  } catch (e: any) { return err(res, e.message); }
+}
+
+export async function cerrarSesionExpediente(req: Request, res: Response) {
+  const userId = (req as any).auth?.userId;
+  if (!userId) return err(res, 'No autenticado', 401);
+  const { id } = req.params;
+  try {
+    await pool.query(
+      `UPDATE chat_expediente_sesiones SET cerrado_at = NOW() WHERE canal_id = $1 AND cerrado_at IS NULL`,
+      [id]
+    );
+    return ok(res, { ok: true });
+  } catch (e: any) { return err(res, e.message); }
+}
+
+export async function getConversacionesExpediente(req: Request, res: Response) {
+  const userId = (req as any).auth?.userId;
+  if (!userId) return err(res, 'No autenticado', 401);
+  const { id } = req.params;
+  try {
+    const { rows: sesiones } = await pool.query(
+      `SELECT s.*, c.nombre AS canal_nombre, c.tipo AS canal_tipo
+       FROM chat_expediente_sesiones s
+       JOIN chat_canales c ON c.id = s.canal_id
+       WHERE s.expediente_id = $1
+       ORDER BY s.iniciado_at DESC`,
+      [id]
+    );
+    // Para cada sesión, traer un snippet del primer y último mensaje
+    const enriched = await Promise.all(sesiones.map(async (s: any) => {
+      const params = [s.canal_id, s.iniciado_at];
+      let cutoffSql = '';
+      if (s.cerrado_at) {
+        params.push(s.cerrado_at);
+        cutoffSql = `AND created_at <= $3`;
+      }
+      const { rows: msgs } = await pool.query(
+        `SELECT id, user_name, contenido, tipo, image_url, file_url, file_name, gif_url, created_at
+         FROM chat_mensajes
+         WHERE canal_id = $1 AND created_at >= $2 ${cutoffSql} AND deleted_at IS NULL
+         ORDER BY created_at ASC`,
+        params
+      );
+      return { ...s, total_mensajes: msgs.length, mensajes: msgs };
+    }));
+    return ok(res, enriched);
+  } catch (e: any) { return err(res, e.message); }
+}
+
 export async function getTypingStatus(req: Request, res: Response) {
   const userId = (req as any).auth?.userId;
   if (!userId) return err(res, 'No autenticado', 401);

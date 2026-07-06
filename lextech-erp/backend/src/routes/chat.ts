@@ -15,6 +15,7 @@ import {
   addMiembro, removeMiembro, updateMiembroRole,
   getSystemUsers, buscarCanalesDisponibles, getUnreadCounts, uploadChatImage, uploadChatFile,
   getTypingStatus, updateTypingStatus,
+  getSesionExpediente, iniciarSesionExpediente, cerrarSesionExpediente,
 } from '../controllers/chatController';
 
 const router = Router();
@@ -86,6 +87,9 @@ router.get   ('/canales/:id/mensajes',           requireAuth, getMensajes);
 router.post  ('/canales/:id/mensajes',           requireAuth, sendMensaje);
 router.get   ('/canales/:id/typing',             requireAuth, getTypingStatus);
 router.post  ('/canales/:id/typing',             requireAuth, updateTypingStatus);
+router.get   ('/canales/:id/sesion-expediente',  requireAuth, getSesionExpediente);
+router.post  ('/canales/:id/sesion-expediente',  requireAuth, iniciarSesionExpediente);
+router.delete('/canales/:id/sesion-expediente',  requireAuth, cerrarSesionExpediente);
 router.post  ('/uploads/image',                  requireAuth, chatUpload.single('image'), uploadChatImage);
 router.post  ('/uploads/file',                   requireAuth, chatFileUpload.single('file'), uploadChatFile);
 
