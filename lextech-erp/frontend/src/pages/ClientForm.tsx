@@ -770,8 +770,8 @@ export default function ClientForm() {
   );
 
   if (isDniFlow) return (
-    <div className="animate-in fade-in duration-500 bg-slate-50 -m-6 min-h-screen p-6">
-      <form onSubmit={handleSubmit} className="mx-auto max-w-[1440px] space-y-6">
+    <div className="h-full min-h-0 overflow-y-auto overscroll-contain bg-slate-50 p-6 animate-in fade-in duration-500 modules-scrollbar">
+      <form onSubmit={handleSubmit} className="mx-auto max-w-[1440px] space-y-6 pb-6">
         <div className="rounded-[24px] border border-slate-200 bg-white px-6 py-5 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="flex items-start gap-3">

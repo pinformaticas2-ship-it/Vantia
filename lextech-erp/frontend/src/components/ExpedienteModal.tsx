@@ -424,7 +424,7 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
   }, []);
 
   const modal = (
-    <div className="fixed inset-0 z-[9999] flex flex-col bg-white overflow-hidden animate-modal-in" style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0 }}>
+    <div className="fixed inset-0 z-[9999] flex flex-col bg-white overflow-hidden overscroll-contain animate-modal-in" style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0 }}>
 
       {/* ── Cabecera ── */}
       <div className="px-6 sm:px-8 py-4 bg-white border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 flex-shrink-0 animate-card-in">
@@ -487,7 +487,7 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
       </div>
 
       {/* ── Cuerpo ── */}
-      <main className="flex-1 min-h-0 overflow-y-auto p-5 sm:p-7 bg-white">
+      <main className="modules-scrollbar flex-1 min-h-0 overflow-y-auto overscroll-contain bg-white p-5 sm:p-7">
         <div className="max-w-[1600px] mx-auto flex flex-col xl:flex-row gap-8 lg:gap-10 xl:items-stretch">
 
           {/* ── Columna izquierda ── */}
