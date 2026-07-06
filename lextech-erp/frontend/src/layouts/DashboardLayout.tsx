@@ -1046,6 +1046,22 @@ export default function DashboardLayout() {
 
   const totalBadge = visibleNotifications.length + (!hiddenKinds.has("email") && emailUnreadCount > 0 ? 1 : 0);
 
+  const isFullPage = useMemo(() => (
+    [
+      '/dashboard/correo',
+      '/dashboard/clientes',
+      '/dashboard/expedientes',
+      '/dashboard/trazabilidad',
+      '/dashboard/agenda',
+      '/dashboard/chat',
+      '/dashboard/chat-ia',
+      '/dashboard/whatsapp',
+    ].includes(location.pathname) ||
+    location.pathname.startsWith('/dashboard/facturacion') ||
+    location.pathname.startsWith('/dashboard/expedientes/') ||
+    location.pathname.startsWith('/dashboard/clientes/')
+  ), [location.pathname]);
+
   return (
     <SidebarContext.Provider value={{ isCollapsed }}>
     <div className="erp-shell min-h-screen flex font-sans antialiased text-neutral-900">
@@ -1154,31 +1170,10 @@ export default function DashboardLayout() {
         </header>
 
         {/* Contenido */}
-        <div id="dashboard-content" className="relative z-10 flex-1 overflow-y-auto bg-slate-50">
+        <div id="dashboard-content" className={`relative z-10 flex-1 bg-slate-50 ${isFullPage ? 'overflow-hidden' : 'overflow-y-auto'}`}>
           <div
             key={getModuleBase(location.pathname)}
-            className={
-              (
-                [
-                  '/dashboard/correo',
-                  '/dashboard/clientes',
-                  '/dashboard/expedientes',
-                  '/dashboard/trazabilidad',
-                  '/dashboard/agenda',
-                  '/dashboard/chat',
-                  '/dashboard/chat-ia',
-                  '/dashboard/whatsapp',
-                ].includes(location.pathname) ||
-                location.pathname.startsWith('/dashboard/facturacion')
-              )
-                ? 'w-full h-full module-page'
-                : (
-                  location.pathname.startsWith('/dashboard/expedientes/') ||
-                  location.pathname.startsWith('/dashboard/clientes/')
-                )
-                  ? 'w-full h-full module-page'
-                  : 'max-w-[1600px] mx-auto p-4 md:p-8 module-page'
-            }>
+            className={isFullPage ? 'w-full h-full module-page' : 'max-w-[1600px] mx-auto p-4 md:p-8 module-page'}>
             <Outlet />
           </div>
         </div>
