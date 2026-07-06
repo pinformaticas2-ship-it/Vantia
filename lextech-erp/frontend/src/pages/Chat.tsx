@@ -3621,7 +3621,9 @@ export default function Chat() {
     const isFirstLoad = mensajesCountRef.current === 0;
     const expectedCanalId = canal.id;
     setLoadingMsgs(isFirstLoad);
-    setHasMore(true); lastAt.current=null;
+    // Solo resetear hasMore en la primera carga; en full-syncs no mover el indicador "sin mensajes anteriores"
+    if (isFirstLoad) setHasMore(true);
+    lastAt.current = null;
     try {
       const h = await hdr();
       const res = await fetch(`/api/chat/canales/${canal.id}/mensajes`, { headers: h });
@@ -4576,7 +4578,7 @@ export default function Chat() {
             <div className={`flex flex-1 overflow-hidden transition-all duration-200 ${isSwitchingChat ? "opacity-70 translate-y-2" : "opacity-100 translate-y-0"}`}>
               {/* Messages list */}
               <div className="flex-1 flex flex-col min-w-0 relative overflow-hidden">
-                <div ref={listRef} onScroll={onScroll} className="flex-1 overflow-y-auto pb-1 bg-[radial-gradient(circle_at_top,_rgba(248,113,113,0.08),_transparent_22%),linear-gradient(180deg,_transparent,_rgba(248,250,252,0.75))]">
+                <div ref={listRef} onScroll={onScroll} style={{ scrollbarGutter: "stable" }} className="flex-1 overflow-y-auto pb-1 bg-[radial-gradient(circle_at_top,_rgba(248,113,113,0.08),_transparent_22%),linear-gradient(180deg,_transparent,_rgba(248,250,252,0.75))]">
                   {loadingMore&&<div className="flex items-center justify-center py-2"><Spinner size="sm" muted /></div>}
                   {!hasMore&&mensajes.length>0&&(
                     <p className="text-center text-xs text-slate-300 py-3 select-none">
