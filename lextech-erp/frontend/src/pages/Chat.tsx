@@ -12,7 +12,7 @@ import {
   Link2, List, ListOrdered, Code, AlignLeft, Paperclip, Mic,
   Video, Pencil, ChevronUp, Layers, MessagesSquare, Star, Download,
   Share2, ExternalLink, Copy, Minus, RotateCcw, Sparkles, Clock3, Eye,
-  PawPrint, UtensilsCrossed, Trophy, Flag, User, type LucideIcon,
+  PawPrint, UtensilsCrossed, Trophy, Flag, User, FileText, File as FileIcon, type LucideIcon,
 } from "lucide-react";
 import { safeJson, resolveUploadUrl } from "../lib/api";
 import { createPortal } from "react-dom";
@@ -44,7 +44,9 @@ interface CanalBuscado {
 interface Mensaje {
   id: string; canal_id: string; user_id: string; user_name: string;
   avatar_url: string | null; contenido: string; tipo: string;
-  gif_url: string | null; image_url?: string | null; reply_to_id: string | null;
+  gif_url: string | null; image_url?: string | null;
+  file_url?: string | null; file_name?: string | null; file_mime?: string | null;
+  reply_to_id: string | null;
   reply_to: Mensaje | null;
   reacciones: { emoji: string; user_id: string; user_name: string }[] | null;
   editado: boolean; deleted_at: string | null; created_at: string;
@@ -2531,7 +2533,8 @@ function MensajeItem({ msg, prevMsg, currentUserId, isHighlighted, isFreshIncomi
     }
     return [...map.entries()].map(([e,v])=>({emoji:e,...v}));
   }, [msg.reacciones, currentUserId]);
-  const imageSrc = mediaUrl(msg.image_url);
+  const imageSrc = msg.tipo !== 'archivo' ? mediaUrl(msg.image_url) : null;
+  const fileSrc  = msg.tipo === 'archivo' ? mediaUrl(msg.file_url ?? msg.image_url) : null;
   const dragDirection = isMe ? -1 : 1;
   const dragMagnitude = Math.abs(dragOffset);
 
@@ -2671,9 +2674,22 @@ function MensajeItem({ msg, prevMsg, currentUserId, isHighlighted, isFreshIncomi
                 )}
               </>
             )}
+            {fileSrc && (
+              <a href={fileSrc} download={msg.file_name || true} target="_blank" rel="noopener noreferrer"
+                className="mt-1 flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 px-3 py-2.5 transition-colors group/file max-w-xs">
+                <div className="h-9 w-9 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 group-hover/file:bg-blue-200 transition-colors">
+                  <FileText size={16}/>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="truncate text-sm font-semibold text-slate-700">{msg.file_name || "Archivo"}</p>
+                  <p className="text-[11px] text-slate-400">Descargar</p>
+                </div>
+                <Download size={14} className="shrink-0 text-slate-400 group-hover/file:text-slate-600"/>
+              </a>
+            )}
             {msg.gif_url
               ? <img src={msg.gif_url} alt="GIF" className="max-w-[240px] rounded-xl mt-1 border border-slate-200 shadow-sm"/>
-              : msg.contenido !== IMAGE_PLACEHOLDER_TEXT && (
+              : !fileSrc && msg.contenido !== IMAGE_PLACEHOLDER_TEXT && (
                 <p className="whitespace-pre-wrap text-slate-700 text-[15px] leading-relaxed break-words">{renderText(msg.contenido)}</p>
               )
             }
@@ -2742,7 +2758,7 @@ function MessageInput({ canalId, canalNombre, replyTo, editingMsg, miembros, cur
   canalId: string; canalNombre: string; replyTo: Mensaje|null; editingMsg: Mensaje|null; miembros: Miembro[]; currentUserId: string;
   resolveDisplayName:(userId?: string | null, name?: string | null, isSelf?: boolean)=>string;
   onTypingChange:(canalId: string, typing: boolean)=>void;
-  onSend:(text:string,gifUrl?:string,replyId?:string,editId?:string,imageUrl?:string)=>Promise<void>;
+  onSend:(text:string,gifUrl?:string,replyId?:string,editId?:string,imageUrl?:string,fileUrl?:string,fileName?:string,fileMime?:string)=>Promise<void>;
   onCancelReply:()=>void; onCancelEdit:()=>void;
 }) {
   const [text, setText] = useState("");
@@ -2750,9 +2766,11 @@ function MessageInput({ canalId, canalNombre, replyTo, editingMsg, miembros, cur
   const [showMediaPicker, setShowMediaPicker] = useState(false);
   const [mentionQ, setMentionQ] = useState<string|null>(null);
   const [selectedImage, setSelectedImage] = useState<{ file: File; previewUrl: string } | null>(null);
+  const [selectedFile, setSelectedFile] = useState<{ file: File; name: string; size: number; mime: string } | null>(null);
   const [isDraggingImage, setIsDraggingImage] = useState(false);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const attachFileRef = useRef<HTMLInputElement>(null);
   const emojiButtonRef = useRef<HTMLButtonElement>(null);
   const selectionRef = useRef({ start: 0, end: 0 });
   const typingActiveRef = useRef(false);
@@ -2849,6 +2867,9 @@ function MessageInput({ canalId, canalNombre, replyTo, editingMsg, miembros, cur
         return;
       }
       let imageUrl: string | undefined;
+      let fileUrl: string | undefined;
+      let fileName: string | undefined;
+      let fileMime: string | undefined;
       if (selectedImage) {
         const form = new FormData();
         form.append("image", selectedImage.file);
@@ -2859,16 +2880,30 @@ function MessageInput({ canalId, canalNombre, replyTo, editingMsg, miembros, cur
           body: form,
         });
         const data = await safeJson(res);
-        if (!res.ok) {
-          return;
-        }
+        if (!res.ok) return;
         imageUrl = data.data?.image_url;
+      } else if (selectedFile) {
+        const form = new FormData();
+        form.append("file", selectedFile.file);
+        const token = await getToken();
+        const res = await fetch("/api/chat/uploads/file", {
+          method: "POST",
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+          body: form,
+        });
+        const data = await safeJson(res);
+        if (!res.ok) return;
+        fileUrl = data.data?.file_url;
+        fileName = data.data?.file_name;
+        fileMime = data.data?.file_mime;
       }
-      await onSend(trimmed || (imageUrl ? IMAGE_PLACEHOLDER_TEXT : ""), undefined, replyTo?.id, undefined, imageUrl);
+      await onSend(trimmed || "", undefined, replyTo?.id, undefined, imageUrl, fileUrl, fileName, fileMime);
       setText("");
       if (selectedImage?.previewUrl) URL.revokeObjectURL(selectedImage.previewUrl);
       setSelectedImage(null);
+      setSelectedFile(null);
       if (fileRef.current) fileRef.current.value = "";
+      if (attachFileRef.current) attachFileRef.current.value = "";
       taRef.current && (taRef.current.style.height="auto");
     } finally {
       setSending(false);
@@ -3011,7 +3046,7 @@ function MessageInput({ canalId, canalNombre, replyTo, editingMsg, miembros, cur
     chooseImage(imageFile);
   };
 
-  const canSend = !!text.trim() || !!editingMsg || !!selectedImage;
+  const canSend = !!text.trim() || !!editingMsg || !!selectedImage || !!selectedFile;
 
   return (
     <div className="px-4 pb-4 pt-3 shrink-0">
@@ -3090,7 +3125,7 @@ function MessageInput({ canalId, canalNombre, replyTo, editingMsg, miembros, cur
         <div className="relative px-1">
           {mentionQ!==null&&<MentionDropdown miembros={miembros} query={mentionQ} onSelect={insertMention}/>}
           {selectedImage && (
-            <div className="mx-3 mt-3 rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-2.5 shadow-sm animate-in fade-in zoom-in-95 duration-200">
+            <div className="mx-3 mt-3 rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-2.5 shadow-sm animate-in fade-in zoom-in-95 duration-200">
               <div className="relative overflow-hidden rounded-xl">
                 <img src={selectedImage.previewUrl} alt="Vista previa" className="max-h-52 w-full object-cover" />
                 <button onClick={()=>{ if (selectedImage.previewUrl) URL.revokeObjectURL(selectedImage.previewUrl); setSelectedImage(null); if (fileRef.current) fileRef.current.value = ""; }}
@@ -3099,6 +3134,21 @@ function MessageInput({ canalId, canalNombre, replyTo, editingMsg, miembros, cur
                 </button>
               </div>
               <p className="mt-2 truncate text-xs font-medium text-slate-500">{selectedImage.file.name}</p>
+            </div>
+          )}
+          {selectedFile && (
+            <div className="mx-3 mt-3 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 shadow-sm animate-in fade-in zoom-in-95 duration-200">
+              <div className="h-9 w-9 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                <FileText size={16}/>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="truncate text-sm font-semibold text-slate-700">{selectedFile.name}</p>
+                <p className="text-[11px] text-slate-400">{(selectedFile.size / 1024).toFixed(0)} KB · {selectedFile.mime}</p>
+              </div>
+              <button onClick={()=>{ setSelectedFile(null); if (attachFileRef.current) attachFileRef.current.value = ""; }}
+                className="shrink-0 rounded-full bg-slate-200 p-1 text-slate-500 hover:bg-slate-300 transition-colors">
+                <X size={12}/>
+              </button>
             </div>
           )}
           <textarea ref={taRef} value={text} onChange={handleChange} onKeyDown={handleKey} onPaste={handlePaste}
@@ -3122,6 +3172,18 @@ function MessageInput({ canalId, canalNombre, replyTo, editingMsg, miembros, cur
               className="hidden"
               onChange={e=>chooseImage(e.target.files?.[0] || null)}
             />
+            <input
+              ref={attachFileRef}
+              type="file"
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv"
+              className="hidden"
+              onChange={e => {
+                const f = e.target.files?.[0];
+                if (!f) return;
+                setSelectedFile({ file: f, name: f.name, size: f.size, mime: f.type });
+                setSelectedImage(null);
+              }}
+            />
             <button
               ref={emojiButtonRef}
               onMouseDown={(event)=>event.preventDefault()}
@@ -3137,7 +3199,11 @@ function MessageInput({ canalId, canalNombre, replyTo, editingMsg, miembros, cur
               className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors">
               <AtSign size={16}/>
             </button>
-            <button title="Adjuntar imagen" onClick={()=>fileRef.current?.click()}
+            <button title="Adjuntar imagen" onClick={()=>{ setSelectedFile(null); fileRef.current?.click(); }}
+              className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors">
+              <ImageIcon size={16}/>
+            </button>
+            <button title="Adjuntar archivo (PDF, Word, Excel...)" onClick={()=>{ setSelectedImage(null); attachFileRef.current?.click(); }}
               className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors">
               <Paperclip size={16}/>
             </button>
@@ -3919,7 +3985,10 @@ export default function Chat() {
     void fetchFavorites(canalActivo.id);
   }, [canalActivoId, fetchFavorites]);
 
-  const handleSend = async (text: string, gifUrl?: string, replyId?: string, editId?: string, imageUrl?: string) => {
+  const handleSend = async (
+    text: string, gifUrl?: string, replyId?: string, editId?: string,
+    imageUrl?: string, fileUrl?: string, fileName?: string, fileMime?: string
+  ) => {
     if (editId) {
       const h = await hdr();
       const res = await fetch(`/api/chat/mensajes/${editId}`, {
@@ -3931,9 +4000,10 @@ export default function Chat() {
     }
     if (!canalActivo) return;
     const h = await hdr();
-    const body: Record<string,any> = { contenido: text || (gifUrl ? "GIF" : imageUrl ? IMAGE_PLACEHOLDER_TEXT : "") };
+    const body: Record<string,any> = { contenido: text || (gifUrl ? "GIF" : imageUrl ? IMAGE_PLACEHOLDER_TEXT : fileUrl ? (fileName || "Archivo") : "") };
     if (gifUrl) body.gif_url = gifUrl;
     if (imageUrl) body.image_url = imageUrl;
+    if (fileUrl) { body.file_url = fileUrl; body.file_name = fileName; body.file_mime = fileMime; }
     if (replyId) body.reply_to_id = replyId;
     const res = await fetch(`/api/chat/canales/${canalActivo.id}/mensajes`, {
       method:"POST", headers: h, body: JSON.stringify(body),

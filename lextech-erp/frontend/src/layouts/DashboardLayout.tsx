@@ -1102,8 +1102,10 @@ export default function DashboardLayout() {
         />
       )}
 
-      {/* VantIA flotante — siempre visible, contextual según la ruta */}
-      <VantIAWidget pathname={location.pathname} getToken={getToken} />
+      {/* VantIA flotante — oculto en módulos con su propio chat */}
+      {!location.pathname.startsWith('/dashboard/chat') && (
+        <VantIAWidget pathname={location.pathname} getToken={getToken} />
+      )}
 
       {/* Sidebar Desktop */}
       <aside className={`hidden md:flex flex-col fixed inset-y-0 z-30 transition-all duration-300 ${isCollapsed ? "w-16" : "w-64"}`}>

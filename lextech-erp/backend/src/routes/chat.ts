@@ -13,13 +13,15 @@ import {
   updateMyStatus, updateMyRole,
   getCanalesDisponibles, joinCanal, leaveCanal,
   addMiembro, removeMiembro, updateMiembroRole,
-  getSystemUsers, buscarCanalesDisponibles, getUnreadCounts, uploadChatImage,
+  getSystemUsers, buscarCanalesDisponibles, getUnreadCounts, uploadChatImage, uploadChatFile,
   getTypingStatus, updateTypingStatus,
 } from '../controllers/chatController';
 
 const router = Router();
 const uploadDir = UPLOADS_CHAT_ROOT;
+const fileUploadDir = path.join(UPLOADS_CHAT_ROOT, 'files');
 fs.mkdirSync(uploadDir, { recursive: true });
+fs.mkdirSync(fileUploadDir, { recursive: true });
 
 const chatUpload = multer({
   storage: multer.diskStorage({
@@ -35,6 +37,29 @@ const chatUpload = multer({
     cb(null, true);
   },
   limits: { fileSize: 10 * 1024 * 1024 },
+});
+
+const ALLOWED_FILE_TYPES = [
+  'image/', 'application/pdf', 'application/msword',
+  'application/vnd.openxmlformats-officedocument',
+  'application/vnd.ms-excel', 'application/vnd.ms-powerpoint',
+  'text/plain', 'text/csv',
+];
+
+const chatFileUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, fileUploadDir),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname || '').toLowerCase() || '.bin';
+      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${ext}`);
+    },
+  }),
+  fileFilter: (_req, file, cb) => {
+    const allowed = ALLOWED_FILE_TYPES.some(t => file.mimetype.startsWith(t));
+    if (!allowed) return cb(new Error('Tipo de archivo no permitido'));
+    cb(null, true);
+  },
+  limits: { fileSize: 20 * 1024 * 1024 },
 });
 
 // Canales (orden importante: rutas con segmento fijo antes que :id)
@@ -62,6 +87,7 @@ router.post  ('/canales/:id/mensajes',           requireAuth, sendMensaje);
 router.get   ('/canales/:id/typing',             requireAuth, getTypingStatus);
 router.post  ('/canales/:id/typing',             requireAuth, updateTypingStatus);
 router.post  ('/uploads/image',                  requireAuth, chatUpload.single('image'), uploadChatImage);
+router.post  ('/uploads/file',                   requireAuth, chatFileUpload.single('file'), uploadChatFile);
 
 // Mensajes (editar / borrar)
 router.put   ('/mensajes/:id',                   requireAuth, editMensaje);

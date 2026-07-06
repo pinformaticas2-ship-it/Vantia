@@ -821,6 +821,9 @@ export async function runMigrations(): Promise<void> {
       ['avatar_url', `VARCHAR(500)`],
       ['gif_url',    `VARCHAR(1000)`],
       ['image_url',  `VARCHAR(1000)`],
+      ['file_url',   `VARCHAR(1000)`],
+      ['file_name',  `VARCHAR(500)`],
+      ['file_mime',  `VARCHAR(200)`],
     ];
     for (const [col, def] of chatMensajesCols) {
       try { await client.query(`ALTER TABLE chat_mensajes ADD COLUMN IF NOT EXISTS ${col} ${def};`); } catch (_e: any) {}

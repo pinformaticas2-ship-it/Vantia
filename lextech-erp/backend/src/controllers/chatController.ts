@@ -251,15 +251,15 @@ export async function sendMensaje(req: Request, res: Response) {
   const avatarUrl = (req as any).auth?.sessionClaims?.picture || null;
   if (!userId) return err(res, 'No autenticado', 401);
   const { id } = req.params;
-  const { contenido, tipo = 'texto', reply_to_id, gif_url, image_url } = req.body;
-  if (!contenido?.trim() && !gif_url && !image_url) return err(res, 'Contenido vacío', 400);
+  const { contenido, tipo = 'texto', reply_to_id, gif_url, image_url, file_url, file_name, file_mime } = req.body;
+  if (!contenido?.trim() && !gif_url && !image_url && !file_url) return err(res, 'Contenido vacío', 400);
   try {
-    const normalizedType = image_url ? 'imagen' : gif_url ? 'gif' : tipo;
-    const fallbackContent = gif_url ? 'GIF' : image_url ? 'Imagen' : '';
+    const normalizedType = file_url ? 'archivo' : image_url ? 'imagen' : gif_url ? 'gif' : tipo;
+    const fallbackContent = gif_url ? 'GIF' : image_url ? 'Imagen' : file_url ? (file_name || 'Archivo') : '';
     const { rows } = await pool.query(`
-      INSERT INTO chat_mensajes (canal_id, user_id, user_name, avatar_url, contenido, tipo, reply_to_id, gif_url, image_url)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *
-    `, [id, userId, userName, avatarUrl, (contenido || '').trim() || fallbackContent, normalizedType, reply_to_id || null, gif_url || null, image_url || null]);
+      INSERT INTO chat_mensajes (canal_id, user_id, user_name, avatar_url, contenido, tipo, reply_to_id, gif_url, image_url, file_url, file_name, file_mime)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *
+    `, [id, userId, userName, avatarUrl, (contenido || '').trim() || fallbackContent, normalizedType, reply_to_id || null, gif_url || null, image_url || null, file_url || null, file_name || null, file_mime || null]);
     const msg: any = { ...rows[0], reacciones: null, reply_to: null };
     if (reply_to_id) {
       const { rows: r } = await pool.query(`SELECT * FROM chat_mensajes WHERE id = $1`, [reply_to_id]);
@@ -289,6 +289,20 @@ export async function uploadChatImage(req: Request, res: Response) {
     original_name: file.originalname,
     mimetype: file.mimetype,
     size: file.size,
+  }, 201);
+}
+
+export async function uploadChatFile(req: Request, res: Response) {
+  const userId = (req as any).auth?.userId;
+  if (!userId) return err(res, 'No autenticado', 401);
+  const file = (req as any).file as Express.Multer.File | undefined;
+  if (!file) return err(res, 'Archivo requerido', 400);
+  const fileUrl = path.posix.join('/uploads', 'chat', 'files', file.filename);
+  return ok(res, {
+    file_url: fileUrl,
+    file_name: file.originalname,
+    file_mime: file.mimetype,
+    file_size: file.size,
   }, 201);
 }
 
