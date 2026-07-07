@@ -1,7 +1,8 @@
-﻿import React, { useEffect, useState, useRef, useCallback } from "react";
+﻿import React, { useContext, useEffect, useState, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
+import { SidebarContext } from "../layouts/DashboardLayout";
 import {
   Edit3, Loader2, AlertCircle,
   Mail, Phone, MapPin, User, Briefcase,
@@ -3615,6 +3616,7 @@ export default function ClientDetail() {
   const { id } = useParams<{ id: string }>();
   const { getToken } = useAuth();
   const navigate = useNavigate();
+  const { isCollapsed } = useContext(SidebarContext);
   const [searchParams, setSearchParams] = useSearchParams();
   const [client, setClient] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -3801,146 +3803,124 @@ export default function ClientDetail() {
   };
 
   return (
-    <div className="flex gap-6 h-full animate-in fade-in duration-500">
+    <div className="flex flex-col h-full overflow-hidden">
 
-      {/* ── COLUMNA PRINCIPAL ──────────────────────────────────── */}
-      <div className="flex-1 min-w-0 flex flex-col min-h-0 gap-4">
-
-        {/* Breadcrumb + acciones */}
-        <div className="flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2 text-sm text-slate-500">
-            <Link to="/dashboard/clientes" className="hover:text-slate-800 transition-colors">Clientes</Link>
-            <span>/</span>
-            <span className="text-slate-800 font-medium">{client.first_name} {client.last_name}</span>
-          </div>
-          <div className="flex gap-2">
-            <BackButton onClick={() => navigate("/dashboard/clientes")} />
-            {editing ? (
-              <>
-                <button
-                  onClick={() => { setEditing(false); setEditForm(null); }}
-                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl shadow-sm active:scale-95 transition-all"
-                >
-                  <X size={14} /> Cancelar
-                </button>
-                <button
-                  onClick={handleSaveClient}
-                  disabled={saving || (!editForm?.first_name?.trim() && !editForm?.commercial_name?.trim())}
-                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-xl shadow-sm active:scale-95 transition-all"
-                >
-                  {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-                  Guardar cambios
-                </button>
-              </>
-            ) : (
+      {/* ── Sticky header ── */}
+      <div className="anim-fade-up px-6 sm:px-8 py-4 bg-white border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 flex-shrink-0 shadow-sm z-20">
+        <div className="flex items-center gap-4 min-w-0">
+          {client.photo_url
+            ? (
               <button
-                onClick={startEdit}
-                className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm active:scale-95 transition-all"
+                onClick={() => setPhotoZoom(true)}
+                className="shrink-0 rounded-xl overflow-hidden shadow focus:outline-none focus:ring-2 focus:ring-red-400 cursor-zoom-in"
+                title="Ver foto ampliada"
               >
-                <Edit3 size={14} /> Editar
+                <img src={client.photo_url} alt="Foto" className="h-12 w-12 object-cover hover:scale-105 transition-transform duration-200" />
               </button>
-            )}
-          </div>
-        </div>
+            )
+            : (
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500 to-red-600 text-white flex items-center justify-center shadow-md shadow-red-500/20 flex-shrink-0 font-bold text-lg">
+                {initials}
+              </div>
+            )
+          }
 
-        {/* Header tarjeta del cliente */}
-        <div className="bg-white border border-slate-200 rounded-xl p-5 shrink-0">
-          <div className="flex items-center gap-4">
-            {client.photo_url
-              ? (
+          {/* Lightbox foto */}
+          {photoZoom && client.photo_url && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+              onClick={() => setPhotoZoom(false)}
+            >
+              <div className="relative max-w-2xl w-full mx-4" onClick={e => e.stopPropagation()}>
+                <img
+                  src={client.photo_url}
+                  alt="Foto ampliada"
+                  className="w-full rounded-2xl shadow-2xl object-contain max-h-[90vh]"
+                />
                 <button
-                  onClick={() => setPhotoZoom(true)}
-                  className="shrink-0 rounded-xl overflow-hidden shadow focus:outline-none focus:ring-2 focus:ring-red-400 cursor-zoom-in"
-                  title="Ver foto ampliada"
+                  onClick={() => setPhotoZoom(false)}
+                  className="absolute -top-3 -right-3 bg-white rounded-full p-1.5 shadow-lg text-slate-500 hover:text-slate-800 transition-colors"
                 >
-                  <img src={client.photo_url} alt="Foto" className="h-16 w-16 object-cover hover:scale-105 transition-transform duration-200" />
+                  <X size={16} />
                 </button>
-              )
-              : (
-                <div className="h-16 w-16 bg-gradient-to-br from-red-500 to-red-700 rounded-xl flex items-center justify-center text-white font-bold text-2xl shadow-lg shadow-red-200 shrink-0">
-                  {initials}
-                </div>
-              )
-            }
-
-            {/* Lightbox foto */}
-            {photoZoom && client.photo_url && (
-              <div
-                className="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
-                onClick={() => setPhotoZoom(false)}
-              >
-                <div className="relative max-w-2xl w-full mx-4" onClick={e => e.stopPropagation()}>
-                  <img
-                    src={client.photo_url}
-                    alt="Foto ampliada"
-                    className="w-full rounded-2xl shadow-2xl object-contain max-h-[90vh]"
-                  />
-                  <button
-                    onClick={() => setPhotoZoom(false)}
-                    className="absolute -top-3 -right-3 bg-white rounded-full p-1.5 shadow-lg text-slate-500 hover:text-slate-800 transition-colors"
-                  >
-                    <X size={16} />
-                  </button>
-                  <p className="text-center text-white/70 text-xs mt-3">
-                    {client.first_name} {client.last_name}
-                  </p>
-                </div>
-              </div>
-            )}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-xl font-bold text-slate-900 truncate">
+                <p className="text-center text-white/70 text-xs mt-3">
                   {client.first_name} {client.last_name}
-                </h1>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${statusColor[client.client_status] || "bg-slate-100 text-slate-600"}`}>
-                  {client.client_status || "Alta"}
-                </span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${typeColor[client.type] || "bg-slate-100 text-slate-600"}`}>
-                  {client.type || "Cliente"}
-                </span>
+                </p>
               </div>
-              {client.commercial_name && <p className="text-slate-500 text-sm mt-0.5">{client.commercial_name}</p>}
-              <div className="flex items-center gap-4 mt-2 text-xs text-slate-400 flex-wrap">
-                {client.nif_cif && (
-                  <span className="flex items-center gap-1 font-mono"><Hash size={11} />{client.nif_cif}</span>
-                )}
-                {client.internal_number && (
-                  <span className="flex items-center gap-1">Nº {client.internal_number}</span>
-                )}
-                {client.date_alta && (
-                  <span className="flex items-center gap-1"><Calendar size={11} /> Alta: {formatDate(client.date_alta)}</span>
-                )}
-              </div>
+            </div>
+          )}
+
+          <div className="flex flex-col justify-center min-w-0">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <h1 className="text-xl font-extrabold text-slate-800 leading-none tracking-tight truncate">
+                {client.first_name} {client.last_name}
+              </h1>
+              <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest leading-none ${statusColor[client.client_status] || "bg-slate-100 text-slate-600"}`}>
+                {client.client_status || "Alta"}
+              </span>
+              <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest leading-none ${typeColor[client.type] || "bg-slate-100 text-slate-600"}`}>
+                {client.type || "Cliente"}
+              </span>
+            </div>
+            <div className="flex items-center gap-4 text-[11px] font-medium text-slate-500 flex-wrap">
+              {client.commercial_name && <span className="font-bold text-slate-700 tracking-wide uppercase">{client.commercial_name}</span>}
+              {client.nif_cif && (
+                <span className="flex items-center gap-1.5 font-mono"><Hash size={11} className="text-slate-400" />{client.nif_cif}</span>
+              )}
+              {client.internal_number && (
+                <span className="flex items-center gap-1.5">Nº {client.internal_number}</span>
+              )}
+              {client.date_alta && (
+                <span className="flex items-center gap-1.5"><Calendar size={11} className="text-slate-400" /> Alta: {formatDate(client.date_alta)}</span>
+              )}
             </div>
           </div>
         </div>
+        <div className="flex items-center gap-2.5 shrink-0">
+          <BackButton onClick={() => navigate("/dashboard/clientes")} />
+          {editing ? (
+            <>
+              <button onClick={() => { setEditing(false); setEditForm(null); }} className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl shadow-sm active:scale-95 transition-all">
+                <X size={14} /> Cancelar
+              </button>
+              <button onClick={handleSaveClient} disabled={saving || (!editForm?.first_name?.trim() && !editForm?.commercial_name?.trim())} className="flex items-center gap-1.5 px-5 py-2.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-xl shadow-sm active:scale-95 transition-all ml-1">
+                {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Guardar cambios
+              </button>
+            </>
+          ) : (
+            <button onClick={startEdit} className="flex items-center gap-1.5 px-5 py-2.5 text-xs font-bold text-white bg-red-600 border border-red-700 hover:bg-red-700 rounded-xl shadow-sm active:scale-95 transition-all ml-1">
+              <Edit3 size={14} /> Editar
+            </button>
+          )}
+        </div>
+      </div>
 
-        {/* ── TABS ────────────────────────────────────────────── */}
-        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden flex-1 min-h-0 flex flex-col">
-          {/* Barra de tabs */}
-          <div className="flex border-b border-slate-100 shrink-0">
-            {TABS.map(tab => {
-              const Icon = tab.icon;
-              const active = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => handleTabChange(tab.id)}
-                  className={`flex items-center gap-2 px-5 py-3.5 text-[12px] font-bold whitespace-nowrap transition-all border-b-2 ${
-                    active
-                      ? "border-red-600 text-red-600 bg-red-50/50"
-                      : "border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50"
-                  }`}
-                >
-                  <Icon size={13} />
-                  {tab.label}
-                </button>
-              );
-            })}
+      {/* ── 3-column body ── */}
+      <div className="flex-1 overflow-auto bg-[#f4f6f8]">
+        <div className={`w-full p-6 sm:p-8 flex flex-col gap-8 items-start ${isCollapsed ? "md:flex-row" : "lg:flex-row"}`}>
+
+          {/* Columna 1: Nav vertical */}
+          <div className={`anim-fade-up w-full flex-shrink-0 ${isCollapsed ? "md:w-56 md:sticky md:top-6" : "lg:w-56 lg:sticky lg:top-6"}`} style={{ animationDelay: '60ms' }}>
+            <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 mb-3">Secciones del Cliente</h3>
+            <nav className="flex flex-col gap-0.5">
+              {TABS.map(tabItem => {
+                const Icon = tabItem.icon;
+                const active = activeTab === tabItem.id;
+                return (
+                  <button key={tabItem.id} onClick={() => handleTabChange(tabItem.id)}
+                    className={`rounded-xl px-4 py-2.5 flex items-center gap-3 text-sm transition-all text-left ${active ? "bg-white text-red-600 shadow-sm ring-1 ring-slate-200/50 font-semibold" : "text-slate-600 hover:bg-white hover:shadow-sm hover:text-slate-900 font-medium"}`}
+                  >
+                    <Icon size={14} className={active ? "text-red-500 shrink-0" : "text-slate-400 shrink-0"} />
+                    {tabItem.label}
+                    {active && <div className="w-1.5 h-1.5 rounded-full bg-red-500 ml-auto shrink-0 shadow-[0_0_6px_rgba(239,68,68,0.7)]" />}
+                  </button>
+                );
+              })}
+            </nav>
           </div>
 
-          {/* Contenido del tab activo — lazy-mount: monta al primer acceso, oculta con CSS */}
-          <div className="p-5 flex-1 overflow-y-auto min-h-0">
+          {/* Columna 2: Contenido principal */}
+          <div className="anim-fade-up flex-1 min-w-0 flex flex-col gap-6 w-full" style={{ animationDelay: '130ms' }}>
             <div style={{ display: activeTab === "perfil" ? "block" : "none" }}>
               {!editing && <TabPerfil client={client} formatDate={formatDate} age={age} />}
               {editing && editForm && (
@@ -4089,11 +4069,14 @@ export default function ClientDetail() {
               </div>
             )}
           </div>
+
+          {/* Columna 3: Panel indicadores */}
+          <div className={`anim-fade-up w-full flex-shrink-0 ${isCollapsed ? "md:w-[280px] md:sticky md:top-6" : "lg:w-[280px] xl:w-[300px] lg:sticky lg:top-6"}`} style={{ animationDelay: '200ms' }}>
+            <PanelIndicadores clientId={id!} onTabChange={handleTabChange} />
+          </div>
+
         </div>
       </div>
-
-      {/* ── PANEL INDICADORES ───────────────────────────────── */}
-      <PanelIndicadores clientId={id!} onTabChange={handleTabChange} />
     </div>
   );
 }
