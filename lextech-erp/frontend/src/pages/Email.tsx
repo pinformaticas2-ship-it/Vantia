@@ -35,7 +35,7 @@ const GMAIL_SCOPES = [
 ].join(' ');
 const GMAIL_TOKEN_KEY = 'lextech-gmail-token-v1';
 const LOCAL_DRAFTS_KEY = 'lextech-email-drafts-v1';
-const MAIL_THEME_KEY = 'lextech-email-theme-v1';
+const MAIL_THEME_KEY = 'lextech-email-theme-v2';
 type MailTheme = 'dark' | 'light';
 // Key de pineados es por cuenta (evita que se mezclen Gmail e IMAP)
 const pinnedKey = (accountKey: string) => `lextech-email-pinned-${accountKey}`;
@@ -3105,7 +3105,7 @@ export default function Email() {
   const [showConnectModal, setShowConnectModal] = useState(false);
   const [ribbonTab, setRibbonTab]               = useState<RibbonTab>('inicio');
   const [mailTheme, setMailTheme]                = useState<MailTheme>(
-    () => (localStorage.getItem(MAIL_THEME_KEY) as MailTheme) || 'dark',
+    () => (localStorage.getItem(MAIL_THEME_KEY) as MailTheme) || 'light',
   );
   useEffect(() => { localStorage.setItem(MAIL_THEME_KEY, mailTheme); }, [mailTheme]);
   const [showSignatures, setShowSignatures]     = useState(false);
