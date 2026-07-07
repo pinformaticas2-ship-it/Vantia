@@ -1313,6 +1313,7 @@ function Sidebar({
     labels.map((label) => [label.id, Number(label.messagesUnread ?? label.messagesTotal ?? 0)]),
   );
 
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const isLight = theme === 'light';
   const cx = (dark: string, light: string) => (isLight ? light : dark);
   const containerCls = cx('bg-[linear-gradient(180deg,#0f172a_0%,#111827_100%)] text-slate-200', 'bg-slate-50 text-slate-600');
@@ -1333,18 +1334,18 @@ function Sidebar({
   const inactiveIconCls = cx('text-slate-500', 'text-slate-400');
   const badgeActiveCls = cx('bg-red-500/20 text-red-200', 'bg-red-100 text-red-700');
   const badgeInactiveCls = cx('bg-white/10 text-slate-300', 'bg-slate-200 text-slate-600');
-  const rowActiveBgCls = cx('bg-gradient-to-r from-red-600/20 to-transparent', 'bg-red-50');
-  const rowHoverCls = cx('hover:bg-white/6', 'hover:bg-slate-100');
   const nameActiveCls = cx('text-white', 'text-slate-800');
-  const nameInactiveCls = cx('text-slate-300', 'text-slate-600');
 
   return (
     <div className={`flex h-full min-h-0 flex-col ${containerCls}`}>
       {/* User info + Compose */}
-      <div className={`flex-shrink-0 border-b px-3 pt-4 pb-3 flex flex-col gap-3 ${sectionBorderCls}`}>
-        <div className={`flex items-center justify-between gap-2 p-2 rounded-lg border cursor-pointer transition-colors ${
-          cx('border-white/10 bg-white/5 hover:border-white/20', 'border-slate-200 bg-white hover:border-slate-300')
-        }`}>
+      <div className={`flex-shrink-0 border-b px-3 pt-4 pb-3 flex flex-col gap-3 relative ${sectionBorderCls}`}>
+        <button
+          type="button"
+          onClick={() => setAccountMenuOpen((o) => !o)}
+          className={`flex items-center justify-between gap-2 p-2 rounded-lg border transition-colors text-left ${
+            cx('border-white/10 bg-white/5 hover:border-white/20', 'border-slate-200 bg-white hover:border-slate-300')
+          }`}>
           <div className="flex items-center gap-2.5 min-w-0 overflow-hidden">
             <Avatar name={userName} email={userEmail} src={userAvatar} size={30} />
             <div className="min-w-0 flex-1">
@@ -1356,8 +1357,115 @@ function Sidebar({
               </p>
             </div>
           </div>
-          <ChevronDown size={12} className={mutedTextCls} />
-        </div>
+          <ChevronDown size={12} className={`flex-shrink-0 transition-transform ${mutedTextCls} ${accountMenuOpen ? 'rotate-180' : ''}`} />
+        </button>
+
+        {accountMenuOpen && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setAccountMenuOpen(false)} />
+            <div className="absolute left-3 right-3 top-[calc(100%-8px)] z-50 rounded-xl border border-gray-200 bg-white shadow-xl overflow-hidden py-1.5 max-h-[60vh] overflow-y-auto">
+              <p className="px-3 pt-1.5 pb-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Cuentas conectadas</p>
+
+              {savedGmailProfiles.map(profile => {
+                const isActive = gmailConnected && gmailProfile?.emailAddress === profile.email && !selectedImapAccountId;
+                const tokenOk = gmailConnected && gmailProfile?.emailAddress === profile.email;
+                const needsReauth = !isActive && !tokenOk;
+                return (
+                  <div key={profile.id} className={`group mx-1.5 flex items-center gap-1 rounded-lg px-2 py-1.5 transition-colors ${isActive ? 'bg-red-50' : 'hover:bg-gray-50'}`}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isActive) onSelectGmail(); else onReconnectGoogleProfile(profile);
+                        setAccountMenuOpen(false);
+                      }}
+                      title={needsReauth ? 'Sesión expirada — haz clic para volver a conectar' : undefined}
+                      className="flex flex-1 items-center gap-2 min-w-0 px-1 py-0.5 text-left">
+                      <svg width={13} height={13} viewBox="0 0 24 24" className="flex-shrink-0">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                      </svg>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[12px] font-medium truncate text-gray-800">{profile.display_name || profile.email}</p>
+                        <p className="text-[10.5px] truncate text-gray-400">{profile.email}</p>
+                      </div>
+                      {isActive && <div className="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" />}
+                      {needsReauth && (
+                        <AlertCircle size={11} className="text-orange-400 flex-shrink-0" title="Sesión expirada" />
+                      )}
+                    </button>
+                    {isActive ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); onSync(); }}
+                          disabled={syncing}
+                          title="Sincronizar"
+                          className="opacity-0 group-hover:opacity-100 p-1 rounded-md text-gray-400 hover:text-[#ab0433] hover:bg-red-50 transition-all flex-shrink-0">
+                          <RefreshCw size={12} className={syncing ? 'animate-spin' : ''} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); onDisconnectGmail(); setAccountMenuOpen(false); }}
+                          title="Desconectar"
+                          className="opacity-0 group-hover:opacity-100 p-1 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all flex-shrink-0">
+                          <LogIn size={12} className="rotate-180" />
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); onDeleteGoogleProfile(profile.id); }}
+                        title="Borrar cuenta guardada"
+                        className="opacity-0 group-hover:opacity-100 p-1 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all flex-shrink-0">
+                        <Trash2 size={12} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+
+              {imapAccounts.map(acc => (
+                <div key={acc.id} className={`group mx-1.5 flex items-center gap-1 rounded-lg px-2 py-1.5 transition-colors ${
+                  selectedImapAccountId === acc.id ? 'bg-red-50' : 'hover:bg-gray-50'
+                }`}>
+                  <button
+                    type="button"
+                    onClick={() => { onSelectImapAccount(acc.id); setAccountMenuOpen(false); }}
+                    className="flex flex-1 items-center gap-2 min-w-0 px-1 py-0.5 text-left">
+                    <div className="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[12px] font-medium truncate text-gray-800">{acc.label || acc.email}</p>
+                      <p className="text-[10.5px] truncate text-gray-400">{acc.email}</p>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onDeleteImapAccount(acc.id); }}
+                    title="Borrar cuenta"
+                    className="opacity-0 group-hover:opacity-100 p-1 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all flex-shrink-0">
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              ))}
+
+              {savedGmailProfiles.length === 0 && imapAccounts.length === 0 && (
+                <p className="px-3 py-2 text-[11.5px] text-gray-400">Solo tienes esta cuenta conectada.</p>
+              )}
+
+              <div className="mt-1 pt-1 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => { onConnectAccount(); setAccountMenuOpen(false); }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-[12.5px] font-medium text-[#ab0433] hover:bg-red-50 transition-colors">
+                  <Plus size={13} /> Conectar cuenta
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
         {/* Compose */}
         <button
           onClick={onCompose}
@@ -1542,102 +1650,6 @@ function Sidebar({
               <Plus size={12} />
               Nueva etiqueta
             </button>
-          </div>
-        )}
-
-        {/* Otras cuentas */}
-        {(savedGmailProfiles.length > 0 || imapAccounts.length > 0) && (
-          <div className={`mt-2 border-t pt-2 ${sectionBorderCls}`}>
-            <div className="px-3 pb-1 flex items-center justify-between">
-              <p className={`text-[10px] font-semibold uppercase tracking-wider ${sectionLabelCls}`}>Otras cuentas</p>
-            </div>
-
-            {savedGmailProfiles.map(profile => {
-              const isActive = gmailConnected && gmailProfile?.emailAddress === profile.email && !selectedImapAccountId;
-              const tokenOk = gmailConnected && gmailProfile?.emailAddress === profile.email;
-              const needsReauth = !isActive && !tokenOk;
-              return (
-                <div
-                  key={profile.id}
-                  className={`group mx-2 flex items-center gap-1 rounded-lg px-2 py-1 transition-colors ${
-                    isActive ? rowActiveBgCls : rowHoverCls
-                  }`}>
-                  <button
-                    type="button"
-                    onClick={() => isActive ? onSelectGmail() : onReconnectGoogleProfile(profile)}
-                    title={needsReauth ? 'Sesión expirada — haz clic para volver a conectar' : undefined}
-                    className="flex flex-1 items-center gap-2 min-w-0 px-1 py-1 text-left">
-                    <svg width={12} height={12} viewBox="0 0 24 24" className="flex-shrink-0">
-                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                    </svg>
-                    <div className="min-w-0 flex-1">
-                      <p className={`text-[11px] font-medium truncate ${isActive ? nameActiveCls : nameInactiveCls}`}>
-                        {profile.display_name || profile.email}
-                      </p>
-                      <p className={`text-[10px] truncate ${mutedTextCls}`}>{profile.email}</p>
-                    </div>
-                    {isActive && <div className="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" />}
-                    {needsReauth && (
-                      <AlertCircle size={11} className="text-orange-400 flex-shrink-0" title="Sesión expirada" />
-                    )}
-                  </button>
-                  {isActive && (
-                    <>
-                      <button onClick={onSync} disabled={syncing} title="Sincronizar"
-                        className={`opacity-0 group-hover:opacity-100 p-1 rounded-md transition-all flex-shrink-0 ${cx('text-red-300 hover:bg-white/6', 'text-red-600 hover:bg-slate-100')}`}>
-                        <RefreshCw size={11} className={syncing ? 'animate-spin' : ''} />
-                      </button>
-                      <button onClick={onDisconnectGmail} title="Desconectar"
-                        className={`opacity-0 group-hover:opacity-100 p-1 rounded-md transition-all flex-shrink-0 ${iconBtnCls}`}>
-                        <LogIn size={11} className="rotate-180" />
-                      </button>
-                    </>
-                  )}
-                  {!isActive && (
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); onDeleteGoogleProfile(profile.id); }}
-                      title="Borrar cuenta guardada"
-                      className={`opacity-0 group-hover:opacity-100 p-1 rounded-md transition-all flex-shrink-0 ${iconBtnCls}`}>
-                      <Trash2 size={12} />
-                    </button>
-                  )}
-                  {!isActive && !needsReauth && (
-                    <RotateCcw size={11} className="opacity-0 group-hover:opacity-100 text-slate-400 flex-shrink-0 mr-1" />
-                  )}
-                </div>
-              );
-            })}
-
-            {/* Cuentas IMAP */}
-            {imapAccounts.map(acc => (
-              <div
-                key={acc.id}
-                className={`group mx-2 flex items-center gap-1 rounded-lg px-2 py-1 transition-colors ${
-                  selectedImapAccountId === acc.id ? `${rowActiveBgCls} ${nameActiveCls}` : `${nameInactiveCls} ${rowHoverCls}`
-                }`}>
-                <button
-                  type="button"
-                  onClick={() => onSelectImapAccount(acc.id)}
-                  className="flex flex-1 items-center gap-2 min-w-0 px-1 py-1 text-left">
-                  <div className="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[11px] font-medium truncate">{acc.label || acc.email}</p>
-                    <p className={`text-[10px] truncate ${mutedTextCls}`}>{acc.email}</p>
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); onDeleteImapAccount(acc.id); }}
-                  title="Borrar cuenta"
-                      className={`opacity-0 group-hover:opacity-100 p-1 rounded-md transition-all flex-shrink-0 ${iconBtnCls}`}>
-                      <Trash2 size={12} />
-                    </button>
-              </div>
-            ))}
           </div>
         )}
 
