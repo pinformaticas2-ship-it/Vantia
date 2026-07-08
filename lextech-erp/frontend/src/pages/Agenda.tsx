@@ -1198,12 +1198,13 @@ function QuickEventPopover({
       <div className="fixed inset-0 z-[190]" onClick={onClose} />
       <div
         ref={cardRef}
-        className="fixed z-[200] w-[420px] flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_24px_64px_rgba(15,23,42,0.20)] quick-popup popup-card"
+        className="fixed z-[200] w-[480px] flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_24px_64px_rgba(15,23,42,0.20)] quick-popup popup-card"
         style={{
           left: pos?.left ?? position.x,
           top: pos?.top ?? position.y,
           visibility: pos ? "visible" : "hidden",
           maxHeight: "calc(100vh - 24px)",
+          maxWidth: "calc(100vw - 24px)",
         }}
         onClick={e => e.stopPropagation()}
       >
