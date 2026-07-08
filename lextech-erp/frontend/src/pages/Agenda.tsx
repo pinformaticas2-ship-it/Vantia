@@ -958,7 +958,7 @@ function QuickEventPopover({
   const [guestInput, setGuestInput] = useState("");
   const titleRef = useRef<HTMLInputElement>(null);
   const cardRef  = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+  const [pos, setPos] = useState<{ left: number; top: number; maxHeight: number; maxWidth: number } | null>(null);
 
   // ── Clientes para la pestaña "Tarea" (carga perezosa, solo al abrir esa pestaña) ──
   const [clientes, setClientes] = useState<{ id: string; name: string }[]>([]);
@@ -1024,30 +1024,50 @@ function QuickEventPopover({
 
   const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }));
 
-  // ── Posicionamiento medido: mide la tarjeta real (no un tamaño asumido)
-  // y hace flip/clamp contra los 4 bordes del viewport para que nunca se recorte.
+  // ── Posicionamiento medido: mide la tarjeta real (no un tamaño asumido) y calcula
+  // left/top/maxHeight/maxWidth en píxeles concretos (nada de calc(100vh) en CSS,
+  // que en algunos entornos no refleja el área realmente visible), con flip/clamp
+  // contra los 4 bordes del viewport para que nunca se recorte pulses donde pulses.
   useLayoutEffect(() => {
     const el = cardRef.current;
     if (!el) return;
     const margin = 12;
     const measure = () => {
+      // Usamos visualViewport cuando existe: refleja mejor el área realmente visible
+      // (zoom, teclados en pantalla, barras del SO) que window.innerWidth/Height.
+      const vv = window.visualViewport;
+      const vw = vv?.width  ?? window.innerWidth;
+      const vh = vv?.height ?? window.innerHeight;
+      const vOffsetX = vv?.offsetLeft ?? 0;
+      const vOffsetY = vv?.offsetTop  ?? 0;
+
+      const maxWidth  = Math.max(240, vw - margin * 2);
+      const maxHeight = Math.max(200, vh - margin * 2);
+
       const rect = el.getBoundingClientRect();
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
+      const width  = Math.min(rect.width, maxWidth);
+      const height = Math.min(rect.height, maxHeight);
+
       let left = position.x + margin;
       let top  = position.y - 20;
-      if (left + rect.width > vw - margin) left = position.x - rect.width - margin;
-      if (left < margin) left = margin;
-      if (left + rect.width > vw - margin) left = Math.max(margin, vw - rect.width - margin);
-      if (top + rect.height > vh - margin) top = vh - rect.height - margin;
-      if (top < margin) top = margin;
-      setPos({ left, top });
+      if (left + width > vOffsetX + vw - margin) left = position.x - width - margin;
+      if (left < vOffsetX + margin) left = vOffsetX + margin;
+      if (left + width > vOffsetX + vw - margin) left = Math.max(vOffsetX + margin, vOffsetX + vw - width - margin);
+      if (top + height > vOffsetY + vh - margin) top = vOffsetY + vh - height - margin;
+      if (top < vOffsetY + margin) top = vOffsetY + margin;
+
+      setPos({ left, top, maxHeight, maxWidth });
     };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     window.addEventListener("resize", measure);
-    return () => { ro.disconnect(); window.removeEventListener("resize", measure); };
+    window.visualViewport?.addEventListener("resize", measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", measure);
+      window.visualViewport?.removeEventListener("resize", measure);
+    };
   }, [position.x, position.y]);
 
   const missingTitle = !form.title.trim();
@@ -1203,8 +1223,8 @@ function QuickEventPopover({
           left: pos?.left ?? position.x,
           top: pos?.top ?? position.y,
           visibility: pos ? "visible" : "hidden",
-          maxHeight: "calc(100vh - 24px)",
-          maxWidth: "calc(100vw - 24px)",
+          maxHeight: pos ? `${pos.maxHeight}px` : "60vh",
+          maxWidth: pos ? `${pos.maxWidth}px` : "90vw",
         }}
         onClick={e => e.stopPropagation()}
       >
