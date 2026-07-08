@@ -1316,7 +1316,10 @@ function Sidebar({
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const isLight = theme === 'light';
   const cx = (dark: string, light: string) => (isLight ? light : dark);
-  const containerCls = cx('bg-[linear-gradient(180deg,#0f172a_0%,#111827_100%)] text-slate-200', 'bg-slate-50 text-slate-600');
+  const containerCls = cx(
+    'bg-[linear-gradient(180deg,#0f172a_0%,#111827_100%)] text-slate-200',
+    'bg-[radial-gradient(circle_at_top,rgba(171,4,51,0.06),transparent_55%),linear-gradient(180deg,#ffffff_0%,#f1f5f9_100%)] text-slate-600',
+  );
   const sectionBorderCls = cx('border-white/10', 'border-slate-200');
   const sectionLabelCls = 'text-slate-500';
   const mutedTextCls = cx('text-slate-400', 'text-slate-500');
@@ -2008,11 +2011,16 @@ function EmailReader({
             <div className={`px-8 pt-8 pb-7 relative overflow-hidden ${
               headerCx(
                 'border-b border-white/10 bg-gradient-to-br from-[#0f172a] via-[#1a2035] to-[#1e1a2e]',
-                'border-b border-slate-100 bg-white',
+                'border-b border-slate-100 bg-gradient-to-br from-white via-white to-red-50/40',
               )
             }`}>
-              {/* Decorative glow blob (solo tema oscuro) */}
-              {!headerIsLight && (
+              {/* Decorative glow blob */}
+              {headerIsLight ? (
+                <>
+                  <div className="absolute -top-12 -right-12 w-52 h-52 bg-[#ab0433]/[0.06] rounded-full blur-3xl pointer-events-none" />
+                  <div className="absolute bottom-0 left-1/4 w-72 h-24 bg-blue-600/[0.04] rounded-full blur-2xl pointer-events-none" />
+                </>
+              ) : (
                 <>
                   <div className="absolute -top-12 -right-12 w-52 h-52 bg-[#ab0433]/20 rounded-full blur-3xl pointer-events-none" />
                   <div className="absolute bottom-0 left-1/4 w-72 h-24 bg-blue-600/10 rounded-full blur-2xl pointer-events-none" />
