@@ -98,6 +98,7 @@ const EVENT_TYPES: Record<string, { label: string; color: string; bg: string; do
   vista:   { label: "Vista oral",   color: "text-red-700",    bg: "bg-red-500",    dot: "bg-red-500",    hex: "#ef4444", icon: Flag },
   reunion: { label: "Reunión",      color: "text-violet-700", bg: "bg-violet-500", dot: "bg-violet-500", hex: "#8b5cf6", icon: Users },
   plazo:   { label: "Plazo",        color: "text-amber-700",  bg: "bg-amber-500",  dot: "bg-amber-500",  hex: "#f59e0b", icon: AlertCircle },
+  tarea:   { label: "Tarea",        color: "text-indigo-700", bg: "bg-indigo-500", dot: "bg-indigo-500", hex: "#6366f1", icon: CheckCircle2 },
   llamada: { label: "Llamada",      color: "text-green-700",  bg: "bg-green-500",  dot: "bg-green-500",  hex: "#22c55e", icon: Phone },
   video:   { label: "Videollamada", color: "text-cyan-700",   bg: "bg-cyan-500",   dot: "bg-cyan-500",   hex: "#06b6d4", icon: Video },
   otro:    { label: "Otro",         color: "text-slate-700",  bg: "bg-slate-400",  dot: "bg-slate-400",  hex: "#94a3b8", icon: Circle },
@@ -947,12 +948,37 @@ function QuickEventPopover({
   events: AgendaEvent[];
   gcalEnabled?: boolean;
 }) {
+  const { getToken } = useAuth();
   const [form, setForm] = useState<AgendaFormData>(() => initialData || emptyForm(date));
   const [activeTab, setActiveTab] = useState<QuickTab>("evento");
   const [guestInput, setGuestInput] = useState("");
   const titleRef = useRef<HTMLInputElement>(null);
   const cardRef  = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+
+  // ── Clientes para la pestaña "Tarea" (carga perezosa, solo al abrir esa pestaña) ──
+  const [clientes, setClientes] = useState<{ id: string; name: string }[]>([]);
+  const [loadingClientes, setLoadingClientes] = useState(false);
+  useEffect(() => {
+    if (activeTab !== "tarea" || clientes.length > 0 || loadingClientes) return;
+    let cancelled = false;
+    (async () => {
+      setLoadingClientes(true);
+      try {
+        const token = await getToken({ skipCache: true });
+        const res = await fetch("/api/entities?limit=500", { headers: { Authorization: `Bearer ${token}` } });
+        const data = await safeJson(res);
+        if (!cancelled && res.ok) {
+          setClientes((data.data || []).map((c: any) => ({
+            id: c.id,
+            name: c.commercial_name || `${c.first_name || ""} ${c.last_name || ""}`.trim() || c.nif_cif || c.internal_number || c.id,
+          })));
+        }
+      } catch (_e) { /* noop */ }
+      finally { if (!cancelled) setLoadingClientes(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [activeTab, clientes.length, loadingClientes, getToken]);
 
   useEffect(() => { titleRef.current?.focus(); }, []);
 
@@ -1033,6 +1059,27 @@ function QuickEventPopover({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (missingTitle) return;
+
+    if (activeTab === "tarea") {
+      const clienteId = (form as any).cliente_id || null;
+      onSave({
+        ...form,
+        type: clienteId ? "plazo" : "tarea",
+        all_day: true,
+        start_at: inputToISO(form.all_day ? form.start_at : `${form.start_at.slice(0, 10)}T00:00`),
+        end_at: null,
+        cliente_id: clienteId,
+        expediente_id: null,
+        related_user_id: null,
+        related_user_name: null,
+        organization_context: null,
+        location: null,
+        with_meet: false,
+        guests: [],
+      });
+      return;
+    }
+
     onSave({
       ...form,
       start_at: inputToISO(form.start_at),
@@ -1043,7 +1090,7 @@ function QuickEventPopover({
     });
   };
 
-  const otherTab = QUICK_TABS.find(t => t.key === activeTab && t.key !== "evento");
+  const otherTab = QUICK_TABS.find(t => t.key === activeTab && t.key !== "evento" && t.key !== "tarea");
 
   return createPortal(
     <>
@@ -1086,25 +1133,8 @@ function QuickEventPopover({
           })}
         </div>
 
-        {activeTab !== "evento" ? (
-          <div className="flex flex-col items-center justify-center gap-2 px-6 py-10 text-center">
-            {otherTab && <otherTab.icon size={22} className="text-slate-300" />}
-            <p className="text-sm font-semibold text-slate-600">{otherTab?.label}</p>
-            <p className="max-w-[240px] text-xs text-slate-400">Esta sección estará disponible próximamente.</p>
-            <span className="mt-1 rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              Próximamente
-            </span>
-            <button
-              type="button"
-              onClick={() => setActiveTab("evento")}
-              className="mt-2 text-xs font-semibold text-red-600 hover:text-red-700 transition-colors"
-            >
-              Volver a Evento
-            </button>
-          </div>
-        ) : (
         <form onSubmit={handleSubmit} className="p-4 space-y-4 overflow-y-auto" style={{ maxHeight: Math.min(window.innerHeight - 24, 640) }}>
-          {/* Título */}
+          {/* Título — común a todas las pestañas */}
           <input
             ref={titleRef}
             value={form.title}
@@ -1113,163 +1143,217 @@ function QuickEventPopover({
             className="w-full border-0 border-b-2 border-slate-100 bg-transparent pb-2 text-[15px] font-semibold text-slate-900 placeholder:text-slate-300 focus:border-red-400 focus:outline-none transition-colors"
           />
 
-          {/* Fecha y hora */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Calendar size={13} className="text-slate-400 shrink-0" />
-              <input
-                type={form.all_day ? "date" : "datetime-local"}
-                value={form.all_day ? form.start_at.slice(0, 10) : form.start_at}
-                onChange={e => set("start_at", form.all_day ? e.target.value + "T00:00" : e.target.value)}
-                className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none transition-colors"
-              />
-            </div>
-            {!form.all_day && (
-              <div className="flex items-center gap-2 pl-[21px]">
-                <span className="text-[11px] text-slate-400 shrink-0">hasta</span>
-                <input
-                  type="datetime-local"
-                  value={form.end_at}
-                  onChange={e => set("end_at", e.target.value)}
-                  className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none transition-colors"
-                />
-                {durationLabel && (
-                  <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-600">
-                    {durationLabel}
-                  </span>
+          {activeTab === "evento" && (
+            <>
+              {/* Fecha y hora */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Calendar size={13} className="text-slate-400 shrink-0" />
+                  <input
+                    type={form.all_day ? "date" : "datetime-local"}
+                    value={form.all_day ? form.start_at.slice(0, 10) : form.start_at}
+                    onChange={e => set("start_at", form.all_day ? e.target.value + "T00:00" : e.target.value)}
+                    className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none transition-colors"
+                  />
+                </div>
+                {!form.all_day && (
+                  <div className="flex items-center gap-2 pl-[21px]">
+                    <span className="text-[11px] text-slate-400 shrink-0">hasta</span>
+                    <input
+                      type="datetime-local"
+                      value={form.end_at}
+                      onChange={e => set("end_at", e.target.value)}
+                      className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none transition-colors"
+                    />
+                    {durationLabel && (
+                      <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-600">
+                        {durationLabel}
+                      </span>
+                    )}
+                  </div>
                 )}
+                <label className="flex items-center gap-2 pl-[21px] text-xs text-slate-500 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={form.all_day}
+                    onChange={e => set("all_day", e.target.checked)}
+                    className="rounded border-slate-300 text-red-600 focus:ring-red-300"
+                  />
+                  Todo el día
+                </label>
               </div>
-            )}
-            <label className="flex items-center gap-2 pl-[21px] text-xs text-slate-500 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={form.all_day}
-                onChange={e => set("all_day", e.target.checked)}
-                className="rounded border-slate-300 text-red-600 focus:ring-red-300"
-              />
-              Todo el día
-            </label>
-          </div>
 
-          {/* Tipo + Color */}
-          <div className="flex items-center gap-2">
-            <Flag size={13} className="text-slate-400 shrink-0" />
-            <select
-              value={form.type}
-              onChange={e => set("type", e.target.value)}
-              className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none transition-colors"
-            >
-              {Object.entries(EVENT_TYPES).map(([k, v]) => (
-                <option key={k} value={k}>{v.label}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Color */}
-          <div className="flex flex-wrap gap-1.5 pl-[21px]">
-            {EVENT_COLORS.map(hex => (
-              <button
-                key={hex}
-                type="button"
-                onClick={() => set("color", form.color === hex ? "" : hex)}
-                className="w-5 h-5 rounded-full transition-transform hover:scale-110 focus:outline-none"
-                style={{ backgroundColor: hex, boxShadow: form.color === hex ? `0 0 0 2px white, 0 0 0 3px ${hex}` : undefined }}
-              />
-            ))}
-          </div>
-
-          {/* Ubicación */}
-          <div className="flex items-center gap-2">
-            <MapPin size={13} className="text-slate-400 shrink-0" />
-            <input
-              value={form.location}
-              onChange={e => set("location", e.target.value)}
-              placeholder="Añadir ubicación"
-              className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none transition-colors"
-            />
-          </div>
-
-          {/* Videoconferencia */}
-          <label className="flex items-center gap-2 text-xs text-slate-500 cursor-pointer select-none">
-            <Video size={13} className="text-slate-400 shrink-0" />
-            <input
-              type="checkbox"
-              checked={!!(form as any).with_meet}
-              onChange={e => set("with_meet", e.target.checked)}
-              className="rounded border-slate-300 text-red-600 focus:ring-red-300"
-            />
-            <span className="flex-1">Añadir videoconferencia de Google Meet</span>
-            {!gcalEnabled && (form as any).with_meet && (
-              <span className="shrink-0 text-[10px] font-semibold text-amber-600">Conecta Google</span>
-            )}
-          </label>
-
-          {/* Invitados */}
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2">
-              <Users size={13} className="text-slate-400 shrink-0" />
-              <input
-                value={guestInput}
-                onChange={e => setGuestInput(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addGuest(); } }}
-                onBlur={addGuest}
-                placeholder="Añadir invitados (email + Intro)"
-                className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none transition-colors"
-              />
-            </div>
-            {guestsList.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 pl-[21px]">
-                {guestsList.map(g => (
-                  <span key={g} className="flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">
-                    {g}
-                    <button type="button" onClick={() => removeGuest(g)} className="text-slate-400 hover:text-red-500">
-                      <X size={10} />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Disponibilidad (usuario relacionado del ERP) */}
-          {organizationUsers.length > 0 && (
-            <div className="space-y-1.5">
+              {/* Tipo + Color */}
               <div className="flex items-center gap-2">
-                <CheckCircle2 size={13} className="text-slate-400 shrink-0" />
+                <Flag size={13} className="text-slate-400 shrink-0" />
                 <select
-                  value={(form as any).related_user_id || ""}
-                  onChange={e => {
-                    const u = organizationUsers.find(o => o.user_id === e.target.value);
-                    set("related_user_id", e.target.value);
-                    set("related_user_name", u?.user_name || "");
-                  }}
+                  value={form.type}
+                  onChange={e => set("type", e.target.value)}
                   className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none transition-colors"
                 >
-                  <option value="">Comprobar disponibilidad de...</option>
-                  {organizationUsers.map(u => (
-                    <option key={u.user_id} value={u.user_id}>{u.user_name}</option>
+                  {Object.entries(EVENT_TYPES).map(([k, v]) => (
+                    <option key={k} value={k}>{v.label}</option>
                   ))}
                 </select>
               </div>
-              {availability && (
-                <p className={`pl-[21px] text-[11px] font-semibold ${availability === "free" ? "text-emerald-600" : "text-amber-600"}`}>
-                  {availability === "free" ? "✓ Todo el mundo está disponible" : "⚠ Puede haber conflicto de horario"}
-                </p>
+
+              {/* Color */}
+              <div className="flex flex-wrap gap-1.5 pl-[21px]">
+                {EVENT_COLORS.map(hex => (
+                  <button
+                    key={hex}
+                    type="button"
+                    onClick={() => set("color", form.color === hex ? "" : hex)}
+                    className="w-5 h-5 rounded-full transition-transform hover:scale-110 focus:outline-none"
+                    style={{ backgroundColor: hex, boxShadow: form.color === hex ? `0 0 0 2px white, 0 0 0 3px ${hex}` : undefined }}
+                  />
+                ))}
+              </div>
+
+              {/* Ubicación */}
+              <div className="flex items-center gap-2">
+                <MapPin size={13} className="text-slate-400 shrink-0" />
+                <input
+                  value={form.location}
+                  onChange={e => set("location", e.target.value)}
+                  placeholder="Añadir ubicación"
+                  className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none transition-colors"
+                />
+              </div>
+
+              {/* Videoconferencia */}
+              <label className="flex items-center gap-2 text-xs text-slate-500 cursor-pointer select-none">
+                <Video size={13} className="text-slate-400 shrink-0" />
+                <input
+                  type="checkbox"
+                  checked={!!(form as any).with_meet}
+                  onChange={e => set("with_meet", e.target.checked)}
+                  className="rounded border-slate-300 text-red-600 focus:ring-red-300"
+                />
+                <span className="flex-1">Añadir videoconferencia de Google Meet</span>
+                {!gcalEnabled && (form as any).with_meet && (
+                  <span className="shrink-0 text-[10px] font-semibold text-amber-600">Conecta Google</span>
+                )}
+              </label>
+
+              {/* Invitados */}
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <Users size={13} className="text-slate-400 shrink-0" />
+                  <input
+                    value={guestInput}
+                    onChange={e => setGuestInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addGuest(); } }}
+                    onBlur={addGuest}
+                    placeholder="Añadir invitados (email + Intro)"
+                    className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none transition-colors"
+                  />
+                </div>
+                {guestsList.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 pl-[21px]">
+                    {guestsList.map(g => (
+                      <span key={g} className="flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">
+                        {g}
+                        <button type="button" onClick={() => removeGuest(g)} className="text-slate-400 hover:text-red-500">
+                          <X size={10} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Disponibilidad (usuario relacionado del ERP) */}
+              {organizationUsers.length > 0 && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 size={13} className="text-slate-400 shrink-0" />
+                    <select
+                      value={(form as any).related_user_id || ""}
+                      onChange={e => {
+                        const u = organizationUsers.find(o => o.user_id === e.target.value);
+                        set("related_user_id", e.target.value);
+                        set("related_user_name", u?.user_name || "");
+                      }}
+                      className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none transition-colors"
+                    >
+                      <option value="">Comprobar disponibilidad de...</option>
+                      {organizationUsers.map(u => (
+                        <option key={u.user_id} value={u.user_id}>{u.user_name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {availability && (
+                    <p className={`pl-[21px] text-[11px] font-semibold ${availability === "free" ? "text-emerald-600" : "text-amber-600"}`}>
+                      {availability === "free" ? "✓ Todo el mundo está disponible" : "⚠ Puede haber conflicto de horario"}
+                    </p>
+                  )}
+                </div>
               )}
-            </div>
+
+              {/* Descripción */}
+              <div className="flex items-start gap-2">
+                <FileText size={13} className="mt-1.5 text-slate-400 shrink-0" />
+                <textarea
+                  value={form.description}
+                  onChange={e => set("description", e.target.value)}
+                  placeholder="Añadir descripción"
+                  rows={2}
+                  className="flex-1 min-w-0 resize-none rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none transition-colors"
+                />
+              </div>
+            </>
           )}
 
-          {/* Descripción */}
-          <div className="flex items-start gap-2">
-            <FileText size={13} className="mt-1.5 text-slate-400 shrink-0" />
-            <textarea
-              value={form.description}
-              onChange={e => set("description", e.target.value)}
-              placeholder="Añadir descripción"
-              rows={2}
-              className="flex-1 min-w-0 resize-none rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none transition-colors"
-            />
-          </div>
+          {activeTab === "tarea" && (
+            <>
+              {/* Fecha límite */}
+              <div className="flex items-center gap-2">
+                <Calendar size={13} className="text-slate-400 shrink-0" />
+                <input
+                  type="date"
+                  value={form.start_at.slice(0, 10)}
+                  onChange={e => set("start_at", `${e.target.value}T00:00`)}
+                  className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none transition-colors"
+                />
+              </div>
+
+              {/* Cliente opcional */}
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <Briefcase size={13} className="text-slate-400 shrink-0" />
+                  <select
+                    value={form.cliente_id || ""}
+                    onChange={e => set("cliente_id", e.target.value)}
+                    disabled={loadingClientes}
+                    className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none transition-colors disabled:opacity-60"
+                  >
+                    <option value="">Sin cliente (tarea personal)</option>
+                    {clientes.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+                {loadingClientes && <p className="pl-[21px] text-[11px] text-slate-400">Cargando clientes...</p>}
+                {form.cliente_id && (
+                  <p className="pl-[21px] text-[11px] text-slate-500">
+                    Se creará también en el módulo Tareas, vinculada a este cliente.
+                  </p>
+                )}
+              </div>
+            </>
+          )}
+
+          {otherTab && (
+            <div className="flex flex-col items-center justify-center gap-2 py-6 text-center">
+              <otherTab.icon size={22} className="text-slate-300" />
+              <p className="text-sm font-semibold text-slate-600">{otherTab.label}</p>
+              <p className="max-w-[240px] text-xs text-slate-400">Esta sección estará disponible próximamente.</p>
+              <span className="mt-1 rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Próximamente
+              </span>
+            </div>
+          )}
 
           {/* Error inline */}
           {errorMsg && (
@@ -1278,13 +1362,15 @@ function QuickEventPopover({
 
           {/* Acciones */}
           <div className="flex items-center justify-between border-t border-slate-100 pt-3">
-            <button
-              type="button"
-              onClick={() => onExpand(form)}
-              className="text-xs font-semibold text-slate-500 hover:text-red-600 transition-colors"
-            >
-              Más opciones
-            </button>
+            {activeTab === "evento" ? (
+              <button
+                type="button"
+                onClick={() => onExpand(form)}
+                className="text-xs font-semibold text-slate-500 hover:text-red-600 transition-colors"
+              >
+                Más opciones
+              </button>
+            ) : <span />}
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -1295,7 +1381,7 @@ function QuickEventPopover({
               </button>
               <button
                 type="submit"
-                disabled={saving || missingTitle}
+                disabled={saving || missingTitle || !!otherTab}
                 title={missingTitle ? "Añade un título para guardar" : ""}
                 className="flex items-center gap-1.5 rounded-xl bg-red-600 px-4 py-1.5 text-xs font-bold text-white transition-colors hover:bg-red-700 disabled:opacity-50"
               >
@@ -1305,7 +1391,6 @@ function QuickEventPopover({
             </div>
           </div>
         </form>
-        )}
       </div>
     </>,
     document.body
