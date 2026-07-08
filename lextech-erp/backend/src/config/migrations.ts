@@ -642,6 +642,7 @@ export async function runMigrations(): Promise<void> {
       `ALTER TABLE agenda_events ADD COLUMN IF NOT EXISTS color VARCHAR(7)`,
       `ALTER TABLE agenda_events ADD COLUMN IF NOT EXISTS meet_url TEXT`,
       `ALTER TABLE agenda_events ADD COLUMN IF NOT EXISTS guests TEXT[]`,
+      `ALTER TABLE agenda_events ADD COLUMN IF NOT EXISTS booking_page_id UUID`,
     ]) {
       try { await client.query(col); } catch (_e: any) {}
     }
@@ -663,6 +664,35 @@ export async function runMigrations(): Promise<void> {
       await client.query(`
         CREATE OR REPLACE TRIGGER trg_agenda_events_updated_at
           BEFORE UPDATE ON agenda_events
+          FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+      `);
+    } catch (_e: any) {}
+
+    // ── Páginas de reservas públicas (Agenda de citas) ──────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS agenda_booking_pages (
+        id               UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id          VARCHAR(150) NOT NULL UNIQUE,
+        user_name        VARCHAR(200),
+        token            VARCHAR(64)  NOT NULL UNIQUE,
+        title            VARCHAR(200) NOT NULL DEFAULT 'Reserva una cita',
+        description      TEXT,
+        duration_minutes INT          NOT NULL DEFAULT 30,
+        buffer_minutes   INT          NOT NULL DEFAULT 0,
+        weekdays         INT[]        NOT NULL DEFAULT '{1,2,3,4,5}',
+        start_time       TIME         NOT NULL DEFAULT '09:00',
+        end_time         TIME         NOT NULL DEFAULT '18:00',
+        advance_days     INT          NOT NULL DEFAULT 30,
+        min_notice_hours INT          NOT NULL DEFAULT 12,
+        active           BOOLEAN      NOT NULL DEFAULT true,
+        created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      );
+    `);
+    try {
+      await client.query(`
+        CREATE OR REPLACE TRIGGER trg_agenda_booking_pages_updated_at
+          BEFORE UPDATE ON agenda_booking_pages
           FOR EACH ROW EXECUTE FUNCTION set_updated_at();
       `);
     } catch (_e: any) {}

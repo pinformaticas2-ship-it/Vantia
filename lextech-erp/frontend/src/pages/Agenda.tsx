@@ -15,6 +15,7 @@ import { safeJson } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
 import { createPortal } from "react-dom";
 import BackButton from "../components/BackButton";
+import { BookingPageSettingsModal, type BookingPage } from "../components/BookingPageSettingsModal";
 
 // ── Google Calendar Types ─────────────────────────────────────────────────────
 interface GCalEvent {
@@ -983,6 +984,36 @@ function QuickEventPopover({
     return () => { cancelled = true; };
   }, [activeTab, clientes.length, loadingClientes, getToken]);
 
+  // ── Página de reservas para la pestaña "Agenda de citas" (carga perezosa) ──
+  const [bookingPage, setBookingPage] = useState<BookingPage | null | undefined>(undefined); // undefined = aún no cargado
+  const [loadingBookingPage, setLoadingBookingPage] = useState(false);
+  const [showBookingSettings, setShowBookingSettings] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+  useEffect(() => {
+    if (activeTab !== "agenda_citas" || bookingPage !== undefined || loadingBookingPage) return;
+    let cancelled = false;
+    (async () => {
+      setLoadingBookingPage(true);
+      try {
+        const token = await getToken({ skipCache: true });
+        const res = await fetch("/api/agenda/booking/mine", { headers: { Authorization: `Bearer ${token}` } });
+        const data = await safeJson(res);
+        if (!cancelled && res.ok) setBookingPage(data.data || null);
+      } catch (_e) { /* noop */ }
+      finally { if (!cancelled) setLoadingBookingPage(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [activeTab, bookingPage, loadingBookingPage, getToken]);
+
+  const bookingUrl = bookingPage ? `${window.location.origin}/reservar/${bookingPage.token}` : "";
+  const copyBookingUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(bookingUrl);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    } catch (_e) { /* noop */ }
+  };
+
   useEffect(() => { titleRef.current?.focus(); }, []);
 
   useEffect(() => {
@@ -1061,6 +1092,7 @@ function QuickEventPopover({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (activeTab === "agenda_citas") return; // se gestiona desde el modal de configuración
     if (missingTitle) return;
 
     if (activeTab === "tarea") {
@@ -1157,7 +1189,8 @@ function QuickEventPopover({
   const otherTab = QUICK_TABS.find(t =>
     t.key === activeTab &&
     t.key !== "evento" && t.key !== "tarea" &&
-    t.key !== "fuera_oficina" && t.key !== "tiempo_concentracion" && t.key !== "ubicacion_trabajo"
+    t.key !== "fuera_oficina" && t.key !== "tiempo_concentracion" && t.key !== "ubicacion_trabajo" &&
+    t.key !== "agenda_citas"
   );
 
   return createPortal(
@@ -1202,14 +1235,16 @@ function QuickEventPopover({
         </div>
 
         <form onSubmit={handleSubmit} className="p-4 space-y-4 overflow-y-auto" style={{ maxHeight: Math.min(window.innerHeight - 24, 640) }}>
-          {/* Título — común a todas las pestañas */}
-          <input
-            ref={titleRef}
-            value={form.title}
-            onChange={e => set("title", e.target.value)}
-            placeholder="Añade un título"
-            className="w-full border-0 border-b-2 border-slate-100 bg-transparent pb-2 text-[15px] font-semibold text-slate-900 placeholder:text-slate-300 focus:border-red-400 focus:outline-none transition-colors"
-          />
+          {/* Título — común a todas las pestañas salvo Agenda de citas (gestiona una página, no un evento puntual) */}
+          {activeTab !== "agenda_citas" && (
+            <input
+              ref={titleRef}
+              value={form.title}
+              onChange={e => set("title", e.target.value)}
+              placeholder="Añade un título"
+              className="w-full border-0 border-b-2 border-slate-100 bg-transparent pb-2 text-[15px] font-semibold text-slate-900 placeholder:text-slate-300 focus:border-red-400 focus:outline-none transition-colors"
+            />
+          )}
 
           {activeTab === "evento" && (
             <>
@@ -1498,6 +1533,61 @@ function QuickEventPopover({
             </>
           )}
 
+          {activeTab === "agenda_citas" && (
+            <div className="space-y-3">
+              {loadingBookingPage ? (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 size={18} className="animate-spin text-slate-300" />
+                </div>
+              ) : bookingPage ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    <CalendarClock size={13} className="text-slate-400 shrink-0" />
+                    <input
+                      readOnly
+                      value={bookingUrl}
+                      onFocus={e => e.target.select()}
+                      className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-600"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 pl-[21px]">
+                    <button
+                      type="button"
+                      onClick={copyBookingUrl}
+                      className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+                    >
+                      {linkCopied ? "¡Copiado!" : "Copiar enlace"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowBookingSettings(true)}
+                      className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+                    >
+                      Editar configuración
+                    </button>
+                  </div>
+                  <p className={`pl-[21px] text-[11px] font-semibold ${bookingPage.active ? "text-emerald-600" : "text-slate-400"}`}>
+                    {bookingPage.active ? "✓ Activa — se puede reservar" : "Desactivada"}
+                  </p>
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center gap-2 py-4 text-center">
+                  <CalendarClock size={22} className="text-slate-300" />
+                  <p className="max-w-[260px] text-xs text-slate-400">
+                    Crea una página pública donde cualquiera con el enlace puede reservar un hueco en tu calendario.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowBookingSettings(true)}
+                    className="mt-1 rounded-xl bg-red-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-red-700 transition-colors"
+                  >
+                    Crear página de reservas
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           {otherTab && (
             <div className="flex flex-col items-center justify-center gap-2 py-6 text-center">
               <otherTab.icon size={22} className="text-slate-300" />
@@ -1531,21 +1621,31 @@ function QuickEventPopover({
                 onClick={onClose}
                 className="px-3 py-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700 transition-colors"
               >
-                Cancelar
+                {activeTab === "agenda_citas" ? "Cerrar" : "Cancelar"}
               </button>
-              <button
-                type="submit"
-                disabled={saving || missingTitle || !!otherTab}
-                title={missingTitle ? "Añade un título para guardar" : ""}
-                className="flex items-center gap-1.5 rounded-xl bg-red-600 px-4 py-1.5 text-xs font-bold text-white transition-colors hover:bg-red-700 disabled:opacity-50"
-              >
-                {saving && <Loader2 size={11} className="animate-spin" />}
-                Guardar
-              </button>
+              {activeTab !== "agenda_citas" && (
+                <button
+                  type="submit"
+                  disabled={saving || missingTitle || !!otherTab}
+                  title={missingTitle ? "Añade un título para guardar" : ""}
+                  className="flex items-center gap-1.5 rounded-xl bg-red-600 px-4 py-1.5 text-xs font-bold text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+                >
+                  {saving && <Loader2 size={11} className="animate-spin" />}
+                  Guardar
+                </button>
+              )}
             </div>
           </div>
         </form>
       </div>
+
+      {showBookingSettings && (
+        <BookingPageSettingsModal
+          page={bookingPage || null}
+          onClose={() => setShowBookingSettings(false)}
+          onSaved={(saved) => { setBookingPage(saved); setShowBookingSettings(false); }}
+        />
+      )}
     </>,
     document.body
   );

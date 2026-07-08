@@ -26,6 +26,7 @@ import Documental from './pages/Documental';
 import WhatsApp from './pages/WhatsApp';
 import AltaConEnlace from './pages/AltaConEnlace';
 import FormularioCliente from './pages/FormularioCliente';
+import AgendaBookingPublic from './pages/AgendaBookingPublic';
 import Facturacion from './pages/Facturacion';
 import Configuracion from './pages/Configuracion';
 import ChatIA from './pages/ChatIA';
@@ -69,6 +70,8 @@ export default function App() {
 
           {/* Formulario público de alta (accesible también si el usuario está logueado) */}
           <Route path="/formulario-cliente/:token" element={<FormularioCliente />} />
+          {/* Página pública de reservas (Agenda de citas) */}
+          <Route path="/reservar/:token" element={<AgendaBookingPublic />} />
 
           {/* Capturar rutas desconocidas */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
@@ -81,6 +84,7 @@ export default function App() {
       <SignedOut>
         <Routes>
           <Route path="/formulario-cliente/:token" element={<FormularioCliente />} />
+          <Route path="/reservar/:token" element={<AgendaBookingPublic />} />
           <Route path="*" element={<PublicLanding />} />
         </Routes>
       </SignedOut>
