@@ -6,6 +6,28 @@
 :root {
   --accent-from: #ef4444; /* red-500 */
   --accent-to:   #dc2626; /* red-600 */
+  --accent-glow: 171, 4, 51; /* RGB de #ab0433, para fondos con radial-gradient */
+}
+
+/* Fondos degradados reutilizables — usan --accent-glow, ya respetan el tema automáticamente */
+.erp-glow-bg {
+  background:
+    radial-gradient(circle at top right, rgba(var(--accent-glow), 0.08), transparent 22%),
+    linear-gradient(180deg, #f8fafc 0%, #eef3f8 100%);
+}
+.erp-content-glow-bg {
+  background:
+    radial-gradient(circle at top right, rgba(var(--accent-glow), 0.05), transparent 28%),
+    radial-gradient(circle at bottom left, rgba(59, 130, 246, 0.04), transparent 32%),
+    linear-gradient(180deg, #f8fafc 0%, #eef1f5 100%);
+}
+.erp-sidebar-glow-bg {
+  background:
+    radial-gradient(circle at top, rgba(var(--accent-glow), 0.06), transparent 55%),
+    linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
+}
+.erp-body-glow-wash {
+  background: radial-gradient(circle at top, rgba(var(--accent-glow), 0.03), transparent 42%);
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -21,6 +43,7 @@
   --destructive: 217 91% 60%;
   --accent-from: #3b82f6; /* blue-500 */
   --accent-to:   #2563eb; /* blue-600 */
+  --accent-glow: 37, 99, 235; /* RGB de #2563eb */
 }
 
 /* Focus ring en inputs */
@@ -264,6 +287,24 @@
 [data-theme="azul"] .focus\:ring-\[\#ab0433\]\/20:focus { --tw-ring-color: rgba(37,99,235,0.2) !important; }
 [data-theme="azul"] .focus\:border-\[\#ab0433\]\/30:focus { border-color: rgba(37,99,235,0.3) !important; }
 /* shadow-red-700/30 y shadow-red-700/50 ya están arriba */
+
+/* ── Variantes usadas en el módulo de Correo (Email.tsx), antes sin cobertura ── */
+[data-theme="azul"] .hover\:text-\[\#ab0433\]:hover { color: #2563eb !important; }
+[data-theme="azul"] .bg-\[\#ab0433\]\/20      { background-color: rgba(37,99,235,0.2) !important; }
+[data-theme="azul"] .bg-\[\#ab0433\]\/\[0\.06\] { background-color: rgba(37,99,235,0.06) !important; }
+[data-theme="azul"] .shadow-red-950\/40 { --tw-shadow-color: rgba(23,37,84,0.4) !important; }
+[data-theme="azul"] .focus\:ring-red-500\/20:focus { --tw-ring-color: rgba(59,130,246,0.2) !important; }
+/* Degradado del botón "Redactar" */
+[data-theme="azul"] .from-\[\#ab0433\] {
+  --tw-gradient-from: #2563eb !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgb(37 99 235 / 0)) !important;
+}
+[data-theme="azul"] .to-\[\#cc184e\]   { --tw-gradient-to: #3b82f6 !important; }
+[data-theme="azul"] .hover\:from-\[\#c01040\]:hover {
+  --tw-gradient-from: #1d4ed8 !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgb(29 78 216 / 0)) !important;
+}
+[data-theme="azul"] .hover\:to-\[\#ab0433\]:hover { --tw-gradient-to: #2563eb !important; }
 
 /* ── bg-[#f4f6f8] → azul-tinted en content areas ── */
 [data-theme="azul"] .bg-\[\#f4f6f8\] { background-color: #f0f5ff !important; }

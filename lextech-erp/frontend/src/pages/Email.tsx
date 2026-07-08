@@ -1318,7 +1318,7 @@ function Sidebar({
   const cx = (dark: string, light: string) => (isLight ? light : dark);
   const containerCls = cx(
     'bg-[linear-gradient(180deg,#0f172a_0%,#111827_100%)] text-slate-200',
-    'bg-[radial-gradient(circle_at_top,rgba(171,4,51,0.06),transparent_55%),linear-gradient(180deg,#ffffff_0%,#f1f5f9_100%)] text-slate-600',
+    'erp-sidebar-glow-bg text-slate-600',
   );
   const sectionBorderCls = cx('border-white/10', 'border-slate-200');
   const sectionLabelCls = 'text-slate-500';
@@ -2087,7 +2087,7 @@ function EmailReader({
               </div>
             </div>
 
-            <div className="px-8 py-8 bg-[radial-gradient(circle_at_top,_rgba(171,4,51,0.03),_transparent_42%)]">
+            <div className="px-8 py-8 erp-body-glow-wash">
               <div className="mx-auto max-w-[760px] rounded-[30px] border border-slate-200/80 bg-white shadow-[0_20px_40px_rgba(15,23,42,0.05)] overflow-hidden">
                 <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-slate-100 bg-slate-50/70">
                   <div className="flex items-center gap-2 text-sm text-slate-600">
@@ -4422,7 +4422,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
   return (
     // 73px = dashboard header (h-18 = 72px + 1px border-b)
     <div
-      className="flex flex-col overflow-hidden bg-[radial-gradient(circle_at_top_right,rgba(171,4,51,0.08),transparent_22%),linear-gradient(180deg,#f8fafc_0%,#eef3f8_100%)]"
+      className="flex flex-col overflow-hidden erp-glow-bg"
       style={{ fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif", height: 'calc(100vh - 73px)' }}>
 
       {/* ── Ribbon ── */}

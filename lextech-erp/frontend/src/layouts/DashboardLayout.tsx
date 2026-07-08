@@ -1173,7 +1173,7 @@ export default function DashboardLayout() {
         </header>
 
         {/* Contenido */}
-        <div id="dashboard-content" className={`relative z-10 flex-1 min-h-0 bg-[radial-gradient(circle_at_top_right,rgba(171,4,51,0.05),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(59,130,246,0.04),transparent_32%),linear-gradient(180deg,#f8fafc_0%,#eef1f5_100%)] ${isFullPage ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+        <div id="dashboard-content" className={`relative z-10 flex-1 min-h-0 erp-content-glow-bg ${isFullPage ? 'overflow-hidden' : 'overflow-y-auto'}`}>
           <div
             key={getModuleBase(location.pathname)}
             className={isFullPage ? 'h-full min-h-0 w-full module-page' : 'max-w-[1600px] mx-auto p-4 md:p-8 module-page'}>
