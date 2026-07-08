@@ -102,6 +102,9 @@ const EVENT_TYPES: Record<string, { label: string; color: string; bg: string; do
   llamada: { label: "Llamada",      color: "text-green-700",  bg: "bg-green-500",  dot: "bg-green-500",  hex: "#22c55e", icon: Phone },
   video:   { label: "Videollamada", color: "text-cyan-700",   bg: "bg-cyan-500",   dot: "bg-cyan-500",   hex: "#06b6d4", icon: Video },
   otro:    { label: "Otro",         color: "text-slate-700",  bg: "bg-slate-400",  dot: "bg-slate-400",  hex: "#94a3b8", icon: Circle },
+  fuera_oficina:        { label: "Fuera de la oficina",     color: "text-slate-700",  bg: "bg-slate-500",  dot: "bg-slate-500",  hex: "#64748b", icon: LogOut },
+  tiempo_concentracion: { label: "Tiempo de concentración", color: "text-purple-700", bg: "bg-purple-500", dot: "bg-purple-500", hex: "#a855f7", icon: Focus },
+  ubicacion_trabajo:    { label: "Ubicación del trabajo",   color: "text-teal-700",   bg: "bg-teal-500",   dot: "bg-teal-500",   hex: "#14b8a6", icon: Building2 },
 };
 
 const EVENT_COLORS = [
@@ -1080,6 +1083,67 @@ function QuickEventPopover({
       return;
     }
 
+    if (activeTab === "fuera_oficina") {
+      const startDate = form.start_at.slice(0, 10);
+      const endDate = form.end_at ? form.end_at.slice(0, 10) : startDate;
+      onSave({
+        ...form,
+        type: "fuera_oficina",
+        all_day: true,
+        start_at: inputToISO(`${startDate}T00:00`),
+        end_at: inputToISO(`${endDate}T00:00`),
+        location: null,
+        cliente_id: null,
+        expediente_id: null,
+        related_user_id: null,
+        related_user_name: null,
+        organization_context: null,
+        with_meet: false,
+        guests: [],
+      });
+      return;
+    }
+
+    if (activeTab === "tiempo_concentracion") {
+      onSave({
+        ...form,
+        type: "tiempo_concentracion",
+        all_day: false,
+        start_at: inputToISO(form.start_at),
+        end_at: form.end_at ? inputToISO(form.end_at) : null,
+        location: null,
+        description: null,
+        cliente_id: null,
+        expediente_id: null,
+        related_user_id: null,
+        related_user_name: null,
+        organization_context: null,
+        with_meet: false,
+        guests: [],
+      });
+      return;
+    }
+
+    if (activeTab === "ubicacion_trabajo") {
+      const dateOnly = form.start_at.slice(0, 10);
+      onSave({
+        ...form,
+        type: "ubicacion_trabajo",
+        all_day: true,
+        start_at: inputToISO(`${dateOnly}T00:00`),
+        end_at: null,
+        description: null,
+        cliente_id: null,
+        expediente_id: null,
+        related_user_id: null,
+        related_user_name: null,
+        organization_context: null,
+        with_meet: false,
+        guests: [],
+      });
+      return;
+    }
+
     onSave({
       ...form,
       start_at: inputToISO(form.start_at),
@@ -1090,7 +1154,11 @@ function QuickEventPopover({
     });
   };
 
-  const otherTab = QUICK_TABS.find(t => t.key === activeTab && t.key !== "evento" && t.key !== "tarea");
+  const otherTab = QUICK_TABS.find(t =>
+    t.key === activeTab &&
+    t.key !== "evento" && t.key !== "tarea" &&
+    t.key !== "fuera_oficina" && t.key !== "tiempo_concentracion" && t.key !== "ubicacion_trabajo"
+  );
 
   return createPortal(
     <>
@@ -1340,6 +1408,92 @@ function QuickEventPopover({
                     Se creará también en el módulo Tareas, vinculada a este cliente.
                   </p>
                 )}
+              </div>
+            </>
+          )}
+
+          {activeTab === "fuera_oficina" && (
+            <>
+              {/* Rango de fechas */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <LogOut size={13} className="text-slate-400 shrink-0" />
+                  <input
+                    type="date"
+                    value={form.start_at.slice(0, 10)}
+                    onChange={e => set("start_at", `${e.target.value}T00:00`)}
+                    className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none transition-colors"
+                  />
+                </div>
+                <div className="flex items-center gap-2 pl-[21px]">
+                  <span className="text-[11px] text-slate-400 shrink-0">hasta</span>
+                  <input
+                    type="date"
+                    value={form.end_at ? form.end_at.slice(0, 10) : form.start_at.slice(0, 10)}
+                    onChange={e => set("end_at", `${e.target.value}T00:00`)}
+                    className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none transition-colors"
+                  />
+                </div>
+              </div>
+              {/* Mensaje (nota, no se envía automáticamente) */}
+              <div className="flex items-start gap-2">
+                <FileText size={13} className="mt-1.5 text-slate-400 shrink-0" />
+                <textarea
+                  value={form.description}
+                  onChange={e => set("description", e.target.value)}
+                  placeholder="Mensaje (opcional) — queda como nota, no se envía ni rechaza reuniones automáticamente"
+                  rows={2}
+                  className="flex-1 min-w-0 resize-none rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none transition-colors"
+                />
+              </div>
+            </>
+          )}
+
+          {activeTab === "tiempo_concentracion" && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Focus size={13} className="text-slate-400 shrink-0" />
+                <input
+                  type="datetime-local"
+                  value={form.start_at}
+                  onChange={e => set("start_at", e.target.value)}
+                  className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none transition-colors"
+                />
+              </div>
+              <div className="flex items-center gap-2 pl-[21px]">
+                <span className="text-[11px] text-slate-400 shrink-0">hasta</span>
+                <input
+                  type="datetime-local"
+                  value={form.end_at}
+                  onChange={e => set("end_at", e.target.value)}
+                  className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none transition-colors"
+                />
+              </div>
+              <p className="pl-[21px] text-[11px] text-slate-400">
+                Se bloquea en tu calendario. No silencia notificaciones ni bloquea otras apps: eso aún no existe en el sistema.
+              </p>
+            </div>
+          )}
+
+          {activeTab === "ubicacion_trabajo" && (
+            <>
+              <div className="flex items-center gap-2">
+                <Calendar size={13} className="text-slate-400 shrink-0" />
+                <input
+                  type="date"
+                  value={form.start_at.slice(0, 10)}
+                  onChange={e => set("start_at", `${e.target.value}T00:00`)}
+                  className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none transition-colors"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Building2 size={13} className="text-slate-400 shrink-0" />
+                <input
+                  value={form.location}
+                  onChange={e => set("location", e.target.value)}
+                  placeholder="¿Dónde trabajas? (ej. Oficina, Casa, Cliente X)"
+                  className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none transition-colors"
+                />
               </div>
             </>
           )}
