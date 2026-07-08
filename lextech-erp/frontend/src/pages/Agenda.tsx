@@ -1,5 +1,5 @@
 ﻿import React, {
-  useDeferredValue, useEffect, useState, useCallback, useMemo, useRef,
+  useDeferredValue, useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef,
 } from "react";
 import { Spinner } from "../components/Spinner";
 import { useAuth } from "@clerk/clerk-react";
@@ -9,6 +9,7 @@ import {
   Trash2, Edit3, CheckCircle2, AlertCircle,
   Phone, Video, FileText, Flag, Circle,
   RefreshCw, ExternalLink, Link2, Unlink,
+  Focus, LogOut, Building2, CalendarClock,
 } from "lucide-react";
 import { safeJson } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
@@ -72,6 +73,7 @@ interface AgendaEvent {
   external_id?: string | null;
   external_url?: string | null;
   meet_url?: string | null;
+  guests?: string[] | null;
 }
 
 interface AgendaOrganizationUser {
@@ -262,6 +264,7 @@ const emptyForm = (date?: string) => {
     related_user_name: "",
     organization_context: "",
     with_meet: false,
+    guests: [] as string[],
   };
 };
 
@@ -310,6 +313,7 @@ function EventModal({
         related_user_name: event.related_user_name || "",
         organization_context: event.organization_context || "",
         with_meet: false,
+        guests: event.guests || [],
       }
     : (initialFormData || emptyForm(defaultDate || undefined))
   );
@@ -907,6 +911,17 @@ function GoogleEventModal({
 }
 
 // ── Quick Event Popover ───────────────────────────────────────────────────────
+type QuickTab = "evento" | "tarea" | "fuera_oficina" | "tiempo_concentracion" | "ubicacion_trabajo" | "agenda_citas";
+
+const QUICK_TABS: { key: QuickTab; label: string; icon: any }[] = [
+  { key: "evento",               label: "Evento",                    icon: Calendar },
+  { key: "tarea",                label: "Tarea",                     icon: CheckCircle2 },
+  { key: "fuera_oficina",        label: "Fuera de la oficina",       icon: LogOut },
+  { key: "tiempo_concentracion", label: "Tiempo de concentración",   icon: Focus },
+  { key: "ubicacion_trabajo",    label: "Ubicación del trabajo",     icon: Building2 },
+  { key: "agenda_citas",         label: "Agenda de citas",           icon: CalendarClock },
+];
+
 function QuickEventPopover({
   date,
   position,
@@ -916,6 +931,9 @@ function QuickEventPopover({
   onExpand,
   saving,
   errorMsg,
+  organizationUsers,
+  events,
+  gcalEnabled,
 }: {
   date: string;
   position: { x: number; y: number };
@@ -925,9 +943,16 @@ function QuickEventPopover({
   onExpand: (data: AgendaFormData) => void;
   saving: boolean;
   errorMsg: string | null;
+  organizationUsers: AgendaOrganizationUser[];
+  events: AgendaEvent[];
+  gcalEnabled?: boolean;
 }) {
   const [form, setForm] = useState<AgendaFormData>(() => initialData || emptyForm(date));
+  const [activeTab, setActiveTab] = useState<QuickTab>("evento");
+  const [guestInput, setGuestInput] = useState("");
   const titleRef = useRef<HTMLInputElement>(null);
+  const cardRef  = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
 
   useEffect(() => { titleRef.current?.focus(); }, []);
 
@@ -939,15 +964,31 @@ function QuickEventPopover({
 
   const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }));
 
-  const POPOVER_W = 340;
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
-  let left = position.x + 12;
-  let top  = position.y - 20;
-  if (left + POPOVER_W > vw - 12) left = position.x - POPOVER_W - 12;
-  if (top > vh - 120) top = vh - 480;
-  if (top < 12) top = 12;
-  if (left < 12) left = 12;
+  // ── Posicionamiento medido: mide la tarjeta real (no un tamaño asumido)
+  // y hace flip/clamp contra los 4 bordes del viewport para que nunca se recorte.
+  useLayoutEffect(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    const margin = 12;
+    const measure = () => {
+      const rect = el.getBoundingClientRect();
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      let left = position.x + margin;
+      let top  = position.y - 20;
+      if (left + rect.width > vw - margin) left = position.x - rect.width - margin;
+      if (left < margin) left = margin;
+      if (left + rect.width > vw - margin) left = Math.max(margin, vw - rect.width - margin);
+      if (top + rect.height > vh - margin) top = vh - rect.height - margin;
+      if (top < margin) top = margin;
+      setPos({ left, top });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    window.addEventListener("resize", measure);
+    return () => { ro.disconnect(); window.removeEventListener("resize", measure); };
+  }, [position.x, position.y]);
 
   const missingTitle = !form.title.trim();
 
@@ -963,6 +1004,32 @@ function QuickEventPopover({
     return `${h}h ${m}m`;
   })();
 
+  // ── Disponibilidad real del usuario relacionado (a partir de los eventos ya cargados) ──
+  const availability = useMemo(() => {
+    const relatedUserId = (form as any).related_user_id;
+    if (!relatedUserId || form.all_day || !form.start_at) return null;
+    const s = new Date(inputToISO(form.start_at)).getTime();
+    const e = form.end_at ? new Date(inputToISO(form.end_at)).getTime() : s;
+    if (!(e > s)) return null;
+    const conflict = events.some(ev => {
+      if (ev.related_user_id !== relatedUserId && ev.user_id !== relatedUserId) return false;
+      if (!ev.end_at) return false;
+      const evS = new Date(ev.start_at).getTime();
+      const evE = new Date(ev.end_at).getTime();
+      return evS < e && evE > s;
+    });
+    return conflict ? "conflict" as const : "free" as const;
+  }, [form, events]);
+
+  const guestsList: string[] = (form as any).guests || [];
+  const addGuest = () => {
+    const email = guestInput.trim().toLowerCase();
+    if (!email) { setGuestInput(""); return; }
+    if (!guestsList.includes(email)) set("guests", [...guestsList, email]);
+    setGuestInput("");
+  };
+  const removeGuest = (email: string) => set("guests", guestsList.filter(g => g !== email));
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (missingTitle) return;
@@ -972,18 +1039,19 @@ function QuickEventPopover({
       end_at:   form.end_at ? inputToISO(form.end_at) : null,
       expediente_id: null,
       cliente_id: null,
-      related_user_id: null,
-      related_user_name: null,
       organization_context: null,
     });
   };
+
+  const otherTab = QUICK_TABS.find(t => t.key === activeTab && t.key !== "evento");
 
   return createPortal(
     <>
       <div className="fixed inset-0 z-[190]" onClick={onClose} />
       <div
-        className="fixed z-[200] w-[340px] rounded-2xl border border-slate-200 bg-white shadow-[0_24px_64px_rgba(15,23,42,0.20)] overflow-hidden quick-popup popup-card"
-        style={{ left, top }}
+        ref={cardRef}
+        className="fixed z-[200] w-[380px] rounded-2xl border border-slate-200 bg-white shadow-[0_24px_64px_rgba(15,23,42,0.20)] overflow-hidden quick-popup popup-card"
+        style={{ left: pos?.left ?? position.x, top: pos?.top ?? position.y, visibility: pos ? "visible" : "hidden" }}
         onClick={e => e.stopPropagation()}
       >
         {/* Cabecera */}
@@ -997,7 +1065,45 @@ function QuickEventPopover({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-4 space-y-4 overflow-y-auto" style={{ maxHeight: Math.min(vh - top - 60, 460) }}>
+        {/* Pestañas estilo Google Calendar */}
+        <div className="no-scrollbar flex items-center gap-1 overflow-x-auto border-b border-slate-100 bg-white px-2 py-1.5">
+          {QUICK_TABS.map(t => {
+            const Icon = t.icon;
+            const active = activeTab === t.key;
+            return (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => setActiveTab(t.key)}
+                className={`flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[11px] font-semibold whitespace-nowrap transition-colors ${
+                  active ? "bg-red-50 text-red-600" : "text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+                }`}
+              >
+                <Icon size={12} />
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {activeTab !== "evento" ? (
+          <div className="flex flex-col items-center justify-center gap-2 px-6 py-10 text-center">
+            {otherTab && <otherTab.icon size={22} className="text-slate-300" />}
+            <p className="text-sm font-semibold text-slate-600">{otherTab?.label}</p>
+            <p className="max-w-[240px] text-xs text-slate-400">Esta sección estará disponible próximamente.</p>
+            <span className="mt-1 rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              Próximamente
+            </span>
+            <button
+              type="button"
+              onClick={() => setActiveTab("evento")}
+              className="mt-2 text-xs font-semibold text-red-600 hover:text-red-700 transition-colors"
+            >
+              Volver a Evento
+            </button>
+          </div>
+        ) : (
+        <form onSubmit={handleSubmit} className="p-4 space-y-4 overflow-y-auto" style={{ maxHeight: Math.min(window.innerHeight - 24, 640) }}>
           {/* Título */}
           <input
             ref={titleRef}
@@ -1072,6 +1178,99 @@ function QuickEventPopover({
             ))}
           </div>
 
+          {/* Ubicación */}
+          <div className="flex items-center gap-2">
+            <MapPin size={13} className="text-slate-400 shrink-0" />
+            <input
+              value={form.location}
+              onChange={e => set("location", e.target.value)}
+              placeholder="Añadir ubicación"
+              className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none transition-colors"
+            />
+          </div>
+
+          {/* Videoconferencia */}
+          <label className="flex items-center gap-2 text-xs text-slate-500 cursor-pointer select-none">
+            <Video size={13} className="text-slate-400 shrink-0" />
+            <input
+              type="checkbox"
+              checked={!!(form as any).with_meet}
+              onChange={e => set("with_meet", e.target.checked)}
+              className="rounded border-slate-300 text-red-600 focus:ring-red-300"
+            />
+            <span className="flex-1">Añadir videoconferencia de Google Meet</span>
+            {!gcalEnabled && (form as any).with_meet && (
+              <span className="shrink-0 text-[10px] font-semibold text-amber-600">Conecta Google</span>
+            )}
+          </label>
+
+          {/* Invitados */}
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <Users size={13} className="text-slate-400 shrink-0" />
+              <input
+                value={guestInput}
+                onChange={e => setGuestInput(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addGuest(); } }}
+                onBlur={addGuest}
+                placeholder="Añadir invitados (email + Intro)"
+                className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none transition-colors"
+              />
+            </div>
+            {guestsList.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pl-[21px]">
+                {guestsList.map(g => (
+                  <span key={g} className="flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">
+                    {g}
+                    <button type="button" onClick={() => removeGuest(g)} className="text-slate-400 hover:text-red-500">
+                      <X size={10} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Disponibilidad (usuario relacionado del ERP) */}
+          {organizationUsers.length > 0 && (
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 size={13} className="text-slate-400 shrink-0" />
+                <select
+                  value={(form as any).related_user_id || ""}
+                  onChange={e => {
+                    const u = organizationUsers.find(o => o.user_id === e.target.value);
+                    set("related_user_id", e.target.value);
+                    set("related_user_name", u?.user_name || "");
+                  }}
+                  className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none transition-colors"
+                >
+                  <option value="">Comprobar disponibilidad de...</option>
+                  {organizationUsers.map(u => (
+                    <option key={u.user_id} value={u.user_id}>{u.user_name}</option>
+                  ))}
+                </select>
+              </div>
+              {availability && (
+                <p className={`pl-[21px] text-[11px] font-semibold ${availability === "free" ? "text-emerald-600" : "text-amber-600"}`}>
+                  {availability === "free" ? "✓ Todo el mundo está disponible" : "⚠ Puede haber conflicto de horario"}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Descripción */}
+          <div className="flex items-start gap-2">
+            <FileText size={13} className="mt-1.5 text-slate-400 shrink-0" />
+            <textarea
+              value={form.description}
+              onChange={e => set("description", e.target.value)}
+              placeholder="Añadir descripción"
+              rows={2}
+              className="flex-1 min-w-0 resize-none rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:border-red-400 focus:bg-white focus:outline-none transition-colors"
+            />
+          </div>
+
           {/* Error inline */}
           {errorMsg && (
             <p className="rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-600">{errorMsg}</p>
@@ -1106,6 +1305,7 @@ function QuickEventPopover({
             </div>
           </div>
         </form>
+        )}
       </div>
     </>,
     document.body
@@ -3369,6 +3569,9 @@ export default function Agenda() {
           onExpand={handleExpandQuickEvent}
           saving={saving}
           errorMsg={errorMsg}
+          organizationUsers={organizationUsers}
+          events={events}
+          gcalEnabled={gcalEnabled}
         />
       )}
 
