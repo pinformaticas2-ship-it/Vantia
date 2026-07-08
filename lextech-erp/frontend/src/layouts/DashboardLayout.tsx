@@ -1056,6 +1056,7 @@ export default function DashboardLayout() {
       '/dashboard/chat',
       '/dashboard/chat-ia',
       '/dashboard/whatsapp',
+      '/dashboard/config',
     ].includes(location.pathname) ||
     location.pathname.startsWith('/dashboard/facturacion') ||
     location.pathname.startsWith('/dashboard/expedientes/') ||
