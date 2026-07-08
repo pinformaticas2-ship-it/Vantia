@@ -2558,7 +2558,7 @@ export default function ClientList() {
                       </div>
                     </td>
                   </tr>
-                ) : filtered.map((client) => {
+                ) : filtered.map((client, rowIdx) => {
                   const isSelected = selected === client.id;
                   const colorStyle = CLIENT_ROW_COLOR_STYLES[client.color || "ninguno"] || CLIENT_ROW_COLOR_STYLES.ninguno;
                   return (
@@ -2566,7 +2566,9 @@ export default function ClientList() {
                       key={client.id}
                       onClick={() => setSelected(isSelected ? null : client.id)}
                       onDoubleClick={() => navigate(`/dashboard/clientes/${client.id}`)}
-                      className={`border-b border-slate-50 cursor-pointer transition-colors group ${isSelected ? colorStyle.rowSelected : colorStyle.row}`}
+                      className={`border-b border-slate-50 cursor-pointer transition-colors group${rowIdx < 12 ? ' anim-fade-up' : ''}
+                        ${isSelected ? colorStyle.rowSelected : colorStyle.row}`}
+                      style={rowIdx < 12 ? { animationDelay: `${rowIdx * 35}ms` } : undefined}
                     >
                       {visibleColumns.internal_number && <td className={`pl-4 pr-3 py-3 font-mono ${isSelected ? colorStyle.numberSelected : colorStyle.number}`}>{client.internal_number || "—"}</td>}
                       {visibleColumns.name && <td className="px-3 py-3">
