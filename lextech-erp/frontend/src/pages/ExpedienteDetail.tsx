@@ -5435,12 +5435,6 @@ export default function ExpedienteDetail() {
             <div>
             {tab === "perfil" && !editing && (
               <div className="space-y-4">
-                {exp.estado === "cerrado" && (
-                  <div className="flex items-center gap-3 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-500">
-                    <X size={15} className="shrink-0 text-slate-400" />
-                    <span>Este expediente está <strong className="text-slate-700">cerrado</strong>. No se pueden realizar modificaciones. Pulsa <strong className="text-emerald-700">Reabrir expediente</strong> para editarlo.</span>
-                  </div>
-                )}
                 <Section title="Identificación" icon={FolderOpen} cols={4}>
                   <Field label="Núm. expediente" value={`${exp.anio}/${exp.num_exp}`} mono />
                   <Field label="Fecha alta" value={fmtDate(exp.fecha_inicio)} />
