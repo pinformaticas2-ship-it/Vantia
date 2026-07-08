@@ -1198,12 +1198,17 @@ function QuickEventPopover({
       <div className="fixed inset-0 z-[190]" onClick={onClose} />
       <div
         ref={cardRef}
-        className="fixed z-[200] w-[380px] rounded-2xl border border-slate-200 bg-white shadow-[0_24px_64px_rgba(15,23,42,0.20)] overflow-hidden quick-popup popup-card"
-        style={{ left: pos?.left ?? position.x, top: pos?.top ?? position.y, visibility: pos ? "visible" : "hidden" }}
+        className="fixed z-[200] w-[420px] flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_24px_64px_rgba(15,23,42,0.20)] quick-popup popup-card"
+        style={{
+          left: pos?.left ?? position.x,
+          top: pos?.top ?? position.y,
+          visibility: pos ? "visible" : "hidden",
+          maxHeight: "calc(100vh - 24px)",
+        }}
         onClick={e => e.stopPropagation()}
       >
         {/* Cabecera */}
-        <div className="flex items-center justify-between bg-slate-50 px-4 py-2.5 border-b border-slate-100">
+        <div className="flex flex-shrink-0 items-center justify-between bg-slate-50 px-4 py-2.5 border-b border-slate-100">
           <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Nuevo evento</span>
           <button
             onClick={onClose}
@@ -1214,7 +1219,7 @@ function QuickEventPopover({
         </div>
 
         {/* Pestañas estilo Google Calendar */}
-        <div className="no-scrollbar flex items-center gap-1 overflow-x-auto border-b border-slate-100 bg-white px-2 py-1.5">
+        <div className="no-scrollbar flex flex-shrink-0 items-center gap-1 overflow-x-auto border-b border-slate-100 bg-white px-2 py-1.5">
           {QUICK_TABS.map(t => {
             const Icon = t.icon;
             const active = activeTab === t.key;
@@ -1234,7 +1239,7 @@ function QuickEventPopover({
           })}
         </div>
 
-        <form onSubmit={handleSubmit} className="p-4 space-y-4 overflow-y-auto" style={{ maxHeight: Math.min(window.innerHeight - 24, 640) }}>
+        <form onSubmit={handleSubmit} className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 modules-scrollbar">
           {/* Título — común a todas las pestañas salvo Agenda de citas (gestiona una página, no un evento puntual) */}
           {activeTab !== "agenda_citas" && (
             <input
