@@ -1052,7 +1052,7 @@ export default function DashboardHome() {
     <div className="space-y-6">
 
       {/* CABECERA */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 anim-fade-up">
+      <div className="relative z-20 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 anim-fade-up">
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-semibold text-slate-900">

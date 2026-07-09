@@ -74,6 +74,25 @@ export async function getCanales(req: Request, res: Response) {
       ORDER BY COALESCE(c.updated_at, c.created_at) DESC, c.nombre ASC
     `, [userId]);
 
+    // El nombre/avatar guardados en chat_miembros son una foto fija tomada al crear
+    // el DM; si en ese momento Clerk no tenía nombre (o el usuario lo cambió después),
+    // se queda obsoleto para siempre. Lo refrescamos aquí con el valor actual de Clerk.
+    try {
+      const liveUsers = await getCachedSystemUsers();
+      const liveBysId = new Map(liveUsers.map((u: any) => [u.user_id, u]));
+      for (const row of rows) {
+        if (row.dm_target_user_id) {
+          const live = liveBysId.get(row.dm_target_user_id);
+          if (live?.user_name) {
+            row.dm_target_user_name = live.user_name;
+            row.dm_target_avatar_url = live.avatar_url ?? row.dm_target_avatar_url;
+          }
+        }
+      }
+    } catch {
+      // si falla el refresco, seguimos con los valores guardados en BD
+    }
+
     return ok(res, rows);
   } catch (e: any) {
     return err(res, e.message);
