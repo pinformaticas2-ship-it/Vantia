@@ -1941,7 +1941,7 @@ function CsvImportReviewView({
     : 0;
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden animate-page-in">
+    <div className="h-full flex flex-col overflow-hidden animate-page-in">
 
       {/* Header */}
       <div className="flex-shrink-0 px-6 lg:px-8 py-5 border-b border-slate-200 bg-white animate-card-in">
@@ -2886,7 +2886,7 @@ function DocumentImportView({
   }));
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden animate-page-in">
+    <div className="h-full flex flex-col overflow-hidden animate-page-in">
       <input
         ref={inputRef}
         type="file"
