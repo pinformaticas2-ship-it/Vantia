@@ -12,12 +12,11 @@ import {
   Users, Activity, Mail, MessageSquare, MessageCircle, Paperclip,
   AlertTriangle, ClipboardList, ChevronRight, ChevronLeft, Star,
   Palette, Zap, Bell, Copy, GitMerge, Smartphone,
-  Bug, History, TrendingUp, UserMinus, Pencil, PenLine, Bookmark, BarChart2,
+  Bug, History, TrendingUp, UserMinus, Pencil, PenLine, Bookmark,
   AlignJustify, LayoutList, ListChecks, Upload, Eye, Settings2, SlidersHorizontal, Check, Search, CheckCircle2,
   Download, FileCode2, FileText, ArrowRight, ArrowLeft, ChevronsRight, ChevronsLeft,
   Scale, Link2, Lock, Unlock, Hash,
 } from "lucide-react";
-import { AtajosButton } from "../components/AtajosSystem";
 import AdjuntosModal from "../components/AdjuntosModal";
 import ColumnVisibilityModal from "../components/ColumnVisibilityModal";
 import BackButton from "../components/BackButton";
@@ -596,7 +595,7 @@ const EXPEDIENTE_ROW_COLOR_STYLES: Record<string, {
     cardDescriptionSelected: "text-red-800",
   },
   azul: {
-    row: "bg-sky-50/45 hover:bg-sky-100/70",
+    row: "bg-sky-50 border-l-2 border-l-sky-400 hover:bg-sky-100/70",
     rowSelected: "bg-sky-100 border-l-2 border-l-sky-500",
     year: "text-sky-500",
     yearSelected: "text-sky-700",
@@ -610,7 +609,7 @@ const EXPEDIENTE_ROW_COLOR_STYLES: Record<string, {
     cardDescriptionSelected: "text-sky-950",
   },
   verde: {
-    row: "bg-emerald-50/45 hover:bg-emerald-100/70",
+    row: "bg-emerald-50 border-l-2 border-l-emerald-400 hover:bg-emerald-100/70",
     rowSelected: "bg-emerald-100 border-l-2 border-l-emerald-500",
     year: "text-emerald-500",
     yearSelected: "text-emerald-700",
@@ -624,7 +623,7 @@ const EXPEDIENTE_ROW_COLOR_STYLES: Record<string, {
     cardDescriptionSelected: "text-emerald-950",
   },
   amarillo: {
-    row: "bg-amber-50/50 hover:bg-amber-100/70",
+    row: "bg-amber-50 border-l-2 border-l-amber-400 hover:bg-amber-100/70",
     rowSelected: "bg-amber-100 border-l-2 border-l-amber-500",
     year: "text-amber-500",
     yearSelected: "text-amber-700",
@@ -638,7 +637,7 @@ const EXPEDIENTE_ROW_COLOR_STYLES: Record<string, {
     cardDescriptionSelected: "text-amber-950",
   },
   naranja: {
-    row: "bg-orange-50/50 hover:bg-orange-100/70",
+    row: "bg-orange-50 border-l-2 border-l-orange-400 hover:bg-orange-100/70",
     rowSelected: "bg-orange-100 border-l-2 border-l-orange-500",
     year: "text-orange-500",
     yearSelected: "text-orange-700",
@@ -652,7 +651,7 @@ const EXPEDIENTE_ROW_COLOR_STYLES: Record<string, {
     cardDescriptionSelected: "text-orange-950",
   },
   rojo: {
-    row: "bg-rose-50/45 hover:bg-rose-100/70",
+    row: "bg-rose-50 border-l-2 border-l-rose-400 hover:bg-rose-100/70",
     rowSelected: "bg-rose-100 border-l-2 border-l-rose-500",
     year: "text-rose-500",
     yearSelected: "text-rose-700",
@@ -666,7 +665,7 @@ const EXPEDIENTE_ROW_COLOR_STYLES: Record<string, {
     cardDescriptionSelected: "text-rose-950",
   },
   morado: {
-    row: "bg-violet-50/45 hover:bg-violet-100/70",
+    row: "bg-violet-50 border-l-2 border-l-violet-400 hover:bg-violet-100/70",
     rowSelected: "bg-violet-100 border-l-2 border-l-violet-500",
     year: "text-violet-500",
     yearSelected: "text-violet-700",
@@ -6416,15 +6415,13 @@ export default function ExpedienteList() {
 
               <div className="w-px h-5 bg-slate-200 mx-1" />
 
-              {/* Excel, Imprimir, Informes */}
+              {/* Excel, Imprimir */}
               <ToolBtn icon={FileSpreadsheet} label="Excel" onClick={openExportModal} />
               <ToolBtn icon={Printer} label="Imprimir" onClick={() => window.print()} />
-              <ToolBtn icon={BarChart2} label="Informes" onClick={() => navigate("/dashboard")} />
 
               <div className="w-px h-5 bg-slate-200 mx-1" />
 
-              {/* Atajos, Opciones */}
-              <AtajosButton modulo="Expedientes" />
+              {/* Opciones */}
               <div className="relative" ref={opcionesRef}>
                 <button
                   ref={opcionesBtnRef}
@@ -6490,7 +6487,6 @@ export default function ExpedienteList() {
                         : <><Lock size={13} className="text-slate-400 shrink-0" /> Cerrar expediente</>}
                     </button>
                     <button onClick={() => alert("Alta Acción")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><Zap size={13} className="text-slate-400 shrink-0" /> Alta Acción</button>
-                    <button onClick={() => alert("Crear Recall")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><Bell size={13} className="text-slate-400 shrink-0" /> Crear Recall</button>
                     <div className="h-px bg-slate-100 my-1" />
                     <button onClick={() => { setShowCounterModal(true); setShowOpciones(false); }} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><Hash size={13} className="text-slate-400 shrink-0" /> Configurar numeración</button>
                     <div className="h-px bg-slate-100 my-1" />
