@@ -74,14 +74,31 @@ const explainTaskError = (error: any) => {
   return "No se pudo guardar la tarea por un error interno. Revisa los datos y vuelve a intentarlo.";
 };
 
-const taskDateToAgendaStart = (value?: string | null) => {
+// client_tasks.plazo/fecha_aviso son columnas DATE: pg las devuelve como objetos
+// Date (no strings), y String(new Date(...)) da un formato tipo "Mon Jul 20 2026 ..."
+// que no es una fecha ISO válida. Hay que extraer año-mes-día explícitamente.
+// OJO: pg-types construye ese Date con el constructor LOCAL (new Date(y, m, d)),
+// así que hay que leerlo con getters locales (no toISOString, que es UTC y
+// desplazaría la fecha un día si el servidor corre en una zona horaria positiva).
+const normalizeTaskDate = (value?: string | Date | null): string | null => {
   if (!value) return null;
-  return `${String(value).slice(0, 10)}T08:00:00.000Z`;
+  if (value instanceof Date) {
+    const y = value.getFullYear();
+    const m = String(value.getMonth() + 1).padStart(2, '0');
+    const d = String(value.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  return String(value).slice(0, 10);
 };
 
-const taskDateToAgendaEnd = (value?: string | null) => {
-  if (!value) return null;
-  return `${String(value).slice(0, 10)}T18:00:00.000Z`;
+const taskDateToAgendaStart = (value?: string | Date | null) => {
+  const d = normalizeTaskDate(value);
+  return d ? `${d}T08:00:00.000Z` : null;
+};
+
+const taskDateToAgendaEnd = (value?: string | Date | null) => {
+  const d = normalizeTaskDate(value);
+  return d ? `${d}T18:00:00.000Z` : null;
 };
 
 const mapTaskEstadoToAgendaStatus = (estado?: string | null) =>
@@ -202,37 +219,43 @@ export const createTask = async (req: any, res: Response) => {
     const createdTask = result.rows[0];
     const agendaPayload = buildTaskAgendaPayload(createdTask);
 
+    // La sincronización con la Agenda es un extra sobre la tarea ya guardada:
+    // si falla, no debe hacer parecer que la tarea (que sí se creó arriba) falló.
     if (agendaPayload) {
-      const agendaRes = await pool.query(
-        `INSERT INTO agenda_events
-           (user_id, user_name, title, description, start_at, end_at, all_day,
-            type, status, expediente_id, cliente_id, organization_context, source, task_id)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
-         RETURNING *`,
-        [
-          userId,
-          userName,
-          agendaPayload.title,
-          agendaPayload.description,
-          agendaPayload.start_at,
-          agendaPayload.end_at,
-          agendaPayload.all_day,
-          agendaPayload.type,
-          agendaPayload.status,
-          agendaPayload.expediente_id,
-          agendaPayload.cliente_id,
-          agendaPayload.organization_context,
-          agendaPayload.source,
-          agendaPayload.task_id,
-        ]
-      );
+      try {
+        const agendaRes = await pool.query(
+          `INSERT INTO agenda_events
+             (user_id, user_name, title, description, start_at, end_at, all_day,
+              type, status, expediente_id, cliente_id, organization_context, source, task_id)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+           RETURNING *`,
+          [
+            userId,
+            userName,
+            agendaPayload.title,
+            agendaPayload.description,
+            agendaPayload.start_at,
+            agendaPayload.end_at,
+            agendaPayload.all_day,
+            agendaPayload.type,
+            agendaPayload.status,
+            agendaPayload.expediente_id,
+            agendaPayload.cliente_id,
+            agendaPayload.organization_context,
+            agendaPayload.source,
+            agendaPayload.task_id,
+          ]
+        );
 
-      const linkedAgenda = agendaRes.rows[0];
-      await pool.query(
-        `UPDATE client_tasks SET agenda_event_id = $1, updated_at = NOW() WHERE id = $2`,
-        [linkedAgenda.id, createdTask.id]
-      );
-      createdTask.agenda_event_id = linkedAgenda.id;
+        const linkedAgenda = agendaRes.rows[0];
+        await pool.query(
+          `UPDATE client_tasks SET agenda_event_id = $1, updated_at = NOW() WHERE id = $2`,
+          [linkedAgenda.id, createdTask.id]
+        );
+        createdTask.agenda_event_id = linkedAgenda.id;
+      } catch (agendaErr: any) {
+        console.error('No se pudo sincronizar la tarea con la Agenda:', agendaErr?.message || agendaErr);
+      }
     }
 
     logActivityForReq(req, `Tarea creada: ${titulo.trim()}`, 'CLIENT', clientId);
@@ -1018,64 +1041,70 @@ export const updateTask = async (req: any, res: Response) => {
     const updatedTask = result.rows[0];
     const agendaPayload = buildTaskAgendaPayload(updatedTask);
 
-    if (agendaPayload && updatedTask.agenda_event_id) {
-      await pool.query(
-        `UPDATE agenda_events
-         SET title=$1, description=$2, start_at=$3, end_at=$4, all_day=$5,
-             type=$6, status=$7, expediente_id=$8, cliente_id=$9,
-             organization_context=$10, task_id=$11, updated_at=NOW()
-         WHERE id=$12`,
-        [
-          agendaPayload.title,
-          agendaPayload.description,
-          agendaPayload.start_at,
-          agendaPayload.end_at,
-          agendaPayload.all_day,
-          agendaPayload.type,
-          agendaPayload.status,
-          agendaPayload.expediente_id,
-          agendaPayload.cliente_id,
-          agendaPayload.organization_context,
-          agendaPayload.task_id,
-          updatedTask.agenda_event_id,
-        ]
-      );
-    } else if (agendaPayload && !updatedTask.agenda_event_id) {
-      const agendaRes = await pool.query(
-        `INSERT INTO agenda_events
-           (user_id, user_name, title, description, start_at, end_at, all_day,
-            type, status, expediente_id, cliente_id, organization_context, source, task_id)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
-         RETURNING *`,
-        [
-          userId,
-          userName,
-          agendaPayload.title,
-          agendaPayload.description,
-          agendaPayload.start_at,
-          agendaPayload.end_at,
-          agendaPayload.all_day,
-          agendaPayload.type,
-          agendaPayload.status,
-          agendaPayload.expediente_id,
-          agendaPayload.cliente_id,
-          agendaPayload.organization_context,
-          agendaPayload.source,
-          agendaPayload.task_id,
-        ]
-      );
-      updatedTask.agenda_event_id = agendaRes.rows[0].id;
-      await pool.query(
-        `UPDATE client_tasks SET agenda_event_id = $1, updated_at = NOW() WHERE id = $2`,
-        [updatedTask.agenda_event_id, updatedTask.id]
-      );
-    } else if (!agendaPayload && updatedTask.agenda_event_id) {
-      await pool.query(`DELETE FROM agenda_events WHERE id = $1`, [updatedTask.agenda_event_id]);
-      await pool.query(
-        `UPDATE client_tasks SET agenda_event_id = NULL, updated_at = NOW() WHERE id = $1`,
-        [updatedTask.id]
-      );
-      updatedTask.agenda_event_id = null;
+    // Igual que en la creación: la tarea ya se actualizó arriba, así que un fallo
+    // al sincronizar con la Agenda no debe reportarse como si la tarea no se hubiera guardado.
+    try {
+      if (agendaPayload && updatedTask.agenda_event_id) {
+        await pool.query(
+          `UPDATE agenda_events
+           SET title=$1, description=$2, start_at=$3, end_at=$4, all_day=$5,
+               type=$6, status=$7, expediente_id=$8, cliente_id=$9,
+               organization_context=$10, task_id=$11, updated_at=NOW()
+           WHERE id=$12`,
+          [
+            agendaPayload.title,
+            agendaPayload.description,
+            agendaPayload.start_at,
+            agendaPayload.end_at,
+            agendaPayload.all_day,
+            agendaPayload.type,
+            agendaPayload.status,
+            agendaPayload.expediente_id,
+            agendaPayload.cliente_id,
+            agendaPayload.organization_context,
+            agendaPayload.task_id,
+            updatedTask.agenda_event_id,
+          ]
+        );
+      } else if (agendaPayload && !updatedTask.agenda_event_id) {
+        const agendaRes = await pool.query(
+          `INSERT INTO agenda_events
+             (user_id, user_name, title, description, start_at, end_at, all_day,
+              type, status, expediente_id, cliente_id, organization_context, source, task_id)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+           RETURNING *`,
+          [
+            userId,
+            userName,
+            agendaPayload.title,
+            agendaPayload.description,
+            agendaPayload.start_at,
+            agendaPayload.end_at,
+            agendaPayload.all_day,
+            agendaPayload.type,
+            agendaPayload.status,
+            agendaPayload.expediente_id,
+            agendaPayload.cliente_id,
+            agendaPayload.organization_context,
+            agendaPayload.source,
+            agendaPayload.task_id,
+          ]
+        );
+        updatedTask.agenda_event_id = agendaRes.rows[0].id;
+        await pool.query(
+          `UPDATE client_tasks SET agenda_event_id = $1, updated_at = NOW() WHERE id = $2`,
+          [updatedTask.agenda_event_id, updatedTask.id]
+        );
+      } else if (!agendaPayload && updatedTask.agenda_event_id) {
+        await pool.query(`DELETE FROM agenda_events WHERE id = $1`, [updatedTask.agenda_event_id]);
+        await pool.query(
+          `UPDATE client_tasks SET agenda_event_id = NULL, updated_at = NOW() WHERE id = $1`,
+          [updatedTask.id]
+        );
+        updatedTask.agenda_event_id = null;
+      }
+    } catch (agendaErr: any) {
+      console.error('No se pudo sincronizar la tarea con la Agenda:', agendaErr?.message || agendaErr);
     }
 
     res.json({ data: updatedTask });
