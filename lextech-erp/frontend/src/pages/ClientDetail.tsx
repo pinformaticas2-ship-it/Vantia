@@ -959,13 +959,18 @@ function TabTareas({ clientId, autoOpen = false, initialTaskType = "" }: { clien
 
   const handleToggleEstado = async (t: any) => {
     const nuevoEstado = t.estado === "completada" ? "pendiente" : "completada";
-    const token = await getToken({ skipCache: true });
-    const res = await fetch(`/api/tasks/${t.id}/estado`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ estado: nuevoEstado }),
-    });
-    if (res.ok) setTareas(prev => prev.map(x => x.id === t.id ? { ...x, estado: nuevoEstado } : x));
+    setTareas(prev => prev.map(x => x.id === t.id ? { ...x, estado: nuevoEstado } : x));
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/tasks/${t.id}/estado`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ estado: nuevoEstado }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      setTareas(prev => prev.map(x => x.id === t.id ? { ...x, estado: t.estado } : x));
+    }
   };
 
   const handleDelete = (id: string) => setConfirmDeleteTareaId(id);
