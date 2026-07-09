@@ -2913,7 +2913,7 @@ function DocumentImportView({
       </div>
 
       {/* Two-column layout */}
-      <div className="modules-scrollbar flex-1 min-h-0 flex flex-col gap-6 overflow-y-auto bg-[#f4f6f8] p-6 lg:flex-row lg:gap-6 lg:overflow-hidden lg:p-10">
+      <div className="modules-scrollbar flex-1 min-h-0 flex flex-col gap-6 overflow-auto bg-[#f4f6f8] p-6 lg:flex-row lg:gap-6 lg:p-10">
 
         {/* Left column — scrolls if content overflows */}
         <div className="min-w-0 flex flex-col gap-6 animate-card-in-1 lg:flex-1 lg:min-h-0 lg:overflow-y-auto lg:pr-1 modules-scrollbar">
