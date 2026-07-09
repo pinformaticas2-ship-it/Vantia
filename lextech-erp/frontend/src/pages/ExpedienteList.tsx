@@ -4644,6 +4644,7 @@ export default function ExpedienteList() {
   // Dropdowns click-based
   const [showOpciones, setShowOpciones] = useState(false);
   const [opcionesMenuPos, setOpcionesMenuPos] = useState({ top: 0, left: 0 });
+  const [opcionesSubmenu, setOpcionesSubmenu] = useState<null | "ir_a" | "color" | "version">(null);
   const opcionesRef = useRef<HTMLDivElement>(null);
   const opcionesBtnRef = useRef<HTMLButtonElement>(null);
   const [showColumnModal, setShowColumnModal] = useState(false);
@@ -4664,7 +4665,7 @@ export default function ExpedienteList() {
   // Cerrar dropdown Opciones al clicar fuera
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (opcionesRef.current && !opcionesRef.current.contains(e.target as Node)) setShowOpciones(false);
+      if (opcionesRef.current && !opcionesRef.current.contains(e.target as Node) && !(e.target as Element).closest?.('[data-opciones-menu]')) { setShowOpciones(false); setOpcionesSubmenu(null); }
       if (altaMenuRef.current && !altaMenuRef.current.contains(e.target as Node) && !(e.target as Element).closest?.('[data-alta-menu]')) setShowAltaMenu(false);
       if (
         formatDropdownBtnRef.current && !formatDropdownBtnRef.current.contains(e.target as Node) &&
@@ -6430,13 +6431,14 @@ export default function ExpedienteList() {
                       const r = opcionesBtnRef.current.getBoundingClientRect();
                       setOpcionesMenuPos({ top: r.bottom + 4, left: r.right - 230 });
                     }
+                    setOpcionesSubmenu(null);
                     setShowOpciones(v => !v);
                   }}
                   className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-colors border shadow-sm ${showOpciones ? "bg-red-50 border-red-300 text-red-700" : "text-slate-600 hover:bg-slate-100 border-slate-200 bg-white"}`}>
                   <MoreHorizontal size={13} /> Opciones <ChevronDown size={10} />
                 </button>
                 {showOpciones && typeof document !== "undefined" && createPortal(
-                  <div style={{ position: "fixed", top: opcionesMenuPos.top, left: opcionesMenuPos.left, zIndex: 9999 }}
+                  <div data-opciones-menu style={{ position: "fixed", top: opcionesMenuPos.top, left: opcionesMenuPos.left, zIndex: 9999 }}
                     className="bg-white border border-slate-200 rounded-xl shadow-xl min-w-[230px] py-1 overflow-visible">
                     <button onClick={() => alert("Seleccionar opciones favoritas")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors">
                       <Star size={13} className="text-slate-400 shrink-0" /> Seleccionar Opciones Favoritas
@@ -6445,23 +6447,23 @@ export default function ExpedienteList() {
                       <span className="flex items-center gap-2.5"><LayoutList size={13} className="text-slate-400 shrink-0" /> Elegir columnas</span>
                     </button>
                     <div className="h-px bg-slate-100 my-1" />
-                    <div className="relative group/sub">
-                      <button className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+                    <div className="relative">
+                      <button type="button" onClick={() => setOpcionesSubmenu(s => s === "ir_a" ? null : "ir_a")} className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors">
                         <span className="flex items-center gap-2.5"><ExternalLink size={13} className="text-slate-400 shrink-0" /> Ir a</span>
                         <ChevronRight size={11} className="text-slate-300" />
                       </button>
-                      <div className="absolute right-full -mr-px top-[-1px] z-50 bg-white border border-slate-200 rounded-xl shadow-xl min-w-[180px] py-1 hidden group-hover/sub:block">
-                        <button onClick={() => selectedExp?.cliente_id && navigate(`/dashboard/clientes/${selectedExp.cliente_id}`)} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><Users size={13} className="text-slate-400 shrink-0" /> Ir a Cliente</button>
-                        <button onClick={() => selected && navigate(`/dashboard/expedientes/${selected}`)} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><FolderOpen size={13} className="text-slate-400 shrink-0" /> Ir a Expediente</button>
+                      <div className={`absolute right-full -mr-px top-[-1px] z-50 bg-white border border-slate-200 rounded-xl shadow-xl min-w-[180px] py-1 ${opcionesSubmenu === "ir_a" ? "block" : "hidden"}`}>
+                        <button onClick={() => { selectedExp?.cliente_id && navigate(`/dashboard/clientes/${selectedExp.cliente_id}`); }} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><Users size={13} className="text-slate-400 shrink-0" /> Ir a Cliente</button>
+                        <button onClick={() => { selected && navigate(`/dashboard/expedientes/${selected}`); }} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><FolderOpen size={13} className="text-slate-400 shrink-0" /> Ir a Expediente</button>
                         <button onClick={() => alert("Ir a Juzgado")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><ClipboardList size={13} className="text-slate-400 shrink-0" /> Ir a Juzgado</button>
                       </div>
                     </div>
-                    <div className="relative group/color">
-                      <button className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+                    <div className="relative">
+                      <button type="button" onClick={() => setOpcionesSubmenu(s => s === "color" ? null : "color")} className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors">
                         <span className="flex items-center gap-2.5"><Palette size={13} className="text-slate-400 shrink-0" /> Asignar Color</span>
                         <ChevronRight size={11} className="text-slate-300" />
                       </button>
-                      <div className="absolute right-full -mr-px top-[-1px] z-50 hidden min-w-[190px] rounded-xl border border-slate-200 bg-white py-1 shadow-xl group-hover/color:block">
+                      <div className={`absolute right-full -mr-px top-[-1px] z-50 min-w-[190px] rounded-xl border border-slate-200 bg-white py-1 shadow-xl ${opcionesSubmenu === "color" ? "block" : "hidden"}`}>
                         {[
                           { value: "ninguno", label: "Sin color", dot: "bg-slate-300" },
                           { value: "azul",    label: "Azul suave",    dot: "bg-sky-400" },
@@ -6494,12 +6496,12 @@ export default function ExpedienteList() {
                     <button onClick={() => alert("Fusionar expedientes")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><GitMerge size={13} className="text-slate-400 shrink-0" /> Fusionar</button>
                     <div className="h-px bg-slate-100 my-1" />
                     <button onClick={() => selectedExp && window.open(`https://wa.me/?text=Expediente ${selectedExp.anio}/${selectedExp.num_exp}`, "_blank")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><Smartphone size={13} className="text-slate-400 shrink-0" /> Enviar SMS</button>
-                    <div className="relative group/ver">
-                      <button className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+                    <div className="relative">
+                      <button type="button" onClick={() => setOpcionesSubmenu(s => s === "version" ? null : "version")} className="w-full flex items-center justify-between gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors">
                         <span className="flex items-center gap-2.5"><History size={13} className="text-slate-400 shrink-0" /> Versión Antigua</span>
                         <ChevronRight size={11} className="text-slate-300" />
                       </button>
-                      <div className="absolute right-full -mr-px top-[-1px] z-50 bg-white border border-slate-200 rounded-xl shadow-xl min-w-[180px] py-1 hidden group-hover/ver:block">
+                      <div className={`absolute right-full -mr-px top-[-1px] z-50 bg-white border border-slate-200 rounded-xl shadow-xl min-w-[180px] py-1 ${opcionesSubmenu === "version" ? "block" : "hidden"}`}>
                         <button onClick={() => alert("Restaurar versión anterior")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><History size={13} className="text-slate-400 shrink-0" /> Ver historial versiones</button>
                         <button onClick={() => alert("Comparar con versión")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><RefreshCw size={13} className="text-slate-400 shrink-0" /> Comparar versión</button>
                       </div>
