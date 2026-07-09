@@ -4,7 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import './index.css'
 import { ClerkProvider } from '@clerk/clerk-react'
-import { initClientIp, installBackendFetchShim } from './lib/api'
+import { initClientIp, installBackendFetchShim, resolveApiUrl } from './lib/api'
 
 // Obtener IP pública lo antes posible — estará lista antes del primer login
 installBackendFetchShim();
@@ -14,6 +14,14 @@ const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
 
 // Log para depuración en consola
 console.log("LexTech Debugger: Verificando clave de Clerk...");
+
+// Para comprobar de un vistazo si frontend (Vercel) y backend (Railway) están al día:
+// abre la consola del navegador y compara ambos commits con `git log`.
+console.log(`LexTech Version: frontend commit ${__APP_COMMIT__} (build ${__APP_BUILD_TIME__})`);
+fetch(resolveApiUrl("/api/health/version"))
+  .then((r) => r.json())
+  .then((d) => console.log(`LexTech Version: backend commit ${d.commit} (deployed ${d.deployedAt})`))
+  .catch(() => {});
 
 if (!PUBLISHABLE_KEY) {
   throw new Error("❌ Error: No se encontró VITE_CLERK_PUBLISHABLE_KEY. Asegúrate de configurar el archivo .env.");
