@@ -2885,6 +2885,16 @@ function DocumentImportView({
     meta: client.nif_cif || client.email || undefined,
   }));
 
+  // Al cargar un lote (p.ej. pulsando "Revisar" en el historial), llevar la vista
+  // hasta la sección "Última importación" — si no, el cambio pasa desapercibido
+  // porque ocurre fuera del área visible donde se hizo clic.
+  const activeBatchSectionRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (activeBatch) {
+      activeBatchSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [activeBatch?.id]);
+
   return (
     <div className="h-full flex flex-col overflow-hidden animate-page-in">
       <input
@@ -3026,7 +3036,7 @@ function DocumentImportView({
 
           {/* Active batch */}
           {(activeBatch || activeItems.length > 0) && (
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex-shrink-0">
+            <div ref={activeBatchSectionRef} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex-shrink-0 scroll-mt-4">
               <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                 <div className="flex items-center gap-3">
                   <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Última importación</h3>
