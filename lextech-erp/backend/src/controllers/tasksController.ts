@@ -1168,7 +1168,7 @@ export const getIndicators = async (req: any, res: Response) => {
         COUNT(*)                                                           AS total_tareas,
         COUNT(*) FILTER (WHERE estado != 'completada')                     AS tareas_pendientes,
         COUNT(*) FILTER (WHERE estado = 'urgente')                         AS tareas_urgentes,
-        COUNT(*) FILTER (WHERE estado != 'completada' AND plazo < NOW())   AS tareas_vencidas,
+        COUNT(*) FILTER (WHERE estado != 'completada' AND plazo < CURRENT_DATE) AS tareas_vencidas,
         COUNT(*) FILTER (WHERE estado = 'completada')                      AS tareas_completadas
        FROM client_tasks WHERE client_id = $1`,
       [clientId]
@@ -1252,7 +1252,7 @@ export const getExpedienteIndicators = async (req: any, res: Response) => {
           COUNT(*)                                                           AS total_tareas,
           COUNT(*) FILTER (WHERE estado != 'completada')                     AS tareas_pendientes,
           COUNT(*) FILTER (WHERE estado = 'urgente')                         AS tareas_urgentes,
-          COUNT(*) FILTER (WHERE estado != 'completada' AND plazo < NOW())   AS tareas_vencidas,
+          COUNT(*) FILTER (WHERE estado != 'completada' AND plazo < CURRENT_DATE) AS tareas_vencidas,
           COUNT(*) FILTER (WHERE estado = 'completada')                      AS tareas_completadas
          FROM client_tasks WHERE expediente_id = $1`,
         [expedienteId],

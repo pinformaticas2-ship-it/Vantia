@@ -1024,7 +1024,13 @@ function TabTareas({ clientId, autoOpen = false, initialTaskType = "" }: { clien
     } finally { setSaving(false); }
   };
 
-  const isVencida = (t: any) => t.plazo && t.estado !== "completada" && new Date(t.plazo) < new Date();
+  // Compara solo fechas de calendario (no el instante exacto): así una tarea con
+  // vencimiento "hoy" no aparece vencida horas antes de que el día termine.
+  const todayYMD = () => {
+    const n = new Date();
+    return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+  };
+  const isVencida = (t: any) => t.plazo && t.estado !== "completada" && String(t.plazo).slice(0, 10) < todayYMD();
   const fmtPlazo = (d: string) => {
     if (!d) return null;
     return new Date(d).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" });

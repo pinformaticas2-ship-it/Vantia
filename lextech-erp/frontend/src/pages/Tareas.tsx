@@ -93,7 +93,11 @@ function fmtSize(bytes: number): string {
 }
 function isOverdue(plazo: string | null, estado: string): boolean {
   if (!plazo || estado === "completada") return false;
-  return new Date(plazo) < new Date();
+  // Compara solo fechas de calendario (no el instante exacto): así una tarea con
+  // vencimiento "hoy" no aparece vencida horas antes de que el día termine.
+  const n = new Date();
+  const todayYMD = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+  return plazo.slice(0, 10) < todayYMD;
 }
 function daysUntil(plazo: string | null): number | null {
   if (!plazo) return null;
