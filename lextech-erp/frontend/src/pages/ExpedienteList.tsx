@@ -2771,7 +2771,7 @@ function ZipDropArea({ zipFileName, onSelectFile, onFileChange }: {
         const file = e.dataTransfer.files?.[0];
         if (file) onFileChange(file);
       }}
-      className={`mt-6 flex min-h-[390px] w-full flex-col items-center justify-center rounded-[24px] border-2 px-6 py-10 text-center transition-all duration-200 ${
+      className={`mt-4 flex min-h-[240px] w-full flex-col items-center justify-center rounded-[24px] border-2 px-6 py-6 text-center transition-all duration-200 ${
         isDragging
           ? 'border-[#ab0433] bg-red-50/40 scale-[1.01]'
           : isClicked
@@ -2779,7 +2779,7 @@ function ZipDropArea({ zipFileName, onSelectFile, onFileChange }: {
             : 'border-slate-200 bg-white hover:border-[#ab0433]/30 hover:bg-red-50/10'
       }`}
     >
-      <div className="mb-8">
+      <div className="mb-4">
         <ZipUploadIllustration hasFile={!!zipFileName} clicked={isClicked} />
       </div>
 
@@ -2790,7 +2790,7 @@ function ZipDropArea({ zipFileName, onSelectFile, onFileChange }: {
           : isClicked ? 'Abriendo selector...'
           : zipFileName ?? 'Añade un archivo ZIP con documentos'}
       </p>
-      <p className="mt-3 max-w-xl text-base leading-7 text-slate-400">
+      <p className="mt-2 max-w-xl text-base leading-7 text-slate-400">
         {zipFileName
           ? 'Haz click para cambiar el archivo'
           : 'Arrastra un ZIP aquí, o haz click para seleccionarlo'}
@@ -2896,11 +2896,11 @@ function DocumentImportView({
       />
 
       {/* Header */}
-      <div className="flex-shrink-0 px-6 lg:px-10 py-6 border-b border-slate-200 bg-white z-10 animate-card-in">
-        <div className="flex flex-col gap-3">
+      <div className="flex-shrink-0 px-6 lg:px-10 py-4 border-b border-slate-200 bg-white z-10 animate-card-in">
+        <div className="flex flex-col gap-2">
           <button
             onClick={onBack}
-            className="w-max inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-all shadow-sm"
+            className="w-max inline-flex items-center gap-2 px-4 py-1.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-all shadow-sm"
           >
             <ChevronLeft size={13} />
             Volver a Expedientes
@@ -2913,7 +2913,7 @@ function DocumentImportView({
       </div>
 
       {/* Two-column layout */}
-      <div className="modules-scrollbar flex-1 min-h-0 flex flex-col gap-6 overflow-auto bg-[#f4f6f8] p-6 lg:flex-row lg:gap-6 lg:p-10">
+      <div className="modules-scrollbar flex-1 min-h-0 flex flex-col gap-6 overflow-auto bg-[#f4f6f8] p-6 lg:flex-row lg:gap-6 lg:p-8">
 
         {/* Left column — scrolls if content overflows */}
         <div className="min-w-0 flex flex-col gap-6 animate-card-in-1 lg:flex-1 lg:min-h-0 lg:overflow-y-auto lg:pr-1 modules-scrollbar">
