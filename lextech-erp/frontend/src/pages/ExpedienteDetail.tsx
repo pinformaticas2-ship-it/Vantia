@@ -3496,7 +3496,7 @@ function TabCorreoExpediente({
       )}
 
       {/* Modal redactar */}
-      {showCompose && !locked && (
+      {showCompose && !locked && createPortal(
         <div className="fixed inset-0 z-50 bg-transparent flex items-end justify-end p-6">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg flex flex-col" style={{ maxHeight: "80vh" }}>
             {/* Header */}
@@ -3575,7 +3575,8 @@ function TabCorreoExpediente({
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Modal picker de adjuntos del expediente */}
