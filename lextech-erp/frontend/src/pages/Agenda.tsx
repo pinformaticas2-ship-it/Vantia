@@ -1074,7 +1074,11 @@ function QuickEventPopover({
       window.removeEventListener("resize", measure);
       window.visualViewport?.removeEventListener("resize", measure);
     };
-  }, [position.x, position.y]);
+    // activeTab entra en las dependencias porque cada pestaña tiene una altura de
+    // contenido muy distinta (Evento trae muchos mas campos que, p.ej., Tarea) —
+    // sin esto, cambiar de pestaña podia dejar el popover posicionado para la
+    // altura de la pestaña anterior y cortarse por abajo.
+  }, [position.x, position.y, activeTab]);
 
   const missingTitle = !form.title.trim();
 
@@ -1229,7 +1233,11 @@ function QuickEventPopover({
           left: pos?.left ?? position.x,
           top: pos?.top ?? position.y,
           visibility: pos ? "visible" : "hidden",
-          maxHeight: pos ? `${pos.maxHeight}px` : "60vh",
+          // Sin tope en la primera pasada (oculta): si el contenido real supera el
+          // 60vh que se usaba antes como valor provisional, esa medicion salia mas
+          // baja de lo real y el calculo de "top" se basaba en una altura menor a
+          // la que el popover acababa teniendo — resultado: se salia por abajo.
+          maxHeight: pos ? `${pos.maxHeight}px` : undefined,
           maxWidth: pos ? `${pos.maxWidth}px` : "90vw",
         }}
         onClick={e => e.stopPropagation()}
