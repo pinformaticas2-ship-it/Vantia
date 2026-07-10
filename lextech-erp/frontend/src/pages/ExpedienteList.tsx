@@ -4135,12 +4135,12 @@ function FieldDropdown({ value, onChange, options }: {
   };
 
   return (
-    <div className="relative">
+    <div className="relative h-full shrink-0">
       <button
         ref={btnRef}
         type="button"
         onClick={handleOpen}
-        className="flex items-center gap-1.5 text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white text-slate-600 min-w-[160px] hover:border-slate-300 focus:outline-none focus:border-red-400 transition-colors select-none"
+        className={`flex h-full items-center gap-1.5 text-xs rounded-l-lg px-2.5 min-w-[160px] transition-colors select-none focus:outline-none ${open ? "bg-slate-50 text-slate-700" : "bg-transparent text-slate-600 hover:bg-slate-50"}`}
       >
         <span className="flex-1 text-left truncate">{selected?.label ?? "Elegir…"}</span>
         <ChevronDown size={11} className={`shrink-0 text-slate-400 transition-transform duration-150 ${open ? "rotate-180" : ""}`} />
@@ -4177,26 +4177,31 @@ function FilterRow({
   inputRef?: React.RefObject<HTMLInputElement>;
 }) {
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex h-8 items-center rounded-lg border border-slate-200 bg-white shadow-sm transition-colors focus-within:border-red-400">
       <FieldDropdown
         value={filter.field}
         onChange={val => onChange(filter.id, { field: val, value: "" })}
         options={FILTER_FIELDS}
       />
+      <div className="h-4 w-px shrink-0 bg-slate-200" />
       <input
         ref={inputRef}
         value={filter.value}
         onChange={e => onChange(filter.id, { value: e.target.value })}
         placeholder="Buscar..."
-        className="border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-700 focus:outline-none focus:border-red-400 h-7 w-48"
+        className="h-full w-48 border-0 bg-transparent px-2.5 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-0"
       />
       {canRemove && (
-        <button
-          onClick={() => onRemove(filter.id)}
-          className="text-slate-300 hover:text-red-500 transition-colors"
-        >
-          <X size={12} />
-        </button>
+        <>
+          <div className="h-4 w-px shrink-0 bg-slate-200" />
+          <button
+            onClick={() => onRemove(filter.id)}
+            title="Quitar filtro"
+            className="flex h-full items-center px-2 text-slate-300 hover:text-red-500 transition-colors"
+          >
+            <X size={12} />
+          </button>
+        </>
       )}
     </div>
   );
@@ -6527,36 +6532,36 @@ export default function ExpedienteList() {
                 />
               ))}
               <button onClick={addFilter} title="Añadir filtro"
-                className="flex items-center justify-center w-7 h-7 rounded-md border border-slate-200 text-slate-500 bg-white hover:bg-slate-50 shadow-sm transition-colors">
+                className="flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 text-slate-500 bg-white hover:bg-slate-50 shadow-sm transition-colors">
                 <Plus size={13} />
               </button>
               <button onClick={clearAllFilters} title="Limpiar filtros"
-                className={`flex items-center justify-center w-7 h-7 rounded-md border bg-white shadow-sm transition-colors ${hasActiveFilters || filters.length > 1 ? "border-red-300 text-red-500 hover:bg-red-50" : "border-slate-200 text-slate-300"}`}>
+                className={`flex items-center justify-center w-8 h-8 rounded-lg border bg-white shadow-sm transition-colors ${hasActiveFilters || filters.length > 1 ? "border-red-300 text-red-500 hover:bg-red-50" : "border-slate-200 text-slate-300"}`}>
                 <ListFilter size={12} />
               </button>
             </div>
             <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
-              <span className="text-xs font-medium text-slate-500 whitespace-nowrap">
+              <span className="inline-flex h-8 items-center whitespace-nowrap rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-500">
                 {filtered.length !== expedientes.length
-                  ? <span className="text-amber-600 font-medium">{filtered.length} de {expedientes.length}</span>
-                  : <>{expedientes.length} {expedientes.length === 1 ? "registro" : "registros"}</>}
+                  ? <span className="text-amber-600 font-semibold">{filtered.length} de {expedientes.length}</span>
+                  : <span className="text-slate-600">{expedientes.length} {expedientes.length === 1 ? "registro" : "registros"}</span>}
               </span>
-              <div className="flex items-center bg-white rounded-md border border-slate-200 shadow-sm p-0.5">
+              <div className="flex h-8 items-center gap-0.5 rounded-lg border border-slate-200 bg-white p-0.5 shadow-sm">
                 <button onClick={() => switchView("list")} title="Vista listado"
-                  className={`px-2 py-1 rounded transition-all ${viewMode === "list" ? "bg-red-50 text-red-600 border border-red-100" : "text-slate-400 hover:text-slate-600"}`}>
+                  className={`flex h-7 w-7 items-center justify-center rounded-md transition-all ${viewMode === "list" ? "bg-red-50 text-red-600" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}>
                   <AlignJustify size={12} />
                 </button>
                 <button onClick={() => switchView("detail")} title="Vista detalle"
-                  className={`px-2 py-1 transition-all ${viewMode === "detail" ? "text-red-600 bg-red-50" : "text-slate-400 hover:text-slate-600"}`}>
+                  className={`flex h-7 w-7 items-center justify-center rounded-md transition-all ${viewMode === "detail" ? "bg-red-50 text-red-600" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}>
                   <LayoutList size={12} />
                 </button>
                 <button onClick={() => switchView("multiselect")} title="Selección múltiple"
-                  className={`px-2 py-1 transition-all ${viewMode === "multiselect" ? "text-red-600 bg-red-50" : "text-slate-400 hover:text-slate-600"}`}>
+                  className={`flex h-7 w-7 items-center justify-center rounded-md transition-all ${viewMode === "multiselect" ? "bg-red-50 text-red-600" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}>
                   <ListChecks size={12} />
                 </button>
               </div>
               <button onClick={handleRefresh} title="Refrescar datos"
-                className="p-1.5 border border-slate-200 rounded-md text-slate-400 hover:text-red-600 hover:border-red-300 hover:bg-red-50 transition-all bg-white shadow-sm w-8 h-8 flex items-center justify-center">
+                className="flex items-center justify-center w-8 h-8 rounded-lg border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-300 hover:bg-red-50 transition-all bg-white shadow-sm">
                 <RefreshCw size={13} className={refreshSpin ? "animate-spin" : ""} />
               </button>
             </div>
