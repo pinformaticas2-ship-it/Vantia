@@ -1274,7 +1274,7 @@ function QuickEventPopover({
           })}
         </div>
 
-        <form onSubmit={handleSubmit} className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 modules-scrollbar">
+        <form id="quick-event-form" onSubmit={handleSubmit} className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 modules-scrollbar">
           {/* Título — común a todas las pestañas salvo Agenda de citas (gestiona una página, no un evento puntual) */}
           {activeTab !== "agenda_citas" && (
             <input
@@ -1643,40 +1643,42 @@ function QuickEventPopover({
           {errorMsg && (
             <p className="rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-600">{errorMsg}</p>
           )}
-
-          {/* Acciones */}
-          <div className="flex items-center justify-between border-t border-slate-100 pt-3">
-            {activeTab === "evento" ? (
-              <button
-                type="button"
-                onClick={() => onExpand(form)}
-                className="text-xs font-semibold text-slate-500 hover:text-red-600 transition-colors"
-              >
-                Más opciones
-              </button>
-            ) : <span />}
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-3 py-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700 transition-colors"
-              >
-                {activeTab === "agenda_citas" ? "Cerrar" : "Cancelar"}
-              </button>
-              {activeTab !== "agenda_citas" && (
-                <button
-                  type="submit"
-                  disabled={saving || missingTitle || !!otherTab}
-                  title={missingTitle ? "Añade un título para guardar" : ""}
-                  className="flex items-center gap-1.5 rounded-xl bg-red-600 px-4 py-1.5 text-xs font-bold text-white transition-colors hover:bg-red-700 disabled:opacity-50"
-                >
-                  {saving && <Loader2 size={11} className="animate-spin" />}
-                  Guardar
-                </button>
-              )}
-            </div>
-          </div>
         </form>
+
+        {/* Acciones — fuera del área con scroll para que Cancelar/Guardar esten
+            siempre visibles, sin importar cuanto contenido tenga la pestaña activa. */}
+        <div className="flex flex-shrink-0 items-center justify-between border-t border-slate-100 bg-white px-4 py-3">
+          {activeTab === "evento" ? (
+            <button
+              type="button"
+              onClick={() => onExpand(form)}
+              className="text-xs font-semibold text-slate-500 hover:text-red-600 transition-colors"
+            >
+              Más opciones
+            </button>
+          ) : <span />}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3 py-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700 transition-colors"
+            >
+              {activeTab === "agenda_citas" ? "Cerrar" : "Cancelar"}
+            </button>
+            {activeTab !== "agenda_citas" && (
+              <button
+                type="submit"
+                form="quick-event-form"
+                disabled={saving || missingTitle || !!otherTab}
+                title={missingTitle ? "Añade un título para guardar" : ""}
+                className="flex items-center gap-1.5 rounded-xl bg-red-600 px-4 py-1.5 text-xs font-bold text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+              >
+                {saving && <Loader2 size={11} className="animate-spin" />}
+                Guardar
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       {showBookingSettings && (
