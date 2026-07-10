@@ -2031,7 +2031,7 @@ export default function ClientList() {
           <AltaOptionsBtn
             onManual={() => navigate("/dashboard/clientes/new?mode=manual")}
             onDni={() => navigate("/dashboard/clientes/new?mode=dni")}
-            onLink={() => navigate("/dashboard/clientes/new?mode=link")}
+            onLink={() => navigate("/dashboard/clientes/invitar")}
           />
 
           {/* ─ Baja (eliminar) ─ */}
