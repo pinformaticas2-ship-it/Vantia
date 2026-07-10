@@ -845,8 +845,15 @@ export async function getMessage(req: Request, res: Response) {
     if (!rows.length) return err(res, 'Email no encontrado', 404);
     const row = rows[0];
 
-    // Fetch body from Gmail API if missing
-    if (row.gmail_profile_id && row.gmail_message_id && !row.body_html && !row.body_text) {
+    // attachments_json vale NULL solo si nunca se ha comprobado (mensajes cacheados
+    // ANTES de que existiera esta funcionalidad); un mensaje sin adjuntos ya
+    // comprobado guarda '[]', no NULL — así distinguimos "falta comprobar" de
+    // "comprobado, no tiene". Esto permite que los correos ya abiertos antes de
+    // este cambio se "reparen" solos la proxima vez que se abran.
+    const attachmentsUnchecked = row.attachments_json == null;
+
+    // Fetch body from Gmail API if falta el cuerpo o nunca se comprobaron adjuntos
+    if (row.gmail_profile_id && row.gmail_message_id && ((!row.body_html && !row.body_text) || attachmentsUnchecked)) {
       try {
         const accessToken = await getGmailAccessToken(row.gmail_profile_id, uid);
         const full = await gmailApiGet(`/messages/${row.gmail_message_id}?format=full`, accessToken);
@@ -869,20 +876,25 @@ export async function getMessage(req: Request, res: Response) {
           if (p.parts) p.parts.forEach(walkParts);
         };
         walkParts(full.payload);
-        const snippet = (bodyText || bodyHtml.replace(/<[^>]+>/g, ' ')).slice(0, 200);
-        const attachmentsJson = attachments.length ? JSON.stringify(attachments) : null;
+        // Si el cuerpo ya estaba cacheado y solo veniamos a comprobar adjuntos,
+        // no pisar el body_html/body_text ya guardados con una version vacia.
+        const nextBodyHtml = bodyHtml || row.body_html || '';
+        const nextBodyText = bodyText || row.body_text || '';
+        const snippet = row.snippet || (nextBodyText || nextBodyHtml.replace(/<[^>]+>/g, ' ')).slice(0, 200);
+        const attachmentsJson = JSON.stringify(attachments);
         await pool.query(
           `UPDATE emails SET body_text=$1, body_html=$2, snippet=$3, attachments_json=$4, has_attachments=$5 WHERE id=$6`,
-          [bodyText, bodyHtml, snippet, attachmentsJson, attachments.length > 0, id],
+          [nextBodyText, nextBodyHtml, snippet, attachmentsJson, attachments.length > 0, id],
         );
-        row.body_text = bodyText; row.body_html = bodyHtml; row.snippet = snippet;
+        row.body_text = nextBodyText; row.body_html = nextBodyHtml; row.snippet = snippet;
         row.attachments_json = attachmentsJson; row.has_attachments = attachments.length > 0;
       } catch (_e) { /* best effort */ }
     }
 
-    // Fetch body from IMAP if missing, y marcar como leido — en la MISMA conexion
-    // IMAP para no pagar dos handshakes TCP/TLS completos al abrir un correo.
-    const needsImapBody     = !row.gmail_profile_id && row.uid && !row.body_html && !row.body_text;
+    // Fetch body from IMAP si falta el cuerpo o nunca se comprobaron adjuntos, y
+    // marcar como leido — en la MISMA conexion IMAP para no pagar dos handshakes
+    // TCP/TLS completos al abrir un correo.
+    const needsImapBody     = !row.gmail_profile_id && row.uid && ((!row.body_html && !row.body_text) || attachmentsUnchecked);
     const needsImapMarkRead = !row.gmail_profile_id && row.uid && !row.is_read;
     if (needsImapBody || needsImapMarkRead) {
       try {
@@ -899,12 +911,17 @@ export async function getMessage(req: Request, res: Response) {
         if (needsImapBody) {
           const full = await client.fetchFullMessage(row.uid);
           if (full) {
-            const attachmentsJson = full.attachments.length ? JSON.stringify(full.attachments) : null;
+            // No pisar un cuerpo ya cacheado con uno vacio si el re-parseo
+            // (hecho solo para comprobar adjuntos) no encontrase texto/html.
+            const nextBodyHtml = full.bodyHtml || row.body_html || '';
+            const nextBodyText = full.bodyText || row.body_text || '';
+            const snippet = full.snippet || row.snippet || '';
+            const attachmentsJson = JSON.stringify(full.attachments);
             await pool.query(
               `UPDATE emails SET body_text=$1, body_html=$2, snippet=$3, attachments_json=$4, has_attachments=$5 WHERE id=$6`,
-              [full.bodyText, full.bodyHtml, full.snippet, attachmentsJson, full.hasAttachments, id],
+              [nextBodyText, nextBodyHtml, snippet, attachmentsJson, full.hasAttachments, id],
             );
-            row.body_text = full.bodyText; row.body_html = full.bodyHtml; row.snippet = full.snippet;
+            row.body_text = nextBodyText; row.body_html = nextBodyHtml; row.snippet = snippet;
             row.attachments_json = attachmentsJson; row.has_attachments = full.hasAttachments;
           }
         }
