@@ -9,7 +9,7 @@ import { useAuth } from "@clerk/clerk-react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Users, Plus, Edit3, Loader2, AlertCircle, RefreshCw,
-  X, Printer, ChevronUp, ChevronDown, ChevronDown as ChevronDownSmall,
+  X, ChevronUp, ChevronDown, ChevronDown as ChevronDownSmall,
   UserMinus, FileSpreadsheet, ExternalLink, ListFilter,
   AlignJustify, LayoutList, ListChecks,
   MapPin, Phone, Mail,
@@ -2164,16 +2164,6 @@ export default function ClientList() {
             icon={Paperclip} label="Adjuntos"
             disabled={!selected}
             onClick={() => selected && setShowAdjuntos(true)}
-          />
-
-          {/* ─ Imprimir ─ */}
-          <DropdownBtn
-            icon={Printer} label="Imprimir"
-            items={[
-              { label: "Imprimir listado",      icon: Printer, onClick: () => window.print() },
-              { label: "Imprimir ficha seleccionada", icon: Printer,
-                onClick: () => selected && navigate(`/dashboard/clientes/${selected}`) },
-            ]}
           />
 
           {/* ─ Excel ─ */}

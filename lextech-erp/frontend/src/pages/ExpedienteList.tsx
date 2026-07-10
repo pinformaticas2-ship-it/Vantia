@@ -8,7 +8,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   FolderOpen, Plus, Loader2, AlertCircle, RefreshCw,
   X, ChevronUp, ChevronDown, ListFilter, ExternalLink,
-  Edit3, Trash2, FileSpreadsheet, Printer, MoreHorizontal,
+  Edit3, Trash2, FileSpreadsheet, MoreHorizontal,
   Users, Activity, Mail, MessageSquare, MessageCircle, Paperclip,
   AlertTriangle, ClipboardList, ChevronRight, ChevronLeft, Star,
   Palette, Zap, Bell, Copy, GitMerge, Smartphone,
@@ -6416,9 +6416,8 @@ export default function ExpedienteList() {
 
               <div className="w-px h-5 bg-slate-200 mx-1" />
 
-              {/* Excel, Imprimir */}
+              {/* Excel */}
               <ToolBtn icon={FileSpreadsheet} label="Excel" onClick={openExportModal} />
-              <ToolBtn icon={Printer} label="Imprimir" onClick={() => window.print()} />
 
               <div className="w-px h-5 bg-slate-200 mx-1" />
 
