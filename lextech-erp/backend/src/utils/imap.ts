@@ -1,4 +1,5 @@
 const { ImapFlow } = require('imapflow');
+import { simpleParser } from 'mailparser';
 
 export interface ImapConfig {
   host: string;
@@ -25,12 +26,20 @@ export interface ImapEnvelope {
   to: string;
   messageId: string;
   size: number;
+  hasAttachments: boolean;
+}
+
+export interface ImapAttachment {
+  filename: string;
+  contentType: string;
+  size: number;
 }
 
 export interface ImapMessage extends ImapEnvelope {
   bodyText: string;
   bodyHtml: string;
   snippet: string;
+  attachments: ImapAttachment[];
 }
 
 function normalizeCharset(cs: string): BufferEncoding {
@@ -79,70 +88,9 @@ function decodeHeader(raw: string): string {
   });
 }
 
-function escapeRegExp(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function parseMimeParts(raw: string): { text: string; html: string } {
-  let text = '';
-  let html = '';
-
-  const contentTypeMatch = raw.match(/Content-Type:\s*([^\r\n;]+)/i);
-  const mainCT = contentTypeMatch?.[1]?.trim().toLowerCase() || '';
-
-  if (!raw.includes('boundary=') && !mainCT.includes('multipart')) {
-    const headerEnd = raw.indexOf('\r\n\r\n');
-    const headerSection = headerEnd !== -1 ? raw.slice(0, headerEnd) : '';
-    const body = headerEnd !== -1 ? raw.slice(headerEnd + 4) : raw;
-    const cte = (raw.match(/Content-Transfer-Encoding:\s*(\S+)/i)?.[1] || '').toLowerCase();
-    const charset = extractCharset(headerSection);
-    const decoded = cte === 'base64'
-      ? decodeBase64(body.replace(/\r?\n/g, ''), charset)
-      : cte === 'quoted-printable'
-        ? decodeQuotedPrintable(body, charset)
-        : body;
-
-    if (mainCT.includes('text/html')) html = decoded;
-    else text = decoded;
-
-    return { text, html };
-  }
-
-  const boundaryMatch = raw.match(/boundary="?([^"\r\n;]+)"?/i);
-  if (!boundaryMatch) return { text, html };
-  const boundary = boundaryMatch[1];
-
-  const parts = raw.split(new RegExp(`--${escapeRegExp(boundary)}(?:--)?`));
-  for (const part of parts) {
-    if (!part.trim() || part.trim() === '--') continue;
-    const headerEnd = part.indexOf('\r\n\r\n');
-    if (headerEnd === -1) continue;
-
-    const headers = part.slice(0, headerEnd);
-    const body = part.slice(headerEnd + 4);
-    const partCT = (headers.match(/Content-Type:\s*([^\r\n;]+)/i)?.[1] || '').trim().toLowerCase();
-    const partCTE = (headers.match(/Content-Transfer-Encoding:\s*(\S+)/i)?.[1] || '').toLowerCase();
-    const partCharset = extractCharset(headers);
-
-    if (partCT.includes('multipart')) {
-      const nested = parseMimeParts(part);
-      if (!text && nested.text) text = nested.text;
-      if (!html && nested.html) html = nested.html;
-      continue;
-    }
-
-    const decoded = partCTE === 'base64'
-      ? decodeBase64(body.replace(/\r?\n/g, ''), partCharset)
-      : partCTE === 'quoted-printable'
-        ? decodeQuotedPrintable(body, partCharset)
-        : body;
-
-    if (partCT.includes('text/html') && !html) html = decoded;
-    else if (partCT.includes('text/plain') && !text) text = decoded;
-  }
-
-  return { text, html };
-}
+// El body (texto/HTML/adjuntos/imagenes inline cid:) se parsea con mailparser
+// (ver fetchFullMessage) en vez de con un parser MIME artesanal — mailparser
+// resuelve correctamente adjuntos, imagenes cid: embebidas y encodings raros.
 
 function buildSnippet(text: string, html: string): string {
   const plain = text || html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -165,6 +113,19 @@ function normalizeAddress(addresses: any): { email: string; name: string } {
   return { email, name };
 }
 
+// Recorre el arbol de bodyStructure (metadata de las partes MIME, sin descargar
+// contenido) para saber si el mensaje trae adjuntos reales — permite mostrar el
+// icono de adjunto en la lista sin tener que bajar el cuerpo completo de cada correo.
+function structureHasAttachment(node: any): boolean {
+  if (!node) return false;
+  const disposition = String(node.disposition || '').toLowerCase();
+  const filename = node.dispositionParameters?.filename || node.parameters?.name;
+  if (disposition === 'attachment' && filename) return true;
+  if (disposition !== 'inline' && filename && !String(node.type || '').toLowerCase().startsWith('text/')) return true;
+  if (Array.isArray(node.childNodes)) return node.childNodes.some(structureHasAttachment);
+  return false;
+}
+
 function mapEnvelope(message: any): ImapEnvelope {
   const envelope = message?.envelope || {};
   const from = normalizeAddress(envelope.from);
@@ -185,6 +146,7 @@ function mapEnvelope(message: any): ImapEnvelope {
     to: to.email,
     messageId: String(envelope.messageId || '').replace(/[<>]/g, ''),
     size: Number(message?.size || message?.source?.length || 0),
+    hasAttachments: structureHasAttachment(message?.bodyStructure),
   };
 }
 
@@ -368,6 +330,7 @@ export class ImapClient {
       flags: true,
       size: true,
       internalDate: true,
+      bodyStructure: true,
     }, { uid: true })) {
       result.push(mapEnvelope(message));
     }
@@ -388,17 +351,54 @@ export class ImapClient {
 
     if (!message) return null;
 
-    const source = Buffer.isBuffer(message.source)
-      ? message.source.toString('utf8')
-      : String(message.source || '');
-    const parts = parseMimeParts(source);
+    const sourceBuffer: Buffer = Buffer.isBuffer(message.source)
+      ? message.source
+      : Buffer.from(String(message.source || ''), 'utf8');
+    const parsed = await simpleParser(sourceBuffer);
     const envelope = mapEnvelope(message);
+
+    // mailparser ya sustituye las imagenes inline (cid:) por data: URIs dentro
+    // del HTML por defecto, y marca con related=true los adjuntos que ya quedaron
+    // embebidos asi — se excluyen de la lista de adjuntos descargables para no duplicar.
+    const bodyHtml = typeof parsed.html === 'string' ? parsed.html : '';
+    const bodyText = parsed.text || '';
+    const attachments: ImapAttachment[] = (parsed.attachments || [])
+      .filter((a) => !a.related)
+      .map((a) => ({
+        filename: a.filename || 'archivo adjunto',
+        contentType: a.contentType || 'application/octet-stream',
+        size: a.size || 0,
+      }));
 
     return {
       ...envelope,
-      bodyText: parts.text,
-      bodyHtml: parts.html,
-      snippet: buildSnippet(parts.text, parts.html),
+      bodyText,
+      bodyHtml,
+      snippet: buildSnippet(bodyText, bodyHtml),
+      attachments,
+      hasAttachments: envelope.hasAttachments || attachments.length > 0,
+    };
+  }
+
+  /** Re-descarga el mensaje completo y devuelve el Buffer de un adjunto concreto por indice
+   *  (mismo orden que fetchFullMessage().attachments) — usado por el endpoint de descarga. */
+  async fetchAttachment(uid: number, index: number): Promise<{ filename: string; contentType: string; content: Buffer } | null> {
+    const client = this.ensureClient();
+    const message = await client.fetchOne(uid, { uid: true, source: true }, { uid: true });
+    if (!message) return null;
+
+    const sourceBuffer: Buffer = Buffer.isBuffer(message.source)
+      ? message.source
+      : Buffer.from(String(message.source || ''), 'utf8');
+    const parsed = await simpleParser(sourceBuffer);
+    const downloadable = (parsed.attachments || []).filter((a) => !a.related);
+    const att = downloadable[index];
+    if (!att) return null;
+
+    return {
+      filename: att.filename || 'archivo adjunto',
+      contentType: att.contentType || 'application/octet-stream',
+      content: att.content,
     };
   }
 
@@ -484,6 +484,7 @@ export async function syncInbox(
       bodyText: '',
       bodyHtml: '',
       snippet: '',
+      attachments: [],
     }));
   } finally {
     await client.logout().catch(() => undefined);

@@ -641,18 +641,19 @@ export async function syncAccount(req: Request, res: Response) {
         const { rowCount } = await pool.query(
           `INSERT INTO emails
              (account_id, user_id, uid, message_id, folder, from_email, from_name,
-              to_emails, subject, snippet, is_read, is_starred, size_bytes, sent_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+              to_emails, subject, snippet, is_read, is_starred, has_attachments, size_bytes, sent_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
            ON CONFLICT (account_id, uid, folder) DO UPDATE SET
-             is_read    = EXCLUDED.is_read,
-             is_starred = EXCLUDED.is_starred,
-             snippet    = COALESCE(EXCLUDED.snippet, emails.snippet)`,
+             is_read         = EXCLUDED.is_read,
+             is_starred      = EXCLUDED.is_starred,
+             has_attachments = EXCLUDED.has_attachments,
+             snippet         = COALESCE(EXCLUDED.snippet, emails.snippet)`,
           [
             acc.id, uid,
             msg.uid > 0 ? msg.uid : null, msg.messageId || null,
             folder, msg.from || null, msg.fromName || null, msg.to || null,
             msg.subject || '(Sin asunto)', msg.snippet || null,
-            msg.flags.includes('\\Seen'), msg.flags.includes('\\Flagged'),
+            msg.flags.includes('\\Seen'), msg.flags.includes('\\Flagged'), msg.hasAttachments,
             msg.size || 0, sentAt,
           ],
         );
@@ -850,10 +851,18 @@ export async function getMessage(req: Request, res: Response) {
         const accessToken = await getGmailAccessToken(row.gmail_profile_id, uid);
         const full = await gmailApiGet(`/messages/${row.gmail_message_id}?format=full`, accessToken);
         let bodyHtml = ''; let bodyText = '';
+        const attachments: { attachmentId: string; filename: string; contentType: string; size: number }[] = [];
         const walkParts = (p: any) => {
           if (!p) return;
           const mt = p.mimeType || '';
-          if (mt === 'text/html'  && p.body?.data && !bodyHtml)
+          if (p.filename && p.body?.attachmentId) {
+            attachments.push({
+              attachmentId: p.body.attachmentId,
+              filename: p.filename,
+              contentType: mt || 'application/octet-stream',
+              size: Number(p.body.size || 0),
+            });
+          } else if (mt === 'text/html'  && p.body?.data && !bodyHtml)
             bodyHtml = Buffer.from(p.body.data.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
           else if (mt === 'text/plain' && p.body?.data && !bodyText)
             bodyText = Buffer.from(p.body.data.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
@@ -861,16 +870,21 @@ export async function getMessage(req: Request, res: Response) {
         };
         walkParts(full.payload);
         const snippet = (bodyText || bodyHtml.replace(/<[^>]+>/g, ' ')).slice(0, 200);
+        const attachmentsJson = attachments.length ? JSON.stringify(attachments) : null;
         await pool.query(
-          `UPDATE emails SET body_text=$1, body_html=$2, snippet=$3 WHERE id=$4`,
-          [bodyText, bodyHtml, snippet, id],
+          `UPDATE emails SET body_text=$1, body_html=$2, snippet=$3, attachments_json=$4, has_attachments=$5 WHERE id=$6`,
+          [bodyText, bodyHtml, snippet, attachmentsJson, attachments.length > 0, id],
         );
         row.body_text = bodyText; row.body_html = bodyHtml; row.snippet = snippet;
+        row.attachments_json = attachmentsJson; row.has_attachments = attachments.length > 0;
       } catch (_e) { /* best effort */ }
     }
 
-    // Fetch body from IMAP if missing
-    if (!row.gmail_profile_id && row.uid && !row.body_html && !row.body_text) {
+    // Fetch body from IMAP if missing, y marcar como leido — en la MISMA conexion
+    // IMAP para no pagar dos handshakes TCP/TLS completos al abrir un correo.
+    const needsImapBody     = !row.gmail_profile_id && row.uid && !row.body_html && !row.body_text;
+    const needsImapMarkRead = !row.gmail_profile_id && row.uid && !row.is_read;
+    if (needsImapBody || needsImapMarkRead) {
       try {
         const password = decryptPassword(row.password_enc);
         const cfg: ImapConfig = {
@@ -881,19 +895,28 @@ export async function getMessage(req: Request, res: Response) {
         await client.connect();
         await client.login();
         await client.selectFolder(row.folder);
-        const full = await client.fetchFullMessage(row.uid);
-        await client.logout();
-        if (full) {
-          await pool.query(
-            `UPDATE emails SET body_text=$1, body_html=$2, snippet=$3 WHERE id=$4`,
-            [full.bodyText, full.bodyHtml, full.snippet, id],
-          );
-          row.body_text = full.bodyText; row.body_html = full.bodyHtml; row.snippet = full.snippet;
+
+        if (needsImapBody) {
+          const full = await client.fetchFullMessage(row.uid);
+          if (full) {
+            const attachmentsJson = full.attachments.length ? JSON.stringify(full.attachments) : null;
+            await pool.query(
+              `UPDATE emails SET body_text=$1, body_html=$2, snippet=$3, attachments_json=$4, has_attachments=$5 WHERE id=$6`,
+              [full.bodyText, full.bodyHtml, full.snippet, attachmentsJson, full.hasAttachments, id],
+            );
+            row.body_text = full.bodyText; row.body_html = full.bodyHtml; row.snippet = full.snippet;
+            row.attachments_json = attachmentsJson; row.has_attachments = full.hasAttachments;
+          }
         }
+        if (needsImapMarkRead) {
+          await client.markRead(row.uid, true);
+        }
+
+        await client.logout();
       } catch (_e) { /* best effort */ }
     }
 
-    // Mark as read
+    // Mark as read (DB + push remoto — el push IMAP ya se hizo en la conexion de arriba)
     if (!row.is_read) {
       await pool.query(`UPDATE emails SET is_read=true WHERE id=$1`, [id]);
       row.is_read = true;
@@ -902,19 +925,6 @@ export async function getMessage(req: Request, res: Response) {
           const token = await getGmailAccessToken(row.gmail_profile_id, uid);
           await gmailApiPost(`/messages/${row.gmail_message_id}/modify`, token,
             { addLabelIds: [], removeLabelIds: ['UNREAD'] });
-        } catch (_e) {}
-      } else if (row.uid) {
-        try {
-          const password = decryptPassword(row.password_enc);
-          const cfg: ImapConfig = {
-            host: row.imap_host, port: row.imap_port, secure: row.imap_secure,
-            user: row.username, password,
-          };
-          const client = new ImapClient(cfg);
-          await client.connect(); await client.login();
-          await client.selectFolder(row.folder);
-          await client.markRead(row.uid, true);
-          await client.logout();
         } catch (_e) {}
       }
     }
@@ -1371,27 +1381,76 @@ export async function getMessageBodyFromEngine(req: Request, res: Response) {
   } catch (e: any) { return err(res, e.message); }
 }
 
-export async function downloadAttachment(req: Request, res: Response) {
+/** GET /messages/:id/attachments/:index — descarga un adjunto real (IMAP o Gmail).
+ *  :index es la posicion del adjunto dentro del array `attachments` que ya
+ *  devuelve getMessage (0-based), no un ID opaco. */
+export async function downloadMessageAttachment(req: Request, res: Response) {
   const uid = userId(req);
   if (!uid) return err(res, 'No autenticado', 401);
   const { id, attachmentId } = req.params;
+  const index = Number(attachmentId);
+
   try {
     const { rows } = await pool.query(
-      `SELECT account_id, engine_msg_id FROM emails WHERE id=$1 AND user_id=$2`,
+      `SELECT e.*, a.imap_host, a.imap_port, a.imap_secure, a.username, a.password_enc
+         FROM emails e
+         LEFT JOIN email_accounts a ON a.id = e.account_id
+        WHERE e.id=$1 AND e.user_id=$2`,
       [id, uid],
     );
     if (!rows.length) return err(res, 'Mensaje no encontrado', 404);
-    const { account_id, engine_msg_id } = rows[0];
-    if (!account_id || !engine_msg_id) return err(res, 'Adjunto no disponible via EmailEngine', 404);
+    const row = rows[0];
 
-    const { isEmailEngineEnabled, eeGetAttachment } = await import('../utils/emailEngineClient');
-    if (!isEmailEngineEnabled()) return err(res, 'EmailEngine no configurado', 503);
+    let meta: any[] = [];
+    try { meta = row.attachments_json ? JSON.parse(row.attachments_json) : []; } catch { /**/ }
+    const entry = Number.isInteger(index) ? meta[index] : null;
 
-    const buffer = await eeGetAttachment(account_id, attachmentId);
-    res.setHeader('Content-Disposition', `attachment; filename="${attachmentId}"`);
-    res.setHeader('Content-Type', 'application/octet-stream');
-    res.setHeader('Content-Length', String(buffer.length));
-    res.send(buffer);
+    if (row.gmail_profile_id && row.gmail_message_id) {
+      if (!entry?.attachmentId) return err(res, 'Adjunto no encontrado', 404);
+      const accessToken = await getGmailAccessToken(row.gmail_profile_id, uid);
+      const part = await gmailApiGet(`/messages/${row.gmail_message_id}/attachments/${entry.attachmentId}`, accessToken);
+      const buffer = Buffer.from(String(part.data || '').replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(entry.filename || 'adjunto')}"`);
+      res.setHeader('Content-Type', entry.contentType || 'application/octet-stream');
+      res.setHeader('Content-Length', String(buffer.length));
+      return res.send(buffer);
+    }
+
+    if (row.uid && !Number.isNaN(index)) {
+      const password = decryptPassword(row.password_enc);
+      const cfg: ImapConfig = {
+        host: row.imap_host, port: row.imap_port, secure: row.imap_secure,
+        user: row.username, password,
+      };
+      const client = new ImapClient(cfg);
+      try {
+        await client.connect();
+        await client.login();
+        await client.selectFolder(row.folder);
+        const att = await client.fetchAttachment(row.uid, index);
+        if (!att) return err(res, 'Adjunto no encontrado', 404);
+        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(att.filename)}"`);
+        res.setHeader('Content-Type', att.contentType);
+        res.setHeader('Content-Length', String(att.content.length));
+        return res.send(att.content);
+      } finally {
+        await client.logout().catch(() => undefined);
+      }
+    }
+
+    // Fallback: cuentas via EmailEngine (dormant salvo que EMAIL_ENGINE_URL este configurado)
+    if (row.account_id && row.engine_msg_id) {
+      const { isEmailEngineEnabled, eeGetAttachment } = await import('../utils/emailEngineClient');
+      if (isEmailEngineEnabled()) {
+        const buffer = await eeGetAttachment(row.account_id, attachmentId);
+        res.setHeader('Content-Disposition', `attachment; filename="${attachmentId}"`);
+        res.setHeader('Content-Type', 'application/octet-stream');
+        res.setHeader('Content-Length', String(buffer.length));
+        return res.send(buffer);
+      }
+    }
+
+    return err(res, 'Adjunto no disponible', 404);
   } catch (e: any) { return err(res, e.message); }
 }
 

@@ -21,7 +21,7 @@ import {
   MoreVertical, AlertCircle, Eye, EyeOff,
   ChevronLeft, Edit3, Tag, Wifi, Zap, Pin, FolderPlus, RotateCcw, Folder, Archive,
   AtSign, Shield, Filter, LogIn, Maximize2, Minimize2, Bold, Italic, Underline,
-  AlignLeft, AlignCenter, AlignRight, List, Pencil, Sun, Moon, type LucideIcon,
+  AlignLeft, AlignCenter, AlignRight, List, Pencil, Sun, Moon, Download, type LucideIcon,
 } from 'lucide-react';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -95,9 +95,16 @@ interface ParsedEmail {
   bodyHtml: string;
   bodyText: string;
   hasAttachments: boolean;
+  attachments?: EmailAttachmentMeta[];
   source: 'gmail' | 'imap' | 'draft';
   isPinned?: boolean;
   draftId?: string;
+}
+
+interface EmailAttachmentMeta {
+  filename: string;
+  contentType: string;
+  size: number;
 }
 
 interface GmailLabel {
@@ -206,6 +213,7 @@ interface ImapApiEmail {
   is_read: boolean;
   is_starred: boolean;
   has_attachments?: boolean;
+  attachments_json?: string | null;
   sent_at?: string | null;
   account_id?: string | null;
   account_label?: string | null;
@@ -444,6 +452,10 @@ function mapFolderToImapApi(
 }
 
 function parseImapEmail(row: ImapApiEmail): ParsedEmail {
+  let attachments: EmailAttachmentMeta[] | undefined;
+  if (row.attachments_json) {
+    try { attachments = JSON.parse(row.attachments_json); } catch { attachments = undefined; }
+  }
   return {
     id: row.id,
     labelIds: row.folder ? [row.folder] : [],
@@ -459,9 +471,16 @@ function parseImapEmail(row: ImapApiEmail): ParsedEmail {
     bodyHtml: decodeQP(row.body_html || ''),
     bodyText: decodeQP(row.body_text || ''),
     hasAttachments: Boolean(row.has_attachments),
+    attachments,
     source: 'imap',
     isPinned: readPinnedEmailIds().includes(String(row.id)),
   };
+}
+
+function fmtAttachmentSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1048576) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / 1048576).toFixed(1)} MB`;
 }
 
 function fmtDate(d: string | null) {
@@ -1815,13 +1834,21 @@ function EmailItem({
 
 // ─── Email Reader ─────────────────────────────────────────────────────────────
 
+// Convierte URLs y direcciones de correo en enlaces clicables dentro de texto
+// plano ya escapado (los emails de solo texto no traian ningun enlace activo).
+function linkifyPlainText(escapedText: string): string {
+  return escapedText
+    .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>')
+    .replace(/([\w.+-]+@[\w-]+\.[\w.-]+)(?![^<]*>)/g, '<a href="mailto:$1">$1</a>');
+}
+
 function buildEmailDoc(bodyHtml?: string | null, bodyText?: string | null): string {
   // Detect if bodyText is actually HTML (sometimes stored in wrong field)
   const looksLikeHtml = bodyText && /<[a-z][\s\S]*>/i.test(bodyText);
   const html = bodyHtml || (looksLikeHtml ? bodyText : null);
   const content = html
     || (bodyText
-      ? `<pre style="font-family:inherit;white-space:pre-wrap;word-break:break-word;margin:0;padding:0">${bodyText.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre>`
+      ? `<pre style="font-family:inherit;white-space:pre-wrap;word-break:break-word;margin:0;padding:0">${linkifyPlainText(bodyText.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'))}</pre>`
       : '<p style="color:#9ca3af;font-style:italic;margin:0">Sin contenido</p>');
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><base target="_blank">
 <style>
@@ -1840,7 +1867,7 @@ function buildEmailDoc(bodyHtml?: string | null, bodyText?: string | null): stri
 function EmailReader({
   email, onReply, onReplyAll, onForward, onDelete, onStar, onBack,
   onPin, onRestore, onAssignLabel, onCreateLabel, userLabels, bodyLoading, theme,
-  viewerName, viewerEmail, viewerAvatar,
+  viewerName, viewerEmail, viewerAvatar, onDownloadAttachment,
 }: {
   email: ParsedEmail;
   onReply: () => void; onReplyAll: () => void; onForward: () => void;
@@ -1855,6 +1882,7 @@ function EmailReader({
   viewerName: string;
   viewerEmail: string;
   viewerAvatar?: string;
+  onDownloadAttachment?: (index: number) => void;
 }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [iframeH, setIframeH] = useState(300);
@@ -2094,13 +2122,31 @@ function EmailReader({
                     <Mail size={16} className="text-[#ab0433]" />
                     <span>Contenido del correo</span>
                   </div>
-                  {email.hasAttachments && (
+                  {email.hasAttachments && !email.attachments?.length && (
                     <div className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
                       <Paperclip size={13} />
-                      Adjuntos detectados
+                      {bodyLoading ? 'Cargando adjuntos…' : 'Adjuntos detectados'}
                     </div>
                   )}
                 </div>
+
+                {!!email.attachments?.length && (
+                  <div className="flex flex-wrap gap-2 px-6 py-3 border-b border-slate-100 bg-slate-50/50">
+                    {email.attachments.map((att, idx) => (
+                      <button
+                        key={`${att.filename}-${idx}`}
+                        type="button"
+                        onClick={() => onDownloadAttachment?.(idx)}
+                        title={`Descargar ${att.filename}`}
+                        className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:border-red-300 hover:bg-red-50 hover:text-red-700 transition-colors">
+                        <Paperclip size={13} className="shrink-0 text-slate-400" />
+                        <span className="max-w-[180px] truncate">{att.filename}</span>
+                        {att.size > 0 && <span className="text-slate-400">{fmtAttachmentSize(att.size)}</span>}
+                        <Download size={12} className="shrink-0 text-slate-400" />
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 <div className="px-6 py-6">
                   {bodyLoading ? (
@@ -3559,9 +3605,14 @@ export default function Email() {
         const folder = mapFolderToImapApi(selectedFolder, imapSystemFolderMap);
         if (reset) setNextPageToken(undefined);
 
-        const res = await authFetch(
-          `${API}/email/messages?account_id=${encodeURIComponent(currentImapAccount.id)}&folder=${encodeURIComponent(folder)}&q=${encodeURIComponent(searchQ.trim())}&limit=100`,
-        );
+        // Mensajes y stats no dependen entre si — se piden en paralelo para no
+        // pagar dos round trips seguidos en cada carga/refresco de carpeta.
+        const [res, statsRes] = await Promise.all([
+          authFetch(
+            `${API}/email/messages?account_id=${encodeURIComponent(currentImapAccount.id)}&folder=${encodeURIComponent(folder)}&q=${encodeURIComponent(searchQ.trim())}&limit=100`,
+          ),
+          authFetch(`${API}/email/stats?account_id=${encodeURIComponent(currentImapAccount.id)}`),
+        ]);
         const payload = await res.json();
         if (!res.ok || !payload?.success) throw new Error(payload?.error || 'Error al cargar correos IMAP');
 
@@ -3575,9 +3626,6 @@ export default function Email() {
             : nextSelected);
         }
 
-        const statsRes = await authFetch(
-          `${API}/email/stats?account_id=${encodeURIComponent(currentImapAccount.id)}`,
-        );
         const statsPayload = await statsRes.json().catch(() => null);
         if (statsRes.ok && statsPayload?.success) {
           setUnreadCount(Number(statsPayload.data?.unread || 0));
@@ -3817,11 +3865,15 @@ export default function Email() {
         }
 
         // ── 2. Fetch latest emails without touching main state yet ──────────
+        // Se lanza tambien aqui (en paralelo) el fetch de stats del paso 5 cuando
+        // es cuenta IMAP, para no pagar dos round trips seguidos en cada poll.
         const knownIds = emailIdsRef.current; // snapshot of what user currently sees
         let latestEmails: ParsedEmail[] | null = null;
+        let imapStatsPromise: Promise<Response | null> | null = null;
 
         if (currentImapAccount) {
           const folderStr = mapFolderToImapApi(selectedFolder, imapSystemFolderMap);
+          imapStatsPromise = authFetch(`${API}/email/stats?account_id=${encodeURIComponent(currentImapAccount.id)}`).catch(() => null);
           const res = await authFetch(
             `${API}/email/messages?account_id=${encodeURIComponent(currentImapAccount.id)}&folder=${encodeURIComponent(folderStr)}&limit=50`,
           ).catch(() => null);
@@ -3868,17 +3920,14 @@ export default function Email() {
         }));
 
         // ── 5. Refresh unread count ─────────────────────────────────────────
-        const statsQp = currentImapAccount
-          ? `account_id=${encodeURIComponent(currentImapAccount.id)}`
+        const stRes = imapStatsPromise
+          ? await imapStatsPromise
           : currentGmailProfileRef.current
-            ? `gmail_profile_id=${encodeURIComponent(currentGmailProfileRef.current.id)}`
+            ? await authFetch(`${API}/email/stats?gmail_profile_id=${encodeURIComponent(currentGmailProfileRef.current.id)}`).catch(() => null)
             : null;
-        if (statsQp) {
-          const stRes = await authFetch(`${API}/email/stats?${statsQp}`).catch(() => null);
-          if (stRes?.ok) {
-            const sp = await stRes.json().catch(() => null);
-            if (sp?.success) setUnreadCount(Number(sp.data?.unread || 0));
-          }
+        if (stRes?.ok) {
+          const sp = await stRes.json().catch(() => null);
+          if (sp?.success) setUnreadCount(Number(sp.data?.unread || 0));
         }
 
       } finally {
@@ -3993,6 +4042,26 @@ export default function Email() {
       gmail.markRead(email.id, true).catch(() => {});
     }
   }, [gmail, handleGmailError, tokenGetter]);
+
+  // ── Descargar un adjunto real del correo abierto ──────────────────────────
+  const downloadAttachment = useCallback(async (email: ParsedEmail, index: number) => {
+    const meta = email.attachments?.[index];
+    try {
+      const res = await authFetch(`${API}/email/messages/${email.id}/attachments/${index}`);
+      if (!res.ok) throw new Error('No se pudo descargar el adjunto');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = meta?.filename || 'adjunto';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      setError(e.message || 'Error al descargar el adjunto');
+    }
+  }, [authFetch]);
 
   useEffect(() => {
     if (!pendingOpenEmailId) return;
@@ -4400,6 +4469,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
           viewerName={userName}
           viewerEmail={userEmail}
           viewerAvatar={userAvatar}
+          onDownloadAttachment={(index) => downloadAttachment(selectedEmail, index)}
         />
         {compose && (
           <ComposeWindow
@@ -4705,6 +4775,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
               viewerName={userName}
               viewerEmail={userEmail}
               viewerAvatar={userAvatar}
+              onDownloadAttachment={(index) => downloadAttachment(selectedEmail, index)}
             />
           ) : hasActiveMailbox ? (
             <div className="flex flex-col items-center justify-center h-full select-none">
@@ -4752,6 +4823,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
               viewerName={userName}
               viewerEmail={userEmail}
               viewerAvatar={userAvatar}
+              onDownloadAttachment={(index) => downloadAttachment(fullscreenEmail, index)}
             />
           </div>
         </div>

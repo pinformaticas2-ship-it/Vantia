@@ -28,7 +28,7 @@ import {
   linkEmailToExpediente,
   emptyTrash,
   getMessageBodyFromEngine,
-  downloadAttachment,
+  downloadMessageAttachment,
 } from '../controllers/emailController';
 
 const router = Router();
@@ -97,8 +97,9 @@ router.delete('/trash',           emptyTrash);
 // ── Asociar email a expediente ───────────────────────────────────────────────
 router.patch('/messages/:id/link', linkEmailToExpediente);
 
-// ── EmailEngine: body cache y adjuntos ───────────────────────────────────────
+// ── EmailEngine: body cache (fallback, normalmente sin usar) ─────────────────
 router.get('/messages/:id/body',                        getMessageBodyFromEngine);
-router.get('/messages/:id/attachments/:attachmentId',   downloadAttachment);
+// ── Adjuntos: descarga real (IMAP/Gmail), con fallback a EmailEngine si aplica ──
+router.get('/messages/:id/attachments/:attachmentId',   downloadMessageAttachment);
 
 export default router;
