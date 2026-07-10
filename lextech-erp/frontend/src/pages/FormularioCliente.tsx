@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Spinner } from "../components/Spinner";
 import { useParams } from "react-router-dom";
-import { Scale, Loader2, AlertCircle, CheckCircle2, ChevronRight } from "lucide-react";
+import { Scale, Loader2, AlertCircle, CheckCircle2, ChevronRight, ChevronLeft } from "lucide-react";
 
 interface FormData {
   first_name: string;
@@ -78,10 +78,20 @@ export default function FormularioCliente() {
 
   /* ── Layout shell ── */
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col items-center justify-center px-4 py-10">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-red-50 flex flex-col items-center justify-center px-4 py-10">
       {/* Logo / cabecera */}
+      <div className="w-full max-w-lg flex items-center justify-between mb-4">
+        <button
+          type="button"
+          onClick={() => window.history.back()}
+          className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 transition-colors"
+        >
+          <ChevronLeft className="w-4 h-4" /> Volver
+        </button>
+      </div>
+
       <div className="flex items-center gap-2 mb-8">
-        <div className="p-2 bg-blue-600 rounded-xl">
+        <div className="p-2 bg-red-600 rounded-xl">
           <Scale className="w-6 h-6 text-white" />
         </div>
         <span className="text-xl font-bold text-slate-800 tracking-tight">
@@ -118,7 +128,7 @@ export default function FormularioCliente() {
             <p className="text-sm text-slate-500 mb-4">{errorMsg}</p>
             <button
               onClick={() => setPageState("valid")}
-              className="text-sm text-blue-600 hover:underline"
+              className="text-sm text-red-600 hover:underline"
             >
               Volver al formulario
             </button>
@@ -169,7 +179,7 @@ export default function FormularioCliente() {
                     onChange={handleChange}
                     placeholder="Juan"
                     required
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
                   />
                 </div>
                 <div>
@@ -179,7 +189,7 @@ export default function FormularioCliente() {
                     value={form.last_name}
                     onChange={handleChange}
                     placeholder="García López"
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
                   />
                 </div>
               </div>
@@ -192,7 +202,7 @@ export default function FormularioCliente() {
                   value={form.email}
                   onChange={handleChange}
                   placeholder="juan@ejemplo.com"
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
                 />
               </div>
 
@@ -205,7 +215,7 @@ export default function FormularioCliente() {
                     value={form.telefono}
                     onChange={handleChange}
                     placeholder="612 345 678"
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
                   />
                 </div>
                 <div>
@@ -215,7 +225,7 @@ export default function FormularioCliente() {
                     value={form.nif_cif}
                     onChange={handleChange}
                     placeholder="12345678A"
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
                   />
                 </div>
               </div>
@@ -228,7 +238,7 @@ export default function FormularioCliente() {
                   onChange={handleChange}
                   placeholder="Información adicional que desees comunicar al despacho..."
                   rows={3}
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
                 />
               </div>
             </div>
@@ -244,7 +254,7 @@ export default function FormularioCliente() {
             <button
               type="submit"
               disabled={pageState === "submitting"}
-              className="mt-6 w-full flex items-center justify-center gap-2 px-5 py-3 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 disabled:opacity-60 transition-colors"
+              className="mt-6 w-full flex items-center justify-center gap-2 px-5 py-3 bg-red-600 text-white text-sm font-semibold rounded-xl hover:bg-red-700 disabled:opacity-60 transition-colors"
             >
               {pageState === "submitting" ? (
                 <><Loader2 className="w-4 h-4 animate-spin" /> Enviando...</>

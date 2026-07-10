@@ -225,7 +225,8 @@ export const getClientActivity = async (req: Request, res: Response) => {
         WHERE avatar_url IS NOT NULL AND avatar_url <> ''
         ORDER BY user_id, joined_at DESC NULLS LAST
       ) cm ON cm.user_id = al.user_id
-      WHERE al.entity_id=$1
+      WHERE al.entity_id = $1
+         OR al.entity_id IN (SELECT id FROM expedientes WHERE cliente_id = $1)
       ORDER BY al.created_at DESC LIMIT 200`,
       [clientId]
     );
@@ -288,7 +289,6 @@ export const getActivityByUsers = async (_req: Request, res: Response) => {
         json_agg(DISTINCT event_type) FILTER (WHERE event_type IS NOT NULL) AS event_types,
         json_agg(DISTINCT entity_type) FILTER (WHERE entity_type IS NOT NULL) AS entity_types
       FROM activity_log
-      WHERE user_id != 'SYSTEM'
       GROUP BY user_id
       ORDER BY MAX(created_at) DESC
     `);

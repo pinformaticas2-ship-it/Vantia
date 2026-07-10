@@ -199,6 +199,12 @@ function buildGooglePayload(data: any) {
     };
   }
 
+  // Sin esto los invitados quedaban guardados en el ERP pero Google Calendar
+  // nunca les mandaba la invitacion por correo ni el enlace de Meet.
+  if (Array.isArray(data.guests) && data.guests.length > 0) {
+    payload.attendees = data.guests.map((email: string) => ({ email }));
+  }
+
   return payload;
 }
 

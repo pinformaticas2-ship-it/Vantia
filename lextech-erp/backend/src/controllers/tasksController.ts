@@ -1107,6 +1107,7 @@ export const updateTask = async (req: any, res: Response) => {
       console.error('No se pudo sincronizar la tarea con la Agenda:', agendaErr?.message || agendaErr);
     }
 
+    logActivityForReq(req, `Tarea modificada: ${updatedTask.titulo}`, 'TASK', id);
     res.json({ data: updatedTask });
   } catch (e: any) {
     res.status(500).json({ error: explainTaskError(e) });
@@ -1133,6 +1134,8 @@ export const patchTaskEstado = async (req: any, res: Response) => {
         [mapTaskEstadoToAgendaStatus(estado), updatedTask.agenda_event_id]
       );
     }
+    const estadoLabel = estado === 'completada' ? 'completada' : estado === 'urgente' ? 'marcada urgente' : 'reabierta';
+    logActivityForReq(req, `Tarea ${estadoLabel}: ${updatedTask.titulo}`, 'TASK', id);
     res.json({ data: updatedTask });
   } catch (e: any) {
     res.status(500).json({ error: explainTaskError(e) });

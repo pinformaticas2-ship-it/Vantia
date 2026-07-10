@@ -405,7 +405,11 @@ export const patchEntity = async (req: any, res: Response) => {
     );
     if (result.rows.length === 0)
       return res.status(404).json({ success: false, error: 'Cliente no encontrado' });
-    res.json({ success: true, data: result.rows[0] });
+    const updated = result.rows[0];
+    const clientName = updated.commercial_name || [updated.first_name, updated.last_name].filter(Boolean).join(' ');
+    const changedFields = entries.map(([k]) => k).join(', ');
+    logActivityForReq(req, `Cliente actualizado (${changedFields})`, 'CLIENT', id, clientName);
+    res.json({ success: true, data: updated });
   } catch (error: any) {
     console.error('❌ patchEntity:', pgErr(error));
     res.status(500).json({ success: false, error: pgErr(error) });
@@ -419,12 +423,15 @@ export const deleteEntity = async (req: any, res: Response) => {
   const { id } = req.params;
   try {
     const result = await pool.query(
-      `DELETE FROM entities WHERE id = $1 RETURNING id`,
+      `DELETE FROM entities WHERE id = $1 RETURNING id, first_name, last_name, commercial_name`,
       [id]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Cliente no encontrado' });
     }
+    const deleted = result.rows[0];
+    const clientName = deleted.commercial_name || [deleted.first_name, deleted.last_name].filter(Boolean).join(' ');
+    logActivityForReq(req, 'Cliente eliminado', 'CLIENT', id, clientName);
     res.json({ success: true, message: 'Cliente eliminado correctamente' });
   } catch (error: any) {
     console.error('❌ deleteEntity:', pgErr(error));

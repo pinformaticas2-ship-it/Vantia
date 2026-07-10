@@ -248,7 +248,13 @@ export default function Trazabilidad() {
     ), [users, search]);
 
   const filteredItems = useMemo(() =>
-    items.filter(i => !entityFilter || i.entity_type === entityFilter),
+    items.filter(i => {
+      if (!entityFilter) return true;
+      // Los archivos se registran como entity_type='CLIENT' (para que aparezcan en el
+      // historial del cliente), nunca como 'FILE' — hay que detectarlos por el texto.
+      if (entityFilter === "FILE") return /^(archivo|documento)/i.test(i.action_type || "");
+      return i.entity_type === entityFilter;
+    }),
     [items, entityFilter]);
 
   // ── Timeline con separadores de fecha ──────────────────────────────────────
