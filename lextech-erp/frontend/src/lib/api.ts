@@ -8,7 +8,7 @@ function ensureProtocol(url: string): string {
 
 const RAW_API_BASE_URL = ensureProtocol(import.meta.env.VITE_API_BASE_URL?.trim() || '');
 const RAW_UPLOADS_BASE_URL = ensureProtocol(import.meta.env.VITE_UPLOADS_BASE_URL?.trim() || '');
-const DEFAULT_PRODUCTION_BACKEND_BASE_URL = 'https://gallant-curiosity-production-0aad.up.railway.app';
+const DEFAULT_PRODUCTION_BACKEND_BASE_URL = 'https://vantia.up.railway.app';
 
 function stripTrailingSlash(value: string): string {
   return value.replace(/\/+$/, '');
