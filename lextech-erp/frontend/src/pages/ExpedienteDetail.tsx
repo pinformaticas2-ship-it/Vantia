@@ -5427,9 +5427,6 @@ export default function ExpedienteDetail() {
               })}
               <div className="h-px w-full bg-slate-200 my-1.5" />
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-4 mt-1 mb-1">Acciones Rápidas</p>
-              <button onClick={() => setTab("notas")} className="text-slate-700 hover:bg-white hover:shadow-sm hover:text-slate-900 rounded-xl px-4 py-2.5 flex items-center gap-3 font-medium text-sm transition-all text-left">
-                <StickyNote size={14} className="text-amber-500 shrink-0" /> Notas
-              </button>
               <button onClick={() => setTab("relacionados" as any)} className="text-slate-700 hover:bg-white hover:shadow-sm hover:text-slate-900 rounded-xl px-4 py-2.5 flex items-center gap-3 font-medium text-sm transition-all text-left">
                 <Link2 size={14} className="text-indigo-500 shrink-0" /> Exp. relacionados
               </button>
