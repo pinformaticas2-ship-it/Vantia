@@ -2540,6 +2540,14 @@ function MensajeItem({ msg, prevMsg, currentUserId, isHighlighted, isFreshIncomi
   }, [msg.reacciones, currentUserId]);
   const imageSrc = msg.tipo !== 'archivo' ? mediaUrl(msg.image_url) : null;
   const fileSrc  = msg.tipo === 'archivo' ? mediaUrl(msg.file_url ?? msg.image_url) : null;
+  // El atributo HTML "download" no funciona en enlaces cross-origin (frontend y
+  // backend viven en dominios distintos): sin esto el navegador solo abre/
+  // previsualiza el archivo en vez de descargarlo. ?download=1 fuerza
+  // Content-Disposition: attachment en el backend (server.ts), que si se
+  // respeta cross-origin.
+  const fileDownloadHref = fileSrc
+    ? `${fileSrc}${fileSrc.includes("?") ? "&" : "?"}download=1${msg.file_name ? `&name=${encodeURIComponent(msg.file_name)}` : ""}`
+    : null;
   const dragDirection = isMe ? -1 : 1;
   const dragMagnitude = Math.abs(dragOffset);
 
@@ -2680,7 +2688,7 @@ function MensajeItem({ msg, prevMsg, currentUserId, isHighlighted, isFreshIncomi
               </>
             )}
             {fileSrc && (
-              <a href={fileSrc} download={msg.file_name || true} target="_blank" rel="noopener noreferrer"
+              <a href={fileDownloadHref ?? fileSrc} download={msg.file_name || true} target="_blank" rel="noopener noreferrer"
                 className="mt-1 flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 px-3 py-2.5 transition-colors group/file max-w-xs">
                 <div className="h-9 w-9 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 group-hover/file:bg-blue-200 transition-colors">
                   <FileText size={16}/>

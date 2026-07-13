@@ -1,4 +1,5 @@
 import express from 'express';
+import path from 'path';
 import helmet from 'helmet';
 import cors from 'cors';
 import compression from 'compression';
@@ -113,6 +114,19 @@ app.use('/api', (_req, res, next) => {
 app.use(compression());
 
 // Servir archivos estáticos (fotos DNI subidas, etc.)
+// El frontend y el backend viven en dominios distintos (Vercel/Railway), asi que
+// el atributo HTML "download" de un <a> no funciona (el navegador lo ignora en
+// enlaces cross-origin y solo abre/previsualiza el archivo). Con ?download=1
+// forzamos Content-Disposition: attachment, que si se respeta cross-origin.
+app.use('/uploads', (req, res, next) => {
+  if (req.query.download) {
+    const name = typeof req.query.name === 'string' && req.query.name.trim()
+      ? req.query.name.trim()
+      : path.basename(req.path);
+    res.setHeader('Content-Disposition', `attachment; filename="${name.replace(/"/g, '')}"`);
+  }
+  next();
+});
 app.use('/uploads', express.static(UPLOADS_ROOT));
 
 // --- RUTAS ---
