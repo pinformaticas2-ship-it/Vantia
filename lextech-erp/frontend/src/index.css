@@ -838,7 +838,11 @@
 
   .module-page {
     animation: module-enter 280ms cubic-bezier(0.22, 1, 0.36, 1);
-    will-change: transform, opacity;
+    /* No usar "transform" aqui: will-change:transform convierte este contenedor
+       en containing block para cualquier descendiente position:fixed (p.ej. el
+       DragOverlay de dnd-kit, que no usa portal), desplazando el elemento
+       "fixed" respecto a este div en vez de respecto al viewport/cursor. */
+    will-change: opacity;
     position: relative;
     z-index: 1;
   }

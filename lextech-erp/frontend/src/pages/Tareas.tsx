@@ -770,11 +770,6 @@ function KanbanCardContent({
               <AlertTriangle size={9} /> Vencida
             </span>
           )}
-          {(task as any).etapa && (
-            <span className="text-[10px] font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
-              🏷 {(task as any).etapa}
-            </span>
-          )}
         </div>
 
         <div className="grid grid-cols-2 gap-2">
