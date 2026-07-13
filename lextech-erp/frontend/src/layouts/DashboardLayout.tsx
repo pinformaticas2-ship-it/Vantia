@@ -1103,8 +1103,8 @@ export default function DashboardLayout() {
         />
       )}
 
-      {/* VantIA flotante — oculto en módulos con su propio chat */}
-      {!location.pathname.startsWith('/dashboard/chat') && (
+      {/* VantIA flotante — oculto en módulos con su propio chat o con controles fijos en la esquina inferior (Correo: barra de "Responder a...") */}
+      {!location.pathname.startsWith('/dashboard/chat') && !location.pathname.startsWith('/dashboard/correo') && (
         <VantIAWidget pathname={location.pathname} getToken={getToken} />
       )}
 

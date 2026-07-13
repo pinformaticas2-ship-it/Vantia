@@ -1927,30 +1927,36 @@ function EmailReader({
   const headerIsLight = theme === 'light';
   const headerCx = (dark: string, light: string) => (headerIsLight ? light : dark);
 
+  const toolbarIconCls = headerCx('text-slate-400 hover:text-white', 'text-slate-500');
+  const toolbarHoverCls = headerCx('hover:bg-white/10', 'hover:bg-slate-100');
+  const dividerCls = headerCx('bg-white/10', 'bg-slate-200');
+  const dropdownCls = headerCx('bg-[#141b2d] border-white/10', 'bg-white border-slate-200');
+  const dropdownItemCls = headerCx('text-slate-200 hover:bg-white/5', 'text-slate-700 hover:bg-slate-50');
+
   return (
-    <div className="flex flex-col h-full min-h-0 bg-[#f0f4f8]">
-      <div className="flex items-center gap-1 px-4 py-3 border-b border-slate-200 bg-white flex-shrink-0">
+    <div className={`flex flex-col h-full min-h-0 ${headerCx('bg-[#0b1120]', 'bg-[#f0f4f8]')}`}>
+      <div className={`flex items-center gap-1 px-4 py-3 border-b flex-shrink-0 ${headerCx('border-white/10 bg-[#0f172a]', 'border-slate-200 bg-white')}`}>
         <button
           onClick={onBack}
-          className="p-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors">
+          className={`p-2 rounded-full transition-colors ${toolbarHoverCls} ${toolbarIconCls}`}>
           <ChevronLeft size={18} />
         </button>
-        <div className="h-6 w-px bg-slate-200 mx-1 hidden md:block" />
+        <div className={`h-6 w-px mx-1 hidden md:block ${dividerCls}`} />
         <button
           onClick={onReply}
-          className="p-2 rounded-full hover:bg-red-50 text-slate-500 hover:text-[#ab0433] transition-colors"
+          className={`p-2 rounded-full hover:bg-red-50 hover:text-[#ab0433] transition-colors ${headerCx('hover:bg-red-500/10 hover:text-red-300', 'hover:bg-red-50 hover:text-[#ab0433]')} ${toolbarIconCls}`}
           title="Responder">
           <Reply size={17} />
         </button>
         <button
           onClick={onReplyAll}
-          className="p-2 rounded-full hover:bg-red-50 text-slate-500 hover:text-[#ab0433] transition-colors"
+          className={`p-2 rounded-full transition-colors ${headerCx('hover:bg-red-500/10 hover:text-red-300', 'hover:bg-red-50 hover:text-[#ab0433]')} ${toolbarIconCls}`}
           title="Responder a todos">
           <ReplyAll size={17} />
         </button>
         <button
           onClick={onForward}
-          className="p-2 rounded-full hover:bg-red-50 text-slate-500 hover:text-[#ab0433] transition-colors"
+          className={`p-2 rounded-full transition-colors ${headerCx('hover:bg-red-500/10 hover:text-red-300', 'hover:bg-red-50 hover:text-[#ab0433]')} ${toolbarIconCls}`}
           title="Reenviar">
           <Forward size={17} />
         </button>
@@ -1958,59 +1964,59 @@ function EmailReader({
           onClick={onPin}
           className={`p-2 rounded-full transition-colors ${
             email.isPinned
-              ? 'bg-blue-50 text-blue-600 hover:bg-blue-100'
-              : 'hover:bg-slate-100 text-slate-400 hover:text-slate-700'
+              ? headerCx('bg-blue-500/20 text-blue-300 hover:bg-blue-500/30', 'bg-blue-50 text-blue-600 hover:bg-blue-100')
+              : `${toolbarHoverCls} ${toolbarIconCls}`
           }`}
           title={email.isPinned ? 'Despinear' : 'Pinear'}>
           <Pin size={17} />
         </button>
-        <div className="h-6 w-px bg-slate-200 mx-1 hidden md:block" />
+        <div className={`h-6 w-px mx-1 hidden md:block ${dividerCls}`} />
         <div className="flex-1" />
         <div className="flex items-center gap-1.5">
           <button
             onClick={onStar}
             className={`p-2 rounded-full hover:bg-amber-50 transition-colors ${
-              email.isStarred ? 'text-amber-500' : 'text-slate-400 hover:text-amber-500'
+              email.isStarred ? 'text-amber-500' : `${toolbarIconCls} hover:text-amber-500`
             }`}>
             <Star size={17} fill={email.isStarred ? 'currentColor' : 'none'} />
           </button>
           <button
             onClick={onDelete}
-            className="p-2 rounded-full hover:bg-red-50 text-slate-400 hover:text-[#ab0433] transition-colors">
+            className={`p-2 rounded-full transition-colors ${headerCx('hover:bg-red-500/10 hover:text-red-300', 'hover:bg-red-50 hover:text-[#ab0433]')} ${toolbarIconCls}`}>
             <Trash2 size={17} />
           </button>
           <div className="relative">
             <button
               onClick={() => setMoreOpen((m) => !m)}
-              className="p-2 rounded-full hover:bg-slate-100 text-slate-400 transition-colors">
+              className={`p-2 rounded-full transition-colors ${toolbarHoverCls} ${toolbarIconCls}`}>
               <MoreVertical size={17} />
             </button>
             {moreOpen && (
-              <div className="absolute right-0 top-10 z-20 bg-white rounded-2xl shadow-xl border border-slate-200 py-1.5 w-56">
+              <div className={`absolute right-0 top-10 z-20 rounded-2xl shadow-xl border py-1.5 w-56 ${dropdownCls}`}>
                 <button
                   onClick={() => { setShowRaw((r) => !r); setMoreOpen(false); }}
-                  className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
+                  className={`w-full text-left px-4 py-2.5 text-sm ${dropdownItemCls}`}>
                   {showRaw ? 'Ver HTML renderizado' : 'Ver texto plano'}
                 </button>
                 <button
                   onClick={() => { onPin(); setMoreOpen(false); }}
-                  className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
+                  className={`w-full text-left px-4 py-2.5 text-sm ${dropdownItemCls}`}>
                   {email.isPinned ? 'Despinear correo' : 'Pinear correo'}
                 </button>
                 {onRestore && (
                   <button
                     onClick={() => { onRestore(); setMoreOpen(false); }}
-                    className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
+                    className={`w-full text-left px-4 py-2.5 text-sm ${dropdownItemCls}`}>
                     Restaurar desde papelera
                   </button>
                 )}
                 {userLabels.length > 0 && (
-                  <div className="border-t border-slate-100 mt-1 pt-1">
+                  <div className={`border-t mt-1 pt-1 ${headerCx('border-white/10', 'border-slate-100')}`}>
                     {userLabels.slice(0, 6).map((label) => (
                       <button
                         key={label.id}
                         onClick={() => { onAssignLabel(label.id); setMoreOpen(false); }}
-                        className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
+                        className={`w-full text-left px-4 py-2.5 text-sm ${dropdownItemCls}`}>
                         Guardar en {label.name}
                       </button>
                     ))}
@@ -2018,12 +2024,12 @@ function EmailReader({
                 )}
                 <button
                   onClick={() => { onCreateLabel(); setMoreOpen(false); }}
-                  className="w-full text-left px-4 py-2.5 text-sm text-[#ab0433] hover:bg-red-50">
+                  className={`w-full text-left px-4 py-2.5 text-sm text-[#ab0433] ${headerCx('hover:bg-red-500/10', 'hover:bg-red-50')}`}>
                   Crear carpeta nueva
                 </button>
                 <button
                   onClick={() => { setMoreOpen(false); window.print(); }}
-                  className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
+                  className={`w-full text-left px-4 py-2.5 text-sm ${dropdownItemCls}`}>
                   Imprimir
                 </button>
               </div>
@@ -2034,7 +2040,7 @@ function EmailReader({
 
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-[1160px] mx-auto px-6 py-6 lg:px-8">
-          <div className="rounded-[28px] border border-slate-200 overflow-hidden shadow-[0_24px_60px_rgba(15,23,42,0.12)]">
+          <div className={`rounded-[28px] border overflow-hidden shadow-[0_24px_60px_rgba(15,23,42,0.12)] ${headerCx('border-white/10', 'border-slate-200')}`}>
             {/* Cabecera del mensaje — oscura/inmersiva o clara según el tema */}
             <div className={`px-8 pt-8 pb-7 relative overflow-hidden ${
               headerCx(
@@ -2184,12 +2190,18 @@ function EmailReader({
               </button>
               <button
                 onClick={onReplyAll}
-                className="flex items-center gap-2 px-4 py-2.5 border border-slate-200 hover:border-red-200 hover:bg-red-50 text-sm text-slate-600 hover:text-[#ab0433] rounded-full transition-colors">
+                className={`flex items-center gap-2 px-4 py-2.5 border text-sm rounded-full transition-colors ${
+                  headerCx('border-white/10 text-slate-300 hover:border-red-400/40 hover:bg-red-500/10 hover:text-red-300',
+                           'border-slate-200 text-slate-600 hover:border-red-200 hover:bg-red-50 hover:text-[#ab0433]')
+                }`}>
                 <ReplyAll size={15} /> Responder a todos
               </button>
               <button
                 onClick={onForward}
-                className="flex items-center gap-2 px-4 py-2.5 border border-slate-200 hover:border-red-200 hover:bg-red-50 text-sm text-slate-600 hover:text-[#ab0433] rounded-full transition-colors">
+                className={`flex items-center gap-2 px-4 py-2.5 border text-sm rounded-full transition-colors ${
+                  headerCx('border-white/10 text-slate-300 hover:border-red-400/40 hover:bg-red-500/10 hover:text-red-300',
+                           'border-slate-200 text-slate-600 hover:border-red-200 hover:bg-red-50 hover:text-[#ab0433]')
+                }`}>
                 <Forward size={15} /> Reenviar
               </button>
             </div>
