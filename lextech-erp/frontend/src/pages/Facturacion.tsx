@@ -4,6 +4,7 @@ import { useAuth } from "@clerk/clerk-react";
 import { Link } from "react-router-dom";
 import {
   AlertCircle,
+  AlertTriangle,
   ArrowLeft,
   BarChart2,
   Banknote,
@@ -22,9 +23,11 @@ import {
   Plus,
   RefreshCw,
   Save,
+  Scale,
   Settings,
   Trash2,
   TrendingDown,
+  TrendingUp,
   Upload,
   Users,
   X,
@@ -35,7 +38,7 @@ import { useUndoDelete } from "../lib/useUndoDelete";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 type FilterPeriod = "year" | "q1" | "q2" | "q3" | "q4" | "jan" | "feb" | "mar" | "apr" | "may" | "jun" | "jul" | "aug" | "sep" | "oct" | "nov" | "dec";
-type TabKey = "dashboard" | "facturas" | "gastos" | "presupuestos" | "contacts" | "bank_accounts" | "receipts" | "config";
+type TabKey = "dashboard" | "analitica" | "facturas" | "gastos" | "presupuestos" | "contacts" | "bank_accounts" | "receipts" | "config";
 
 type QuipuContact = {
   id: string;
@@ -527,6 +530,73 @@ function OdooSection({
       </div>
       <div className="p-5">{children}</div>
     </section>
+  );
+}
+
+// ── AnaliticaKpiCard ─────────────────────────────────────────
+function AnaliticaKpiCard({
+  icon: Icon, iconBg, iconColor, label, value, footer,
+}: {
+  icon: React.ComponentType<any>; iconBg: string; iconColor: string;
+  label: string; value: string; footer?: React.ReactNode;
+}) {
+  return (
+    <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">{label}</p>
+          <h3 className="truncate text-2xl font-black text-slate-800">{value}</h3>
+        </div>
+        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${iconBg} ${iconColor}`}>
+          <Icon size={18} />
+        </div>
+      </div>
+      {footer ? <div className="mt-4">{footer}</div> : null}
+    </div>
+  );
+}
+
+// ── AreaDonutChart (dona pura SVG, sin libreria) ────────────
+function AreaDonutChart({ data, colors }: { data: [string, number][]; colors: Record<string, string> }) {
+  const total = data.reduce((s, [, v]) => s + v, 0) || 1;
+  const R = 60; const STROKE = 22; const C = 2 * Math.PI * R;
+  let acc = 0;
+  return (
+    <svg viewBox="0 0 160 160" className="w-full max-w-[180px]">
+      <g transform="translate(80,80) rotate(-90)">
+        <circle r={R} fill="none" stroke="#f1f5f9" strokeWidth={STROKE} />
+        {data.map(([area, val]) => {
+          const dash = (val / total) * C;
+          const el = (
+            <circle key={area} r={R} fill="none" stroke={colors[area] || "#94a3b8"} strokeWidth={STROKE}
+              strokeDasharray={`${dash} ${C - dash}`} strokeDashoffset={-acc} />
+          );
+          acc += dash;
+          return el;
+        })}
+      </g>
+    </svg>
+  );
+}
+
+// ── EstadoBar (barra de progreso con etiqueta + importe) ────
+function EstadoBar({ color, label, value, pct }: { color: string; label: string; value: number; pct: number }) {
+  return (
+    <div>
+      <div className="mb-2 flex items-end justify-between">
+        <div className="flex items-center gap-2">
+          <div className={`h-2.5 w-2.5 rounded-full ${color}`} />
+          <span className="text-sm font-bold text-slate-700">{label}</span>
+        </div>
+        <div className="text-right">
+          <span className="text-sm font-bold text-slate-800">{fmtEur(value)}</span>
+          <span className="ml-1 text-[10px] text-slate-400">({pct.toFixed(0)}%)</span>
+        </div>
+      </div>
+      <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} />
+      </div>
+    </div>
   );
 }
 
@@ -1501,6 +1571,7 @@ function FacturacionContent() {
 
   const TABS: { key: TabKey; label: string; icon?: React.ComponentType<any>; quipuOnly?: boolean }[] = [
     { key: "dashboard",     label: "Vista general" },
+    { key: "analitica",     label: "Analítica" },
     { key: "facturas",      label: "Facturas" },
     { key: "gastos",        label: "Gastos" },
     { key: "presupuestos",  label: "Presupuestos" },
@@ -2826,6 +2897,99 @@ function FacturacionContent() {
                   </TableShell>
                 </>
               )}
+
+              {tab === "analitica" && (() => {
+                const beneficioNeto = totalFacturado - gastosMensuales;
+                const margenPct = totalFacturado > 0 ? (beneficioNeto / totalFacturado) * 100 : 0;
+                const cobradoTotal = filteredFacturas.filter((f) => f.estado === "cobrada").reduce((s, f) => s + f.total, 0);
+                const vencidasFacturas = filteredFacturas.filter((f) => f.estado === "vencida");
+                const vencidoTotal = vencidasFacturas.reduce((s, f) => s + f.total, 0);
+                const pendienteTotal = totalFacturado - cobradoTotal;
+                const pendienteEnPlazoTotal = pendienteTotal - vencidoTotal;
+                const pctCobrado = totalFacturado > 0 ? (cobradoTotal / totalFacturado) * 100 : 0;
+                const pctPendiente = totalFacturado > 0 ? (pendienteEnPlazoTotal / totalFacturado) * 100 : 0;
+                const pctVencido = totalFacturado > 0 ? (vencidoTotal / totalFacturado) * 100 : 0;
+
+                const AREA_LABELS: Record<string, string> = { procesal: "Procesal", mercantil: "Mercantil", laboral: "Laboral", familia: "Familia", penal: "Penal", fiscal: "Fiscal" };
+                const AREA_COLORS: Record<string, string> = { procesal: "#ef4444", mercantil: "#3b82f6", laboral: "#10b981", familia: "#f59e0b", penal: "#8b5cf6", fiscal: "#14b8a6" };
+                const porArea = (() => {
+                  const map = new Map<string, number>();
+                  for (const f of filteredFacturas) map.set(f.area, (map.get(f.area) || 0) + f.total);
+                  return [...map.entries()].filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+                })();
+
+                return (
+                  <div className="flex flex-col gap-6">
+                    {/* KPIs superiores */}
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                      <AnaliticaKpiCard icon={TrendingUp} iconBg="bg-emerald-100" iconColor="text-emerald-600"
+                        label="Ingresos Totales" value={fmtEur(totalFacturado)}
+                        footer={<span className="text-[10px] text-slate-400">Año {filterYear}</span>} />
+                      <AnaliticaKpiCard icon={TrendingDown} iconBg="bg-rose-100" iconColor="text-rose-600"
+                        label="Gastos Totales" value={fmtEur(gastosMensuales)}
+                        footer={<span className="text-[10px] text-slate-400">Año {filterYear}</span>} />
+                      <AnaliticaKpiCard icon={Scale} iconBg="bg-indigo-100" iconColor="text-indigo-600"
+                        label="Beneficio Neto" value={fmtEur(beneficioNeto)}
+                        footer={
+                          <div className="flex w-full items-center gap-2">
+                            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+                              <div className="h-full bg-indigo-500" style={{ width: `${Math.max(0, Math.min(100, margenPct))}%` }} />
+                            </div>
+                            <span className="whitespace-nowrap text-[10px] font-bold text-indigo-600">Margen {margenPct.toFixed(0)}%</span>
+                          </div>
+                        } />
+                      <AnaliticaKpiCard icon={AlertTriangle} iconBg="bg-amber-100" iconColor="text-amber-600"
+                        label="Pendiente de Cobro" value={fmtEur(pendienteTotal)}
+                        footer={
+                          <span className="rounded border border-amber-200/50 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                            {vencidasFacturas.length} {vencidasFacturas.length === 1 ? "factura vencida" : "facturas vencidas"}
+                          </span>
+                        } />
+                    </div>
+
+                    {/* Evolución mensual + Ingresos por área */}
+                    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                      <div className="lg:col-span-2">
+                        <OdooSection title="Evolución de Ingresos y Gastos" subtitle={`Año ${filterYear}`}>
+                          <MonthlyBarChart facturas={filteredFacturas} gastos={filteredGastos} year={filterYear} chartType="bar" />
+                        </OdooSection>
+                      </div>
+                      <OdooSection title="Ingresos por Área">
+                        {porArea.length === 0 ? (
+                          <p className="py-10 text-center text-sm text-slate-400">Sin datos para el periodo seleccionado.</p>
+                        ) : (
+                          <div className="flex flex-col items-center gap-4">
+                            <AreaDonutChart data={porArea} colors={AREA_COLORS} />
+                            <div className="flex w-full flex-col gap-1.5">
+                              {porArea.map(([area, val]) => (
+                                <div key={area} className="flex items-center gap-2 text-xs">
+                                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: AREA_COLORS[area] || "#94a3b8" }} />
+                                  <span className="flex-1 truncate text-slate-600">{AREA_LABELS[area] || area}</span>
+                                  <span className="font-bold text-slate-800">{fmtEur(val)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </OdooSection>
+                    </div>
+
+                    {/* Top clientes + Estado de facturación */}
+                    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                      <OdooSection title="Top Clientes por Facturación">
+                        <ClientIncomeChart facturas={filteredFacturas} />
+                      </OdooSection>
+                      <OdooSection title="Estado de Facturación">
+                        <div className="flex flex-col gap-5 py-2">
+                          <EstadoBar color="bg-emerald-500" label="Facturas Cobradas" value={cobradoTotal} pct={pctCobrado} />
+                          <EstadoBar color="bg-blue-500" label="Pendientes (en plazo)" value={pendienteEnPlazoTotal} pct={pctPendiente} />
+                          <EstadoBar color="bg-rose-500" label="Vencidas (impagadas)" value={vencidoTotal} pct={pctVencido} />
+                        </div>
+                      </OdooSection>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {tab === "facturas" && (
                 <TableShell title="Facturas de cliente" count={`${filteredFacturas.length} facturas`} headers={["Número", "Cliente", "Expediente", "Área", "Serie", "Vencimiento", "Total", "Estado", ""]}>
