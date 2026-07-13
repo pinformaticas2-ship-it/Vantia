@@ -968,6 +968,7 @@ function TabTareas({ clientId, autoOpen = false, initialTaskType = "" }: { clien
         body: JSON.stringify({ estado: nuevoEstado }),
       });
       if (!res.ok) throw new Error();
+      window.dispatchEvent(new CustomEvent('historial-changed'));
     } catch {
       setTareas(prev => prev.map(x => x.id === t.id ? { ...x, estado: t.estado } : x));
     }
