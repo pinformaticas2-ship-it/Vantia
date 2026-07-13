@@ -13,6 +13,7 @@ import AdjuntosModal from "./AdjuntosModal";
 import BackButton from "./BackButton";
 import { UndoToast } from "./UndoToast";
 import { useUndoDelete } from "../lib/useUndoDelete";
+import { PROVINCIAS_ESPANA, getJuzgadosComunes, detectarProvincia } from "../lib/juzgadosEspana";
 
 // ── Constantes compartidas ────────────────────────────────────
 export const TIPOS: Record<string, { label: string; short: string; color: string }> = {
@@ -126,6 +127,60 @@ const TIPOS_ASUNTO_GROUPS: Array<{ label: string; items: string[] }> = [
 export const lbl   = "text-xs font-bold text-slate-500 uppercase tracking-wider";
 export const inp   = "w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-md text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-red-500 focus:border-red-500 transition-colors";
 export const inpRO = "w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-md text-sm text-slate-500 cursor-not-allowed font-medium";
+
+// ── JuzgadoField ──────────────────────────────────────────────
+// Selector de Provincia + Juzgado habitual de la capital, con opción de
+// escribir uno manualmente (partido judicial concreto, número exacto,
+// o cualquier valor que no aparezca en la lista sugerida).
+function JuzgadoField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [provincia, setProvincia] = useState<string>(() => detectarProvincia(value) || "");
+  const [modoManual, setModoManual] = useState<boolean>(() => {
+    const detectada = detectarProvincia(value);
+    return !detectada || !getJuzgadosComunes(detectada).includes(value);
+  });
+
+  const opciones = provincia ? getJuzgadosComunes(provincia) : [];
+  const MANUAL = "__manual__";
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="grid grid-cols-2 gap-2">
+        <AppSelect
+          value={provincia}
+          onChange={e => {
+            const nueva = e.target.value;
+            setProvincia(nueva);
+            setModoManual(true);
+            onChange("");
+          }}
+          searchable
+          searchPlaceholder="Buscar provincia...">
+          <option value="">— Provincia —</option>
+          {PROVINCIAS_ESPANA.map(p => <option key={p.nombre} value={p.nombre}>{p.nombre}</option>)}
+        </AppSelect>
+        <AppSelect
+          value={modoManual ? MANUAL : value}
+          onChange={e => {
+            if (e.target.value === MANUAL) { setModoManual(true); onChange(""); }
+            else { setModoManual(false); onChange(e.target.value); }
+          }}
+          disabled={!provincia}
+          searchable
+          searchPlaceholder="Buscar juzgado...">
+          <option value={MANUAL}>{provincia ? "Escribir manualmente…" : "Elige antes la provincia"}</option>
+          {opciones.map(j => <option key={j} value={j}>{j}</option>)}
+        </AppSelect>
+      </div>
+      {modoManual && (
+        <input value={value} onChange={e => onChange(e.target.value)}
+          placeholder="Juzgado de 1ª Inst. nº 3 de Madrid" className={inp} />
+      )}
+      <p className="text-[10px] text-slate-400 leading-snug">
+        Lista con los juzgados habituales de la capital de cada provincia — para un partido judicial distinto o un número concreto, escríbelo manualmente.
+      </p>
+    </div>
+  );
+}
 
 // ── SecCard ───────────────────────────────────────────────────
 export function SecCard({ title, icon: Icon, children, cols = 3 }: {
@@ -591,8 +646,7 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
                 </div>
                 <div className="flex flex-col gap-2 md:col-span-2">
                   <label className={lbl}>Juzgado / Tribunal</label>
-                  <input value={form.juzgado} onChange={e => set("juzgado", e.target.value)}
-                    placeholder="Juzgado de 1ª Inst. nº 3 de Madrid" className={inp} />
+                  <JuzgadoField value={form.juzgado} onChange={v => set("juzgado", v)} />
                 </div>
                 <div className="flex flex-col gap-2">
                   <label className={lbl}>N.I.G.</label>
