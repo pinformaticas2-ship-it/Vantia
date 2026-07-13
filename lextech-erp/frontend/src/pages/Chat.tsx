@@ -13,6 +13,7 @@ import {
   Video, Pencil, ChevronUp, Layers, MessagesSquare, Star, Download,
   Share2, ExternalLink, Copy, Minus, RotateCcw, Sparkles, Clock3, Eye,
   PawPrint, UtensilsCrossed, Trophy, Flag, User, FileText, File as FileIcon, Briefcase, type LucideIcon,
+  FileSpreadsheet, FileArchive, FileImage, FileVideo, FileAudio, FileCode,
 } from "lucide-react";
 import { safeJson, resolveUploadUrl } from "../lib/api";
 import { createPortal } from "react-dom";
@@ -263,6 +264,31 @@ const fmtTime = (iso: string) =>
   new Date(iso).toLocaleTimeString("es-ES", { hour:"2-digit", minute:"2-digit" });
 
 const mediaUrl = (url?: string | null) => resolveUploadUrl(url);
+
+function getFileTypeIcon(fileName?: string | null, mime?: string | null): { Icon: LucideIcon; iconBg: string; iconColor: string } {
+  const ext = (fileName?.split(".").pop() || "").toLowerCase();
+  const m = (mime || "").toLowerCase();
+
+  if (ext === "pdf" || m.includes("pdf"))
+    return { Icon: FileText, iconBg: "bg-red-100 group-hover/file:bg-red-200", iconColor: "text-red-600" };
+  if (["doc", "docx", "odt", "rtf"].includes(ext) || m.includes("word") || m.includes("wordprocessingml"))
+    return { Icon: FileText, iconBg: "bg-blue-100 group-hover/file:bg-blue-200", iconColor: "text-blue-600" };
+  if (["xls", "xlsx", "csv", "ods"].includes(ext) || m.includes("sheet") || m.includes("excel") || m.includes("csv"))
+    return { Icon: FileSpreadsheet, iconBg: "bg-emerald-100 group-hover/file:bg-emerald-200", iconColor: "text-emerald-600" };
+  if (["ppt", "pptx", "odp"].includes(ext) || m.includes("presentation"))
+    return { Icon: FileText, iconBg: "bg-orange-100 group-hover/file:bg-orange-200", iconColor: "text-orange-600" };
+  if (["zip", "rar", "7z", "tar", "gz"].includes(ext) || m.includes("zip") || m.includes("compressed"))
+    return { Icon: FileArchive, iconBg: "bg-amber-100 group-hover/file:bg-amber-200", iconColor: "text-amber-600" };
+  if (["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp"].includes(ext) || m.startsWith("image/"))
+    return { Icon: FileImage, iconBg: "bg-pink-100 group-hover/file:bg-pink-200", iconColor: "text-pink-600" };
+  if (["mp4", "mov", "avi", "mkv", "webm"].includes(ext) || m.startsWith("video/"))
+    return { Icon: FileVideo, iconBg: "bg-purple-100 group-hover/file:bg-purple-200", iconColor: "text-purple-600" };
+  if (["mp3", "wav", "ogg", "m4a"].includes(ext) || m.startsWith("audio/"))
+    return { Icon: FileAudio, iconBg: "bg-indigo-100 group-hover/file:bg-indigo-200", iconColor: "text-indigo-600" };
+  if (["txt", "md", "json", "xml", "html", "css", "js", "ts", "tsx"].includes(ext) || m.startsWith("text/"))
+    return { Icon: FileCode, iconBg: "bg-slate-200 group-hover/file:bg-slate-300", iconColor: "text-slate-600" };
+  return { Icon: FileIcon, iconBg: "bg-slate-200 group-hover/file:bg-slate-300", iconColor: "text-slate-600" };
+}
 
 function fmtDateLabel(iso: string) {
   const d = new Date(iso);
@@ -2540,14 +2566,38 @@ function MensajeItem({ msg, prevMsg, currentUserId, isHighlighted, isFreshIncomi
   }, [msg.reacciones, currentUserId]);
   const imageSrc = msg.tipo !== 'archivo' ? mediaUrl(msg.image_url) : null;
   const fileSrc  = msg.tipo === 'archivo' ? mediaUrl(msg.file_url ?? msg.image_url) : null;
-  // El atributo HTML "download" no funciona en enlaces cross-origin (frontend y
-  // backend viven en dominios distintos): sin esto el navegador solo abre/
-  // previsualiza el archivo en vez de descargarlo. ?download=1 fuerza
-  // Content-Disposition: attachment en el backend (server.ts), que si se
-  // respeta cross-origin.
+  // ?download=1 hace que el backend anada Content-Disposition: attachment
+  // (server.ts) — se usa como fallback si el fetch de abajo falla.
   const fileDownloadHref = fileSrc
     ? `${fileSrc}${fileSrc.includes("?") ? "&" : "?"}download=1${msg.file_name ? `&name=${encodeURIComponent(msg.file_name)}` : ""}`
     : null;
+  const [downloadingFile, setDownloadingFile] = useState(false);
+  const handleFileDownload = useCallback(async () => {
+    if (!fileSrc || downloadingFile) return;
+    setDownloadingFile(true);
+    try {
+      // El enlace <a download> no funciona cross-origin (frontend y backend
+      // viven en dominios distintos: el navegador lo ignora y solo abre el
+      // archivo). Descargamos el contenido via fetch y forzamos la descarga
+      // con un blob: URL, que si respeta el atributo download.
+      const response = await fetch(fileSrc);
+      if (!response.ok) throw new Error("download failed");
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = msg.file_name || "archivo";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1200);
+    } catch {
+      window.open(fileDownloadHref ?? fileSrc, "_blank", "noopener,noreferrer");
+    } finally {
+      setDownloadingFile(false);
+    }
+  }, [fileSrc, fileDownloadHref, downloadingFile, msg.file_name]);
+  const fileTypeIcon = msg.tipo === 'archivo' ? getFileTypeIcon(msg.file_name, msg.file_mime) : null;
   const dragDirection = isMe ? -1 : 1;
   const dragMagnitude = Math.abs(dragOffset);
 
@@ -2687,18 +2737,20 @@ function MensajeItem({ msg, prevMsg, currentUserId, isHighlighted, isFreshIncomi
                 )}
               </>
             )}
-            {fileSrc && (
-              <a href={fileDownloadHref ?? fileSrc} download={msg.file_name || true} target="_blank" rel="noopener noreferrer"
-                className="mt-1 flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 px-3 py-2.5 transition-colors group/file max-w-xs">
-                <div className="h-9 w-9 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 group-hover/file:bg-blue-200 transition-colors">
-                  <FileText size={16}/>
+            {fileSrc && fileTypeIcon && (
+              <button type="button" onClick={handleFileDownload} disabled={downloadingFile}
+                className="mt-1 flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 px-3 py-2.5 transition-colors group/file max-w-xs text-left disabled:opacity-70">
+                <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 transition-colors ${fileTypeIcon.iconBg} ${fileTypeIcon.iconColor}`}>
+                  <fileTypeIcon.Icon size={16}/>
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="truncate text-sm font-semibold text-slate-700">{msg.file_name || "Archivo"}</p>
-                  <p className="text-[11px] text-slate-400">Descargar</p>
+                  <p className="text-[11px] text-slate-400">{downloadingFile ? "Descargando…" : "Descargar"}</p>
                 </div>
-                <Download size={14} className="shrink-0 text-slate-400 group-hover/file:text-slate-600"/>
-              </a>
+                {downloadingFile
+                  ? <Loader2 size={14} className="shrink-0 text-slate-400 animate-spin"/>
+                  : <Download size={14} className="shrink-0 text-slate-400 group-hover/file:text-slate-600"/>}
+              </button>
             )}
             {msg.gif_url
               ? <img src={msg.gif_url} alt="GIF" className="max-w-[240px] rounded-xl mt-1 border border-slate-200 shadow-sm"/>
