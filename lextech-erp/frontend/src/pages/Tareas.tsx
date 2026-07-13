@@ -10,7 +10,7 @@ import {
   Briefcase, Users, Calendar, MoreHorizontal, GripVertical,
   ArrowUpDown, ChevronDown, ChevronUp, ZoomIn, ZoomOut,
   AlignJustify, LayoutList, BarChart2, Zap, Paperclip,
-  Download, FileText, ChevronRight, MessageSquare,
+  Download, FileText, ChevronRight, ChevronLeft, MessageSquare,
   Upload, Check,
 } from "lucide-react";
 import {
@@ -847,27 +847,49 @@ function KanbanCard({ task, onToggle, onEdit }: {
   );
 }
 
-function KanbanLane({ id, title, accent, badgeCls, tasks, onToggle, onEdit, onAddNew }: {
+function KanbanLane({ id, title, accent, badgeCls, tasks, onToggle, onEdit, onAddNew, onMoveLeft, onMoveRight }: {
   id: string; title: string; accent: string; badgeCls: string; tasks: Task[];
   onToggle: (id: string, newEstado: string) => void;
   onEdit:   (t: Task) => void;
   onAddNew: () => void;
+  onMoveLeft?: () => void;
+  onMoveRight?: () => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
   const overdueCount = useMemo(() => tasks.filter(t => isOverdue(t.plazo, t.estado)).length, [tasks]);
+  const canReorder = !!(onMoveLeft || onMoveRight);
 
   return (
     <div className="w-[320px] flex-shrink-0 flex flex-col rounded-2xl bg-slate-100/60 border border-slate-200 shadow-sm overflow-hidden"
       style={{ maxHeight: "calc(100vh - 320px)", minHeight: 320 }}>
       <div style={{ borderTop: `3px solid ${accent}` }}
         className="px-4 py-3 bg-white/70 backdrop-blur-sm border-b border-slate-200/60 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-2">
-          <GripVertical size={14} className="text-slate-300" />
-          <span className="text-sm font-extrabold text-slate-800 tracking-tight">{title}</span>
-          <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${badgeCls}`}>{tasks.length}</span>
+        <div className="flex items-center gap-2 min-w-0">
+          {canReorder ? (
+            <div className="flex items-center -ml-1 shrink-0">
+              <button
+                disabled={!onMoveLeft}
+                onClick={onMoveLeft}
+                title="Mover columna a la izquierda"
+                className="w-5 h-5 rounded flex items-center justify-center text-slate-400 hover:bg-slate-200 hover:text-slate-700 disabled:opacity-0 disabled:pointer-events-none transition-colors">
+                <ChevronLeft size={13} />
+              </button>
+              <button
+                disabled={!onMoveRight}
+                onClick={onMoveRight}
+                title="Mover columna a la derecha"
+                className="w-5 h-5 rounded flex items-center justify-center text-slate-400 hover:bg-slate-200 hover:text-slate-700 disabled:opacity-0 disabled:pointer-events-none transition-colors">
+                <ChevronRight size={13} />
+              </button>
+            </div>
+          ) : (
+            <GripVertical size={14} className="text-slate-300 shrink-0" />
+          )}
+          <span className="text-sm font-extrabold text-slate-800 tracking-tight truncate">{title}</span>
+          <span className={`px-2 py-0.5 rounded-full text-xs font-bold shrink-0 ${badgeCls}`}>{tasks.length}</span>
         </div>
         <button
-          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition-colors"
+          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition-colors shrink-0"
           onPointerDown={e => e.stopPropagation()}
           onClick={e => { e.stopPropagation(); onAddNew(); }}>
           <Plus size={14} />
@@ -1214,6 +1236,28 @@ export default function Tareas() {
     } finally {
       setSavingEtapa(false);
     }
+  };
+
+  const persistEtapaOrder = useCallback(async (orderedIds: string[]) => {
+    try {
+      const token = await getToken({ skipCache: true });
+      await fetch("/api/tasks/etapas/reorder", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ ids: orderedIds }),
+      });
+    } catch { /* silencioso: si falla, la reordenaran volviendo a intentarlo */ }
+  }, [getToken]);
+
+  const moveEtapa = (index: number, dir: -1 | 1) => {
+    setEtapas(prev => {
+      const target = index + dir;
+      if (target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[target]] = [next[target], next[index]];
+      persistEtapaOrder(next.map(e => e.id));
+      return next;
+    });
   };
 
   const [showPanel,  setShowPanel]  = useState(false);
@@ -1721,7 +1765,9 @@ export default function Tareas() {
                   return (
                     <KanbanLane key={e.id} id={e.nombre} title={e.nombre} accent={accent} badgeCls={badgeCls}
                       tasks={filtered.filter(t => t.etapa === e.nombre)}
-                      onToggle={handleToggle} onEdit={openEdit} onAddNew={openNew} />
+                      onToggle={handleToggle} onEdit={openEdit} onAddNew={openNew}
+                      onMoveLeft={i > 0 ? () => moveEtapa(i, -1) : undefined}
+                      onMoveRight={i < etapas.length - 1 ? () => moveEtapa(i, 1) : undefined} />
                   );
                 })}
                 <div className="w-[240px] flex-shrink-0 pt-1">

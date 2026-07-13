@@ -15,6 +15,8 @@ import {
   getExpedienteIndicators,
   getEtapas,
   createEtapa,
+  deleteEtapa,
+  reorderEtapas,
   listTaskFiles,
   uploadTaskFiles,
   updateTaskFileMetadata,
@@ -61,6 +63,8 @@ router.put('/files/dl/:token/sync', rawBinary, syncTaskFileByToken);
 // ── Etapas (antes de rutas con :id) ──────────────────────────────
 router.get('/etapas',               requireAuth, getEtapas);
 router.post('/etapas',              requireAuth, createEtapa);
+router.patch('/etapas/reorder',     requireAuth, reorderEtapas);
+router.delete('/etapas/:id',        requireAuth, deleteEtapa);
 
 router.get('/me',                   requireAuth, getMyTasks);
 router.get('/indicators/expediente/:expedienteId', requireAuth, getExpedienteIndicators);

@@ -1363,3 +1363,50 @@ export const createEtapa = async (req: any, res: Response) => {
     res.status(500).json({ error: e.message });
   }
 };
+
+// ── DELETE /api/tasks/etapas/:id ── eliminar etapa (las tareas asignadas pasan a "Sin etapa") ──
+export const deleteEtapa = async (req: any, res: Response) => {
+  const { id } = req.params;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const etapaRes = await client.query(`SELECT nombre FROM task_etapas WHERE id = $1`, [id]);
+    if (etapaRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Etapa no encontrada' });
+    }
+    await client.query(
+      `UPDATE client_tasks SET etapa = NULL, updated_at = NOW() WHERE etapa = $1`,
+      [etapaRes.rows[0].nombre]
+    );
+    await client.query(`DELETE FROM task_etapas WHERE id = $1`, [id]);
+    await client.query('COMMIT');
+    res.json({ success: true });
+  } catch (e: any) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: e.message });
+  } finally {
+    client.release();
+  }
+};
+
+// ── PATCH /api/tasks/etapas/reorder ── reordenar columnas del Kanban ────────
+export const reorderEtapas = async (req: any, res: Response) => {
+  const { ids } = req.body as { ids?: string[] };
+  if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'ids es obligatorio' });
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    for (let i = 0; i < ids.length; i++) {
+      await client.query(`UPDATE task_etapas SET orden = $1 WHERE id = $2`, [i, ids[i]]);
+    }
+    await client.query('COMMIT');
+    const result = await pool.query(`SELECT id, nombre, orden FROM task_etapas ORDER BY orden ASC, nombre ASC`);
+    res.json({ data: result.rows });
+  } catch (e: any) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: e.message });
+  } finally {
+    client.release();
+  }
+};
