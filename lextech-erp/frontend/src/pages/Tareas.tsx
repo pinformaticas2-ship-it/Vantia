@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import {
   DndContext, DragOverlay, useDraggable, useDroppable,
-  useSensors, useSensor, PointerSensor, TouchSensor,
+  useSensors, useSensor, PointerSensor, TouchSensor, MeasuringStrategy,
 } from "@dnd-kit/core";
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
 import { safeJson } from "../lib/api";
@@ -40,9 +40,16 @@ interface Task {
   expediente_id: string | null;
   juzgado: string | null;
   num_proc: string | null;
+  etapa?: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
+}
+
+interface TaskEtapa {
+  id: string;
+  nombre: string;
+  orden: number;
 }
 
 interface TaskFile {
@@ -682,11 +689,22 @@ function TaskRow({
 }
 
 // ── Kanban ────────────────────────────────────────────────────────────────────
-const KANBAN_COL = {
-  pendiente:  { title: "Pendientes",  accent: "#f59e0b", badgeCls: "bg-amber-100 text-amber-700"   },
-  urgente:    { title: "Urgentes",    accent: "#ef4444", badgeCls: "bg-red-100 text-red-700"        },
-  completada: { title: "Completadas", accent: "#10b981", badgeCls: "bg-emerald-100 text-emerald-700"},
-} as const;
+// Id especial para la columna "Sin etapa" (dnd-kit necesita un id estable no vacio)
+const KANBAN_SIN_ETAPA_ID = "__sin_etapa__";
+
+const KANBAN_PALETTE = [
+  { accent: "#6366f1", badgeCls: "bg-indigo-100 text-indigo-700" },
+  { accent: "#0ea5e9", badgeCls: "bg-sky-100 text-sky-700"       },
+  { accent: "#10b981", badgeCls: "bg-emerald-100 text-emerald-700" },
+  { accent: "#f59e0b", badgeCls: "bg-amber-100 text-amber-700"   },
+  { accent: "#ec4899", badgeCls: "bg-pink-100 text-pink-700"     },
+  { accent: "#8b5cf6", badgeCls: "bg-violet-100 text-violet-700" },
+  { accent: "#ef4444", badgeCls: "bg-red-100 text-red-700"       },
+  { accent: "#14b8a6", badgeCls: "bg-teal-100 text-teal-700"     },
+] as const;
+function kanbanColorForIndex(i: number) {
+  return KANBAN_PALETTE[i % KANBAN_PALETTE.length];
+}
 
 function KanbanCardContent({
   task, onToggle, onEdit, isDragging = false,
@@ -817,25 +835,24 @@ function KanbanCard({ task, onToggle, onEdit }: {
   );
 }
 
-function KanbanLane({ id, title, tasks, onToggle, onEdit, onAddNew }: {
-  id: string; title: string; tasks: Task[];
+function KanbanLane({ id, title, accent, badgeCls, tasks, onToggle, onEdit, onAddNew }: {
+  id: string; title: string; accent: string; badgeCls: string; tasks: Task[];
   onToggle: (id: string, newEstado: string) => void;
   onEdit:   (t: Task) => void;
   onAddNew: () => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
-  const col = KANBAN_COL[id as keyof typeof KANBAN_COL];
   const overdueCount = useMemo(() => tasks.filter(t => isOverdue(t.plazo, t.estado)).length, [tasks]);
 
   return (
     <div className="w-[320px] flex-shrink-0 flex flex-col rounded-2xl bg-slate-100/60 border border-slate-200 shadow-sm overflow-hidden"
       style={{ maxHeight: "calc(100vh - 320px)", minHeight: 320 }}>
-      <div style={{ borderTop: `3px solid ${col.accent}` }}
+      <div style={{ borderTop: `3px solid ${accent}` }}
         className="px-4 py-3 bg-white/70 backdrop-blur-sm border-b border-slate-200/60 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">
           <GripVertical size={14} className="text-slate-300" />
           <span className="text-sm font-extrabold text-slate-800 tracking-tight">{title}</span>
-          <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${col.badgeCls}`}>{tasks.length}</span>
+          <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${badgeCls}`}>{tasks.length}</span>
         </div>
         <button
           className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition-colors"
@@ -878,6 +895,23 @@ function KanbanLane({ id, title, tasks, onToggle, onEdit, onAddNew }: {
 }
 
 // ── Gantt ─────────────────────────────────────────────────────────────────────
+// Reconstruye una fecha a medianoche LOCAL a partir de sus componentes de
+// calendario (no via setHours sobre la instancia original, que arrastraria
+// cualquier resto de hora si el Date ya tenia una hora distinta de medianoche).
+function toLocalMidnight(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+// Mismo motivo que normalizeTaskDate en tasksController.ts: toISOString()
+// convierte a UTC, lo que desplaza la fecha un dia en zonas horarias positivas
+// (como España). Para guardar "que dia es" hay que leer los getters locales.
+function toLocalDateInputValue(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 function GanttBoard({ tasks, onEdit, onUpdatePlazo }: {
   tasks: Task[];
   onEdit: (t: Task) => void;
@@ -891,9 +925,9 @@ function GanttBoard({ tasks, onEdit, onUpdatePlazo }: {
 
   const ganttData = useMemo(() => {
     const list = tasks.filter(t => !!t.plazo).map(t => {
-      const end  = new Date(t.plazo as string);
+      const end  = toLocalMidnight(new Date(t.plazo as string));
       const src  = t.created_at || t.updated_at || t.plazo || new Date().toISOString();
-      const parsed = new Date(src);
+      const parsed = toLocalMidnight(new Date(src));
       const start  = parsed.getTime() <= end.getTime() ? parsed : new Date(end.getTime() - 86400000 * 3);
       return { task: t, start, end };
     }).sort((a, b) => a.start.getTime() - b.start.getTime());
@@ -902,7 +936,6 @@ function GanttBoard({ tasks, onEdit, onUpdatePlazo }: {
 
     const minStart = new Date(Math.min(...list.map(i => i.start.getTime())));
     const maxEnd   = new Date(Math.max(...list.map(i => i.end.getTime())));
-    minStart.setHours(0,0,0,0); maxEnd.setHours(0,0,0,0);
     minStart.setDate(minStart.getDate() - 7);
     maxEnd.setDate(maxEnd.getDate() + 14);
 
@@ -933,7 +966,7 @@ function GanttBoard({ tasks, onEdit, onUpdatePlazo }: {
       if (dragging.deltaDays !== 0) {
         const newPlazo = new Date(dragging.originalPlazo);
         newPlazo.setDate(newPlazo.getDate() + dragging.deltaDays);
-        onUpdatePlazo(dragging.taskId, newPlazo.toISOString().slice(0, 10));
+        onUpdatePlazo(dragging.taskId, toLocalDateInputValue(newPlazo));
       }
       setDragging(null);
     };
@@ -1134,6 +1167,43 @@ export default function Tareas() {
     useSensor(TouchSensor,   { activationConstraint: { delay: 250, tolerance: 5 } }),
   );
 
+  // ── Etapas del Kanban ────────────────────────────────────────
+  const [etapas, setEtapas] = useState<TaskEtapa[]>([]);
+  const fetchEtapas = useCallback(async () => {
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch("/api/tasks/etapas", { headers: { Authorization: `Bearer ${token}` } });
+      const data = await safeJson(res);
+      if (res.ok) setEtapas(data.data || []);
+    } catch { /* silencioso: el Kanban simplemente mostrara solo "Sin etapa" */ }
+  }, [getToken]);
+  useEffect(() => { fetchEtapas(); }, [fetchEtapas]);
+
+  const [addingEtapa, setAddingEtapa] = useState(false);
+  const [newEtapaName, setNewEtapaName] = useState("");
+  const [savingEtapa, setSavingEtapa] = useState(false);
+  const handleCreateEtapa = async () => {
+    const nombre = newEtapaName.trim();
+    if (!nombre || savingEtapa) return;
+    setSavingEtapa(true);
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch("/api/tasks/etapas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ nombre }),
+      });
+      const data = await safeJson(res);
+      if (res.ok) {
+        setEtapas(prev => [...prev, data.data]);
+        setNewEtapaName("");
+        setAddingEtapa(false);
+      }
+    } finally {
+      setSavingEtapa(false);
+    }
+  };
+
   const [showPanel,  setShowPanel]  = useState(false);
   const [editTask,   setEditTask]   = useState<Task | null>(null);
   const [modalInitialClientId, setModalInitialClientId] = useState("");
@@ -1315,6 +1385,30 @@ export default function Tareas() {
     }
   }, [getToken, tasks]);
 
+  const handleUpdateEtapa = useCallback(async (id: string, etapa: string) => {
+    const task = tasks.find(t => t.id === id);
+    if (!task) return;
+    const previousEtapa = task.etapa || "";
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, etapa } : t));
+    try {
+      const token = await getToken({ skipCache: true });
+      await fetch(`/api/tasks/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          titulo: task.titulo, descripcion: task.descripcion || "", plazo: task.plazo || "",
+          estado: task.estado, prioridad: task.prioridad, tipo: task.tipo,
+          expediente: task.expediente || "", juzgado: task.juzgado || "", num_proc: task.num_proc || "",
+          importe: (task as any).importe || "", notas: (task as any).notas || "",
+          etapa,
+          fecha_aviso: (task as any).fecha_aviso ? (task as any).fecha_aviso.slice(0, 10) : "",
+        }),
+      });
+    } catch {
+      setTasks(prev => prev.map(t => t.id === id ? { ...t, etapa: previousEtapa } : t));
+    }
+  }, [getToken, tasks]);
+
   const handleSave = async (clientId: string, data: TaskFormData) => {
     setSaving(true); setErrorMsg(null);
     try {
@@ -1362,11 +1456,10 @@ export default function Tareas() {
     const { active, over } = event;
     if (!over) return;
     const taskId = active.id as string;
-    const targetEstado = over.id as string;
-    if (!["pendiente", "urgente", "completada"].includes(targetEstado)) return;
+    const targetEtapa = over.id === KANBAN_SIN_ETAPA_ID ? "" : (over.id as string);
     const task = tasks.find(t => t.id === taskId);
-    if (!task || task.estado === targetEstado) return;
-    handleToggle(taskId, targetEstado);
+    if (!task || (task.etapa || "") === targetEtapa) return;
+    handleUpdateEtapa(taskId, targetEtapa);
   };
 
   // ── Render ───────────────────────────────────────────────────────────────────
@@ -1600,14 +1693,60 @@ export default function Tareas() {
           })()
         ) : view === "kanban" ? (
           <div className="p-5 overflow-x-auto">
-            <DndContext sensors={kanbanSensors} onDragStart={handleKanbanDragStart} onDragEnd={handleKanbanDragEnd}>
+            <DndContext
+              sensors={kanbanSensors}
+              onDragStart={handleKanbanDragStart}
+              onDragEnd={handleKanbanDragEnd}
+              measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
+            >
               <div className="flex items-start gap-5 pb-3 min-h-[400px]">
-                <KanbanLane id="pendiente"  title="Pendientes"  tasks={filtered.filter(t => t.estado === "pendiente")}
+                <KanbanLane id={KANBAN_SIN_ETAPA_ID} title="Sin etapa" accent="#94a3b8" badgeCls="bg-slate-100 text-slate-600"
+                  tasks={filtered.filter(t => !t.etapa)}
                   onToggle={handleToggle} onEdit={openEdit} onAddNew={openNew} />
-                <KanbanLane id="urgente"    title="Urgentes"    tasks={filtered.filter(t => t.estado === "urgente")}
-                  onToggle={handleToggle} onEdit={openEdit} onAddNew={openNew} />
-                <KanbanLane id="completada" title="Completadas" tasks={filtered.filter(t => t.estado === "completada")}
-                  onToggle={handleToggle} onEdit={openEdit} onAddNew={openNew} />
+                {etapas.map((e, i) => {
+                  const { accent, badgeCls } = kanbanColorForIndex(i);
+                  return (
+                    <KanbanLane key={e.id} id={e.nombre} title={e.nombre} accent={accent} badgeCls={badgeCls}
+                      tasks={filtered.filter(t => t.etapa === e.nombre)}
+                      onToggle={handleToggle} onEdit={openEdit} onAddNew={openNew} />
+                  );
+                })}
+                <div className="w-[240px] flex-shrink-0 pt-1">
+                  {addingEtapa ? (
+                    <div className="flex flex-col gap-2 p-3 rounded-2xl bg-slate-100/60 border border-slate-200 shadow-sm">
+                      <input
+                        autoFocus
+                        value={newEtapaName}
+                        onChange={e => setNewEtapaName(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === "Enter") { e.preventDefault(); handleCreateEtapa(); }
+                          if (e.key === "Escape") { setAddingEtapa(false); setNewEtapaName(""); }
+                        }}
+                        placeholder="Nombre de la etapa…"
+                        className="w-full px-3 h-9 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400"
+                      />
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={handleCreateEtapa}
+                          disabled={savingEtapa || !newEtapaName.trim()}
+                          className="flex-1 h-8 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors">
+                          {savingEtapa ? "Guardando…" : "Crear"}
+                        </button>
+                        <button
+                          onClick={() => { setAddingEtapa(false); setNewEtapaName(""); }}
+                          className="h-8 px-3 text-xs font-semibold text-slate-500 hover:bg-slate-200 rounded-lg transition-colors">
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setAddingEtapa(true)}
+                      className="w-full flex items-center justify-center gap-2 h-12 text-xs font-bold text-slate-400 hover:text-indigo-600 border-2 border-dashed border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/40 rounded-2xl transition-colors">
+                      <Plus size={14} /> Nueva etapa
+                    </button>
+                  )}
+                </div>
               </div>
               <DragOverlay dropAnimation={{ duration: 180, easing: "ease" }}>
                 {activeDragTask
