@@ -13,7 +13,8 @@ import AdjuntosModal from "./AdjuntosModal";
 import BackButton from "./BackButton";
 import { UndoToast } from "./UndoToast";
 import { useUndoDelete } from "../lib/useUndoDelete";
-import { PROVINCIAS_ESPANA, getJuzgadosComunes, detectarProvincia } from "../lib/juzgadosEspana";
+import { loadJuzgadosEspana, getProvincias, getPartidosJudiciales, getJuzgadosDePartido, detectarUbicacion } from "../lib/juzgadosEspana";
+import type { JuzgadoProvinciaData } from "../lib/juzgadosEspanaData";
 
 // ── Constantes compartidas ────────────────────────────────────
 export const TIPOS: Record<string, { label: string; short: string; color: string }> = {
@@ -129,46 +130,70 @@ export const inp   = "w-full px-3.5 py-2.5 bg-white border border-slate-300 roun
 export const inpRO = "w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-md text-sm text-slate-500 cursor-not-allowed font-medium";
 
 // ── JuzgadoField ──────────────────────────────────────────────
-// Selector de Provincia + Juzgado habitual de la capital, con opción de
-// escribir uno manualmente (partido judicial concreto, número exacto,
-// o cualquier valor que no aparezca en la lista sugerida).
+// Selector de Provincia -> Partido Judicial -> Juzgado, con el listado
+// oficial completo (CGPJ, via demarcacion.cgpe.es). Los datos se cargan de
+// forma diferida solo cuando se monta este campo. Siempre se puede escribir
+// manualmente por si el juzgado buscado no aparece en el listado.
 function JuzgadoField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const [provincia, setProvincia] = useState<string>(() => detectarProvincia(value) || "");
-  const [modoManual, setModoManual] = useState<boolean>(() => {
-    const detectada = detectarProvincia(value);
-    return !detectada || !getJuzgadosComunes(detectada).includes(value);
-  });
+  const [data, setData] = useState<JuzgadoProvinciaData[] | null>(null);
+  const [provincia, setProvincia] = useState("");
+  const [partido, setPartido] = useState("");
+  const [modoManual, setModoManual] = useState(true);
 
-  const opciones = provincia ? getJuzgadosComunes(provincia) : [];
+  useEffect(() => {
+    let cancelled = false;
+    loadJuzgadosEspana().then(d => {
+      if (cancelled) return;
+      setData(d);
+      const detectado = detectarUbicacion(d, value);
+      if (detectado) {
+        setProvincia(detectado.provincia);
+        setPartido(detectado.partido);
+        setModoManual(false);
+      }
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const provincias  = data ? getProvincias(data) : [];
+  const partidos    = data && provincia ? getPartidosJudiciales(data, provincia) : [];
+  const juzgados    = data && provincia && partido ? getJuzgadosDePartido(data, provincia, partido) : [];
   const MANUAL = "__manual__";
+  const juzgadoSeleccionado = juzgados.find(j => `${j} de ${partido}` === value) || MANUAL;
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         <AppSelect
           value={provincia}
-          onChange={e => {
-            const nueva = e.target.value;
-            setProvincia(nueva);
-            setModoManual(true);
-            onChange("");
-          }}
+          onChange={e => { setProvincia(e.target.value); setPartido(""); setModoManual(true); onChange(""); }}
+          disabled={!data}
           searchable
           searchPlaceholder="Buscar provincia...">
-          <option value="">— Provincia —</option>
-          {PROVINCIAS_ESPANA.map(p => <option key={p.nombre} value={p.nombre}>{p.nombre}</option>)}
+          <option value="">{data ? "— Provincia —" : "Cargando..."}</option>
+          {provincias.map(p => <option key={p} value={p}>{p}</option>)}
         </AppSelect>
         <AppSelect
-          value={modoManual ? MANUAL : value}
-          onChange={e => {
-            if (e.target.value === MANUAL) { setModoManual(true); onChange(""); }
-            else { setModoManual(false); onChange(e.target.value); }
-          }}
+          value={partido}
+          onChange={e => { setPartido(e.target.value); setModoManual(true); onChange(""); }}
           disabled={!provincia}
           searchable
+          searchPlaceholder="Buscar partido judicial...">
+          <option value="">— Partido judicial —</option>
+          {partidos.map(p => <option key={p} value={p}>{p}</option>)}
+        </AppSelect>
+        <AppSelect
+          value={modoManual ? MANUAL : juzgadoSeleccionado}
+          onChange={e => {
+            if (e.target.value === MANUAL) { setModoManual(true); onChange(""); }
+            else { setModoManual(false); onChange(`${e.target.value} de ${partido}`); }
+          }}
+          disabled={!partido}
+          searchable
           searchPlaceholder="Buscar juzgado...">
-          <option value={MANUAL}>{provincia ? "Escribir manualmente…" : "Elige antes la provincia"}</option>
-          {opciones.map(j => <option key={j} value={j}>{j}</option>)}
+          <option value={MANUAL}>{partido ? "Escribir manualmente…" : "Elige antes el partido"}</option>
+          {juzgados.map(j => <option key={j} value={j}>{j}</option>)}
         </AppSelect>
       </div>
       {modoManual && (
@@ -176,7 +201,7 @@ function JuzgadoField({ value, onChange }: { value: string; onChange: (v: string
           placeholder="Juzgado de 1ª Inst. nº 3 de Madrid" className={inp} />
       )}
       <p className="text-[10px] text-slate-400 leading-snug">
-        Lista con los juzgados habituales de la capital de cada provincia — para un partido judicial distinto o un número concreto, escríbelo manualmente.
+        Listado oficial de partidos judiciales y juzgados de España (CGPJ) — si no encuentras el que buscas, escríbelo manualmente.
       </p>
     </div>
   );
