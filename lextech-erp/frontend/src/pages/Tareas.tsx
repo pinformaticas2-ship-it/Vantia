@@ -1710,6 +1710,7 @@ export default function Tareas() {
               onDragStart={handleKanbanDragStart}
               onDragEnd={handleKanbanDragEnd}
               measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
+              modifiers={[kanbanCenterOnCursor]}
             >
               <div className="flex items-start gap-5 pb-3 min-h-[400px]">
                 <KanbanLane id={KANBAN_SIN_ETAPA_ID} title="Sin etapa" accent="#94a3b8" badgeCls="bg-slate-100 text-slate-600"
@@ -1760,7 +1761,7 @@ export default function Tareas() {
                   )}
                 </div>
               </div>
-              <DragOverlay dropAnimation={{ duration: 180, easing: "ease" }} modifiers={[kanbanCenterOnCursor]}>
+              <DragOverlay dropAnimation={{ duration: 180, easing: "ease" }}>
                 {activeDragTask
                   ? <KanbanCardContent task={activeDragTask} onToggle={handleToggle} onEdit={openEdit} isDragging />
                   : null}
