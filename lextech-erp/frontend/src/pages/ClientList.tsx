@@ -640,10 +640,12 @@ function AltaOptionsBtn({
   onManual,
   onDni,
   onLink,
+  onCsv,
 }: {
   onManual: () => void;
   onDni: () => void;
   onLink: () => void;
+  onCsv: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -683,6 +685,13 @@ function AltaOptionsBtn({
       icon: ExternalLink,
       iconWrap: "bg-amber-100 text-amber-700",
       onClick: onLink,
+    },
+    {
+      title: "Importar CSV",
+      description: "Sube un archivo CSV con múltiples clientes a la vez.",
+      icon: FileSpreadsheet,
+      iconWrap: "bg-sky-100 text-sky-700",
+      onClick: onCsv,
     },
   ];
 
@@ -2032,6 +2041,7 @@ export default function ClientList() {
             onManual={() => navigate("/dashboard/clientes/new?mode=manual")}
             onDni={() => navigate("/dashboard/clientes/new?mode=dni")}
             onLink={() => navigate("/dashboard/clientes/invitar")}
+            onCsv={() => navigate("/dashboard/clientes/importar-csv")}
           />
 
           {/* ─ Baja (eliminar) ─ */}

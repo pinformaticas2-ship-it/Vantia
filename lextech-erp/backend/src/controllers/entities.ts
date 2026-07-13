@@ -438,3 +438,195 @@ export const deleteEntity = async (req: any, res: Response) => {
     res.status(500).json({ success: false, error: pgErr(error) });
   }
 };
+
+// ─────────────────────────────────────────────────────────────
+// Importacion masiva de clientes por CSV — lotes de importacion
+// (mismo patron que expediente_import_batches/items en expedientesController.ts)
+// ─────────────────────────────────────────────────────────────
+
+function clampImportStatus(status: any): string {
+  const value = String(status || '').toLowerCase();
+  const allowed = new Set(['uploaded', 'configuring', 'reviewing', 'processing', 'completed', 'failed']);
+  return allowed.has(value) ? value : 'uploaded';
+}
+
+function normalizeCount(value: any): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 0;
+}
+
+export const getEntityImportHistory = async (req: any, res: Response) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit as string, 10) || 50, 200);
+    const r = await pool.query(
+      `SELECT id, file_name, status, total_count, completed_count, error_count, pending_count,
+              notes, created_at, updated_at, user_id, user_name
+       FROM entity_import_batches
+       ORDER BY created_at DESC
+       LIMIT $1`,
+      [limit]
+    );
+    res.json({ success: true, data: r.rows });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: pgErr(e) });
+  }
+};
+
+export const getEntityImportBatchDetail = async (req: any, res: Response) => {
+  try {
+    const [batchResult, itemsResult] = await Promise.all([
+      pool.query(
+        `SELECT id, file_name, status, total_count, completed_count, error_count, pending_count,
+                notes, created_at, updated_at, user_id, user_name
+         FROM entity_import_batches
+         WHERE id = $1`,
+        [req.params.id]
+      ),
+      pool.query(
+        `SELECT id, row_number, reference, status, error_message, payload, created_entity_id,
+                created_at, updated_at
+         FROM entity_import_items
+         WHERE batch_id = $1
+         ORDER BY row_number ASC NULLS LAST, created_at ASC`,
+        [req.params.id]
+      ),
+    ]);
+
+    if (!batchResult.rows.length) {
+      return res.status(404).json({ success: false, error: 'Lote de importacion no encontrado' });
+    }
+
+    res.json({ success: true, data: { ...batchResult.rows[0], items: itemsResult.rows } });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: pgErr(e) });
+  }
+};
+
+export const createEntityImportBatch = async (req: any, res: Response) => {
+  const client = await pool.connect();
+
+  try {
+    const fileName = String(req.body?.file_name || '').trim();
+    if (!fileName) {
+      client.release();
+      return res.status(400).json({ success: false, error: 'file_name es obligatorio' });
+    }
+
+    const status = clampImportStatus(req.body?.status);
+    const totalCount = normalizeCount(req.body?.total_count);
+    const completedCount = normalizeCount(req.body?.completed_count);
+    const errorCount = normalizeCount(req.body?.error_count);
+    const pendingCount = req.body?.pending_count != null
+      ? normalizeCount(req.body?.pending_count)
+      : Math.max(totalCount - completedCount - errorCount, 0);
+    const notes = typeof req.body?.notes === 'string' ? req.body.notes.trim() || null : null;
+    const items = Array.isArray(req.body?.items) ? req.body.items : [];
+    const userId = req.auth?.userId || 'SYSTEM';
+    const userName = reqUserName(req);
+
+    await client.query('BEGIN');
+
+    const batchInsert = await client.query(
+      `INSERT INTO entity_import_batches
+         (user_id, user_name, file_name, status, total_count, completed_count, error_count, pending_count, notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+       RETURNING id, file_name, status, total_count, completed_count, error_count, pending_count,
+                 notes, created_at, updated_at, user_id, user_name`,
+      [userId, userName, fileName, status, totalCount, completedCount, errorCount, pendingCount, notes]
+    );
+
+    const batch = batchInsert.rows[0];
+
+    for (const rawItem of items) {
+      const rowNumber = rawItem?.row_number != null ? normalizeCount(rawItem.row_number) : null;
+      const reference = typeof rawItem?.reference === 'string' ? rawItem.reference.trim() || null : null;
+      const rawStatus = String(rawItem?.status || '').toLowerCase();
+      const itemStatus = rawStatus === 'completed' || rawStatus === 'failed' || rawStatus === 'processing'
+        ? rawStatus
+        : 'uploaded';
+      const errorMessage = typeof rawItem?.error_message === 'string' ? rawItem.error_message.trim() || null : null;
+      const payload = rawItem?.payload ?? null;
+      const createdEntityId = typeof rawItem?.created_entity_id === 'string'
+        ? rawItem.created_entity_id
+        : null;
+
+      await client.query(
+        `INSERT INTO entity_import_items
+           (batch_id, row_number, reference, status, error_message, payload, created_entity_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        [batch.id, rowNumber, reference, itemStatus, errorMessage, payload, createdEntityId]
+      );
+    }
+
+    await client.query('COMMIT');
+
+    logActivityForReq(req, `Importacion CSV de clientes registrada: ${fileName}`, 'CLIENT_IMPORT', batch.id, fileName, 'UPLOAD');
+
+    res.status(201).json({ success: true, data: batch });
+  } catch (e: any) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ success: false, error: pgErr(e) });
+  } finally {
+    client.release();
+  }
+};
+
+export const updateEntityImportBatch = async (req: any, res: Response) => {
+  try {
+    const status = req.body?.status != null ? clampImportStatus(req.body.status) : null;
+    const notes = req.body?.notes != null
+      ? (typeof req.body.notes === 'string' ? req.body.notes.trim() || null : null)
+      : undefined;
+    const totalCount = req.body?.total_count != null ? normalizeCount(req.body.total_count) : undefined;
+    const completedCount = req.body?.completed_count != null ? normalizeCount(req.body.completed_count) : undefined;
+    const errorCount = req.body?.error_count != null ? normalizeCount(req.body.error_count) : undefined;
+    const pendingCount = req.body?.pending_count != null ? normalizeCount(req.body.pending_count) : undefined;
+
+    const current = await pool.query(
+      `SELECT id, file_name, status, total_count, completed_count, error_count, pending_count, notes
+       FROM entity_import_batches
+       WHERE id = $1`,
+      [req.params.id]
+    );
+
+    if (!current.rows.length) {
+      return res.status(404).json({ success: false, error: 'Lote de importacion no encontrado' });
+    }
+
+    const prev = current.rows[0];
+    const nextTotal = totalCount ?? prev.total_count ?? 0;
+    const nextCompleted = completedCount ?? prev.completed_count ?? 0;
+    const nextErrors = errorCount ?? prev.error_count ?? 0;
+    const nextPending = pendingCount ?? Math.max(nextTotal - nextCompleted - nextErrors, 0);
+
+    const r = await pool.query(
+      `UPDATE entity_import_batches
+       SET status = $1,
+           total_count = $2,
+           completed_count = $3,
+           error_count = $4,
+           pending_count = $5,
+           notes = $6,
+           updated_at = NOW()
+       WHERE id = $7
+       RETURNING id, file_name, status, total_count, completed_count, error_count, pending_count,
+                 notes, created_at, updated_at, user_id, user_name`,
+      [status ?? prev.status, nextTotal, nextCompleted, nextErrors, nextPending, notes === undefined ? prev.notes : notes, req.params.id]
+    );
+
+    const batch = r.rows[0];
+
+    logActivityForReq(
+      req,
+      `Importacion CSV de clientes actualizada: ${batch.file_name} (${batch.status})`,
+      'CLIENT_IMPORT',
+      batch.id,
+      batch.file_name,
+      batch.status === 'failed' ? 'ACTION' : 'UPLOAD'
+    );
+
+    res.json({ success: true, data: batch });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: pgErr(e) });
+  }
+};

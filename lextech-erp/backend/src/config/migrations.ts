@@ -523,6 +523,69 @@ export async function runMigrations(): Promise<void> {
       `);
     } catch (_e: any) {}
 
+    // -- Tabla de lotes de importacion de clientes (entities) --
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS entity_import_batches (
+        id               UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id          VARCHAR(150) NOT NULL DEFAULT 'SYSTEM',
+        user_name        VARCHAR(200) NOT NULL DEFAULT 'Sistema',
+        file_name        VARCHAR(255) NOT NULL,
+        status           VARCHAR(30)  NOT NULL DEFAULT 'uploaded'
+                         CHECK (status IN ('uploaded','configuring','reviewing','processing','completed','failed')),
+        total_count      INTEGER      NOT NULL DEFAULT 0,
+        completed_count  INTEGER      NOT NULL DEFAULT 0,
+        error_count      INTEGER      NOT NULL DEFAULT 0,
+        pending_count    INTEGER      NOT NULL DEFAULT 0,
+        notes            TEXT,
+        created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      );
+    `);
+    for (const idx of [
+      `CREATE INDEX IF NOT EXISTS idx_entity_import_batches_created_at ON entity_import_batches (created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_entity_import_batches_status ON entity_import_batches (status)`,
+      `CREATE INDEX IF NOT EXISTS idx_entity_import_batches_user_id ON entity_import_batches (user_id)`,
+    ]) {
+      try { await client.query(idx); } catch (_e: any) {}
+    }
+    try {
+      await client.query(`
+        CREATE TRIGGER trg_entity_import_batches_updated_at
+          BEFORE UPDATE ON entity_import_batches
+          FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+      `);
+    } catch (_e: any) {}
+
+    // -- Tabla de filas/items de importacion de clientes --
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS entity_import_items (
+        id                    UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        batch_id              UUID         NOT NULL REFERENCES entity_import_batches(id) ON DELETE CASCADE,
+        row_number            INTEGER,
+        reference             VARCHAR(150),
+        status                VARCHAR(30)  NOT NULL DEFAULT 'uploaded'
+                              CHECK (status IN ('uploaded','processing','completed','failed')),
+        error_message         TEXT,
+        payload               JSONB,
+        created_entity_id     UUID         REFERENCES entities(id) ON DELETE SET NULL,
+        created_at            TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at            TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      );
+    `);
+    for (const idx of [
+      `CREATE INDEX IF NOT EXISTS idx_entity_import_items_batch_id ON entity_import_items (batch_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_entity_import_items_status ON entity_import_items (status)`,
+      `CREATE INDEX IF NOT EXISTS idx_entity_import_items_created_entity ON entity_import_items (created_entity_id)`,
+    ]) {
+      try { await client.query(idx); } catch (_e: any) {}
+    }
+    try {
+      await client.query(`
+        CREATE TRIGGER trg_entity_import_items_updated_at
+          BEFORE UPDATE ON entity_import_items
+          FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+      `);
+    } catch (_e: any) {}
 
     // ── Eliminar FK de client_files.client_id → entities ──────────
     // client_files se usa también para expedientes (que no están en entities),

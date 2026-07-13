@@ -15,6 +15,7 @@ import DashboardHome from './pages/DashboardHome';
 import ClientList from './pages/ClientList';
 import ClientForm from './pages/ClientForm';
 import ClientDetail from './pages/ClientDetail';
+import ClientCsvImport from './pages/ClientCsvImport';
 import ExpedienteList from './pages/ExpedienteList';
 import ExpedienteDetail from './pages/ExpedienteDetail';
 import Trazabilidad from './pages/Trazabilidad';
@@ -48,6 +49,7 @@ export default function App() {
             <Route index element={<DashboardHome />} />
             <Route path="clientes" element={<ClientList />} />
             <Route path="clientes/invitar" element={<AltaConEnlace />} />
+            <Route path="clientes/importar-csv" element={<ClientCsvImport />} />
             <Route path="clientes/new" element={<ClientForm />} />
             <Route path="clientes/:id/edit" element={<ClientForm />} />
             <Route path="clientes/:id" element={<ClientDetail />} />
