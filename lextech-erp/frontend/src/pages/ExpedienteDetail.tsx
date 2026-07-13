@@ -178,6 +178,7 @@ const DETAIL_TABS: { key: DetailTabKey; label: string; icon: any }[] = [
   { key: "conversaciones",  label: "Conversaciones",         icon: MessageSquare },
   { key: "historial",       label: "Historial expediente",   icon: Activity },
   { key: "cronologia",      label: "Cronología",             icon: Clock },
+  { key: "relacionados",    label: "Exp. relacionados",      icon: Link2 },
 ];
 
 const NOTIF_TIPOS = [
@@ -5425,11 +5426,6 @@ export default function ExpedienteDetail() {
                   </button>
                 );
               })}
-              <div className="h-px w-full bg-slate-200 my-1.5" />
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-4 mt-1 mb-1">Acciones Rápidas</p>
-              <button onClick={() => setTab("relacionados" as any)} className="text-slate-700 hover:bg-white hover:shadow-sm hover:text-slate-900 rounded-xl px-4 py-2.5 flex items-center gap-3 font-medium text-sm transition-all text-left">
-                <Link2 size={14} className="text-indigo-500 shrink-0" /> Exp. relacionados
-              </button>
             </nav>
           </div>
 
