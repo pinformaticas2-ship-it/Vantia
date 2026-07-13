@@ -1176,7 +1176,11 @@ export default function DashboardLayout() {
         <div id="dashboard-content" className={`relative z-10 flex-1 min-h-0 erp-content-glow-bg ${isFullPage ? 'overflow-hidden' : 'overflow-y-auto'}`}>
           <div
             key={getModuleBase(location.pathname)}
-            className={isFullPage ? 'h-full min-h-0 w-full module-page' : 'max-w-[1600px] mx-auto p-4 md:p-8 module-page'}>
+            className={
+              isFullPage ? 'h-full min-h-0 w-full module-page'
+              : location.pathname === '/dashboard/tareas' ? 'w-full p-4 md:p-8 module-page'
+              : 'max-w-[1600px] mx-auto p-4 md:p-8 module-page'
+            }>
             <Outlet />
           </div>
         </div>

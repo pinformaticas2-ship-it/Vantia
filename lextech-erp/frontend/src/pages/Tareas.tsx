@@ -17,7 +17,8 @@ import {
   DndContext, DragOverlay, useDraggable, useDroppable,
   useSensors, useSensor, PointerSensor, TouchSensor, MeasuringStrategy,
 } from "@dnd-kit/core";
-import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
+import type { DragEndEvent, DragStartEvent, Modifier } from "@dnd-kit/core";
+import { getEventCoordinates } from "@dnd-kit/utilities";
 import { safeJson } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
 import { createPortal } from "react-dom";
@@ -705,6 +706,22 @@ const KANBAN_PALETTE = [
 function kanbanColorForIndex(i: number) {
   return KANBAN_PALETTE[i % KANBAN_PALETTE.length];
 }
+
+// Fuerza a que el CENTRO de la tarjeta arrastrada coincida siempre con la posicion
+// real del puntero, sin importar en que punto de la tarjeta se hizo clic. Por
+// defecto dnd-kit conserva el offset relativo del clic original, lo que puede
+// hacer que la tarjeta "fantasma" se sienta lejos del cursor si se agarro cerca
+// de un borde.
+const kanbanCenterOnCursor: Modifier = ({ activatorEvent, draggingNodeRect, transform }) => {
+  if (!draggingNodeRect || !activatorEvent) return transform;
+  const pointer = getEventCoordinates(activatorEvent);
+  if (!pointer) return transform;
+  return {
+    ...transform,
+    x: transform.x + (pointer.x - draggingNodeRect.left - draggingNodeRect.width / 2),
+    y: transform.y + (pointer.y - draggingNodeRect.top - draggingNodeRect.height / 2),
+  };
+};
 
 function KanbanCardContent({
   task, onToggle, onEdit, isDragging = false,
@@ -1743,7 +1760,7 @@ export default function Tareas() {
                   )}
                 </div>
               </div>
-              <DragOverlay dropAnimation={{ duration: 180, easing: "ease" }}>
+              <DragOverlay dropAnimation={{ duration: 180, easing: "ease" }} modifiers={[kanbanCenterOnCursor]}>
                 {activeDragTask
                   ? <KanbanCardContent task={activeDragTask} onToggle={handleToggle} onEdit={openEdit} isDragging />
                   : null}
