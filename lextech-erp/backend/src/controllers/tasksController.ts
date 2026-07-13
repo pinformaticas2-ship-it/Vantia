@@ -1249,7 +1249,7 @@ export const getIndicators = async (req: any, res: Response) => {
 export const getExpedienteIndicators = async (req: any, res: Response) => {
   const { expedienteId } = req.params;
   try {
-    const [tasksQ, filesQ, notesQ, actQ, expQ, apuntesQ] = await Promise.all([
+    const [tasksQ, filesQ, notesQ, actQ, expQ, facturasQ] = await Promise.all([
       pool.query(
         `SELECT
           COUNT(*)                                                           AS total_tareas,
@@ -1284,17 +1284,16 @@ export const getExpedienteIndicators = async (req: any, res: Response) => {
       ),
       pool.query(
         `SELECT
-          COALESCE(SUM(importe) FILTER (WHERE tipo='cobro'),   0) AS total_cobrado,
-          COALESCE(SUM(importe) FILTER (WHERE tipo='cargo'),   0) AS total_cargos,
-          COALESCE(SUM(importe) FILTER (WHERE tipo='abono'),   0) AS total_abonos
-         FROM expediente_apuntes WHERE expediente_id = $1`,
+          COALESCE(SUM(total) FILTER (WHERE estado = 'cobrada'), 0) AS total_cobrado,
+          COALESCE(SUM(total) FILTER (WHERE estado != 'cobrada'), 0) AS total_pendiente
+         FROM facturacion_facturas WHERE expediente_id = $1`,
         [expedienteId],
       ),
     ]);
 
     const t    = tasksQ.rows[0];
     const exp  = expQ.rows[0];
-    const ap   = apuntesQ.rows[0];
+    const fact = facturasQ.rows[0];
     const ultimaAct = actQ.rows[0]?.ultima_actuacion;
     const diasSinActuacion = ultimaAct
       ? Math.floor((Date.now() - new Date(ultimaAct).getTime()) / 86400000)
@@ -1322,9 +1321,8 @@ export const getExpedienteIndicators = async (req: any, res: Response) => {
         estado:             exp?.estado || '—',
         etapa:              exp?.etapa  || '—',
         cliente_nombre:     clienteNombre,
-        total_cobrado:      Number(ap?.total_cobrado ?? 0),
-        total_cargos:       Number(ap?.total_cargos  ?? 0),
-        saldo:              Number(ap?.total_cargos ?? 0) - Number(ap?.total_cobrado ?? 0),
+        total_cobrado:      Number(fact?.total_cobrado ?? 0),
+        saldo:              Number(fact?.total_pendiente ?? 0),
       }
     });
   } catch (e: any) {
