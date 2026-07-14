@@ -4510,6 +4510,17 @@ export default function ExpedienteList() {
     },
   });
 
+  // Borrado masivo (misma logica de deshacer que el borrado individual, ids
+  // van concatenados por "," ya que useUndoDelete solo trackea un id de tipo string)
+  const { pending: pendingBulkDelete, startDelete: startBulkDelete, undo: undoBulkDelete, dismiss: dismissBulkDelete } = useUndoDelete<any[]>({
+    onDelete: async (idsJoined: string) => {
+      const token = await getToken({ skipCache: true });
+      await Promise.all(idsJoined.split(",").map(id =>
+        fetch(`/api/expedientes/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } })
+      ));
+    },
+  });
+
   // Vistas
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const switchView = (v: ViewMode) => { setViewMode(v); if (v !== "multiselect") setSelectedIds(new Set()); };
@@ -4537,17 +4548,18 @@ export default function ExpedienteList() {
   const selectAll = () => setSelectedIds(new Set(filtered.map(e => e.id)));
   const deselectAll = () => setSelectedIds(new Set());
 
-  const handleBulkDelete = async () => {
+  const handleBulkDelete = () => {
     const ids = Array.from(selectedIds);
+    const items = expedientes.filter(e => selectedIds.has(e.id));
     setBulkDeleteConfirm(false);
     setExpedientes(prev => prev.filter(e => !selectedIds.has(e.id)));
     setSelectedIds(new Set());
-    for (const id of ids) {
-      try {
-        const token = await getToken({ skipCache: true });
-        await fetch(`/api/expedientes/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
-      } catch { /* ignore individual failures */ }
-    }
+    startBulkDelete(ids.join(","), items);
+  };
+
+  const handleUndoBulkDelete = () => {
+    const items = undoBulkDelete();
+    if (items) setExpedientes(prev => [...prev, ...items]);
   };
 
   const handleBulkChangeState = async (estado: string) => {
@@ -6330,6 +6342,14 @@ export default function ExpedienteList() {
           onDismiss={dismissDelete}
         />
       )}
+      {pendingBulkDelete && (
+        <UndoToast
+          message={`${pendingBulkDelete.item.length} expediente${pendingBulkDelete.item.length !== 1 ? "s" : ""} eliminado${pendingBulkDelete.item.length !== 1 ? "s" : ""}`}
+          startedAt={pendingBulkDelete.startedAt}
+          onUndo={handleUndoBulkDelete}
+          onDismiss={dismissBulkDelete}
+        />
+      )}
 
       <div className="flex flex-col h-full animate-in fade-in duration-300">
 
@@ -6868,7 +6888,7 @@ export default function ExpedienteList() {
                   </div>
                   <div>
                     <h3 className="font-bold text-slate-900 text-sm">¿Dar de baja {selectedIds.size} expediente{selectedIds.size !== 1 ? "s" : ""}?</h3>
-                    <p className="text-xs text-slate-500 mt-1">Se eliminarán permanentemente. Esta acción no se puede deshacer.</p>
+                    <p className="text-xs text-slate-500 mt-1">Tendrás 15 segundos para deshacer la eliminación.</p>
                   </div>
                 </div>
                 <div className="flex gap-2 justify-end">

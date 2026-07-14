@@ -1200,6 +1200,18 @@ export default function ClientList() {
       await fetch(`/api/entities/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
     },
   });
+
+  // Borrado masivo (misma logica de deshacer; ids van concatenados por ","
+  // ya que useUndoDelete solo trackea un id de tipo string)
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+  const { pending: pendingClientBulkDelete, startDelete: startClientBulkDelete, undo: undoClientBulkDelete, dismiss: dismissClientBulkDelete } = useUndoDelete<any[]>({
+    onDelete: async (idsJoined: string) => {
+      const token = await getToken({ skipCache: true });
+      await Promise.all(idsJoined.split(",").map(id =>
+        fetch(`/api/entities/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } })
+      ));
+    },
+  });
   const [showQuickTaskModal, setShowQuickTaskModal] = useState(false);
   const [quickTaskSaving, setQuickTaskSaving] = useState(false);
   const [quickTaskError, setQuickTaskError] = useState<string | null>(null);
@@ -1400,6 +1412,21 @@ export default function ClientList() {
   const handleUndoClient = () => {
     const item = undoClientDelete();
     if (item) setClients(prev => [...prev, item]);
+  };
+
+  // ── Eliminar seleccionados (vista multiselect) ───────────────
+  const handleBulkDeleteClients = () => {
+    const ids = Array.from(selectedIds);
+    const items = clients.filter(c => selectedIds.has(c.id));
+    setBulkDeleteConfirm(false);
+    setClients(prev => prev.filter(c => !selectedIds.has(c.id)));
+    setSelectedIds(new Set());
+    startClientBulkDelete(ids.join(","), items);
+  };
+
+  const handleUndoBulkClients = () => {
+    const items = undoClientBulkDelete();
+    if (items) setClients(prev => [...prev, ...items]);
   };
 
   // ── Dar de alta (reactivar) ─────────────────────────────────
@@ -1718,6 +1745,27 @@ export default function ClientList() {
         startedAt={pendingClientDelete.startedAt}
         onUndo={handleUndoClient}
         onDismiss={dismissClientDelete}
+      />
+    )}
+
+    {/* ── Modal confirmación borrado masivo ─────────────────── */}
+    {bulkDeleteConfirm && (
+      <ConfirmModal
+        title={`¿Eliminar ${selectedIds.size} cliente${selectedIds.size !== 1 ? "s" : ""}?`}
+        message="Se borrarán de la base de datos. Tendrás 15 segundos para deshacer."
+        confirmLabel="Eliminar seleccionados"
+        danger
+        onConfirm={handleBulkDeleteClients}
+        onCancel={() => setBulkDeleteConfirm(false)}
+      />
+    )}
+
+    {pendingClientBulkDelete && (
+      <UndoToast
+        message={`${pendingClientBulkDelete.item.length} cliente${pendingClientBulkDelete.item.length !== 1 ? "s" : ""} eliminado${pendingClientBulkDelete.item.length !== 1 ? "s" : ""}`}
+        startedAt={pendingClientBulkDelete.startedAt}
+        onUndo={handleUndoBulkClients}
+        onDismiss={dismissClientBulkDelete}
       />
     )}
     {showQuickTaskModal && selectedClient && (
@@ -2483,6 +2531,12 @@ export default function ClientList() {
                 className="flex items-center gap-1.5 px-3 py-1 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-colors"
               >
                 <FileSpreadsheet size={11} /> Exportar seleccionados
+              </button>
+              <button
+                onClick={() => setBulkDeleteConfirm(true)}
+                className="flex items-center gap-1.5 px-3 py-1 bg-white text-red-600 border border-red-200 rounded-lg font-semibold hover:bg-red-50 transition-colors"
+              >
+                <Trash2 size={11} /> Eliminar seleccionados
               </button>
               <button
                 onClick={() => { setSelectedIds(new Set()); setShowSelectionDropdown(false); }}
