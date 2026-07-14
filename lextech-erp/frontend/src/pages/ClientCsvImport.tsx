@@ -1777,7 +1777,7 @@ export default function ClientCsvImport() {
   const handleFinish = () => navigate("/dashboard/clientes");
 
   return (
-    <div className="fixed inset-0 z-[100] bg-white flex flex-col">
+    <div className="flex-1 h-full min-h-0 flex flex-col overflow-hidden bg-white">
       {viewMode === "upload" && (
         <CsvImportUploadView
           fileName={csvFileName}
