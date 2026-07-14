@@ -76,7 +76,23 @@ interface CsvRowImportResult {
 }
 
 type ClientCsvViewMode =
-  | "upload" | "configure" | "review" | "complete" | "errorDetail" | "history";
+  | "upload" | "configure" | "review" | "complete" | "errorDetail" | "history" | "historyDetail";
+
+interface ImportBatchItem {
+  id: string;
+  row_number: number | null;
+  reference: string | null;
+  status: "uploaded" | "processing" | "completed" | "failed";
+  error_message: string | null;
+  payload: Record<string, any> | null;
+  created_entity_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface ImportBatchDetail extends ImportBatch {
+  items: ImportBatchItem[];
+}
 
 // ─── Definicion de campos + plantilla ──────────────────────────────────────
 
@@ -1187,7 +1203,7 @@ function CsvImportErrorDetailView({
               ))}
             </div>
           </div>
-          <div className="overflow-auto max-h-[520px]">
+          <div className="overflow-auto">
             <table className="w-full text-left border-collapse">
               <thead className="sticky top-0 bg-slate-50 border-b border-slate-200">
                 <tr>
@@ -1228,8 +1244,9 @@ function CsvImportErrorDetailView({
 
 // ─── Histórico de lotes ──────────────────────────────────────────────────────
 
-function CsvImportHistoryView({ rows, loading, error, onBack, onReload }: {
+function CsvImportHistoryView({ rows, loading, error, onBack, onReload, onSelectBatch }: {
   rows: ImportBatch[]; loading: boolean; error: string | null; onBack: () => void; onReload: () => void;
+  onSelectBatch: (batchId: string) => void;
 }) {
   const statusBadge = (row: ImportBatch) => {
     const hasErrors = row.error_count > 0;
@@ -1284,19 +1301,21 @@ function CsvImportHistoryView({ rows, loading, error, onBack, onReload }: {
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Total</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Completados</th>
               <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Errores</th>
-              <th className="pr-6 lg:pr-8 pl-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Archivo</th>
+              <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Archivo</th>
+              <th className="w-10" />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {loading ? (
-              <tr><td colSpan={6} className="px-6 py-20 text-center text-slate-400">
+              <tr><td colSpan={7} className="px-6 py-20 text-center text-slate-400">
                 <div className="flex items-center justify-center gap-3"><Loader2 size={18} className="animate-spin" /><span>Cargando importaciones...</span></div>
               </td></tr>
             ) : rows.length === 0 ? (
-              <tr><td colSpan={6} className="px-6 py-20 text-center text-slate-400">No hay importaciones registradas</td></tr>
+              <tr><td colSpan={7} className="px-6 py-20 text-center text-slate-400">No hay importaciones registradas</td></tr>
             ) : (
               rows.map((row) => (
-                <tr key={row.id} className={`group transition-colors ${row.error_count > 0 ? "bg-red-50/30 hover:bg-red-50/50" : "hover:bg-slate-50/80"}`}>
+                <tr key={row.id} onClick={() => onSelectBatch(row.id)}
+                  className={`group cursor-pointer transition-colors ${row.error_count > 0 ? "bg-red-50/30 hover:bg-red-50/50" : "hover:bg-slate-50/80"}`}>
                   <td className="pl-6 lg:pl-8 pr-6 py-4 whitespace-nowrap text-[13px] text-slate-700 font-medium">{fmtDateTime(row.created_at)}</td>
                   <td className="px-6 py-4 whitespace-nowrap">{statusBadge(row)}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-[13px] text-slate-600 font-semibold">{row.total_count}</td>
@@ -1308,13 +1327,158 @@ function CsvImportHistoryView({ rows, loading, error, onBack, onReload }: {
                       <span className="text-[13px] text-slate-400 font-medium">0</span>
                     )}
                   </td>
-                  <td className="pr-6 lg:pr-8 pl-6 py-4 whitespace-nowrap text-[13px] text-slate-500" title={row.notes || row.file_name}>{row.file_name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-[13px] text-slate-500 max-w-[220px] truncate" title={row.notes || row.file_name}>{row.file_name}</td>
+                  <td className="pr-6 lg:pr-8 pl-2 py-4 text-slate-300 group-hover:text-red-500 transition-colors"><ChevronRight size={15} /></td>
                 </tr>
               ))
             )}
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+// ─── Detalle de un lote del historial (ver filas, reintentar, deshacer) ─────
+function CsvImportHistoryDetailView({
+  batch, loading, error, retrying, retryProgress, undoing, onBack, onRetryFailed, onUndo,
+}: {
+  batch: ImportBatchDetail | null;
+  loading: boolean;
+  error: string | null;
+  retrying: boolean;
+  retryProgress: { done: number; total: number } | null;
+  undoing: boolean;
+  onBack: () => void;
+  onRetryFailed: () => void;
+  onUndo: () => void;
+}) {
+  const [statusFilter, setStatusFilter] = useState<"all" | "error" | "ok">("all");
+
+  const failedCount = batch?.items.filter((it) => it.status === "failed").length ?? 0;
+  const completedItems = batch?.items.filter((it) => it.status === "completed" && it.created_entity_id) ?? [];
+  const canUndo = completedItems.length > 0;
+
+  const itemName = (it: ImportBatchItem) => {
+    const p = it.payload || {};
+    return [p.first_name, p.last_name].filter(Boolean).join(" ") || it.reference || "-";
+  };
+
+  const filteredItems = (batch?.items ?? []).filter((it) => {
+    if (statusFilter === "all") return true;
+    if (statusFilter === "error") return it.status === "failed";
+    return it.status === "completed";
+  });
+
+  return (
+    <div className="p-6 lg:p-8 flex flex-col gap-6 overflow-y-auto h-full">
+      <div className="flex items-start justify-between gap-4 flex-shrink-0">
+        <div>
+          <h1 className="text-base font-bold text-slate-900">Detalle de la importación</h1>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-500">
+            <span>{batch?.file_name || "archivo.csv"}</span>
+            {batch && <span>· {fmtDateTime(batch.created_at)}</span>}
+          </div>
+        </div>
+        <BackButton onClick={onBack} label="Volver al historial" />
+      </div>
+
+      {error && (
+        <div className="flex-shrink-0 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">{error}</div>
+      )}
+
+      {loading ? (
+        <div className="flex-1 flex items-center justify-center gap-3 text-slate-400 py-20">
+          <Loader2 size={18} className="animate-spin" /> Cargando detalle...
+        </div>
+      ) : batch ? (
+        <>
+          <div className="flex-shrink-0 grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="rounded-2xl bg-slate-100 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Total</p>
+              <p className="mt-1 text-xl font-bold text-slate-900">{batch.total_count}</p>
+            </div>
+            <div className="rounded-2xl bg-emerald-50 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Completados</p>
+              <p className="mt-1 text-xl font-bold text-slate-900">{batch.completed_count}</p>
+            </div>
+            <div className="rounded-2xl bg-red-50 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Errores</p>
+              <p className="mt-1 text-xl font-bold text-slate-900">{batch.error_count}</p>
+            </div>
+            <div className="rounded-2xl bg-slate-100 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Estado</p>
+              <p className="mt-1 text-sm font-bold text-slate-900">{importStatusMeta(batch.status).label}</p>
+            </div>
+          </div>
+
+          {batch.notes && (
+            <p className="flex-shrink-0 text-xs text-slate-400 italic">{batch.notes}</p>
+          )}
+
+          <div className="flex-shrink-0 flex flex-wrap items-center gap-2">
+            <button type="button" onClick={onRetryFailed} disabled={failedCount === 0 || retrying}
+              className="inline-flex items-center gap-2 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed text-white px-4 py-2.5 text-sm font-bold shadow-sm transition-colors">
+              {retrying ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+              {retrying && retryProgress ? `Reintentando ${retryProgress.done}/${retryProgress.total}...` : `Reintentar fallidas (${failedCount})`}
+            </button>
+            <button type="button" onClick={onUndo} disabled={!canUndo || undoing}
+              className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-white hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed text-red-600 px-4 py-2.5 text-sm font-bold transition-colors">
+              {undoing ? <Loader2 size={14} className="animate-spin" /> : <AlertTriangle size={14} />}
+              Deshacer importación ({completedItems.length})
+            </button>
+          </div>
+
+          <div className="flex-1 min-h-0 flex flex-col rounded-[24px] border border-slate-200 bg-white/90 shadow-sm overflow-hidden">
+            <div className="flex-shrink-0 flex items-center justify-between gap-3 px-5 py-3 border-b border-slate-100">
+              <p className="text-sm font-bold text-slate-900">Filas ({filteredItems.length})</p>
+              <div className="flex items-center gap-1.5">
+                {(["all", "error", "ok"] as const).map((f) => (
+                  <button key={f} type="button" onClick={() => setStatusFilter(f)}
+                    className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors ${
+                      statusFilter === f ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}>
+                    {f === "all" ? "Todas" : f === "error" ? "Con error" : "Correctas"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto">
+              <table className="w-full text-left border-collapse">
+                <thead className="sticky top-0 bg-slate-50 border-b border-slate-200">
+                  <tr>
+                    <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Fila</th>
+                    <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Nombre</th>
+                    <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">NIF/CIF</th>
+                    <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Estado</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredItems.map((it) => (
+                    <tr key={it.id} className={it.status === "failed" ? "bg-red-50/50" : ""}>
+                      <td className="px-4 py-3 text-sm text-slate-500">{it.row_number ?? "-"}</td>
+                      <td className="px-4 py-3 text-sm text-slate-700 font-medium">{itemName(it)}</td>
+                      <td className="px-4 py-3 text-sm text-slate-700">{it.reference || "-"}</td>
+                      <td className="px-4 py-3 text-xs">
+                        {it.status === "failed" ? (
+                          <span className="text-red-600 font-medium">{it.error_message}</span>
+                        ) : it.status === "completed" && !it.created_entity_id ? (
+                          <span className="inline-flex items-center gap-1 text-slate-400 font-semibold"><AlertTriangle size={11} /> Deshecha</span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-emerald-600 font-semibold"><Check size={11} /> Correcto</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {filteredItems.length === 0 && (
+                    <tr><td colSpan={4} className="py-10 text-center text-sm text-slate-400">Sin filas que mostrar</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }
@@ -1339,6 +1503,13 @@ export default function ClientCsvImport() {
   const [importHistory, setImportHistory] = useState<ImportBatch[]>([]);
   const [loadingImportHistory, setLoadingImportHistory] = useState(false);
   const [importHistoryError, setImportHistoryError] = useState<string | null>(null);
+
+  const [historyDetailBatch, setHistoryDetailBatch] = useState<ImportBatchDetail | null>(null);
+  const [loadingHistoryDetail, setLoadingHistoryDetail] = useState(false);
+  const [historyDetailError, setHistoryDetailError] = useState<string | null>(null);
+  const [retryingFailedItems, setRetryingFailedItems] = useState(false);
+  const [retryProgress, setRetryProgress] = useState<{ done: number; total: number } | null>(null);
+  const [undoingBatch, setUndoingBatch] = useState(false);
 
   const fetchImportHistory = useCallback(async (silent = false) => {
     try {
@@ -1394,32 +1565,29 @@ export default function ClientCsvImport() {
     )));
   };
 
-  const handleImportCsv = async () => {
-    const issues: CsvImportIssue[] = [...validateCsvImport(csvFieldMappings, csvPreviewRows).issues];
-    const results: CsvRowImportResult[] = new Array(csvPreviewRows.length);
-    const toProcess = csvPreviewRows.map((row, index) => ({ index, row }));
+  // CSVs grandes (1000+ filas) pueden tardar varios minutos: concurrencia
+  // moderada + pausa entre lotes para no saturar la instancia de backend,
+  // token renovado en cada lote (el de Clerk caduca en ~60s), y reintento
+  // automatico de errores que parecen un fallo transitorio del servidor en
+  // vez de marcar la fila como fallida a la primera. Se reutiliza tanto para
+  // la importacion inicial como para "Reintentar fallidas" desde el historial.
+  const isTransientImportError = (message: string) =>
+    /Failed to fetch|Backend no disponible|Ruta no encontrada|Metodo no permitido|Error del servidor \(5\d\d\)/i.test(message);
 
-    // CSVs grandes (1000+ filas) pueden tardar varios minutos: bajamos la
-    // concurrencia y metemos una pausa entre lotes para no saturar la
-    // instancia de backend, renovamos el token en cada lote (el de Clerk
-    // caduca en ~60s y antes se capturaba una sola vez al principio), y
-    // reintentamos automaticamente errores que parecen un fallo transitorio
-    // del servidor en vez de marcar la fila como fallida a la primera.
+  const runResilientImport = useCallback(async (
+    items: { rowNumber: number; payload: Record<string, unknown> }[],
+    onProgress?: (done: number, total: number) => void,
+  ): Promise<CsvRowImportResult[]> => {
     const CONCURRENCY = 4;
     const BATCH_DELAY_MS = 200;
     const MAX_RETRIES = 2;
-    const isTransientError = (message: string) =>
-      /Failed to fetch|Backend no disponible|Ruta no encontrada|Metodo no permitido|Error del servidor \(5\d\d\)/i.test(message);
-
+    const results: CsvRowImportResult[] = [];
     let doneCount = 0;
-    setCsvImportProgress({ done: 0, total: toProcess.length });
 
-    for (let i = 0; i < toProcess.length; i += CONCURRENCY) {
-      const batch = toProcess.slice(i, i + CONCURRENCY);
+    for (let i = 0; i < items.length; i += CONCURRENCY) {
+      const batch = items.slice(i, i + CONCURRENCY);
       const token = await getToken({ skipCache: true });
-      await Promise.all(batch.map(async ({ index, row }) => {
-        const rowNumber = index + 1;
-        const payload = buildClientPayload(row, csvFieldMappings);
+      await Promise.all(batch.map(async ({ rowNumber, payload }) => {
         const reference = (payload.nif_cif as string) || null;
         for (let attempt = 0; ; attempt++) {
           try {
@@ -1431,33 +1599,48 @@ export default function ClientCsvImport() {
             const data = await safeJson(res);
             if (!res.ok) {
               const message = data.error || "No se pudo crear el cliente";
-              if (attempt < MAX_RETRIES && isTransientError(message)) {
+              if (attempt < MAX_RETRIES && isTransientImportError(message)) {
                 await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
                 continue;
               }
-              issues.push({ rowNumber, fieldId: "cliente", fieldLabel: "Cliente", message });
-              results[index] = { rowNumber, status: "failed", reference, error_message: message, payload };
+              results.push({ rowNumber, status: "failed", reference, error_message: message, payload });
             } else {
-              results[index] = { rowNumber, status: "completed", reference, error_message: null, payload, created_entity_id: data.data?.id || null };
+              results.push({ rowNumber, status: "completed", reference, error_message: null, payload, created_entity_id: data.data?.id || null });
             }
           } catch (e: any) {
             const message = e.message || "No se pudo crear el cliente";
-            if (attempt < MAX_RETRIES && isTransientError(message)) {
+            if (attempt < MAX_RETRIES && isTransientImportError(message)) {
               await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
               continue;
             }
-            issues.push({ rowNumber, fieldId: "cliente", fieldLabel: "Cliente", message });
-            results[index] = { rowNumber, status: "failed", reference, error_message: message, payload };
+            results.push({ rowNumber, status: "failed", reference, error_message: message, payload });
           }
           break;
         }
         doneCount += 1;
-        setCsvImportProgress({ done: doneCount, total: toProcess.length });
+        onProgress?.(doneCount, items.length);
       }));
-      if (i + CONCURRENCY < toProcess.length) await new Promise((r) => setTimeout(r, BATCH_DELAY_MS));
+      if (i + CONCURRENCY < items.length) await new Promise((r) => setTimeout(r, BATCH_DELAY_MS));
     }
+    return results;
+  }, [getToken]);
 
+  const handleImportCsv = async () => {
+    const items = csvPreviewRows.map((row, index) => ({
+      rowNumber: index + 1,
+      payload: buildClientPayload(row, csvFieldMappings),
+    }));
+
+    setCsvImportProgress({ done: 0, total: items.length });
+    const results = await runResilientImport(items, (done, total) => setCsvImportProgress({ done, total }));
     setCsvImportProgress(null);
+
+    const issues: CsvImportIssue[] = [...validateCsvImport(csvFieldMappings, csvPreviewRows).issues];
+    for (const r of results) {
+      if (r.status === "failed") {
+        issues.push({ rowNumber: r.rowNumber, fieldId: "cliente", fieldLabel: "Cliente", message: r.error_message || "No se pudo crear el cliente" });
+      }
+    }
     const summary = buildCsvSummary(csvPreviewRows.length, issues);
     setCsvImportSummary(summary);
 
@@ -1476,6 +1659,10 @@ export default function ClientCsvImport() {
             notes: summary.errorCount > 0
               ? `Importación finalizada: ${summary.successCount} correctos, ${summary.errorCount} con errores.`
               : "Importación completada correctamente.",
+            items: results.map((r) => ({
+              row_number: r.rowNumber, reference: r.reference, status: r.status,
+              error_message: r.error_message, payload: r.payload, created_entity_id: r.created_entity_id || null,
+            })),
           }),
         });
       } catch {}
@@ -1486,6 +1673,104 @@ export default function ClientCsvImport() {
 
     setViewMode("complete");
   };
+
+  // ── Detalle de un lote del historial: ver filas, reintentar fallidas, deshacer ──
+  const openHistoryDetail = useCallback(async (batchId: string) => {
+    setViewMode("historyDetail");
+    setLoadingHistoryDetail(true);
+    setHistoryDetailError(null);
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/entities/imports/${batchId}`, { headers: { Authorization: `Bearer ${token}` } });
+      const d = await safeJson(res);
+      if (!res.ok) throw new Error(d.error || "No se pudo cargar el detalle de la importación");
+      setHistoryDetailBatch(d.data);
+    } catch (e: any) {
+      setHistoryDetailError(e.message || "Error al cargar el detalle de la importación");
+    } finally {
+      setLoadingHistoryDetail(false);
+    }
+  }, [getToken]);
+
+  const handleRetryFailedInBatch = useCallback(async () => {
+    if (!historyDetailBatch) return;
+    const failedItems = historyDetailBatch.items.filter((it) => it.status === "failed");
+    if (failedItems.length === 0) return;
+    setRetryingFailedItems(true);
+    setRetryProgress({ done: 0, total: failedItems.length });
+    try {
+      const toRetry = failedItems.map((it) => ({ rowNumber: it.row_number ?? 0, payload: it.payload || {} }));
+      const results = await runResilientImport(toRetry, (done, total) => setRetryProgress({ done, total }));
+
+      const retriedRowNumbers = new Set(failedItems.map((it) => it.row_number));
+      const untouched = historyDetailBatch.items.filter((it) => !retriedRowNumbers.has(it.row_number));
+      const mergedItems = [
+        ...untouched.map((it) => ({
+          row_number: it.row_number, reference: it.reference, status: it.status,
+          error_message: it.error_message, payload: it.payload, created_entity_id: it.created_entity_id,
+        })),
+        ...results.map((r) => ({
+          row_number: r.rowNumber, reference: r.reference, status: r.status,
+          error_message: r.error_message, payload: r.payload, created_entity_id: r.created_entity_id || null,
+        })),
+      ];
+      const completedTotal = mergedItems.filter((it) => it.status === "completed").length;
+      const errorTotal = mergedItems.filter((it) => it.status === "failed").length;
+      const recovered = results.filter((r) => r.status === "completed").length;
+
+      const token = await getToken({ skipCache: true });
+      const patchRes = await fetch(`/api/entities/imports/${historyDetailBatch.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          status: errorTotal > 0 ? "completed" : "completed",
+          total_count: mergedItems.length,
+          completed_count: completedTotal,
+          error_count: errorTotal,
+          pending_count: 0,
+          notes: `Reintento: ${recovered} de ${failedItems.length} filas recuperadas.`,
+          items: mergedItems,
+        }),
+      });
+      const patchData = await safeJson(patchRes);
+      if (patchRes.ok) {
+        openHistoryDetail(historyDetailBatch.id);
+        fetchImportHistory(true);
+      } else {
+        setHistoryDetailError(patchData.error || "No se pudo guardar el resultado del reintento");
+      }
+    } catch (e: any) {
+      setHistoryDetailError(e.message || "No se pudieron reintentar las filas fallidas");
+    } finally {
+      setRetryingFailedItems(false);
+      setRetryProgress(null);
+    }
+  }, [historyDetailBatch, runResilientImport, getToken, fetchImportHistory, openHistoryDetail]);
+
+  const handleUndoBatch = useCallback(async () => {
+    if (!historyDetailBatch) return;
+    const confirmed = window.confirm(
+      `¿Deshacer esta importación? Se eliminarán los ${historyDetailBatch.completed_count} clientes que se crearon en este lote. Esta acción no se puede deshacer.`
+    );
+    if (!confirmed) return;
+    setUndoingBatch(true);
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/entities/imports/${historyDetailBatch.id}/undo`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const d = await safeJson(res);
+      if (!res.ok) throw new Error(d.error || "No se pudo deshacer la importación");
+      window.alert(`Se eliminaron ${d.data.deletedCount} cliente(s) creados por esta importación.`);
+      openHistoryDetail(historyDetailBatch.id);
+      fetchImportHistory(true);
+    } catch (e: any) {
+      setHistoryDetailError(e.message || "No se pudo deshacer la importación");
+    } finally {
+      setUndoingBatch(false);
+    }
+  }, [historyDetailBatch, getToken, openHistoryDetail, fetchImportHistory]);
 
   useEffect(() => { fetchImportHistory(); }, [fetchImportHistory]);
 
@@ -1555,6 +1840,20 @@ export default function ClientCsvImport() {
           error={importHistoryError}
           onBack={() => setViewMode("upload")}
           onReload={() => fetchImportHistory()}
+          onSelectBatch={openHistoryDetail}
+        />
+      )}
+      {viewMode === "historyDetail" && (
+        <CsvImportHistoryDetailView
+          batch={historyDetailBatch}
+          loading={loadingHistoryDetail}
+          error={historyDetailError}
+          retrying={retryingFailedItems}
+          retryProgress={retryProgress}
+          undoing={undoingBatch}
+          onBack={() => setViewMode("history")}
+          onRetryFailed={handleRetryFailedInBatch}
+          onUndo={handleUndoBatch}
         />
       )}
     </div>

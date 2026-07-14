@@ -572,6 +572,7 @@ export const createEntityImportBatch = async (req: any, res: Response) => {
 };
 
 export const updateEntityImportBatch = async (req: any, res: Response) => {
+  const client = await pool.connect();
   try {
     const status = req.body?.status != null ? clampImportStatus(req.body.status) : null;
     const notes = req.body?.notes != null
@@ -581,8 +582,11 @@ export const updateEntityImportBatch = async (req: any, res: Response) => {
     const completedCount = req.body?.completed_count != null ? normalizeCount(req.body.completed_count) : undefined;
     const errorCount = req.body?.error_count != null ? normalizeCount(req.body.error_count) : undefined;
     const pendingCount = req.body?.pending_count != null ? normalizeCount(req.body.pending_count) : undefined;
+    const items = Array.isArray(req.body?.items) ? req.body.items : null;
 
-    const current = await pool.query(
+    await client.query('BEGIN');
+
+    const current = await client.query(
       `SELECT id, file_name, status, total_count, completed_count, error_count, pending_count, notes
        FROM entity_import_batches
        WHERE id = $1`,
@@ -590,6 +594,7 @@ export const updateEntityImportBatch = async (req: any, res: Response) => {
     );
 
     if (!current.rows.length) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ success: false, error: 'Lote de importacion no encontrado' });
     }
 
@@ -599,7 +604,7 @@ export const updateEntityImportBatch = async (req: any, res: Response) => {
     const nextErrors = errorCount ?? prev.error_count ?? 0;
     const nextPending = pendingCount ?? Math.max(nextTotal - nextCompleted - nextErrors, 0);
 
-    const r = await pool.query(
+    const r = await client.query(
       `UPDATE entity_import_batches
        SET status = $1,
            total_count = $2,
@@ -616,6 +621,32 @@ export const updateEntityImportBatch = async (req: any, res: Response) => {
 
     const batch = r.rows[0];
 
+    // Si se mandan items (resultado fila a fila del import), sustituimos los
+    // que ya hubiera para este lote -- permite reintentar y volver a guardar.
+    if (items) {
+      await client.query(`DELETE FROM entity_import_items WHERE batch_id = $1`, [batch.id]);
+      for (const rawItem of items) {
+        const rowNumber = rawItem?.row_number != null ? normalizeCount(rawItem.row_number) : null;
+        const reference = typeof rawItem?.reference === 'string' ? rawItem.reference.trim() || null : null;
+        const rawStatus = String(rawItem?.status || '').toLowerCase();
+        const itemStatus = rawStatus === 'completed' || rawStatus === 'failed' || rawStatus === 'processing'
+          ? rawStatus
+          : 'uploaded';
+        const errorMessage = typeof rawItem?.error_message === 'string' ? rawItem.error_message.trim() || null : null;
+        const payload = rawItem?.payload ?? null;
+        const createdEntityId = typeof rawItem?.created_entity_id === 'string' ? rawItem.created_entity_id : null;
+
+        await client.query(
+          `INSERT INTO entity_import_items
+             (batch_id, row_number, reference, status, error_message, payload, created_entity_id)
+           VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+          [batch.id, rowNumber, reference, itemStatus, errorMessage, payload, createdEntityId]
+        );
+      }
+    }
+
+    await client.query('COMMIT');
+
     logActivityForReq(
       req,
       `Importacion CSV de clientes actualizada: ${batch.file_name} (${batch.status})`,
@@ -627,6 +658,65 @@ export const updateEntityImportBatch = async (req: any, res: Response) => {
 
     res.json({ success: true, data: batch });
   } catch (e: any) {
+    await client.query('ROLLBACK');
     res.status(500).json({ success: false, error: pgErr(e) });
+  } finally {
+    client.release();
+  }
+};
+
+// ── POST /api/entities/imports/:id/undo ── deshacer un lote: borra los
+// clientes que se llegaron a crear en esa importacion ─────────────────────
+export const undoEntityImportBatch = async (req: any, res: Response) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const batchRes = await client.query(
+      `SELECT id, file_name FROM entity_import_batches WHERE id = $1`,
+      [req.params.id]
+    );
+    if (!batchRes.rows.length) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ success: false, error: 'Lote de importacion no encontrado' });
+    }
+
+    const itemsRes = await client.query(
+      `SELECT id, created_entity_id FROM entity_import_items
+       WHERE batch_id = $1 AND status = 'completed' AND created_entity_id IS NOT NULL`,
+      [req.params.id]
+    );
+
+    const entityIds = itemsRes.rows.map((r: any) => r.created_entity_id);
+    let deletedCount = 0;
+    if (entityIds.length > 0) {
+      // La FK entity_import_items.created_entity_id tiene ON DELETE SET NULL,
+      // asi que al borrar las entidades el item deja constancia (sin violar
+      // el CHECK de status, que no admite un valor tipo "undone").
+      const del = await client.query(
+        `DELETE FROM entities WHERE id = ANY($1::uuid[]) RETURNING id`,
+        [entityIds]
+      );
+      deletedCount = del.rowCount || 0;
+    }
+
+    const batch = batchRes.rows[0];
+    await client.query(
+      `UPDATE entity_import_batches
+       SET notes = COALESCE(notes || ' | ', '') || $2, updated_at = NOW()
+       WHERE id = $1`,
+      [req.params.id, `Deshecha: se eliminaron ${deletedCount} clientes creados por este lote.`]
+    );
+
+    await client.query('COMMIT');
+
+    logActivityForReq(req, `Importacion CSV deshecha: ${batch.file_name} (${deletedCount} clientes eliminados)`, 'CLIENT_IMPORT', batch.id, batch.file_name, 'ACTION');
+
+    res.json({ success: true, data: { deletedCount } });
+  } catch (e: any) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ success: false, error: pgErr(e) });
+  } finally {
+    client.release();
   }
 };

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   getEntities, getEntityById, createEntity, updateEntity, patchEntity, deleteEntity, checkNifCif,
   getEntityImportHistory, getEntityImportBatchDetail, createEntityImportBatch, updateEntityImportBatch,
+  undoEntityImportBatch,
 } from '../controllers/entities';
 import noteRoutes from './noteRoutes';
 import { requireAuth } from '../middleware/auth';
@@ -16,6 +17,7 @@ router.get('/imports', requireAuth, getEntityImportHistory);
 router.get('/imports/:id', requireAuth, getEntityImportBatchDetail);
 router.post('/imports', requireAuth, createEntityImportBatch);
 router.patch('/imports/:id', requireAuth, updateEntityImportBatch);
+router.post('/imports/:id/undo', requireAuth, undoEntityImportBatch);
 router.get('/:id', requireAuth, getEntityById);
 router.post('/', requireAuth, uploadDNI.single('dni_image'), createEntity);
 router.put('/:id', requireAuth, updateEntity);
