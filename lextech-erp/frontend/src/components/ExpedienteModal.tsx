@@ -794,7 +794,7 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
                     <option value="" disabled>— Selecciona un cliente —</option>
                     {clientes.map((c: any) => (
                       <option key={c.id} value={c.id}>
-                        {`${c.first_name || ""} ${c.last_name || ""}`.trim() || c.commercial_name || c.nif_cif}
+                        {`${c.first_name || ""} ${c.last_name || ""}`.trim() || c.commercial_name || c.nif_cif || "Cliente sin nombre"}
                       </option>
                     ))}
                   </AppSelect>

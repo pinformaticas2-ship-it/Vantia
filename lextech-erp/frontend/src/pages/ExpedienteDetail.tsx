@@ -3869,7 +3869,7 @@ function TabClienteVinculado({ exp, clientes, linkedClient, linkedClientDisplayN
                       <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-200 text-[10px] font-bold text-slate-600 shrink-0">{initialsFromName(name)}</div>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-semibold text-slate-800 truncate">{name}</p>
-                        <p className="text-[10px] text-slate-400">{c.nif_cif}{c.address_town ? ` · ${c.address_town}` : ""}</p>
+                        <p className="text-[10px] text-slate-400">{c.nif_cif || "Sin NIF"}{c.address_town ? ` · ${c.address_town}` : ""}</p>
                       </div>
                     </button>
                   );
@@ -5563,7 +5563,7 @@ export default function ExpedienteDetail() {
                       }} className={EI}>
                         <option value="">— Sin cliente —</option>
                         {clientes.map((c: any) => (
-                          <option key={c.id} value={c.id}>{`${c.first_name || ""} ${c.last_name || ""}`.trim() || c.commercial_name || c.nif_cif}</option>
+                          <option key={c.id} value={c.id}>{`${c.first_name || ""} ${c.last_name || ""}`.trim() || c.commercial_name || c.nif_cif || "Cliente sin nombre"}</option>
                         ))}
                       </select>
                     </EF>

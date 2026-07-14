@@ -116,7 +116,7 @@ const CLIENT_ERROR_LABELS: Record<string, string> = {
   phone_fax: "Fax",
 };
 
-const REQUIRED_CLIENT_FIELDS = ["document_type", "nif_cif", "type", "first_name", "last_name"] as const;
+const REQUIRED_CLIENT_FIELDS = ["document_type", "type", "first_name", "last_name"] as const;
 
 const PROVINCIAS = ["Álava","Albacete","Alicante","Almería","Asturias","Ávila","Badajoz","Barcelona","Burgos","Cáceres","Cádiz","Cantabria","Castellón","Ciudad Real","Córdoba","Cuenca","Girona","Granada","Guadalajara","Guipúzcoa","Huelva","Huesca","Illes Balears","Jaén","La Coruña","La Rioja","Las Palmas","León","Lleida","Lugo","Madrid","Málaga","Murcia","Navarra","Ourense","Palencia","Pontevedra","Salamanca","Santa Cruz de Tenerife","Segovia","Sevilla","Soria","Tarragona","Teruel","Toledo","Valencia","Valladolid","Vizcaya","Zamora","Zaragoza","Ceuta","Melilla"];
 const PAISES = ["España","Francia","Portugal","Italia","Alemania","Reino Unido","Países Bajos","Bélgica","Suiza","Estados Unidos","México","Argentina","Colombia","Venezuela","Otro"];
@@ -387,7 +387,6 @@ export default function ClientForm() {
   const validateClientForm = () => {
     const missing = new Set<string>();
     if (!form.document_type.trim()) missing.add("document_type");
-    if (!form.nif_cif.trim()) missing.add("nif_cif");
     if (!form.type.trim()) missing.add("type");
     if (!form.first_name.trim()) missing.add("first_name");
     if (!form.last_name.trim()) missing.add("last_name");
@@ -1423,7 +1422,7 @@ export default function ClientForm() {
                     </select>
                   </div>
                   <div className="flex flex-col gap-2">
-                    <label className={`${lbl}${isInvalid("nif_cif") ? " text-red-500" : ""}`}>NIF / CIF <span className="text-red-500">*</span></label>
+                    <label className={`${lbl}${isInvalid("nif_cif") ? " text-red-500" : ""}`}>NIF / CIF</label>
                     <input name="nif_cif" value={form.nif_cif} onChange={handleChange} placeholder="12345678Z" className={`${inputCls("nif_cif")} font-mono`} />
                     {nifDupEntity && (
                       <Link to={`/dashboard/clientes/${nifDupEntity.id}`} className="mt-1 flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-amber-800 hover:bg-amber-100 transition-colors">

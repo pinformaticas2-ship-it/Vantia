@@ -19,7 +19,7 @@ import {
   Star, Palette, Copy, GitMerge, CreditCard, MessageSquare,
   RotateCcw, Bell, ArrowRight, Settings, Trash2,
   ChevronRight, Bug, History, TrendingUp, Pencil, Smartphone, ScanLine,
-  FileCode2, FileText, Download, ArrowLeft, ChevronsLeft, ChevronsRight, CheckCircle2, Check,
+  FileCode2, FileText, Download, ArrowLeft, ChevronLeft, ChevronsLeft, ChevronsRight, CheckCircle2, Check,
 } from "lucide-react";
 import { safeJson } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
@@ -750,6 +750,65 @@ function AltaOptionsBtn({
   );
 }
 
+// ── Barra de paginación (1, 2, 3...) ──────────────────────────
+function PaginationBar({ currentPage, totalPages, onPageChange, totalItems, pageSize }: {
+  currentPage: number; totalPages: number; onPageChange: (page: number) => void;
+  totalItems: number; pageSize: number;
+}) {
+  if (totalPages <= 1) return null;
+
+  const pageSet = new Set<number>([1, totalPages]);
+  for (let p = currentPage - 1; p <= currentPage + 1; p++) {
+    if (p > 1 && p < totalPages) pageSet.add(p);
+  }
+  const sorted = [...pageSet].sort((a, b) => a - b);
+  const items: (number | "...")[] = [];
+  let prev = 0;
+  for (const p of sorted) {
+    if (prev && p - prev > 1) items.push("...");
+    items.push(p);
+    prev = p;
+  }
+
+  const from = totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const to = Math.min(currentPage * pageSize, totalItems);
+
+  return (
+    <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-t border-slate-100 bg-white text-xs shrink-0">
+      <span className="text-slate-400">{from}–{to} de {totalItems}</span>
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+          disabled={currentPage === 1}
+          className="w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+        >
+          <ChevronLeft size={13} />
+        </button>
+        {items.map((p, i) => p === "..." ? (
+          <span key={`ellipsis-${i}`} className="w-7 h-7 flex items-center justify-center text-slate-300 select-none">…</span>
+        ) : (
+          <button
+            key={p}
+            onClick={() => onPageChange(p)}
+            className={`w-7 h-7 flex items-center justify-center rounded-md text-xs font-semibold transition-colors ${
+              p === currentPage ? "bg-red-600 text-white" : "text-slate-600 hover:bg-slate-100"
+            }`}
+          >
+            {p}
+          </button>
+        ))}
+        <button
+          onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+          disabled={currentPage === totalPages}
+          className="w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+        >
+          <ChevronRight size={13} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Modal de confirmación ─────────────────────────────────────
 function ConfirmModal({
   title, message, confirmLabel = "Confirmar", danger = false,
@@ -1307,7 +1366,9 @@ export default function ClientList() {
     try {
       if (!silent) { setLoading(true); setError(null); }
       const token = await getToken({ skipCache: true });
-      const res   = await fetch("/api/entities", { headers: { Authorization: `Bearer ${token}` } });
+      // limit alto explicito: sin esto el backend solo devolvia 200 clientes
+      // (su valor por defecto) y el resto quedaba invisible sin ningun aviso.
+      const res   = await fetch("/api/entities?limit=5000", { headers: { Authorization: `Bearer ${token}` } });
       const result = await safeJson(res);
       if (res.ok) setClients(result.data || []);
       else throw new Error(result.error || "Error al obtener clientes");
@@ -1341,6 +1402,20 @@ export default function ClientList() {
   }, [clients, filters, sortKey, sortDir]);
 
   const exportPreviewRows = useMemo(() => filtered.slice(0, 12), [filtered]);
+
+  // ── Paginación (cliente): la lista completa ya se carga y se filtra/ordena
+  // en el navegador, esto solo trocea el resultado para no renderizar miles
+  // de filas de golpe y para poder navegar por paginas (1, 2, 3...) ────────
+  const CLIENTS_PAGE_SIZE = 60;
+  const [currentPage, setCurrentPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / CLIENTS_PAGE_SIZE));
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(1);
+  }, [totalPages, currentPage]);
+  const pagedClients = useMemo(
+    () => filtered.slice((currentPage - 1) * CLIENTS_PAGE_SIZE, currentPage * CLIENTS_PAGE_SIZE),
+    [filtered, currentPage]
+  );
 
   // ── Estadísticas barra inferior ────────────────────────────
   const stats = useMemo(() => {
@@ -2552,6 +2627,7 @@ export default function ClientList() {
             VISTA LISTA — tabla densa compacta
         ══════════════════════════════════════════════════════ */}
         {viewMode === "list" && (
+          <div className="flex-1 min-h-0 flex flex-col">
           <div className="modules-scrollbar flex-1 min-h-0 overflow-auto">
             <table className="w-full text-left text-sm min-w-[900px]">
               <thead className="bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
@@ -2612,7 +2688,7 @@ export default function ClientList() {
                       </div>
                     </td>
                   </tr>
-                ) : filtered.map((client, rowIdx) => {
+                ) : pagedClients.map((client, rowIdx) => {
                   const isSelected = selected === client.id;
                   const colorStyle = CLIENT_ROW_COLOR_STYLES[client.color || "ninguno"] || CLIENT_ROW_COLOR_STYLES.ninguno;
                   return (
@@ -2691,12 +2767,16 @@ export default function ClientList() {
               </tbody>
             </table>
           </div>
+          <PaginationBar currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage}
+            totalItems={filtered.length} pageSize={CLIENTS_PAGE_SIZE} />
+          </div>
         )}
 
         {/* ══════════════════════════════════════════════════════
             VISTA DETALLE — tarjetas horizontales completas
         ══════════════════════════════════════════════════════ */}
         {viewMode === "detail" && (
+          <div className="flex-1 min-h-0 flex flex-col">
           <div className="modules-scrollbar flex-1 min-h-0 overflow-auto p-4">
             {filtered.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-40 gap-3 text-slate-400">
@@ -2705,7 +2785,7 @@ export default function ClientList() {
               </div>
             ) : (
               <div className="space-y-2">
-                {filtered.map((client) => {
+                {pagedClients.map((client) => {
                   const isSelected = selected === client.id;
                   const colorStyle = CLIENT_ROW_COLOR_STYLES[client.color || "ninguno"] || CLIENT_ROW_COLOR_STYLES.ninguno;
                   return (
@@ -2814,12 +2894,16 @@ export default function ClientList() {
               </div>
             )}
           </div>
+          <PaginationBar currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage}
+            totalItems={filtered.length} pageSize={CLIENTS_PAGE_SIZE} />
+          </div>
         )}
 
         {/* ══════════════════════════════════════════════════════
             VISTA MULTISELECT — cuadrícula de tarjetas con checkbox
         ══════════════════════════════════════════════════════ */}
         {viewMode === "multiselect" && (
+          <div className="flex-1 min-h-0 flex flex-col">
           <div className="modules-scrollbar flex-1 min-h-0 overflow-auto p-4">
             {/* Cabecera de selección rápida */}
             <div className="flex items-center gap-3 mb-3 px-1">
@@ -2845,7 +2929,7 @@ export default function ClientList() {
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-                {filtered.map((client) => {
+                {pagedClients.map((client) => {
                   const isChecked = selectedIds.has(client.id);
                   const colorStyle = CLIENT_ROW_COLOR_STYLES[client.color || "ninguno"] || CLIENT_ROW_COLOR_STYLES.ninguno;
                   return (
@@ -2923,6 +3007,9 @@ export default function ClientList() {
                 })}
               </div>
             )}
+          </div>
+          <PaginationBar currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage}
+            totalItems={filtered.length} pageSize={CLIENTS_PAGE_SIZE} />
           </div>
         )}
 

@@ -102,7 +102,7 @@ const CSV_FIELD_DEFINITIONS: CsvFieldDefinition[] = [
   { id: "first_name",       label: "Nombre",             help: "Nombre de pila del cliente",                    required: true,  aliases: ["nombre", "first name", "first_name", "nombre cliente"] },
   { id: "last_name",        label: "Apellidos",          help: "Apellidos del cliente",                                          aliases: ["apellidos", "apellido", "last name", "last_name"] },
   { id: "commercial_name",  label: "Nombre comercial",   help: "Razón social o nombre de la empresa",                            aliases: ["nombre comercial", "empresa", "razon social", "razón social", "compania", "compañía"] },
-  { id: "nif_cif",          label: "NIF / CIF",          help: "Documento de identificación fiscal",            required: true,  aliases: ["nif", "cif", "nif cif", "nif/cif", "dni", "documento", "identificacion"] },
+  { id: "nif_cif",          label: "NIF / CIF",          help: "Documento de identificación fiscal (opcional)",                  aliases: ["nif", "cif", "nif cif", "nif/cif", "dni", "documento", "identificacion"] },
   { id: "email",            label: "Email",              help: "Correo electrónico de contacto",                                 aliases: ["email", "correo", "correo electronico", "correo electrónico", "e-mail"] },
   { id: "phone_mobile",     label: "Teléfono móvil",     help: "Número de móvil de contacto",                                    aliases: ["telefono", "teléfono", "movil", "móvil", "celular", "phone", "telefono movil"] },
   { id: "phone_1",          label: "Teléfono fijo",      help: "Número de teléfono fijo",                                        aliases: ["telefono fijo", "teléfono fijo", "fijo"] },
@@ -627,8 +627,8 @@ function CsvImportUploadView({
                   <code className="bg-slate-100 border border-slate-200 px-1 rounded text-slate-800 font-bold">;</code>.
                 </p>
                 <ul className="flex flex-col gap-3 text-xs text-slate-600">
-                  <li className="flex items-center gap-2.5"><Check size={10} className="text-emerald-500 shrink-0" /> <strong>Nombre</strong> y <strong>NIF/CIF</strong> (obligatorios)</li>
-                  <li className="flex items-center gap-2.5"><Check size={10} className="text-emerald-500 shrink-0" /> Email y teléfono</li>
+                  <li className="flex items-center gap-2.5"><Check size={10} className="text-emerald-500 shrink-0" /> <strong>Nombre</strong> (obligatorio)</li>
+                  <li className="flex items-center gap-2.5"><Check size={10} className="text-emerald-500 shrink-0" /> NIF/CIF, email y teléfono</li>
                   <li className="flex items-center gap-2.5"><Check size={10} className="text-emerald-500 shrink-0" /> Dirección, población, provincia</li>
                 </ul>
                 <div className="mt-2 p-3 bg-blue-50 border border-blue-100 rounded-md flex items-start gap-2.5">
