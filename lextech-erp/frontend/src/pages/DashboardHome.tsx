@@ -9,7 +9,7 @@ import {
   ChevronDown, FileSpreadsheet, ClipboardList,
   ScanLine, ExternalLink, MoreHorizontal, LayoutGrid, X, GripVertical,
   Briefcase, Users, History, MessageSquare, MessageCircle, Mail, Library,
-  Receipt, Reply, MailOpen,
+  Receipt, Reply, MailOpen, ArrowRight,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { safeJson } from "../lib/api";
@@ -856,34 +856,51 @@ export default function DashboardHome() {
       );
 
       case "correo": return (
-        <div className="group bg-white rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-all">
-          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 min-w-0">
+        <div className="group bg-white rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-all overflow-hidden flex flex-col">
+          <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between gap-2 cursor-move">
+            <div className="flex items-center gap-3 min-w-0">
               {handle}
-              <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
-                <Mail size={14} className="text-blue-600" />
+              <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100/50 shadow-sm shrink-0">
+                <Mail size={14} />
               </div>
-              <h3 className="font-semibold text-slate-800 text-base shrink-0">Correo</h3>
-              {emailStats.unread > 0 && (
-                <span className="shrink-0 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white leading-none">
-                  {emailStats.unread}
-                </span>
-              )}
+              <div className="flex items-center gap-2 min-w-0">
+                <h3 className="font-bold text-slate-800 text-base tracking-tight shrink-0">Correo</h3>
+                {emailStats.unread > 0 && (
+                  <span className="shrink-0 rounded-full bg-[#dc2626] px-1.5 py-0.5 text-[10px] font-bold text-white leading-none shadow-sm">
+                    {emailStats.unread}
+                  </span>
+                )}
+              </div>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-3 shrink-0">
               {emailAccounts.length > 0 && (
-                <select
-                  value={selectedEmailAccountId}
-                  onChange={(e) => { setSelectedEmailAccountId(e.target.value); fetchEmailMessages(e.target.value); }}
-                  onClick={(e) => e.stopPropagation()}
-                  className="max-w-[140px] rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] text-slate-600 focus:outline-none focus:ring-1 focus:ring-red-400"
-                >
-                  {emailAccounts.map((acc: any) => (
-                    <option key={acc.id} value={acc.id}>{acc.username || acc.email || acc.name || "Cuenta"}</option>
-                  ))}
-                </select>
+                <div className="relative" onClick={(e) => e.stopPropagation()}>
+                  <div className="pointer-events-none bg-white border border-slate-200 rounded-full px-3 py-1.5 flex items-center gap-2 shadow-sm">
+                    <span className="text-[11px] font-medium text-slate-600 truncate max-w-[140px]">
+                      {emailAccounts.find((a: any) => a.id === selectedEmailAccountId)?.username
+                        || emailAccounts.find((a: any) => a.id === selectedEmailAccountId)?.email
+                        || emailAccounts.find((a: any) => a.id === selectedEmailAccountId)?.name
+                        || "Cuenta"}
+                    </span>
+                    <ChevronDown size={9} className="text-slate-400" />
+                  </div>
+                  <select
+                    value={selectedEmailAccountId}
+                    onChange={(e) => { setSelectedEmailAccountId(e.target.value); fetchEmailMessages(e.target.value); }}
+                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                  >
+                    {emailAccounts.map((acc: any) => (
+                      <option key={acc.id} value={acc.id}>{acc.username || acc.email || acc.name || "Cuenta"}</option>
+                    ))}
+                  </select>
+                </div>
               )}
-              <ChevronRight size={14} onClick={() => goTo("/dashboard/correo")} className="cursor-pointer text-slate-300 group-hover:text-red-500 transition-colors" />
+              <button
+                onClick={() => goTo("/dashboard/correo")}
+                className="w-6 h-6 flex items-center justify-center rounded-md text-slate-400 hover:text-[#dc2626] hover:bg-red-50 transition-colors"
+              >
+                <ChevronRight size={13} />
+              </button>
             </div>
           </div>
           {emailMsgLoading ? (
@@ -891,19 +908,28 @@ export default function DashboardHome() {
           ) : emailMessages.length === 0 ? (
             <p className="py-8 text-center text-xs text-slate-400">Sin mensajes recientes</p>
           ) : (
-            <ul className="divide-y divide-slate-50" ref={emailMenuRef}>
+            <div className="flex flex-col divide-y divide-slate-100/80" ref={emailMenuRef}>
               {emailMessages.slice(0, 5).map((msg: any, i: number) => (
-                <li
+                <div
                   key={i}
-                  className="relative flex cursor-pointer items-start gap-3 px-4 py-3 hover:bg-slate-50 transition-colors"
+                  className={`relative flex cursor-pointer items-start gap-3.5 p-4 hover:bg-slate-50 transition-colors ${!msg.is_read ? "bg-blue-50/20" : ""}`}
                   onClick={() => setOpenMenuEmailId(openMenuEmailId === msg.id ? null : msg.id)}
                 >
-                  <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${msg.is_read ? "bg-slate-200" : "bg-blue-500"}`} />
+                  {!msg.is_read && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-blue-500" />}
+                  <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${!msg.is_read ? "bg-blue-500 shadow-sm shadow-blue-500/30" : "bg-slate-200 border border-slate-300"}`} />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-semibold text-slate-800">{msg.from_name || msg.from_email || "Desconocido"}</p>
-                    <p className="truncate text-xs text-slate-500">{msg.subject || "(Sin asunto)"}</p>
+                    <div className="flex items-center justify-between gap-2 mb-0.5">
+                      <h4 className={`truncate text-[13px] pr-2 ${!msg.is_read ? "font-bold text-slate-900" : "font-semibold text-slate-700"}`}>
+                        {msg.from_name || msg.from_email || "Desconocido"}
+                      </h4>
+                      <span className={`shrink-0 whitespace-nowrap text-[10px] ${!msg.is_read ? "font-bold text-blue-600" : "font-medium text-slate-400"}`}>
+                        {msg.sent_at ? timeAgo(msg.sent_at) : ""}
+                      </span>
+                    </div>
+                    <p className={`truncate text-xs ${!msg.is_read ? "font-medium text-slate-800" : "text-slate-500"}`}>
+                      {msg.subject || "(Sin asunto)"}
+                    </p>
                   </div>
-                  <span className="shrink-0 text-[10px] text-slate-400">{msg.sent_at ? timeAgo(msg.sent_at) : ""}</span>
 
                   {openMenuEmailId === msg.id && (
                     <div
@@ -932,10 +958,16 @@ export default function DashboardHome() {
                       )}
                     </div>
                   )}
-                </li>
+                </div>
               ))}
-            </ul>
+            </div>
           )}
+          <button
+            onClick={() => goTo("/dashboard/correo")}
+            className="mt-auto px-4 py-2.5 bg-slate-50 border-t border-slate-100 flex items-center justify-center gap-1.5 text-[11px] font-bold text-slate-500 hover:text-blue-600 uppercase tracking-wider transition-colors"
+          >
+            Abrir bandeja de entrada <ArrowRight size={11} />
+          </button>
         </div>
       );
 
