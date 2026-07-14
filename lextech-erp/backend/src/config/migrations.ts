@@ -123,6 +123,14 @@ export async function runMigrations(): Promise<void> {
       `);
     } catch (_e: any) {}
 
+    // ── nif_cif pasa a ser opcional (importaciones CSV masivas traen muchos
+    // clientes/entidades sin NIF/CIF, sobre todo asociaciones). La UNIQUE ya
+    // existente sigue funcionando bien con NULL: en Postgres un UNIQUE nunca
+    // considera dos NULL como duplicados entre si. ──────────────────────
+    try {
+      await client.query(`ALTER TABLE entities ALTER COLUMN nif_cif DROP NOT NULL;`);
+    } catch (_e: any) {}
+
     // ── Índices ────────────────────────────────────────────────────
     for (const idx of [
       `CREATE INDEX IF NOT EXISTS idx_entities_type          ON entities (type)`,

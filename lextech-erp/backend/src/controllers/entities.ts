@@ -52,7 +52,11 @@ export const getEntities = async (req: any, res: Response) => {
     const search = (req.query.search as string || '').trim();
     const typeFilter = req.query.type as string || '';
     const statusFilter = req.query.status as string || '';
-    const limit  = Math.min(parseInt(req.query.limit  as string) || 200, 500);
+    // El listado de clientes se carga entero en el frontend (filtra/ordena/pagina
+    // en cliente), asi que el limite por defecto debe cubrir despachos grandes.
+    // Antes el tope era 200/500 y con mas clientes que eso quedaban invisibles
+    // sin ningun aviso ni forma de verlos.
+    const limit  = Math.min(parseInt(req.query.limit  as string) || 5000, 20000);
     const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
 
     const conditions: string[] = [];
@@ -86,27 +90,33 @@ export const getEntities = async (req: any, res: Response) => {
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    const result = await pool.query(`
-      SELECT
-        e.id, e.internal_number, e.type, e.client_status,
-        e.first_name, e.last_name, e.commercial_name, e.nif_cif,
-        e.email, e.phone_1, e.phone_mobile,
-        e.address_town, e.address_province,
-        e.photo_url, e.created_at, e.date_alta, e.lopd, e.color,
-        (SELECT COUNT(*) FROM activity_log al
-         WHERE al.entity_id = e.id AND al.entity_type = 'CLIENT'
-           AND al.action_type NOT LIKE 'Nota%'
-        )::int AS total_actuaciones,
-        (SELECT COUNT(*) FROM expedientes exp
-         WHERE exp.cliente_id = e.id
-        )::int AS total_expedientes
-      FROM entities e
-      ${where}
-      ORDER BY e.created_at DESC
-      LIMIT $${p} OFFSET $${p + 1}
-    `, [...values, limit, offset]);
+    const [result, countResult] = await Promise.all([
+      pool.query(`
+        SELECT
+          e.id, e.internal_number, e.type, e.client_status,
+          e.first_name, e.last_name, e.commercial_name, e.nif_cif,
+          e.email, e.phone_1, e.phone_mobile,
+          e.address_town, e.address_province,
+          e.photo_url, e.created_at, e.date_alta, e.lopd, e.color,
+          (SELECT COUNT(*) FROM activity_log al
+           WHERE al.entity_id = e.id AND al.entity_type = 'CLIENT'
+             AND al.action_type NOT LIKE 'Nota%'
+          )::int AS total_actuaciones,
+          (SELECT COUNT(*) FROM expedientes exp
+           WHERE exp.cliente_id = e.id
+          )::int AS total_expedientes
+        FROM entities e
+        ${where}
+        ORDER BY e.created_at DESC
+        LIMIT $${p} OFFSET $${p + 1}
+      `, [...values, limit, offset]),
+      // Total real de filas que cumplen el filtro (independiente del limit/offset
+      // de la pagina) -- antes se devolvia result.rowCount, que solo refleja
+      // cuantas filas trajo ESTA pagina, no el total.
+      pool.query(`SELECT COUNT(*)::int AS total FROM entities e ${where}`, values),
+    ]);
 
-    return res.json({ success: true, data: result.rows, count: result.rowCount });
+    return res.json({ success: true, data: result.rows, count: countResult.rows[0]?.total ?? result.rowCount });
   } catch (error: any) {
     console.error('❌ getEntities:', pgErr(error));
     res.status(500).json({ success: false, error: pgErr(error) });
@@ -172,10 +182,13 @@ export const createEntity = async (req: any, res: Response) => {
 
   const userId = req.auth?.userId || 'SYSTEM';
 
-  if (!first_name || !nif_cif) {
+  // El NIF/CIF es opcional (columna nullable): hay entidades reales sin el
+  // (asociaciones, importaciones CSV masivas...). El formulario manual sigue
+  // pidiendolo en el frontend, pero el backend solo exige el nombre.
+  if (!first_name) {
     return res.status(400).json({
       success: false,
-      error: 'Nombre y NIF/CIF son obligatorios.'
+      error: 'El nombre es obligatorio.'
     });
   }
 
@@ -218,7 +231,7 @@ export const createEntity = async (req: any, res: Response) => {
         first_name,                                          // $4
         nullIfEmpty(last_name),                              // $5
         nullIfEmpty(commercial_name),                        // $6
-        nif_cif,                                             // $7
+        nullIfEmpty(nif_cif),                                // $7
         nullIfEmpty(gender),                                 // $8
         safeBirthDate,                                       // $9  ::date
         nullIfEmpty(nationality)             || 'Española',  // $10
@@ -257,7 +270,7 @@ export const createEntity = async (req: any, res: Response) => {
     }
 
     // Registrar actividad (fire-and-forget, no bloquea la respuesta)
-    const entityName = `${first_name} ${last_name || ''}`.trim() + ` (${nif_cif})`;
+    const entityName = `${first_name} ${last_name || ''}`.trim() + ` (${nif_cif || 'sin NIF'})`;
     logActivityForReq(req, 'Nuevo cliente creado', 'CLIENT', result.rows[0].id, entityName);
 
     res.status(201).json({ success: true, data: result.rows[0] });
@@ -336,7 +349,7 @@ export const updateEntity = async (req: any, res: Response) => {
         first_name,
         nullIfEmpty(last_name),
         nullIfEmpty(commercial_name),
-        nif_cif,
+        nullIfEmpty(nif_cif),
         nullIfEmpty(gender),
         safeBirthDate,
         nullIfEmpty(nationality)             || 'Española',

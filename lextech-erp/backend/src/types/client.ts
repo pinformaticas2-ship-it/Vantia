@@ -8,7 +8,7 @@ export interface Client {
     last_name?: string;
     commercial_name?: string;
     doc_type: string;
-    nif_cif: string;
+    nif_cif?: string; // opcional: hay clientes reales sin NIF/CIF (asociaciones, importaciones CSV)
     email?: string;
     phone_1?: string;
     phone_2?: string;
