@@ -1395,43 +1395,66 @@ export default function ClientCsvImport() {
   };
 
   const handleImportCsv = async () => {
-    const token = await getToken({ skipCache: true });
     const issues: CsvImportIssue[] = [...validateCsvImport(csvFieldMappings, csvPreviewRows).issues];
     const results: CsvRowImportResult[] = new Array(csvPreviewRows.length);
     const toProcess = csvPreviewRows.map((row, index) => ({ index, row }));
 
-    const CONCURRENCY = 8;
+    // CSVs grandes (1000+ filas) pueden tardar varios minutos: bajamos la
+    // concurrencia y metemos una pausa entre lotes para no saturar la
+    // instancia de backend, renovamos el token en cada lote (el de Clerk
+    // caduca en ~60s y antes se capturaba una sola vez al principio), y
+    // reintentamos automaticamente errores que parecen un fallo transitorio
+    // del servidor en vez de marcar la fila como fallida a la primera.
+    const CONCURRENCY = 4;
+    const BATCH_DELAY_MS = 200;
+    const MAX_RETRIES = 2;
+    const isTransientError = (message: string) =>
+      /Failed to fetch|Backend no disponible|Ruta no encontrada|Metodo no permitido|Error del servidor \(5\d\d\)/i.test(message);
+
     let doneCount = 0;
     setCsvImportProgress({ done: 0, total: toProcess.length });
 
     for (let i = 0; i < toProcess.length; i += CONCURRENCY) {
       const batch = toProcess.slice(i, i + CONCURRENCY);
+      const token = await getToken({ skipCache: true });
       await Promise.all(batch.map(async ({ index, row }) => {
         const rowNumber = index + 1;
         const payload = buildClientPayload(row, csvFieldMappings);
         const reference = (payload.nif_cif as string) || null;
-        try {
-          const res = await fetch("/api/entities", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-            body: JSON.stringify(payload),
-          });
-          const data = await safeJson(res);
-          if (!res.ok) {
-            const message = data.error || "No se pudo crear el cliente";
+        for (let attempt = 0; ; attempt++) {
+          try {
+            const res = await fetch("/api/entities", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+              body: JSON.stringify(payload),
+            });
+            const data = await safeJson(res);
+            if (!res.ok) {
+              const message = data.error || "No se pudo crear el cliente";
+              if (attempt < MAX_RETRIES && isTransientError(message)) {
+                await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+                continue;
+              }
+              issues.push({ rowNumber, fieldId: "cliente", fieldLabel: "Cliente", message });
+              results[index] = { rowNumber, status: "failed", reference, error_message: message, payload };
+            } else {
+              results[index] = { rowNumber, status: "completed", reference, error_message: null, payload, created_entity_id: data.data?.id || null };
+            }
+          } catch (e: any) {
+            const message = e.message || "No se pudo crear el cliente";
+            if (attempt < MAX_RETRIES && isTransientError(message)) {
+              await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+              continue;
+            }
             issues.push({ rowNumber, fieldId: "cliente", fieldLabel: "Cliente", message });
             results[index] = { rowNumber, status: "failed", reference, error_message: message, payload };
-          } else {
-            results[index] = { rowNumber, status: "completed", reference, error_message: null, payload, created_entity_id: data.data?.id || null };
           }
-        } catch (e: any) {
-          const message = e.message || "No se pudo crear el cliente";
-          issues.push({ rowNumber, fieldId: "cliente", fieldLabel: "Cliente", message });
-          results[index] = { rowNumber, status: "failed", reference, error_message: message, payload };
+          break;
         }
         doneCount += 1;
         setCsvImportProgress({ done: doneCount, total: toProcess.length });
       }));
+      if (i + CONCURRENCY < toProcess.length) await new Promise((r) => setTimeout(r, BATCH_DELAY_MS));
     }
 
     setCsvImportProgress(null);
@@ -1440,9 +1463,10 @@ export default function ClientCsvImport() {
 
     if (csvImportBatchId) {
       try {
+        const finalToken = await getToken({ skipCache: true });
         await fetch(`/api/entities/imports/${csvImportBatchId}`, {
           method: "PATCH",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${finalToken}` },
           body: JSON.stringify({
             status: summary.successCount > 0 ? "completed" : "failed",
             total_count: summary.totalProcessed,
