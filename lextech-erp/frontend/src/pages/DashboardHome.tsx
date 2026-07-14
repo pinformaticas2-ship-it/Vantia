@@ -1088,6 +1088,7 @@ export default function DashboardHome() {
                     { label:"Crear manualmente", desc:"Crea un cliente desde cero introduciendo sus datos manualmente.", icon:<Plus size={17}/>, cls:"bg-emerald-100 text-emerald-600", to:"/dashboard/clientes/new" },
                     { label:"Con DNI", desc:"Sube anverso y reverso del DNI para rellenar la ficha automáticamente.", icon:<ScanLine size={17}/>, cls:"bg-blue-100 text-blue-600", to:"/dashboard/clientes/new?mode=dni" },
                     { label:"Con enlace", desc:"Genera un enlace para que el cliente rellene sus datos directamente.", icon:<ExternalLink size={17}/>, cls:"bg-amber-100 text-amber-600", to:"/dashboard/clientes/invitar" },
+                    { label:"Importar CSV", desc:"Sube un archivo CSV con múltiples clientes a la vez.", icon:<FileSpreadsheet size={17}/>, cls:"bg-sky-100 text-sky-700", to:"/dashboard/clientes/importar-csv" },
                   ].map(item => (
                     <button key={item.label} onClick={() => { setShowClienteMenu(false); navigate(item.to); }} className="flex w-full items-start gap-3 rounded-2xl px-3 py-3 text-left hover:bg-slate-50 transition-colors">
                       <div className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${item.cls}`}>{item.icon}</div>
