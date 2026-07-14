@@ -857,26 +857,24 @@ export default function DashboardHome() {
 
       case "correo": return (
         <div className="group bg-white rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-all overflow-hidden flex flex-col">
-          <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between gap-2 cursor-move">
-            <div className="flex items-center gap-3 min-w-0">
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
               {handle}
-              <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100/50 shadow-sm shrink-0">
-                <Mail size={14} />
+              <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+                <Mail size={14} className="text-blue-600" />
               </div>
-              <div className="flex items-center gap-2 min-w-0">
-                <h3 className="font-bold text-slate-800 text-base tracking-tight shrink-0">Correo</h3>
-                {emailStats.unread > 0 && (
-                  <span className="shrink-0 rounded-full bg-[#dc2626] px-1.5 py-0.5 text-[10px] font-bold text-white leading-none shadow-sm">
-                    {emailStats.unread}
-                  </span>
-                )}
-              </div>
+              <h3 className="font-semibold text-slate-800 text-base shrink-0">Correo</h3>
+              {emailStats.unread > 0 && (
+                <span className="shrink-0 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white leading-none">
+                  {emailStats.unread}
+                </span>
+              )}
             </div>
-            <div className="flex items-center gap-3 shrink-0">
+            <div className="flex items-center gap-2 shrink-0">
               {emailAccounts.length > 0 && (
                 <div className="relative" onClick={(e) => e.stopPropagation()}>
-                  <div className="pointer-events-none bg-white border border-slate-200 rounded-full px-3 py-1.5 flex items-center gap-2 shadow-sm">
-                    <span className="text-[11px] font-medium text-slate-600 truncate max-w-[140px]">
+                  <div className="pointer-events-none bg-white border border-slate-200 rounded-full px-3 py-1 flex items-center gap-1.5">
+                    <span className="text-[10px] font-medium text-slate-600 truncate max-w-[130px]">
                       {emailAccounts.find((a: any) => a.id === selectedEmailAccountId)?.username
                         || emailAccounts.find((a: any) => a.id === selectedEmailAccountId)?.email
                         || emailAccounts.find((a: any) => a.id === selectedEmailAccountId)?.name
@@ -895,12 +893,7 @@ export default function DashboardHome() {
                   </select>
                 </div>
               )}
-              <button
-                onClick={() => goTo("/dashboard/correo")}
-                className="w-6 h-6 flex items-center justify-center rounded-md text-slate-400 hover:text-[#dc2626] hover:bg-red-50 transition-colors"
-              >
-                <ChevronRight size={13} />
-              </button>
+              <ChevronRight size={14} onClick={() => goTo("/dashboard/correo")} className="cursor-pointer text-slate-300 group-hover:text-red-500 transition-colors" />
             </div>
           </div>
           {emailMsgLoading ? (
