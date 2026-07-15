@@ -10,7 +10,7 @@ import {
   MessageCircle, Bot, Send, ChevronRight, ChevronLeft, Loader2, History, CheckCircle2,
   MessageSquare, LogOut, Mail, Library, Receipt, Mic, Sparkles, ChevronsUpDown,
   MoreVertical, ThumbsUp, ThumbsDown, RotateCcw, Copy, MoreHorizontal,
-  Paperclip, Pen, AlertTriangle, RefreshCw,
+  Paperclip, Pen, AlertTriangle, RefreshCw, Link2, Plus, Trash2,
 } from "lucide-react";
 import { UserButton, useUser, useAuth, useClerk } from "@clerk/clerk-react";
 import { getDeviceId, safeJson, waitForClientIp } from "../lib/api";
@@ -515,6 +515,134 @@ function NotificationsPanel({ notifs, loading, onClose }: { notifs: UnifiedNotif
   );
 }
 
+// ── Links de interés (por usuario) ────────────────────────────────────────────
+interface QuickLink { id: string; label: string; url: string; sort_order: number; created_at: string; }
+
+function QuickLinksPanel({ getToken, onClose }: { getToken: () => Promise<string | null | undefined>; onClose: () => void }) {
+  const [links, setLinks]         = useState<QuickLink[]>([]);
+  const [loading, setLoading]     = useState(true);
+  const [showForm, setShowForm]   = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [label, setLabel]         = useState("");
+  const [url, setUrl]             = useState("");
+  const [saving, setSaving]       = useState(false);
+  const [error, setError]         = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const token = await getToken();
+      const res = await fetch("/api/quick-links", { headers: { Authorization: `Bearer ${token}` } });
+      const d = await safeJson(res);
+      if (res.ok) setLinks(d.data || []);
+    } finally {
+      setLoading(false);
+    }
+  }, [getToken]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const resetForm = () => { setShowForm(false); setEditingId(null); setLabel(""); setUrl(""); setError(""); };
+  const openNewForm = () => { setEditingId(null); setLabel(""); setUrl(""); setError(""); setShowForm(true); };
+  const startEdit = (l: QuickLink) => { setEditingId(l.id); setLabel(l.label); setUrl(l.url); setError(""); setShowForm(true); };
+
+  const handleSave = async () => {
+    if (!label.trim() || !url.trim()) { setError("Nombre y URL son obligatorios"); return; }
+    setSaving(true);
+    setError("");
+    try {
+      const token = await getToken();
+      const res = await fetch(editingId ? `/api/quick-links/${editingId}` : "/api/quick-links", {
+        method: editingId ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ label: label.trim(), url: url.trim() }),
+      });
+      const d = await safeJson(res);
+      if (!res.ok) throw new Error(d.error || "No se pudo guardar el enlace");
+      resetForm();
+      load();
+    } catch (e: any) {
+      setError(e.message || "No se pudo guardar el enlace");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    setDeletingId(id);
+    try {
+      const token = await getToken();
+      await fetch(`/api/quick-links/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      setLinks(prev => prev.filter(l => l.id !== id));
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  return (
+    <div className="absolute right-0 top-14 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden">
+      <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+        <h3 className="font-bold text-slate-800 text-sm">Links de interés</h3>
+        <div className="flex items-center gap-1">
+          <button onClick={showForm ? resetForm : openNewForm} className="text-slate-400 hover:text-red-600 p-1 rounded-lg hover:bg-red-50 transition-colors" title="Añadir enlace">
+            <Plus size={14} className={`transition-transform ${showForm ? "rotate-45" : ""}`} />
+          </button>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1"><X size={14} /></button>
+        </div>
+      </div>
+
+      {showForm && (
+        <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 space-y-2">
+          <input
+            value={label}
+            onChange={e => setLabel(e.target.value)}
+            placeholder="Nombre (ej. Portal LexNET)"
+            autoFocus
+            className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-red-500"
+          />
+          <input
+            value={url}
+            onChange={e => setUrl(e.target.value)}
+            placeholder="URL (ej. lexnet.justicia.es)"
+            className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-red-500"
+          />
+          {error && <p className="text-[11px] text-red-600">{error}</p>}
+          <div className="flex justify-end gap-1.5 pt-0.5">
+            <button onClick={resetForm} className="px-2.5 py-1 text-[11px] font-semibold text-slate-500 hover:bg-slate-100 rounded-lg">Cancelar</button>
+            <button onClick={handleSave} disabled={saving} className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg disabled:opacity-60">
+              {saving && <Loader2 size={10} className="animate-spin" />} {editingId ? "Guardar" : "Añadir"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="max-h-72 overflow-y-auto divide-y divide-slate-50">
+        {loading ? (
+          <div className="flex items-center justify-center py-8"><Spinner size="sm" muted /></div>
+        ) : links.length === 0 ? (
+          <div className="py-8 text-center text-slate-400 text-xs px-6">
+            Aún no tienes enlaces guardados. Pulsa <Plus size={10} className="inline" /> para añadir uno.
+          </div>
+        ) : links.map(l => (
+          <div key={l.id} className="group flex items-center gap-2 px-4 py-2.5 hover:bg-slate-50">
+            <a href={l.url} target="_blank" rel="noreferrer" className="flex-1 min-w-0 flex items-center gap-2.5">
+              <Link2 size={13} className="text-slate-300 shrink-0" />
+              <span className="text-xs font-semibold text-slate-700 truncate group-hover:text-red-700">{l.label}</span>
+            </a>
+            <button onClick={() => startEdit(l)} className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-slate-600 p-1 transition-opacity shrink-0" title="Editar">
+              <Pen size={11} />
+            </button>
+            <button onClick={() => handleDelete(l.id)} disabled={deletingId === l.id} className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-600 p-1 transition-opacity shrink-0" title="Eliminar">
+              {deletingId === l.id ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Search Dropdown ──────────────────────────────────────────────────────────
 function SearchDropdown({ query, onSelect }: { query: string; onSelect: () => void }) {
   const navigate  = useNavigate();
@@ -739,6 +867,7 @@ export default function DashboardLayout() {
   const [isMobileOpen,    setIsMobileOpen]    = useState(false);
   const [isCollapsed,     setIsCollapsed]     = useState(() => localStorage.getItem("sidebar_collapsed") === "1");
   const [isNotifOpen,     setIsNotifOpen]     = useState(false);
+  const [isLinksOpen,     setIsLinksOpen]     = useState(false);
   const [searchQuery,     setSearchQuery]     = useState("");
   const [searchFocused,   setSearchFocused]   = useState(false);
   const [notifications,   setNotifications]   = useState<UnifiedNotification[]>([]);
@@ -747,6 +876,7 @@ export default function DashboardLayout() {
 
   const searchRef          = useRef<HTMLDivElement>(null);
   const notifRef           = useRef<HTMLDivElement>(null);
+  const linksRef           = useRef<HTMLDivElement>(null);
   const loginFiredRef      = useRef<string | null>(null);
   const notifBusyRef       = useRef(false);
   const prevChatUnreadRef  = useRef(-1);
@@ -835,6 +965,7 @@ export default function DashboardLayout() {
         setSearchFocused(false); setSearchQuery("");
       }
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) setIsNotifOpen(false);
+      if (linksRef.current && !linksRef.current.contains(e.target as Node)) setIsLinksOpen(false);
     };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
@@ -1148,6 +1279,20 @@ export default function DashboardLayout() {
             />
             {searchFocused && searchQuery && (
               <SearchDropdown query={searchQuery} onSelect={() => { setSearchQuery(""); setSearchFocused(false); }} />
+            )}
+          </div>
+
+          {/* Links de interés (por usuario) */}
+          <div ref={linksRef} className="relative shrink-0">
+            <button
+              onClick={() => setIsLinksOpen(v => !v)}
+              className="relative p-2.5 rounded-full hover:bg-slate-100 text-slate-500 transition-colors"
+              title="Links de interés"
+            >
+              <Link2 className="h-5 w-5" />
+            </button>
+            {isLinksOpen && (
+              <QuickLinksPanel getToken={getToken} onClose={() => setIsLinksOpen(false)} />
             )}
           </div>
 

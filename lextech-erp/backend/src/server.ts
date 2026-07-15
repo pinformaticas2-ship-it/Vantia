@@ -23,6 +23,7 @@ import documentalRoutes     from './routes/documental';
 import clientInviteRoutes   from './routes/clientInvite';
 import facturacionRoutes    from './routes/facturacion';
 import quipuRoutes          from './routes/quipu';
+import quickLinksRoutes     from './routes/quickLinks';
 import { syncAllQuipuUsers } from './controllers/quipuController';
 import { clerkMiddleware } from '@clerk/express';
 import { runMigrations } from './config/migrations';
@@ -148,6 +149,7 @@ app.use('/api/documental',        documentalRoutes);
 app.use('/api/clientes/invites',  clientInviteRoutes);
 app.use('/api/facturacion',       facturacionRoutes);
 app.use('/api/quipu',             quipuRoutes);
+app.use('/api/quick-links',       quickLinksRoutes);
 
 // Health check básico
 app.get('/health', (_req, res) => {

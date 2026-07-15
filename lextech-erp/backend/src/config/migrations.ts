@@ -119,6 +119,22 @@ export async function runMigrations(): Promise<void> {
       );
     `);
 
+    // ── Enlaces de interés personales (por usuario, junto a la campana) ──
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS user_quick_links (
+        id          UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id     VARCHAR(150) NOT NULL,
+        label       VARCHAR(120) NOT NULL,
+        url         VARCHAR(500) NOT NULL,
+        sort_order  INTEGER      NOT NULL DEFAULT 0,
+        created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      );
+    `);
+    try {
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_user_quick_links_user_id ON user_quick_links (user_id, sort_order);`);
+    } catch (_e: any) {}
+
     // ── UNIQUE en nif_cif ──────────────────────────────────────────
     try {
       await client.query(`
