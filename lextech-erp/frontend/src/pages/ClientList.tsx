@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
+﻿import React, { useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef } from "react";
 import { Spinner } from "../components/Spinner";
 import {
   fetchSharedTemplates, createSharedTemplate as apiCreateTpl,
@@ -1420,9 +1420,9 @@ export default function ClientList() {
   // (solo una vista de las 3 esta montada a la vez, asi que un unico ref
   // vale para las tres).
   const listScrollRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    listScrollRef.current?.scrollTo({ top: 0 });
-  }, [currentPage]);
+  useLayoutEffect(() => {
+    if (listScrollRef.current) listScrollRef.current.scrollTop = 0;
+  }, [currentPage, viewMode]);
 
   // ── Estadísticas barra inferior ────────────────────────────
   const stats = useMemo(() => {
