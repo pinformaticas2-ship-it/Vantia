@@ -19,7 +19,7 @@ import {
   Star, Palette, Copy, GitMerge, CreditCard, MessageSquare,
   RotateCcw, Bell, ArrowRight, Settings, Trash2,
   ChevronRight, Bug, History, TrendingUp, Pencil, Smartphone, ScanLine,
-  FileCode2, FileText, Download, ArrowLeft, ChevronLeft, ChevronsLeft, ChevronsRight, CheckCircle2, Check,
+  FileCode2, FileText, Download, ArrowLeft, ChevronLeft, ChevronsLeft, ChevronsRight, CheckCircle2, Check, Hash,
 } from "lucide-react";
 import { safeJson } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
@@ -809,6 +809,183 @@ function PaginationBar({ currentPage, totalPages, onPageChange, totalItems, page
   );
 }
 
+// ── Modal "Configurar numeración" (igual concepto que en Expedientes, pero
+// sin dimensión de año: un único contador global para el Nº de cliente) ──
+function ClientCounterConfigModal({ onClose, getToken }: { onClose: () => void; getToken: () => Promise<string | null> }) {
+  const getTokenRef = useRef(getToken);
+  getTokenRef.current = getToken;
+
+  const [data, setData] = useState<any | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const [autoFill,    setAutoFill]    = useState(true);
+  const [generalNum,  setGeneralNum]  = useState("1");
+  const [useOverride, setUseOverride] = useState(false);
+  const [overrideNum, setOverrideNum] = useState("");
+  const [formError,   setFormError]   = useState("");
+  const [saving, setSaving] = useState(false);
+  const [savedOk, setSavedOk] = useState(false);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const token = await getTokenRef.current();
+      const res = await fetch("/api/entities/counter-config", { headers: { Authorization: `Bearer ${token}` } });
+      const d = await res.json();
+      if (res.ok && d.data) {
+        setData(d.data);
+        setAutoFill(d.data.auto_fill !== false);
+        setGeneralNum(String(d.data.min_num ?? 1));
+        setUseOverride(d.data.override_next != null);
+        setOverrideNum(d.data.override_next != null ? String(d.data.override_next) : "");
+      }
+    } finally { setLoading(false); }
+  };
+
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleAccept = async () => {
+    setFormError("");
+    const mn = Number(generalNum);
+    if (!Number.isInteger(mn) || mn < 1) { setFormError("El número mínimo debe ser un entero >= 1"); return; }
+    if (useOverride) {
+      const ov = Number(overrideNum);
+      if (!Number.isInteger(ov) || ov < 1) { setFormError("El número específico debe ser un entero >= 1"); return; }
+    }
+    setSaving(true);
+    try {
+      const token = await getTokenRef.current();
+      const res = await fetch("/api/entities/counter-config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ min_num: mn, auto_fill: autoFill, override_next: useOverride ? Number(overrideNum) : null }),
+      });
+      if (!res.ok) { const d = await res.json(); setFormError(d.error || "Error al guardar"); return; }
+      setSavedOk(true);
+      setTimeout(() => setSavedOk(false), 2500);
+      await load();
+    } finally { setSaving(false); }
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden">
+
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+          <div className="flex items-center gap-2.5">
+            <div className="h-8 w-8 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
+              <Hash size={15} className="text-red-600" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-900">Configurar numeración</h2>
+              <p className="text-xs text-slate-400">Gestión del contador de nº de cliente</p>
+            </div>
+          </div>
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-5" style={{ minHeight: 320 }}>
+          {loading ? (
+            <div className="flex items-center gap-2 text-slate-400 py-4">
+              <Loader2 size={15} className="animate-spin" />
+              <span className="text-sm">Cargando...</span>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {data && (
+                <div className="flex flex-wrap gap-2">
+                  <span className="text-xs px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 font-medium">
+                    {data.used_count} cliente{data.used_count !== 1 ? "s" : ""} numerado{data.used_count !== 1 ? "s" : ""}
+                  </span>
+                  <span className="text-xs px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">
+                    Próximo: {data.next_num}
+                  </span>
+                  {data.gaps?.length > 0 ? (
+                    <span className="text-xs px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200">
+                      {data.gaps.length} hueco{data.gaps.length !== 1 ? "s" : ""}: {data.gaps.slice(0, 6).join(", ")}{data.gaps.length > 6 ? "…" : ""}
+                    </span>
+                  ) : data.used_count > 0 ? (
+                    <span className="text-xs px-2.5 py-1 rounded-lg bg-slate-50 text-slate-400 border border-slate-200">Sin huecos</span>
+                  ) : null}
+                </div>
+              )}
+
+              <label className="flex items-start gap-3 cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 hover:bg-slate-100 transition-colors">
+                <input type="checkbox" checked={autoFill} onChange={e => setAutoFill(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 accent-red-600 cursor-pointer shrink-0" />
+                <div>
+                  <span className="text-sm font-semibold text-slate-800">Calcular el Contador de Forma Automática</span>
+                  <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
+                    (El contador busca el <strong>primer número libre</strong>, rellenando huecos si se han borrado clientes)
+                  </p>
+                </div>
+              </label>
+
+              <div className="rounded-xl border border-slate-200 overflow-hidden">
+                <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100">
+                  <p className="text-[11px] font-bold text-red-600 uppercase tracking-widest">Contador de Clientes</p>
+                </div>
+                <div className="p-4 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-2.5 cursor-pointer flex-1">
+                      <input type="radio" name="client-counter-mode" checked={!useOverride} onChange={() => setUseOverride(false)}
+                        className="w-4 h-4 accent-red-600" />
+                      <span className="text-sm text-slate-700 font-medium">General</span>
+                    </label>
+                    <input type="number" min="1" step="1" value={generalNum}
+                      onChange={e => setGeneralNum(e.target.value)}
+                      className="w-24 text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-right focus:outline-none focus:ring-1 focus:ring-red-500 shadow-sm" />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-2.5 cursor-pointer flex-1">
+                      <input type="radio" name="client-counter-mode" checked={useOverride} onChange={() => setUseOverride(true)}
+                        className="w-4 h-4 accent-red-600" />
+                      <span className="text-sm text-slate-700 font-medium">Número específico</span>
+                    </label>
+                    <input type="number" min="1" step="1" value={overrideNum}
+                      onChange={e => setOverrideNum(e.target.value)}
+                      disabled={!useOverride} placeholder="—"
+                      className="w-24 text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-right focus:outline-none focus:ring-1 focus:ring-red-500 shadow-sm disabled:bg-slate-50 disabled:text-slate-300" />
+                  </div>
+                  {useOverride && (
+                    <p className="text-xs text-amber-700 bg-amber-50 rounded-lg border border-amber-200 px-3 py-2">
+                      El próximo cliente usará este número exacto (uso único — después vuelve al modo automático).
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {formError && (
+                <p className="text-xs text-red-600 font-medium flex items-center gap-1.5">
+                  <AlertCircle size={12} /> {formError}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 bg-slate-50">
+          <p className="text-xs text-slate-400">Los cambios se aplican al siguiente cliente creado</p>
+          <div className="flex gap-2">
+            <button type="button" onClick={onClose}
+              className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors">
+              Cancelar
+            </button>
+            <button type="button" onClick={handleAccept} disabled={saving || loading}
+              className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-700 disabled:opacity-50 transition-colors shadow-sm">
+              {saving ? <Loader2 size={13} className="animate-spin" /> : savedOk ? <CheckCircle2 size={13} /> : null}
+              {savedOk ? "Guardado" : "Aceptar"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 // ── Modal de confirmación ─────────────────────────────────────
 function ConfirmModal({
   title, message, confirmLabel = "Confirmar", danger = false,
@@ -1173,6 +1350,7 @@ export default function ClientList() {
   const [showOpciones, setShowOpciones] = useState(false);
   const [opcionesSubMenu, setOpcionesSubMenu] = useState<string | null>(null);
   const [showColumnModal, setShowColumnModal] = useState(false);
+  const [showCounterModal, setShowCounterModal] = useState(false);
   const opcionesRef = useRef<HTMLDivElement>(null);
   const opcionesMenuRef = useRef<HTMLDivElement>(null);
   const [opcionesPos, setOpcionesPos] = useState({ top: 0, right: 0 });
@@ -2130,6 +2308,12 @@ export default function ClientList() {
       onMoveAllToAvailable={moveAllClientColumnsToAvailable}
       onClose={() => setShowColumnModal(false)}
     />
+    {showCounterModal && (
+      <ClientCounterConfigModal
+        onClose={() => setShowCounterModal(false)}
+        getToken={() => getToken({ skipCache: true })}
+      />
+    )}
     <div className="h-full min-h-0 flex flex-col overflow-hidden animate-page-in">
 
       {/* ── CABECERA ─────────────────────────────────────────── */}
@@ -2352,6 +2536,19 @@ export default function ClientList() {
                   >
                     <span className="flex items-center gap-2.5">
                       <LayoutList size={12} className="text-slate-400" /> Elegir columnas
+                    </span>
+                  </button>
+                </div>
+                <div className="relative">
+                  <button
+                    onClick={() => {
+                      setShowCounterModal(true);
+                      setShowOpciones(false);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors"
+                  >
+                    <span className="flex items-center gap-2.5">
+                      <Hash size={12} className="text-slate-400" /> Configurar numeración
                     </span>
                   </button>
                 </div>

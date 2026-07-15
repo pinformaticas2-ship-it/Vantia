@@ -108,6 +108,17 @@ export async function runMigrations(): Promise<void> {
       // Si ya existe como SERIAL nativo, ignorar
     }
 
+    // ── Configuracion de numeracion de clientes (igual que expedientes, pero
+    // sin dimension de "anio": es un unico contador global, fila fija id=1) ──
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS client_counter_config (
+        id            SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+        min_num       INTEGER  NOT NULL DEFAULT 1,
+        auto_fill     BOOLEAN  NOT NULL DEFAULT TRUE,
+        override_next INTEGER
+      );
+    `);
+
     // ── UNIQUE en nif_cif ──────────────────────────────────────────
     try {
       await client.query(`

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import {
   getEntities, getEntityById, createEntity, updateEntity, patchEntity, deleteEntity, checkNifCif,
   getEntityImportHistory, getEntityImportBatchDetail, createEntityImportBatch, updateEntityImportBatch,
-  undoEntityImportBatch,
+  undoEntityImportBatch, getEntitiesCounterConfig, setEntitiesCounterConfig,
 } from '../controllers/entities';
 import noteRoutes from './noteRoutes';
 import { requireAuth } from '../middleware/auth';
@@ -12,7 +12,9 @@ const router = Router();
 
 router.get('/', requireAuth, getEntities);
 router.get('/check-nif', requireAuth, checkNifCif);
-// Rutas literales /imports* ANTES de /:id, si no Express trata "imports" como un id
+// Rutas literales ANTES de /:id, si no Express trata el segmento como un id
+router.get('/counter-config', requireAuth, getEntitiesCounterConfig);
+router.post('/counter-config', requireAuth, setEntitiesCounterConfig);
 router.get('/imports', requireAuth, getEntityImportHistory);
 router.get('/imports/:id', requireAuth, getEntityImportBatchDetail);
 router.post('/imports', requireAuth, createEntityImportBatch);

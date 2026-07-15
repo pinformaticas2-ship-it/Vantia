@@ -124,6 +124,112 @@ export const getEntities = async (req: any, res: Response) => {
 };
 
 // ─────────────────────────────────────────────────────────────
+// Numeracion de clientes (mismo concepto que "Configurar numeracion" de
+// expedientes, pero sin dimension de "anio": un unico contador global).
+// GET  /api/entities/counter-config
+// POST /api/entities/counter-config
+// ─────────────────────────────────────────────────────────────
+export const getEntitiesCounterConfig = async (_req: any, res: Response) => {
+  try {
+    const { rows: cfgRows } = await pool.query(
+      `SELECT min_num, auto_fill, override_next FROM client_counter_config WHERE id = 1`
+    );
+    const cfg = cfgRows[0] || {};
+    const minNum: number = cfg.min_num ?? 1;
+    const autoFill: boolean = cfg.auto_fill !== false;
+    const overrideNext: number | null = cfg.override_next ?? null;
+
+    const { rows: usedRows } = await pool.query(
+      `SELECT internal_number FROM entities WHERE internal_number IS NOT NULL ORDER BY internal_number`
+    );
+    const used: number[] = usedRows.map((r: any) => r.internal_number);
+    const maxUsed = used.length ? Math.max(...used) : 0;
+
+    let nextNum: number;
+    if (overrideNext != null) {
+      nextNum = overrideNext;
+    } else if (autoFill) {
+      // Primer hueco libre (limitado para evitar series gigantes)
+      const top = Math.min(maxUsed + 1, 999999);
+      const usedSet = new Set(used);
+      nextNum = minNum;
+      for (let i = minNum; i <= top + 1; i++) {
+        if (!usedSet.has(i)) { nextNum = i; break; }
+      }
+    } else {
+      nextNum = Math.max(maxUsed + 1, minNum);
+    }
+
+    const gaps: number[] = [];
+    const usedSet2 = new Set(used);
+    for (let i = minNum; i <= maxUsed && gaps.length < 20; i++) {
+      if (!usedSet2.has(i)) gaps.push(i);
+    }
+
+    return res.json({
+      success: true,
+      data: { min_num: minNum, auto_fill: autoFill, override_next: overrideNext, used_count: used.length, max_used: maxUsed, next_num: nextNum, gaps },
+    });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+};
+
+export const setEntitiesCounterConfig = async (req: any, res: Response) => {
+  const { min_num, auto_fill, override_next } = req.body;
+  const mn = Number(min_num ?? 1);
+  if (!Number.isInteger(mn) || mn < 1) return res.status(400).json({ error: 'Número mínimo inválido (debe ser >= 1)' });
+  const af = auto_fill !== false;
+  const ov = override_next != null ? Number(override_next) : null;
+  if (ov !== null && (!Number.isInteger(ov) || ov < 1)) return res.status(400).json({ error: 'Número de override inválido' });
+  try {
+    await pool.query(
+      `INSERT INTO client_counter_config (id, min_num, auto_fill, override_next)
+       VALUES (1, $1, $2, $3)
+       ON CONFLICT (id) DO UPDATE SET min_num = EXCLUDED.min_num, auto_fill = EXCLUDED.auto_fill, override_next = EXCLUDED.override_next`,
+      [mn, af, ov]
+    );
+    return res.json({ success: true });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+};
+
+// Calcula el proximo internal_number a usar segun la config (mismo criterio
+// que getEntitiesCounterConfig) y, si viene de un override de un solo uso,
+// lo consume (lo borra) para que el siguiente cliente vuelva al modo normal.
+async function resolveNextInternalNumber(dbClient: any): Promise<number> {
+  const { rows: cfgRows } = await dbClient.query(
+    `SELECT min_num, auto_fill, override_next FROM client_counter_config WHERE id = 1`
+  );
+  const cfg = cfgRows[0] || {};
+  const minNum: number = cfg.min_num ?? 1;
+  const autoFill: boolean = cfg.auto_fill !== false;
+  const overrideNext: number | null = cfg.override_next ?? null;
+
+  if (overrideNext != null) {
+    await dbClient.query(`UPDATE client_counter_config SET override_next = NULL WHERE id = 1`);
+    return overrideNext;
+  }
+
+  const { rows: usedRows } = await dbClient.query(
+    `SELECT internal_number FROM entities WHERE internal_number IS NOT NULL ORDER BY internal_number`
+  );
+  const used: number[] = usedRows.map((r: any) => r.internal_number);
+  const maxUsed = used.length ? Math.max(...used) : 0;
+
+  if (autoFill) {
+    const top = Math.min(maxUsed + 1, 999999);
+    const usedSet = new Set(used);
+    for (let i = minNum; i <= top + 1; i++) {
+      if (!usedSet.has(i)) return i;
+    }
+    return top + 1;
+  }
+  return Math.max(maxUsed + 1, minNum);
+}
+
+// ─────────────────────────────────────────────────────────────
 // GET /api/entities/check-nif?nif=<NIF_CIF>
 // ─────────────────────────────────────────────────────────────
 export const checkNifCif = async (req: any, res: Response) => {
@@ -198,8 +304,14 @@ export const createEntity = async (req: any, res: Response) => {
   const safeDateBaja   = nullIfEmpty(date_baja);
 
   try {
+    // Numero interno segun la config de "Configurar numeracion" (min/auto-fill/
+    // override), igual criterio que expedientes. Si no hay config guardada usa
+    // el comportamiento por defecto (proximo hueco libre desde 1).
+    const internalNumber = await resolveNextInternalNumber(pool);
+
     const result = await pool.query(`
       INSERT INTO entities (
+        internal_number,
         type, client_status, document_type,
         first_name, last_name, commercial_name,
         nif_cif, gender, birth_date,
@@ -212,6 +324,7 @@ export const createEntity = async (req: any, res: Response) => {
         lopd, commercial_communications, center,
         photo_url, created_by
       ) VALUES (
+        $32,
         $1, $2, $3,
         $4, $5, $6,
         $7, $8, $9::date,
@@ -256,6 +369,7 @@ export const createEntity = async (req: any, res: Response) => {
         nullIfEmpty(center),                                 // $29
         nullIfEmpty(photo_url),                              // $30
         userId,                                              // $31
+        internalNumber,                                      // $32
       ]
     );
     // Crear carpetas para archivos del cliente (uploads del servidor + carpeta local)
