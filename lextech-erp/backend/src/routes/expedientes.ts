@@ -13,6 +13,7 @@ import {
   createExpediente,
   updateImportBatch,
   updateExpediente,
+  linkExpedienteCliente,
   deleteExpediente,
   getExpedienteHistorial,
   getCounterConfig,
@@ -54,6 +55,7 @@ router.post('/',      requireAuth, createExpediente);
 router.get('/:id/historial', requireAuth, getExpedienteHistorial);
 router.get('/:id',    requireAuth, getExpediente);
 router.put('/:id',    requireAuth, updateExpediente);
+router.patch('/:id/cliente', requireAuth, linkExpedienteCliente);
 router.delete('/:id', requireAuth, deleteExpediente);
 
 router.get('/:id/notificaciones',          requireAuth, listNotificaciones);

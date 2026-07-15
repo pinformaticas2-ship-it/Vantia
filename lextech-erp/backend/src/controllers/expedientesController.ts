@@ -663,6 +663,38 @@ export const updateExpediente = async (req: any, res: Response) => {
   }
 };
 
+// PATCH /api/expedientes/:id/cliente — vincular un expediente ya existente a
+// un cliente sin tener que reenviar el resto del formulario del expediente
+// (a diferencia de updateExpediente, que exige el objeto completo).
+export const linkExpedienteCliente = async (req: any, res: Response) => {
+  const { id } = req.params;
+  const clienteId = nullableText(req.body?.cliente_id);
+  if (!clienteId) return res.status(400).json({ error: 'cliente_id es obligatorio' });
+
+  try {
+    const cr = await pool.query(
+      `SELECT first_name || COALESCE(' ' || last_name, '') AS n FROM entities WHERE id = $1`,
+      [clienteId]
+    );
+    if (!cr.rows.length) return res.status(404).json({ error: 'Cliente no encontrado' });
+    const nombre = cr.rows[0].n;
+
+    const r = await pool.query(
+      `UPDATE expedientes SET cliente_id = $1, cliente_nombre = $2, updated_at = NOW()
+       WHERE id = $3 RETURNING *`,
+      [clienteId, nombre, id]
+    );
+    if (!r.rows.length) return res.status(404).json({ error: 'Expediente no encontrado' });
+
+    const exp = r.rows[0];
+    const label = exp.descripcion ? `${exp.anio}/${exp.num_exp} - ${exp.descripcion}` : `${exp.anio}/${exp.num_exp}`;
+    logActivityForReq(req, `Expediente vinculado a cliente: ${label} → ${nombre}`, 'EXPEDIENTE', exp.id, 'UPDATE' as any);
+    res.json({ data: exp });
+  } catch (e: any) {
+    res.status(e?.code === '22P02' ? 400 : 500).json({ error: friendlyExpedienteError(e) });
+  }
+};
+
 export const getExpedienteHistorial = async (req: any, res: Response) => {
   const { id } = req.params;
   try {

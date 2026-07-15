@@ -1,4 +1,4 @@
-﻿import React, { useContext, useEffect, useState, useRef, useCallback } from "react";
+﻿import React, { useContext, useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
@@ -13,7 +13,7 @@ import {
   ScrollText, Receipt, Scale, UserCheck,
   MessageSquare, FileSignature, ShieldAlert, FilePlus,
   FilePlus2, Search, ChevronDown, ChevronRight as ChevronR,
-  Banknote, TrendingUp, TrendingDown, BadgeEuro,
+  Banknote, TrendingUp, TrendingDown, BadgeEuro, Link2,
 } from "lucide-react";
 import { safeJson, resolveApiUrl } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
@@ -174,34 +174,32 @@ const TIPO_SHORT: Record<string, string> = {
   otro:             "OTRO",
 };
 
-function TabExpedientes({ clientId }: { clientId: string }) {
+function TabExpedientes({ clientId, clientName }: { clientId: string; clientName?: string }) {
   const { getToken } = useAuth();
   const navigate     = useNavigate();
   const [expedientes, setExpedientes] = useState<any[]>([]);
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState<string | null>(null);
+  const [showLinkModal, setShowLinkModal] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const token = await getToken({ skipCache: true });
-        const res = await fetch(`/api/expedientes?clienteId=${clientId}&limit=200`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) throw new Error(`Error ${res.status}`);
-        const data = await res.json();
-        if (!cancelled) setExpedientes(data.data || []);
-      } catch (e: any) {
-        if (!cancelled) setError(e?.message || "Error al cargar expedientes");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
+  const loadExpedientes = useCallback(async (silent = false) => {
+    if (!silent) { setLoading(true); setError(null); }
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/expedientes?clienteId=${clientId}&limit=200`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(`Error ${res.status}`);
+      const data = await res.json();
+      setExpedientes(data.data || []);
+    } catch (e: any) {
+      if (!silent) setError(e?.message || "Error al cargar expedientes");
+    } finally {
+      if (!silent) setLoading(false);
+    }
   }, [clientId, getToken]);
+
+  useEffect(() => { loadExpedientes(); }, [loadExpedientes]);
 
   if (loading) return (
     <div className="flex items-center justify-center min-h-[60vh]">
@@ -219,19 +217,28 @@ function TabExpedientes({ clientId }: { clientId: string }) {
         <p className="text-sm text-slate-500">
           {expedientes.length} expediente{expedientes.length !== 1 ? "s" : ""} vinculado{expedientes.length !== 1 ? "s" : ""}
         </p>
-        <Link
-          to="/dashboard/expedientes?nuevo=1"
-          className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm active:scale-95 transition-all"
-        >
-          <Plus size={15} /> Nuevo expediente
-        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowLinkModal(true)}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl shadow-sm active:scale-95 transition-all"
+          >
+            <Link2 size={15} /> Vincular expediente
+          </button>
+          <Link
+            to="/dashboard/expedientes?nuevo=1"
+            className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm active:scale-95 transition-all"
+          >
+            <Plus size={15} /> Nuevo expediente
+          </Link>
+        </div>
       </div>
 
       {expedientes.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded-xl p-16 flex flex-col items-center gap-3 text-slate-400">
           <Gavel size={40} className="opacity-20" />
           <p className="font-medium text-sm">No hay expedientes vinculados</p>
-          <p className="text-xs text-slate-300">Crea un expediente y asígnale este cliente</p>
+          <p className="text-xs text-slate-300">Crea un expediente nuevo o vincula uno ya existente</p>
         </div>
       ) : (
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
@@ -290,7 +297,205 @@ function TabExpedientes({ clientId }: { clientId: string }) {
           </table>
         </div>
       )}
+
+      {showLinkModal && (
+        <LinkExpedienteModal
+          clientId={clientId}
+          clientName={clientName}
+          linkedIds={new Set(expedientes.map((e: any) => e.id))}
+          onClose={() => setShowLinkModal(false)}
+          onLinked={() => { setShowLinkModal(false); loadExpedientes(true); }}
+        />
+      )}
     </div>
+  );
+}
+
+// ── Modal: vincular un expediente ya existente a este cliente ──────────
+function LinkExpedienteModal({
+  clientId, clientName, linkedIds, onClose, onLinked,
+}: {
+  clientId: string;
+  clientName?: string;
+  linkedIds: Set<string>;
+  onClose: () => void;
+  onLinked: () => void;
+}) {
+  const { getToken } = useAuth();
+  const [query, setQuery]             = useState("");
+  const [searching, setSearching]     = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchError, setSearchError] = useState("");
+  const [linkError, setLinkError]     = useState("");
+  const [savingId, setSavingId]       = useState<string | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const searchExpedientes = useCallback(async (term: string) => {
+    try {
+      setSearching(true);
+      setSearchError("");
+      const token = await getToken({ skipCache: true });
+      const url = term.trim()
+        ? `/api/expedientes?limit=100&q=${encodeURIComponent(term.trim())}`
+        : `/api/expedientes?limit=100`;
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await safeJson(res);
+      if (!res.ok) throw new Error(data.error || "No se pudieron buscar expedientes");
+      setSearchResults((data.data || []).filter((item: any) => !linkedIds.has(item.id)));
+    } catch (e: any) {
+      setSearchResults([]);
+      setSearchError(e?.message || "No se pudieron buscar expedientes");
+    } finally {
+      setSearching(false);
+    }
+  }, [getToken, linkedIds]);
+
+  useEffect(() => {
+    setHasSearched(true);
+    searchExpedientes("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setHasSearched(true);
+      searchExpedientes(query);
+    }, 380);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query]);
+
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prevOverflow; };
+  }, []);
+
+  const handleLink = async (expedienteId: string) => {
+    try {
+      setSavingId(expedienteId);
+      setLinkError("");
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/expedientes/${expedienteId}/cliente`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ cliente_id: clientId }),
+      });
+      const data = await safeJson(res);
+      if (!res.ok) throw new Error(data.error || "No se pudo vincular el expediente");
+      onLinked();
+    } catch (e: any) {
+      setLinkError(e?.message || "No se pudo vincular el expediente");
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/40 backdrop-blur-sm px-4" onClick={onClose}>
+      <div className="w-full max-w-2xl rounded-3xl bg-white border border-slate-200 shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-slate-100">
+          <div>
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Vincular expediente</p>
+            <h3 className="text-lg font-bold text-slate-900">Asociar un expediente a {clientName || "este cliente"}</h3>
+          </div>
+          <button type="button" onClick={onClose} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-400 hover:text-slate-700 hover:border-slate-300 transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <div className="relative">
+            <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" />
+            <input
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Buscar por referencia, descripción, NIG, juzgado..."
+              autoFocus
+              spellCheck={false}
+              autoComplete="off"
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 pl-11 pr-4 py-3 text-sm text-slate-700 placeholder:text-slate-400 outline-none transition-colors focus:border-slate-300 focus:bg-white"
+            />
+          </div>
+
+          {searchError && (
+            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{searchError}</div>
+          )}
+          {linkError && (
+            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{linkError}</div>
+          )}
+
+          <div className="rounded-2xl border border-slate-200 overflow-hidden">
+            {!hasSearched || searching ? (
+              <div className="flex items-center justify-center px-5 py-12 bg-slate-50/60">
+                <Spinner size="sm" muted label="Buscando expedientes..." />
+              </div>
+            ) : searchResults.length === 0 ? (
+              <div className="flex flex-col items-center justify-center px-6 py-12 bg-slate-50/60 text-center gap-3">
+                <div className="h-12 w-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-slate-300">
+                  <AlertCircle size={20} />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-slate-600">Sin resultados</p>
+                  <p className="mt-0.5 text-xs text-slate-400">Prueba con otra búsqueda o revisa si ya están vinculados.</p>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border-b border-slate-200">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">
+                    {searchResults.length} {searchResults.length === 1 ? "expediente encontrado" : "expedientes encontrados"}
+                  </span>
+                </div>
+                <div className="max-h-[360px] overflow-y-auto divide-y divide-slate-100">
+                  {searchResults.map((item: any) => {
+                    const ref = item.ref_expediente || `${item.anio}/${item.num_exp}`;
+                    const meta = [item.tipo_proc, item.juzgado].filter(Boolean).join(" · ");
+                    const hasOtherClient = item.cliente_id && item.cliente_id !== clientId;
+                    return (
+                      <div key={item.id} className="group flex items-center gap-4 px-4 py-3.5 hover:bg-blue-50/40 transition-colors bg-white">
+                        <div className="shrink-0 h-9 w-9 rounded-xl bg-slate-100 group-hover:bg-white group-hover:border group-hover:border-slate-200 flex items-center justify-center text-slate-400 transition-all">
+                          <Scale size={15} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-mono text-[11px] font-bold bg-slate-100 text-slate-600 rounded px-1.5 py-0.5">{ref}</span>
+                            <span className={`text-[10px] font-bold rounded-full px-2 py-0.5 uppercase ${ESTADO_COLOR[item.estado] || "bg-slate-100 text-slate-500"}`}>
+                              {item.estado || "abierto"}
+                            </span>
+                          </div>
+                          {item.descripcion && (
+                            <p className="mt-1 text-sm font-semibold text-slate-800 truncate">{item.descripcion}</p>
+                          )}
+                          {meta && <p className="mt-0.5 text-[11px] text-slate-400 truncate">{meta}</p>}
+                          {hasOtherClient && (
+                            <p className="mt-1 text-[11px] font-semibold text-amber-600 flex items-center gap-1">
+                              <AlertTriangle size={10} /> Ya vinculado a {item.cliente_nombre || "otro cliente"} — se reasignará
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleLink(item.id)}
+                          disabled={savingId === item.id}
+                          className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl disabled:opacity-60 disabled:cursor-not-allowed transition-all active:scale-95 shadow-sm"
+                        >
+                          {savingId === item.id ? <Loader2 size={11} className="animate-spin" /> : <Link2 size={11} />}
+                          Vincular
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }
 
@@ -4043,7 +4248,7 @@ export default function ClientDetail() {
             </div>
             {mountedTabs.has("expedientes") && (
               <div style={{ display: activeTab === "expedientes" ? "block" : "none" }}>
-                <TabExpedientes clientId={id!} />
+                <TabExpedientes clientId={id!} clientName={`${client.first_name} ${client.last_name || ""}`.trim()} />
               </div>
             )}
             {mountedTabs.has("economico") && (
