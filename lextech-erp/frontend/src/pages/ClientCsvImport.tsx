@@ -1593,7 +1593,7 @@ export default function ClientCsvImport() {
           try {
             const res = await fetch("/api/entities", {
               method: "POST",
-              headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, "X-Bulk-Import": "1" },
               body: JSON.stringify(payload),
             });
             const data = await safeJson(res);

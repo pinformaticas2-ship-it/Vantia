@@ -198,6 +198,8 @@ export default function Trazabilidad() {
   const [search, setSearch]           = useState("");
   const [eventFilter, setEventFilter] = useState("");
   const [entityFilter, setEntityFilter] = useState("");
+  const [dateFrom, setDateFrom]       = useState("");
+  const [dateTo, setDateTo]           = useState("");
 
   const hdr = useCallback(async () => {
     const t = await getToken();
@@ -217,12 +219,16 @@ export default function Trazabilidad() {
     userId: string,
     evType: string,
     offset: number,
-    append = false
+    append = false,
+    from = "",
+    to = "",
   ) => {
     if (append) setLoadingMore(true);
     else setLoadItems(true);
     const params = new URLSearchParams({ limit: "300", offset: String(offset) });
     if (evType) params.set("event_type", evType);
+    if (from) params.set("date_from", from);
+    if (to) params.set("date_to", to);
     const res = await fetch(`/api/activity/user/${userId}?${params}`, { headers: await hdr() });
     const d = await safeJson(res);
     if (res.ok) {
@@ -238,8 +244,8 @@ export default function Trazabilidad() {
   useAutoRefresh(fetchUsers, { intervalMs: 30000 });
 
   useEffect(() => {
-    if (selected) fetchItems(selected.user_id, eventFilter, 0);
-  }, [selected, eventFilter, fetchItems]);
+    if (selected) fetchItems(selected.user_id, eventFilter, 0, false, dateFrom, dateTo);
+  }, [selected, eventFilter, dateFrom, dateTo, fetchItems]);
 
   const filteredUsers = useMemo(() =>
     users.filter(u =>
@@ -483,6 +489,32 @@ export default function Trazabilidad() {
                   >
                     {ENTITY_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="date"
+                      value={dateFrom}
+                      max={dateTo || undefined}
+                      onChange={e => setDateFrom(e.target.value)}
+                      className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-md text-xs font-medium text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                    />
+                    <span className="text-slate-300 text-xs">—</span>
+                    <input
+                      type="date"
+                      value={dateTo}
+                      min={dateFrom || undefined}
+                      onChange={e => setDateTo(e.target.value)}
+                      className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-md text-xs font-medium text-slate-700 focus:outline-none focus:ring-1 focus:ring-slate-300"
+                    />
+                    {(dateFrom || dateTo) && (
+                      <button
+                        onClick={() => { setDateFrom(""); setDateTo(""); }}
+                        title="Quitar filtro de fechas"
+                        className="text-slate-400 hover:text-slate-600 p-1"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <span className="text-xs font-medium text-slate-500">Mostrando {filteredItems.length} de {total} registros</span>
               </div>
@@ -588,7 +620,7 @@ export default function Trazabilidad() {
                       <div className="flex items-center justify-center mt-4 pb-8">
                         {hasMore ? (
                           <button
-                            onClick={() => fetchItems(selected.user_id, eventFilter, items.length, true)}
+                            onClick={() => fetchItems(selected.user_id, eventFilter, items.length, true, dateFrom, dateTo)}
                             disabled={loadingMore}
                             className="bg-white border border-slate-300 text-slate-600 hover:text-slate-900 hover:bg-slate-50 text-xs font-bold py-2 px-6 rounded-full relative z-10 shadow-sm transition-all disabled:opacity-60 flex items-center gap-2"
                           >

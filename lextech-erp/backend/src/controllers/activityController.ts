@@ -304,12 +304,20 @@ export const getUserActivity = async (req: Request, res: Response) => {
   const limit = Math.min(parseInt((req.query.limit as string) || '500'), 1000);
   const offset = parseInt((req.query.offset as string) || '0');
   const eventType = (req.query.event_type as string) || '';
-  
-  try {
-    const params: any[] = [userId, limit, offset];
-    const filter = eventType ? `AND event_type=$4` : '';
-    if (eventType) params.push(eventType);
+  const dateFrom = (req.query.date_from as string) || '';
+  const dateTo = (req.query.date_to as string) || '';
 
+  try {
+    // WHERE compartido entre la consulta de filas y la de total, para que
+    // "Mostrando X de Y" y el paginado ("hay mas") reflejen los mismos filtros.
+    const conditions: string[] = ['user_id=$1'];
+    const whereParams: any[] = [userId];
+    if (eventType) { whereParams.push(eventType); conditions.push(`event_type=$${whereParams.length}`); }
+    if (dateFrom)  { whereParams.push(dateFrom);  conditions.push(`created_at >= $${whereParams.length}::date`); }
+    if (dateTo)    { whereParams.push(dateTo);    conditions.push(`created_at < ($${whereParams.length}::date + INTERVAL '1 day')`); }
+    const where = conditions.join(' AND ');
+
+    const rowsParams = [...whereParams, limit, offset];
     const [rows, total] = await Promise.all([
       pool.query(
         `
@@ -317,12 +325,12 @@ export const getUserActivity = async (req: Request, res: Response) => {
                entity_type, entity_id, entity_name,
                event_type, ip_address, session_id, user_agent, device_id, created_at
         FROM activity_log
-        WHERE user_id=$1 ${filter}
-        ORDER BY created_at DESC LIMIT $2 OFFSET $3
+        WHERE ${where}
+        ORDER BY created_at DESC LIMIT $${rowsParams.length - 1} OFFSET $${rowsParams.length}
       `,
-        params
+        rowsParams
       ),
-      pool.query(`SELECT COUNT(*)::int AS total FROM activity_log WHERE user_id=$1`, [userId]),
+      pool.query(`SELECT COUNT(*)::int AS total FROM activity_log WHERE ${where}`, whereParams),
     ]);
 
     res.json({ success: true, data: rows.rows, total: total.rows[0]?.total ?? 0 });

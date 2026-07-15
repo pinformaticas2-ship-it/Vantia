@@ -383,9 +383,15 @@ export const createEntity = async (req: any, res: Response) => {
       console.warn('⚠️ No se pudo crear carpeta para cliente:', err);
     }
 
-    // Registrar actividad (fire-and-forget, no bloquea la respuesta)
-    const entityName = `${first_name} ${last_name || ''}`.trim() + ` (${nif_cif || 'sin NIF'})`;
-    logActivityForReq(req, 'Nuevo cliente creado', 'CLIENT', result.rows[0].id, entityName);
+    // Registrar actividad (fire-and-forget, no bloquea la respuesta).
+    // Las altas de una importacion CSV masiva no se registran una a una aqui
+    // -- el lote ya deja su propia entrada consolidada de "Alta masiva" en
+    // createEntityImportBatch/updateEntityImportBatch, para no inundar la
+    // trazabilidad con cientos de filas individuales.
+    if (req.headers['x-bulk-import'] !== '1') {
+      const entityName = `${first_name} ${last_name || ''}`.trim() + ` (${nif_cif || 'sin NIF'})`;
+      logActivityForReq(req, 'Nuevo cliente creado', 'CLIENT', result.rows[0].id, entityName);
+    }
 
     res.status(201).json({ success: true, data: result.rows[0] });
   } catch (error: any) {
@@ -687,7 +693,7 @@ export const createEntityImportBatch = async (req: any, res: Response) => {
 
     await client.query('COMMIT');
 
-    logActivityForReq(req, `Importacion CSV de clientes registrada: ${fileName}`, 'CLIENT_IMPORT', batch.id, fileName, 'UPLOAD');
+    logActivityForReq(req, `Alta masiva iniciada: ${fileName} (${totalCount} fila${totalCount === 1 ? '' : 's'})`, 'CLIENT_IMPORT', batch.id, fileName, 'UPLOAD');
 
     res.status(201).json({ success: true, data: batch });
   } catch (e: any) {
@@ -776,7 +782,9 @@ export const updateEntityImportBatch = async (req: any, res: Response) => {
 
     logActivityForReq(
       req,
-      `Importacion CSV de clientes actualizada: ${batch.file_name} (${batch.status})`,
+      `Alta masiva: ${batch.completed_count} cliente${batch.completed_count === 1 ? '' : 's'} creado${batch.completed_count === 1 ? '' : 's'}` +
+        (batch.error_count > 0 ? `, ${batch.error_count} con error` : '') +
+        ` — ${batch.file_name}`,
       'CLIENT_IMPORT',
       batch.id,
       batch.file_name,
