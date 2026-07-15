@@ -1416,6 +1416,13 @@ export default function ClientList() {
     () => filtered.slice((currentPage - 1) * CLIENTS_PAGE_SIZE, currentPage * CLIENTS_PAGE_SIZE),
     [filtered, currentPage]
   );
+  // Al cambiar de pagina, subir el scroll de la lista/tarjetas al inicio
+  // (solo una vista de las 3 esta montada a la vez, asi que un unico ref
+  // vale para las tres).
+  const listScrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    listScrollRef.current?.scrollTo({ top: 0 });
+  }, [currentPage]);
 
   // ── Estadísticas barra inferior ────────────────────────────
   const stats = useMemo(() => {
@@ -2628,7 +2635,7 @@ export default function ClientList() {
         ══════════════════════════════════════════════════════ */}
         {viewMode === "list" && (
           <div className="flex-1 min-h-0 flex flex-col">
-          <div className="modules-scrollbar flex-1 min-h-0 overflow-auto">
+          <div ref={listScrollRef} className="modules-scrollbar flex-1 min-h-0 overflow-auto">
             <table className="w-full text-left text-sm min-w-[900px]">
               <thead className="bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
                 <tr>
@@ -2777,7 +2784,7 @@ export default function ClientList() {
         ══════════════════════════════════════════════════════ */}
         {viewMode === "detail" && (
           <div className="flex-1 min-h-0 flex flex-col">
-          <div className="modules-scrollbar flex-1 min-h-0 overflow-auto p-4">
+          <div ref={listScrollRef} className="modules-scrollbar flex-1 min-h-0 overflow-auto p-4">
             {filtered.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-40 gap-3 text-slate-400">
                 <Users size={36} className="opacity-15" />
@@ -2904,7 +2911,7 @@ export default function ClientList() {
         ══════════════════════════════════════════════════════ */}
         {viewMode === "multiselect" && (
           <div className="flex-1 min-h-0 flex flex-col">
-          <div className="modules-scrollbar flex-1 min-h-0 overflow-auto p-4">
+          <div ref={listScrollRef} className="modules-scrollbar flex-1 min-h-0 overflow-auto p-4">
             {/* Cabecera de selección rápida */}
             <div className="flex items-center gap-3 mb-3 px-1">
               <button
