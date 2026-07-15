@@ -4841,7 +4841,7 @@ export default function Chat() {
                     <div className="flex flex-col items-center justify-center h-full py-16 px-8 gap-4 text-center animate-in fade-in zoom-in-95 duration-300">
                       <div className="w-20 h-20 rounded-[1.7rem] bg-white border border-slate-200 shadow-lg flex items-center justify-center text-4xl">💬</div>
                       <p className="font-bold text-slate-800 text-lg">
-                        ¡Empieza la conversación en <span className="text-[#ab0433]">#{canalActivo.nombre}</span>!
+                        ¡Empieza la conversación en <span className="text-[#ab0433]">#{canalActivo.tipo === "directo" ? activeChatTitle : canalActivo.nombre}</span>!
                       </p>
                       {canalActivo.descripcion&&<p className="text-slate-500 text-sm max-w-md">{canalActivo.descripcion}</p>}
                       <p className="text-slate-400 text-xs">Sé el primero en escribir ✨</p>
