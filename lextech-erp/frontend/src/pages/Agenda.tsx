@@ -2428,11 +2428,13 @@ function TimeGridView({
                     <div className="border-t border-dashed border-gray-100 w-full" />
                   </div>
                 ))}
-                {/* Línea de hora actual (solo en la columna de hoy) */}
+                {/* Línea de hora actual (solo en la columna de hoy) — por debajo de los
+                    eventos (zIndex 10+) para que un evento en curso la tape en vez de
+                    cortarla por encima; solo se ve donde no hay ningún evento */}
                 {isToday && (
                   <div
                     className="absolute left-0 right-0 pointer-events-none flex items-center"
-                    style={{ top: nowTopPx, zIndex: 20 }}
+                    style={{ top: nowTopPx, zIndex: 5 }}
                   >
                     <div className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0 -ml-1" />
                     <div className="flex-1 border-t-2 border-red-500" />
