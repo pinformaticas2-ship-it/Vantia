@@ -13,12 +13,23 @@ interface Profesional {
   tipo: "PROCURADOR" | "ABOGADO";
   first_name: string;
   last_name: string | null;
+  nif_cif: string | null;
+  estado: string;
   colegio: string | null;
   num_colegiado: string | null;
   despacho: string | null;
   email: string | null;
-  phone: string | null;
-  address: string | null;
+  website: string | null;
+  phone_1: string | null;
+  phone_2: string | null;
+  phone_3: string | null;
+  mobile: string | null;
+  fax: string | null;
+  address_street: string | null;
+  address_cp: string | null;
+  address_town: string | null;
+  address_province: string | null;
+  address_country: string | null;
   notes: string | null;
   cuenta_consignaciones: string | null;
   codigo_repre: string | null;
@@ -291,20 +302,21 @@ export default function DirectorioProfesionales({ tipo, title, singular, desc }:
 
       {/* ── TABLA ────────────────────────────────────────────── */}
       <div className="flex-1 min-h-0 overflow-auto">
-        <table className="w-full text-left text-sm min-w-[820px]">
+        <table className="w-full text-left text-sm min-w-[900px]">
           <thead className="bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
             <tr>
               <Th label="Nombre" sortKey="nombre" active={sortKey === "nombre"} dir={sortDir} onSort={handleSort} />
               <Th label="Colegiación" sortKey="colegio" active={sortKey === "colegio"} dir={sortDir} onSort={handleSort} />
               <Th label={tipo === "PROCURADOR" ? "Código REPRE" : "Especialidad"} />
               <Th label="Contacto" />
+              <Th label="Estado" />
               <th className="px-3 py-2.5 w-10"></th>
             </tr>
           </thead>
           <tbody>
             {paged.length === 0 ? (
               <tr>
-                <td colSpan={5} className="py-20 text-center">
+                <td colSpan={6} className="py-20 text-center">
                   <div className="flex flex-col items-center gap-3 text-slate-400">
                     <Icon size={36} className="opacity-15" />
                     <p className="font-medium text-sm">
@@ -362,8 +374,13 @@ export default function DirectorioProfesionales({ tipo, title, singular, desc }:
                   </td>
                   <td className="px-3 py-3 text-slate-500">
                     {p.email && <p className="truncate max-w-[180px]">{p.email}</p>}
-                    {p.phone && <p className="text-xs text-slate-400">{p.phone}</p>}
-                    {!p.email && !p.phone && <span className="text-slate-300">—</span>}
+                    {(p.phone_1 || p.mobile) && <p className="text-xs text-slate-400">{p.phone_1 || p.mobile}</p>}
+                    {!p.email && !p.phone_1 && !p.mobile && <span className="text-slate-300">—</span>}
+                  </td>
+                  <td className="px-3 py-3">
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${p.estado === "Baja" ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-700"}`}>
+                      {p.estado || "Alta"}
+                    </span>
                   </td>
                   <td className="px-3 py-3 text-right">
                     <button

@@ -16,6 +16,23 @@ function nullIfEmpty(v: any): string | null {
 
 const LABELS: Record<string, string> = { PROCURADOR: 'Procurador', ABOGADO: 'Abogado' };
 
+// Columnas de texto editables (comunes a Procurador/Abogado + las propias de
+// cada tipo, que simplemente quedan NULL para el tipo al que no le aplican)
+const TEXT_FIELDS = [
+  'last_name', 'colegio', 'num_colegiado', 'despacho', 'nif_cif',
+  'email', 'website',
+  'address_street', 'address_cp', 'address_town', 'address_province', 'address_country',
+  'phone_1', 'phone_2', 'phone_3', 'mobile', 'fax',
+  'notes',
+  'cuenta_consignaciones', 'codigo_repre', 'especialidad',
+] as const;
+
+function readTextFields(body: any): Record<string, string | null> {
+  const out: Record<string, string | null> = {};
+  for (const f of TEXT_FIELDS) out[f] = nullIfEmpty(body?.[f]);
+  return out;
+}
+
 export const getProfesionales = async (req: any, res: Response) => {
   const tipo = normalizeTipo(req.query.tipo);
   if (!tipo) return res.status(400).json({ success: false, error: 'tipo debe ser PROCURADOR o ABOGADO' });
@@ -33,6 +50,7 @@ export const getProfesionales = async (req: any, res: Response) => {
         OR unaccent(COALESCE(despacho, '')) ILIKE unaccent($${vals.length})
         OR unaccent(COALESCE(colegio, '')) ILIKE unaccent($${vals.length})
         OR COALESCE(num_colegiado, '') ILIKE $${vals.length}
+        OR COALESCE(nif_cif, '') ILIKE $${vals.length}
       )`);
     }
 
@@ -57,6 +75,10 @@ export const getProfesionalById = async (req: any, res: Response) => {
   }
 };
 
+function normalizeEstado(raw: any): string {
+  return String(raw || '').trim() === 'Baja' ? 'Baja' : 'Alta';
+}
+
 export const createProfesional = async (req: any, res: Response) => {
   const tipo = normalizeTipo(req.body?.tipo);
   const firstName = nullIfEmpty(req.body?.first_name);
@@ -64,25 +86,19 @@ export const createProfesional = async (req: any, res: Response) => {
   if (!firstName) return res.status(400).json({ success: false, error: 'El nombre es obligatorio' });
 
   const userId = req.auth?.userId || 'SYSTEM';
-  const {
-    last_name, colegio, num_colegiado, despacho, email, phone, address, notes,
-    cuenta_consignaciones, codigo_repre, especialidad, turno_oficio,
-  } = req.body || {};
+  const fields = readTextFields(req.body);
+  fields.address_country = fields.address_country || 'España';
+  const turnoOficio = req.body?.turno_oficio === true || req.body?.turno_oficio === 'true';
+  const estado = normalizeEstado(req.body?.estado);
+
+  const cols = ['tipo', 'first_name', 'created_by', 'turno_oficio', 'estado', ...TEXT_FIELDS];
+  const vals: any[] = [tipo, firstName, userId, turnoOficio, estado, ...TEXT_FIELDS.map(f => fields[f])];
+  const placeholders = cols.map((_, i) => `$${i + 1}`).join(',');
 
   try {
     const { rows } = await pool.query(
-      `INSERT INTO directorio_profesionales
-         (tipo, first_name, last_name, colegio, num_colegiado, despacho, email, phone, address, notes, created_by,
-          cuenta_consignaciones, codigo_repre, especialidad, turno_oficio)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
-       RETURNING *`,
-      [
-        tipo, firstName, nullIfEmpty(last_name), nullIfEmpty(colegio), nullIfEmpty(num_colegiado),
-        nullIfEmpty(despacho), nullIfEmpty(email), nullIfEmpty(phone), nullIfEmpty(address),
-        nullIfEmpty(notes), userId,
-        nullIfEmpty(cuenta_consignaciones), nullIfEmpty(codigo_repre), nullIfEmpty(especialidad),
-        turno_oficio === true || turno_oficio === 'true',
-      ]
+      `INSERT INTO directorio_profesionales (${cols.join(', ')}) VALUES (${placeholders}) RETURNING *`,
+      vals
     );
     const p = rows[0];
     logActivityForReq(req, `${LABELS[tipo]} creado: ${p.first_name} ${p.last_name || ''}`.trim(), 'DIRECTORIO', p.id, undefined, 'CREATE');
@@ -96,28 +112,21 @@ export const updateProfesional = async (req: any, res: Response) => {
   const firstName = nullIfEmpty(req.body?.first_name);
   if (!firstName) return res.status(400).json({ success: false, error: 'El nombre es obligatorio' });
 
-  const {
-    last_name, colegio, num_colegiado, despacho, email, phone, address, notes,
-    cuenta_consignaciones, codigo_repre, especialidad, turno_oficio,
-  } = req.body || {};
+  const fields = readTextFields(req.body);
+  fields.address_country = fields.address_country || 'España';
+  const turnoOficio = req.body?.turno_oficio === true || req.body?.turno_oficio === 'true';
+  const estado = normalizeEstado(req.body?.estado);
+
+  const setCols = ['first_name', 'turno_oficio', 'estado', ...TEXT_FIELDS];
+  const vals: any[] = [firstName, turnoOficio, estado, ...TEXT_FIELDS.map(f => fields[f])];
+  const setClause = setCols.map((c, i) => `${c} = $${i + 1}`).join(', ');
 
   try {
     const { rows } = await pool.query(
-      `UPDATE directorio_profesionales SET
-         first_name = $1, last_name = $2, colegio = $3, num_colegiado = $4,
-         despacho = $5, email = $6, phone = $7, address = $8, notes = $9,
-         cuenta_consignaciones = $10, codigo_repre = $11, especialidad = $12, turno_oficio = $13,
-         updated_at = NOW()
-       WHERE id = $14
+      `UPDATE directorio_profesionales SET ${setClause}, updated_at = NOW()
+       WHERE id = $${setCols.length + 1}
        RETURNING *`,
-      [
-        firstName, nullIfEmpty(last_name), nullIfEmpty(colegio), nullIfEmpty(num_colegiado),
-        nullIfEmpty(despacho), nullIfEmpty(email), nullIfEmpty(phone), nullIfEmpty(address),
-        nullIfEmpty(notes),
-        nullIfEmpty(cuenta_consignaciones), nullIfEmpty(codigo_repre), nullIfEmpty(especialidad),
-        turno_oficio === true || turno_oficio === 'true',
-        req.params.id,
-      ]
+      [...vals, req.params.id]
     );
     if (!rows.length) return res.status(404).json({ success: false, error: 'No encontrado' });
     const p = rows[0];

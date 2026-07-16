@@ -9,8 +9,11 @@ import { Spinner } from "../components/Spinner";
 import { safeJson } from "../lib/api";
 
 const EMPTY_FORM = {
-  first_name: "", last_name: "", colegio: "", num_colegiado: "",
-  despacho: "", email: "", phone: "", address: "", notes: "",
+  first_name: "", last_name: "", nif_cif: "", estado: "Alta",
+  colegio: "", num_colegiado: "",
+  despacho: "", address_street: "", address_cp: "", address_town: "", address_province: "", address_country: "España",
+  email: "", website: "", phone_1: "", phone_2: "", phone_3: "", mobile: "", fax: "",
+  notes: "",
   cuenta_consignaciones: "", codigo_repre: "", especialidad: "", turno_oficio: false,
 };
 
@@ -50,9 +53,13 @@ export default function DirectorioProfesionalForm({ tipo, singular }: {
         const p = d.data;
         if (!cancelled) {
           setForm({
-            first_name: p.first_name || "", last_name: p.last_name || "", colegio: p.colegio || "",
-            num_colegiado: p.num_colegiado || "", despacho: p.despacho || "", email: p.email || "",
-            phone: p.phone || "", address: p.address || "", notes: p.notes || "",
+            first_name: p.first_name || "", last_name: p.last_name || "", nif_cif: p.nif_cif || "", estado: p.estado || "Alta",
+            colegio: p.colegio || "", num_colegiado: p.num_colegiado || "",
+            despacho: p.despacho || "", address_street: p.address_street || "", address_cp: p.address_cp || "",
+            address_town: p.address_town || "", address_province: p.address_province || "", address_country: p.address_country || "España",
+            email: p.email || "", website: p.website || "",
+            phone_1: p.phone_1 || "", phone_2: p.phone_2 || "", phone_3: p.phone_3 || "", mobile: p.mobile || "", fax: p.fax || "",
+            notes: p.notes || "",
             cuenta_consignaciones: p.cuenta_consignaciones || "", codigo_repre: p.codigo_repre || "",
             especialidad: p.especialidad || "", turno_oficio: !!p.turno_oficio,
           });
@@ -66,7 +73,7 @@ export default function DirectorioProfesionalForm({ tipo, singular }: {
     return () => { cancelled = true; };
   }, [id, isEdit, getToken]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setForm(prev => ({ ...prev, [name]: value }));
   };
@@ -173,13 +180,24 @@ export default function DirectorioProfesionalForm({ tipo, singular }: {
               <Icon size={16} className="text-slate-400" /> Identificación
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-6">
-              <div className="flex flex-col gap-2 md:col-span-2">
+              <div className="flex flex-col gap-2">
                 <label className={lbl}>Nombre *</label>
                 <input name="first_name" value={form.first_name} onChange={handleChange} className={inputCls} autoFocus />
               </div>
               <div className="flex flex-col gap-2">
                 <label className={lbl}>Apellidos</label>
                 <input name="last_name" value={form.last_name} onChange={handleChange} className={inputCls} />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className={lbl}>NIF / CIF</label>
+                <input name="nif_cif" value={form.nif_cif} onChange={handleChange} className={inputCls} />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className={lbl}>Estado</label>
+                <select name="estado" value={form.estado} onChange={handleChange} className={inputCls}>
+                  <option value="Alta">Alta</option>
+                  <option value="Baja">Baja</option>
+                </select>
               </div>
             </div>
           </div>
@@ -211,8 +229,8 @@ export default function DirectorioProfesionalForm({ tipo, singular }: {
               )}
               {tipo === "PROCURADOR" ? (
                 <div className="flex flex-col gap-2 md:col-span-3">
-                  <label className={lbl}>Cuenta de consignaciones</label>
-                  <input name="cuenta_consignaciones" value={form.cuenta_consignaciones} onChange={handleChange} placeholder="IBAN" className={`${inputCls} font-mono`} />
+                  <label className={lbl}>Cuenta de consignaciones (IBAN)</label>
+                  <input name="cuenta_consignaciones" value={form.cuenta_consignaciones} onChange={handleChange} placeholder="ES00 0000 0000 0000 0000 0000" className={`${inputCls} font-mono`} />
                 </div>
               ) : (
                 <div className="flex items-center gap-2 md:col-span-3 pt-1">
@@ -229,10 +247,10 @@ export default function DirectorioProfesionalForm({ tipo, singular }: {
             </div>
           </div>
 
-          {/* DESPACHO */}
+          {/* DIRECCIÓN */}
           <div className="pt-8 border-t border-slate-100">
             <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-6 flex items-center gap-2">
-              <Building2 size={16} className="text-slate-400" /> Despacho
+              <Building2 size={16} className="text-slate-400" /> Despacho y dirección
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-6">
               <div className="flex flex-col gap-2 md:col-span-3">
@@ -241,7 +259,23 @@ export default function DirectorioProfesionalForm({ tipo, singular }: {
               </div>
               <div className="flex flex-col gap-2 md:col-span-3">
                 <label className={lbl}>Dirección</label>
-                <input name="address" value={form.address} onChange={handleChange} className={inputCls} />
+                <input name="address_street" value={form.address_street} onChange={handleChange} className={inputCls} />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className={lbl}>Código Postal</label>
+                <input name="address_cp" value={form.address_cp} onChange={handleChange} className={inputCls} />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className={lbl}>Población</label>
+                <input name="address_town" value={form.address_town} onChange={handleChange} className={inputCls} />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className={lbl}>Provincia</label>
+                <input name="address_province" value={form.address_province} onChange={handleChange} className={inputCls} />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className={lbl}>País</label>
+                <input name="address_country" value={form.address_country} onChange={handleChange} className={inputCls} />
               </div>
             </div>
           </div>
@@ -257,8 +291,28 @@ export default function DirectorioProfesionalForm({ tipo, singular }: {
                 <input type="email" name="email" value={form.email} onChange={handleChange} placeholder="nombre@despacho.com" className={inputCls} />
               </div>
               <div className="flex flex-col gap-2">
-                <label className={lbl}>Teléfono</label>
-                <input name="phone" value={form.phone} onChange={handleChange} placeholder="900 000 000" className={inputCls} />
+                <label className={lbl}>Página web</label>
+                <input name="website" value={form.website} onChange={handleChange} placeholder="www.despacho.com" className={inputCls} />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className={lbl}>Teléfono 1</label>
+                <input name="phone_1" value={form.phone_1} onChange={handleChange} placeholder="900 000 000" className={inputCls} />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className={lbl}>Teléfono 2</label>
+                <input name="phone_2" value={form.phone_2} onChange={handleChange} className={inputCls} />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className={lbl}>Teléfono 3</label>
+                <input name="phone_3" value={form.phone_3} onChange={handleChange} className={inputCls} />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className={lbl}>Móvil</label>
+                <input name="mobile" value={form.mobile} onChange={handleChange} placeholder="600 000 000" className={inputCls} />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className={lbl}>Fax</label>
+                <input name="fax" value={form.fax} onChange={handleChange} className={inputCls} />
               </div>
             </div>
           </div>

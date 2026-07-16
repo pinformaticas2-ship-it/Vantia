@@ -170,6 +170,29 @@ export async function runMigrations(): Promise<void> {
       try { await client.query(`ALTER TABLE directorio_profesionales ADD COLUMN IF NOT EXISTS ${col} ${def};`); } catch (_e: any) {}
     }
 
+    // Renombrar columnas iniciales a nombres mas especificos (idempotente: si
+    // ya se renombraron en un deploy anterior, el ALTER falla y se ignora)
+    try { await client.query(`ALTER TABLE directorio_profesionales RENAME COLUMN phone TO phone_1;`); } catch (_e: any) {}
+    try { await client.query(`ALTER TABLE directorio_profesionales RENAME COLUMN address TO address_street;`); } catch (_e: any) {}
+
+    // Campos generales de contacto (comunes a Procurador y Abogado), calcados
+    // de la ficha de "Mantenimiento de Procuradores" del programa anterior.
+    for (const [col, def] of [
+      ['nif_cif',          'VARCHAR(20)'],
+      ['website',          'VARCHAR(200)'],
+      ['address_cp',       'VARCHAR(10)'],
+      ['address_town',     'VARCHAR(150)'],
+      ['address_province', 'VARCHAR(100)'],
+      ['address_country',  "VARCHAR(100) DEFAULT 'España'"],
+      ['phone_2',          'VARCHAR(50)'],
+      ['phone_3',          'VARCHAR(50)'],
+      ['mobile',           'VARCHAR(50)'],
+      ['fax',              'VARCHAR(50)'],
+      ['estado',           "VARCHAR(20) NOT NULL DEFAULT 'Alta'"],
+    ] as [string, string][]) {
+      try { await client.query(`ALTER TABLE directorio_profesionales ADD COLUMN IF NOT EXISTS ${col} ${def};`); } catch (_e: any) {}
+    }
+
     // ── UNIQUE en nif_cif ──────────────────────────────────────────
     try {
       await client.query(`
