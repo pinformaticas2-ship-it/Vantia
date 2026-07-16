@@ -10,6 +10,7 @@ import { safeJson } from "../lib/api";
 import AppSelect from "../components/AppSelect";
 import { loadColegiosAbogados, getProvincias as getProvinciasAbogados, getColegiosDeProvincia, detectarProvinciaDeColegio } from "../lib/colegiosAbogados";
 import type { ColegioAbogadosProvinciaData } from "../lib/colegiosAbogadosData";
+import { loadColegiosProcuradores } from "../lib/colegiosProcuradores";
 
 const EMPTY_FORM = {
   first_name: "", last_name: "", nif_cif: "", estado: "Alta",
@@ -79,6 +80,51 @@ function ColegioAbogadoField({ value, onChange }: { value: string; onChange: (v:
       )}
       <p className="text-[10px] text-slate-400 leading-snug">
         Listado oficial de Colegios de la Abogacía de España — si no encuentras el tuyo, escríbelo manualmente.
+      </p>
+    </div>
+  );
+}
+
+// ── Selector de Colegio de Procuradores, con listado oficial (cgpe.es); la
+// fuente no agrupa por provincia, así que es un único buscador con todos.
+function ColegioProcuradorField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [data, setData] = useState<string[] | null>(null);
+  const [modoManual, setModoManual] = useState(true);
+  const MANUAL = "__manual__";
+
+  useEffect(() => {
+    let cancelled = false;
+    loadColegiosProcuradores().then(d => {
+      if (cancelled) return;
+      setData(d);
+      if (d.includes(value)) setModoManual(false);
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const colegioSeleccionado = data?.includes(value) ? value : MANUAL;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <AppSelect
+        value={modoManual ? MANUAL : colegioSeleccionado}
+        onChange={e => {
+          if (e.target.value === MANUAL) { setModoManual(true); onChange(""); }
+          else { setModoManual(false); onChange(e.target.value); }
+        }}
+        disabled={!data}
+        searchable
+        searchPlaceholder="Buscar colegio..."
+      >
+        <option value={MANUAL}>{data ? "Escribir manualmente…" : "Cargando..."}</option>
+        {(data || []).map(c => <option key={c} value={c}>{c}</option>)}
+      </AppSelect>
+      {modoManual && (
+        <input value={value} onChange={e => onChange(e.target.value)} placeholder="Nombre del colegio" className={inputCls} />
+      )}
+      <p className="text-[10px] text-slate-400 leading-snug">
+        Listado oficial de Colegios de Procuradores de España — si no encuentras el tuyo, escríbelo manualmente.
       </p>
     </div>
   );
@@ -272,12 +318,12 @@ export default function DirectorioProfesionalForm({ tipo, singular }: {
               <BadgeCheck size={16} className="text-slate-400" /> Colegiación
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-6">
-              <div className={`flex flex-col gap-2 ${tipo === "ABOGADO" ? "md:col-span-2" : ""}`}>
+              <div className="flex flex-col gap-2 md:col-span-2">
                 <label className={lbl}>Colegio</label>
                 {tipo === "ABOGADO" ? (
                   <ColegioAbogadoField value={form.colegio} onChange={v => setForm(prev => ({ ...prev, colegio: v }))} />
                 ) : (
-                  <input name="colegio" value={form.colegio} onChange={handleChange} placeholder="Ej. Colegio de Procuradores de Madrid" className={inputCls} />
+                  <ColegioProcuradorField value={form.colegio} onChange={v => setForm(prev => ({ ...prev, colegio: v }))} />
                 )}
               </div>
               <div className="flex flex-col gap-2">
