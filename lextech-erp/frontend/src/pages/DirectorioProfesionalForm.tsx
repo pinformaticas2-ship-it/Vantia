@@ -7,6 +7,9 @@ import {
 } from "lucide-react";
 import { Spinner } from "../components/Spinner";
 import { safeJson } from "../lib/api";
+import AppSelect from "../components/AppSelect";
+import { loadColegiosAbogados, getProvincias as getProvinciasAbogados, getColegiosDeProvincia, detectarProvinciaDeColegio } from "../lib/colegiosAbogados";
+import type { ColegioAbogadosProvinciaData } from "../lib/colegiosAbogadosData";
 
 const EMPTY_FORM = {
   first_name: "", last_name: "", nif_cif: "", estado: "Alta",
@@ -19,6 +22,67 @@ const EMPTY_FORM = {
 
 const lbl = "text-xs font-bold text-slate-500 uppercase tracking-wider";
 const inputCls = "w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-md text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-red-500 focus:border-red-500 transition-colors";
+
+// ── Selector de Colegio de la Abogacía (Provincia → Colegio), con listado
+// oficial (abogacia.es); si no se encuentra el colegio se puede escribir a mano.
+function ColegioAbogadoField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [data, setData] = useState<ColegioAbogadosProvinciaData[] | null>(null);
+  const [provincia, setProvincia] = useState("");
+  const [modoManual, setModoManual] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadColegiosAbogados().then(d => {
+      if (cancelled) return;
+      setData(d);
+      const detectado = detectarProvinciaDeColegio(d, value);
+      if (detectado) { setProvincia(detectado.provincia); setModoManual(false); }
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const provincias = data ? getProvinciasAbogados(data) : [];
+  const colegios = data && provincia ? getColegiosDeProvincia(data, provincia) : [];
+  const MANUAL = "__manual__";
+  const colegioSeleccionado = colegios.includes(value) ? value : MANUAL;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="grid grid-cols-2 gap-2">
+        <AppSelect
+          value={provincia}
+          onChange={e => { setProvincia(e.target.value); setModoManual(true); onChange(""); }}
+          disabled={!data}
+          searchable
+          searchPlaceholder="Buscar provincia..."
+        >
+          <option value="">{data ? "— Provincia —" : "Cargando..."}</option>
+          {provincias.map(p => <option key={p} value={p}>{p}</option>)}
+        </AppSelect>
+        <AppSelect
+          value={modoManual ? MANUAL : colegioSeleccionado}
+          onChange={e => {
+            if (e.target.value === MANUAL) { setModoManual(true); onChange(""); }
+            else { setModoManual(false); onChange(e.target.value); }
+          }}
+          disabled={!provincia}
+          searchable
+          searchPlaceholder="Buscar colegio..."
+        >
+          <option value={MANUAL}>{provincia ? "Escribir manualmente…" : "Elige antes la provincia"}</option>
+          {colegios.map(c => <option key={c} value={c}>{c}</option>)}
+        </AppSelect>
+      </div>
+      {modoManual && (
+        <input value={value} onChange={e => onChange(e.target.value)} placeholder="Nombre del colegio" className={inputCls} />
+      )}
+      <p className="text-[10px] text-slate-400 leading-snug">
+        Listado oficial de Colegios de la Abogacía de España — si no encuentras el tuyo, escríbelo manualmente.
+      </p>
+    </div>
+  );
+}
 
 export default function DirectorioProfesionalForm({ tipo, singular }: {
   tipo: "PROCURADOR" | "ABOGADO";
@@ -208,9 +272,13 @@ export default function DirectorioProfesionalForm({ tipo, singular }: {
               <BadgeCheck size={16} className="text-slate-400" /> Colegiación
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-6">
-              <div className="flex flex-col gap-2">
+              <div className={`flex flex-col gap-2 ${tipo === "ABOGADO" ? "md:col-span-2" : ""}`}>
                 <label className={lbl}>Colegio</label>
-                <input name="colegio" value={form.colegio} onChange={handleChange} placeholder={tipo === "PROCURADOR" ? "Ej. ICPM" : "Ej. ICAM"} className={inputCls} />
+                {tipo === "ABOGADO" ? (
+                  <ColegioAbogadoField value={form.colegio} onChange={v => setForm(prev => ({ ...prev, colegio: v }))} />
+                ) : (
+                  <input name="colegio" value={form.colegio} onChange={handleChange} placeholder="Ej. Colegio de Procuradores de Madrid" className={inputCls} />
+                )}
               </div>
               <div className="flex flex-col gap-2">
                 <label className={lbl}>Nº Colegiado</label>
