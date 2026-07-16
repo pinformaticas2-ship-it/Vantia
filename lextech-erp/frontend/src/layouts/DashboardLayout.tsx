@@ -783,7 +783,16 @@ function SidebarContent({ pathname, onClose, onSignOut, collapsed, onToggleColla
 
                     const isOpen = openGroups.has(item.name);
                     return (
-                      <div key={item.name}>
+                      <div
+                        key={item.name}
+                        onMouseEnter={() => setOpenGroups((prev) => (prev.has(item.name) ? prev : new Set(prev).add(item.name)))}
+                        onMouseLeave={() => setOpenGroups((prev) => {
+                          if (!prev.has(item.name)) return prev;
+                          const next = new Set(prev);
+                          next.delete(item.name);
+                          return next;
+                        })}
+                      >
                         <button
                           type="button"
                           onClick={() => toggleGroup(item.name)}
