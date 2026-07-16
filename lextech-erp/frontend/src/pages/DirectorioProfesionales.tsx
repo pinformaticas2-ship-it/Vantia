@@ -4,9 +4,11 @@ import { useAuth } from "@clerk/clerk-react";
 import {
   Scale, Gavel, Search, Plus, X, Edit3, Trash2, ExternalLink,
   RefreshCw, AlertCircle, Loader2, ChevronUp, ChevronDown, ChevronLeft, ChevronRight,
+  SlidersHorizontal,
 } from "lucide-react";
 import { Spinner } from "../components/Spinner";
 import { safeJson } from "../lib/api";
+import ColumnVisibilityModal from "../components/ColumnVisibilityModal";
 
 interface Profesional {
   id: string;
@@ -40,6 +42,61 @@ interface Profesional {
 
 type SortKey = "nombre" | "colegio";
 const PAGE_SIZE = 60;
+
+// ── Columnas disponibles (igual concepto que "Elegir columnas" en Clientes) ──
+type ColumnKey =
+  | "name" | "nif_cif" | "colegio" | "num_colegiado" | "codigo_repre" | "especialidad" | "turno_oficio"
+  | "cuenta_consignaciones" | "despacho" | "address_street" | "address_cp" | "address_town"
+  | "address_province" | "address_country" | "email" | "website" | "phone_1" | "phone_2" | "phone_3"
+  | "mobile" | "fax" | "estado";
+
+const ALL_COLUMNS: { key: ColumnKey; label: string; tipoOnly?: "PROCURADOR" | "ABOGADO" }[] = [
+  { key: "name",                   label: "Nombre y Apellidos" },
+  { key: "nif_cif",                label: "NIF / CIF" },
+  { key: "colegio",                label: "Colegio" },
+  { key: "num_colegiado",          label: "Nº Colegiado" },
+  { key: "codigo_repre",           label: "Código REPRE",          tipoOnly: "PROCURADOR" },
+  { key: "cuenta_consignaciones",  label: "Cuenta de consignaciones", tipoOnly: "PROCURADOR" },
+  { key: "especialidad",           label: "Especialidad",          tipoOnly: "ABOGADO" },
+  { key: "turno_oficio",           label: "Turno de oficio",       tipoOnly: "ABOGADO" },
+  { key: "despacho",               label: "Despacho" },
+  { key: "address_street",         label: "Dirección" },
+  { key: "address_cp",             label: "Código Postal" },
+  { key: "address_town",           label: "Población" },
+  { key: "address_province",       label: "Provincia" },
+  { key: "address_country",        label: "País" },
+  { key: "email",                  label: "Correo Electrónico" },
+  { key: "website",                label: "Página web" },
+  { key: "phone_1",                label: "Teléfono 1" },
+  { key: "phone_2",                label: "Teléfono 2" },
+  { key: "phone_3",                label: "Teléfono 3" },
+  { key: "mobile",                 label: "Móvil" },
+  { key: "fax",                    label: "Fax" },
+  { key: "estado",                 label: "Estado" },
+];
+
+const DEFAULT_VISIBLE: ColumnKey[] = ["name", "colegio", "num_colegiado", "codigo_repre", "especialidad", "email", "phone_1", "estado"];
+
+function cellValue(p: Profesional, key: ColumnKey): React.ReactNode {
+  switch (key) {
+    case "turno_oficio":
+      return p.turno_oficio
+        ? <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold">Sí</span>
+        : <span className="text-slate-300">—</span>;
+    case "estado":
+      return (
+        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${p.estado === "Baja" ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-700"}`}>
+          {p.estado || "Alta"}
+        </span>
+      );
+    case "num_colegiado":
+      return p.num_colegiado ? `Nº ${p.num_colegiado}` : <span className="text-slate-300">—</span>;
+    default: {
+      const v = (p as any)[key];
+      return v ? v : <span className="text-slate-300">—</span>;
+    }
+  }
+}
 
 // ── Botón de barra de herramientas (calcado de ToolBtn en ClientList) ──────
 function ToolBtn({ icon: Icon, label, onClick, disabled, danger, primary }: {
@@ -141,6 +198,12 @@ export default function DirectorioProfesionales({ tipo, title, singular, desc }:
   const navigate = useNavigate();
   const base = tipo === "PROCURADOR" ? "procuradores" : "abogados";
   const Icon = tipo === "PROCURADOR" ? Scale : Gavel;
+  const storageKey = `directorio-${base}-visible-columns`;
+
+  const columnsForTipo = useMemo(
+    () => ALL_COLUMNS.filter(c => !c.tipoOnly || c.tipoOnly === tipo),
+    [tipo]
+  );
 
   const [items, setItems]       = useState<Profesional[]>([]);
   const [loading, setLoading]   = useState(true);
@@ -153,6 +216,37 @@ export default function DirectorioProfesionales({ tipo, title, singular, desc }:
   const [currentPage, setCurrentPage] = useState(1);
   const [deleteTarget, setDeleteTarget] = useState<Profesional | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [showColumnModal, setShowColumnModal] = useState(false);
+  const [visibleKeys, setVisibleKeys] = useState<ColumnKey[]>(() => {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) {
+        const parsed = JSON.parse(raw) as ColumnKey[];
+        const valid = new Set(columnsForTipo.map(c => c.key));
+        const filtered = parsed.filter(k => valid.has(k));
+        if (filtered.length) return filtered;
+      }
+    } catch {}
+    return DEFAULT_VISIBLE.filter(k => columnsForTipo.some(c => c.key === k));
+  });
+
+  useEffect(() => {
+    localStorage.setItem(storageKey, JSON.stringify(visibleKeys));
+  }, [visibleKeys, storageKey]);
+
+  const visibleSet = useMemo(() => new Set(visibleKeys), [visibleKeys]);
+  const availableColumnItems = useMemo(
+    () => columnsForTipo.filter(c => !visibleSet.has(c.key)).map(c => ({ key: c.key, label: c.label })),
+    [columnsForTipo, visibleSet]
+  );
+  const visibleColumnItems = useMemo(
+    () => columnsForTipo.filter(c => visibleSet.has(c.key)).map(c => ({ key: c.key, label: c.label })),
+    [columnsForTipo, visibleSet]
+  );
+  const orderedVisibleColumns = useMemo(
+    () => columnsForTipo.filter(c => visibleSet.has(c.key)),
+    [columnsForTipo, visibleSet]
+  );
 
   const load = useCallback(async (q = "", spin = false) => {
     if (spin) setRefreshSpin(true); else setLoading(true);
@@ -271,12 +365,13 @@ export default function DirectorioProfesionales({ tipo, title, singular, desc }:
       </div>
 
       {/* ── BARRA DE HERRAMIENTAS ───────────────────────────────── */}
-      <div className="px-6 py-2.5 border-b border-slate-200 bg-slate-50 flex items-center flex-shrink-0 z-10 overflow-x-auto animate-card-in-1">
+      <div className="px-6 py-2.5 border-b border-slate-200 bg-slate-50 flex items-center justify-between flex-shrink-0 z-10 overflow-x-auto animate-card-in-1">
         <div className="flex items-center gap-1.5 min-w-max pb-0.5">
           <ToolBtn icon={Plus} label="Nuevo" primary onClick={() => navigate(`/dashboard/${base}/new`)} />
           <ToolBtn icon={Edit3} label="Editar" disabled={!selected} onClick={() => selected && navigate(`/dashboard/${base}/${selected}/edit`)} />
           <ToolBtn icon={Trash2} label="Eliminar" danger disabled={!selected} onClick={() => selectedItem && setDeleteTarget(selectedItem)} />
         </div>
+        <ToolBtn icon={SlidersHorizontal} label="Elegir columnas" onClick={() => setShowColumnModal(true)} />
       </div>
 
       {/* ── FILTROS / BÚSQUEDA ──────────────────────────────────── */}
@@ -305,18 +400,22 @@ export default function DirectorioProfesionales({ tipo, title, singular, desc }:
         <table className="w-full text-left text-sm min-w-[900px]">
           <thead className="bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
             <tr>
-              <Th label="Nombre" sortKey="nombre" active={sortKey === "nombre"} dir={sortDir} onSort={handleSort} />
-              <Th label="Colegiación" sortKey="colegio" active={sortKey === "colegio"} dir={sortDir} onSort={handleSort} />
-              <Th label={tipo === "PROCURADOR" ? "Código REPRE" : "Especialidad"} />
-              <Th label="Contacto" />
-              <Th label="Estado" />
+              {orderedVisibleColumns.map(col => (
+                col.key === "name" ? (
+                  <Th key={col.key} label={col.label} sortKey="nombre" active={sortKey === "nombre"} dir={sortDir} onSort={handleSort} />
+                ) : col.key === "colegio" ? (
+                  <Th key={col.key} label={col.label} sortKey="colegio" active={sortKey === "colegio"} dir={sortDir} onSort={handleSort} />
+                ) : (
+                  <Th key={col.key} label={col.label} />
+                )
+              ))}
               <th className="px-3 py-2.5 w-10"></th>
             </tr>
           </thead>
           <tbody>
             {paged.length === 0 ? (
               <tr>
-                <td colSpan={6} className="py-20 text-center">
+                <td colSpan={orderedVisibleColumns.length + 1} className="py-20 text-center">
                   <div className="flex flex-col items-center gap-3 text-slate-400">
                     <Icon size={36} className="opacity-15" />
                     <p className="font-medium text-sm">
@@ -342,46 +441,24 @@ export default function DirectorioProfesionales({ tipo, title, singular, desc }:
                   }`}
                   style={rowIdx < 12 ? { animationDelay: `${rowIdx * 35}ms` } : undefined}
                 >
-                  <td className="px-3 py-3">
-                    <div className="flex items-center gap-2.5">
-                      <div className={`h-9 w-9 rounded-lg flex items-center justify-center text-sm font-bold shrink-0 ${isSelected ? "bg-red-200 text-red-700" : "bg-slate-100 text-slate-500"}`}>
-                        {initials(p)}
-                      </div>
-                      <div className="min-w-0">
-                        <p className={`font-semibold leading-tight truncate ${isSelected ? "text-red-700" : "text-slate-800"}`}>{p.first_name} {p.last_name || ""}</p>
-                        {p.despacho && <p className="text-xs text-slate-400 truncate leading-tight">{p.despacho}</p>}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-3 py-3 text-slate-500">
-                    {(p.colegio || p.num_colegiado)
-                      ? <>{p.colegio}{p.colegio && p.num_colegiado ? " · " : ""}{p.num_colegiado ? `Nº ${p.num_colegiado}` : ""}</>
-                      : <span className="text-slate-300">—</span>}
-                  </td>
-                  <td className="px-3 py-3 text-slate-500">
-                    {tipo === "PROCURADOR" ? (
-                      p.codigo_repre ? <span className="font-mono">{p.codigo_repre}</span> : <span className="text-slate-300">—</span>
+                  {orderedVisibleColumns.map(col => (
+                    col.key === "name" ? (
+                      <td key={col.key} className="px-3 py-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className={`h-9 w-9 rounded-lg flex items-center justify-center text-sm font-bold shrink-0 ${isSelected ? "bg-red-200 text-red-700" : "bg-slate-100 text-slate-500"}`}>
+                            {initials(p)}
+                          </div>
+                          <div className="min-w-0">
+                            <p className={`font-semibold leading-tight truncate ${isSelected ? "text-red-700" : "text-slate-800"}`}>{p.first_name} {p.last_name || ""}</p>
+                          </div>
+                        </div>
+                      </td>
                     ) : (
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        {p.especialidad ? <span>{p.especialidad}</span> : <span className="text-slate-300">—</span>}
-                        {p.turno_oficio && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold">
-                            Turno de oficio
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-3 py-3 text-slate-500">
-                    {p.email && <p className="truncate max-w-[180px]">{p.email}</p>}
-                    {(p.phone_1 || p.mobile) && <p className="text-xs text-slate-400">{p.phone_1 || p.mobile}</p>}
-                    {!p.email && !p.phone_1 && !p.mobile && <span className="text-slate-300">—</span>}
-                  </td>
-                  <td className="px-3 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${p.estado === "Baja" ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-700"}`}>
-                      {p.estado || "Alta"}
-                    </span>
-                  </td>
+                      <td key={col.key} className="px-3 py-3 text-slate-500 truncate max-w-[220px]">
+                        {cellValue(p, col.key)}
+                      </td>
+                    )
+                  ))}
                   <td className="px-3 py-3 text-right">
                     <button
                       onClick={e => { e.stopPropagation(); navigate(`/dashboard/${base}/${p.id}/edit`); }}
@@ -416,6 +493,20 @@ export default function DirectorioProfesionales({ tipo, title, singular, desc }:
           Doble clic para editar · Ctrl+F para buscar
         </span>
       </div>
+
+      <ColumnVisibilityModal
+        open={showColumnModal}
+        title={`Columnas de ${title}`}
+        sourceLabel="Disponibles"
+        targetLabel="Visibles"
+        availableItems={availableColumnItems}
+        visibleItems={visibleColumnItems}
+        onMoveToVisible={(keys) => setVisibleKeys(prev => [...prev, ...keys.filter(k => !prev.includes(k as ColumnKey)) as ColumnKey[]])}
+        onMoveToAvailable={(keys) => setVisibleKeys(prev => prev.filter(k => !keys.includes(k)))}
+        onMoveAllToVisible={() => setVisibleKeys(columnsForTipo.map(c => c.key))}
+        onMoveAllToAvailable={() => setVisibleKeys([])}
+        onClose={() => setShowColumnModal(false)}
+      />
 
       {deleteTarget && (
         <div className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/40 backdrop-blur-sm px-4" onClick={() => setDeleteTarget(null)}>
