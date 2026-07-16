@@ -248,10 +248,29 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const revealTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (open) setEverOpened(true);
   }, [open]);
+
+  // Efecto "máquina de escribir": revela el texto ya recibido poco a poco en
+  // vez de volcarlo de golpe, para que se vea como si VantIA lo fuera
+  // escribiendo (igual que Gemini), sin depender de streaming real del backend.
+  useEffect(() => () => { if (revealTimerRef.current) clearInterval(revealTimerRef.current); }, []);
+  const streamReveal = (idx: number, fullText: string): Promise<void> =>
+    new Promise((resolve) => {
+      if (revealTimerRef.current) clearInterval(revealTimerRef.current);
+      let pos = 0;
+      revealTimerRef.current = setInterval(() => {
+        pos = Math.min(pos + 3, fullText.length);
+        setMessages((prev) => prev.map((m, i) => (i === idx ? { ...m, text: fullText.slice(0, pos) } : m)));
+        if (pos >= fullText.length) {
+          if (revealTimerRef.current) { clearInterval(revealTimerRef.current); revealTimerRef.current = null; }
+          resolve();
+        }
+      }, 18);
+    });
 
   useEffect(() => {
     if (!showMenu) return;
@@ -292,7 +311,10 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
   }, [open]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    // "auto" (instantáneo) en vez de "smooth": con la revelación tipo máquina
+    // de escribir el contenido crece varias veces por segundo y un scroll
+    // suave repetido se nota a tirones.
+    bottomRef.current?.scrollIntoView({ behavior: "auto" });
   }, [messages, loading]);
 
   const autoResize = (el: HTMLTextAreaElement) => {
@@ -323,12 +345,14 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
     setLoading(true);
     try {
       const reply = await callApi(text, messages);
-      setMessages([...newHistory, { role: "model", text: reply }]);
+      const idx = newHistory.length;
+      setMessages([...newHistory, { role: "model", text: "" }]);
+      setLoading(false);
+      await streamReveal(idx, reply);
       setRetryText("");
     } catch (err: any) {
       setRetryText(text);
       setMessages([...newHistory, { role: "model", text: `❌ ${err.message}` }]);
-    } finally {
       setLoading(false);
     }
   };
@@ -343,11 +367,13 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
     setRetryText("");
     try {
       const reply = await callApi(text, prevMessages);
-      setMessages([...withUser, { role: "model", text: reply }]);
+      const idx = withUser.length;
+      setMessages([...withUser, { role: "model", text: "" }]);
+      setLoading(false);
+      await streamReveal(idx, reply);
     } catch (err: any) {
       setRetryText(text);
       setMessages([...withUser, { role: "model", text: `❌ ${err.message}` }]);
-    } finally {
       setLoading(false);
     }
   };
@@ -362,10 +388,11 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
     setRegeneratingIdx(idx);
     try {
       const reply = await callApi(userMsg.text, prevMessages);
-      setMessages((prev) => prev.map((m, i) => (i === idx ? { role: "model", text: reply } : m)));
+      setMessages((prev) => prev.map((m, i) => (i === idx ? { role: "model", text: "" } : m)));
+      setRegeneratingIdx(null);
+      await streamReveal(idx, reply);
     } catch (err: any) {
       setMessages((prev) => prev.map((m, i) => (i === idx ? { role: "model", text: `❌ ${err.message}` } : m)));
-    } finally {
       setRegeneratingIdx(null);
     }
   };
@@ -528,10 +555,8 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
                 <div className="w-7 h-7 rounded-full bg-gradient-to-br from-red-500 to-red-700 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
                   <Bot size={13} />
                 </div>
-                <div className="flex items-center gap-1.5 pt-3">
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-300 animate-bounce" style={{ animationDelay: "0ms" }} />
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-300 animate-bounce" style={{ animationDelay: "150ms" }} />
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-300 animate-bounce" style={{ animationDelay: "300ms" }} />
+                <div className="flex items-center pt-2.5">
+                  <Loader2 size={16} className="text-red-400 animate-spin" />
                 </div>
               </div>
             )}
