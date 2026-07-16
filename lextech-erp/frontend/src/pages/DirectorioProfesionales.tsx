@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
 import {
-  Scale, Gavel, Search, Plus, X, Pen, Trash2, ExternalLink,
-  RefreshCw, AlertCircle, Loader2,
+  Scale, Gavel, Search, Plus, X, Edit3, Trash2, ExternalLink,
+  RefreshCw, AlertCircle, Loader2, ChevronUp, ChevronDown, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { Spinner } from "../components/Spinner";
 import { safeJson } from "../lib/api";
@@ -27,6 +27,99 @@ interface Profesional {
   created_at: string;
 }
 
+type SortKey = "nombre" | "colegio";
+const PAGE_SIZE = 60;
+
+// ── Botón de barra de herramientas (calcado de ToolBtn en ClientList) ──────
+function ToolBtn({ icon: Icon, label, onClick, disabled, danger, primary }: {
+  icon: React.ComponentType<{ size?: number }>;
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  danger?: boolean;
+  primary?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={label}
+      className={`inline-flex items-center gap-1.5 whitespace-nowrap px-3 py-2 rounded-lg text-xs font-semibold transition-all active:scale-[0.97] border ${
+        disabled
+          ? "text-slate-300 cursor-not-allowed bg-white border-slate-100"
+          : primary
+            ? "bg-red-600 text-white hover:bg-red-700 border-red-600 shadow-sm shadow-red-200"
+            : danger
+              ? "text-red-600 bg-white hover:bg-red-50 border-red-200"
+              : "text-slate-600 bg-white hover:bg-slate-50 hover:border-slate-300 border-slate-200"
+      }`}
+    >
+      <Icon size={13} />
+      <span className="hidden sm:inline">{label}</span>
+    </button>
+  );
+}
+
+function Th({ label, sortKey, active, dir, onSort, className }: {
+  label: string; sortKey?: SortKey; active?: boolean; dir?: "asc" | "desc";
+  onSort?: (k: SortKey) => void; className?: string;
+}) {
+  return (
+    <th
+      className={`px-3 py-2.5 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest select-none whitespace-nowrap ${sortKey ? "cursor-pointer hover:text-slate-600" : ""} ${className || ""}`}
+      onClick={() => sortKey && onSort?.(sortKey)}
+    >
+      <span className="flex items-center gap-1">
+        {label}
+        {sortKey && (
+          <span className={active ? "text-red-500" : "text-slate-200"}>
+            {active && dir === "asc" ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+          </span>
+        )}
+      </span>
+    </th>
+  );
+}
+
+function PaginationBar({ currentPage, totalPages, onPageChange, totalItems, pageSize }: {
+  currentPage: number; totalPages: number; onPageChange: (page: number) => void;
+  totalItems: number; pageSize: number;
+}) {
+  if (totalPages <= 1) return null;
+  const pageSet = new Set<number>([1, totalPages]);
+  for (let p = currentPage - 1; p <= currentPage + 1; p++) if (p > 1 && p < totalPages) pageSet.add(p);
+  const sorted = [...pageSet].sort((a, b) => a - b);
+  const items: (number | "...")[] = [];
+  let prev = 0;
+  for (const p of sorted) { if (prev && p - prev > 1) items.push("..."); items.push(p); prev = p; }
+  const from = totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const to = Math.min(currentPage * pageSize, totalItems);
+
+  return (
+    <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-t border-slate-100 bg-white text-xs shrink-0">
+      <span className="text-slate-400">{from}–{to} de {totalItems}</span>
+      <div className="flex items-center gap-1">
+        <button onClick={() => onPageChange(Math.max(1, currentPage - 1))} disabled={currentPage === 1}
+          className="w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-30 disabled:pointer-events-none transition-colors">
+          <ChevronLeft size={13} />
+        </button>
+        {items.map((p, i) => p === "..." ? (
+          <span key={`e-${i}`} className="w-7 h-7 flex items-center justify-center text-slate-300 select-none">…</span>
+        ) : (
+          <button key={p} onClick={() => onPageChange(p)}
+            className={`w-7 h-7 flex items-center justify-center rounded-md text-xs font-semibold transition-colors ${p === currentPage ? "bg-red-600 text-white" : "text-slate-600 hover:bg-slate-100"}`}>
+            {p}
+          </button>
+        ))}
+        <button onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))} disabled={currentPage === totalPages}
+          className="w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-30 disabled:pointer-events-none transition-colors">
+          <ChevronRight size={13} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function DirectorioProfesionales({ tipo, title, singular, desc }: {
   tipo: "PROCURADOR" | "ABOGADO";
   title: string;
@@ -44,6 +137,9 @@ export default function DirectorioProfesionales({ tipo, title, singular, desc }:
   const [refreshSpin, setRefreshSpin] = useState(false);
   const [search, setSearch]     = useState("");
   const [selected, setSelected] = useState<string | null>(null);
+  const [sortKey, setSortKey]   = useState<SortKey>("nombre");
+  const [sortDir, setSortDir]   = useState<"asc" | "desc">("asc");
+  const [currentPage, setCurrentPage] = useState(1);
   const [deleteTarget, setDeleteTarget] = useState<Profesional | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -68,12 +164,32 @@ export default function DirectorioProfesionales({ tipo, title, singular, desc }:
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
-    const t = setTimeout(() => load(search), 300);
+    const t = setTimeout(() => { load(search); setCurrentPage(1); }, 300);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
 
   const handleRefresh = () => load(search, true);
+  const handleSort = (k: SortKey) => {
+    if (k === sortKey) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortKey(k); setSortDir("asc"); }
+  };
+
+  const sorted = useMemo(() => {
+    const arr = [...items];
+    arr.sort((a, b) => {
+      const av = sortKey === "nombre" ? `${a.first_name} ${a.last_name || ""}` : (a.colegio || "");
+      const bv = sortKey === "nombre" ? `${b.first_name} ${b.last_name || ""}` : (b.colegio || "");
+      return sortDir === "asc" ? av.localeCompare(bv, "es") : bv.localeCompare(av, "es");
+    });
+    return arr;
+  }, [items, sortKey, sortDir]);
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  useEffect(() => { if (currentPage > totalPages) setCurrentPage(1); }, [totalPages, currentPage]);
+  const paged = useMemo(() => sorted.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE), [sorted, currentPage]);
+
+  const selectedItem = items.find(i => i.id === selected) || null;
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
@@ -82,6 +198,7 @@ export default function DirectorioProfesionales({ tipo, title, singular, desc }:
       const token = await getToken({ skipCache: true });
       await fetch(`/api/directorio/${deleteTarget.id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
       setItems(prev => prev.filter(i => i.id !== deleteTarget.id));
+      setSelected(prev => prev === deleteTarget.id ? null : prev);
       setDeleteTarget(null);
     } finally {
       setDeleting(false);
@@ -89,6 +206,7 @@ export default function DirectorioProfesionales({ tipo, title, singular, desc }:
   };
 
   const initials = (p: Profesional) => ((p.first_name || "?")[0] || "?").toUpperCase();
+  const turnoOficioCount = tipo === "ABOGADO" ? items.filter(i => i.turno_oficio).length : 0;
 
   if (loading) return (
     <div className="w-full min-h-[60vh] flex flex-col items-center justify-center gap-4">
@@ -125,6 +243,9 @@ export default function DirectorioProfesionales({ tipo, title, singular, desc }:
               <h1 className="text-lg font-extrabold text-slate-900 leading-tight">{title}</h1>
               <p className="text-xs text-slate-500 mt-0.5">
                 <span className="font-semibold text-slate-700">{items.length}</span> {desc}
+                {tipo === "ABOGADO" && (
+                  <> {" · "}<span className="font-semibold text-emerald-600">{turnoOficioCount}</span> en turno de oficio</>
+                )}
               </p>
             </div>
           </div>
@@ -138,8 +259,17 @@ export default function DirectorioProfesionales({ tipo, title, singular, desc }:
         </div>
       </div>
 
-      {/* ── TOOLBAR ──────────────────────────────────────────── */}
-      <div className="px-6 py-2.5 border-b border-slate-200 bg-slate-50 flex items-center justify-between gap-3 flex-shrink-0 z-10 animate-card-in-1">
+      {/* ── BARRA DE HERRAMIENTAS ───────────────────────────────── */}
+      <div className="px-6 py-2.5 border-b border-slate-200 bg-slate-50 flex items-center flex-shrink-0 z-10 overflow-x-auto animate-card-in-1">
+        <div className="flex items-center gap-1.5 min-w-max pb-0.5">
+          <ToolBtn icon={Plus} label="Nuevo" primary onClick={() => navigate(`/dashboard/${base}/new`)} />
+          <ToolBtn icon={Edit3} label="Editar" disabled={!selected} onClick={() => selected && navigate(`/dashboard/${base}/${selected}/edit`)} />
+          <ToolBtn icon={Trash2} label="Eliminar" danger disabled={!selected} onClick={() => selectedItem && setDeleteTarget(selectedItem)} />
+        </div>
+      </div>
+
+      {/* ── FILTROS / BÚSQUEDA ──────────────────────────────────── */}
+      <div className="px-6 py-2 border-b border-slate-200 bg-white flex items-center justify-between gap-3 flex-shrink-0 z-10">
         <div className="relative">
           <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
@@ -154,17 +284,9 @@ export default function DirectorioProfesionales({ tipo, title, singular, desc }:
             </button>
           )}
         </div>
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-slate-400 whitespace-nowrap">
-            {items.length} {items.length === 1 ? "registro" : "registros"}
-          </span>
-          <button
-            onClick={() => navigate(`/dashboard/${base}/new`)}
-            className="inline-flex items-center gap-1.5 whitespace-nowrap px-3 py-2 rounded-lg text-xs font-semibold transition-all active:scale-[0.97] border bg-red-600 text-white hover:bg-red-700 border-red-600 shadow-sm shadow-red-200"
-          >
-            <Plus size={13} /> Nuevo
-          </button>
-        </div>
+        <span className="text-xs text-slate-400 whitespace-nowrap">
+          {items.length} {items.length === 1 ? "registro" : "registros"}
+        </span>
       </div>
 
       {/* ── TABLA ────────────────────────────────────────────── */}
@@ -172,17 +294,15 @@ export default function DirectorioProfesionales({ tipo, title, singular, desc }:
         <table className="w-full text-left text-sm min-w-[820px]">
           <thead className="bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
             <tr>
-              <th className="px-3 py-2.5 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest select-none whitespace-nowrap">Nombre</th>
-              <th className="px-3 py-2.5 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest select-none whitespace-nowrap">Colegiación</th>
-              <th className="px-3 py-2.5 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest select-none whitespace-nowrap">
-                {tipo === "PROCURADOR" ? "Código REPRE" : "Especialidad"}
-              </th>
-              <th className="px-3 py-2.5 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest select-none whitespace-nowrap">Contacto</th>
-              <th className="px-3 py-2.5 w-16"></th>
+              <Th label="Nombre" sortKey="nombre" active={sortKey === "nombre"} dir={sortDir} onSort={handleSort} />
+              <Th label="Colegiación" sortKey="colegio" active={sortKey === "colegio"} dir={sortDir} onSort={handleSort} />
+              <Th label={tipo === "PROCURADOR" ? "Código REPRE" : "Especialidad"} />
+              <Th label="Contacto" />
+              <th className="px-3 py-2.5 w-10"></th>
             </tr>
           </thead>
           <tbody>
-            {items.length === 0 ? (
+            {paged.length === 0 ? (
               <tr>
                 <td colSpan={5} className="py-20 text-center">
                   <div className="flex flex-col items-center gap-3 text-slate-400">
@@ -198,7 +318,7 @@ export default function DirectorioProfesionales({ tipo, title, singular, desc }:
                   </div>
                 </td>
               </tr>
-            ) : items.map((p, rowIdx) => {
+            ) : paged.map((p, rowIdx) => {
               const isSelected = selected === p.id;
               return (
                 <tr
@@ -246,20 +366,38 @@ export default function DirectorioProfesionales({ tipo, title, singular, desc }:
                     {!p.email && !p.phone && <span className="text-slate-300">—</span>}
                   </td>
                   <td className="px-3 py-3 text-right">
-                    <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Link to={`/dashboard/${base}/${p.id}/edit`} onClick={e => e.stopPropagation()} className="p-1.5 rounded-lg text-slate-300 hover:text-red-600 hover:bg-red-50 transition-colors inline-flex" title="Editar">
-                        <Pen size={13} />
-                      </Link>
-                      <button onClick={e => { e.stopPropagation(); setDeleteTarget(p); }} className="p-1.5 rounded-lg text-slate-300 hover:text-red-600 hover:bg-red-50 transition-colors" title="Eliminar">
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
+                    <button
+                      onClick={e => { e.stopPropagation(); navigate(`/dashboard/${base}/${p.id}/edit`); }}
+                      className="p-1 rounded-lg text-slate-200 hover:text-red-500 hover:bg-red-50 transition-colors inline-flex opacity-0 group-hover:opacity-100"
+                      title="Abrir ficha"
+                    >
+                      <ExternalLink size={14} />
+                    </button>
                   </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
+      </div>
+
+      <PaginationBar currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} totalItems={sorted.length} pageSize={PAGE_SIZE} />
+
+      {/* ── BARRA DE ESTADO INFERIOR ─────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-1 px-4 py-2 border-t border-slate-100 bg-slate-50/60 text-[11px] text-slate-500 shrink-0 overflow-x-auto">
+        <span className="whitespace-nowrap">
+          <span className="font-semibold text-slate-700">{title}:</span>{" "}
+          <span className="font-mono">{items.length.toLocaleString("es-ES")}</span>
+        </span>
+        {tipo === "ABOGADO" && (
+          <span className="whitespace-nowrap">
+            <span className="font-semibold text-emerald-600">Turno de oficio:</span>{" "}
+            <span className="font-mono">{turnoOficioCount.toLocaleString("es-ES")}</span>
+          </span>
+        )}
+        <span className="ml-auto text-slate-300 whitespace-nowrap hidden lg:inline">
+          Doble clic para editar · Ctrl+F para buscar
+        </span>
       </div>
 
       {deleteTarget && (
