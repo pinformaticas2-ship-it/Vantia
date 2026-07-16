@@ -475,7 +475,7 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
           {/* Footer / Input */}
           <div className="bg-white px-4 py-4 border-t border-slate-200/80 shrink-0 shadow-[0_-4px_10px_rgba(0,0,0,0.02)]">
             <div className="flex items-end gap-3">
-              <div className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl transition-all focus-within:border-red-400 focus-within:ring-2 focus-within:ring-red-500/20 focus-within:bg-white shadow-inner">
+              <div className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl transition-all duration-150 focus-within:border-red-300 focus-within:ring-4 focus-within:ring-red-100 focus-within:bg-white shadow-sm">
                 <textarea
                   ref={textareaRef}
                   rows={1}
