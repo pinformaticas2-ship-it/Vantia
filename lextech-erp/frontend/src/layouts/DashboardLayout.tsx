@@ -1268,6 +1268,8 @@ export default function DashboardLayout() {
       '/dashboard/correo',
       '/dashboard/clientes',
       '/dashboard/expedientes',
+      '/dashboard/procuradores',
+      '/dashboard/abogados',
       '/dashboard/trazabilidad',
       '/dashboard/agenda',
       '/dashboard/chat',
@@ -1277,7 +1279,9 @@ export default function DashboardLayout() {
     ].includes(location.pathname) ||
     location.pathname.startsWith('/dashboard/facturacion') ||
     location.pathname.startsWith('/dashboard/expedientes/') ||
-    location.pathname.startsWith('/dashboard/clientes/')
+    location.pathname.startsWith('/dashboard/clientes/') ||
+    location.pathname.startsWith('/dashboard/procuradores/') ||
+    location.pathname.startsWith('/dashboard/abogados/')
   ), [location.pathname]);
 
   return (
