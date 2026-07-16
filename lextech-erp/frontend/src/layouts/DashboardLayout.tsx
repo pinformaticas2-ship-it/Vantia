@@ -841,23 +841,28 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
                           <span className="flex-1 truncate text-left">{item.name}</span>
                           <ChevronDown size={13} className={`shrink-0 transition-transform duration-200 ${isOpen ? "rotate-180" : ""} ${childActive ? "text-red-400" : "text-slate-500"}`} />
                         </button>
-                        {isOpen && (
-                          <div className="mt-1 ml-4 pl-3 border-l border-slate-800 space-y-1">
-                            {item.children.map((child) => {
-                              const isChildActive = hrefMatches(pathname, currentSearch, child.href);
-                              const ChildIcon = child.icon;
-                              return (
-                                <Link key={child.name} to={child.href} onClick={onClose}
-                                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
-                                    isChildActive ? "bg-red-500/10 text-white" : "text-slate-400 hover:bg-slate-800/50 hover:text-white"
-                                  }`}>
-                                  <ChildIcon className={`h-3.5 w-3.5 shrink-0 ${isChildActive ? "text-red-400" : "text-slate-500"}`} />
-                                  <span className="flex-1 truncate">{child.name}</span>
-                                </Link>
-                              );
-                            })}
+                        <div
+                          className={`grid transition-all duration-200 ease-out ${isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}
+                        >
+                          <div className="overflow-hidden">
+                            <div className="mt-1 ml-4 pl-3 border-l border-slate-800 space-y-1 pb-0.5">
+                              {item.children.map((child) => {
+                                const isChildActive = hrefMatches(pathname, currentSearch, child.href);
+                                const ChildIcon = child.icon;
+                                return (
+                                  <Link key={child.name} to={child.href} onClick={onClose}
+                                    className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                                      isChildActive ? "bg-red-500/10 text-white" : "text-slate-400 hover:bg-slate-800/50 hover:text-white"
+                                    }`}
+                                  >
+                                    <ChildIcon className={`h-3.5 w-3.5 shrink-0 ${isChildActive ? "text-red-400" : "text-slate-500"}`} />
+                                    <span className="flex-1 truncate">{child.name}</span>
+                                  </Link>
+                                );
+                              })}
+                            </div>
                           </div>
-                        )}
+                        </div>
                       </div>
                     );
                   }
