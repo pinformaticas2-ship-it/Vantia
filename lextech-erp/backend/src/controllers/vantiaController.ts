@@ -623,6 +623,26 @@ export const getChatHistory = async (req: Request, res: Response) => {
   }
 };
 
+// ── DELETE /api/vantia/chat/history ── vacía la conversación del widget
+// flotante para el módulo actual (a diferencia de deleteConversation, que
+// borra por id de fila y solo se usa desde el listado de Chat IA) ──────────
+export const clearChatHistory = async (req: Request, res: Response) => {
+  const { moduleId } = req.query;
+  // @ts-ignore
+  const userId = req.auth?.userId;
+  if (!moduleId || !userId) return res.status(400).json({ success: false, error: 'Faltan parámetros.' });
+  try {
+    await pool.query(
+      'DELETE FROM vantia_chat_history WHERE user_id=$1 AND module_id=$2',
+      [userId, String(moduleId)]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('❌ Error clearing VantIA history:', err);
+    res.status(500).json({ success: false, error: 'Error interno del servidor.' });
+  }
+};
+
 // ── POST /api/vantia/chat ─────────────────────────────────────────────────────
 export const chatVantia = async (req: any, res: Response) => {
   const {

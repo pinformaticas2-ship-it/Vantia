@@ -9,8 +9,8 @@ import {
   Menu, Search, X, Bell, ShieldCheck, Calendar,
   MessageCircle, Bot, Send, ChevronRight, ChevronLeft, Loader2, History, CheckCircle2,
   MessageSquare, LogOut, Mail, Library, Receipt, Mic, Sparkles, ChevronsUpDown,
-  MoreVertical, ThumbsUp, ThumbsDown, RotateCcw, Copy, MoreHorizontal,
-  Paperclip, Pen, AlertTriangle, RefreshCw, Link2, Plus, Trash2, Scale, Gavel, ChevronDown,
+  MoreVertical, RotateCcw, Copy, Check,
+  Pen, AlertTriangle, RefreshCw, Link2, Plus, Trash2, Scale, Gavel, ChevronDown,
   Wallet, CreditCard, Building2, BarChart3, FileText, Calculator,
 } from "lucide-react";
 import { UserButton, useUser, useAuth, useClerk } from "@clerk/clerk-react";
@@ -169,12 +169,31 @@ interface ChatMsg { role: "user" | "model"; text: string }
 
 function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opts?: { skipCache?: boolean }) => Promise<string | null> }) {
   const [open, setOpen] = useState(false);
+  const [everOpened, setEverOpened] = useState(false);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [retryText, setRetryText] = useState("");
+  const [showMenu, setShowMenu] = useState(false);
+  const [clearing, setClearing] = useState(false);
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const [regeneratingIdx, setRegeneratingIdx] = useState<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (open) setEverOpened(true);
+  }, [open]);
+
+  useEffect(() => {
+    if (!showMenu) return;
+    const h = (e: MouseEvent) => { if (menuRef.current && !menuRef.current.contains(e.target as Node)) setShowMenu(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [showMenu]);
+
+  const greeting = (): ChatMsg => ({ role: "model", text: `¡Hola! Soy VantIA — ${getVantIALabel(pathname)}. ¿En qué puedo ayudarte?` });
 
   useEffect(() => {
     if (!open) return;
@@ -189,7 +208,7 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
         if (res.ok && data.history && data.history.length > 0) {
           setMessages(data.history);
         } else {
-          setMessages([{ role: "model", text: `¡Hola! Soy VantIA — ${getVantIALabel(pathname)}. ¿En qué puedo ayudarte?` }]);
+          setMessages([greeting()]);
         }
       } catch (err) {
         setMessages([{ role: "model", text: `❌ No pude cargar el historial. ${err instanceof Error ? err.message : ""}` }]);
@@ -198,7 +217,12 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
       }
     };
     fetchHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, pathname, getToken]);
+
+  useEffect(() => {
+    if (open) requestAnimationFrame(() => textareaRef.current?.focus());
+  }, [open]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -261,12 +285,59 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
     }
   };
 
+  // Regenera una respuesta concreta del asistente: reenvía el mensaje de
+  // usuario justo anterior y sustituye solo esa respuesta.
+  const regenerate = async (idx: number) => {
+    if (loading || regeneratingIdx !== null) return;
+    const userMsg = messages[idx - 1];
+    if (!userMsg || userMsg.role !== "user") return;
+    const prevMessages = messages.slice(0, idx - 1);
+    setRegeneratingIdx(idx);
+    try {
+      const reply = await callApi(userMsg.text, prevMessages);
+      setMessages((prev) => prev.map((m, i) => (i === idx ? { role: "model", text: reply } : m)));
+    } catch (err: any) {
+      setMessages((prev) => prev.map((m, i) => (i === idx ? { role: "model", text: `❌ ${err.message}` } : m)));
+    } finally {
+      setRegeneratingIdx(null);
+    }
+  };
+
+  const copyMessage = (idx: number, text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedIdx(idx);
+    setTimeout(() => setCopiedIdx((v) => (v === idx ? null : v)), 1500);
+  };
+
+  const clearConversation = async () => {
+    if (clearing) return;
+    setClearing(true);
+    setShowMenu(false);
+    try {
+      const token = await getToken({ skipCache: true });
+      await fetch(`/api/vantia/chat/history?moduleId=${pathname}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setMessages([greeting()]);
+      setRetryText("");
+    } finally {
+      setClearing(false);
+    }
+  };
+
   return (
     <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
 
-      {/* Panel de chat */}
-      {open && (
-        <div className="w-[360px] bg-white rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.18)] flex flex-col overflow-hidden border border-slate-200/60 origin-bottom-right" style={{ height: "580px" }}>
+      {/* Panel de chat — se mantiene montado tras abrirse la primera vez, para
+          poder animar también el cierre en vez de desaparecer de golpe */}
+      {everOpened && (
+        <div
+          className={`w-[360px] bg-white rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.18)] flex flex-col overflow-hidden border border-slate-200/60 origin-bottom-right transition-all duration-200 ease-out ${
+            open ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-3 pointer-events-none"
+          }`}
+          style={{ height: "580px" }}
+        >
 
           {/* Header */}
           <div className="bg-gradient-to-r from-red-700 to-red-600 px-5 py-4 flex items-center justify-between shrink-0 shadow-sm">
@@ -283,9 +354,23 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
               </div>
             </div>
             <div className="flex items-center gap-1">
-              <button className="w-8 h-8 flex items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors focus:outline-none">
-                <MoreVertical size={14} />
-              </button>
+              <div className="relative" ref={menuRef}>
+                <button onClick={() => setShowMenu((v) => !v)} className="w-8 h-8 flex items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors focus:outline-none">
+                  <MoreVertical size={14} />
+                </button>
+                {showMenu && (
+                  <div className="absolute right-0 top-10 w-48 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-10 animate-fade-in">
+                    <button
+                      onClick={clearConversation}
+                      disabled={clearing}
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-red-700 transition-colors disabled:opacity-50"
+                    >
+                      {clearing ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} className="rotate-45" />}
+                      Nueva conversación
+                    </button>
+                  </div>
+                )}
+              </div>
               <button onClick={() => setOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors focus:outline-none">
                 <X size={16} />
               </button>
@@ -308,7 +393,7 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
 
               if (msg.role === "model" && isError) {
                 return (
-                  <div key={i} className="flex justify-center">
+                  <div key={i} className="flex justify-center animate-fade-in">
                     <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-3 shadow-sm max-w-[95%]">
                       <AlertTriangle size={14} className="text-red-500 mt-0.5 shrink-0" />
                       <div className="flex flex-col gap-1.5">
@@ -329,21 +414,28 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
               }
 
               if (msg.role === "model") {
+                const isRegenerating = regeneratingIdx === i;
                 return (
-                  <div key={i} className="flex items-start gap-2.5 max-w-[95%] group">
+                  <div key={i} className="flex items-start gap-2.5 max-w-[95%] group animate-fade-in">
                     <div className="w-7 h-7 rounded-lg bg-red-100 text-red-600 flex items-center justify-center shrink-0 border border-red-200/50 mt-0.5">
                       <Bot size={12} />
                     </div>
                     <div className="flex flex-col gap-1.5 min-w-0">
-                      <div className="bg-white border border-slate-200 text-slate-700 px-4 py-3 rounded-2xl rounded-tl-sm shadow-sm text-[13px] leading-relaxed w-max max-w-full whitespace-pre-wrap break-words">
+                      <div className={`bg-white border border-slate-200 text-slate-700 px-4 py-3 rounded-2xl rounded-tl-sm shadow-sm text-[13px] leading-relaxed w-max max-w-full whitespace-pre-wrap break-words transition-opacity ${isRegenerating ? "opacity-40" : ""}`}>
                         {msg.text}
                       </div>
-                      <div className="flex items-center gap-3.5 ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                        <button className="text-slate-400 hover:text-slate-700 transition-colors focus:outline-none" title="Me gusta"><ThumbsUp size={11} /></button>
-                        <button className="text-slate-400 hover:text-slate-700 transition-colors focus:outline-none" title="No me gusta"><ThumbsDown size={11} /></button>
-                        <button className="text-slate-400 hover:text-slate-700 transition-colors focus:outline-none" title="Regenerar"><RotateCcw size={11} /></button>
-                        <button onClick={() => navigator.clipboard.writeText(msg.text)} className="text-slate-400 hover:text-slate-700 transition-colors focus:outline-none" title="Copiar"><Copy size={11} /></button>
-                        <button className="text-slate-400 hover:text-slate-700 transition-colors focus:outline-none" title="Más"><MoreHorizontal size={11} /></button>
+                      <div className={`flex items-center gap-3.5 ml-2 transition-opacity duration-200 ${isRegenerating ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
+                        <button
+                          onClick={() => regenerate(i)}
+                          disabled={isRegenerating || loading}
+                          className="text-slate-400 hover:text-slate-700 transition-colors focus:outline-none disabled:opacity-60"
+                          title="Regenerar respuesta"
+                        >
+                          <RotateCcw size={11} className={isRegenerating ? "animate-spin" : ""} />
+                        </button>
+                        <button onClick={() => copyMessage(i, msg.text)} className="text-slate-400 hover:text-slate-700 transition-colors focus:outline-none" title="Copiar">
+                          {copiedIdx === i ? <Check size={11} className="text-emerald-500" /> : <Copy size={11} />}
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -351,20 +443,21 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
               }
 
               return (
-                <div key={i} className="flex flex-col items-end gap-1.5 max-w-[85%] self-end group">
+                <div key={i} className="flex flex-col items-end gap-1.5 max-w-[85%] self-end group animate-fade-in">
                   <div className="bg-red-600 text-white px-4 py-2.5 rounded-2xl rounded-tr-sm shadow-md shadow-red-500/20 text-[13px] font-medium whitespace-pre-wrap break-words">
                     {msg.text}
                   </div>
                   <div className="flex items-center gap-3.5 mr-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                    <button onClick={() => navigator.clipboard.writeText(msg.text)} className="text-slate-400 hover:text-slate-700 transition-colors focus:outline-none" title="Copiar"><Copy size={11} /></button>
-                    <button className="text-slate-400 hover:text-slate-700 transition-colors focus:outline-none" title="Editar"><Pen size={11} /></button>
+                    <button onClick={() => copyMessage(i, msg.text)} className="text-slate-400 hover:text-slate-700 transition-colors focus:outline-none" title="Copiar">
+                      {copiedIdx === i ? <Check size={11} className="text-emerald-500" /> : <Copy size={11} />}
+                    </button>
                   </div>
                 </div>
               );
             })}
 
             {loading && (
-              <div className="flex items-end gap-2.5 max-w-[90%]">
+              <div className="flex items-end gap-2.5 max-w-[90%] animate-fade-in">
                 <div className="w-7 h-7 rounded-lg bg-red-100 text-red-600 flex items-center justify-center shrink-0 border border-red-200/50">
                   <Bot size={12} />
                 </div>
@@ -382,9 +475,6 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
           {/* Footer / Input */}
           <div className="bg-white px-4 py-4 border-t border-slate-200/80 shrink-0 shadow-[0_-4px_10px_rgba(0,0,0,0.02)]">
             <div className="flex items-end gap-3">
-              <button className="w-9 h-9 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors shrink-0 mb-0.5 focus:outline-none">
-                <Paperclip size={14} />
-              </button>
               <div className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl transition-all focus-within:border-red-400 focus-within:ring-2 focus-within:ring-red-500/20 focus-within:bg-white shadow-inner">
                 <textarea
                   ref={textareaRef}
@@ -415,14 +505,17 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
       {/* Botón flotante VantIA */}
       <button
         onClick={() => setOpen((v) => !v)}
-        className={`h-14 w-14 rounded-full shadow-xl flex items-center justify-center transition-all active:scale-95 ${
+        className={`relative h-14 w-14 rounded-full shadow-xl flex items-center justify-center transition-all duration-200 active:scale-90 ${
           open
-            ? "bg-neutral-800 shadow-neutral-900/30"
+            ? "bg-neutral-800 shadow-neutral-900/30 rotate-90"
             : "bg-red-600 shadow-red-700/30 hover:shadow-red-700/50 hover:scale-105"
         }`}
         title="VantIA — Asistente IA"
       >
-        {open ? <X size={18} className="text-white" /> : <Bot size={22} className="text-white" />}
+        {!open && <span className="absolute inset-0 rounded-full bg-red-500/40 animate-ping [animation-duration:2.5s]" />}
+        <span className={`relative transition-transform duration-200 ${open ? "-rotate-90" : ""}`}>
+          {open ? <X size={18} className="text-white" /> : <Bot size={22} className="text-white" />}
+        </span>
       </button>
     </div>
   );
