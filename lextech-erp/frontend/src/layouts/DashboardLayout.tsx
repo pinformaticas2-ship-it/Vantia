@@ -817,7 +817,9 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
                       );
                     }
 
-                    const isOpen = openGroups.has(item.name);
+                    // Si hay una sub-opción activa (estás dentro de ese grupo), se queda
+                    // desplegado aunque el ratón se vaya, para no perder el sitio al navegar.
+                    const isOpen = openGroups.has(item.name) || childActive;
                     return (
                       <div
                         key={item.name}
