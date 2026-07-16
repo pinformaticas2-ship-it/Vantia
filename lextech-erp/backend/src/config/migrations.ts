@@ -135,6 +135,31 @@ export async function runMigrations(): Promise<void> {
       await client.query(`CREATE INDEX IF NOT EXISTS idx_user_quick_links_user_id ON user_quick_links (user_id, sort_order);`);
     } catch (_e: any) {}
 
+    // ── Directorio de profesionales externos (Procuradores / Abogados) ──
+    // Modulo independiente de Clientes (entities): terceros profesionales
+    // con los que se colabora en expedientes, no partes del caso.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS directorio_profesionales (
+        id             UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        tipo           VARCHAR(20)  NOT NULL CHECK (tipo IN ('PROCURADOR', 'ABOGADO')),
+        first_name     VARCHAR(150) NOT NULL,
+        last_name      VARCHAR(150),
+        colegio        VARCHAR(200),
+        num_colegiado  VARCHAR(50),
+        despacho       VARCHAR(200),
+        email          VARCHAR(200),
+        phone          VARCHAR(50),
+        address        VARCHAR(300),
+        notes          TEXT,
+        created_by     VARCHAR(150),
+        created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      );
+    `);
+    try {
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_directorio_profesionales_tipo ON directorio_profesionales (tipo);`);
+    } catch (_e: any) {}
+
     // ── UNIQUE en nif_cif ──────────────────────────────────────────
     try {
       await client.query(`

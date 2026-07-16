@@ -10,7 +10,7 @@ import {
   MessageCircle, Bot, Send, ChevronRight, ChevronLeft, Loader2, History, CheckCircle2,
   MessageSquare, LogOut, Mail, Library, Receipt, Mic, Sparkles, ChevronsUpDown,
   MoreVertical, ThumbsUp, ThumbsDown, RotateCcw, Copy, MoreHorizontal,
-  Paperclip, Pen, AlertTriangle, RefreshCw, Link2, Plus, Trash2,
+  Paperclip, Pen, AlertTriangle, RefreshCw, Link2, Plus, Trash2, Scale, Gavel, ChevronDown,
 } from "lucide-react";
 import { UserButton, useUser, useAuth, useClerk } from "@clerk/clerk-react";
 import { getDeviceId, safeJson, waitForClientIp } from "../lib/api";
@@ -24,6 +24,8 @@ const MODULES = [
   { name: "Expedientes",    path: "/dashboard/expedientes",  icon: Briefcase,       desc: "Gestión de expedientes" },
   { name: "Clientes",       path: "/dashboard/clientes",     icon: Users,           desc: "Base de datos de clientes" },
   { name: "Nuevo Cliente",  path: "/dashboard/clientes/new", icon: Users,           desc: "Alta de nuevo cliente" },
+  { name: "Procuradores",   path: "/dashboard/procuradores", icon: Scale,           desc: "Directorio de procuradores" },
+  { name: "Abogados",       path: "/dashboard/abogados",     icon: Gavel,           desc: "Directorio de abogados" },
   { name: "Trazabilidad",   path: "/dashboard/trazabilidad", icon: History,         desc: "Historial de acciones por usuario" },
   { name: "Agenda",         path: "/dashboard/agenda",       icon: Calendar,        desc: "Calendario y citas" },
   { name: "Tareas",         path: "/dashboard/tareas",       icon: CheckCircle2,    desc: "Tareas y plazos del usuario" },
@@ -37,10 +39,21 @@ const MODULES = [
   { name: "Configuración",  path: "/dashboard/config",       icon: Settings,        desc: "Ajustes del sistema" },
 ];
 
-const NAV_ITEMS = [
+type NavChild = { name: string; href: string; icon: React.ComponentType<{ className?: string }> };
+type NavItem  = { name: string; href?: string; icon: React.ComponentType<{ className?: string }>; children?: NavChild[] };
+
+const NAV_ITEMS: NavItem[] = [
   { name: "Dashboard",    href: "/dashboard",             icon: LayoutDashboard },
   { name: "Expedientes",  href: "/dashboard/expedientes", icon: Briefcase },
-  { name: "Clientes",     href: "/dashboard/clientes",    icon: Users },
+  {
+    name: "Directorio",
+    icon: Users,
+    children: [
+      { name: "Clientes",     href: "/dashboard/clientes",     icon: Users },
+      { name: "Procuradores", href: "/dashboard/procuradores", icon: Scale },
+      { name: "Abogados",     href: "/dashboard/abogados",     icon: Gavel },
+    ],
+  },
   { name: "Trazabilidad", href: "/dashboard/trazabilidad", icon: History },
   { name: "Agenda",       href: "/dashboard/agenda",      icon: Calendar },
   { name: "Tareas",       href: "/dashboard/tareas",      icon: CheckCircle2 },
@@ -56,7 +69,7 @@ const NAV_ITEMS = [
 const NAV_GROUPS = [
   {
     label: "Principal",
-    items: ["Dashboard", "Expedientes", "Clientes", "Trazabilidad"],
+    items: ["Dashboard", "Expedientes", "Directorio", "Trazabilidad"],
   },
   {
     label: "Productividad",
@@ -686,6 +699,26 @@ function SidebarContent({ pathname, onClose, onSignOut, collapsed, onToggleColla
   const { unreadCount: emailUnreadCount } = useEmailUnread();
   const { unreadCount: waUnreadCount } = useWhatsAppUnread();
 
+  const isGroupActive = useCallback((item: NavItem) =>
+    !!item.children?.some((c) => pathname === c.href || pathname.startsWith(c.href + "/")),
+  [pathname]);
+
+  const [openGroups, setOpenGroups] = useState<Set<string>>(() => {
+    const initial = new Set<string>();
+    NAV_ITEMS.forEach((item) => { if (isGroupActive(item)) initial.add(item.name); });
+    return initial;
+  });
+  useEffect(() => {
+    NAV_ITEMS.forEach((item) => {
+      if (isGroupActive(item)) setOpenGroups((prev) => (prev.has(item.name) ? prev : new Set(prev).add(item.name)));
+    });
+  }, [pathname, isGroupActive]);
+  const toggleGroup = (name: string) => setOpenGroups((prev) => {
+    const next = new Set(prev);
+    next.has(name) ? next.delete(name) : next.add(name);
+    return next;
+  });
+
   return (
     <div className="erp-sidebar flex flex-col h-full bg-slate-900 border-r border-slate-800 overflow-hidden">
 
@@ -732,11 +765,64 @@ function SidebarContent({ pathname, onClose, onSignOut, collapsed, onToggleColla
               {collapsed && <div className="erp-sidebar-divider h-px bg-slate-800 mb-2 mx-1" />}
               <div className="space-y-1">
                 {items.map((item) => {
-                  const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href + '/'));
+                  if (item.children) {
+                    const childActive = isGroupActive(item);
+                    const GroupIcon = item.icon;
+
+                    if (collapsed) {
+                      return (
+                        <Link key={item.name} to={item.children[0].href} onClick={onClose} title={item.name}
+                          className={`relative flex items-center justify-center h-10 w-10 mx-auto rounded-lg transition-colors border-l-4 ${
+                            childActive ? "erp-sidebar-nav-active bg-red-500/10 text-white border-red-500"
+                                     : "erp-sidebar-nav-inactive text-slate-400 hover:bg-slate-800/50 hover:text-white border-transparent"
+                          }`}>
+                          <GroupIcon className={`h-5 w-5 ${childActive ? "text-red-400" : "text-slate-500"}`} />
+                        </Link>
+                      );
+                    }
+
+                    const isOpen = openGroups.has(item.name);
+                    return (
+                      <div key={item.name}>
+                        <button
+                          type="button"
+                          onClick={() => toggleGroup(item.name)}
+                          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors border-l-4 ${
+                            childActive ? "erp-sidebar-nav-active bg-red-500/10 text-white border-red-500"
+                                     : "erp-sidebar-nav-inactive text-slate-400 hover:bg-slate-800/50 hover:text-white border-transparent"
+                          }`}
+                        >
+                          <GroupIcon className={`h-4 w-4 shrink-0 ${childActive ? "text-red-400" : "text-slate-500"}`} />
+                          <span className="flex-1 truncate text-left">{item.name}</span>
+                          <ChevronDown size={13} className={`shrink-0 transition-transform duration-200 ${isOpen ? "rotate-180" : ""} ${childActive ? "text-red-400" : "text-slate-500"}`} />
+                        </button>
+                        {isOpen && (
+                          <div className="mt-1 ml-4 pl-3 border-l border-slate-800 space-y-1">
+                            {item.children.map((child) => {
+                              const isChildActive = pathname === child.href || pathname.startsWith(child.href + "/");
+                              const ChildIcon = child.icon;
+                              return (
+                                <Link key={child.name} to={child.href} onClick={onClose}
+                                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                                    isChildActive ? "bg-red-500/10 text-white" : "text-slate-400 hover:bg-slate-800/50 hover:text-white"
+                                  }`}>
+                                  <ChildIcon className={`h-3.5 w-3.5 shrink-0 ${isChildActive ? "text-red-400" : "text-slate-500"}`} />
+                                  <span className="flex-1 truncate">{child.name}</span>
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  const href = item.href!;
+                  const isActive = pathname === href || (href !== "/dashboard" && pathname.startsWith(href + '/'));
                   const Icon = item.icon;
-                  const isChat  = item.href === "/dashboard/chat";
-                  const isEmail = item.href === "/dashboard/correo";
-                  const isWA    = item.href === "/dashboard/whatsapp";
+                  const isChat  = href === "/dashboard/chat";
+                  const isEmail = href === "/dashboard/correo";
+                  const isWA    = href === "/dashboard/whatsapp";
                   const chatBadge  = isChat  && !isActive && totalUnread > 0;
                   const emailBadge = isEmail && !isActive && emailUnreadCount > 0;
                   const waBadge    = isWA    && !isActive && waUnreadCount > 0;
@@ -745,7 +831,7 @@ function SidebarContent({ pathname, onClose, onSignOut, collapsed, onToggleColla
 
                   if (collapsed) {
                     return (
-                      <Link key={item.name} to={item.href} onClick={onClose} title={item.name}
+                      <Link key={item.name} to={href} onClick={onClose} title={item.name}
                         className={`relative flex items-center justify-center h-10 w-10 mx-auto rounded-lg transition-colors border-l-4 ${
                           isActive ? "erp-sidebar-nav-active bg-red-500/10 text-white border-red-500"
                                    : "erp-sidebar-nav-inactive text-slate-400 hover:bg-slate-800/50 hover:text-white border-transparent"
@@ -759,7 +845,7 @@ function SidebarContent({ pathname, onClose, onSignOut, collapsed, onToggleColla
                   }
 
                   return (
-                    <Link key={item.name} to={item.href} onClick={onClose}
+                    <Link key={item.name} to={href} onClick={onClose}
                       className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors border-l-4 ${
                         isActive ? "erp-sidebar-nav-active bg-red-500/10 text-white border-red-500"
                                  : "erp-sidebar-nav-inactive text-slate-400 hover:bg-slate-800/50 hover:text-white border-transparent"

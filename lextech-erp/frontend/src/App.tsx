@@ -31,6 +31,7 @@ import AgendaBookingPublic from './pages/AgendaBookingPublic';
 import Facturacion from './pages/Facturacion';
 import Configuracion from './pages/Configuracion';
 import ChatIA from './pages/ChatIA';
+import DirectorioProfesionales from './pages/DirectorioProfesionales';
 
 export default function App() {
   return (
@@ -53,6 +54,8 @@ export default function App() {
             <Route path="clientes/new" element={<ClientForm />} />
             <Route path="clientes/:id/edit" element={<ClientForm />} />
             <Route path="clientes/:id" element={<ClientDetail />} />
+            <Route path="procuradores" element={<DirectorioProfesionales tipo="PROCURADOR" title="Procuradores" desc="procuradores" />} />
+            <Route path="abogados" element={<DirectorioProfesionales tipo="ABOGADO" title="Abogados" desc="abogados" />} />
             <Route path="expedientes" element={<ExpedienteList />} />
             <Route path="expedientes/:id" element={<ExpedienteDetail />} />
             <Route path="trazabilidad" element={<Trazabilidad />} />
