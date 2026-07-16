@@ -167,6 +167,73 @@ function actionIcon(t: string) {
 // ── VantIA flotante (siempre visible, contextual) ───────────────────────────
 interface ChatMsg { role: "user" | "model"; text: string }
 
+// Markdown ligero para las respuestas de VantIA: negrita, cursiva, código
+// inline, listas con guion/asterisco y listas numeradas. No es un parser
+// completo de Markdown (no hay tablas, enlaces ni bloques de código) — solo
+// lo que el modelo usa realmente, para no arrastrar una librería entera.
+function renderInlineMd(text: string, keyPrefix: string): React.ReactNode[] {
+  const parts: React.ReactNode[] = [];
+  const re = /\*\*([^*]+)\*\*|`([^`]+)`|(?<![\w*])\*([^*\n]+)\*(?!\w)/g;
+  let lastIndex = 0;
+  let m: RegExpExecArray | null;
+  let k = 0;
+  while ((m = re.exec(text))) {
+    if (m.index > lastIndex) parts.push(text.slice(lastIndex, m.index));
+    if (m[1] !== undefined) parts.push(<strong key={`${keyPrefix}-${k++}`} className="font-semibold text-slate-900">{m[1]}</strong>);
+    else if (m[2] !== undefined) parts.push(<code key={`${keyPrefix}-${k++}`} className="px-1.5 py-0.5 rounded-md bg-slate-100 text-[12px] font-mono text-red-700">{m[2]}</code>);
+    else if (m[3] !== undefined) parts.push(<em key={`${keyPrefix}-${k++}`}>{m[3]}</em>);
+    lastIndex = re.lastIndex;
+  }
+  if (lastIndex < text.length) parts.push(text.slice(lastIndex));
+  return parts;
+}
+
+function renderMarkdownLite(text: string): React.ReactNode {
+  const lines = text.split("\n");
+  const blocks: React.ReactNode[] = [];
+  const isBullet = (l: string) => /^\s*[-*]\s+/.test(l);
+  const isNumbered = (l: string) => /^\s*\d+[.)]\s+/.test(l);
+  let i = 0;
+  let key = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    if (line.trim() === "") { i++; continue; }
+    if (isBullet(line)) {
+      const items: string[] = [];
+      while (i < lines.length && isBullet(lines[i])) { items.push(lines[i].replace(/^\s*[-*]\s+/, "")); i++; }
+      blocks.push(
+        <ul key={`b-${key++}`} className="list-disc pl-5 space-y-1 my-1.5">
+          {items.map((it, idx) => <li key={idx}>{renderInlineMd(it, `u${key}-${idx}`)}</li>)}
+        </ul>
+      );
+      continue;
+    }
+    if (isNumbered(line)) {
+      const items: string[] = [];
+      while (i < lines.length && isNumbered(lines[i])) { items.push(lines[i].replace(/^\s*\d+[.)]\s+/, "")); i++; }
+      blocks.push(
+        <ol key={`b-${key++}`} className="list-decimal pl-5 space-y-1 my-1.5">
+          {items.map((it, idx) => <li key={idx}>{renderInlineMd(it, `o${key}-${idx}`)}</li>)}
+        </ol>
+      );
+      continue;
+    }
+    const paraLines: string[] = [];
+    while (i < lines.length && lines[i].trim() !== "" && !isBullet(lines[i]) && !isNumbered(lines[i])) { paraLines.push(lines[i]); i++; }
+    blocks.push(
+      <p key={`b-${key++}`} className="mb-2 last:mb-0">
+        {paraLines.map((l, idx) => (
+          <React.Fragment key={idx}>
+            {idx > 0 && <br />}
+            {renderInlineMd(l, `p${key}-${idx}`)}
+          </React.Fragment>
+        ))}
+      </p>
+    );
+  }
+  return <>{blocks}</>;
+}
+
 function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opts?: { skipCache?: boolean }) => Promise<string | null> }) {
   const [open, setOpen] = useState(false);
   const [everOpened, setEverOpened] = useState(false);
@@ -416,15 +483,15 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
               if (msg.role === "model") {
                 const isRegenerating = regeneratingIdx === i;
                 return (
-                  <div key={i} className="flex items-start gap-2.5 max-w-[95%] group animate-fade-in">
-                    <div className="w-7 h-7 rounded-lg bg-red-100 text-red-600 flex items-center justify-center shrink-0 border border-red-200/50 mt-0.5">
-                      <Bot size={12} />
+                  <div key={i} className="flex items-start gap-3 group animate-fade-in">
+                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-red-500 to-red-700 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
+                      <Bot size={13} />
                     </div>
-                    <div className="flex flex-col gap-1.5 min-w-0">
-                      <div className={`bg-white border border-slate-200 text-slate-700 px-4 py-3 rounded-2xl rounded-tl-sm shadow-sm text-[13px] leading-relaxed w-max max-w-full whitespace-pre-wrap break-words transition-opacity ${isRegenerating ? "opacity-40" : ""}`}>
-                        {msg.text}
+                    <div className="flex-1 flex flex-col gap-1.5 min-w-0 pt-0.5">
+                      <div className={`text-slate-700 text-[13px] leading-relaxed break-words transition-opacity ${isRegenerating ? "opacity-40" : ""}`}>
+                        {renderMarkdownLite(msg.text)}
                       </div>
-                      <div className={`flex items-center gap-3.5 ml-2 transition-opacity duration-200 ${isRegenerating ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
+                      <div className={`flex items-center gap-3.5 transition-opacity duration-200 ${isRegenerating ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
                         <button
                           onClick={() => regenerate(i)}
                           disabled={isRegenerating || loading}
@@ -444,7 +511,7 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
 
               return (
                 <div key={i} className="flex flex-col items-end gap-1.5 max-w-[85%] self-end group animate-fade-in">
-                  <div className="bg-red-600 text-white px-4 py-2.5 rounded-2xl rounded-tr-sm shadow-md shadow-red-500/20 text-[13px] font-medium whitespace-pre-wrap break-words">
+                  <div className="bg-red-600 text-white px-4 py-2.5 rounded-[20px] shadow-md shadow-red-500/20 text-[13px] font-medium whitespace-pre-wrap break-words">
                     {msg.text}
                   </div>
                   <div className="flex items-center gap-3.5 mr-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
@@ -457,14 +524,14 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
             })}
 
             {loading && (
-              <div className="flex items-end gap-2.5 max-w-[90%] animate-fade-in">
-                <div className="w-7 h-7 rounded-lg bg-red-100 text-red-600 flex items-center justify-center shrink-0 border border-red-200/50">
-                  <Bot size={12} />
+              <div className="flex items-start gap-3 animate-fade-in">
+                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-red-500 to-red-700 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
+                  <Bot size={13} />
                 </div>
-                <div className="bg-white border border-slate-200 px-4 py-3.5 rounded-2xl rounded-tl-sm shadow-sm flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: "0ms" }} />
-                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: "150ms" }} />
-                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: "300ms" }} />
+                <div className="flex items-center gap-1.5 pt-3">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-300 animate-bounce" style={{ animationDelay: "0ms" }} />
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-300 animate-bounce" style={{ animationDelay: "150ms" }} />
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-300 animate-bounce" style={{ animationDelay: "300ms" }} />
                 </div>
               </div>
             )}
