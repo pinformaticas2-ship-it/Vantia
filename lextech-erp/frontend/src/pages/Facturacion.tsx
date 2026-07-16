@@ -2223,7 +2223,7 @@ function FacturacionContent() {
             </div>
           )}
 
-          {!quipuStatus.connected ? (
+          {tab === "config" && (!quipuStatus.connected ? (
             <div className="flex items-center justify-between gap-4 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4">
               <div className="flex items-center gap-3">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100">
@@ -2275,7 +2275,7 @@ function FacturacionContent() {
                 </button>
               </div>
             </div>
-          )}
+          ))}
 
           {facturaRouteMode ? (
             loading ? (
