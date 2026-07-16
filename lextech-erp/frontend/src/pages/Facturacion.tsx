@@ -12,7 +12,6 @@ import {
   CheckCircle2,
   ChevronDown,
   Clock,
-  CreditCard,
   ExternalLink,
   FileSpreadsheet,
   LineChart,
@@ -1580,17 +1579,21 @@ function FacturacionContent() {
     onDelete: deleteFacturaPermanently,
   });
 
-  const TABS: { key: TabKey; label: string; icon?: React.ComponentType<any>; quipuOnly?: boolean }[] = [
-    { key: "dashboard",     label: "Vista general" },
-    { key: "analitica",     label: "Analítica" },
-    { key: "facturas",      label: "Facturas" },
-    { key: "gastos",        label: "Gastos" },
-    { key: "presupuestos",  label: "Presupuestos" },
-    { key: "receipts",      label: "Cobros",           icon: CreditCard,   quipuOnly: true },
-    { key: "contacts",      label: "Contactos",         icon: Users,        quipuOnly: true },
-    { key: "bank_accounts", label: "Cuentas bancarias", icon: Building2,    quipuOnly: true },
-    { key: "config",        label: "Configuración",     icon: Settings },
-  ];
+  // Cada sub-opción de "Tesorería" en el sidebar enlaza con ?tab=X y espera
+  // ver solo esa sección — la cabecera ya no es siempre la misma "Centro de
+  // facturación", cambia según la sección activa (título, breadcrumb, y el
+  // único botón de acción que tiene sentido en esa pantalla).
+  const SECTION_META: Record<TabKey, { crumb: string; title: string; desc: string }> = {
+    dashboard:     { crumb: "Vista general",  title: "Vista general de tesorería", desc: "Resumen de facturación, cobros y gastos del despacho." },
+    analitica:     { crumb: "Analítica",      title: "Analítica financiera", desc: "Evolución de ingresos, gastos y facturación por cliente." },
+    facturas:      { crumb: "Facturas",       title: "Facturas", desc: "Gestiona las facturas emitidas por el despacho." },
+    gastos:        { crumb: "Gastos",         title: "Gastos", desc: "Registra y controla los gastos y proveedores del despacho." },
+    presupuestos:  { crumb: "Presupuestos",   title: "Presupuestos", desc: "Presupuestos enviados a clientes." },
+    receipts:      { crumb: "Pagos y Cobros", title: "Pagos y Cobros", desc: "Cobros pendientes y realizados." },
+    contacts:      { crumb: "Contactos",      title: "Contactos", desc: "Contactos de facturación sincronizados con Quipu." },
+    bank_accounts: { crumb: "Cuentas",        title: "Cuentas bancarias", desc: "Cuentas bancarias conectadas para cobros y pagos." },
+    config:        { crumb: "Conexión Quipu", title: "Conexión con Quipu", desc: "Configura la integración con Quipu." },
+  };
 
   const loadBilling = useCallback(async () => {
     setLoading(true);
@@ -2303,50 +2306,42 @@ function FacturacionContent() {
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">
-                    <span>Contabilidad</span>
+                    <span>Tesorería</span>
                     <span className="text-slate-300">/</span>
-                    <span className="text-red-600">Facturación</span>
+                    <span className="text-red-600">{SECTION_META[tab].crumb}</span>
                   </div>
-                  <h1 className="mt-3 text-xl font-bold tracking-tight text-slate-900">Centro de facturación del despacho</h1>
-                  <p className="mt-2 max-w-3xl text-sm text-slate-500">Controla ventas, provisiones, gastos, presupuestos y relación cliente-expediente con una estructura tipo ERP, sin perder el flujo jurídico del despacho.</p>
+                  <h1 className="mt-3 text-xl font-bold tracking-tight text-slate-900">{SECTION_META[tab].title}</h1>
+                  <p className="mt-2 max-w-3xl text-sm text-slate-500">{SECTION_META[tab].desc}</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <button onClick={() => openEditor("factura")} disabled={loading || saving} className="inline-flex items-center gap-2 rounded-xl bg-red-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-60">
-                    <Plus size={14} /> Nueva factura
-                  </button>
-                  <button onClick={() => openEditor("presupuesto")} disabled={loading || saving} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60">
-                    <FileSpreadsheet size={14} /> Nuevo presupuesto
-                  </button>
-                  <button onClick={() => openEditor("gasto")} disabled={loading || saving} className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-60">
-                    <Plus size={14} /> Registrar gasto
-                  </button>
+                  {tab === "facturas" && (
+                    <button onClick={() => openEditor("factura")} disabled={loading || saving} className="inline-flex items-center gap-2 rounded-xl bg-red-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-60">
+                      <Plus size={14} /> Nueva factura
+                    </button>
+                  )}
+                  {tab === "presupuestos" && (
+                    <button onClick={() => openEditor("presupuesto")} disabled={loading || saving} className="inline-flex items-center gap-2 rounded-xl bg-red-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-60">
+                      <FileSpreadsheet size={14} /> Nuevo presupuesto
+                    </button>
+                  )}
+                  {tab === "gastos" && (
+                    <button onClick={() => openEditor("gasto")} disabled={loading || saving} className="inline-flex items-center gap-2 rounded-xl bg-red-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-60">
+                      <Plus size={14} /> Registrar gasto
+                    </button>
+                  )}
                 </div>
               </div>
 
-              <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
-                <OdooMiniStat label="Facturado" value={fmtEur(totalFacturado)} tone="blue" />
-                <OdooMiniStat label="Cobrado" value={fmtEur(totalCobrado)} tone="emerald" />
-                <OdooMiniStat label="Pendiente de cobro" value={fmtEur(totalPendiente)} tone="amber" />
-                <OdooMiniStat label="Pagos pendientes" value={fmtEur(pagosPendientes)} tone="red" />
-                <OdooMiniStat label="Expedientes facturables" value={String(expedientesFacturables)} tone="violet" />
-                <OdooMiniStat label="Clientes con movimiento" value={String(clientesFacturables)} tone="slate" />
-              </div>
-            </div>
-
-            <div className="border-b border-slate-200 px-4 pt-3">
-              <div className="flex flex-wrap items-center gap-2">
-                {TABS.map((item) => (
-                  <button
-                    key={item.key}
-                    onClick={() => setTab(item.key)}
-                    className={`rounded-t-2xl border border-b-0 px-4 py-3 text-sm font-semibold transition-colors ${
-                      tab === item.key ? "border-slate-200 bg-white text-red-700 shadow-[0_-1px_0_0_white]" : "border-transparent bg-transparent text-slate-500 hover:text-slate-700"
-                    }`}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
+              {tab === "dashboard" && (
+                <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
+                  <OdooMiniStat label="Facturado" value={fmtEur(totalFacturado)} tone="blue" />
+                  <OdooMiniStat label="Cobrado" value={fmtEur(totalCobrado)} tone="emerald" />
+                  <OdooMiniStat label="Pendiente de cobro" value={fmtEur(totalPendiente)} tone="amber" />
+                  <OdooMiniStat label="Pagos pendientes" value={fmtEur(pagosPendientes)} tone="red" />
+                  <OdooMiniStat label="Expedientes facturables" value={String(expedientesFacturables)} tone="violet" />
+                  <OdooMiniStat label="Clientes con movimiento" value={String(clientesFacturables)} tone="slate" />
+                </div>
+              )}
             </div>
 
             <div className="space-y-5 bg-slate-50/70 p-5">
