@@ -47,6 +47,16 @@ export const getProfesionales = async (req: any, res: Response) => {
   }
 };
 
+export const getProfesionalById = async (req: any, res: Response) => {
+  try {
+    const { rows } = await pool.query(`SELECT * FROM directorio_profesionales WHERE id = $1`, [req.params.id]);
+    if (!rows.length) return res.status(404).json({ success: false, error: 'No encontrado' });
+    res.json({ success: true, data: rows[0] });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: pgErr(e) });
+  }
+};
+
 export const createProfesional = async (req: any, res: Response) => {
   const tipo = normalizeTipo(req.body?.tipo);
   const firstName = nullIfEmpty(req.body?.first_name);
