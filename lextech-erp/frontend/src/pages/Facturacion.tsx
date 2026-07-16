@@ -39,6 +39,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 type FilterPeriod = "year" | "q1" | "q2" | "q3" | "q4" | "jan" | "feb" | "mar" | "apr" | "may" | "jun" | "jul" | "aug" | "sep" | "oct" | "nov" | "dec";
 type TabKey = "dashboard" | "analitica" | "facturas" | "gastos" | "presupuestos" | "contacts" | "bank_accounts" | "receipts" | "config";
+const TAB_KEYS: TabKey[] = ["dashboard", "analitica", "facturas", "gastos", "presupuestos", "contacts", "bank_accounts", "receipts", "config"];
 
 type QuipuContact = {
   id: string;
@@ -1510,7 +1511,17 @@ function FacturacionContent() {
   const location = useLocation();
   const { facturaId } = useParams<{ facturaId?: string }>();
   const pendingInvoicesPreviewCount = 12;
-  const [tab, setTab] = useState<TabKey>("dashboard");
+  const [tab, setTab] = useState<TabKey>(() => {
+    const fromUrl = new URLSearchParams(location.search).get("tab");
+    return fromUrl && TAB_KEYS.includes(fromUrl as TabKey) ? (fromUrl as TabKey) : "dashboard";
+  });
+  // Los sub-items de "Tesorería" en el sidebar enlazan aquí con ?tab=X — si el
+  // usuario ya está en Facturación y pulsa otro sub-item, la ruta no remonta
+  // el componente, así que hay que releer el query string en cada cambio.
+  useEffect(() => {
+    const fromUrl = new URLSearchParams(location.search).get("tab");
+    if (fromUrl && TAB_KEYS.includes(fromUrl as TabKey)) setTab(fromUrl as TabKey);
+  }, [location.search]);
   const [filterYear,   setFilterYear]   = useState<number>(new Date().getFullYear());
   const [filterPeriod, setFilterPeriod] = useState<FilterPeriod>("year");
   const [showYearMenu,   setShowYearMenu]   = useState(false);

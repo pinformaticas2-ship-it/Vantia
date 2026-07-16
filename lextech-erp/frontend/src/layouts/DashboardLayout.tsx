@@ -11,6 +11,7 @@ import {
   MessageSquare, LogOut, Mail, Library, Receipt, Mic, Sparkles, ChevronsUpDown,
   MoreVertical, ThumbsUp, ThumbsDown, RotateCcw, Copy, MoreHorizontal,
   Paperclip, Pen, AlertTriangle, RefreshCw, Link2, Plus, Trash2, Scale, Gavel, ChevronDown,
+  Wallet, CreditCard, Building2,
 } from "lucide-react";
 import { UserButton, useUser, useAuth, useClerk } from "@clerk/clerk-react";
 import { getDeviceId, safeJson, waitForClientIp } from "../lib/api";
@@ -33,7 +34,10 @@ const MODULES = [
   { name: "WhatsApp",       path: "/dashboard/whatsapp",     icon: MessageCircle,   desc: "Mensajería y comunicación por WhatsApp" },
   { name: "Correo",         path: "/dashboard/correo",       icon: Mail,            desc: "Gestor de correo electrónico" },
   { name: "Documental",     path: "/dashboard/documental",   icon: Library,         desc: "Cendoj, BOE y Lexnet" },
-  { name: "Facturación",    path: "/dashboard/facturacion",  icon: Receipt,         desc: "Contabilidad y facturación" },
+  { name: "Facturación",    path: "/dashboard/facturacion",  icon: Receipt,         desc: "Facturas, presupuestos y analítica" },
+  { name: "Gastos",         path: "/dashboard/facturacion?tab=gastos",        icon: Wallet,     desc: "Gastos del despacho" },
+  { name: "Pagos y Cobros", path: "/dashboard/facturacion?tab=receipts",      icon: CreditCard, desc: "Cobros pendientes y realizados" },
+  { name: "Cuentas",        path: "/dashboard/facturacion?tab=bank_accounts", icon: Building2,  desc: "Cuentas bancarias" },
   { name: "Plaud IA",       path: "/dashboard/plaud-ia",     icon: Mic,             desc: "Grabación y asistencia con IA" },
   { name: "Chat IA",        path: "/dashboard/chat-ia",      icon: Sparkles,        desc: "Asistente IA con herramientas e historial" },
   { name: "Configuración",  path: "/dashboard/config",       icon: Settings,        desc: "Ajustes del sistema" },
@@ -61,7 +65,16 @@ const NAV_ITEMS: NavItem[] = [
   { name: "WhatsApp",     href: "/dashboard/whatsapp",    icon: MessageCircle },
   { name: "Correo",       href: "/dashboard/correo",      icon: Mail },
   { name: "Documental",   href: "/dashboard/documental",  icon: Library },
-  { name: "Facturación",  href: "/dashboard/facturacion", icon: Receipt },
+  {
+    name: "Tesorería",
+    icon: Receipt,
+    children: [
+      { name: "Facturación",    href: "/dashboard/facturacion",                   icon: Receipt },
+      { name: "Gastos",         href: "/dashboard/facturacion?tab=gastos",        icon: Wallet },
+      { name: "Pagos y Cobros", href: "/dashboard/facturacion?tab=receipts",      icon: CreditCard },
+      { name: "Cuentas",        href: "/dashboard/facturacion?tab=bank_accounts", icon: Building2 },
+    ],
+  },
   { name: "Plaud IA",     href: "/dashboard/plaud-ia",    icon: Mic },
   { name: "Chat IA",      href: "/dashboard/chat-ia",     icon: Sparkles },
 ];
@@ -73,7 +86,7 @@ const NAV_GROUPS = [
   },
   {
     label: "Productividad",
-    items: ["Agenda", "Tareas", "Chat", "WhatsApp", "Correo", "Facturación"],
+    items: ["Agenda", "Tareas", "Chat", "WhatsApp", "Correo", "Tesorería"],
   },
   {
     label: "Conocimiento",
@@ -686,9 +699,21 @@ function SearchDropdown({ query, onSelect }: { query: string; onSelect: () => vo
   );
 }
 
+// Compara la ruta actual (pathname + query) contra un href de nav que puede
+// llevar su propio query string (p.ej. "/dashboard/facturacion?tab=gastos"),
+// para que cada sub-opción con el mismo pathname pero distinto tab se
+// resalte solo cuando corresponde exactamente.
+function hrefMatches(pathname: string, search: string, href: string): boolean {
+  const [hrefPath, hrefQuery = ""] = href.split("?");
+  if (pathname !== hrefPath && !pathname.startsWith(hrefPath + "/")) return false;
+  const currentQuery = search.startsWith("?") ? search.slice(1) : search;
+  return currentQuery === hrefQuery;
+}
+
 // ── Sidebar ──────────────────────────────────────────────────────────────────
-function SidebarContent({ pathname, onClose, onSignOut, collapsed, onToggleCollapse }: {
+function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onToggleCollapse }: {
   pathname: string;
+  search?: string;
   onClose?: () => void;
   onSignOut?: () => void;
   collapsed?: boolean;
@@ -698,10 +723,11 @@ function SidebarContent({ pathname, onClose, onSignOut, collapsed, onToggleColla
   const { totalUnread } = useChatUnread();
   const { unreadCount: emailUnreadCount } = useEmailUnread();
   const { unreadCount: waUnreadCount } = useWhatsAppUnread();
+  const currentSearch = search || "";
 
   const isGroupActive = useCallback((item: NavItem) =>
-    !!item.children?.some((c) => pathname === c.href || pathname.startsWith(c.href + "/")),
-  [pathname]);
+    !!item.children?.some((c) => hrefMatches(pathname, currentSearch, c.href)),
+  [pathname, currentSearch]);
 
   const [openGroups, setOpenGroups] = useState<Set<string>>(() => {
     const initial = new Set<string>();
@@ -808,7 +834,7 @@ function SidebarContent({ pathname, onClose, onSignOut, collapsed, onToggleColla
                         {isOpen && (
                           <div className="mt-1 ml-4 pl-3 border-l border-slate-800 space-y-1">
                             {item.children.map((child) => {
-                              const isChildActive = pathname === child.href || pathname.startsWith(child.href + "/");
+                              const isChildActive = hrefMatches(pathname, currentSearch, child.href);
                               const ChildIcon = child.icon;
                               return (
                                 <Link key={child.name} to={child.href} onClick={onClose}
@@ -1340,7 +1366,7 @@ export default function DashboardLayout() {
 
       {/* Sidebar Desktop */}
       <aside className={`hidden md:flex flex-col fixed inset-y-0 z-30 transition-all duration-300 ${isCollapsed ? "w-16" : "w-64"}`}>
-        <SidebarContent pathname={location.pathname} onSignOut={handleSignOut} collapsed={isCollapsed} onToggleCollapse={toggleSidebar} />
+        <SidebarContent pathname={location.pathname} search={location.search} onSignOut={handleSignOut} collapsed={isCollapsed} onToggleCollapse={toggleSidebar} />
       </aside>
 
       {/* Menú Móvil */}
@@ -1351,7 +1377,7 @@ export default function DashboardLayout() {
             <button onClick={() => setIsMobileOpen(false)} className="absolute right-4 top-6 text-slate-400 hover:text-white z-10">
               <X className="h-6 w-6" />
             </button>
-            <SidebarContent pathname={location.pathname} onClose={() => setIsMobileOpen(false)} onSignOut={handleSignOut} />
+            <SidebarContent pathname={location.pathname} search={location.search} onClose={() => setIsMobileOpen(false)} onSignOut={handleSignOut} />
           </div>
         </div>
       )}
