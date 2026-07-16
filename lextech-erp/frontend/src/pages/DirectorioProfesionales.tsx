@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import {
   Scale, Gavel, Search, Plus, X, Loader2, Pen, Trash2,
-  Mail, Phone, MapPin, Building2, BadgeCheck, AlertCircle,
+  Mail, Phone, MapPin, Building2, BadgeCheck, AlertCircle, Landmark, Fingerprint, Briefcase, Gift,
 } from "lucide-react";
 import { Spinner } from "../components/Spinner";
 import { safeJson } from "../lib/api";
@@ -19,12 +19,17 @@ interface Profesional {
   phone: string | null;
   address: string | null;
   notes: string | null;
+  cuenta_consignaciones: string | null;
+  codigo_repre: string | null;
+  especialidad: string | null;
+  turno_oficio: boolean;
   created_at: string;
 }
 
 const EMPTY_FORM = {
   first_name: "", last_name: "", colegio: "", num_colegiado: "",
   despacho: "", email: "", phone: "", address: "", notes: "",
+  cuenta_consignaciones: "", codigo_repre: "", especialidad: "", turno_oficio: false,
 };
 
 export default function DirectorioProfesionales({ tipo, title, desc }: {
@@ -74,12 +79,15 @@ export default function DirectorioProfesionales({ tipo, title, desc }: {
       first_name: p.first_name, last_name: p.last_name || "", colegio: p.colegio || "",
       num_colegiado: p.num_colegiado || "", despacho: p.despacho || "", email: p.email || "",
       phone: p.phone || "", address: p.address || "", notes: p.notes || "",
+      cuenta_consignaciones: p.cuenta_consignaciones || "", codigo_repre: p.codigo_repre || "",
+      especialidad: p.especialidad || "", turno_oficio: !!p.turno_oficio,
     });
     setError("");
     setShowForm(true);
   };
   const closeForm = () => { setShowForm(false); setEditing(null); setForm(EMPTY_FORM); setError(""); };
   const set = (k: keyof typeof EMPTY_FORM, v: string) => setForm(prev => ({ ...prev, [k]: v }));
+  const setTurnoOficio = (v: boolean) => setForm(prev => ({ ...prev, turno_oficio: v }));
 
   const handleSave = async () => {
     if (!form.first_name.trim()) { setError("El nombre es obligatorio"); return; }
@@ -173,6 +181,21 @@ export default function DirectorioProfesionales({ tipo, title, desc }: {
                         {[p.colegio, p.num_colegiado ? `Nº ${p.num_colegiado}` : null].filter(Boolean).join(" · ")}
                       </p>
                     )}
+                    {tipo === "PROCURADOR" && p.codigo_repre && (
+                      <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1 truncate">
+                        <Fingerprint size={11} className="text-slate-300 shrink-0" /> REPRE: {p.codigo_repre}
+                      </p>
+                    )}
+                    {tipo === "ABOGADO" && (p.especialidad || p.turno_oficio) && (
+                      <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1 truncate flex-wrap">
+                        {p.especialidad && (<><Briefcase size={11} className="text-slate-300 shrink-0" /> {p.especialidad}</>)}
+                        {p.turno_oficio && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold ml-1">
+                            <Gift size={9} /> Turno de oficio
+                          </span>
+                        )}
+                      </p>
+                    )}
                   </div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                     <button onClick={() => openEdit(p)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100" title="Editar">
@@ -184,6 +207,11 @@ export default function DirectorioProfesionales({ tipo, title, desc }: {
                   </div>
                 </div>
                 <div className="mt-3 pt-3 border-t border-slate-100 space-y-1.5">
+                  {tipo === "PROCURADOR" && p.cuenta_consignaciones && (
+                    <p className="text-xs text-slate-500 flex items-center gap-1.5 truncate font-mono">
+                      <Landmark size={11} className="text-slate-300 shrink-0" /> {p.cuenta_consignaciones}
+                    </p>
+                  )}
                   {p.despacho && (
                     <p className="text-xs text-slate-500 flex items-center gap-1.5 truncate">
                       <Building2 size={11} className="text-slate-300 shrink-0" /> {p.despacho}
@@ -204,7 +232,7 @@ export default function DirectorioProfesionales({ tipo, title, desc }: {
                       <MapPin size={11} className="text-slate-300 shrink-0" /> {p.address}
                     </p>
                   )}
-                  {!p.despacho && !p.email && !p.phone && !p.address && (
+                  {!p.despacho && !p.email && !p.phone && !p.address && !(tipo === "PROCURADOR" && p.cuenta_consignaciones) && (
                     <p className="text-xs text-slate-300">Sin datos de contacto</p>
                   )}
                 </div>
@@ -230,6 +258,20 @@ export default function DirectorioProfesionales({ tipo, title, desc }: {
                 <FormField label="Colegio"><input value={form.colegio} onChange={e => set("colegio", e.target.value)} placeholder="Ej. ICAM" className={inputCls} /></FormField>
                 <FormField label="Nº Colegiado"><input value={form.num_colegiado} onChange={e => set("num_colegiado", e.target.value)} className={inputCls} /></FormField>
               </div>
+              {tipo === "PROCURADOR" ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField label="Cuenta de consignaciones"><input value={form.cuenta_consignaciones} onChange={e => set("cuenta_consignaciones", e.target.value)} placeholder="IBAN" className={inputCls} /></FormField>
+                  <FormField label="Código REPRE"><input value={form.codigo_repre} onChange={e => set("codigo_repre", e.target.value)} placeholder="Identificador LexNET" className={inputCls} /></FormField>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3 items-end">
+                  <FormField label="Especialidad"><input value={form.especialidad} onChange={e => set("especialidad", e.target.value)} placeholder="Ej. Civil, Penal, Laboral..." className={inputCls} /></FormField>
+                  <label className="flex items-center gap-2 pb-2 cursor-pointer select-none">
+                    <input type="checkbox" checked={form.turno_oficio} onChange={e => setTurnoOficio(e.target.checked)} className="w-4 h-4 accent-red-600 cursor-pointer" />
+                    <span className="text-sm text-slate-700 font-medium">Turno de oficio</span>
+                  </label>
+                </div>
+              )}
               <FormField label="Despacho / Bufete"><input value={form.despacho} onChange={e => set("despacho", e.target.value)} className={inputCls} /></FormField>
               <div className="grid grid-cols-2 gap-3">
                 <FormField label="Email"><input type="email" value={form.email} onChange={e => set("email", e.target.value)} className={inputCls} /></FormField>

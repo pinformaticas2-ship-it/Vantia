@@ -56,18 +56,22 @@ export const createProfesional = async (req: any, res: Response) => {
   const userId = req.auth?.userId || 'SYSTEM';
   const {
     last_name, colegio, num_colegiado, despacho, email, phone, address, notes,
+    cuenta_consignaciones, codigo_repre, especialidad, turno_oficio,
   } = req.body || {};
 
   try {
     const { rows } = await pool.query(
       `INSERT INTO directorio_profesionales
-         (tipo, first_name, last_name, colegio, num_colegiado, despacho, email, phone, address, notes, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+         (tipo, first_name, last_name, colegio, num_colegiado, despacho, email, phone, address, notes, created_by,
+          cuenta_consignaciones, codigo_repre, especialidad, turno_oficio)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
        RETURNING *`,
       [
         tipo, firstName, nullIfEmpty(last_name), nullIfEmpty(colegio), nullIfEmpty(num_colegiado),
         nullIfEmpty(despacho), nullIfEmpty(email), nullIfEmpty(phone), nullIfEmpty(address),
         nullIfEmpty(notes), userId,
+        nullIfEmpty(cuenta_consignaciones), nullIfEmpty(codigo_repre), nullIfEmpty(especialidad),
+        turno_oficio === true || turno_oficio === 'true',
       ]
     );
     const p = rows[0];
@@ -84,6 +88,7 @@ export const updateProfesional = async (req: any, res: Response) => {
 
   const {
     last_name, colegio, num_colegiado, despacho, email, phone, address, notes,
+    cuenta_consignaciones, codigo_repre, especialidad, turno_oficio,
   } = req.body || {};
 
   try {
@@ -91,13 +96,17 @@ export const updateProfesional = async (req: any, res: Response) => {
       `UPDATE directorio_profesionales SET
          first_name = $1, last_name = $2, colegio = $3, num_colegiado = $4,
          despacho = $5, email = $6, phone = $7, address = $8, notes = $9,
+         cuenta_consignaciones = $10, codigo_repre = $11, especialidad = $12, turno_oficio = $13,
          updated_at = NOW()
-       WHERE id = $10
+       WHERE id = $14
        RETURNING *`,
       [
         firstName, nullIfEmpty(last_name), nullIfEmpty(colegio), nullIfEmpty(num_colegiado),
         nullIfEmpty(despacho), nullIfEmpty(email), nullIfEmpty(phone), nullIfEmpty(address),
-        nullIfEmpty(notes), req.params.id,
+        nullIfEmpty(notes),
+        nullIfEmpty(cuenta_consignaciones), nullIfEmpty(codigo_repre), nullIfEmpty(especialidad),
+        turno_oficio === true || turno_oficio === 'true',
+        req.params.id,
       ]
     );
     if (!rows.length) return res.status(404).json({ success: false, error: 'No encontrado' });

@@ -159,6 +159,16 @@ export async function runMigrations(): Promise<void> {
     try {
       await client.query(`CREATE INDEX IF NOT EXISTS idx_directorio_profesionales_tipo ON directorio_profesionales (tipo);`);
     } catch (_e: any) {}
+    // Campos propios de cada tipo (una sola tabla, columnas opcionales según tipo):
+    // Procurador -> cuenta_consignaciones, codigo_repre · Abogado -> especialidad, turno_oficio
+    for (const [col, def] of [
+      ['cuenta_consignaciones', 'VARCHAR(50)'],
+      ['codigo_repre',          'VARCHAR(50)'],
+      ['especialidad',          'VARCHAR(150)'],
+      ['turno_oficio',          'BOOLEAN NOT NULL DEFAULT FALSE'],
+    ] as [string, string][]) {
+      try { await client.query(`ALTER TABLE directorio_profesionales ADD COLUMN IF NOT EXISTS ${col} ${def};`); } catch (_e: any) {}
+    }
 
     // ── UNIQUE en nif_cif ──────────────────────────────────────────
     try {
