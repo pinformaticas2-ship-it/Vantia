@@ -21,9 +21,10 @@ export type EventType =
   | 'DOWNLOAD';
 
 const _nameCache = new Map<string, { name: string; exp: number }>();
+const _roleCache = new Map<string, { role: string; exp: number }>();
 let _clerk: ReturnType<typeof createClerkClient> | null = null;
 
-function getClerk() {
+export function getClerk() {
   if (!_clerk) _clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
   return _clerk;
 }
@@ -43,6 +44,24 @@ export async function resolveUserName(userId: string): Promise<string> {
     return name;
   } catch {
     return userId;
+  }
+}
+
+// Rol guardado en publicMetadata.role (Clerk) -- fuente de verdad para
+// autorización de secciones restringidas como Tesorería. Cacheado 5 min
+// para no golpear la API de Clerk en cada petición; en caso de fallo se
+// asume el rol más restrictivo ('user'), nunca se falla abierto a 'admin'.
+export async function resolveUserRole(userId: string): Promise<string> {
+  const hit = _roleCache.get(userId);
+  if (hit && hit.exp > Date.now()) return hit.role;
+
+  try {
+    const user = await getClerk().users.getUser(userId);
+    const role = String((user.publicMetadata as any)?.role || 'user');
+    _roleCache.set(userId, { role, exp: Date.now() + 5 * 60 * 1000 });
+    return role;
+  } catch {
+    return 'user';
   }
 }
 

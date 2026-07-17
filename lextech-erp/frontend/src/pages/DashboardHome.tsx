@@ -138,9 +138,10 @@ function loadOrder(): string[]    {
   return DEFAULT_ORDER;
 }
 
-function WidgetPickerModal({ visible, onClose, onSave }: { visible: string[]; onClose: () => void; onSave: (ids: string[]) => void }) {
+function WidgetPickerModal({ visible, isAdmin, onClose, onSave }: { visible: string[]; isAdmin: boolean; onClose: () => void; onSave: (ids: string[]) => void }) {
   const [sel, setSel] = useState<string[]>(visible);
   const toggle = (id: string) => setSel(cur => cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id]);
+  const availableWidgets = ALL_WIDGETS.filter(w => w.id !== "facturacion" || isAdmin);
 
   useEffect(() => {
     const scrollEl = document.getElementById("dashboard-content") as HTMLElement | null;
@@ -162,7 +163,7 @@ function WidgetPickerModal({ visible, onClose, onSave }: { visible: string[]; on
           <button onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50"><X size={16} /></button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-3">
-          {ALL_WIDGETS.map(w => (
+          {availableWidgets.map(w => (
             <label key={w.id} className="flex cursor-pointer items-center gap-4 border-b border-slate-100 py-3 last:border-b-0">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-xl">{w.icon}</span>
               <div className="flex-1 min-w-0">
@@ -306,6 +307,8 @@ export default function DashboardHome() {
   const { user }     = useUser();
   const { getToken } = useAuth();
   const navigate     = useNavigate();
+  // Tesorería (widget "Facturación") es solo para administradores.
+  const isAdmin = (user?.publicMetadata as any)?.role === "admin";
   const weather      = useWeather();
   const greeting     = getGreeting();
   const { isCollapsed } = useContext(SidebarContext);
@@ -553,7 +556,7 @@ export default function DashboardHome() {
   const orderedVisible = [
     ...widgetOrder.filter(id => visibleWidgets.includes(id)),
     ...visibleWidgets.filter(id => !widgetOrder.includes(id)),
-  ];
+  ].filter(id => id !== "facturacion" || isAdmin);
 
   // ── Billing calcs ─────────────────────────────────────────────────────────
   const billingCalc = (() => {
@@ -1223,7 +1226,7 @@ export default function DashboardHome() {
       </section>}
 
       {showWidgetPicker && (
-        <WidgetPickerModal visible={visibleWidgets} onClose={() => setShowWidgetPicker(false)} onSave={saveVisible} />
+        <WidgetPickerModal visible={visibleWidgets} isAdmin={isAdmin} onClose={() => setShowWidgetPicker(false)} onSave={saveVisible} />
       )}
     </div>
   );

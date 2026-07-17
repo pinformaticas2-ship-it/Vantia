@@ -868,10 +868,14 @@ function QuickLinksPanel({ getToken, onClose }: { getToken: () => Promise<string
 // ── Search Dropdown ──────────────────────────────────────────────────────────
 function SearchDropdown({ query, onSelect }: { query: string; onSelect: () => void }) {
   const navigate  = useNavigate();
-  const filtered  = MODULES.filter(
-    (m) => m.name.toLowerCase().includes(query.toLowerCase()) ||
-           m.desc.toLowerCase().includes(query.toLowerCase())
-  );
+  const { user }  = useUser();
+  const isAdmin   = (user?.publicMetadata as any)?.role === "admin";
+  const filtered  = MODULES
+    .filter((m) => isAdmin || !m.path.startsWith("/dashboard/facturacion"))
+    .filter(
+      (m) => m.name.toLowerCase().includes(query.toLowerCase()) ||
+             m.desc.toLowerCase().includes(query.toLowerCase())
+    );
   if (!query || !filtered.length) return null;
   return (
     <div className="absolute top-full left-0 mt-2 w-full bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden">
@@ -921,6 +925,9 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
   const { unreadCount: waUnreadCount } = useWhatsAppUnread();
   const { isProcessing: isDocProcessing } = useDocumentProcessing();
   const currentSearch = search || "";
+  // Tesorería (facturación/Quipu) es solo para administradores -- se oculta
+  // del sidebar para el resto (el backend ya lo bloquea aparte, esto es solo UI).
+  const isAdmin = (user?.publicMetadata as any)?.role === "admin";
 
   const isGroupActive = useCallback((item: NavItem) =>
     !!item.children?.some((c) => hrefMatches(pathname, currentSearch, c.href)),
@@ -976,7 +983,8 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
         {NAV_GROUPS.map((group) => {
           const items = group.items
             .map((name) => NAV_ITEMS.find((item) => item.name === name))
-            .filter((item): item is (typeof NAV_ITEMS)[number] => !!item);
+            .filter((item): item is (typeof NAV_ITEMS)[number] => !!item)
+            .filter((item) => item.name !== "Tesorería" || isAdmin);
           if (!items.length) return null;
           return (
             <div key={group.label} className="mb-4">

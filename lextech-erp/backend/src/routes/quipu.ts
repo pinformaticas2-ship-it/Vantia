@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth';
+import { requireAdmin } from '../middleware/requireAdmin';
 import {
   diagnoseQuipu,
   disconnectQuipu,
@@ -36,6 +37,9 @@ import {
 } from '../controllers/quipuController';
 
 const router = Router();
+
+// Quipu es la integración contable de Tesorería -- solo administradores.
+router.use(requireAdmin);
 
 // ── Configuración ──────────────────────────────────────────────
 router.get('/status',      requireAuth, getQuipuStatus);

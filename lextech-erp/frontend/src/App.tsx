@@ -34,6 +34,7 @@ import Configuracion from './pages/Configuracion';
 import ChatIA from './pages/ChatIA';
 import DirectorioProfesionales from './pages/DirectorioProfesionales';
 import DirectorioProfesionalForm from './pages/DirectorioProfesionalForm';
+import { useIsAdmin } from './lib/useIsAdmin';
 
 export default function App() {
   return (
@@ -72,9 +73,9 @@ export default function App() {
             <Route path="whatsapp" element={<WhatsApp />} />
             <Route path="correo" element={<Email />} />
             <Route path="documental" element={<Documental />} />
-            <Route path="facturacion" element={<Facturacion />} />
-            <Route path="facturacion/facturas/nueva" element={<Facturacion />} />
-            <Route path="facturacion/facturas/:facturaId/editar" element={<Facturacion />} />
+            <Route path="facturacion" element={<RequireAdmin><Facturacion /></RequireAdmin>} />
+            <Route path="facturacion/facturas/nueva" element={<RequireAdmin><Facturacion /></RequireAdmin>} />
+            <Route path="facturacion/facturas/:facturaId/editar" element={<RequireAdmin><Facturacion /></RequireAdmin>} />
             <Route path="plaud-ia" element={<ModuloEnCarga nombre="Plaud IA" />} />
             <Route path="chat-ia" element={<ChatIA />} />
             <Route path="config" element={<Configuracion />} />
@@ -104,6 +105,16 @@ export default function App() {
       </>
     </ThemeProvider>
   );
+}
+
+// Bloquea el acceso a Tesorería si el usuario no tiene rol admin en Clerk
+// (publicMetadata.role). Es solo la barrera de UI -- el backend vuelve a
+// comprobarlo en cada endpoint de /api/facturacion y /api/quipu.
+function RequireAdmin({ children }: { children: React.ReactNode }) {
+  const { isAdmin, isLoaded } = useIsAdmin();
+  if (!isLoaded) return null;
+  if (!isAdmin) return <Navigate to="/dashboard" replace />;
+  return <>{children}</>;
 }
 
 // Placeholder para módulos aún no implementados
