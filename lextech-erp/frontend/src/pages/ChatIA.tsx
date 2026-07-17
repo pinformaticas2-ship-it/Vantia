@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth, useUser } from '@clerk/clerk-react';
 import {
   Plus, Trash2, Copy, RotateCcw, ThumbsUp, ThumbsDown,
-  Paperclip, Link2, Send, MessageSquare, Sparkles, MoreHorizontal,
+  Paperclip, Link2, Send, MessageSquare, Sparkles, MoreHorizontal, Loader2,
 } from 'lucide-react';
 import { resolveApiUrl } from '../lib/api';
 
@@ -168,6 +168,24 @@ export default function ChatIA() {
 
   const bottomRef   = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const revealTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Efecto "máquina de escribir": revela el texto ya recibido poco a poco en
+  // vez de volcarlo de golpe, igual que en el widget flotante de VantIA.
+  useEffect(() => () => { if (revealTimerRef.current) clearInterval(revealTimerRef.current); }, []);
+  const streamReveal = (idx: number, fullText: string): Promise<void> =>
+    new Promise((resolve) => {
+      if (revealTimerRef.current) clearInterval(revealTimerRef.current);
+      let pos = 0;
+      revealTimerRef.current = setInterval(() => {
+        pos = Math.min(pos + 3, fullText.length);
+        setMessages(prev => prev.map((m, i) => (i === idx ? { ...m, text: fullText.slice(0, pos) } : m)));
+        if (pos >= fullText.length) {
+          if (revealTimerRef.current) { clearInterval(revealTimerRef.current); revealTimerRef.current = null; }
+          resolve();
+        }
+      }, 18);
+    });
 
   // ── Load conversations ──────────────────────────────────────────────────────
 
@@ -189,7 +207,10 @@ export default function ChatIA() {
   // ── Scroll to bottom ────────────────────────────────────────────────────────
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // "auto" en vez de "smooth": con la revelación tipo máquina de escribir
+    // el contenido crece varias veces por segundo y un scroll suave repetido
+    // se nota a tirones.
+    bottomRef.current?.scrollIntoView({ behavior: 'auto' });
   }, [messages, sending]);
 
   // ── Auto-resize textarea ────────────────────────────────────────────────────
@@ -260,8 +281,9 @@ export default function ChatIA() {
 
     const isNew         = messages.length === 0;
     const historyToSend = messages.map(m => ({ role: m.role, text: m.text }));
+    const newHistory: Message[] = [...messages, { role: 'user', text, ts: new Date() }];
 
-    setMessages(prev => [...prev, { role: 'user', text, ts: new Date() }]);
+    setMessages(newHistory);
     setInput('');
     setSending(true);
 
@@ -275,7 +297,9 @@ export default function ChatIA() {
       const data = await res.json();
 
       if (data.success) {
-        setMessages(prev => [...prev, { role: 'model', text: data.reply, ts: new Date() }]);
+        const idx = newHistory.length;
+        setMessages([...newHistory, { role: 'model', text: '', ts: new Date() }]);
+        setSending(false);
 
         if (isNew) {
           const stub: Conversation = {
@@ -298,12 +322,15 @@ export default function ChatIA() {
             c.module_id === moduleId ? { ...c, updated_at: new Date().toISOString() } : c
           ));
         }
+
+        await streamReveal(idx, data.reply);
       } else {
         setMessages(prev => [...prev, {
           role: 'model',
           text: `⚠️ Error: ${data.error || 'No se pudo obtener respuesta.'}`,
           ts: new Date(),
         }]);
+        setSending(false);
       }
     } catch {
       setMessages(prev => [...prev, {
@@ -311,7 +338,8 @@ export default function ChatIA() {
         text: '⚠️ Error de conexión. Comprueba tu red e inténtalo de nuevo.',
         ts: new Date(),
       }]);
-    } finally { setSending(false); }
+      setSending(false);
+    }
   };
 
   const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -330,7 +358,8 @@ export default function ChatIA() {
     const lastUser = [...messages].reverse().find(m => m.role === 'user');
     if (!lastUser) return;
     const histWoLast = messages.slice(0,-2).map(m => ({role:m.role, text:m.text}));
-    setMessages(prev => prev.slice(0,-1));
+    const base = messages.slice(0,-1);
+    setMessages(base);
     setSending(true);
     try {
       const token = await getToken();
@@ -340,9 +369,15 @@ export default function ChatIA() {
         body: JSON.stringify({ message: lastUser.text, history: histWoLast, moduleId: activeModuleId }),
       });
       const data = await res.json();
-      if (data.success)
-        setMessages(prev => [...prev, { role: 'model', text: data.reply, ts: new Date() }]);
-    } catch { /**/ } finally { setSending(false); }
+      if (data.success) {
+        const idx = base.length;
+        setMessages([...base, { role: 'model', text: '', ts: new Date() }]);
+        setSending(false);
+        await streamReveal(idx, data.reply);
+      } else {
+        setSending(false);
+      }
+    } catch { setSending(false); }
   };
 
   const userInitials = user?.firstName
@@ -570,7 +605,7 @@ export default function ChatIA() {
                   {/* Bubble + actions */}
                   <div className={`flex flex-col gap-1 max-w-[76%] ${msg.role==='user'?'items-end':''}`}>
                     {msg.role === 'model' ? (
-                      <div className="bg-white rounded-2xl rounded-tl-sm px-5 py-4 shadow-sm border border-slate-100/80 text-sm">
+                      <div className="text-sm px-1 pt-1">
                         {renderMd(msg.text)}
                       </div>
                     ) : (
@@ -619,16 +654,8 @@ export default function ChatIA() {
                   <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-red-500 to-red-900 flex items-center justify-center shrink-0 shadow-sm shadow-red-200 mt-1">
                     <Sparkles className="h-3.5 w-3.5 text-white" />
                   </div>
-                  <div className="bg-white rounded-2xl rounded-tl-sm px-5 py-4 shadow-sm border border-slate-100/80">
-                    <div className="flex items-center gap-1.5 h-5">
-                      {[0,1,2].map(i => (
-                        <span
-                          key={i}
-                          className="cia-wave-dot h-2 w-2 rounded-full bg-gradient-to-b from-red-400 to-red-600 inline-block"
-                          style={{ animationDelay: `${i*180}ms` }}
-                        />
-                      ))}
-                    </div>
+                  <div className="flex items-center pt-2.5">
+                    <Loader2 className="h-4 w-4 text-red-400 cia-spin" />
                   </div>
                 </div>
               )}
@@ -640,9 +667,7 @@ export default function ChatIA() {
           {/* ── Input bar ─────────────────────────────────────────────────── */}
           <div className="cia-input-bar shrink-0 px-4 pb-4 pt-2 bg-gradient-to-t from-white via-white/95 to-transparent">
             <div className="max-w-3xl mx-auto">
-              <div className={`bg-white rounded-2xl border transition-all duration-200 shadow-sm ${
-                input ? 'border-red-300 shadow-red-100/50' : 'border-slate-200 hover:border-slate-300'
-              }`}>
+              <div className="bg-white rounded-2xl border border-slate-200 hover:border-slate-300 focus-within:border-red-300 focus-within:ring-4 focus-within:ring-red-100 transition-all duration-200 shadow-sm">
                 <div className="flex items-end gap-2 px-4 py-3">
                   <button className="p-2 rounded-xl text-slate-300 hover:text-slate-500 hover:bg-slate-100 transition-colors active:scale-95 shrink-0 mb-0.5">
                     <Paperclip className="h-4 w-4" />
