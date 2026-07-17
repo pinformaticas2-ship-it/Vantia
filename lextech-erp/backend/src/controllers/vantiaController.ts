@@ -43,7 +43,7 @@ function moduleInstructions(moduleId: string): string {
   if (moduleId.includes('/correo'))
     return 'MÓDULO ACTIVO: Correo. El usuario gestiona emails del despacho. Puedes redactar correos profesionales, resumir conversaciones, proponer respuestas o ayudar a organizar la bandeja de entrada.';
   if (moduleId.includes('/documental'))
-    return 'MÓDULO ACTIVO: Documental. El usuario busca o gestiona documentación jurídica. Puedes ayudar con búsquedas en CENDOJ, BOE, LexNET, resúmenes normativos y localización de jurisprudencia.';
+    return 'MÓDULO ACTIVO: Documental. El usuario busca o gestiona documentación jurídica. Puedes ayudar con búsquedas en el BOE, resúmenes normativos y localización de jurisprudencia. CENDOJ y LexNET solo están disponibles como enlace directo al portal oficial, no hay búsqueda automática sobre ellos.';
   if (moduleId.includes('/whatsapp'))
     return 'MÓDULO ACTIVO: WhatsApp. El usuario gestiona mensajería con clientes. Puedes redactar mensajes, proponer respuestas y ayudar con la comunicación comercial.';
   if (moduleId.includes('/chat'))

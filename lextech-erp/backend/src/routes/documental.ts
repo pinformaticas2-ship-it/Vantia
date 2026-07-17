@@ -5,8 +5,6 @@ import {
   getBoeDocumentById,
   getBoeSchemas,
   searchBoeDocuments,
-  getCendojHighlights,
-  searchCendoj,
   getDocumentalProviders,
 } from '../controllers/documentalController';
 
@@ -17,7 +15,5 @@ router.get('/boe/schemas', requireAuth, getBoeSchemas);
 router.get('/boe/search', requireAuth, searchBoeDocuments);
 router.get('/boe/document/:id/block/:blockId', requireAuth, getBoeBlockById);
 router.get('/boe/document/:id', requireAuth, getBoeDocumentById);
-router.get('/cendoj/highlights', requireAuth, getCendojHighlights);
-router.get('/cendoj/search', requireAuth, searchCendoj);
 
 export default router;

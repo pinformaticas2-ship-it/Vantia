@@ -40,26 +40,6 @@ interface BoeDocumentResponse {
   }>;
 }
 
-interface CendojHighlight {
-  id: string;
-  title: string;
-  url: string;
-}
-
-interface CendojSearchResult {
-  id: string;
-  roj: string | null;
-  ecli: string | null;
-  organo: string | null;
-  municipio: string | null;
-  ponente: string | null;
-  numeroRecurso: string | null;
-  fecha: string | null;
-  tipoResolucion: string | null;
-  resumen: string | null;
-  url: string | null;
-}
-
 interface BoeBlockResponse {
   documentId: string;
   id: string | null;
@@ -97,14 +77,6 @@ interface BoeAdvancedFilters {
   yearTo: string;
 }
 
-interface CendojAdvancedFilters {
-  organo: string;
-  tipo: string;
-  ponente: string;
-  year: string;
-}
-
-
 export default function Documental() {
   const { getToken } = useAuth();
   const [providers, setProviders] = useState<Record<string, ProviderInfo> | null>(null);
@@ -131,26 +103,8 @@ export default function Documental() {
   const [selectedBlockLoading, setSelectedBlockLoading] = useState(false);
   const [selectedBlockError, setSelectedBlockError] = useState<string | null>(null);
 
-  const [cendojHighlights, setCendojHighlights] = useState<CendojHighlight[]>([]);
-  const [, setCendojLoading] = useState(false);
-  const [, setCendojError] = useState<string | null>(null);
-  const [cendojQuery, setCendojQuery] = useState("caducidad");
-  const [cendojSearchLoading, setCendojSearchLoading] = useState(false);
-  const [cendojSearchError, setCendojSearchError] = useState<string | null>(null);
-  const [cendojSearchResults, setCendojSearchResults] = useState<CendojSearchResult[]>([]);
-  const [cendojSearchTotal, setCendojSearchTotal] = useState<number | null>(null);
-  const [cendojRemoteTotal, setCendojRemoteTotal] = useState<number | null>(null);
-  const [cendojRecoverableMax, setCendojRecoverableMax] = useState<number | null>(null);
-  const [cendojSearchUrl, setCendojSearchUrl] = useState<string | null>(null);
-  const [cendojSearchWarning, setCendojSearchWarning] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"boe" | "cendoj" | "lexnet">("boe");
   const [showBoeAdvanced, setShowBoeAdvanced] = useState(false);
-  const [cendojAdvanced, setCendojAdvanced] = useState<CendojAdvancedFilters>({
-    organo: "",
-    tipo: "",
-    ponente: "",
-    year: "",
-  });
 
   const fetchProviders = useCallback(async () => {
     try {
@@ -197,71 +151,9 @@ export default function Documental() {
     }
   }, [getToken]);
 
-  const fetchCendojHighlights = useCallback(async () => {
-    try {
-      setCendojLoading(true);
-      setCendojError(null);
-      const data = await apiFetch("/api/documental/cendoj/highlights", { getToken });
-      if (data?.success === false) throw new Error(data.error || "No se pudo consultar CENDOJ.");
-      setCendojHighlights(data.data?.highlights || []);
-    } catch (e: any) {
-      setCendojHighlights([]);
-      setCendojError(null);
-    } finally {
-      setCendojLoading(false);
-    }
-  }, [getToken]);
-
-  const searchCendoj = useCallback(async (query: string) => {
-    const value = query.trim();
-    const hasAdvanced = Object.values(cendojAdvanced).some((item) => item.trim());
-    if (!value && !hasAdvanced) {
-      setCendojSearchError("Escribe un texto o usa algún filtro avanzado para buscar en CENDOJ.");
-      setCendojSearchResults([]);
-      setCendojSearchTotal(null);
-      setCendojRemoteTotal(null);
-      setCendojRecoverableMax(null);
-      setCendojSearchUrl(null);
-      setCendojSearchWarning(null);
-      return;
-    }
-
-    try {
-      setCendojSearchLoading(true);
-      setCendojSearchError(null);
-      const params = new URLSearchParams();
-      if (value) params.set("q", value);
-      if (cendojAdvanced.organo.trim()) params.set("organo", cendojAdvanced.organo.trim());
-      if (cendojAdvanced.tipo.trim()) params.set("tipo", cendojAdvanced.tipo.trim());
-      if (cendojAdvanced.ponente.trim()) params.set("ponente", cendojAdvanced.ponente.trim());
-      if (cendojAdvanced.year.trim()) params.set("year", cendojAdvanced.year.trim());
-      params.set("page", "1");
-      params.set("max_pages", "100");
-      const data = await apiFetch(`/api/documental/cendoj/search?${params.toString()}`, { getToken });
-      if (data?.success === false) throw new Error(data.error || "No se pudo buscar en CENDOJ.");
-      setCendojSearchResults(data.data?.results || []);
-      setCendojSearchTotal(typeof data.data?.total === "number" ? data.data.total : null);
-      setCendojRemoteTotal(typeof data.data?.remoteTotal === "number" ? data.data.remoteTotal : null);
-      setCendojRecoverableMax(typeof data.data?.recoverableMax === "number" ? data.data.recoverableMax : null);
-      setCendojSearchUrl(data.data?.searchUrl || null);
-      setCendojSearchWarning(data.data?.warning || null);
-    } catch (e: any) {
-      setCendojSearchResults([]);
-      setCendojSearchTotal(null);
-      setCendojRemoteTotal(null);
-      setCendojRecoverableMax(null);
-      setCendojSearchUrl(null);
-      setCendojSearchWarning(null);
-      setCendojSearchError(e.message || "No se pudo buscar en CENDOJ.");
-    } finally {
-      setCendojSearchLoading(false);
-    }
-  }, [cendojAdvanced, getToken]);
-
   useEffect(() => {
     void fetchProviders();
-    void fetchCendojHighlights();
-  }, [fetchProviders, fetchCendojHighlights]);
+  }, [fetchProviders]);
 
   useEffect(() => {
     if (!(selectedBlockLoading || selectedBlock || selectedBlockError)) return undefined;
@@ -336,8 +228,8 @@ export default function Documental() {
           <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />BOE · API oficial
           </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
-            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />CENDOJ · Portal público
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-500">
+            <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />CENDOJ · Solo enlace directo
           </span>
           <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-500">
             <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />LexNET · {lexnetProvider?.configured ? "Preparado" : "Pendiente"}
@@ -554,136 +446,41 @@ export default function Documental() {
       {/* ── CENDOJ ──────────────────────────────────────────────── */}
       {activeTab === "cendoj" && (
         <div className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex flex-wrap gap-3">
-            <div className="flex-1 min-w-[240px] flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 focus-within:border-amber-300 focus-within:bg-white transition-colors">
-              <Search size={15} className="text-slate-400 shrink-0" />
-              <input
-                value={cendojQuery}
-                onChange={(e) => setCendojQuery(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void searchCendoj(cendojQuery); } }}
-                placeholder="caducidad, despido, Ley 40/2015..."
-                className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
-              />
-              {cendojQuery && <button type="button" onClick={() => setCendojQuery("")} className="text-slate-300 hover:text-slate-500"><X size={13} /></button>}
+          <div className="flex items-start gap-4">
+            <div className="h-12 w-12 rounded-2xl bg-slate-100 flex items-center justify-center shrink-0">
+              <Scale size={22} className="text-slate-500" />
             </div>
-            <button
-              type="button"
-              onClick={() => void searchCendoj(cendojQuery)}
-              disabled={cendojSearchLoading}
-              className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-bold text-white hover:bg-slate-800 disabled:opacity-60 transition-colors"
-            >
-              {cendojSearchLoading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
-              Buscar
-            </button>
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-wrap items-center gap-3">
+                <h2 className="text-base font-semibold text-slate-900">CENDOJ</h2>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-0.5 text-xs font-semibold text-amber-700">
+                  Búsqueda automática desactivada
+                </span>
+              </div>
+              <p className="mt-1 text-sm text-slate-500">Buscador de jurisprudencia del Poder Judicial</p>
+            </div>
           </div>
 
-          <div className="mt-3 flex flex-wrap gap-2">
-            <input value={cendojAdvanced.organo} onChange={(e) => setCendojAdvanced((c) => ({ ...c, organo: e.target.value }))} placeholder="Órgano judicial" className="flex-1 min-w-[150px] rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none placeholder:text-slate-400 focus:border-amber-300 focus:bg-white transition-colors" />
-            <input value={cendojAdvanced.tipo} onChange={(e) => setCendojAdvanced((c) => ({ ...c, tipo: e.target.value }))} placeholder="Tipo (Sentencia...)" className="flex-1 min-w-[140px] rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none placeholder:text-slate-400 focus:border-amber-300 focus:bg-white transition-colors" />
-            <input value={cendojAdvanced.ponente} onChange={(e) => setCendojAdvanced((c) => ({ ...c, ponente: e.target.value }))} placeholder="Ponente" className="flex-1 min-w-[120px] rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none placeholder:text-slate-400 focus:border-amber-300 focus:bg-white transition-colors" />
-            <input value={cendojAdvanced.year} onChange={(e) => setCendojAdvanced((c) => ({ ...c, year: e.target.value.replace(/[^\d]/g, "").slice(0, 4) }))} placeholder="Año" className="w-24 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none placeholder:text-slate-400 focus:border-amber-300 focus:bg-white transition-colors" />
-          </div>
-
-          <div className="mt-3 flex flex-wrap gap-2">
-            <a href={cendojProvider?.searchUrl || "https://www.poderjudicial.es/search/indexAN.jsp"} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
-              <ExternalLink size={12} /> Abrir CENDOJ oficial
-            </a>
-            <a href={cendojProvider?.docsUrl || "https://www.poderjudicial.es"} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
-              <BookOpen size={12} /> CGPJ
-            </a>
-          </div>
-
-          {cendojSearchError && (
-            <div className="mt-4 flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              <AlertCircle size={14} className="shrink-0" /> {cendojSearchError}
-            </div>
-          )}
-
-          {!cendojSearchError && cendojSearchWarning && (
-            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800">
-              <p>{cendojSearchWarning}</p>
-              {cendojSearchUrl && (
-                <a href={cendojSearchUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-100">
-                  <ExternalLink size={12} /> Abrir en CENDOJ
-                </a>
-              )}
-            </div>
-          )}
-
-          {cendojSearchLoading && !cendojSearchError && (
-            <div className="mt-4 flex items-center gap-3 text-sm text-slate-500">
-              <Spinner size="sm" muted /> Consultando CENDOJ...
-            </div>
-          )}
-
-          {!cendojSearchError && !cendojSearchLoading && cendojSearchResults.length > 0 && (
-            <div className="mt-5">
-              <div className="mb-3 flex flex-wrap items-center gap-3">
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                  {typeof cendojRemoteTotal === "number" ? `${cendojRemoteTotal} resultados en CENDOJ` : `${cendojSearchTotal ?? cendojSearchResults.length} resultados`}
+          <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle size={16} className="text-amber-500 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-slate-700">El portal público bloquea las consultas automáticas</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  CENDOJ devuelve error 403 ante peticiones automatizadas, así que hemos desactivado la búsqueda integrada. Usa el enlace oficial para consultar jurisprudencia directamente en el portal.
                 </p>
-                {typeof cendojRecoverableMax === "number" && typeof cendojRemoteTotal === "number" && cendojRemoteTotal > cendojRecoverableMax && (
-                  <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-medium text-amber-700">Límite portal: {cendojRecoverableMax}</span>
-                )}
-              </div>
-              <div className="space-y-2">
-                {cendojSearchResults.map((item) => (
-                  <a
-                    key={`${item.id}-${item.roj}`}
-                    href={item.url || cendojProvider?.searchUrl || "https://www.poderjudicial.es/search/indexAN.jsp"}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-start gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 transition-colors hover:border-amber-300 hover:bg-amber-50/30"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-[11px] font-bold text-slate-400">{item.roj || "ROJ —"}</p>
-                        {item.fecha && <span className="text-[11px] text-slate-400">{item.fecha}</span>}
-                        {item.tipoResolucion && <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-600 ring-1 ring-slate-200">{item.tipoResolucion}</span>}
-                      </div>
-                      <p className="mt-0.5 text-sm font-semibold text-slate-900">{item.organo || "Resolución CENDOJ"}</p>
-                      {item.ecli && <p className="mt-0.5 text-xs text-slate-400 truncate">{item.ecli}</p>}
-                      <div className="mt-1 flex flex-wrap gap-3 text-xs text-slate-400">
-                        {item.ponente && <span>Ponente: {item.ponente}</span>}
-                        {item.municipio && <span>{item.municipio}</span>}
-                        {item.numeroRecurso && <span>Recurso: {item.numeroRecurso}</span>}
-                      </div>
-                      {item.resumen && <p className="mt-1.5 text-xs leading-5 text-slate-500 line-clamp-2">{item.resumen}</p>}
-                    </div>
-                    <ExternalLink size={13} className="text-slate-400 shrink-0 mt-0.5" />
-                  </a>
-                ))}
               </div>
             </div>
-          )}
+          </div>
 
-          {!cendojSearchError && !cendojSearchLoading && cendojSearchTotal === 0 && (
-            <p className="mt-4 text-sm text-slate-500">No se encontraron resoluciones para esa búsqueda.</p>
-          )}
-
-          {!cendojSearchError && !cendojSearchLoading && cendojSearchResults.length === 0 && cendojSearchTotal === null && (
-            <div className="mt-5">
-              {cendojHighlights.length > 0 ? (
-                <>
-                  <p className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-400">Resoluciones destacadas</p>
-                  <div className="space-y-2">
-                    {cendojHighlights.map((item) => (
-                      <a key={item.id} href={item.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 transition-colors hover:border-amber-300 hover:bg-amber-50/40">
-                        <FileText size={13} className="text-slate-400 shrink-0" />
-                        <p className="flex-1 min-w-0 text-sm font-medium text-slate-800 truncate">{item.title}</p>
-                        <ExternalLink size={12} className="text-slate-400 shrink-0" />
-                      </a>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 px-6 py-10 text-center">
-                  <Scale size={28} className="text-slate-300" />
-                  <p className="text-sm text-slate-400">Busca jurisprudencia por concepto, órgano o referencia</p>
-                </div>
-              )}
-            </div>
-          )}
+          <div className="mt-5 flex flex-wrap gap-2">
+            <a href={cendojProvider?.searchUrl || "https://www.poderjudicial.es/search/indexAN.jsp"} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
+              <ExternalLink size={14} /> Abrir CENDOJ oficial
+            </a>
+            <a href={cendojProvider?.docsUrl || "https://www.poderjudicial.es"} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
+              <BookOpen size={14} /> CGPJ
+            </a>
+          </div>
         </div>
       )}
 

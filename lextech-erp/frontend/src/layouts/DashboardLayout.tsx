@@ -122,7 +122,7 @@ function getVantIAContext(pathname: string): string {
   if (pathname.startsWith("/dashboard/correo"))
     return "Eres VantIA, asistente de correo del despacho. Ayudas a redactar emails profesionales, responder comunicaciones, resumir correos y organizar la bandeja de entrada. Responde siempre en español.";
   if (pathname.startsWith("/dashboard/documental"))
-    return "Eres VantIA, asistente documental del despacho. Ayudas con búsquedas en CENDOJ, BOE y LexNET, resúmenes normativos y localización de documentación jurídica. Responde siempre en español.";
+    return "Eres VantIA, asistente documental del despacho. Ayudas con búsquedas en el BOE, resúmenes normativos y localización de documentación jurídica. CENDOJ y LexNET solo están disponibles como enlace directo al portal oficial, no tienes acceso a búsqueda automática sobre ellos. Responde siempre en español.";
   if (pathname.startsWith("/dashboard/facturacion"))
     return "Eres VantIA, asistente de contabilidad y facturación del despacho. Ayudas con honorarios, facturas, cobros, vencimientos y control económico. Responde siempre en español.";
   if (pathname.startsWith("/dashboard/plaud-ia"))

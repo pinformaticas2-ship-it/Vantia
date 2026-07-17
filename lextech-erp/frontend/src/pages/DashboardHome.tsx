@@ -353,7 +353,7 @@ export default function DashboardHome() {
   const [selectedEmailAccountId, setSelectedEmailAccountId] = useState<string>("");
   const [openMenuEmailId,      setOpenMenuEmailId]      = useState<string | null>(null);
   const emailMenuRef = useRef<HTMLUListElement | null>(null);
-  const [docStats,      setDocStats]      = useState({ providers: 0, activos: 0, highlights: 0, lexnet: false });
+  const [docStats,      setDocStats]      = useState({ providers: 0, activos: 0, lexnet: false });
 
   // Billing period state
   const thisYear = new Date().getFullYear();
@@ -370,7 +370,7 @@ export default function DashboardHome() {
         actRes, agendaRes, tasksRes, billingRes,
         expRes, clientsRes, chatRes, chatUnreadRes,
         waStatusRes, waSchedulesRes, emailStatsRes, emailAccountsRes,
-        docProvidersRes, docHighlightsRes, emailMsgsRes,
+        docProvidersRes, emailMsgsRes,
       ] = await Promise.all([
         fetch("/api/activity/me?limit=10",        { headers }),
         fetch("/api/agenda/upcoming?limit=3",     { headers }),
@@ -385,19 +385,18 @@ export default function DashboardHome() {
         fetch("/api/email/stats",                 { headers }),
         fetch("/api/email/accounts",              { headers }),
         fetch("/api/documental/providers",        { headers }),
-        fetch("/api/documental/cendoj/highlights",{ headers }),
         fetch("/api/email/messages?folder=INBOX&limit=5", { headers }),
       ]);
       const [
         actData, agendaData, tasksData, billingData,
         expData, clientsData, chatData, chatUnreadData,
         waStatusData, waSchedulesData, emailStatsData, emailAccountsData,
-        docProvidersData, docHighlightsData, emailMsgsData,
+        docProvidersData, emailMsgsData,
       ] = await Promise.all([
         safeJson(actRes), safeJson(agendaRes), safeJson(tasksRes), safeJson(billingRes),
         safeJson(expRes), safeJson(clientsRes), safeJson(chatRes), safeJson(chatUnreadRes),
         safeJson(waStatusRes), safeJson(waSchedulesRes), safeJson(emailStatsRes), safeJson(emailAccountsRes),
-        safeJson(docProvidersRes), safeJson(docHighlightsRes), safeJson(emailMsgsRes),
+        safeJson(docProvidersRes), safeJson(emailMsgsRes),
       ]);
       if (actRes.ok) {
         setActivity(actData.data || []);
@@ -475,14 +474,12 @@ export default function DashboardHome() {
       if (emailMsgsRes.ok) {
         setEmailMessages(emailMsgsData.data?.emails || emailMsgsData.data || []);
       }
-      if (docProvidersRes.ok || docHighlightsRes.ok) {
+      if (docProvidersRes.ok) {
         const providers = docProvidersData.data || {};
         const providerValues = Object.values(providers) as any[];
-        const highlights: any[] = docHighlightsData.data?.highlights || [];
         setDocStats({
           providers: providerValues.length,
           activos: providerValues.filter((provider) => provider?.status === "available" || provider?.status === "prepared" || provider?.configured).length,
-          highlights: highlights.length,
           lexnet: Boolean((providers as any).lexnet?.configured),
         });
       }
@@ -980,7 +977,7 @@ export default function DashboardHome() {
             <ChevronRight size={14} className="text-slate-300 group-hover:text-red-500 transition-colors" />
           </div>
           <div className="px-5 py-4">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Fuentes</p>
                 <p className="mt-1 text-xl font-bold text-slate-800">{docStats.providers}</p>
@@ -988,10 +985,6 @@ export default function DashboardHome() {
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Activas</p>
                 <p className="mt-1 text-xl font-bold text-emerald-600">{docStats.activos}</p>
-              </div>
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Destacados</p>
-                <p className="mt-1 text-xl font-bold text-slate-700">{docStats.highlights}</p>
               </div>
             </div>
             <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-3 text-xs text-slate-500">
