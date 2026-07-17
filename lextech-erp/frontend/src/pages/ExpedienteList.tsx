@@ -22,6 +22,7 @@ import ColumnVisibilityModal from "../components/ColumnVisibilityModal";
 import BackButton from "../components/BackButton";
 import { UndoToast } from "../components/UndoToast";
 import { useUndoDelete } from "../lib/useUndoDelete";
+import { useDocumentProcessing } from "../contexts/DocumentProcessingContext";
 
 type ViewMode = "list" | "detail" | "multiselect" | "csvImport" | "csvImportConfigure" | "csvImportReview" | "csvImportComplete" | "csvImportHistory" | "csvImportErrorDetail" | "documentImport" | "documentImportVerify" | "documentImportHistory";
 import { safeJson, resolveApiUrl, resolveUploadUrl } from "../lib/api";
@@ -4479,6 +4480,7 @@ function CounterConfigModal({ onClose, getToken }: { onClose: () => void; getTok
 // ── Componente principal ───────────────────────────────────────
 export default function ExpedienteList() {
   const { getToken } = useAuth();
+  const { setProcessing: setDocumentProcessingIndicator } = useDocumentProcessing();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -4985,6 +4987,7 @@ export default function ExpedienteList() {
         xhr.upload.onload = () => {
           setDocumentImportUploadStage("processing");
           setDocumentImportUploadProgress(100);
+          setDocumentProcessingIndicator(true);
           startDocumentImportPolling(zipFileForPolling.name);
         };
         xhr.onload = async () => {
@@ -5013,6 +5016,7 @@ export default function ExpedienteList() {
       setDocumentImportError(e.message || "No se pudo importar el ZIP");
     } finally {
       stopDocumentImportPolling();
+      setDocumentProcessingIndicator(false);
       setDocumentImportUploadStage("idle");
       setDocumentImportSubmitting(false);
     }

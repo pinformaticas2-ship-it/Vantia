@@ -18,6 +18,7 @@ import { getDeviceId, safeJson, waitForClientIp } from "../lib/api";
 import { useChatUnread } from "../contexts/ChatUnreadContext";
 import { useEmailUnread } from "../contexts/EmailUnreadContext";
 import { useWhatsAppUnread, WA_LAST_SEEN_KEY } from "../contexts/WhatsAppUnreadContext";
+import { useDocumentProcessing } from "../contexts/DocumentProcessingContext";
 
 // ── Módulos buscables ────────────────────────────────────────────────────────
 const MODULES = [
@@ -918,6 +919,7 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
   const { totalUnread } = useChatUnread();
   const { unreadCount: emailUnreadCount } = useEmailUnread();
   const { unreadCount: waUnreadCount } = useWhatsAppUnread();
+  const { isProcessing: isDocProcessing } = useDocumentProcessing();
   const currentSearch = search || "";
 
   const isGroupActive = useCallback((item: NavItem) =>
@@ -1057,24 +1059,34 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
                   const href = item.href!;
                   const isActive = pathname === href || (href !== "/dashboard" && pathname.startsWith(href + '/'));
                   const Icon = item.icon;
-                  const isChat  = href === "/dashboard/chat";
-                  const isEmail = href === "/dashboard/correo";
-                  const isWA    = href === "/dashboard/whatsapp";
+                  const isChat        = href === "/dashboard/chat";
+                  const isEmail       = href === "/dashboard/correo";
+                  const isWA          = href === "/dashboard/whatsapp";
+                  const isExpedientes = href === "/dashboard/expedientes";
                   const chatBadge  = isChat  && !isActive && totalUnread > 0;
                   const emailBadge = isEmail && !isActive && emailUnreadCount > 0;
                   const waBadge    = isWA    && !isActive && waUnreadCount > 0;
                   const badgeCount = chatBadge ? totalUnread : emailBadge ? emailUnreadCount : waUnreadCount;
                   const hasBadge   = chatBadge || emailBadge || waBadge;
+                  // Expedientes: mientras se procesa un ZIP de documentos (cédula ->
+                  // expediente) en segundo plano, el icono muestra un spinner para que
+                  // quede claro que hay algo trabajando, se esté viendo esa pantalla o no.
+                  const showProcessingSpinner = isExpedientes && isDocProcessing;
 
                   if (collapsed) {
                     return (
-                      <Link key={item.name} to={href} onClick={onClose} title={item.name}
+                      <Link key={item.name} to={href} onClick={onClose} title={showProcessingSpinner ? `${item.name} — procesando documentos…` : item.name}
                         className={`relative flex items-center justify-center h-10 w-10 mx-auto rounded-lg transition-colors border-l-4 ${
                           isActive ? "erp-sidebar-nav-active bg-red-500/10 text-white border-red-500"
                                    : "erp-sidebar-nav-inactive text-slate-400 hover:bg-slate-800/50 hover:text-white border-transparent"
                         }`}>
                         <Icon className={`erp-sidebar-icon-${isActive ? "active" : "inactive"} h-5 w-5 ${isActive ? "text-red-400" : "text-slate-500"}`} />
-                        {hasBadge && (
+                        {showProcessingSpinner && (
+                          <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-slate-900 ring-1 ring-slate-900">
+                            <Loader2 size={10} className="text-red-400 animate-spin" />
+                          </span>
+                        )}
+                        {!showProcessingSpinner && hasBadge && (
                           <span className="erp-sidebar-badge-dot absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full ring-1 ring-slate-900" />
                         )}
                       </Link>
@@ -1083,13 +1095,22 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
 
                   return (
                     <Link key={item.name} to={href} onClick={onClose}
+                      title={showProcessingSpinner ? "Procesando documentos en segundo plano…" : undefined}
                       className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors border-l-4 ${
                         isActive ? "erp-sidebar-nav-active bg-red-500/10 text-white border-red-500"
                                  : "erp-sidebar-nav-inactive text-slate-400 hover:bg-slate-800/50 hover:text-white border-transparent"
                       }`}>
-                      <Icon className={`erp-sidebar-icon-${isActive ? "active" : "inactive"} h-4 w-4 shrink-0 ${isActive ? "text-red-400" : "text-slate-500"}`} />
+                      <span className="relative shrink-0 flex items-center justify-center h-4 w-4">
+                        <Icon className={`erp-sidebar-icon-${isActive ? "active" : "inactive"} h-4 w-4 ${isActive ? "text-red-400" : "text-slate-500"} ${showProcessingSpinner ? "opacity-0" : ""}`} />
+                        {showProcessingSpinner && (
+                          <Loader2 size={14} className="absolute inset-0 m-auto text-red-400 animate-spin" />
+                        )}
+                      </span>
                       <span className="flex-1 truncate">{item.name}</span>
-                      {hasBadge && (
+                      {showProcessingSpinner && (
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-red-400/80 shrink-0">Procesando</span>
+                      )}
+                      {!showProcessingSpinner && hasBadge && (
                         <span className="erp-sidebar-badge ml-auto min-w-[20px] h-5 bg-red-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1.5">
                           {badgeCount > 99 ? "99+" : badgeCount}
                         </span>

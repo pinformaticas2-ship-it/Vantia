@@ -4,6 +4,7 @@ import { SignedIn, SignedOut } from "@clerk/clerk-react";
 import { ChatUnreadProvider } from './contexts/ChatUnreadContext';
 import { EmailUnreadProvider } from './contexts/EmailUnreadContext';
 import { WhatsAppUnreadProvider } from './contexts/WhatsAppUnreadContext';
+import { DocumentProcessingProvider } from './contexts/DocumentProcessingContext';
 import { ThemeProvider } from './lib/ThemeContext';
 
 // Layouts
@@ -42,6 +43,7 @@ export default function App() {
         <ChatUnreadProvider>
         <EmailUnreadProvider>
         <WhatsAppUnreadProvider>
+        <DocumentProcessingProvider>
         <Routes>
           {/* Redirigir raíz al dashboard */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -86,6 +88,7 @@ export default function App() {
           {/* Capturar rutas desconocidas */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
+        </DocumentProcessingProvider>
         </WhatsAppUnreadProvider>
         </EmailUnreadProvider>
         </ChatUnreadProvider>
