@@ -273,13 +273,16 @@ async function extractFocusedNotificationDate(file: DocFile) {
       // Render all pages at once (max 8), check last pages first (cédula is usually last)
       let allPageImages: { path: string; pageNumber?: number; mimeType: string }[] = [];
       try {
-        allPageImages = renderPdfPagesToImages(file.fullPath, 8);
-        const ocrByPage = allPageImages.map((page) => ({
-          pageNumber: Number(page.pageNumber || 0),
-          path: page.path,
-          mimeType: page.mimeType,
-          text: extractImageOcr(page.path),
-        }));
+        allPageImages = await renderPdfPagesToImages(file.fullPath, 8);
+        const ocrByPage: { pageNumber: number; path: string; mimeType: string; text: string }[] = [];
+        for (const page of allPageImages) {
+          ocrByPage.push({
+            pageNumber: Number(page.pageNumber || 0),
+            path: page.path,
+            mimeType: page.mimeType,
+            text: await extractImageOcr(page.path),
+          });
+        }
 
         // 1st pass OCR: primeras 2 páginas (la anotación manuscrita suele estar al inicio)
         const firstPagesText = ocrByPage.slice(0, 2).map((p) => p.text).filter((t) => t.trim()).join('\n\n');
@@ -313,7 +316,7 @@ async function extractFocusedNotificationDate(file: DocFile) {
     }
 
     if (IMAGE_EXTS.includes(file.ext)) {
-      const imageText = extractImageOcr(file.fullPath);
+      const imageText = await extractImageOcr(file.fullPath);
       const ocrDate = runNotificationDateChecks(imageText);
       if (ocrDate) return ocrDate;
       // Fallback: ask Gemini focused
@@ -980,7 +983,7 @@ async function parseExpedienteFromVision(file: DocFile, ocrText: string): Promis
   let imagesToCleanup: Array<{ path: string }> = [];
   try {
     const imageInputs = file.ext === '.pdf'
-      ? renderPdfPagesToImages(file.fullPath, 8)
+      ? await renderPdfPagesToImages(file.fullPath, 8)
       : ['.jpg', '.jpeg', '.png', '.tiff', '.tif', '.bmp', '.webp'].includes(file.ext)
         ? [{ path: file.fullPath, mimeType: getMimeType(file.ext), pageNumber: 1 }]
         : [];
@@ -1068,7 +1071,7 @@ async function parseExpedienteFromVisionOpenAI(file: DocFile, ocrText: string): 
   let imagesToCleanup: any[] = [];
   try {
     const imageInputs: any[] = file.ext === '.pdf'
-      ? renderPdfPagesToImages(file.fullPath, 8)
+      ? await renderPdfPagesToImages(file.fullPath, 8)
       : ['.jpg','.jpeg','.png','.tiff','.tif','.bmp','.webp'].includes(file.ext)
         ? [{ path: file.fullPath, mimeType: getMimeType(file.ext), pageNumber: 1 }]
         : [];
@@ -1443,7 +1446,7 @@ export async function uploadDocumentImport(req: Request, res: Response) {
     );
     batchId = batchResult.rows[0].id;
 
-    const { dir, files } = extractZip(zipFile.path);
+    const { dir, files } = await extractZip(zipFile.path);
     zipDir = dir;
 
     if (files.length === 0) {
@@ -1476,7 +1479,7 @@ export async function uploadDocumentImport(req: Request, res: Response) {
 
       try {
         try {
-          textPreview = extractTextFromFile(file).trim();
+          textPreview = (await extractTextFromFile(file)).trim();
         } catch (extractError: any) {
           extractionWarning = String(extractError?.message || extractError || 'La extracción clásica falló');
           console.warn(`[documentImport] Extracción clásica con incidencia en ${file.name}:`, extractionWarning);

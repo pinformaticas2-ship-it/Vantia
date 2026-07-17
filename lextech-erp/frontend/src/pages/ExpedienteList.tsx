@@ -2992,20 +2992,43 @@ function DocumentImportView({
                     : "El sistema extraerá texto de cada documento."}
                 </p>
                 {importError && <p className="mt-1 text-xs font-medium text-red-600">{importError}</p>}
-                {importBusy && (
-                  <div className="mt-2 w-full max-w-xs">
-                    <div className="mb-1 flex items-center justify-between text-[11px] font-medium text-slate-500">
-                      <span>{uploadStage === "uploading" ? "Subiendo ZIP..." : "Procesando documentos..."}</span>
-                      <span>{uploadStage === "uploading" ? `${uploadProgress}%` : "Servidor trabajando"}</span>
+                {importBusy && (() => {
+                  // Mientras se sube el ZIP, el % viene del propio XHR. Una vez subido,
+                  // el servidor procesa documento a documento y cada uno va apareciendo
+                  // en activeItems según se completa (polling) -- así el indicador
+                  // muestra progreso real ("documento 2 de 5"), no una barra falsa.
+                  const processingTotal = activeBatch?.total_count || 0;
+                  const processingDone = activeItems.length;
+                  const knowsTotal = uploadStage === "processing" && processingTotal > 0;
+                  const processingPct = knowsTotal ? Math.round((processingDone / processingTotal) * 100) : 0;
+                  return (
+                    <div className="mt-2 w-full max-w-xs">
+                      <div className="mb-1 flex items-center justify-between text-[11px] font-medium text-slate-500">
+                        <span>
+                          {uploadStage === "uploading"
+                            ? "Subiendo ZIP..."
+                            : knowsTotal
+                              ? `Procesando documento ${Math.min(processingDone + 1, processingTotal)} de ${processingTotal}...`
+                              : "Preparando documentos..."}
+                        </span>
+                        <span>
+                          {uploadStage === "uploading" ? `${uploadProgress}%` : knowsTotal ? `${processingDone}/${processingTotal}` : ""}
+                        </span>
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+                        <div
+                          className={`h-full rounded-full transition-all duration-300 ${
+                            uploadStage === "uploading" ? "bg-red-600" : knowsTotal ? "bg-amber-500" : "bg-amber-500 animate-pulse"
+                          }`}
+                          style={{ width: `${uploadStage === "uploading" ? Math.max(uploadProgress, 6) : knowsTotal ? Math.max(processingPct, 6) : 100}%` }}
+                        />
+                      </div>
+                      <p className="mt-1 text-[10px] text-slate-400">
+                        {uploadStage === "processing" && "Puedes seguir usando el resto de la aplicación mientras se procesa."}
+                      </p>
                     </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-slate-200">
-                      <div
-                        className={`h-full rounded-full transition-all duration-300 ${uploadStage === "uploading" ? "bg-red-600" : "bg-amber-500 animate-pulse"}`}
-                        style={{ width: `${uploadStage === "uploading" ? Math.max(uploadProgress, 6) : 100}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
               <button
                 type="button"
@@ -4882,6 +4905,41 @@ export default function ExpedienteList() {
     }
   }, [getToken]);
 
+  // Mientras el backend procesa el ZIP (ahora en segundo plano, sin bloquear
+  // al resto de usuarios) sondeamos el lote para mostrar progreso real:
+  // cada documento completado inserta una fila en expediente_import_items,
+  // así que activeItems.length creciendo === documentos ya procesados.
+  const documentImportPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const stopDocumentImportPolling = useCallback(() => {
+    if (documentImportPollRef.current) {
+      clearInterval(documentImportPollRef.current);
+      documentImportPollRef.current = null;
+    }
+  }, []);
+  const startDocumentImportPolling = useCallback((zipFileNameToMatch: string) => {
+    stopDocumentImportPolling();
+    let discoveredBatchId: string | null = null;
+    const tick = async () => {
+      try {
+        if (!discoveredBatchId) {
+          const token = await getToken({ skipCache: true });
+          const res = await fetch("/api/expedientes/documents/batches", { headers: { Authorization: `Bearer ${token}` } });
+          const data = await safeJson(res);
+          if (res.ok) {
+            const match = (data.data || []).find(
+              (b: ImportBatch) => b.file_name === zipFileNameToMatch && b.status === "processing"
+            );
+            if (match) discoveredBatchId = match.id;
+          }
+        }
+        if (discoveredBatchId) await fetchDocumentImportBatch(discoveredBatchId);
+      } catch { /* se reintenta en el siguiente tick */ }
+    };
+    tick();
+    documentImportPollRef.current = setInterval(tick, 1500);
+  }, [getToken, fetchDocumentImportBatch, stopDocumentImportPolling]);
+  useEffect(() => () => stopDocumentImportPolling(), [stopDocumentImportPolling]);
+
   async function handleStartDocumentImport() {
     if (!documentImportZipFile) {
       setDocumentImportError("Selecciona primero un archivo ZIP.");
@@ -4892,11 +4950,16 @@ export default function ExpedienteList() {
       return;
     }
 
+    const zipFileForPolling = documentImportZipFile;
     setDocumentImportSubmitting(true);
     setDocumentImportUploadProgress(0);
     setDocumentImportUploadStage("uploading");
     setDocumentImportError(null);
     setDocumentImportSuccessNotice(null);
+    // Evita que se vea un instante el progreso de una importación anterior
+    // mientras se localiza el nuevo lote.
+    setDocumentImportActiveBatch(null);
+    setDocumentImportItems([]);
     try {
       const token = await getToken({ skipCache: true });
       const formData = new FormData();
@@ -4915,9 +4978,16 @@ export default function ExpedienteList() {
             setDocumentImportUploadProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)));
           }
         };
-        xhr.onload = async () => {
+        // El upload de los bytes del ZIP ha terminado — a partir de aquí el
+        // servidor procesa (OCR/IA), que puede tardar minutos. Empezamos a
+        // sondear el lote para dar progreso real en vez de dejar la barra
+        // "congelada" en 100% hasta que llegue la respuesta final.
+        xhr.upload.onload = () => {
           setDocumentImportUploadStage("processing");
           setDocumentImportUploadProgress(100);
+          startDocumentImportPolling(zipFileForPolling.name);
+        };
+        xhr.onload = async () => {
           try {
             const parsed = xhr.responseText ? JSON.parse(xhr.responseText) : {};
             if (xhr.status < 200 || xhr.status >= 300) {
@@ -4942,6 +5012,7 @@ export default function ExpedienteList() {
     } catch (e: any) {
       setDocumentImportError(e.message || "No se pudo importar el ZIP");
     } finally {
+      stopDocumentImportPolling();
       setDocumentImportUploadStage("idle");
       setDocumentImportSubmitting(false);
     }

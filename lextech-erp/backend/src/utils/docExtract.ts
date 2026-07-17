@@ -1,8 +1,15 @@
 /**
  * Extracción de texto de documentos — sin dependencias npm externas
  * Usa herramientas del sistema: pdftotext (poppler-utils), unzip, tesseract
+ *
+ * IMPORTANTE: todas las llamadas a procesos externos usan spawn (asíncrono),
+ * nunca spawnSync. spawnSync bloquea el hilo único de Node mientras el
+ * proceso hijo corre (segundos o minutos en OCR/render de PDF a 300 DPI),
+ * dejando sin servicio a CUALQUIER otra petición del backend mientras tanto
+ * — no solo para el usuario que sube el documento, para todos los usuarios
+ * conectados. spawn + Promise deja el event loop libre entre medias.
  */
-import { spawnSync } from 'child_process';
+import { spawn } from 'child_process';
 import * as fs   from 'fs';
 import * as path from 'path';
 import * as os   from 'os';
@@ -33,11 +40,70 @@ export type RenderedPageImage = {
   pageNumber: number;
 };
 
+// ── spawn asíncrono con la misma forma de retorno que spawnSync ────────────
+// (.status, .stdout, .stderr, .error) para poder mover cada llamada a
+// spawnSync -> spawnAsync sin reescribir la lógica de cada caller.
+type SpawnResult = { status: number | null; stdout: Buffer; stderr: Buffer; error?: Error };
+
+function spawnAsync(command: string, args: string[], opts: { timeout?: number; maxBuffer?: number } = {}): Promise<SpawnResult> {
+  return new Promise((resolve) => {
+    const maxBuffer = opts.maxBuffer ?? 10 * 1024 * 1024;
+    let child;
+    try {
+      child = spawn(command, args, { windowsHide: true });
+    } catch (error: any) {
+      resolve({ status: null, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0), error });
+      return;
+    }
+
+    const stdoutChunks: Buffer[] = [];
+    const stderrChunks: Buffer[] = [];
+    let stdoutLen = 0;
+    let stderrLen = 0;
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const finish = (result: SpawnResult) => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      resolve(result);
+    };
+
+    child.stdout?.on('data', (chunk: Buffer) => {
+      stdoutLen += chunk.length;
+      if (stdoutLen <= maxBuffer) stdoutChunks.push(chunk);
+    });
+    child.stderr?.on('data', (chunk: Buffer) => {
+      stderrLen += chunk.length;
+      if (stderrLen <= maxBuffer) stderrChunks.push(chunk);
+    });
+    child.on('error', (error) => {
+      finish({ status: null, stdout: Buffer.concat(stdoutChunks), stderr: Buffer.concat(stderrChunks), error });
+    });
+    child.on('close', (code) => {
+      finish({ status: code, stdout: Buffer.concat(stdoutChunks), stderr: Buffer.concat(stderrChunks) });
+    });
+
+    if (opts.timeout) {
+      timer = setTimeout(() => {
+        try { child.kill(); } catch { /**/ }
+        finish({
+          status: null,
+          stdout: Buffer.concat(stdoutChunks),
+          stderr: Buffer.concat(stderrChunks),
+          error: new Error(`Tiempo de espera agotado (${opts.timeout}ms) ejecutando ${command}`),
+        });
+      }, opts.timeout);
+    }
+  });
+}
+
 // ── Extraer ZIP ───────────────────────────────────────────────────────────────
 
-export function extractZip(zipPath: string): { dir: string; files: DocFile[] } {
+export async function extractZip(zipPath: string): Promise<{ dir: string; files: DocFile[] }> {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lextech-zip-'));
-  extractArchive(zipPath, dir);
+  await extractArchive(zipPath, dir);
 
   const files = getAllFiles(dir)
     .filter(f => !path.basename(f).startsWith('__MACOSX') &&
@@ -66,7 +132,7 @@ function getAllFiles(dir: string): string[] {
 const SUPPORTED_EXTS = ['.pdf', '.docx', '.doc', '.txt', '.text', '.rtf',
   '.jpg', '.jpeg', '.png', '.tiff', '.tif', '.bmp', '.webp'];
 
-function extractArchive(archivePath: string, destinationDir: string) {
+async function extractArchive(archivePath: string, destinationDir: string): Promise<void> {
   try {
     const zip = new AdmZip(archivePath);
     zip.extractAllTo(destinationDir, true);
@@ -79,7 +145,7 @@ function extractArchive(archivePath: string, destinationDir: string) {
     const needsZipAlias = path.extname(archivePath).toLowerCase() !== '.zip';
     const zipPath = needsZipAlias ? `${archivePath}.zip` : archivePath;
     if (needsZipAlias) fs.copyFileSync(archivePath, zipPath);
-    const result = spawnSync(
+    const result = await spawnAsync(
       'powershell.exe',
       [
         '-NoProfile',
@@ -97,7 +163,7 @@ function extractArchive(archivePath: string, destinationDir: string) {
     return;
   }
 
-  const result = spawnSync('unzip', ['-o', archivePath, '-d', destinationDir], {
+  const result = await spawnAsync('unzip', ['-o', archivePath, '-d', destinationDir], {
     timeout: 60_000,
     maxBuffer: 100 * 1024 * 1024,
   });
@@ -109,11 +175,20 @@ function extractArchive(archivePath: string, destinationDir: string) {
   }
 }
 
-function commandExists(command: string): boolean {
-  return Boolean(resolveCommand(command));
+// Cachea la ruta resuelta de cada comando (tesseract/pdftotext/pdftoppm/...):
+// antes se relanzaba "where"/"which" en cada archivo/página, multiplicando
+// llamadas a spawn innecesarias — el resultado nunca cambia durante un run.
+const resolvedCommandCache = new Map<string, string | null>();
+
+async function resolveCommand(command: string): Promise<string | null> {
+  if (resolvedCommandCache.has(command)) return resolvedCommandCache.get(command)!;
+
+  const resolved = await resolveCommandUncached(command);
+  resolvedCommandCache.set(command, resolved);
+  return resolved;
 }
 
-function resolveCommand(command: string): string | null {
+async function resolveCommandUncached(command: string): Promise<string | null> {
   if (process.platform === 'win32') {
     const windowsCandidates: Record<string, string[]> = {
       tesseract: [
@@ -140,7 +215,7 @@ function resolveCommand(command: string): string | null {
   }
 
   const checker = process.platform === 'win32' ? 'where' : 'which';
-  const result = spawnSync(checker, [command], { timeout: 3000 });
+  const result = await spawnAsync(checker, [command], { timeout: 3000 });
   if (result.status !== 0) return null;
 
   const resolved = result.stdout?.toString('utf-8')?.split(/\r?\n/).find(Boolean)?.trim();
@@ -149,15 +224,15 @@ function resolveCommand(command: string): string | null {
 
 // ── Extraer texto ─────────────────────────────────────────────────────────────
 
-export function extractTextFromFile(file: DocFile): string {
+export async function extractTextFromFile(file: DocFile): Promise<string> {
   try {
-    if (file.ext === '.pdf') return extractPdf(file.fullPath);
-    if (['.docx', '.doc'].includes(file.ext)) return extractDocx(file.fullPath);
+    if (file.ext === '.pdf') return await extractPdf(file.fullPath);
+    if (['.docx', '.doc'].includes(file.ext)) return await extractDocx(file.fullPath);
     if (['.txt', '.text', '.rtf'].includes(file.ext)) {
       return fs.readFileSync(file.fullPath, 'utf-8').slice(0, 50_000);
     }
     if (['.jpg', '.jpeg', '.png', '.tiff', '.tif', '.bmp', '.webp'].includes(file.ext)) {
-      return extractImageOcr(file.fullPath);
+      return await extractImageOcr(file.fullPath);
     }
   } catch (e: any) {
     console.warn(`[docExtract] Error extrayendo ${file.name}: ${e.message}`);
@@ -168,19 +243,19 @@ export function extractTextFromFile(file: DocFile): string {
 
 // ── PDF via pdftotext (poppler-utils) ─────────────────────────────────────────
 
-function extractPdf(filePath: string): string {
-  const pdftotextCmd = resolveCommand('pdftotext');
+async function extractPdf(filePath: string): Promise<string> {
+  const pdftotextCmd = await resolveCommand('pdftotext');
   if (!pdftotextCmd) {
     return extractPdfViaOcr(filePath, true);
   }
 
-  const result = spawnSync(pdftotextCmd, ['-layout', '-enc', 'UTF-8', filePath, '-'], {
+  const result = await spawnAsync(pdftotextCmd, ['-layout', '-enc', 'UTF-8', filePath, '-'], {
     timeout: 30_000,
     maxBuffer: 10 * 1024 * 1024,
   });
   if (result.status !== 0) {
     // Intentar sin -layout como fallback
-    const r2 = spawnSync(pdftotextCmd, ['-enc', 'UTF-8', filePath, '-'], {
+    const r2 = await spawnAsync(pdftotextCmd, ['-enc', 'UTF-8', filePath, '-'], {
       timeout: 30_000, maxBuffer: 10 * 1024 * 1024,
     });
     const fallbackText = (r2.stdout?.toString('utf-8') || '').slice(0, 50_000);
@@ -192,13 +267,15 @@ function extractPdf(filePath: string): string {
   return extractPdfViaOcr(filePath, false);
 }
 
-function extractPdfViaOcr(filePath: string, pdftotextUnavailable: boolean): string {
-  const pageImages = renderPdfPagesToImages(filePath);
+async function extractPdfViaOcr(filePath: string, _pdftotextUnavailable: boolean): Promise<string> {
+  const pageImages = await renderPdfPagesToImages(filePath);
   try {
-    const merged = pageImages
-      .map((page) => extractImageOcr(page.path))
-      .filter((chunk) => chunk.trim())
-      .join('\n\n');
+    const chunks: string[] = [];
+    for (const page of pageImages) {
+      const chunk = await extractImageOcr(page.path);
+      if (chunk.trim()) chunks.push(chunk);
+    }
+    const merged = chunks.join('\n\n');
 
     if (!merged.trim()) {
       throw new DocExtractError(
@@ -213,9 +290,9 @@ function extractPdfViaOcr(filePath: string, pdftotextUnavailable: boolean): stri
   }
 }
 
-export function renderPdfPagesToImages(filePath: string, maxPages = 8): RenderedPageImage[] {
-  const pdftoppmCmd = resolveCommand('pdftoppm');
-  const pdftocairoCmd = resolveCommand('pdftocairo');
+export async function renderPdfPagesToImages(filePath: string, maxPages = 8): Promise<RenderedPageImage[]> {
+  const pdftoppmCmd = await resolveCommand('pdftoppm');
+  const pdftocairoCmd = await resolveCommand('pdftocairo');
   const pdfRenderer = pdftoppmCmd || pdftocairoCmd || '';
   if (!pdfRenderer) {
     throw new DocExtractError(
@@ -230,7 +307,7 @@ export function renderPdfPagesToImages(filePath: string, maxPages = 8): Rendered
   const renderArgs = pdfRenderer === pdftoppmCmd
     ? ['-png', '-r', '300', '-f', '1', '-l', String(maxPages), filePath, prefix]
     : ['-png', '-r', '300', '-f', '1', '-l', String(maxPages), filePath, prefix];
-  const render = spawnSync(pdfRenderer, renderArgs, {
+  const render = await spawnAsync(pdfRenderer, renderArgs, {
     timeout: 120_000,
     maxBuffer: 200 * 1024 * 1024,
   });
@@ -275,10 +352,10 @@ export function cleanupRenderedPageImages(pageImages: RenderedPageImage[]) {
 
 // ── DOCX via unzip + XML ──────────────────────────────────────────────────────
 
-function extractDocx(filePath: string): string {
+async function extractDocx(filePath: string): Promise<string> {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lextech-docx-'));
   try {
-    extractArchive(filePath, tmpDir);
+    await extractArchive(filePath, tmpDir);
     const xmlPath = path.join(tmpDir, 'word', 'document.xml');
     if (!fs.existsSync(xmlPath)) return '';
     const xml = fs.readFileSync(xmlPath, 'utf-8');
@@ -306,15 +383,15 @@ function xmlToText(xml: string): string {
 
 // ── OCR via Tesseract ─────────────────────────────────────────────────────────
 
-export function extractImageOcr(filePath: string): string {
+export async function extractImageOcr(filePath: string): Promise<string> {
   // Intentar con tesseract CLI si está disponible
-  const tesseractCmd = resolveCommand('tesseract');
+  const tesseractCmd = await resolveCommand('tesseract');
   if (tesseractCmd) {
-    const outBase = path.join(os.tmpdir(), `ocr_${Date.now()}`);
+    const outBase = path.join(os.tmpdir(), `ocr_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
     // --oem 1 = LSTM neural net (mejor para manuscritos y docs escaneados)
     // --psm 6 = asume bloque uniforme de texto (más preciso que auto)
     // -l spa+eng = español + inglés para documentos mixtos
-    const result = spawnSync(
+    const result = await spawnAsync(
       tesseractCmd,
       [filePath, outBase, '-l', 'spa+eng', '--oem', '1', '--psm', '6'],
       { timeout: 90_000 },
@@ -326,8 +403,8 @@ export function extractImageOcr(filePath: string): string {
       if (text.trim()) return text.slice(0, 50_000);
     }
     // Fallback: modo auto (--psm 3) si --psm 6 no devuelve nada
-    const outBase2 = path.join(os.tmpdir(), `ocr_${Date.now()}_b`);
-    spawnSync(tesseractCmd, [filePath, outBase2, '-l', 'spa+eng', '--oem', '1', '--psm', '3'], {
+    const outBase2 = path.join(os.tmpdir(), `ocr_${Date.now()}_${Math.random().toString(36).slice(2, 8)}_b`);
+    await spawnAsync(tesseractCmd, [filePath, outBase2, '-l', 'spa+eng', '--oem', '1', '--psm', '3'], {
       timeout: 90_000,
     });
     const outFile2 = `${outBase2}.txt`;
