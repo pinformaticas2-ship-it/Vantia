@@ -584,7 +584,7 @@ function normalizeForMatch(s: string) {
     .trim();
 }
 
-async function matchClientInDb(candidateNames: string[]): Promise<{ id: string; nombre: string } | null> {
+async function matchClientInDb(candidateNames: string[], organizacionId: string): Promise<{ id: string; nombre: string } | null> {
   const candidates = candidateNames
     .map((n) => normalizeForMatch(String(n || '')))
     .filter((n) => n.length >= 3);
@@ -595,7 +595,8 @@ async function matchClientInDb(candidateNames: string[]): Promise<{ id: string; 
             TRIM(COALESCE(NULLIF(TRIM(first_name || ' ' || COALESCE(last_name, '')), ''), commercial_name, '')) AS nombre,
             COALESCE(commercial_name, '') AS comercial
      FROM entities
-     WHERE first_name IS NOT NULL OR commercial_name IS NOT NULL`,
+     WHERE (first_name IS NOT NULL OR commercial_name IS NOT NULL) AND organizacion_id = $1`,
+    [organizacionId],
   );
 
   // Exact match first
@@ -1226,16 +1227,24 @@ function buildDraftFromExtracted(
 async function createExpediente(
   data: Record<string, any>,
   userName_: string,
+  organizacionId: string,
 ): Promise<{ id: string; anio: number; num_exp: number }> {
   const yr = data.anio || new Date().getFullYear();
 
   let clienteNombre = data.cliente_nombre || null;
-  if (data.cliente_id && !clienteNombre) {
+  let clienteId = data.cliente_id || null;
+  if (clienteId) {
     const cr = await pool.query(
-      `SELECT first_name || COALESCE(' ' || last_name, '') AS n FROM entities WHERE id = $1`,
-      [data.cliente_id],
+      `SELECT first_name || COALESCE(' ' || last_name, '') AS n FROM entities WHERE id = $1 AND organizacion_id = $2`,
+      [clienteId, organizacionId],
     );
-    clienteNombre = cr.rows[0]?.n || null;
+    // Si el cliente indicado no pertenece a esta organización (id obsoleto o
+    // de otro despacho), no lo enlazamos -- mismo criterio que expedientesController.ts.
+    if (!cr.rows.length) {
+      clienteId = null;
+    } else if (!clienteNombre) {
+      clienteNombre = cr.rows[0].n || null;
+    }
   }
 
   // Retry loop: si hay race condition (otro proceso tomó el mismo num_exp),
@@ -1245,7 +1254,7 @@ async function createExpediente(
   while (attempts < 10) {
     attempts++;
     const maxR = await pool.query(
-      `SELECT COALESCE(MAX(num_exp), 0) + 1 AS next FROM expedientes WHERE anio = $1`, [yr]
+      `SELECT COALESCE(MAX(num_exp), 0) + 1 AS next FROM expedientes WHERE anio = $1 AND organizacion_id = $2`, [yr, organizacionId]
     );
     const numExp = maxR.rows[0].next;
 
@@ -1259,8 +1268,8 @@ async function createExpediente(
             tipos_asunto, cuantia_principal, intereses, costas, cuantia_total,
             indeterminado, etapa, persona_contacto, contacto, centro, color,
             demandantes, demandados, fecha_notificacion,
-            created_by)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34)
+            created_by, organizacion_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35)
          RETURNING id, anio, num_exp`,
         [
           yr, numExp,
@@ -1268,7 +1277,7 @@ async function createExpediente(
       data.ref_expediente?.trim() || null,
       data.descripcion?.trim() || 'Expediente importado desde documento',
       data.tipo || 'judicial',
-      data.cliente_id || null,
+      clienteId,
       clienteNombre,
       data.contrario?.trim() || null,
       data.procurador?.trim() || null,
@@ -1296,6 +1305,7 @@ async function createExpediente(
       data.demandados ? JSON.stringify(data.demandados) : null,
       data.fecha_notificacion || null,
       userName_,
+      organizacionId,
         ],
       );
       rows = result.rows;
@@ -1425,7 +1435,9 @@ async function refreshBatchCounters(batchId: string) {
 export async function uploadDocumentImport(req: Request, res: Response) {
   const uid = userId(req);
   const unam = userName(req);
+  const organizacionId = (req as any).organizacionId;
   if (!uid) return err(res, 'No autenticado', 401);
+  if (!organizacionId) return err(res, 'No se pudo determinar la organización activa', 400);
 
   const zipFile = (req as any).file;
   if (!zipFile) return err(res, 'No se recibió ningún archivo ZIP', 400);
@@ -1439,10 +1451,10 @@ export async function uploadDocumentImport(req: Request, res: Response) {
   try {
     const batchResult = await pool.query(
       `INSERT INTO expediente_import_batches
-         (user_id, user_name, file_name, status, total_count, notes)
-       VALUES ($1,$2,$3,'processing',0,$4)
+         (user_id, user_name, file_name, status, total_count, notes, organizacion_id)
+       VALUES ($1,$2,$3,'processing',0,$4,$5)
        RETURNING id`,
-      [uid, unam, fixFileName(zipFile.originalname), 'Importación desde documentos ZIP'],
+      [uid, unam, fixFileName(zipFile.originalname), 'Importación desde documentos ZIP', organizacionId],
     );
     batchId = batchResult.rows[0].id;
 
@@ -1539,7 +1551,7 @@ export async function uploadDocumentImport(req: Request, res: Response) {
             extractedData.cliente_nombre,
           ].filter((n): n is string => Boolean(n && String(n).trim()));
           try {
-            const matched = await matchClientInDb(nameCandidates);
+            const matched = await matchClientInDb(nameCandidates, organizacionId);
             if (matched) {
               draft.cliente_id = matched.id;
               draft.cliente_nombre = matched.nombre;
@@ -1619,15 +1631,17 @@ export async function uploadDocumentImport(req: Request, res: Response) {
 export async function acceptDocumentImportItem(req: Request, res: Response) {
   const uid = userId(req);
   const unam = userName(req);
+  const organizacionId = (req as any).organizacionId;
   if (!uid) return err(res, 'No autenticado', 401);
+  if (!organizacionId) return err(res, 'No se pudo determinar la organización activa', 400);
 
   const { batchId, itemId } = req.params;
   const verifiedDraft = req.body?.draft || null;
 
   try {
     const { rows: batchRows } = await pool.query(
-      `SELECT * FROM expediente_import_batches WHERE id=$1 AND user_id=$2`,
-      [batchId, uid],
+      `SELECT * FROM expediente_import_batches WHERE id=$1 AND organizacion_id=$2`,
+      [batchId, organizacionId],
     );
     if (!batchRows.length) return err(res, 'Lote no encontrado', 404);
 
@@ -1662,7 +1676,7 @@ export async function acceptDocumentImportItem(req: Request, res: Response) {
       representa_a: representacion,
     };
 
-    const expediente = await createExpediente(finalDraft, unam);
+    const expediente = await createExpediente(finalDraft, unam, organizacionId);
     await attachImportedDocumentToExpediente(expediente.id, payload, uid);
     await createImportedDeadlineFollowUps(expediente, finalDraft, uid, unam);
 
@@ -1695,13 +1709,15 @@ export async function acceptDocumentImportItem(req: Request, res: Response) {
 
 export async function getDocumentImportBatch(req: Request, res: Response) {
   const uid = userId(req);
+  const organizacionId = (req as any).organizacionId;
   if (!uid) return err(res, 'No autenticado', 401);
+  if (!organizacionId) return err(res, 'No se pudo determinar la organización activa', 400);
   const { id } = req.params;
 
   try {
     const { rows: batch } = await pool.query(
-      `SELECT * FROM expediente_import_batches WHERE id=$1 AND user_id=$2`,
-      [id, uid],
+      `SELECT * FROM expediente_import_batches WHERE id=$1 AND organizacion_id=$2`,
+      [id, organizacionId],
     );
     if (!batch.length) return err(res, 'Batch no encontrado', 404);
 
@@ -1722,14 +1738,16 @@ export async function getDocumentImportBatch(req: Request, res: Response) {
 
 export async function listDocumentImportBatches(req: Request, res: Response) {
   const uid = userId(req);
+  const organizacionId = (req as any).organizacionId;
   if (!uid) return err(res, 'No autenticado', 401);
+  if (!organizacionId) return err(res, 'No se pudo determinar la organización activa', 400);
 
   try {
     const { rows } = await pool.query(
       `SELECT * FROM expediente_import_batches
-       WHERE user_id=$1
+       WHERE organizacion_id=$1
        ORDER BY created_at DESC LIMIT 20`,
-      [uid],
+      [organizacionId],
     );
     return ok(res, rows);
   } catch (error: any) {
@@ -1739,14 +1757,16 @@ export async function listDocumentImportBatches(req: Request, res: Response) {
 
 export async function deleteDocumentImportBatch(req: Request, res: Response) {
   const uid = userId(req);
+  const organizacionId = (req as any).organizacionId;
   if (!uid) return err(res, 'No autenticado', 401);
+  if (!organizacionId) return err(res, 'No se pudo determinar la organización activa', 400);
   const { id } = req.params;
 
   try {
     await pool.query(`DELETE FROM expediente_import_items WHERE batch_id=$1`, [id]);
     const { rowCount } = await pool.query(
-      `DELETE FROM expediente_import_batches WHERE id=$1 AND user_id=$2`,
-      [id, uid],
+      `DELETE FROM expediente_import_batches WHERE id=$1 AND organizacion_id=$2`,
+      [id, organizacionId],
     );
     if (!rowCount) return err(res, 'Lote no encontrado', 404);
     return ok(res, { deleted: true });

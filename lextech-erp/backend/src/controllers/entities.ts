@@ -129,7 +129,7 @@ export const getEntities = async (req: any, res: Response) => {
 // GET  /api/entities/counter-config
 // POST /api/entities/counter-config
 // ─────────────────────────────────────────────────────────────
-export const getEntitiesCounterConfig = async (_req: any, res: Response) => {
+export const getEntitiesCounterConfig = async (req: any, res: Response) => {
   try {
     const { rows: cfgRows } = await pool.query(
       `SELECT min_num, auto_fill, override_next FROM client_counter_config WHERE id = 1`
@@ -140,7 +140,8 @@ export const getEntitiesCounterConfig = async (_req: any, res: Response) => {
     const overrideNext: number | null = cfg.override_next ?? null;
 
     const { rows: usedRows } = await pool.query(
-      `SELECT internal_number FROM entities WHERE internal_number IS NOT NULL ORDER BY internal_number`
+      `SELECT internal_number FROM entities WHERE internal_number IS NOT NULL AND organizacion_id = $1 ORDER BY internal_number`,
+      [req.organizacionId]
     );
     const used: number[] = usedRows.map((r: any) => r.internal_number);
     const maxUsed = used.length ? Math.max(...used) : 0;
@@ -198,7 +199,7 @@ export const setEntitiesCounterConfig = async (req: any, res: Response) => {
 // Calcula el proximo internal_number a usar segun la config (mismo criterio
 // que getEntitiesCounterConfig) y, si viene de un override de un solo uso,
 // lo consume (lo borra) para que el siguiente cliente vuelva al modo normal.
-async function resolveNextInternalNumber(dbClient: any): Promise<number> {
+async function resolveNextInternalNumber(dbClient: any, organizacionId: string): Promise<number> {
   const { rows: cfgRows } = await dbClient.query(
     `SELECT min_num, auto_fill, override_next FROM client_counter_config WHERE id = 1`
   );
@@ -213,7 +214,8 @@ async function resolveNextInternalNumber(dbClient: any): Promise<number> {
   }
 
   const { rows: usedRows } = await dbClient.query(
-    `SELECT internal_number FROM entities WHERE internal_number IS NOT NULL ORDER BY internal_number`
+    `SELECT internal_number FROM entities WHERE internal_number IS NOT NULL AND organizacion_id = $1 ORDER BY internal_number`,
+    [organizacionId]
   );
   const used: number[] = usedRows.map((r: any) => r.internal_number);
   const maxUsed = used.length ? Math.max(...used) : 0;
@@ -307,7 +309,7 @@ export const createEntity = async (req: any, res: Response) => {
     // Numero interno segun la config de "Configurar numeracion" (min/auto-fill/
     // override), igual criterio que expedientes. Si no hay config guardada usa
     // el comportamiento por defecto (proximo hueco libre desde 1).
-    const internalNumber = await resolveNextInternalNumber(pool);
+    const internalNumber = await resolveNextInternalNumber(pool, req.organizacionId);
 
     const result = await pool.query(`
       INSERT INTO entities (
