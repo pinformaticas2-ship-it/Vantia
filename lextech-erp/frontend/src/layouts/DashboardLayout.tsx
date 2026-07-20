@@ -8,7 +8,7 @@ import {
   LayoutDashboard, Briefcase, Users, Settings,
   Menu, Search, X, Bell, ShieldCheck, Calendar,
   MessageCircle, Bot, Send, ChevronRight, ChevronLeft, Loader2, History, CheckCircle2,
-  MessageSquare, LogOut, Mail, Library, Receipt, Mic, Sparkles, ChevronsUpDown,
+  MessageSquare, LogOut, Mail, Library, Receipt, Sparkles, ChevronsUpDown,
   MoreVertical, RotateCcw, Copy, Check,
   Pen, AlertTriangle, RefreshCw, Link2, Plus, Trash2, Scale, Gavel, ChevronDown,
   Wallet, CreditCard, Building2, BarChart3, FileText, Calculator,
@@ -45,7 +45,6 @@ const MODULES = [
   { name: "Contactos",      path: "/dashboard/facturacion?tab=contacts",      icon: Users,      desc: "Contactos de facturación (Quipu)" },
   { name: "Cuentas",        path: "/dashboard/facturacion?tab=bank_accounts", icon: Building2,  desc: "Cuentas bancarias" },
   { name: "Conexión Quipu", path: "/dashboard/facturacion?tab=config",        icon: Settings,   desc: "Configuración de la conexión con Quipu" },
-  { name: "Plaud IA",       path: "/dashboard/plaud-ia",     icon: Mic,             desc: "Grabación y asistencia con IA" },
   { name: "Chat IA",        path: "/dashboard/chat-ia",      icon: Sparkles,        desc: "Asistente IA con herramientas e historial" },
   { name: "Configuración",  path: "/dashboard/config",       icon: Settings,        desc: "Ajustes del sistema" },
 ];
@@ -87,7 +86,6 @@ const NAV_ITEMS: NavItem[] = [
       { name: "Conexión Quipu", href: "/dashboard/facturacion?tab=config",        icon: Settings },
     ],
   },
-  { name: "Plaud IA",     href: "/dashboard/plaud-ia",    icon: Mic },
   { name: "Chat IA",      href: "/dashboard/chat-ia",     icon: Sparkles },
 ];
 
@@ -102,7 +100,7 @@ const NAV_GROUPS = [
   },
   {
     label: "Conocimiento",
-    items: ["Documental", "Plaud IA", "Chat IA"],
+    items: ["Documental", "Chat IA"],
   },
 ];
 
@@ -126,8 +124,6 @@ function getVantIAContext(pathname: string): string {
     return "Eres VantIA, asistente documental del despacho. Ayudas con búsquedas en el BOE, resúmenes normativos y localización de documentación jurídica. CENDOJ y LexNET solo están disponibles como enlace directo al portal oficial, no tienes acceso a búsqueda automática sobre ellos. Responde siempre en español.";
   if (pathname.startsWith("/dashboard/facturacion"))
     return "Eres VantIA, asistente de contabilidad y facturación del despacho. Ayudas con honorarios, facturas, cobros, vencimientos y control económico. Responde siempre en español.";
-  if (pathname.startsWith("/dashboard/plaud-ia"))
-    return "Eres VantIA, asistente de Plaud IA. Ayudas con grabaciones, transcripciones, resúmenes y extracción de tareas o acuerdos relevantes. Responde siempre en español.";
   if (pathname.startsWith("/dashboard/config"))
     return "Eres VantIA, asistente de configuración de VANTIA Legis ERP. Ayudas con ajustes del sistema, usuarios, permisos y personalización. Responde siempre en español.";
   return "Eres VantIA, el asistente inteligente de VANTIA Legis ERP, un ERP para despachos de abogados. Tienes conocimientos generales de derecho español, gestión de despachos, expedientes, clientes y documentación. Eres útil, conciso y profesional. Responde siempre en español.";
@@ -143,7 +139,6 @@ function getVantIALabel(pathname: string): string {
   if (pathname.startsWith("/dashboard/correo"))       return "Asistente de Correo";
   if (pathname.startsWith("/dashboard/documental"))   return "Asistente Documental";
   if (pathname.startsWith("/dashboard/facturacion"))  return "Asistente de Facturación";
-  if (pathname.startsWith("/dashboard/plaud-ia"))     return "Asistente Plaud IA";
   return "Asistente General";
 }
 

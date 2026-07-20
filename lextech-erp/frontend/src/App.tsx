@@ -76,7 +76,6 @@ export default function App() {
             <Route path="facturacion" element={<RequireAdmin><Facturacion /></RequireAdmin>} />
             <Route path="facturacion/facturas/nueva" element={<RequireAdmin><Facturacion /></RequireAdmin>} />
             <Route path="facturacion/facturas/:facturaId/editar" element={<RequireAdmin><Facturacion /></RequireAdmin>} />
-            <Route path="plaud-ia" element={<ModuloEnCarga nombre="Plaud IA" />} />
             <Route path="chat-ia" element={<ChatIA />} />
             <Route path="config" element={<Configuracion />} />
           </Route>
@@ -115,17 +114,4 @@ function RequireAdmin({ children }: { children: React.ReactNode }) {
   if (!isLoaded) return null;
   if (!isAdmin) return <Navigate to="/dashboard" replace />;
   return <>{children}</>;
-}
-
-// Placeholder para módulos aún no implementados
-function ModuloEnCarga({ nombre }: { nombre: string }) {
-  return (
-    <div className="h-[60vh] flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-200 rounded-3xl">
-      <div className="h-16 w-16 bg-slate-100 rounded-2xl flex items-center justify-center mb-4">
-        <span className="text-3xl">🚧</span>
-      </div>
-      <p className="text-lg font-semibold text-slate-500">{nombre}</p>
-      <p className="text-sm text-slate-400 mt-1">Módulo en construcción</p>
-    </div>
-  );
 }
