@@ -59,9 +59,9 @@ export const getExpedientes = async (req: any, res: Response) => {
     const limit = Math.min(parseInt(req.query.limit as string, 10) || 300, 500);
     const offset = Math.max(parseInt(req.query.offset as string, 10) || 0, 0);
 
-    const conds: string[] = [];
-    const vals: any[] = [];
-    let p = 1;
+    const conds: string[] = [`e.organizacion_id = $1`];
+    const vals: any[] = [req.organizacionId];
+    let p = 2;
 
     if (q) {
       conds.push(`(
@@ -108,7 +108,7 @@ export const getExpedientes = async (req: any, res: Response) => {
   }
 };
 
-export const getStats = async (_req: any, res: Response) => {
+export const getStats = async (req: any, res: Response) => {
   try {
     const r = await pool.query(`
       SELECT
@@ -120,7 +120,8 @@ export const getStats = async (_req: any, res: Response) => {
         EXTRACT(YEAR FROM NOW())::int AS anio_actual,
         COUNT(*) FILTER (WHERE anio = EXTRACT(YEAR FROM NOW())::int) AS este_anio
       FROM expedientes
-    `);
+      WHERE organizacion_id = $1
+    `, [req.organizacionId]);
     res.json({ data: r.rows[0] });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
@@ -134,9 +135,10 @@ export const getImportHistory = async (req: any, res: Response) => {
       `SELECT id, file_name, status, total_count, completed_count, error_count, pending_count,
               notes, created_at, updated_at, user_id, user_name
        FROM expediente_import_batches
+       WHERE organizacion_id = $1
        ORDER BY created_at DESC
-       LIMIT $1`,
-      [limit]
+       LIMIT $2`,
+      [req.organizacionId, limit]
     );
 
     res.json({ data: r.rows });
@@ -152,8 +154,8 @@ export const getImportBatchDetail = async (req: any, res: Response) => {
         `SELECT id, file_name, status, total_count, completed_count, error_count, pending_count,
                 notes, created_at, updated_at, user_id, user_name
          FROM expediente_import_batches
-         WHERE id = $1`,
-        [req.params.id]
+         WHERE id = $1 AND organizacion_id = $2`,
+        [req.params.id, req.organizacionId]
       ),
       pool.query(
         `SELECT id, row_number, reference, status, error_message, payload, created_expediente_id,
@@ -200,11 +202,11 @@ export const createImportBatch = async (req: any, res: Response) => {
 
     const batchInsert = await client.query(
       `INSERT INTO expediente_import_batches
-         (user_id, user_name, file_name, status, total_count, completed_count, error_count, pending_count, notes)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+         (user_id, user_name, file_name, status, total_count, completed_count, error_count, pending_count, notes, organizacion_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
        RETURNING id, file_name, status, total_count, completed_count, error_count, pending_count,
                  notes, created_at, updated_at, user_id, user_name`,
-      [userId, userName, fileName, status, totalCount, completedCount, errorCount, pendingCount, notes]
+      [userId, userName, fileName, status, totalCount, completedCount, errorCount, pendingCount, notes, req.organizacionId]
     );
 
     const batch = batchInsert.rows[0];
@@ -264,8 +266,8 @@ export const updateImportBatch = async (req: any, res: Response) => {
     const current = await pool.query(
       `SELECT id, file_name, status, total_count, completed_count, error_count, pending_count, notes
        FROM expediente_import_batches
-       WHERE id = $1`,
-      [req.params.id]
+       WHERE id = $1 AND organizacion_id = $2`,
+      [req.params.id, req.organizacionId]
     );
 
     if (!current.rows.length) {
@@ -317,8 +319,8 @@ export const getExpediente = async (req: any, res: Response) => {
               ent.phone_1, ent.phone_mobile, ent.email AS cliente_email
        FROM expedientes e
        LEFT JOIN entities ent ON ent.id = e.cliente_id
-       WHERE e.id = $1`,
-      [req.params.id]
+       WHERE e.id = $1 AND e.organizacion_id = $2`,
+      [req.params.id, req.organizacionId]
     );
     if (!r.rows.length) return res.status(404).json({ error: 'Expediente no encontrado' });
     res.json({ data: r.rows[0] });
@@ -338,9 +340,10 @@ export const getRelatedExpedientes = async (req: any, res: Response) => {
            WHEN rel.expediente_id = $1 THEN rel.related_expediente_id
            ELSE rel.expediente_id
          END
-       WHERE rel.expediente_id = $1 OR rel.related_expediente_id = $1
+       WHERE (rel.expediente_id = $1 OR rel.related_expediente_id = $1)
+         AND e.organizacion_id = $2
        ORDER BY e.anio DESC, e.num_exp DESC`,
-      [expedienteId]
+      [expedienteId, req.organizacionId]
     );
     res.json({ data: r.rows });
   } catch (e: any) {
@@ -358,6 +361,14 @@ export const addRelatedExpediente = async (req: any, res: Response) => {
     }
     if (expedienteId === relatedExpedienteId) {
       return res.status(400).json({ error: 'No puedes relacionar un expediente consigo mismo' });
+    }
+
+    const bothOwned = await pool.query(
+      `SELECT COUNT(*)::int AS n FROM expedientes WHERE id = ANY($1::uuid[]) AND organizacion_id = $2`,
+      [[expedienteId, relatedExpedienteId], req.organizacionId]
+    );
+    if (bothOwned.rows[0]?.n !== 2) {
+      return res.status(404).json({ error: 'Expediente no encontrado' });
     }
 
     const [leftId, rightId] = normalizeExpedienteRelationPair(expedienteId, relatedExpedienteId);
@@ -389,9 +400,10 @@ export const addRelatedExpediente = async (req: any, res: Response) => {
            WHEN rel.expediente_id = $1 THEN rel.related_expediente_id
            ELSE rel.expediente_id
          END
-       WHERE rel.expediente_id = $1 OR rel.related_expediente_id = $1
+       WHERE (rel.expediente_id = $1 OR rel.related_expediente_id = $1)
+         AND e.organizacion_id = $2
        ORDER BY e.anio DESC, e.num_exp DESC`,
-      [expedienteId]
+      [expedienteId, req.organizacionId]
     );
 
     res.status(201).json({ data: related.rows });
@@ -455,22 +467,23 @@ export const createExpediente = async (req: any, res: Response) => {
         `UPDATE expediente_counter_config SET override_next = NULL WHERE anio = $1`, [yr]
       );
     } else if (autoFill) {
-      // Primer hueco disponible >= min_num (rellena huecos)
+      // Primer hueco disponible >= min_num (rellena huecos) -- por organización,
+      // así cada despacho empieza su propia numeración desde min_num.
       const nextR = await pool.query(
         `WITH bounds AS (
-            SELECT GREATEST(COALESCE(MAX(num_exp), 0), $2 - 1) + 1 AS top_n FROM expedientes WHERE anio = $1
+            SELECT GREATEST(COALESCE(MAX(num_exp), 0), $2 - 1) + 1 AS top_n FROM expedientes WHERE anio = $1 AND organizacion_id = $3
          ),
          seq AS (SELECT generate_series($2, (SELECT top_n FROM bounds)) AS n)
          SELECT MIN(s.n) AS next FROM seq s
-         WHERE s.n NOT IN (SELECT num_exp FROM expedientes WHERE anio = $1)`,
-        [yr, minNum]
+         WHERE s.n NOT IN (SELECT num_exp FROM expedientes WHERE anio = $1 AND organizacion_id = $3)`,
+        [yr, minNum, req.organizacionId]
       );
       numExp = nextR.rows[0]?.next ?? minNum;
     } else {
-      // Modo clásico: MAX + 1, respetando min_num
+      // Modo clásico: MAX + 1, respetando min_num (por organización)
       const maxR = await pool.query(
-        `SELECT GREATEST(COALESCE(MAX(num_exp), 0), $2 - 1) + 1 AS next FROM expedientes WHERE anio = $1`,
-        [yr, minNum]
+        `SELECT GREATEST(COALESCE(MAX(num_exp), 0), $2 - 1) + 1 AS next FROM expedientes WHERE anio = $1 AND organizacion_id = $3`,
+        [yr, minNum, req.organizacionId]
       );
       numExp = maxR.rows[0]?.next ?? minNum;
     }
@@ -480,19 +493,36 @@ export const createExpediente = async (req: any, res: Response) => {
 
     if (resolvedClienteId && !nombre) {
       const cr = await pool.query(
-        `SELECT first_name || COALESCE(' ' || last_name, '') AS n FROM entities WHERE id = $1`,
-        [resolvedClienteId]
+        `SELECT first_name || COALESCE(' ' || last_name, '') AS n FROM entities WHERE id = $1 AND organizacion_id = $2`,
+        [resolvedClienteId, req.organizacionId]
       );
-      nombre = cr.rows[0]?.n || null;
-    } else if (!resolvedClienteId && nombre) {
-      // Sin cliente_id pero con nombre: buscar primero por coincidencia exacta
+      // Si el cliente indicado no existe en esta organización (id de otra
+      // organización, manipulado o de datos obsoletos), no lo enlazamos --
+      // evita que un expediente quede vinculado al cliente de otro despacho.
+      if (!cr.rows.length) {
+        resolvedClienteId = null;
+      } else {
+        nombre = cr.rows[0].n || null;
+      }
+    } else if (resolvedClienteId && nombre) {
+      const cr = await pool.query(
+        `SELECT id FROM entities WHERE id = $1 AND organizacion_id = $2`,
+        [resolvedClienteId, req.organizacionId]
+      );
+      if (!cr.rows.length) resolvedClienteId = null;
+    }
+
+    if (!resolvedClienteId && nombre) {
+      // Sin cliente_id (o no válido) pero con nombre: buscar primero por
+      // coincidencia exacta dentro de esta organización.
       const searchName = nombre.trim();
       const found = await pool.query(
         `SELECT id FROM entities
-          WHERE TRIM(COALESCE(commercial_name,'')) ILIKE $1
-             OR TRIM(COALESCE(first_name,'') || COALESCE(' ' || last_name,'')) ILIKE $1
+          WHERE (TRIM(COALESCE(commercial_name,'')) ILIKE $1
+             OR TRIM(COALESCE(first_name,'') || COALESCE(' ' || last_name,'')) ILIKE $1)
+            AND organizacion_id = $2
           LIMIT 1`,
-        [searchName]
+        [searchName, req.organizacionId]
       );
       if (found.rows.length) {
         resolvedClienteId = found.rows[0].id;
@@ -502,10 +532,10 @@ export const createExpediente = async (req: any, res: Response) => {
         const parts = searchName.split(/\s+/);
         const newClient = await pool.query(
           `INSERT INTO entities
-             (type, first_name, last_name, nif_cif, client_status, date_alta, created_by)
-           VALUES ('CLIENTE', $1, $2, 'IMP-' || LEFT(gen_random_uuid()::text, 8), 'Alta', CURRENT_DATE, $3)
+             (type, first_name, last_name, nif_cif, client_status, date_alta, created_by, organizacion_id)
+           VALUES ('CLIENTE', $1, $2, 'IMP-' || LEFT(gen_random_uuid()::text, 8), 'Alta', CURRENT_DATE, $3, $4)
            RETURNING id`,
-          [parts[0] || searchName, parts.slice(1).join(' ') || null, reqUserName(req)]
+          [parts[0] || searchName, parts.slice(1).join(' ') || null, reqUserName(req), req.organizacionId]
         );
         resolvedClienteId = newClient.rows[0].id;
       }
@@ -524,18 +554,18 @@ export const createExpediente = async (req: any, res: Response) => {
         } else if (autoFill) {
           const nextR2 = await pool.query(
             `WITH bounds AS (
-                SELECT GREATEST(COALESCE(MAX(num_exp), 0), $2 - 1) + 1 AS top_n FROM expedientes WHERE anio = $1
+                SELECT GREATEST(COALESCE(MAX(num_exp), 0), $2 - 1) + 1 AS top_n FROM expedientes WHERE anio = $1 AND organizacion_id = $3
              ),
              seq AS (SELECT generate_series($2, (SELECT top_n FROM bounds)) AS n)
              SELECT MIN(s.n) AS next FROM seq s
-             WHERE s.n NOT IN (SELECT num_exp FROM expedientes WHERE anio = $1)`,
-            [yr, minNum]
+             WHERE s.n NOT IN (SELECT num_exp FROM expedientes WHERE anio = $1 AND organizacion_id = $3)`,
+            [yr, minNum, req.organizacionId]
           );
           numExp = nextR2.rows[0]?.next ?? minNum;
         } else {
           const maxR2 = await pool.query(
-            `SELECT GREATEST(COALESCE(MAX(num_exp), 0), $2 - 1) + 1 AS next FROM expedientes WHERE anio = $1`,
-            [yr, minNum]
+            `SELECT GREATEST(COALESCE(MAX(num_exp), 0), $2 - 1) + 1 AS next FROM expedientes WHERE anio = $1 AND organizacion_id = $3`,
+            [yr, minNum, req.organizacionId]
           );
           numExp = maxR2.rows[0]?.next ?? minNum;
         }
@@ -550,8 +580,8 @@ export const createExpediente = async (req: any, res: Response) => {
               fecha_inicio, fecha_cierre, importe,
               tipos_asunto, cuantia_principal, intereses, costas, cuantia_total,
               indeterminado, etapa, persona_contacto, contacto, centro, color,
-              created_by)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31)
+              created_by, organizacion_id)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32)
            RETURNING *`,
           [
             yr, numExp,
@@ -577,6 +607,7 @@ export const createExpediente = async (req: any, res: Response) => {
             nullableText(centro),
             nullableText(color) || 'ninguno',
             reqUserName(req),
+            req.organizacionId,
           ]
         );
       } catch (insertErr: any) {
@@ -604,12 +635,20 @@ export const updateExpediente = async (req: any, res: Response) => {
 
   try {
     let nombre = cliente_nombre || null;
-    if (cliente_id && !nombre) {
+    let resolvedClienteId = cliente_id || null;
+    if (resolvedClienteId) {
       const cr = await pool.query(
-        `SELECT first_name || COALESCE(' ' || last_name, '') AS n FROM entities WHERE id = $1`,
-        [cliente_id]
+        `SELECT first_name || COALESCE(' ' || last_name, '') AS n FROM entities WHERE id = $1 AND organizacion_id = $2`,
+        [resolvedClienteId, req.organizacionId]
       );
-      nombre = cr.rows[0]?.n || null;
+      // Igual que en createExpediente: si el cliente no es de esta organización,
+      // no lo enlazamos (evita vincular un expediente al cliente de otro despacho).
+      if (!cr.rows.length) {
+        resolvedClienteId = null;
+        nombre = cliente_nombre || null;
+      } else if (!nombre) {
+        nombre = cr.rows[0].n || null;
+      }
     }
 
     const r = await pool.query(
@@ -624,11 +663,11 @@ export const updateExpediente = async (req: any, res: Response) => {
          persona_contacto=$25, contacto=$26, centro=$27, color=$28,
          procurador_contrario=$29, abogado_propio=$30, abogado_contrario=$31,
          updated_at=NOW()
-       WHERE id=$32 RETURNING *`,
+       WHERE id=$32 AND organizacion_id=$33 RETURNING *`,
       [
         nullableText(ref_propia), nullableText(ref_expediente),
         nullableText(descripcion), tipo || 'judicial',
-        cliente_id || null, nombre,
+        resolvedClienteId, nombre,
         nullableText(contrario), nullableText(procurador),
         nullableText(juzgado), nullableText(tipo_proc),
         nullableText(num_autos), nullableText(nig),
@@ -651,6 +690,7 @@ export const updateExpediente = async (req: any, res: Response) => {
         nullableText(abogado_propio),
         nullableText(abogado_contrario),
         req.params.id,
+        req.organizacionId,
       ]
     );
     if (!r.rows.length) return res.status(404).json({ error: 'Expediente no encontrado' });
@@ -673,16 +713,16 @@ export const linkExpedienteCliente = async (req: any, res: Response) => {
 
   try {
     const cr = await pool.query(
-      `SELECT first_name || COALESCE(' ' || last_name, '') AS n FROM entities WHERE id = $1`,
-      [clienteId]
+      `SELECT first_name || COALESCE(' ' || last_name, '') AS n FROM entities WHERE id = $1 AND organizacion_id = $2`,
+      [clienteId, req.organizacionId]
     );
     if (!cr.rows.length) return res.status(404).json({ error: 'Cliente no encontrado' });
     const nombre = cr.rows[0].n;
 
     const r = await pool.query(
       `UPDATE expedientes SET cliente_id = $1, cliente_nombre = $2, updated_at = NOW()
-       WHERE id = $3 RETURNING *`,
-      [clienteId, nombre, id]
+       WHERE id = $3 AND organizacion_id = $4 RETURNING *`,
+      [clienteId, nombre, id, req.organizacionId]
     );
     if (!r.rows.length) return res.status(404).json({ error: 'Expediente no encontrado' });
 
@@ -703,8 +743,8 @@ export const getExpedienteHistorial = async (req: any, res: Response) => {
       taskFilesRes, facturasRes, presupuestosRes, emailsRes, agendaRes, taskActRes,
     ] = await Promise.all([
       pool.query(
-        `SELECT id, anio, num_exp, descripcion, estado, created_at, updated_at, fecha_inicio, fecha_cierre FROM expedientes WHERE id=$1`,
-        [id]
+        `SELECT id, anio, num_exp, descripcion, estado, created_at, updated_at, fecha_inicio, fecha_cierre FROM expedientes WHERE id=$1 AND organizacion_id=$2`,
+        [id, req.organizacionId]
       ),
       pool.query(
         `SELECT user_name, action_type, event_type, created_at FROM activity_log
@@ -932,8 +972,8 @@ export const getExpedienteHistorial = async (req: any, res: Response) => {
 export const deleteExpediente = async (req: any, res: Response) => {
   try {
     const r = await pool.query(
-      `DELETE FROM expedientes WHERE id=$1 RETURNING anio, num_exp, descripcion`,
-      [req.params.id]
+      `DELETE FROM expedientes WHERE id=$1 AND organizacion_id=$2 RETURNING anio, num_exp, descripcion`,
+      [req.params.id, req.organizacionId]
     );
     if (!r.rows.length) return res.status(404).json({ error: 'Expediente no encontrado' });
     logActivityForReq(req, `Expediente eliminado: ${r.rows[0].anio}/${r.rows[0].num_exp}`, 'EXPEDIENTE', req.params.id);
@@ -951,7 +991,8 @@ export const getCounterConfig = async (req: any, res: Response) => {
       `SELECT anio FROM expediente_counter_config ORDER BY anio DESC`
     );
     const { rows: expYears } = await pool.query(
-      `SELECT DISTINCT anio FROM expedientes ORDER BY anio DESC LIMIT 10`
+      `SELECT DISTINCT anio FROM expedientes WHERE organizacion_id = $1 ORDER BY anio DESC LIMIT 10`,
+      [req.organizacionId]
     );
     const years = Array.from(
       new Set([currentYear, ...cfgRows.map((r: any) => r.anio), ...expYears.map((r: any) => r.anio)])
@@ -976,7 +1017,7 @@ export const getCounterConfigYear = async (req: any, res: Response) => {
     const overrideNext: number | null = cfg.override_next ?? null;
 
     const { rows: usedRows } = await pool.query(
-      `SELECT num_exp FROM expedientes WHERE anio = $1 ORDER BY num_exp`, [yr]
+      `SELECT num_exp FROM expedientes WHERE anio = $1 AND organizacion_id = $2 ORDER BY num_exp`, [yr, req.organizacionId]
     );
     const used: number[] = usedRows.map((r: any) => r.num_exp);
     const maxUsed = used.length ? Math.max(...used) : 0;

@@ -59,9 +59,9 @@ export const getEntities = async (req: any, res: Response) => {
     const limit  = Math.min(parseInt(req.query.limit  as string) || 5000, 20000);
     const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
 
-    const conditions: string[] = [];
-    const values: any[] = [];
-    let p = 1;
+    const conditions: string[] = [`organizacion_id = $1`];
+    const values: any[] = [req.organizacionId];
+    let p = 2;
 
     // Búsqueda por texto (nombre, NIF, email)
     if (search) {
@@ -238,8 +238,8 @@ export const checkNifCif = async (req: any, res: Response) => {
   try {
     const result = await pool.query(
       `SELECT id, type, client_status, first_name, last_name, commercial_name, nif_cif, email, phone_1, phone_mobile, address_town
-       FROM entities WHERE UPPER(nif_cif) = $1 LIMIT 1`,
-      [nif]
+       FROM entities WHERE UPPER(nif_cif) = $1 AND organizacion_id = $2 LIMIT 1`,
+      [nif, req.organizacionId]
     );
     if (result.rows.length === 0) return res.json({ exists: false, entity: null });
     return res.json({ exists: true, entity: result.rows[0] });
@@ -255,8 +255,8 @@ export const getEntityById = async (req: any, res: Response) => {
   const { id } = req.params;
   try {
     const result = await pool.query(
-      `SELECT * FROM entities WHERE id = $1`,
-      [id]
+      `SELECT * FROM entities WHERE id = $1 AND organizacion_id = $2`,
+      [id, req.organizacionId]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Cliente no encontrado' });
@@ -322,7 +322,7 @@ export const createEntity = async (req: any, res: Response) => {
         phone_mobile, phone_fax, website,
         date_alta, date_baja,
         lopd, commercial_communications, center,
-        photo_url, created_by
+        photo_url, created_by, organizacion_id
       ) VALUES (
         $32,
         $1, $2, $3,
@@ -335,7 +335,7 @@ export const createEntity = async (req: any, res: Response) => {
         $22, $23, $24,
         $25::date, $26::date,
         $27, $28, $29,
-        $30, $31
+        $30, $31, $33
       ) RETURNING *`,
       [
         nullIfEmpty(type)                    || 'CLIENTE',   // $1
@@ -370,6 +370,7 @@ export const createEntity = async (req: any, res: Response) => {
         nullIfEmpty(photo_url),                              // $30
         userId,                                              // $31
         internalNumber,                                      // $32
+        req.organizacionId,                                  // $33
       ]
     );
     // Crear carpetas para archivos del cliente (uploads del servidor + carpeta local)
@@ -460,7 +461,7 @@ export const updateEntity = async (req: any, res: Response) => {
         commercial_communications = $28,
         center                   = $29,
         photo_url                = $30
-      WHERE id = $31
+      WHERE id = $31 AND organizacion_id = $32
       RETURNING *`,
       [
         nullIfEmpty(type)                    || 'CLIENTE',
@@ -494,6 +495,7 @@ export const updateEntity = async (req: any, res: Response) => {
         nullIfEmpty(center),
         nullIfEmpty(photo_url),
         id,
+        req.organizacionId,
       ]
     );
     if (result.rows.length === 0) {
@@ -533,8 +535,8 @@ export const patchEntity = async (req: any, res: Response) => {
   const values = entries.map(([, v]) => (v === '' ? null : v));
   try {
     const result = await pool.query(
-      `UPDATE entities SET ${sets}, updated_at = NOW() WHERE id = $${entries.length + 1} RETURNING *`,
-      [...values, id]
+      `UPDATE entities SET ${sets}, updated_at = NOW() WHERE id = $${entries.length + 1} AND organizacion_id = $${entries.length + 2} RETURNING *`,
+      [...values, id, req.organizacionId]
     );
     if (result.rows.length === 0)
       return res.status(404).json({ success: false, error: 'Cliente no encontrado' });
@@ -556,8 +558,8 @@ export const deleteEntity = async (req: any, res: Response) => {
   const { id } = req.params;
   try {
     const result = await pool.query(
-      `DELETE FROM entities WHERE id = $1 RETURNING id, first_name, last_name, commercial_name`,
-      [id]
+      `DELETE FROM entities WHERE id = $1 AND organizacion_id = $2 RETURNING id, first_name, last_name, commercial_name`,
+      [id, req.organizacionId]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Cliente no encontrado' });
@@ -595,9 +597,10 @@ export const getEntityImportHistory = async (req: any, res: Response) => {
       `SELECT id, file_name, status, total_count, completed_count, error_count, pending_count,
               notes, created_at, updated_at, user_id, user_name
        FROM entity_import_batches
+       WHERE organizacion_id = $1
        ORDER BY created_at DESC
-       LIMIT $1`,
-      [limit]
+       LIMIT $2`,
+      [req.organizacionId, limit]
     );
     res.json({ success: true, data: r.rows });
   } catch (e: any) {
@@ -612,8 +615,8 @@ export const getEntityImportBatchDetail = async (req: any, res: Response) => {
         `SELECT id, file_name, status, total_count, completed_count, error_count, pending_count,
                 notes, created_at, updated_at, user_id, user_name
          FROM entity_import_batches
-         WHERE id = $1`,
-        [req.params.id]
+         WHERE id = $1 AND organizacion_id = $2`,
+        [req.params.id, req.organizacionId]
       ),
       pool.query(
         `SELECT id, row_number, reference, status, error_message, payload, created_entity_id,
@@ -661,11 +664,11 @@ export const createEntityImportBatch = async (req: any, res: Response) => {
 
     const batchInsert = await client.query(
       `INSERT INTO entity_import_batches
-         (user_id, user_name, file_name, status, total_count, completed_count, error_count, pending_count, notes)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+         (user_id, user_name, file_name, status, total_count, completed_count, error_count, pending_count, notes, organizacion_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
        RETURNING id, file_name, status, total_count, completed_count, error_count, pending_count,
                  notes, created_at, updated_at, user_id, user_name`,
-      [userId, userName, fileName, status, totalCount, completedCount, errorCount, pendingCount, notes]
+      [userId, userName, fileName, status, totalCount, completedCount, errorCount, pendingCount, notes, req.organizacionId]
     );
 
     const batch = batchInsert.rows[0];
@@ -722,8 +725,8 @@ export const updateEntityImportBatch = async (req: any, res: Response) => {
     const current = await client.query(
       `SELECT id, file_name, status, total_count, completed_count, error_count, pending_count, notes
        FROM entity_import_batches
-       WHERE id = $1`,
-      [req.params.id]
+       WHERE id = $1 AND organizacion_id = $2`,
+      [req.params.id, req.organizacionId]
     );
 
     if (!current.rows.length) {
@@ -808,8 +811,8 @@ export const undoEntityImportBatch = async (req: any, res: Response) => {
     await client.query('BEGIN');
 
     const batchRes = await client.query(
-      `SELECT id, file_name FROM entity_import_batches WHERE id = $1`,
-      [req.params.id]
+      `SELECT id, file_name FROM entity_import_batches WHERE id = $1 AND organizacion_id = $2`,
+      [req.params.id, req.organizacionId]
     );
     if (!batchRes.rows.length) {
       await client.query('ROLLBACK');

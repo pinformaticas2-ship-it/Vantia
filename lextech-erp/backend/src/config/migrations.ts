@@ -1582,6 +1582,118 @@ export async function runMigrations(): Promise<void> {
       await client.query(`ALTER TABLE vantia_chat_history ADD COLUMN IF NOT EXISTS title VARCHAR(255);`);
     } catch (_e: any) {}
 
+    // ── Multi-organización: organizaciones + membresías + roles ────────────
+    // Cada usuario pertenece a una o más organizaciones (organizacion_miembros)
+    // con un rol (propietario/admin/miembro). Se siembra una organización por
+    // defecto para no romper instalaciones existentes: todo lo que ya había en
+    // la BD se backfillea a esa organización, así el comportamiento actual no
+    // cambia hasta que alguien cree una segunda organización de verdad.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS organizaciones (
+        id         UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        nombre     VARCHAR(200) NOT NULL,
+        created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      );
+    `);
+    try {
+      await client.query(`
+        INSERT INTO organizaciones (nombre)
+        SELECT 'Despacho principal'
+        WHERE NOT EXISTS (SELECT 1 FROM organizaciones)
+      `);
+    } catch (_e: any) {}
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS organizacion_miembros (
+        id              UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        organizacion_id UUID         NOT NULL REFERENCES organizaciones(id) ON DELETE CASCADE,
+        user_id         VARCHAR(150) NOT NULL,
+        rol             VARCHAR(20)  NOT NULL DEFAULT 'miembro'
+                        CHECK (rol IN ('propietario','admin','miembro')),
+        created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      );
+    `);
+    try {
+      await client.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_organizacion_miembros_org_user
+          ON organizacion_miembros (organizacion_id, user_id)
+      `);
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_organizacion_miembros_user
+          ON organizacion_miembros (user_id)
+      `);
+    } catch (_e: any) {}
+
+    // entities: columna organizacion_id + backfill a la organización sembrada
+    try {
+      await client.query(`ALTER TABLE entities ADD COLUMN IF NOT EXISTS organizacion_id UUID REFERENCES organizaciones(id);`);
+      await client.query(`
+        UPDATE entities SET organizacion_id = (SELECT id FROM organizaciones ORDER BY created_at LIMIT 1)
+        WHERE organizacion_id IS NULL
+      `);
+      await client.query(`ALTER TABLE entities ALTER COLUMN organizacion_id SET NOT NULL;`);
+    } catch (_e: any) {}
+    try {
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_entities_organizacion_id ON entities (organizacion_id);`);
+    } catch (_e: any) {}
+
+    // nif_cif: la unicidad global ya no vale con varias organizaciones -- pasa
+    // a ser única por organización (la misma persona puede ser cliente de dos
+    // despachos distintos, con el mismo NIF en cada uno).
+    try {
+      await client.query(`
+        DO $$ BEGIN
+          IF EXISTS (
+            SELECT 1 FROM pg_constraint
+            WHERE conname = 'entities_nif_cif_key' AND conrelid = 'entities'::regclass
+          ) THEN
+            ALTER TABLE entities DROP CONSTRAINT entities_nif_cif_key;
+          END IF;
+        END $$;
+      `);
+      await client.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_entities_org_nif_cif
+          ON entities (organizacion_id, nif_cif)
+      `);
+    } catch (_e: any) {}
+
+    // expedientes: columna organizacion_id + backfill
+    try {
+      await client.query(`ALTER TABLE expedientes ADD COLUMN IF NOT EXISTS organizacion_id UUID REFERENCES organizaciones(id);`);
+      await client.query(`
+        UPDATE expedientes SET organizacion_id = (SELECT id FROM organizaciones ORDER BY created_at LIMIT 1)
+        WHERE organizacion_id IS NULL
+      `);
+      await client.query(`ALTER TABLE expedientes ALTER COLUMN organizacion_id SET NOT NULL;`);
+    } catch (_e: any) {}
+
+    // Numeración de expediente (año + número) única por organización, no global
+    try {
+      await client.query(`DROP INDEX IF EXISTS idx_expedientes_anio_num;`);
+      await client.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_expedientes_org_anio_num
+          ON expedientes (organizacion_id, anio, num_exp)
+      `);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_expedientes_organizacion_id ON expedientes (organizacion_id);`);
+    } catch (_e: any) {}
+
+    // Lotes de importación CSV (clientes/expedientes): también se backfillean
+    // a la organización sembrada -- si no, el historial de importaciones
+    // (nombres de fichero, filas con datos de clientes) quedaría visible
+    // entre organizaciones distintas.
+    for (const table of ['entity_import_batches', 'expediente_import_batches']) {
+      try {
+        await client.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS organizacion_id UUID REFERENCES organizaciones(id);`);
+        await client.query(`
+          UPDATE ${table} SET organizacion_id = (SELECT id FROM organizaciones ORDER BY created_at LIMIT 1)
+          WHERE organizacion_id IS NULL
+        `);
+        await client.query(`ALTER TABLE ${table} ALTER COLUMN organizacion_id SET NOT NULL;`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_${table}_organizacion_id ON ${table} (organizacion_id);`);
+      } catch (_e: any) {}
+    }
+
     // VACUUM ANALYZE para mantener las estadísticas de consulta frescas
     try {
       await client.query(`ANALYZE entities;`);

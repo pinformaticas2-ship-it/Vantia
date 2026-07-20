@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { UserButton, useUser, useAuth, useClerk } from "@clerk/clerk-react";
 import { getDeviceId, safeJson, waitForClientIp } from "../lib/api";
+import { useOrganizacion } from "../lib/useOrganizacion";
 import { useChatUnread } from "../contexts/ChatUnreadContext";
 import { useEmailUnread } from "../contexts/EmailUnreadContext";
 import { useWhatsAppUnread, WA_LAST_SEEN_KEY } from "../contexts/WhatsAppUnreadContext";
@@ -924,6 +925,15 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
   const { unreadCount: emailUnreadCount } = useEmailUnread();
   const { unreadCount: waUnreadCount } = useWhatsAppUnread();
   const { isProcessing: isDocProcessing } = useDocumentProcessing();
+  const { organizacion, organizaciones, switchOrganizacion, isLoaded: orgLoaded } = useOrganizacion();
+  const [orgMenuOpen, setOrgMenuOpen] = useState(false);
+  const orgMenuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!orgMenuOpen) return;
+    const h = (e: MouseEvent) => { if (orgMenuRef.current && !orgMenuRef.current.contains(e.target as Node)) setOrgMenuOpen(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [orgMenuOpen]);
   const currentSearch = search || "";
   // Tesorería (facturación/Quipu) es solo para administradores -- se oculta
   // del sidebar para el resto (el backend ya lo bloquea aparte, esto es solo UI).
@@ -961,20 +971,45 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
             </div>
           </div>
         ) : (
-          <button
-            type="button"
-            title="Seleccionar empresa"
-            className="erp-company-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-slate-700/60 bg-slate-800/40 hover:bg-slate-700/50 hover:border-slate-600 transition-all duration-200 group"
-          >
-            <div className="erp-company-logo w-9 h-9 rounded-lg bg-slate-800 border border-slate-700/50 flex items-center justify-center shrink-0 overflow-hidden">
-              <img src="/vantia-sidebar-slate.png" alt="Vantia Legis" className="h-7 w-7 object-contain" />
-            </div>
-            <div className="flex-1 min-w-0 text-left">
-              <p className="erp-company-name text-[11px] font-bold text-slate-200 truncate leading-tight">Avalentia Abogados</p>
-              <p className="erp-company-sub text-[10px] text-slate-500 truncate mt-0.5">Despacho principal</p>
-            </div>
-            <ChevronsUpDown size={13} className="erp-company-chevron text-slate-600 group-hover:text-slate-400 shrink-0 transition-colors" />
-          </button>
+          <div className="relative" ref={orgMenuRef}>
+            <button
+              type="button"
+              title="Seleccionar empresa"
+              onClick={() => organizaciones.length > 1 && setOrgMenuOpen((v) => !v)}
+              className="erp-company-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-slate-700/60 bg-slate-800/40 hover:bg-slate-700/50 hover:border-slate-600 transition-all duration-200 group"
+            >
+              <div className="erp-company-logo w-9 h-9 rounded-lg bg-slate-800 border border-slate-700/50 flex items-center justify-center shrink-0 overflow-hidden">
+                <img src="/vantia-sidebar-slate.png" alt="Vantia Legis" className="h-7 w-7 object-contain" />
+              </div>
+              <div className="flex-1 min-w-0 text-left">
+                <p className="erp-company-name text-[11px] font-bold text-slate-200 truncate leading-tight">
+                  {orgLoaded ? (organizacion?.nombre || "Vantia Legis") : "Cargando…"}
+                </p>
+                <p className="erp-company-sub text-[10px] text-slate-500 truncate mt-0.5">
+                  {organizaciones.length > 1 ? `${organizaciones.length} organizaciones` : "Despacho"}
+                </p>
+              </div>
+              {organizaciones.length > 1 && (
+                <ChevronsUpDown size={13} className="erp-company-chevron text-slate-600 group-hover:text-slate-400 shrink-0 transition-colors" />
+              )}
+            </button>
+
+            {orgMenuOpen && organizaciones.length > 1 && (
+              <div className="absolute left-0 right-0 top-full mt-1.5 bg-slate-800 border border-slate-700 rounded-xl shadow-xl py-1.5 z-20">
+                {organizaciones.map((o) => (
+                  <button
+                    key={o.id}
+                    type="button"
+                    onClick={() => { setOrgMenuOpen(false); if (o.id !== organizacion?.id) switchOrganizacion(o.id); }}
+                    className="w-full flex items-center justify-between gap-2 px-3.5 py-2 text-left hover:bg-slate-700/50 transition-colors"
+                  >
+                    <span className="text-xs font-medium text-slate-200 truncate">{o.nombre}</span>
+                    {o.id === organizacion?.id && <Check size={13} className="text-red-500 shrink-0" />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </div>
 

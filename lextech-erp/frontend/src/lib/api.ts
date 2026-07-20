@@ -62,6 +62,36 @@ function normalizeBackendPayload<T>(value: T): T {
   return value;
 }
 
+const ACTIVE_ORG_KEY = 'vantia_active_org_id';
+
+// Organización activa elegida con el selector del sidebar ("Seleccionar
+// empresa"). El backend (middleware resolveOrg) solo la respeta si el
+// usuario es realmente miembro de esa organización -- esto es solo para
+// indicar la preferencia, nunca es la barrera de seguridad real.
+export function getActiveOrganizacionId(): string | null {
+  if (typeof window === 'undefined') return null;
+  return window.localStorage.getItem(ACTIVE_ORG_KEY);
+}
+
+export function setActiveOrganizacionId(id: string | null): void {
+  if (typeof window === 'undefined') return;
+  if (id) window.localStorage.setItem(ACTIVE_ORG_KEY, id);
+  else window.localStorage.removeItem(ACTIVE_ORG_KEY);
+}
+
+function isApiUrl(url: string): boolean {
+  return url.includes('/api/');
+}
+
+function withOrgHeader(init: RequestInit | undefined, url: string): RequestInit | undefined {
+  const orgId = getActiveOrganizacionId();
+  if (!orgId || !isApiUrl(url)) return init;
+
+  const headers = new Headers(init?.headers);
+  headers.set('X-Organizacion-Id', orgId);
+  return { ...init, headers };
+}
+
 export function installBackendFetchShim(): void {
   if (typeof window === 'undefined') return;
   const anyWindow = window as typeof window & { __vantiaFetchShimInstalled?: boolean };
@@ -71,16 +101,22 @@ export function installBackendFetchShim(): void {
 
   window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
     if (typeof input === 'string') {
-      return originalFetch(resolveApiUrl(input), init);
+      const resolved = resolveApiUrl(input);
+      return originalFetch(resolved, withOrgHeader(init, resolved));
     }
     if (input instanceof URL) {
       const resolved = resolveApiUrl(input.toString());
-      return originalFetch(new URL(resolved), init);
+      return originalFetch(new URL(resolved), withOrgHeader(init, resolved));
     }
     if (input instanceof Request) {
       const resolved = resolveApiUrl(input.url);
-      if (resolved === input.url) return originalFetch(input, init);
-      const proxied = new Request(resolved, input);
+      const proxied = resolved === input.url ? input : new Request(resolved, input);
+      const orgId = getActiveOrganizacionId();
+      if (orgId && isApiUrl(resolved)) {
+        const headers = new Headers(proxied.headers);
+        headers.set('X-Organizacion-Id', orgId);
+        return originalFetch(new Request(proxied, { headers }), init);
+      }
       return originalFetch(proxied, init);
     }
     return originalFetch(input, init);

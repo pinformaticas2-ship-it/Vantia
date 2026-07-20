@@ -25,8 +25,10 @@ import facturacionRoutes    from './routes/facturacion';
 import quipuRoutes          from './routes/quipu';
 import quickLinksRoutes     from './routes/quickLinks';
 import directorioRoutes     from './routes/directorio';
+import organizacionRoutes   from './routes/organizacion';
 import { syncAllQuipuUsers } from './controllers/quipuController';
 import { clerkMiddleware } from '@clerk/express';
+import { resolveOrg } from './middleware/resolveOrg';
 import { runMigrations } from './config/migrations';
 import { startLocalFilesWatcher } from './watchers/localFilesWatcher';
 import { migrateLocalFoldersStructure } from './controllers/filesController';
@@ -99,6 +101,7 @@ app.use(helmet({
 app.use('/api/email/webhook/engine', emailEngineWebhookRoute);
 
 app.use(clerkMiddleware());
+app.use(resolveOrg);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -152,6 +155,7 @@ app.use('/api/facturacion',       facturacionRoutes);
 app.use('/api/quipu',             quipuRoutes);
 app.use('/api/quick-links',       quickLinksRoutes);
 app.use('/api/directorio',        directorioRoutes);
+app.use('/api/organizacion',      organizacionRoutes);
 
 // Health check básico
 app.get('/health', (_req, res) => {

@@ -54,7 +54,7 @@ function moduleInstructions(moduleId: string): string {
 }
 
 // ── Contexto dinámico por entidad en pantalla ─────────────────────────────────
-async function buildEntityContext(moduleId: string, userId: string): Promise<string> {
+async function buildEntityContext(moduleId: string, userId: string, organizacionId: string): Promise<string> {
   const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
   const entityId = UUID_RE.exec(moduleId)?.[0];
   const lines: string[] = [];
@@ -65,7 +65,7 @@ async function buildEntityContext(moduleId: string, userId: string): Promise<str
       const [cRes, statsRes] = await Promise.all([
         pool.query(
           `SELECT first_name, last_name, commercial_name, nif_cif, email, phone, type, created_at
-           FROM entities WHERE id=$1`, [entityId]
+           FROM entities WHERE id=$1 AND organizacion_id=$2`, [entityId, organizacionId]
         ),
         pool.query(
           `SELECT
@@ -93,7 +93,7 @@ async function buildEntityContext(moduleId: string, userId: string): Promise<str
                   ent.commercial_name, ent.first_name, ent.last_name
            FROM expedientes e
            LEFT JOIN entities ent ON e.cliente_id = ent.id
-           WHERE e.id=$1`, [entityId]
+           WHERE e.id=$1 AND e.organizacion_id=$2`, [entityId, organizacionId]
         ),
         pool.query(
           `SELECT
@@ -302,16 +302,16 @@ const TOOLS = [{
 }];
 
 // ── Dispatcher de herramientas ────────────────────────────────────────────────
-async function callTool(name: string, args: Record<string, any>, userId: string): Promise<object> {
+async function callTool(name: string, args: Record<string, any>, userId: string, organizacionId: string): Promise<object> {
   try {
     switch (name) {
 
       case 'estadisticas_generales': {
         const r = await pool.query(`
           SELECT
-            (SELECT COUNT(*)::int FROM entities WHERE type='CLIENTE')                                                 AS total_clientes,
-            (SELECT COUNT(*)::int FROM expedientes WHERE estado NOT IN ('cerrado','archivado'))                        AS expedientes_activos,
-            (SELECT COUNT(*)::int FROM expedientes WHERE estado='cerrado')                                             AS expedientes_cerrados,
+            (SELECT COUNT(*)::int FROM entities WHERE type='CLIENTE' AND organizacion_id=$2)                          AS total_clientes,
+            (SELECT COUNT(*)::int FROM expedientes WHERE estado NOT IN ('cerrado','archivado') AND organizacion_id=$2) AS expedientes_activos,
+            (SELECT COUNT(*)::int FROM expedientes WHERE estado='cerrado' AND organizacion_id=$2)                      AS expedientes_cerrados,
             (SELECT COUNT(*)::int FROM client_tasks WHERE created_by=$1 AND estado!='completada')                      AS tareas_pendientes,
             (SELECT COUNT(*)::int FROM client_tasks WHERE created_by=$1 AND estado='urgente')                          AS tareas_urgentes,
             (SELECT COUNT(*)::int FROM client_tasks WHERE created_by=$1 AND plazo<NOW() AND estado!='completada')      AS tareas_vencidas,
@@ -319,7 +319,7 @@ async function callTool(name: string, args: Record<string, any>, userId: string)
             (SELECT COALESCE(SUM(total),0) FROM facturacion_facturas WHERE estado='pendiente')                         AS importe_pendiente_eur,
             (SELECT COUNT(*)::int FROM facturacion_gastos WHERE estado='pendiente')                                    AS gastos_pendientes,
             (SELECT COUNT(*)::int FROM agenda_events WHERE user_id=$1 AND start_at>=NOW())                             AS eventos_proximos
-        `, [userId]);
+        `, [userId, organizacionId]);
         return { estadisticas: r.rows[0] };
       }
 
@@ -331,12 +331,13 @@ async function callTool(name: string, args: Record<string, any>, userId: string)
                  COUNT(exp.id) FILTER (WHERE exp.estado NOT IN ('cerrado','archivado'))::int AS expedientes_activos
           FROM entities e
           LEFT JOIN expedientes exp ON exp.cliente_id = e.id
-          WHERE (e.commercial_name ILIKE $1
+          WHERE e.organizacion_id = $3
+            AND (e.commercial_name ILIKE $1
              OR CONCAT(COALESCE(e.first_name,''),' ',COALESCE(e.last_name,'')) ILIKE $1
              OR e.nif_cif ILIKE $1 OR e.email ILIKE $1)
           GROUP BY e.id
           ORDER BY COALESCE(e.commercial_name, e.first_name) NULLS LAST LIMIT $2
-        `, [q, limit]);
+        `, [q, limit, organizacionId]);
         return {
           total: r.rowCount,
           clientes: r.rows.map(c => ({
@@ -352,9 +353,9 @@ async function callTool(name: string, args: Record<string, any>, userId: string)
 
       case 'listar_clientes': {
         const limit = Math.min(Number(args.limit) || 10, 30);
-        const conds: string[] = [];
-        const params: any[] = [];
-        let pi = 1;
+        const conds: string[] = [`e.organizacion_id=$1`];
+        const params: any[] = [organizacionId];
+        let pi = 2;
         if (args.tipo) { conds.push(`e.type=$${pi++}`); params.push(args.tipo); }
         const havingConds: string[] = [];
         if (args.con_expedientes)  havingConds.push('COUNT(exp.id) > 0');
@@ -369,7 +370,7 @@ async function callTool(name: string, args: Record<string, any>, userId: string)
                  COUNT(exp.id) FILTER (WHERE exp.estado NOT IN ('cerrado','archivado'))::int AS expedientes_activos
           FROM entities e
           LEFT JOIN expedientes exp ON exp.cliente_id = e.id
-          ${conds.length ? 'WHERE ' + conds.join(' AND ') : ''}
+          WHERE ${conds.join(' AND ')}
           GROUP BY e.id
           ${havingConds.length ? 'HAVING ' + havingConds.join(' AND ') : ''}
           ORDER BY ${orderSql}
@@ -396,16 +397,16 @@ async function callTool(name: string, args: Record<string, any>, userId: string)
           const q = `%${args.cliente_nombre}%`;
           const found = await pool.query(
             `SELECT id, COALESCE(commercial_name, CONCAT(first_name,' ',last_name)) AS nombre
-             FROM entities WHERE commercial_name ILIKE $1 OR CONCAT(first_name,' ',last_name) ILIKE $1 LIMIT 1`,
-            [q]
+             FROM entities WHERE (commercial_name ILIKE $1 OR CONCAT(first_name,' ',last_name) ILIKE $1) AND organizacion_id=$2 LIMIT 1`,
+            [q, organizacionId]
           );
           if (!found.rows.length) return { error: `No se encontró cliente con nombre "${args.cliente_nombre}"` };
           clienteId = found.rows[0].id;
           clienteNombre = found.rows[0].nombre;
         }
         if (!clienteId) return { error: 'Se requiere cliente_id o cliente_nombre' };
-        const conds = ['e.cliente_id=$1'], params: any[] = [clienteId];
-        let pi = 2;
+        const conds = ['e.cliente_id=$1', 'e.organizacion_id=$2'], params: any[] = [clienteId, organizacionId];
+        let pi = 3;
         if (args.estado) { conds.push(`e.estado=$${pi++}`); params.push(args.estado); }
         const r = await pool.query(`
           SELECT e.id, e.anio, e.num_exp, e.descripcion, e.estado, e.fecha_inicio, e.fecha_cierre,
@@ -421,7 +422,7 @@ async function callTool(name: string, args: Record<string, any>, userId: string)
         `, params);
         if (!clienteNombre || clienteNombre === '—') {
           const cn = await pool.query(
-            `SELECT COALESCE(commercial_name, CONCAT(first_name,' ',last_name)) AS nombre FROM entities WHERE id=$1`, [clienteId]
+            `SELECT COALESCE(commercial_name, CONCAT(first_name,' ',last_name)) AS nombre FROM entities WHERE id=$1 AND organizacion_id=$2`, [clienteId, organizacionId]
           );
           clienteNombre = cn.rows[0]?.nombre || clienteId;
         }
@@ -439,8 +440,8 @@ async function callTool(name: string, args: Record<string, any>, userId: string)
 
       case 'listar_expedientes': {
         const limit = Math.min(Number(args.limit) || 10, 30);
-        const conds: string[] = [], params: any[] = [];
-        let pi = 1;
+        const conds: string[] = [`e.organizacion_id=$1`], params: any[] = [organizacionId];
+        let pi = 2;
         if (args.estado)     { conds.push(`e.estado=$${pi++}`); params.push(args.estado); }
         if (args.cliente_id) { conds.push(`e.cliente_id=$${pi++}`); params.push(args.cliente_id); }
         if (args.busqueda)   {
@@ -453,7 +454,7 @@ async function callTool(name: string, args: Record<string, any>, userId: string)
                  COALESCE(ent.commercial_name, CONCAT(ent.first_name,' ',ent.last_name)) AS cliente
           FROM expedientes e
           LEFT JOIN entities ent ON ent.id = e.cliente_id
-          ${conds.length ? 'WHERE ' + conds.join(' AND ') : ''}
+          WHERE ${conds.join(' AND ')}
           ORDER BY e.created_at DESC LIMIT $${pi}
         `, params);
         return { total: r.rowCount, expedientes: r.rows.map(e => ({ id: e.id, ref: `${e.anio}/${e.num_exp}`, descripcion: e.descripcion, estado: e.estado, cliente: e.cliente, inicio: e.fecha_inicio, cierre: e.fecha_cierre })) };
@@ -668,7 +669,7 @@ export const chatVantia = async (req: any, res: Response) => {
   try {
     // Construir el system prompt completo con contexto de entidad en paralelo al envío
     const [entityCtx] = await Promise.all([
-      buildEntityContext(moduleId, userId),
+      buildEntityContext(moduleId, userId, req.organizacionId),
     ]);
 
     const fullSystemPrompt =
@@ -730,7 +731,7 @@ export const chatVantia = async (req: any, res: Response) => {
       const toolResults = await Promise.all(
         fnCalls.map(async (part: any) => {
           const { name, args } = part.functionCall;
-          return { name, result: await callTool(name, args ?? {}, userId) };
+          return { name, result: await callTool(name, args ?? {}, userId, req.organizacionId) };
         })
       );
 
