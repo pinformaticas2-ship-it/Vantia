@@ -64,19 +64,31 @@ function normalizeBackendPayload<T>(value: T): T {
 
 const ACTIVE_ORG_KEY = 'vantia_active_org_id';
 
+// Clave de localStorage acotada por usuario de Clerk -- si dos personas
+// comparten el mismo navegador (frecuente en despachos pequeños), sin esto
+// la organización elegida por una se filtraría a la sesión de la otra
+// (mismo tipo de bug ya corregido antes para WhatsApp/Email unread state).
+// window.Clerk lo expone @clerk/clerk-react fuera de React, así que esto
+// funciona aunque esta función no sea un hook.
+function activeOrgStorageKey(): string {
+  const userId = (window as any).Clerk?.user?.id;
+  return userId ? `${ACTIVE_ORG_KEY}-${userId}` : ACTIVE_ORG_KEY;
+}
+
 // Organización activa elegida con el selector del sidebar ("Seleccionar
 // empresa"). El backend (middleware resolveOrg) solo la respeta si el
 // usuario es realmente miembro de esa organización -- esto es solo para
 // indicar la preferencia, nunca es la barrera de seguridad real.
 export function getActiveOrganizacionId(): string | null {
   if (typeof window === 'undefined') return null;
-  return window.localStorage.getItem(ACTIVE_ORG_KEY);
+  return window.localStorage.getItem(activeOrgStorageKey());
 }
 
 export function setActiveOrganizacionId(id: string | null): void {
   if (typeof window === 'undefined') return;
-  if (id) window.localStorage.setItem(ACTIVE_ORG_KEY, id);
-  else window.localStorage.removeItem(ACTIVE_ORG_KEY);
+  const key = activeOrgStorageKey();
+  if (id) window.localStorage.setItem(key, id);
+  else window.localStorage.removeItem(key);
 }
 
 function isApiUrl(url: string): boolean {
