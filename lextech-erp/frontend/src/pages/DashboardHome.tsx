@@ -9,7 +9,7 @@ import {
   ChevronDown, FileSpreadsheet, ClipboardList,
   ScanLine, ExternalLink, MoreHorizontal, LayoutGrid, X, GripVertical,
   Briefcase, Users, History, MessageSquare, MessageCircle, Mail, Library,
-  Receipt, Reply, MailOpen, ArrowRight,
+  Receipt, Reply, MailOpen, ArrowRight, Check,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { safeJson } from "../lib/api";
@@ -351,6 +351,8 @@ export default function DashboardHome() {
   const [emailMessages,    setEmailMessages]    = useState<any[]>([]);
   const [emailMsgLoading,  setEmailMsgLoading]  = useState(false);
   const [selectedEmailAccountId, setSelectedEmailAccountId] = useState<string>("");
+  const [emailAccountMenuOpen, setEmailAccountMenuOpen] = useState(false);
+  const emailAccountMenuRef = useRef<HTMLDivElement | null>(null);
   const [openMenuEmailId,      setOpenMenuEmailId]      = useState<string | null>(null);
   const emailMenuRef = useRef<HTMLUListElement | null>(null);
   const [docStats,      setDocStats]      = useState({ providers: 0, activos: 0, lexnet: false });
@@ -511,6 +513,9 @@ export default function DashboardHome() {
     const handler = (e: MouseEvent) => {
       if (emailMenuRef.current && !emailMenuRef.current.contains(e.target as Node)) {
         setOpenMenuEmailId(null);
+      }
+      if (emailAccountMenuRef.current && !emailAccountMenuRef.current.contains(e.target as Node)) {
+        setEmailAccountMenuOpen(false);
       }
     };
     document.addEventListener("mousedown", handler);
@@ -872,25 +877,46 @@ export default function DashboardHome() {
             </div>
             <div className="flex items-center gap-2 shrink-0">
               {emailAccounts.length > 0 && (
-                <div className="relative" onClick={(e) => e.stopPropagation()}>
-                  <div className="pointer-events-none bg-white border border-slate-200 rounded-full px-3 py-1 flex items-center gap-1.5">
+                <div className="relative" ref={emailAccountMenuRef} onClick={(e) => e.stopPropagation()}>
+                  <button
+                    type="button"
+                    onClick={() => setEmailAccountMenuOpen((v) => !v)}
+                    className="bg-white border border-slate-200 hover:border-slate-300 rounded-full px-3 py-1 flex items-center gap-1.5 transition-colors"
+                  >
                     <span className="text-[10px] font-medium text-slate-600 truncate max-w-[130px]">
                       {emailAccounts.find((a: any) => a.id === selectedEmailAccountId)?.username
                         || emailAccounts.find((a: any) => a.id === selectedEmailAccountId)?.email
                         || emailAccounts.find((a: any) => a.id === selectedEmailAccountId)?.name
                         || "Cuenta"}
                     </span>
-                    <ChevronDown size={9} className="text-slate-400" />
-                  </div>
-                  <select
-                    value={selectedEmailAccountId}
-                    onChange={(e) => { setSelectedEmailAccountId(e.target.value); fetchEmailMessages(e.target.value); }}
-                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                  >
-                    {emailAccounts.map((acc: any) => (
-                      <option key={acc.id} value={acc.id}>{acc.username || acc.email || acc.name || "Cuenta"}</option>
-                    ))}
-                  </select>
+                    <ChevronDown size={9} className={`text-slate-400 transition-transform ${emailAccountMenuOpen ? "rotate-180" : ""}`} />
+                  </button>
+
+                  {emailAccountMenuOpen && (
+                    <div className="absolute right-0 top-full mt-1.5 w-56 max-h-64 overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl z-30 py-1.5">
+                      {emailAccounts.map((acc: any) => {
+                        const label = acc.username || acc.email || acc.name || "Cuenta";
+                        const active = acc.id === selectedEmailAccountId;
+                        return (
+                          <button
+                            key={acc.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedEmailAccountId(acc.id);
+                              fetchEmailMessages(acc.id);
+                              setEmailAccountMenuOpen(false);
+                            }}
+                            className={`flex w-full items-center justify-between gap-2 px-3.5 py-2 text-left text-xs transition-colors ${
+                              active ? "text-blue-700 font-semibold bg-blue-50/60" : "text-slate-600 hover:bg-slate-50 font-medium"
+                            }`}
+                          >
+                            <span className="truncate">{label}</span>
+                            {active && <Check size={13} className="shrink-0 text-blue-600" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
               <ChevronRight size={14} onClick={() => goTo("/dashboard/correo")} className="cursor-pointer text-slate-300 group-hover:text-red-500 transition-colors" />
