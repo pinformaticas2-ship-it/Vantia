@@ -1793,27 +1793,93 @@ function WaToast({ name, message, onOpen, onClose }: { name: string; message: st
 }
 
 function ChatToast({ title, meta, onOpen, onClose }: { title: string; meta?: string; onOpen: () => void; onClose: () => void }) {
+  const DURATION_MS = 8_000;
+  const [progress, setProgress] = useState(100);
+  const [paused, setPaused] = useState(false);
+  const [visible, setVisible] = useState(false);
+  const elapsedRef = useRef(0);
+  // Refs para leer siempre el valor mas reciente de onClose/paused dentro del
+  // intervalo sin tener que reiniciarlo -- onClose es una función nueva en
+  // cada render del padre, y si el intervalo dependiera de ella se
+  // reiniciaría constantemente y la barra de progreso iría a tirones.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
+
+  // Entrada animada: monta oculto y aparece un frame después para que la
+  // transición de opacidad/posición se anime de verdad en vez de aparecer
+  // de golpe.
   useEffect(() => {
-    const t = setTimeout(onClose, 8_000);
-    return () => clearTimeout(t);
-  }, [onClose]);
+    const raf = requestAnimationFrame(() => setVisible(true));
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  // Cierre automático con barra de progreso visible, en pausa mientras el
+  // ratón está encima -- antes desaparecía a los 8s sin aviso, incluso si
+  // el usuario lo estaba leyendo.
+  useEffect(() => {
+    let last = Date.now();
+    const id = setInterval(() => {
+      const now = Date.now();
+      if (!pausedRef.current) {
+        elapsedRef.current += now - last;
+        setProgress(Math.max(0, 100 - (elapsedRef.current / DURATION_MS) * 100));
+        if (elapsedRef.current >= DURATION_MS) {
+          clearInterval(id);
+          onCloseRef.current();
+        }
+      }
+      last = now;
+    }, 50);
+    return () => clearInterval(id);
+  }, []);
 
   return (
-    <div className="fixed bottom-6 right-24 z-50 w-[360px] max-w-[calc(100vw-2rem)] rounded-2xl border border-indigo-100 bg-white shadow-2xl overflow-hidden">
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(e) => { if (e.key === "Enter") onOpen(); }}
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      className={`fixed bottom-6 right-24 z-50 w-[360px] max-w-[calc(100vw-2rem)] rounded-2xl border border-indigo-100 bg-white shadow-2xl shadow-indigo-900/10 overflow-hidden cursor-pointer transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-indigo-900/20 ${
+        visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"
+      }`}
+    >
       <div className="flex items-start gap-3 px-4 py-4 bg-gradient-to-r from-indigo-50 to-white">
-        <div className="h-10 w-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
+        <div className="relative h-10 w-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-700 text-white flex items-center justify-center shrink-0 shadow-sm shadow-indigo-500/30">
           <MessageSquare className="h-5 w-5" />
+          <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-red-500 border-2 border-white" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-bold tracking-[0.18em] uppercase text-indigo-600">Chat interno</p>
+          <p className="text-[10px] font-bold tracking-[0.18em] uppercase text-indigo-600">Chat interno</p>
           <p className="text-sm font-semibold text-slate-800 truncate">{title}</p>
-          {meta && <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">{meta}</p>}
+          {meta && <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{meta}</p>}
         </div>
-        <button onClick={onClose} className="text-slate-400 hover:text-slate-700"><X size={14} /></button>
+        <button
+          onClick={(e) => { e.stopPropagation(); onClose(); }}
+          className="shrink-0 text-slate-300 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1 -m-1 transition-colors"
+        >
+          <X size={14} />
+        </button>
       </div>
       <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-end gap-2">
-        <button onClick={onClose} className="px-3 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:bg-slate-100">Cerrar</button>
-        <button onClick={onOpen} className="px-3 py-2 rounded-xl text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700">Abrir chat</button>
+        <button
+          onClick={(e) => { e.stopPropagation(); onClose(); }}
+          className="px-3 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:bg-slate-100 transition-colors"
+        >
+          Cerrar
+        </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); onOpen(); }}
+          className="px-3 py-2 rounded-xl text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95 shadow-sm shadow-indigo-600/30 transition-all"
+        >
+          Abrir chat
+        </button>
+      </div>
+      <div className="h-0.5 bg-slate-100">
+        <div className="h-full bg-indigo-400 transition-[width] duration-100 ease-linear" style={{ width: `${progress}%` }} />
       </div>
     </div>
   );
