@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Bell, Building2, Check, Loader2, Palette, Plug, Plus, ShieldCheck, Trash2, UsersRound } from 'lucide-react';
+import { AlertTriangle, Bell, Building2, Check, Loader2, Palette, Plug, Plus, ShieldCheck, Trash2, UsersRound, X } from 'lucide-react';
 import { useAuth } from '@clerk/clerk-react';
 import { useTheme, AppTheme } from '../lib/ThemeContext';
-import { apiFetch } from '../lib/api';
+import { apiFetch, setActiveOrganizacionId } from '../lib/api';
 import { useOrganizacion, OrgRol } from '../lib/useOrganizacion';
 
 const PALETTES: {
@@ -147,6 +147,144 @@ function PaletteCard({ p, active, onClick }: {
   );
 }
 
+interface DeletionImpact {
+  clientes: number;
+  expedientes: number;
+  otrosMiembros: number;
+  esLaUnica: boolean;
+}
+
+function DeleteOrganizacionModal({ nombre, onClose }: { nombre: string; onClose: () => void }) {
+  const { getToken } = useAuth();
+  const [impact, setImpact] = useState<DeletionImpact | null>(null);
+  const [loadingImpact, setLoadingImpact] = useState(true);
+  const [confirmChecked, setConfirmChecked] = useState(false);
+  const [typedNombre, setTypedNombre] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await apiFetch('/api/organizacion/impacto-borrado', { getToken });
+        if (data?.success === false) throw new Error(data.error);
+        setImpact(data.data);
+      } catch (e: any) {
+        setError(e.message || 'No se pudo calcular el impacto del borrado.');
+      } finally {
+        setLoadingImpact(false);
+      }
+    })();
+  }, [getToken]);
+
+  const nameMatches = typedNombre.trim() === nombre.trim();
+  const canDelete = !loadingImpact && impact && !impact.esLaUnica && confirmChecked && nameMatches && !deleting;
+
+  const handleDelete = async () => {
+    if (!canDelete) return;
+    setDeleting(true); setError('');
+    try {
+      const data = await apiFetch('/api/organizacion', { method: 'DELETE', getToken, body: JSON.stringify({ confirmNombre: typedNombre.trim() }) });
+      if (data?.success === false) throw new Error(data.error);
+      // La organización activa ya no existe -- recargar para que el backend
+      // resuelva cuál es la nueva organización activa del usuario.
+      setActiveOrganizacionId(null);
+      window.location.reload();
+    } catch (e: any) {
+      setError(e.message || 'No se pudo eliminar la organización.');
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm flex items-center justify-center px-4">
+      <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden">
+        <div className="px-6 py-5 border-b border-slate-100 flex items-start gap-3.5 bg-red-50/60">
+          <div className="h-10 w-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+            <AlertTriangle size={20} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-base font-extrabold text-slate-900">Eliminar organización</h2>
+            <p className="text-sm text-slate-500 mt-0.5">Esta acción es permanente y no se puede deshacer.</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 shrink-0"><X size={16} /></button>
+        </div>
+
+        <div className="px-6 py-5 space-y-4">
+          {loadingImpact ? (
+            <div className="flex justify-center py-6"><Loader2 className="animate-spin text-slate-300" size={22} /></div>
+          ) : impact?.esLaUnica ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              No puedes eliminar <strong>{nombre}</strong> porque es la única organización del sistema. Crea otra organización antes de poder borrar esta.
+            </div>
+          ) : (
+            <>
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3.5">
+                <p className="text-xs font-bold uppercase tracking-wider text-red-700 mb-2">Se eliminará permanentemente</p>
+                <ul className="space-y-1 text-sm text-red-800">
+                  <li>• <strong>{impact?.clientes ?? 0}</strong> cliente{impact?.clientes === 1 ? '' : 's'}</li>
+                  <li>• <strong>{impact?.expedientes ?? 0}</strong> expediente{impact?.expedientes === 1 ? '' : 's'}</li>
+                  <li>• Todo el historial de importaciones de esta organización</li>
+                </ul>
+                {!!impact?.otrosMiembros && (
+                  <p className="mt-2.5 pt-2.5 border-t border-red-200 text-sm text-red-800">
+                    <strong>{impact.otrosMiembros}</strong> persona{impact.otrosMiembros === 1 ? '' : 's'} más perderá{impact.otrosMiembros === 1 ? '' : 'n'} el acceso a esta organización inmediatamente.
+                  </p>
+                )}
+              </div>
+
+              <p className="text-xs text-slate-500">
+                Los módulos aún compartidos entre organizaciones (chat, agenda, tareas, facturación, email, WhatsApp) no se ven afectados por este borrado.
+              </p>
+
+              <label className="flex items-start gap-2.5 text-sm text-slate-700 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={confirmChecked}
+                  onChange={(e) => setConfirmChecked(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-300"
+                />
+                Entiendo que esta acción es irreversible y que se perderán todos los datos anteriores.
+              </label>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                  Escribe <span className="text-slate-800">{nombre}</span> para confirmar
+                </label>
+                <input
+                  value={typedNombre}
+                  onChange={(e) => setTypedNombre(e.target.value)}
+                  placeholder={nombre}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-red-300"
+                  autoFocus
+                />
+              </div>
+            </>
+          )}
+
+          {error && <p className="text-xs text-red-600">{error}</p>}
+        </div>
+
+        <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-2.5 bg-slate-50">
+          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm font-semibold text-slate-500 hover:bg-slate-100 transition-colors">
+            Cancelar
+          </button>
+          {!impact?.esLaUnica && (
+            <button
+              onClick={handleDelete}
+              disabled={!canDelete}
+              className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+            >
+              {deleting && <Loader2 size={14} className="animate-spin" />}
+              Eliminar definitivamente
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DespachoPanel() {
   const { getToken } = useAuth();
   const { organizacion, rol, organizaciones, isLoaded, reload, switchOrganizacion } = useOrganizacion();
@@ -157,6 +295,7 @@ function DespachoPanel() {
   const [newNombre, setNewNombre] = useState('');
   const [creatingLoading, setCreatingLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   useEffect(() => { if (organizacion) setNombre(organizacion.nombre); }, [organizacion]);
 
@@ -279,6 +418,28 @@ function DespachoPanel() {
           </div>
         )}
       </section>
+
+      {rol === 'propietario' && organizacion && (
+        <section className="mt-12 max-w-lg">
+          <h3 className="text-sm font-bold text-red-700 uppercase tracking-wider mb-4 border-b border-red-100 pb-2">Zona de peligro</h3>
+          <div className="bg-red-50/50 border border-red-200 rounded-xl p-5 flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold text-slate-800">Eliminar esta organización</p>
+              <p className="text-xs text-slate-500 mt-0.5">Borra permanentemente clientes, expedientes y el acceso de todos sus miembros.</p>
+            </div>
+            <button
+              onClick={() => setShowDeleteModal(true)}
+              className="inline-flex items-center gap-2 shrink-0 bg-white border border-red-300 hover:bg-red-600 hover:text-white hover:border-red-600 text-red-700 text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+            >
+              <Trash2 size={14} /> Eliminar
+            </button>
+          </div>
+        </section>
+      )}
+
+      {showDeleteModal && organizacion && (
+        <DeleteOrganizacionModal nombre={organizacion.nombre} onClose={() => setShowDeleteModal(false)} />
+      )}
     </>
   );
 }

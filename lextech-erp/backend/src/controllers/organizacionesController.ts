@@ -276,3 +276,95 @@ export async function removeOrganizacionMiembro(req: Request, res: Response) {
     return err(res, pgErr(e));
   }
 }
+
+// GET /api/organizacion/impacto-borrado — cuenta lo que se perdería al
+// borrar la organización activa, para mostrar advertencias reales (no
+// genéricas) antes de dejar confirmar el borrado.
+export async function getOrganizacionDeletionImpact(req: Request, res: Response) {
+  try {
+    const ctx = requireOrgContext(req, res);
+    if (!ctx) return;
+    if (ctx.organizacionRol !== 'propietario') {
+      return err(res, 'Solo el propietario puede eliminar la organización.', 403);
+    }
+
+    const [clientes, expedientes, miembros, totalOrgs] = await Promise.all([
+      pool.query(`SELECT COUNT(*)::int AS n FROM entities WHERE organizacion_id = $1`, [ctx.organizacionId]),
+      pool.query(`SELECT COUNT(*)::int AS n FROM expedientes WHERE organizacion_id = $1`, [ctx.organizacionId]),
+      pool.query(`SELECT COUNT(*)::int AS n FROM organizacion_miembros WHERE organizacion_id = $1 AND user_id <> $2`, [ctx.organizacionId, (req as any).auth?.userId]),
+      pool.query(`SELECT COUNT(*)::int AS n FROM organizaciones`),
+    ]);
+
+    return ok(res, {
+      clientes: clientes.rows[0].n,
+      expedientes: expedientes.rows[0].n,
+      otrosMiembros: miembros.rows[0].n,
+      esLaUnica: totalOrgs.rows[0].n <= 1,
+    });
+  } catch (e: any) {
+    return err(res, pgErr(e));
+  }
+}
+
+// DELETE /api/organizacion — elimina la organización activa por completo:
+// clientes, expedientes, lotes de importación y miembros. Solo el
+// propietario, y solo si escribe el nombre exacto de la organización --
+// no hay forma de deshacerlo.
+export async function deleteOrganizacionActiva(req: Request, res: Response) {
+  const ctx = requireOrgContext(req, res);
+  if (!ctx) return;
+  if (ctx.organizacionRol !== 'propietario') {
+    return err(res, 'Solo el propietario puede eliminar la organización.', 403);
+  }
+
+  const client = await pool.connect();
+  try {
+    const { rows: orgRows } = await client.query(`SELECT nombre FROM organizaciones WHERE id = $1`, [ctx.organizacionId]);
+    if (!orgRows.length) return err(res, 'Organización no encontrada.', 404);
+    const nombreReal = String(orgRows[0].nombre || '').trim();
+
+    const confirmNombre = String(req.body?.confirmNombre || '').trim();
+    if (!confirmNombre || confirmNombre !== nombreReal) {
+      return err(res, 'El nombre no coincide. Escribe el nombre exacto de la organización para confirmar.', 400);
+    }
+
+    const { rows: totalOrgs } = await client.query(`SELECT COUNT(*)::int AS n FROM organizaciones`);
+    if (totalOrgs[0].n <= 1) {
+      return err(res, 'No puedes eliminar la única organización del sistema.', 400);
+    }
+
+    const { rows: memberRows } = await client.query(
+      `SELECT user_id FROM organizacion_miembros WHERE organizacion_id = $1`,
+      [ctx.organizacionId]
+    );
+    // client_invite_links se crea de forma perezosa (ver clientInviteController.ts)
+    // -- puede que todavía no exista en este entorno si nunca se usó "Alta con enlace".
+    const { rows: inviteTableRows } = await client.query(`SELECT to_regclass('client_invite_links') AS reg`);
+    const hasInviteTable = Boolean(inviteTableRows[0]?.reg);
+
+    await client.query('BEGIN');
+    try {
+      await client.query(`DELETE FROM entities WHERE organizacion_id = $1`, [ctx.organizacionId]);
+      await client.query(`DELETE FROM expedientes WHERE organizacion_id = $1`, [ctx.organizacionId]);
+      await client.query(`DELETE FROM entity_import_batches WHERE organizacion_id = $1`, [ctx.organizacionId]);
+      await client.query(`DELETE FROM expediente_import_batches WHERE organizacion_id = $1`, [ctx.organizacionId]);
+      if (hasInviteTable) {
+        await client.query(`DELETE FROM client_invite_links WHERE organizacion_id = $1`, [ctx.organizacionId]);
+      }
+      // organizacion_miembros cae en cascada al borrar la organización (FK ON DELETE CASCADE)
+      await client.query(`DELETE FROM organizaciones WHERE id = $1`, [ctx.organizacionId]);
+      await client.query('COMMIT');
+    } catch (txErr) {
+      await client.query('ROLLBACK');
+      throw txErr;
+    }
+
+    for (const m of memberRows) invalidateUserCache(m.user_id);
+
+    return ok(res, { deleted: true });
+  } catch (e: any) {
+    return err(res, pgErr(e));
+  } finally {
+    client.release();
+  }
+}

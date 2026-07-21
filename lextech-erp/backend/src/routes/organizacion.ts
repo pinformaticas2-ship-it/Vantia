@@ -8,6 +8,8 @@ import {
   addOrganizacionMiembro,
   updateOrganizacionMiembroRol,
   removeOrganizacionMiembro,
+  getOrganizacionDeletionImpact,
+  deleteOrganizacionActiva,
 } from '../controllers/organizacionesController';
 
 const router = Router();
@@ -19,5 +21,7 @@ router.get('/miembros', requireAuth, getOrganizacionMiembros);
 router.post('/miembros', requireAuth, addOrganizacionMiembro);
 router.patch('/miembros/:id', requireAuth, updateOrganizacionMiembroRol);
 router.delete('/miembros/:id', requireAuth, removeOrganizacionMiembro);
+router.get('/impacto-borrado', requireAuth, getOrganizacionDeletionImpact);
+router.delete('/', requireAuth, deleteOrganizacionActiva);
 
 export default router;
