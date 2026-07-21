@@ -3189,15 +3189,13 @@ function DocumentImportView({
                   </div>
                 </div>
                 <div className="flex items-center gap-2.5 pl-3 flex-shrink-0">
-                  {(batch.status === "reviewing" || batch.status === "processing") && (
-                    <button
-                      onClick={() => onReviewBatch(batch)}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 border border-amber-200 px-2.5 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition-colors"
-                    >
-                      <Eye size={11} />
-                      Revisar
-                    </button>
-                  )}
+                  <button
+                    onClick={() => onReviewBatch(batch)}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 border border-amber-200 px-2.5 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition-colors"
+                  >
+                    <Eye size={11} />
+                    Revisar
+                  </button>
                   <span className={`px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md border ${
                     batch.status === "completed" ? "bg-emerald-50 text-emerald-700 border-emerald-100"
                     : batch.status === "failed" ? "bg-red-50 text-red-700 border-red-100"
@@ -4097,15 +4095,13 @@ function DocumentImportHistoryView({
                   </div>
                 </div>
                 <div className="flex items-center gap-2.5 pl-4 flex-shrink-0">
-                  {(batch.status === "reviewing" || batch.status === "processing") && (
-                    <button
-                      onClick={() => onReviewBatch(batch)}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 border border-amber-200 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition-colors"
-                    >
-                      <Eye size={12} />
-                      Revisar
-                    </button>
-                  )}
+                  <button
+                    onClick={() => onReviewBatch(batch)}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 border border-amber-200 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition-colors"
+                  >
+                    <Eye size={12} />
+                    Revisar
+                  </button>
                   <span className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md border ${
                     batch.status === "completed" ? "bg-emerald-50 text-emerald-700 border-emerald-100"
                     : batch.status === "failed" ? "bg-red-50 text-red-700 border-red-100"
