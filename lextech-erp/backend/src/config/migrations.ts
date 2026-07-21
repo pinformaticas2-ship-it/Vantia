@@ -1668,9 +1668,18 @@ export async function runMigrations(): Promise<void> {
       await client.query(`ALTER TABLE expedientes ALTER COLUMN organizacion_id SET NOT NULL;`);
     } catch (_e: any) {}
 
-    // Numeración de expediente (año + número) única por organización, no global
+    // Numeración de expediente (año + número) única por organización, no global.
+    // idx_expedientes_anio_num nació como un CONSTRAINT UNIQUE de la tabla
+    // (no un índice suelto) -- DROP INDEX no puede quitarlo, Postgres exige
+    // DROP CONSTRAINT. Se intentan las dos formas por separado para que un
+    // fallo en una no bloquee la otra ni la creación del índice compuesto.
+    try {
+      await client.query(`ALTER TABLE expedientes DROP CONSTRAINT IF EXISTS idx_expedientes_anio_num;`);
+    } catch (_e: any) {}
     try {
       await client.query(`DROP INDEX IF EXISTS idx_expedientes_anio_num;`);
+    } catch (_e: any) {}
+    try {
       await client.query(`
         CREATE UNIQUE INDEX IF NOT EXISTS idx_expedientes_org_anio_num
           ON expedientes (organizacion_id, anio, num_exp)
