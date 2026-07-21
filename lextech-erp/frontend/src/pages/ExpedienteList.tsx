@@ -25,7 +25,7 @@ import { useUndoDelete } from "../lib/useUndoDelete";
 import { useDocumentProcessing } from "../contexts/DocumentProcessingContext";
 
 type ViewMode = "list" | "detail" | "multiselect" | "csvImport" | "csvImportConfigure" | "csvImportReview" | "csvImportComplete" | "csvImportHistory" | "csvImportErrorDetail" | "documentImport" | "documentImportVerify" | "documentImportHistory";
-import { safeJson, resolveApiUrl, resolveUploadUrl } from "../lib/api";
+import { safeJson, resolveApiUrl, resolveUploadUrl, getActiveOrganizacionId } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
 import { TIPOS, ESTADOS, EXP_EMPTY, ExpedienteModal, lbl, inp } from "../components/ExpedienteModal";
 import AppSelect from "../components/AppSelect";
@@ -4974,6 +4974,12 @@ export default function ExpedienteList() {
         const xhr = new XMLHttpRequest();
         xhr.open("POST", resolveApiUrl("/api/expedientes/documents/upload"));
         xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+        // XMLHttpRequest no pasa por el shim de window.fetch (instalado en
+        // main.tsx), así que la cabecera de organización activa hay que
+        // ponerla aquí a mano -- si no, esta subida siempre iría a la
+        // organización por defecto del usuario, aunque tenga otra seleccionada.
+        const activeOrgId = getActiveOrganizacionId();
+        if (activeOrgId) xhr.setRequestHeader("X-Organizacion-Id", activeOrgId);
         xhr.upload.onprogress = (event) => {
           if (event.lengthComputable) {
             setDocumentImportUploadStage("uploading");
