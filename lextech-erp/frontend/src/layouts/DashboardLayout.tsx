@@ -962,7 +962,7 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
         {collapsed ? (
           <div className="flex justify-center">
             <div
-              className="erp-company-icon relative w-10 h-10 rounded-xl border border-slate-700/60 bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center cursor-pointer hover:border-red-500/40 hover:shadow-lg hover:shadow-red-500/10 transition-all duration-200 overflow-hidden"
+              className="erp-company-icon w-10 h-10 rounded-xl border border-slate-700/60 bg-slate-800/50 flex items-center justify-center cursor-pointer overflow-hidden transition-all duration-200 hover:scale-105 active:scale-95"
               title={organizacion?.nombre || "Vantia Legis"}
             >
               {organizacion?.logoUrl ? (
@@ -970,7 +970,6 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
               ) : (
                 <img src="/vantia-sidebar-slate.png" alt="Vantia Legis" className="h-6 w-6 object-contain" />
               )}
-              <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 border-2 border-slate-900" />
             </div>
           </div>
         ) : (
@@ -979,32 +978,31 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
               type="button"
               title="Seleccionar empresa"
               onClick={() => organizaciones.length > 1 && setOrgMenuOpen((v) => !v)}
-              className="erp-company-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-slate-700/60 bg-gradient-to-br from-slate-800/70 to-slate-800/30 hover:border-red-500/30 hover:from-slate-700/60 hover:to-slate-800/40 transition-all duration-200 group shadow-sm"
+              className="erp-company-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-slate-700/60 bg-slate-800/40 hover:bg-slate-700/50 hover:border-slate-600 transition-all duration-200 active:scale-[0.98] group"
             >
-              <div className="erp-company-logo relative w-9 h-9 rounded-lg bg-gradient-to-br from-slate-700 to-slate-800 border border-slate-700/50 flex items-center justify-center shrink-0 overflow-hidden shadow-inner">
+              <div className="erp-company-logo w-9 h-9 rounded-lg bg-slate-800 border border-slate-700/50 flex items-center justify-center shrink-0 overflow-hidden">
                 {organizacion?.logoUrl ? (
                   <img src={resolveUploadUrl(organizacion.logoUrl) || undefined} alt={organizacion.nombre} className="h-full w-full object-contain p-1" />
                 ) : (
                   <img src="/vantia-sidebar-slate.png" alt="Vantia Legis" className="h-7 w-7 object-contain" />
                 )}
-                <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-500 border border-slate-900" />
               </div>
               <div className="flex-1 min-w-0 text-left">
-                <p className="erp-company-name text-[11px] font-bold text-slate-100 truncate leading-tight group-hover:text-white transition-colors">
+                <p className="erp-company-name text-[11px] font-bold text-slate-200 truncate leading-tight">
                   {orgLoaded ? (organizacion?.nombre || "Vantia Legis") : "Cargando…"}
                 </p>
                 <p className="erp-company-sub text-[10px] text-slate-500 truncate mt-0.5 flex items-center gap-1">
-                  {orgRol === 'propietario' && <Crown size={9} className="text-amber-400 shrink-0" />}
+                  {orgRol === 'propietario' && <Crown size={9} className="text-amber-500 shrink-0" />}
                   {organizaciones.length > 1 ? `${organizaciones.length} organizaciones` : "Despacho"}
                 </p>
               </div>
               {organizaciones.length > 1 && (
-                <ChevronsUpDown size={13} className={`erp-company-chevron shrink-0 transition-all duration-200 ${orgMenuOpen ? "text-red-400 rotate-180" : "text-slate-600 group-hover:text-slate-400"}`} />
+                <ChevronsUpDown size={13} className={`erp-company-chevron text-slate-600 group-hover:text-slate-400 shrink-0 transition-transform duration-200 ${orgMenuOpen ? "rotate-180" : ""}`} />
               )}
             </button>
 
             {orgMenuOpen && organizaciones.length > 1 && (
-              <div className="absolute left-0 right-0 top-full mt-1.5 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl shadow-black/40 py-1.5 z-20 overflow-hidden">
+              <div className="animate-fade-in absolute left-0 right-0 top-full mt-1.5 bg-slate-800 border border-slate-700 rounded-xl shadow-xl py-1.5 z-20 overflow-hidden origin-top">
                 {organizaciones.map((o) => (
                   <button
                     key={o.id}

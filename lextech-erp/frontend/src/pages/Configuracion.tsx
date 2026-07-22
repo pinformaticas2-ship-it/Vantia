@@ -287,13 +287,12 @@ function DeleteOrganizacionModal({ nombre, onClose }: { nombre: string; onClose:
 
 function DespachoPanel() {
   const { getToken } = useAuth();
-  const { organizacion, rol, organizaciones, isLoaded, reload, switchOrganizacion } = useOrganizacion();
+  const { organizacion, rol, organizaciones, isLoaded, switchOrganizacion } = useOrganizacion();
   const [nombre, setNombre] = useState('');
   const [nifCif, setNifCif] = useState('');
   const [direccionFiscal, setDireccionFiscal] = useState('');
   const [textoLegalFacturas, setTextoLegalFacturas] = useState('');
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const [creating, setCreating] = useState(false);
@@ -329,12 +328,13 @@ function DespachoPanel() {
         }),
       });
       if (data?.success === false) throw new Error(data.error);
-      await reload();
-      setSaved(true);
-      setTimeout(() => setSaved(false), 1600);
+      // El selector de organización del sidebar es otra instancia de este
+      // mismo hook (no comparten estado), así que un simple reload() local
+      // no le llega -- recargamos la página, igual que ya hace
+      // switchOrganizacion, para que se vea en todas partes.
+      window.location.reload();
     } catch (e: any) {
       setError(e.message || 'No se pudo guardar.');
-    } finally {
       setSaving(false);
     }
   };
@@ -354,10 +354,11 @@ function DespachoPanel() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data?.success === false) throw new Error(data?.error || 'No se pudo subir el logotipo.');
-      await reload();
+      // Mismo motivo que en save(): forzar recarga para que el logotipo
+      // nuevo se vea también en el selector de organización del sidebar.
+      window.location.reload();
     } catch (e: any) {
       setError(e.message || 'No se pudo subir el logotipo.');
-    } finally {
       setUploadingLogo(false);
       if (logoInputRef.current) logoInputRef.current.value = '';
     }
@@ -476,8 +477,8 @@ function DespachoPanel() {
               disabled={saving || !nombre.trim()}
               className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
             >
-              {saving ? <Loader2 size={14} className="animate-spin" /> : saved ? <Check size={14} /> : null}
-              {saved ? 'Guardado' : 'Guardar cambios'}
+              {saving && <Loader2 size={14} className="animate-spin" />}
+              Guardar cambios
             </button>
           )}
         </div>
