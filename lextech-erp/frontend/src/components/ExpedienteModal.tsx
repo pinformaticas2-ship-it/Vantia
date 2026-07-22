@@ -5,6 +5,7 @@ import {
   FolderOpen, FolderPlus, Loader2, Paperclip, Activity, FileSpreadsheet,
   Users, ClipboardList, MoreHorizontal, Coins, Scale, ArrowLeft,
   Upload, Trash2, Eye, Download, ExternalLink, Maximize2, AlertTriangle,
+  UserPlus, X as XIcon,
 } from "lucide-react";
 import AppSelect from "./AppSelect";
 import { useAuth } from "@clerk/clerk-react";
@@ -476,14 +477,16 @@ export function AdjuntosPanel({ entityId, entityName, onOpenFull }: {
 }
 
 // ── Modal de alta / edición ───────────────────────────────────
-export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, saving }: {
+export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, saving, onClienteCreated }: {
   initial: typeof EXP_EMPTY;
   editId?: string;
   clientes: any[];
   onSave: (d: typeof EXP_EMPTY) => void;
   onClose: () => void;
   saving: boolean;
+  onClienteCreated?: (cliente: any) => void;
 }) {
+  const { getToken } = useAuth();
   const [form, setForm]       = useState(initial);
   const [tab, setTab]         = useState<TabKey>("notas");
   const [showAdj, setShowAdj] = useState(false);
@@ -493,6 +496,48 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
     const c = clientes.find((x: any) => x.id === id);
     set("cliente_id", id);
     set("cliente_nombre", c ? `${c.first_name || ""} ${c.last_name || ""}`.trim() : "");
+  };
+
+  // ── Alta rápida de cliente sin salir del formulario del expediente ──
+  const [showNewCliente, setShowNewCliente]         = useState(false);
+  const [newClienteNombre, setNewClienteNombre]     = useState("");
+  const [newClienteApellidos, setNewClienteApellidos] = useState("");
+  const [newClienteNif, setNewClienteNif]           = useState("");
+  const [creatingCliente, setCreatingCliente]       = useState(false);
+  const [newClienteError, setNewClienteError]       = useState("");
+
+  const closeNewCliente = () => {
+    setShowNewCliente(false);
+    setNewClienteNombre(""); setNewClienteApellidos(""); setNewClienteNif(""); setNewClienteError("");
+  };
+
+  const createClienteRapido = async () => {
+    if (!newClienteNombre.trim()) return;
+    setCreatingCliente(true); setNewClienteError("");
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch("/api/entities", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          type: "CLIENTE",
+          first_name: newClienteNombre.trim(),
+          last_name: newClienteApellidos.trim(),
+          nif_cif: newClienteNif.trim(),
+        }),
+      });
+      const d = await safeJson(res);
+      if (!res.ok) throw new Error(d.error || "No se pudo crear el cliente");
+      const cliente = d.data;
+      onClienteCreated?.(cliente);
+      set("cliente_id", cliente.id);
+      set("cliente_nombre", `${cliente.first_name || ""} ${cliente.last_name || ""}`.trim());
+      closeNewCliente();
+    } catch (e: any) {
+      setNewClienteError(e.message || "No se pudo crear el cliente");
+    } finally {
+      setCreatingCliente(false);
+    }
   };
 
   const HeaderIcon = editId ? FolderOpen : FolderPlus;
@@ -782,22 +827,87 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
                       <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
                       <label className={`${lbl} text-slate-700`}>Cliente <span className="text-red-500">*</span></label>
                     </div>
+                    {!showNewCliente && (
+                      <button
+                        type="button"
+                        onClick={() => setShowNewCliente(true)}
+                        className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-800"
+                      >
+                        <UserPlus size={12} /> Nuevo cliente
+                      </button>
+                    )}
                   </div>
-                  <AppSelect
-                    value={form.cliente_id}
-                    onChange={e => handleClienteChange(e.target.value)}
-                    required
-                    variant="emerald"
-                    searchable
-                    searchPlaceholder="Buscar cliente..."
-                  >
-                    <option value="" disabled>— Selecciona un cliente —</option>
-                    {clientes.map((c: any) => (
-                      <option key={c.id} value={c.id}>
-                        {`${c.first_name || ""} ${c.last_name || ""}`.trim() || c.commercial_name || c.nif_cif || "Cliente sin nombre"}
-                      </option>
-                    ))}
-                  </AppSelect>
+
+                  {showNewCliente ? (
+                    <div className="flex flex-col gap-2 rounded-md border border-emerald-200 bg-emerald-50/50 p-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">Alta rápida de cliente</span>
+                        <button type="button" onClick={closeNewCliente} className="text-slate-400 hover:text-slate-600">
+                          <XIcon size={13} />
+                        </button>
+                      </div>
+                      <input
+                        value={newClienteNombre}
+                        onChange={e => setNewClienteNombre(e.target.value)}
+                        placeholder="Nombre *"
+                        autoFocus
+                        className={inp}
+                      />
+                      <input
+                        value={newClienteApellidos}
+                        onChange={e => setNewClienteApellidos(e.target.value)}
+                        placeholder="Apellidos"
+                        className={inp}
+                      />
+                      <input
+                        value={newClienteNif}
+                        onChange={e => setNewClienteNif(e.target.value)}
+                        placeholder="NIF/CIF (opcional)"
+                        className={inp}
+                      />
+                      {newClienteError && <p className="text-xs text-red-600">{newClienteError}</p>}
+                      <div className="flex items-center gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={createClienteRapido}
+                          disabled={creatingCliente || !newClienteNombre.trim()}
+                          className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-md transition-colors"
+                        >
+                          {creatingCliente && <Loader2 size={12} className="animate-spin" />}
+                          Crear y seleccionar
+                        </button>
+                        <button type="button" onClick={closeNewCliente} className="px-3 py-2 text-xs text-slate-500 hover:text-slate-700">
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <AppSelect
+                        value={form.cliente_id}
+                        onChange={e => handleClienteChange(e.target.value)}
+                        required
+                        variant="emerald"
+                        searchable
+                        searchPlaceholder="Buscar cliente..."
+                      >
+                        <option value="" disabled>— Selecciona un cliente —</option>
+                        {clientes.map((c: any) => (
+                          <option key={c.id} value={c.id}>
+                            {`${c.first_name || ""} ${c.last_name || ""}`.trim() || c.commercial_name || c.nif_cif || "Cliente sin nombre"}
+                          </option>
+                        ))}
+                      </AppSelect>
+                      {clientes.length === 0 && (
+                        <p className="text-xs text-slate-400">
+                          Todavía no hay clientes.{" "}
+                          <button type="button" onClick={() => setShowNewCliente(true)} className="font-semibold text-emerald-700 hover:underline">
+                            Crea el primero
+                          </button>.
+                        </p>
+                      )}
+                    </>
+                  )}
                 </div>
 
                 <div className="w-full h-px bg-slate-100" />

@@ -1153,6 +1153,7 @@ function CsvImportView({
   clientes,
   onSaveNew,
   savingNew,
+  onClienteCreated,
 }: {
   fileName: string | null;
   onBack: () => void;
@@ -1164,6 +1165,7 @@ function CsvImportView({
   clientes: any[];
   onSaveNew: (form: typeof EXP_EMPTY) => Promise<void>;
   savingNew: boolean;
+  onClienteCreated: (cliente: any) => void;
 }) {
   const [showNewModal, setShowNewModal] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -1357,6 +1359,7 @@ function CsvImportView({
           onSave={async (form) => { await onSaveNew(form); setShowNewModal(false); }}
           onClose={() => setShowNewModal(false)}
           saving={savingNew}
+          onClienteCreated={onClienteCreated}
         />
       )}
     </div>
@@ -5721,6 +5724,7 @@ export default function ExpedienteList() {
         clientes={clientes}
         onSaveNew={async (form) => { await handleSave(form); }}
         savingNew={saving}
+        onClienteCreated={(cliente) => setClientes((prev) => [...prev, cliente])}
       />
     );
   }
@@ -6381,6 +6385,7 @@ export default function ExpedienteList() {
           onSave={handleSave}
           onClose={() => { setShowModal(false); setEditItem(null); }}
           saving={saving}
+          onClienteCreated={(cliente) => setClientes((prev) => [...prev, cliente])}
         />
       )}
 
