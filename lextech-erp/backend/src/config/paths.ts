@@ -30,6 +30,7 @@ export const UPLOADS_ROOT = ensureDir(uploadsRoot);
 export const UPLOADS_CLIENTS_ROOT = ensureDir(path.join(UPLOADS_ROOT, 'clients'));
 export const UPLOADS_CHAT_ROOT = ensureDir(path.join(UPLOADS_ROOT, 'chat'));
 export const UPLOADS_DNIS_ROOT = ensureDir(path.join(UPLOADS_ROOT, 'dnis'));
+export const UPLOADS_ORG_LOGOS_ROOT = ensureDir(path.join(UPLOADS_ROOT, 'org-logos'));
 export const CLIENT_FILES_ROOT = ensureDir(clientFilesRoot);
 export const TEMP_ROOT = ensureDir(tempRoot);
 

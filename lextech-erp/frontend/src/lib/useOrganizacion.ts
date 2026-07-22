@@ -7,6 +7,10 @@ export type OrgRol = 'propietario' | 'admin' | 'miembro';
 export interface OrganizacionInfo {
   id: string;
   nombre: string;
+  nifCif?: string | null;
+  direccionFiscal?: string | null;
+  logoUrl?: string | null;
+  textoLegalFacturas?: string | null;
 }
 
 export interface OrganizacionMembership extends OrganizacionInfo {

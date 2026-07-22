@@ -1596,6 +1596,19 @@ export async function runMigrations(): Promise<void> {
         updated_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
       );
     `);
+    // Personalización del despacho: datos fiscales, logo y texto legal para
+    // facturas -- editable al crear la organización y en cualquier momento
+    // después desde Configuración → Mi Despacho.
+    for (const [col, def] of [
+      ['nif_cif',               `VARCHAR(20)`],
+      ['direccion_fiscal',      `TEXT`],
+      ['logo_url',              `TEXT`],
+      ['texto_legal_facturas',  `TEXT`],
+    ] as [string, string][]) {
+      try {
+        await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS ${col} ${def};`);
+      } catch (_e: any) {}
+    }
     try {
       await client.query(`
         INSERT INTO organizaciones (nombre)

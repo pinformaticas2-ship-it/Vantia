@@ -1,8 +1,8 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, Bell, Building2, Check, Loader2, Palette, Plug, Plus, ShieldCheck, Trash2, UsersRound, X } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { AlertTriangle, Bell, Building2, Camera, Check, Loader2, Palette, Plug, Plus, ShieldCheck, Trash2, UsersRound, X } from 'lucide-react';
 import { useAuth } from '@clerk/clerk-react';
 import { useTheme, AppTheme } from '../lib/ThemeContext';
-import { apiFetch, setActiveOrganizacionId } from '../lib/api';
+import { apiFetch, resolveUploadUrl, setActiveOrganizacionId } from '../lib/api';
 import { useOrganizacion, OrgRol } from '../lib/useOrganizacion';
 
 const PALETTES: {
@@ -289,15 +289,29 @@ function DespachoPanel() {
   const { getToken } = useAuth();
   const { organizacion, rol, organizaciones, isLoaded, reload, switchOrganizacion } = useOrganizacion();
   const [nombre, setNombre] = useState('');
+  const [nifCif, setNifCif] = useState('');
+  const [direccionFiscal, setDireccionFiscal] = useState('');
+  const [textoLegalFacturas, setTextoLegalFacturas] = useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
   const [creating, setCreating] = useState(false);
   const [newNombre, setNewNombre] = useState('');
+  const [newNifCif, setNewNifCif] = useState('');
+  const [newDireccionFiscal, setNewDireccionFiscal] = useState('');
+  const [newTextoLegalFacturas, setNewTextoLegalFacturas] = useState('');
   const [creatingLoading, setCreatingLoading] = useState(false);
   const [error, setError] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-  useEffect(() => { if (organizacion) setNombre(organizacion.nombre); }, [organizacion]);
+  useEffect(() => {
+    if (!organizacion) return;
+    setNombre(organizacion.nombre);
+    setNifCif(organizacion.nifCif || '');
+    setDireccionFiscal(organizacion.direccionFiscal || '');
+    setTextoLegalFacturas(organizacion.textoLegalFacturas || '');
+  }, [organizacion]);
 
   const canEdit = rol === 'propietario' || rol === 'admin';
 
@@ -305,7 +319,15 @@ function DespachoPanel() {
     if (!nombre.trim()) return;
     setSaving(true); setError('');
     try {
-      const data = await apiFetch('/api/organizacion', { method: 'PUT', getToken, body: JSON.stringify({ nombre: nombre.trim() }) });
+      const data = await apiFetch('/api/organizacion', {
+        method: 'PUT', getToken,
+        body: JSON.stringify({
+          nombre: nombre.trim(),
+          nifCif: nifCif.trim(),
+          direccionFiscal: direccionFiscal.trim(),
+          textoLegalFacturas: textoLegalFacturas.trim(),
+        }),
+      });
       if (data?.success === false) throw new Error(data.error);
       await reload();
       setSaved(true);
@@ -317,11 +339,43 @@ function DespachoPanel() {
     }
   };
 
+  const handleLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingLogo(true); setError('');
+    try {
+      const token = await getToken();
+      const formData = new FormData();
+      formData.append('logo', file);
+      const res = await fetch('/api/organizacion/logo', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.success === false) throw new Error(data?.error || 'No se pudo subir el logotipo.');
+      await reload();
+    } catch (e: any) {
+      setError(e.message || 'No se pudo subir el logotipo.');
+    } finally {
+      setUploadingLogo(false);
+      if (logoInputRef.current) logoInputRef.current.value = '';
+    }
+  };
+
   const createOrg = async () => {
     if (!newNombre.trim()) return;
     setCreatingLoading(true); setError('');
     try {
-      const data = await apiFetch('/api/organizacion', { method: 'POST', getToken, body: JSON.stringify({ nombre: newNombre.trim() }) });
+      const data = await apiFetch('/api/organizacion', {
+        method: 'POST', getToken,
+        body: JSON.stringify({
+          nombre: newNombre.trim(),
+          nifCif: newNifCif.trim(),
+          direccionFiscal: newDireccionFiscal.trim(),
+          textoLegalFacturas: newTextoLegalFacturas.trim(),
+        }),
+      });
       if (data?.success === false) throw new Error(data.error);
       switchOrganizacion(data.data.id);
     } catch (e: any) {
@@ -344,6 +398,34 @@ function DespachoPanel() {
       <section className="mb-10 max-w-lg">
         <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">Organización activa</h3>
         <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">
+          <div className="flex items-center gap-4">
+            <div className="relative shrink-0 group">
+              <div className="h-16 w-16 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden">
+                {organizacion?.logoUrl ? (
+                  <img src={resolveUploadUrl(organizacion.logoUrl) || ''} alt="Logotipo" className="h-full w-full object-contain" />
+                ) : (
+                  <Building2 size={22} className="text-slate-300" />
+                )}
+              </div>
+              {canEdit && (
+                <button
+                  type="button"
+                  onClick={() => logoInputRef.current?.click()}
+                  disabled={uploadingLogo}
+                  className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/0 group-hover:bg-black/40 text-white opacity-0 group-hover:opacity-100 transition-all disabled:cursor-wait"
+                  title="Cambiar logotipo"
+                >
+                  {uploadingLogo ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
+                </button>
+              )}
+              <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoChange} className="hidden" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-slate-800">Logotipo</p>
+              <p className="text-xs text-slate-400 mt-0.5">{canEdit ? 'Pasa el ratón por encima para cambiarlo. Se usará en facturas y documentos.' : 'Solo el propietario o un administrador pueden cambiarlo.'}</p>
+            </div>
+          </div>
+
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Nombre</label>
             <input
@@ -353,7 +435,40 @@ function DespachoPanel() {
               className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-red-300 disabled:bg-slate-50 disabled:text-slate-400"
             />
           </div>
-          {!canEdit && <p className="text-xs text-slate-400">Solo el propietario o un administrador pueden editar el nombre.</p>}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">NIF/CIF</label>
+              <input
+                value={nifCif}
+                onChange={(e) => setNifCif(e.target.value)}
+                disabled={!canEdit}
+                placeholder="B12345678"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-red-300 disabled:bg-slate-50 disabled:text-slate-400"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Dirección fiscal</label>
+              <input
+                value={direccionFiscal}
+                onChange={(e) => setDireccionFiscal(e.target.value)}
+                disabled={!canEdit}
+                placeholder="Calle, número, ciudad"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-red-300 disabled:bg-slate-50 disabled:text-slate-400"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Texto legal para facturas</label>
+            <textarea
+              value={textoLegalFacturas}
+              onChange={(e) => setTextoLegalFacturas(e.target.value)}
+              disabled={!canEdit}
+              rows={3}
+              placeholder="Texto que aparecerá al pie de las facturas (condiciones, aviso legal...)"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-red-300 disabled:bg-slate-50 disabled:text-slate-400 resize-none"
+            />
+          </div>
+          {!canEdit && <p className="text-xs text-slate-400">Solo el propietario o un administrador pueden editar estos datos.</p>}
           {error && <p className="text-xs text-red-600">{error}</p>}
           {canEdit && (
             <button
@@ -399,22 +514,62 @@ function DespachoPanel() {
             <Plus size={15} /> Nueva organización
           </button>
         ) : (
-          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center gap-3">
-            <input
-              value={newNombre}
-              onChange={(e) => setNewNombre(e.target.value)}
-              placeholder="Nombre del nuevo despacho"
-              className="flex-1 rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-red-300"
-              autoFocus
-            />
-            <button
-              onClick={createOrg}
-              disabled={creatingLoading || !newNombre.trim()}
-              className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors"
-            >
-              {creatingLoading ? <Loader2 size={14} className="animate-spin" /> : 'Crear'}
-            </button>
-            <button onClick={() => { setCreating(false); setNewNombre(''); }} className="text-sm text-slate-400 hover:text-slate-600 px-2">Cancelar</button>
+          <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Nombre</label>
+              <input
+                value={newNombre}
+                onChange={(e) => setNewNombre(e.target.value)}
+                placeholder="Nombre del nuevo despacho"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-red-300"
+                autoFocus
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">NIF/CIF <span className="normal-case font-normal text-slate-300">(opcional)</span></label>
+                <input
+                  value={newNifCif}
+                  onChange={(e) => setNewNifCif(e.target.value)}
+                  placeholder="B12345678"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-red-300"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Dirección fiscal <span className="normal-case font-normal text-slate-300">(opcional)</span></label>
+                <input
+                  value={newDireccionFiscal}
+                  onChange={(e) => setNewDireccionFiscal(e.target.value)}
+                  placeholder="Calle, número, ciudad"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-red-300"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Texto legal para facturas <span className="normal-case font-normal text-slate-300">(opcional)</span></label>
+              <textarea
+                value={newTextoLegalFacturas}
+                onChange={(e) => setNewTextoLegalFacturas(e.target.value)}
+                rows={2}
+                placeholder="Podrás cambiarlo luego, y añadir el logotipo una vez creada"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-red-300 resize-none"
+              />
+            </div>
+            <div className="flex items-center gap-3 pt-1">
+              <button
+                onClick={createOrg}
+                disabled={creatingLoading || !newNombre.trim()}
+                className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors"
+              >
+                {creatingLoading ? <Loader2 size={14} className="animate-spin" /> : 'Crear'}
+              </button>
+              <button
+                onClick={() => { setCreating(false); setNewNombre(''); setNewNifCif(''); setNewDireccionFiscal(''); setNewTextoLegalFacturas(''); }}
+                className="text-sm text-slate-400 hover:text-slate-600 px-2"
+              >
+                Cancelar
+              </button>
+            </div>
           </div>
         )}
       </section>

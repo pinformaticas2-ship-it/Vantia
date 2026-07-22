@@ -1,6 +1,9 @@
 import { Request, Response } from 'express';
+import fs from 'fs';
+import path from 'path';
 import pool from '../config/database';
 import { getClerk, resolveUserRole } from './activityController';
+import { UPLOADS_ORG_LOGOS_ROOT } from '../config/paths';
 
 const pgErr = (e: any) =>
   `${e?.message || String(e)}${e?.detail ? ' | detail: ' + e.detail : ''}${e?.code ? ' | code: ' + e.code : ''}`;
@@ -82,6 +85,11 @@ function err(res: Response, message: string, status = 500) {
   return res.status(status).json({ success: false, error: message });
 }
 
+function nullIfEmpty(v: any): string | null {
+  const s = String(v ?? '').trim();
+  return s ? s : null;
+}
+
 function requireOrgContext(req: Request, res: Response): { organizacionId: string; organizacionRol: OrgRol } | null {
   const organizacionId = (req as any).organizacionId;
   const organizacionRol = (req as any).organizacionRol;
@@ -92,7 +100,7 @@ function requireOrgContext(req: Request, res: Response): { organizacionId: strin
   return { organizacionId, organizacionRol };
 }
 
-// GET /api/organizacion — organización activa + todas las del usuario
+// GET /api/organizacion — organización activa (con sus datos de personalización) + todas las del usuario
 export async function getMyOrganizacion(req: Request, res: Response) {
   try {
     const ctx = requireOrgContext(req, res);
@@ -100,8 +108,26 @@ export async function getMyOrganizacion(req: Request, res: Response) {
     const userId = (req as any).auth?.userId;
     const memberships = await resolveUserOrgMemberships(userId);
     const activa = memberships.find((m) => m.organizacionId === ctx.organizacionId) || memberships[0];
+
+    let organizacion = null;
+    if (activa) {
+      const { rows } = await pool.query(
+        `SELECT id, nombre, nif_cif, direccion_fiscal, logo_url, texto_legal_facturas FROM organizaciones WHERE id = $1`,
+        [activa.organizacionId]
+      );
+      const org = rows[0];
+      organizacion = org ? {
+        id: org.id,
+        nombre: org.nombre,
+        nifCif: org.nif_cif,
+        direccionFiscal: org.direccion_fiscal,
+        logoUrl: org.logo_url,
+        textoLegalFacturas: org.texto_legal_facturas,
+      } : { id: activa.organizacionId, nombre: activa.organizacionNombre };
+    }
+
     return ok(res, {
-      organizacion: activa ? { id: activa.organizacionId, nombre: activa.organizacionNombre } : null,
+      organizacion,
       rol: activa?.rol || null,
       organizaciones: memberships.map((m) => ({ id: m.organizacionId, nombre: m.organizacionNombre, rol: m.rol })),
     });
@@ -110,7 +136,7 @@ export async function getMyOrganizacion(req: Request, res: Response) {
   }
 }
 
-// PUT /api/organizacion — editar nombre (propietario/admin)
+// PUT /api/organizacion — editar nombre + datos de personalización (propietario/admin)
 export async function updateMyOrganizacion(req: Request, res: Response) {
   try {
     const ctx = requireOrgContext(req, res);
@@ -120,30 +146,43 @@ export async function updateMyOrganizacion(req: Request, res: Response) {
     }
     const nombre = String(req.body?.nombre || '').trim();
     if (!nombre) return err(res, 'El nombre de la organización no puede estar vacío.', 400);
+    const nifCif = nullIfEmpty(req.body?.nifCif);
+    const direccionFiscal = nullIfEmpty(req.body?.direccionFiscal);
+    const textoLegalFacturas = nullIfEmpty(req.body?.textoLegalFacturas);
 
     await pool.query(
-      `UPDATE organizaciones SET nombre = $1, updated_at = NOW() WHERE id = $2`,
-      [nombre, ctx.organizacionId]
+      `UPDATE organizaciones
+         SET nombre = $1, nif_cif = $2, direccion_fiscal = $3, texto_legal_facturas = $4, updated_at = NOW()
+       WHERE id = $5`,
+      [nombre, nifCif, direccionFiscal, textoLegalFacturas, ctx.organizacionId]
     );
     const userId = (req as any).auth?.userId;
     invalidateUserCache(userId);
-    return ok(res, { id: ctx.organizacionId, nombre });
+    return ok(res, { id: ctx.organizacionId, nombre, nifCif, direccionFiscal, textoLegalFacturas });
   } catch (e: any) {
     return err(res, pgErr(e));
   }
 }
 
-// POST /api/organizacion — crear una organización nueva (el creador es propietario)
+// POST /api/organizacion — crear una organización nueva (el creador es propietario).
+// Acepta ya de entrada los mismos datos de personalización que la edición
+// (salvo el logo, que necesita que la organización exista primero para
+// poder asociarle un fichero).
 export async function createOrganizacion(req: Request, res: Response) {
   try {
     const userId = (req as any).auth?.userId;
     if (!userId) return err(res, 'No autenticado', 401);
     const nombre = String(req.body?.nombre || '').trim();
     if (!nombre) return err(res, 'El nombre de la organización no puede estar vacío.', 400);
+    const nifCif = nullIfEmpty(req.body?.nifCif);
+    const direccionFiscal = nullIfEmpty(req.body?.direccionFiscal);
+    const textoLegalFacturas = nullIfEmpty(req.body?.textoLegalFacturas);
 
     const { rows } = await pool.query(
-      `INSERT INTO organizaciones (nombre) VALUES ($1) RETURNING id, nombre`,
-      [nombre]
+      `INSERT INTO organizaciones (nombre, nif_cif, direccion_fiscal, texto_legal_facturas)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, nombre, nif_cif, direccion_fiscal, texto_legal_facturas`,
+      [nombre, nifCif, direccionFiscal, textoLegalFacturas]
     );
     const org = rows[0];
     await pool.query(
@@ -151,7 +190,42 @@ export async function createOrganizacion(req: Request, res: Response) {
       [org.id, userId]
     );
     invalidateUserCache(userId);
-    return ok(res, { id: org.id, nombre: org.nombre, rol: 'propietario' });
+    return ok(res, {
+      id: org.id, nombre: org.nombre, rol: 'propietario',
+      nifCif: org.nif_cif, direccionFiscal: org.direccion_fiscal, textoLegalFacturas: org.texto_legal_facturas,
+    });
+  } catch (e: any) {
+    return err(res, pgErr(e));
+  }
+}
+
+// POST /api/organizacion/logo — subir/reemplazar el logotipo (propietario/admin)
+export async function uploadOrganizacionLogo(req: Request, res: Response) {
+  try {
+    const ctx = requireOrgContext(req, res);
+    if (!ctx) return;
+    if (ctx.organizacionRol !== 'propietario' && ctx.organizacionRol !== 'admin') {
+      return err(res, 'Solo el propietario o un administrador pueden cambiar el logotipo.', 403);
+    }
+    const file = (req as any).file;
+    if (!file) return err(res, 'No se recibió ninguna imagen.', 400);
+
+    const { rows } = await pool.query(`SELECT logo_url FROM organizaciones WHERE id = $1`, [ctx.organizacionId]);
+    const previousUrl = rows[0]?.logo_url as string | undefined;
+
+    const logoUrl = `/uploads/org-logos/${file.filename}`;
+    await pool.query(
+      `UPDATE organizaciones SET logo_url = $1, updated_at = NOW() WHERE id = $2`,
+      [logoUrl, ctx.organizacionId]
+    );
+
+    // Borrar el fichero anterior para no acumular logos huérfanos
+    if (previousUrl && previousUrl.startsWith('/uploads/org-logos/')) {
+      const previousPath = path.join(UPLOADS_ORG_LOGOS_ROOT, path.basename(previousUrl));
+      fs.unlink(previousPath, () => {});
+    }
+
+    return ok(res, { logoUrl });
   } catch (e: any) {
     return err(res, pgErr(e));
   }

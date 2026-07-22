@@ -1,7 +1,7 @@
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import { UPLOADS_DNIS_ROOT } from '../config/paths';
+import { UPLOADS_DNIS_ROOT, UPLOADS_ORG_LOGOS_ROOT } from '../config/paths';
 
 // Asegurarnos de que existe la carpeta donde guardaremos los DNIs
 const uploadDir = UPLOADS_DNIS_ROOT;
@@ -31,3 +31,18 @@ const fileFilter = (req: any, file: Express.Multer.File, cb: any) => {
 };
 
 export const uploadDNI = multer({ storage: storage, fileFilter: fileFilter });
+
+// ── Logo de organización (despacho) ─────────────────────────────────────────
+if (!fs.existsSync(UPLOADS_ORG_LOGOS_ROOT)) {
+  fs.mkdirSync(UPLOADS_ORG_LOGOS_ROOT, { recursive: true });
+}
+const orgLogoStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, UPLOADS_ORG_LOGOS_ROOT);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'logo-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+export const uploadOrgLogo = multer({ storage: orgLogoStorage, fileFilter: fileFilter, limits: { fileSize: 5 * 1024 * 1024 } });
