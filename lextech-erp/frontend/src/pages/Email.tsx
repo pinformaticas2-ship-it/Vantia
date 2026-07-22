@@ -4,6 +4,7 @@
  * El usuario autenticado (Clerk) se usa como identidad principal
  */
 import { Spinner } from "../components/Spinner";
+import { useSidebar } from "../layouts/DashboardLayout";
 import React, {
   useState, useEffect, useRef, useCallback, useMemo,
 } from 'react';
@@ -633,6 +634,7 @@ function ComposeWindow({
   const [showCc, setShowCc]   = useState(!!data.cc);
   const [showBcc, setShowBcc] = useState(!!data.bcc);
   const [minimized, setMinimized] = useState(false);
+  const { isCollapsed } = useSidebar();
   const [sending, setSending] = useState(false);
   const [sent, setSent]       = useState(false);
   const [error, setError]     = useState('');
@@ -846,7 +848,11 @@ function ComposeWindow({
     <div className={`fixed z-50 bg-white shadow-2xl border border-gray-200 flex flex-col transition-all duration-200
       ${minimized
         ? 'bottom-0 right-6 w-80 h-12 rounded-t-2xl'
-        : 'inset-4 rounded-2xl'
+        // En móvil el sidebar va oculto (hidden md:flex en DashboardLayout), así
+        // que solo desde md hace falta dejar hueco a su ancho real (w-16/w-64) --
+        // antes esto se posicionaba con inset-4 relativo a toda la ventana, sin
+        // contar con el sidebar, y el panel quedaba tapado/cortado por él.
+        : `top-4 right-4 bottom-4 left-4 rounded-2xl ${isCollapsed ? 'md:left-20' : 'md:left-[17rem]'}`
       }`}>
       {/* Header */}
       <div
