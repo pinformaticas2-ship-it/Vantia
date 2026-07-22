@@ -434,7 +434,7 @@ export const removeRelatedExpediente = async (req: any, res: Response) => {
 export const createExpediente = async (req: any, res: Response) => {
   const {
     anio, num_exp: numExpFromBody, ref_propia, ref_expediente, descripcion, tipo, cliente_id, cliente_nombre,
-    contrario, procurador, juzgado, tipo_proc, num_autos, nig,
+    contrario, procurador, procurador_contrario, abogado_propio, abogado_contrario, juzgado, tipo_proc, num_autos, nig,
     estado, observaciones, fecha_inicio, fecha_cierre, importe,
     tipos_asunto, cuantia_principal, intereses, costas, cuantia_total,
     indeterminado, etapa, persona_contacto, contacto, centro, color,
@@ -580,8 +580,9 @@ export const createExpediente = async (req: any, res: Response) => {
               fecha_inicio, fecha_cierre, importe,
               tipos_asunto, cuantia_principal, intereses, costas, cuantia_total,
               indeterminado, etapa, persona_contacto, contacto, centro, color,
+              procurador_contrario, abogado_propio, abogado_contrario,
               created_by, organizacion_id)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34)
            RETURNING *`,
           [
             yr, numExp,
@@ -606,6 +607,9 @@ export const createExpediente = async (req: any, res: Response) => {
             nullableText(contacto),
             nullableText(centro),
             nullableText(color) || 'ninguno',
+            nullableText(procurador_contrario),
+            nullableText(abogado_propio),
+            nullableText(abogado_contrario),
             reqUserName(req),
             req.organizacionId,
           ]
