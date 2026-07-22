@@ -396,7 +396,7 @@ function DespachoPanel() {
         <p className="text-sm text-slate-500">Información de la organización activa y gestión de organizaciones.</p>
       </div>
 
-      <section className="mb-10 max-w-lg">
+      <section className="mb-10 max-w-3xl">
         <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">Organización activa</h3>
         <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">
           <div className="flex items-center gap-4">
@@ -485,7 +485,7 @@ function DespachoPanel() {
       </section>
 
       {organizaciones.length > 0 && (
-        <section className="mb-10 max-w-lg">
+        <section className="mb-10 max-w-3xl">
           <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">Tus organizaciones</h3>
           <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100 shadow-sm overflow-hidden">
             {organizaciones.map((o) => (
@@ -505,7 +505,7 @@ function DespachoPanel() {
         </section>
       )}
 
-      <section className="max-w-lg">
+      <section className="max-w-3xl">
         <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">Crear una nueva organización</h3>
         {!creating ? (
           <button
@@ -576,7 +576,7 @@ function DespachoPanel() {
       </section>
 
       {rol === 'propietario' && organizacion && (
-        <section className="mt-12 max-w-lg">
+        <section className="mt-12 max-w-3xl">
           <h3 className="text-sm font-bold text-red-700 uppercase tracking-wider mb-4 border-b border-red-100 pb-2">Zona de peligro</h3>
           <div className="bg-red-50/50 border border-red-200 rounded-xl p-5 flex items-center justify-between gap-4">
             <div>
