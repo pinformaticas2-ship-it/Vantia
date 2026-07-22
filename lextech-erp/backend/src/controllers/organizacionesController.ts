@@ -237,6 +237,35 @@ export async function uploadOrganizacionLogo(req: Request, res: Response) {
   }
 }
 
+// DELETE /api/organizacion/logo — quita el logotipo actual (propietario/admin);
+// vuelve a mostrarse el icono por defecto en el resto de la app.
+export async function deleteOrganizacionLogo(req: Request, res: Response) {
+  try {
+    const ctx = requireOrgContext(req, res);
+    if (!ctx) return;
+    if (ctx.organizacionRol !== 'propietario' && ctx.organizacionRol !== 'admin') {
+      return err(res, 'Solo el propietario o un administrador pueden cambiar el logotipo.', 403);
+    }
+
+    const { rows } = await pool.query(`SELECT logo_url FROM organizaciones WHERE id = $1`, [ctx.organizacionId]);
+    const previousUrl = rows[0]?.logo_url as string | undefined;
+
+    await pool.query(
+      `UPDATE organizaciones SET logo_url = NULL, updated_at = NOW() WHERE id = $1`,
+      [ctx.organizacionId]
+    );
+
+    if (previousUrl && previousUrl.startsWith('/uploads/org-logos/')) {
+      const previousPath = path.join(UPLOADS_ORG_LOGOS_ROOT, path.basename(previousUrl));
+      fs.unlink(previousPath, () => {});
+    }
+
+    return ok(res, { logoUrl: null });
+  } catch (e: any) {
+    return err(res, pgErr(e));
+  }
+}
+
 // GET /api/organizacion/miembros
 export async function getOrganizacionMiembros(req: Request, res: Response) {
   try {

@@ -294,12 +294,16 @@ function DespachoPanel() {
   const [textoLegalFacturas, setTextoLegalFacturas] = useState('');
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [removingLogo, setRemovingLogo] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const [creating, setCreating] = useState(false);
   const [newNombre, setNewNombre] = useState('');
   const [newNifCif, setNewNifCif] = useState('');
   const [newDireccionFiscal, setNewDireccionFiscal] = useState('');
   const [newTextoLegalFacturas, setNewTextoLegalFacturas] = useState('');
+  const [newLogoFile, setNewLogoFile] = useState<File | null>(null);
+  const [newLogoPreview, setNewLogoPreview] = useState<string | null>(null);
+  const newLogoInputRef = useRef<HTMLInputElement>(null);
   const [creatingLoading, setCreatingLoading] = useState(false);
   const [error, setError] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -364,6 +368,38 @@ function DespachoPanel() {
     }
   };
 
+  const removeLogo = async () => {
+    setRemovingLogo(true); setError('');
+    try {
+      const token = await getToken();
+      const res = await fetch('/api/organizacion/logo', {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.success === false) throw new Error(data?.error || 'No se pudo quitar el logotipo.');
+      window.location.reload();
+    } catch (e: any) {
+      setError(e.message || 'No se pudo quitar el logotipo.');
+      setRemovingLogo(false);
+    }
+  };
+
+  const handleNewLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (newLogoPreview) URL.revokeObjectURL(newLogoPreview);
+    setNewLogoFile(file);
+    setNewLogoPreview(URL.createObjectURL(file));
+  };
+
+  const clearNewLogo = () => {
+    if (newLogoPreview) URL.revokeObjectURL(newLogoPreview);
+    setNewLogoFile(null);
+    setNewLogoPreview(null);
+    if (newLogoInputRef.current) newLogoInputRef.current.value = '';
+  };
+
   const createOrg = async () => {
     if (!newNombre.trim()) return;
     setCreatingLoading(true); setError('');
@@ -378,7 +414,26 @@ function DespachoPanel() {
         }),
       });
       if (data?.success === false) throw new Error(data.error);
-      switchOrganizacion(data.data.id);
+      const newOrgId = data.data.id;
+
+      if (newLogoFile) {
+        // La organización aún no es la "activa" -- hay que serlo antes de
+        // subir el logo para que el shim de fetch apunte la cabecera
+        // X-Organizacion-Id a la recién creada y no a la actual.
+        setActiveOrganizacionId(newOrgId);
+        try {
+          const token = await getToken();
+          const formData = new FormData();
+          formData.append('logo', newLogoFile);
+          await fetch('/api/organizacion/logo', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+            body: formData,
+          });
+        } catch { /* la organización ya se creó bien; el logo se puede añadir luego desde Mi Despacho */ }
+      }
+
+      switchOrganizacion(newOrgId);
     } catch (e: any) {
       setError(e.message || 'No se pudo crear la organización.');
       setCreatingLoading(false);
@@ -421,9 +476,20 @@ function DespachoPanel() {
               )}
               <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoChange} className="hidden" />
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-slate-800">Logotipo</p>
               <p className="text-xs text-slate-400 mt-0.5">{canEdit ? 'Pasa el ratón por encima para cambiarlo. Se usará en facturas y documentos.' : 'Solo el propietario o un administrador pueden cambiarlo.'}</p>
+              {canEdit && organizacion?.logoUrl && (
+                <button
+                  type="button"
+                  onClick={removeLogo}
+                  disabled={removingLogo || uploadingLogo}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-700 disabled:opacity-50 mt-1.5"
+                >
+                  {removingLogo ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
+                  Quitar logotipo
+                </button>
+              )}
             </div>
           </div>
 
@@ -516,6 +582,35 @@ function DespachoPanel() {
           </button>
         ) : (
           <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-3">
+            <div className="flex items-center gap-4">
+              <div className="relative shrink-0 group">
+                <div className="h-16 w-16 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden">
+                  {newLogoPreview ? (
+                    <img src={newLogoPreview} alt="Logotipo" className="h-full w-full object-contain" />
+                  ) : (
+                    <Building2 size={22} className="text-slate-300" />
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => newLogoInputRef.current?.click()}
+                  className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/0 group-hover:bg-black/40 text-white opacity-0 group-hover:opacity-100 transition-all"
+                  title="Elegir logotipo"
+                >
+                  <Camera size={16} />
+                </button>
+                <input ref={newLogoInputRef} type="file" accept="image/*" onChange={handleNewLogoChange} className="hidden" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-slate-800">Logotipo <span className="normal-case font-normal text-slate-300">(opcional)</span></p>
+                <p className="text-xs text-slate-400 mt-0.5">Pasa el ratón por encima para elegir una imagen. Si no pones ninguna se usará un icono por defecto.</p>
+                {newLogoPreview && (
+                  <button type="button" onClick={clearNewLogo} className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-700 mt-1">
+                    <Trash2 size={11} /> Quitar
+                  </button>
+                )}
+              </div>
+            </div>
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Nombre</label>
               <input
@@ -552,7 +647,7 @@ function DespachoPanel() {
                 value={newTextoLegalFacturas}
                 onChange={(e) => setNewTextoLegalFacturas(e.target.value)}
                 rows={2}
-                placeholder="Podrás cambiarlo luego, y añadir el logotipo una vez creada"
+                placeholder="Podrás cambiarlo luego desde Mi Despacho"
                 className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-red-300 resize-none"
               />
             </div>
@@ -565,7 +660,7 @@ function DespachoPanel() {
                 {creatingLoading ? <Loader2 size={14} className="animate-spin" /> : 'Crear'}
               </button>
               <button
-                onClick={() => { setCreating(false); setNewNombre(''); setNewNifCif(''); setNewDireccionFiscal(''); setNewTextoLegalFacturas(''); }}
+                onClick={() => { setCreating(false); setNewNombre(''); setNewNifCif(''); setNewDireccionFiscal(''); setNewTextoLegalFacturas(''); clearNewLogo(); }}
                 className="text-sm text-slate-400 hover:text-slate-600 px-2"
               >
                 Cancelar
