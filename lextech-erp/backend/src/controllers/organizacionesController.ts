@@ -13,6 +13,7 @@ export type OrgRol = 'propietario' | 'admin' | 'miembro';
 export interface OrgMembership {
   organizacionId: string;
   organizacionNombre: string;
+  organizacionLogoUrl: string | null;
   rol: OrgRol;
 }
 
@@ -25,14 +26,19 @@ function invalidateUserCache(userId: string) {
 
 async function fetchMemberships(userId: string): Promise<OrgMembership[]> {
   const { rows } = await pool.query(
-    `SELECT m.organizacion_id, o.nombre, m.rol
+    `SELECT m.organizacion_id, o.nombre, o.logo_url, m.rol
        FROM organizacion_miembros m
        JOIN organizaciones o ON o.id = m.organizacion_id
       WHERE m.user_id = $1
       ORDER BY m.created_at ASC`,
     [userId]
   );
-  return rows.map((r) => ({ organizacionId: r.organizacion_id, organizacionNombre: r.nombre, rol: r.rol as OrgRol }));
+  return rows.map((r) => ({
+    organizacionId: r.organizacion_id,
+    organizacionNombre: r.nombre,
+    organizacionLogoUrl: r.logo_url || null,
+    rol: r.rol as OrgRol,
+  }));
 }
 
 // Autoprovisiona al usuario en la organización sembrada la primera vez que se
@@ -129,7 +135,7 @@ export async function getMyOrganizacion(req: Request, res: Response) {
     return ok(res, {
       organizacion,
       rol: activa?.rol || null,
-      organizaciones: memberships.map((m) => ({ id: m.organizacionId, nombre: m.organizacionNombre, rol: m.rol })),
+      organizaciones: memberships.map((m) => ({ id: m.organizacionId, nombre: m.organizacionNombre, logoUrl: m.organizacionLogoUrl, rol: m.rol })),
     });
   } catch (e: any) {
     return err(res, pgErr(e));

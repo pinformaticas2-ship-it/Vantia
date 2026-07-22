@@ -9,12 +9,12 @@ import {
   Menu, Search, X, Bell, ShieldCheck, Calendar,
   MessageCircle, Bot, Send, ChevronRight, ChevronLeft, Loader2, History, CheckCircle2,
   MessageSquare, LogOut, Mail, Library, Receipt, Sparkles, ChevronsUpDown,
-  MoreVertical, RotateCcw, Copy, Check,
+  MoreVertical, RotateCcw, Copy, Check, Crown,
   Pen, AlertTriangle, RefreshCw, Link2, Plus, Trash2, Scale, Gavel, ChevronDown,
   Wallet, CreditCard, Building2, BarChart3, FileText, Calculator,
 } from "lucide-react";
 import { UserButton, useUser, useAuth, useClerk } from "@clerk/clerk-react";
-import { getDeviceId, safeJson, waitForClientIp } from "../lib/api";
+import { getDeviceId, safeJson, waitForClientIp, resolveUploadUrl } from "../lib/api";
 import { useOrganizacion } from "../lib/useOrganizacion";
 import { useChatUnread } from "../contexts/ChatUnreadContext";
 import { useEmailUnread } from "../contexts/EmailUnreadContext";
@@ -920,7 +920,7 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
   const { unreadCount: emailUnreadCount } = useEmailUnread();
   const { unreadCount: waUnreadCount } = useWhatsAppUnread();
   const { isProcessing: isDocProcessing } = useDocumentProcessing();
-  const { organizacion, organizaciones, switchOrganizacion, isLoaded: orgLoaded } = useOrganizacion();
+  const { organizacion, organizaciones, rol: orgRol, switchOrganizacion, isLoaded: orgLoaded } = useOrganizacion();
   const [orgMenuOpen, setOrgMenuOpen] = useState(false);
   const orgMenuRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -961,8 +961,16 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
       <div className={`erp-sidebar-logo-border border-b border-slate-800 shrink-0 transition-all duration-300 ${collapsed ? "px-2 py-3" : "px-3 py-3"}`}>
         {collapsed ? (
           <div className="flex justify-center">
-            <div className="erp-company-icon w-10 h-10 rounded-xl border border-slate-700/60 bg-slate-800/50 flex items-center justify-center cursor-pointer hover:bg-slate-700/50 transition-colors">
-              <img src="/vantia-sidebar-slate.png" alt="Vantia Legis" className="h-6 w-6 object-contain" />
+            <div
+              className="erp-company-icon relative w-10 h-10 rounded-xl border border-slate-700/60 bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center cursor-pointer hover:border-red-500/40 hover:shadow-lg hover:shadow-red-500/10 transition-all duration-200 overflow-hidden"
+              title={organizacion?.nombre || "Vantia Legis"}
+            >
+              {organizacion?.logoUrl ? (
+                <img src={resolveUploadUrl(organizacion.logoUrl) || undefined} alt={organizacion.nombre} className="h-full w-full object-contain p-1.5" />
+              ) : (
+                <img src="/vantia-sidebar-slate.png" alt="Vantia Legis" className="h-6 w-6 object-contain" />
+              )}
+              <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 border-2 border-slate-900" />
             </div>
           </div>
         ) : (
@@ -971,34 +979,47 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
               type="button"
               title="Seleccionar empresa"
               onClick={() => organizaciones.length > 1 && setOrgMenuOpen((v) => !v)}
-              className="erp-company-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-slate-700/60 bg-slate-800/40 hover:bg-slate-700/50 hover:border-slate-600 transition-all duration-200 group"
+              className="erp-company-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-slate-700/60 bg-gradient-to-br from-slate-800/70 to-slate-800/30 hover:border-red-500/30 hover:from-slate-700/60 hover:to-slate-800/40 transition-all duration-200 group shadow-sm"
             >
-              <div className="erp-company-logo w-9 h-9 rounded-lg bg-slate-800 border border-slate-700/50 flex items-center justify-center shrink-0 overflow-hidden">
-                <img src="/vantia-sidebar-slate.png" alt="Vantia Legis" className="h-7 w-7 object-contain" />
+              <div className="erp-company-logo relative w-9 h-9 rounded-lg bg-gradient-to-br from-slate-700 to-slate-800 border border-slate-700/50 flex items-center justify-center shrink-0 overflow-hidden shadow-inner">
+                {organizacion?.logoUrl ? (
+                  <img src={resolveUploadUrl(organizacion.logoUrl) || undefined} alt={organizacion.nombre} className="h-full w-full object-contain p-1" />
+                ) : (
+                  <img src="/vantia-sidebar-slate.png" alt="Vantia Legis" className="h-7 w-7 object-contain" />
+                )}
+                <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-500 border border-slate-900" />
               </div>
               <div className="flex-1 min-w-0 text-left">
-                <p className="erp-company-name text-[11px] font-bold text-slate-200 truncate leading-tight">
+                <p className="erp-company-name text-[11px] font-bold text-slate-100 truncate leading-tight group-hover:text-white transition-colors">
                   {orgLoaded ? (organizacion?.nombre || "Vantia Legis") : "Cargando…"}
                 </p>
-                <p className="erp-company-sub text-[10px] text-slate-500 truncate mt-0.5">
+                <p className="erp-company-sub text-[10px] text-slate-500 truncate mt-0.5 flex items-center gap-1">
+                  {orgRol === 'propietario' && <Crown size={9} className="text-amber-400 shrink-0" />}
                   {organizaciones.length > 1 ? `${organizaciones.length} organizaciones` : "Despacho"}
                 </p>
               </div>
               {organizaciones.length > 1 && (
-                <ChevronsUpDown size={13} className="erp-company-chevron text-slate-600 group-hover:text-slate-400 shrink-0 transition-colors" />
+                <ChevronsUpDown size={13} className={`erp-company-chevron shrink-0 transition-all duration-200 ${orgMenuOpen ? "text-red-400 rotate-180" : "text-slate-600 group-hover:text-slate-400"}`} />
               )}
             </button>
 
             {orgMenuOpen && organizaciones.length > 1 && (
-              <div className="absolute left-0 right-0 top-full mt-1.5 bg-slate-800 border border-slate-700 rounded-xl shadow-xl py-1.5 z-20">
+              <div className="absolute left-0 right-0 top-full mt-1.5 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl shadow-black/40 py-1.5 z-20 overflow-hidden">
                 {organizaciones.map((o) => (
                   <button
                     key={o.id}
                     type="button"
                     onClick={() => { setOrgMenuOpen(false); if (o.id !== organizacion?.id) switchOrganizacion(o.id); }}
-                    className="w-full flex items-center justify-between gap-2 px-3.5 py-2 text-left hover:bg-slate-700/50 transition-colors"
+                    className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-slate-700/50 transition-colors"
                   >
-                    <span className="text-xs font-medium text-slate-200 truncate">{o.nombre}</span>
+                    <div className="w-6 h-6 rounded-md bg-slate-900 border border-slate-700/60 flex items-center justify-center shrink-0 overflow-hidden">
+                      {o.logoUrl ? (
+                        <img src={resolveUploadUrl(o.logoUrl) || undefined} alt={o.nombre} className="h-full w-full object-contain" />
+                      ) : (
+                        <img src="/vantia-sidebar-slate.png" alt="" className="h-4 w-4 object-contain opacity-70" />
+                      )}
+                    </div>
+                    <span className="text-xs font-medium text-slate-200 truncate flex-1">{o.nombre}</span>
                     {o.id === organizacion?.id && <Check size={13} className="text-red-500 shrink-0" />}
                   </button>
                 ))}
