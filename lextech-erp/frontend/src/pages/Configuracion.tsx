@@ -249,7 +249,7 @@ function DeleteOrganizacionModal({ nombre, onClose }: { nombre: string; onClose:
 
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                  Escribe <span className="text-slate-800">{nombre}</span> para confirmar
+                  Escribe <span className="text-slate-800 normal-case">{nombre}</span> para confirmar
                 </label>
                 <input
                   value={typedNombre}
