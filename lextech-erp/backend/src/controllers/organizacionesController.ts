@@ -337,10 +337,18 @@ export async function deleteOrganizacionActiva(req: Request, res: Response) {
       `SELECT user_id FROM organizacion_miembros WHERE organizacion_id = $1`,
       [ctx.organizacionId]
     );
-    // client_invite_links se crea de forma perezosa (ver clientInviteController.ts)
-    // -- puede que todavía no exista en este entorno si nunca se usó "Alta con enlace".
+    // client_invite_links se crea de forma perezosa (ver clientInviteController.ts) --
+    // puede que todavía no exista, o que exista pero sin organizacion_id si nadie
+    // ha usado "Alta con enlace" desde que se añadió esa columna (ensureTable()
+    // solo la añade cuando alguien llama a esas rutas). Comprobar solo la tabla
+    // no basta: hay que asegurar también la columna antes de filtrar por ella.
     const { rows: inviteTableRows } = await client.query(`SELECT to_regclass('client_invite_links') AS reg`);
     const hasInviteTable = Boolean(inviteTableRows[0]?.reg);
+    if (hasInviteTable) {
+      try {
+        await client.query(`ALTER TABLE client_invite_links ADD COLUMN IF NOT EXISTS organizacion_id UUID REFERENCES organizaciones(id);`);
+      } catch (_e: any) {}
+    }
 
     await client.query('BEGIN');
     try {
