@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AlertTriangle, Bell, Building2, Camera, Check, Loader2, Palette, Plug, Plus, ShieldCheck, Trash2, UsersRound, X } from 'lucide-react';
+import { AlertTriangle, Bell, Building2, Camera, Check, Loader2, Lock, Palette, Plug, Plus, ShieldCheck, Trash2, UsersRound, X } from 'lucide-react';
 import { useAuth } from '@clerk/clerk-react';
 import { useTheme, AppTheme } from '../lib/ThemeContext';
 import { apiFetch, resolveUploadUrl, setActiveOrganizacionId } from '../lib/api';
@@ -502,40 +502,45 @@ function DespachoPanel() {
               className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-red-300 disabled:bg-slate-50 disabled:text-slate-400"
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">NIF/CIF</label>
-              <input
-                value={nifCif}
-                onChange={(e) => setNifCif(e.target.value)}
-                disabled={!canEdit}
-                placeholder="B12345678"
-                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-red-300 disabled:bg-slate-50 disabled:text-slate-400"
-              />
+          {canEdit ? (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">NIF/CIF</label>
+                  <input
+                    value={nifCif}
+                    onChange={(e) => setNifCif(e.target.value)}
+                    placeholder="B12345678"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-red-300"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Dirección fiscal</label>
+                  <input
+                    value={direccionFiscal}
+                    onChange={(e) => setDireccionFiscal(e.target.value)}
+                    placeholder="Calle, número, ciudad"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-red-300"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Texto legal para facturas</label>
+                <textarea
+                  value={textoLegalFacturas}
+                  onChange={(e) => setTextoLegalFacturas(e.target.value)}
+                  rows={3}
+                  placeholder="Texto que aparecerá al pie de las facturas (condiciones, aviso legal...)"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-red-300 resize-none"
+                />
+              </div>
+            </>
+          ) : (
+            <div className="flex items-center gap-2.5 rounded-lg border border-slate-100 bg-slate-50 px-3.5 py-3 text-xs text-slate-400">
+              <Lock size={14} className="shrink-0" />
+              Solo el propietario o un administrador pueden ver y editar el NIF/CIF, la dirección fiscal y el texto legal de esta organización.
             </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Dirección fiscal</label>
-              <input
-                value={direccionFiscal}
-                onChange={(e) => setDireccionFiscal(e.target.value)}
-                disabled={!canEdit}
-                placeholder="Calle, número, ciudad"
-                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-red-300 disabled:bg-slate-50 disabled:text-slate-400"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Texto legal para facturas</label>
-            <textarea
-              value={textoLegalFacturas}
-              onChange={(e) => setTextoLegalFacturas(e.target.value)}
-              disabled={!canEdit}
-              rows={3}
-              placeholder="Texto que aparecerá al pie de las facturas (condiciones, aviso legal...)"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-red-300 disabled:bg-slate-50 disabled:text-slate-400 resize-none"
-            />
-          </div>
-          {!canEdit && <p className="text-xs text-slate-400">Solo el propietario o un administrador pueden editar estos datos.</p>}
+          )}
           {error && <p className="text-xs text-red-600">{error}</p>}
           {canEdit && (
             <button

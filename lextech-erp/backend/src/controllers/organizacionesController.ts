@@ -115,6 +115,11 @@ export async function getMyOrganizacion(req: Request, res: Response) {
     const memberships = await resolveUserOrgMemberships(userId);
     const activa = memberships.find((m) => m.organizacionId === ctx.organizacionId) || memberships[0];
 
+    // Los datos fiscales/legales (NIF, dirección, texto de facturas) solo
+    // los puede VER (no solo editar) el propietario o un administrador --
+    // un miembro normal no debe poder consultarlos ni por API directa.
+    const canSeeCredenciales = activa?.rol === 'propietario' || activa?.rol === 'admin';
+
     let organizacion = null;
     if (activa) {
       const { rows } = await pool.query(
@@ -125,10 +130,10 @@ export async function getMyOrganizacion(req: Request, res: Response) {
       organizacion = org ? {
         id: org.id,
         nombre: org.nombre,
-        nifCif: org.nif_cif,
-        direccionFiscal: org.direccion_fiscal,
         logoUrl: org.logo_url,
-        textoLegalFacturas: org.texto_legal_facturas,
+        nifCif: canSeeCredenciales ? org.nif_cif : null,
+        direccionFiscal: canSeeCredenciales ? org.direccion_fiscal : null,
+        textoLegalFacturas: canSeeCredenciales ? org.texto_legal_facturas : null,
       } : { id: activa.organizacionId, nombre: activa.organizacionNombre };
     }
 
