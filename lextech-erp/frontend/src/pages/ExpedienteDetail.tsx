@@ -44,6 +44,7 @@ import {
   TrendingDown,
   BadgeEuro,
   ChevronRight,
+  ChevronLeft,
   Copy,
   ClipboardPaste,
   Lock,
@@ -4852,6 +4853,15 @@ function PanelIndicadoresExpediente({ expedienteId, onTabChange }: { expedienteI
   const { getToken } = useAuth();
   const [ind, setInd] = useState<any>(null);
   const [error, setError] = useState('');
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem('exp_indicadores_collapsed') === '1');
+
+  const toggleCollapsed = () => {
+    setCollapsed(prev => {
+      const next = !prev;
+      localStorage.setItem('exp_indicadores_collapsed', next ? '1' : '0');
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!expedienteId) return;
@@ -4873,8 +4883,31 @@ function PanelIndicadoresExpediente({ expedienteId, onTabChange }: { expedienteI
   const fmtMoney = (v: number | null | undefined) =>
     v == null ? '—' : new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(v);
 
+  if (collapsed) {
+    return (
+      <aside className="relative w-4 shrink-0 flex flex-col min-h-0 transition-all duration-200">
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          title="Mostrar indicadores"
+          className="absolute -left-3 top-3 z-10 h-6 w-6 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-400 hover:text-red-600 hover:border-red-200 transition-colors"
+        >
+          <ChevronLeft size={12} />
+        </button>
+      </aside>
+    );
+  }
+
   return (
-    <aside className="w-52 shrink-0 flex flex-col min-h-0">
+    <aside className="relative w-52 shrink-0 flex flex-col min-h-0 transition-all duration-200">
+      <button
+        type="button"
+        onClick={toggleCollapsed}
+        title="Ocultar indicadores"
+        className="absolute -left-3 top-3 z-10 h-6 w-6 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-400 hover:text-red-600 hover:border-red-200 transition-colors"
+      >
+        <ChevronRight size={12} />
+      </button>
       <div className="bg-white border border-slate-200 rounded-xl overflow-y-auto flex-1 min-h-0">
         <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100">
           <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Indicadores</h3>
