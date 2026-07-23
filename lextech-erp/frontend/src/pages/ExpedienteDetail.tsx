@@ -2821,9 +2821,9 @@ function ActuacionModal({
   ].filter(Boolean).join("\n");
 
   return createPortal(
-    <div className="fixed inset-0 z-[140] flex items-center justify-center bg-transparent p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[140] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-overlay-in" onClick={onClose}>
       <div
-        className="w-full max-w-[1500px] flex flex-col overflow-hidden rounded-3xl bg-white border border-slate-200 shadow-2xl"
+        className="w-full max-w-[1500px] flex flex-col overflow-hidden rounded-3xl bg-white border border-slate-200 shadow-2xl animate-modal-in"
         style={{ height: "92vh" }}
         onClick={(e) => e.stopPropagation()}
       >
