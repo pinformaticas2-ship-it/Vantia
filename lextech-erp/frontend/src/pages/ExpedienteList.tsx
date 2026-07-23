@@ -4254,7 +4254,6 @@ function CounterConfigModal({ onClose, getToken }: { onClose: () => void; getTok
   const [formError,   setFormError]   = useState("");
   const [saving, setSaving] = useState(false);
   const [savedOk, setSavedOk] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Carga rápida de la lista de años
   useEffect(() => {
@@ -4489,6 +4488,7 @@ export default function ExpedienteList() {
   const [error,    setError]    = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [refreshSpin, setRefreshSpin] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Filtros
   const [filters, setFilters] = useState<ActiveFilter[]>([
