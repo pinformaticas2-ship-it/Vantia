@@ -234,6 +234,47 @@ function fmtHour(h: number): string {
   return `${h - 12} PM`;
 }
 
+// Cuando varios eventos del día se solapan en el tiempo, antes se dibujaban
+// todos a ancho completo uno encima de otro (texto ilegible superpuesto).
+// Este algoritmo agrupa los eventos en "clusters" de solape mutuo y les
+// asigna una columna dentro del cluster (primera libre, estilo Google
+// Calendar/Outlook), para poder pintarlos lado a lado en vez de apilados.
+interface OverlapLayoutItem { key: string; startMs: number; endMs: number }
+interface OverlapLayoutResult { col: number; colCount: number }
+function layoutOverlappingEvents(items: OverlapLayoutItem[]): Map<string, OverlapLayoutResult> {
+  const sorted = [...items].sort((a, b) => a.startMs - b.startMs || a.endMs - b.endMs);
+  const result = new Map<string, OverlapLayoutResult>();
+  let cluster: OverlapLayoutItem[] = [];
+  let clusterEnd = -Infinity;
+
+  const flushCluster = () => {
+    if (!cluster.length) return;
+    const colEnds: number[] = []; // fin (ms) del último evento colocado en cada columna
+    const placed: { item: OverlapLayoutItem; col: number }[] = [];
+    for (const item of cluster) {
+      let col = colEnds.findIndex((end) => end <= item.startMs);
+      if (col === -1) { col = colEnds.length; colEnds.push(item.endMs); }
+      else { colEnds[col] = item.endMs; }
+      placed.push({ item, col });
+    }
+    const colCount = colEnds.length;
+    for (const { item, col } of placed) result.set(item.key, { col, colCount });
+    cluster = [];
+  };
+
+  for (const item of sorted) {
+    if (cluster.length && item.startMs >= clusterEnd) {
+      flushCluster();
+      clusterEnd = -Infinity;
+    }
+    cluster.push(item);
+    clusterEnd = Math.max(clusterEnd, item.endMs);
+  }
+  flushCluster();
+
+  return result;
+}
+
 function getMondayOfWeek(dateStr: string): Date {
   const d = new Date(dateStr + "T12:00:00");
   const dow = d.getDay();
@@ -2386,6 +2427,21 @@ function TimeGridView({
             const isToday = dateStr === todayStr;
             const timedEvs = (eventsByDay[dateStr] || []).filter(ev => !ev.all_day);
             const timedGcal = (gcalEventsByDay[dateStr] || []).filter(ev => !!ev.start.dateTime);
+            // Layout conjunto (propios + Google) para que un evento LexTech y
+            // uno de Google que se solapen también se repartan el ancho entre
+            // los dos, en vez de solo evitarse dentro de su propia lista.
+            const overlapLayout = layoutOverlappingEvents([
+              ...timedEvs.map(ev => {
+                const start = new Date(ev.start_at).getTime();
+                const end = ev.end_at ? new Date(ev.end_at).getTime() : start + 3600000;
+                return { key: `own-${ev.id}`, startMs: start, endMs: Math.max(end, start + 1) };
+              }),
+              ...timedGcal.map(ev => {
+                const start = new Date(ev.start.dateTime as string).getTime();
+                const end = ev.end.dateTime ? new Date(ev.end.dateTime).getTime() : start + 3600000;
+                return { key: `gcal-${ev.id}`, startMs: start, endMs: Math.max(end, start + 1) };
+              }),
+            ]);
             return (
               <div key={dateStr} ref={el => { columnRefsMap.current.set(dateStr, el); }} className="flex-1 border-r border-gray-200 relative">
                 {/* Celdas de hora (clic o arrastre para crear) */}
@@ -2527,6 +2583,9 @@ function TimeGridView({
                   const durationH = Math.max((end.getTime() - start.getTime()) / 3600000, 0.25);
                   const heightPx = durationH * HOUR_HEIGHT - 2;
                   const evColor = getEventColor(ev);
+                  const { col, colCount } = overlapLayout.get(`own-${ev.id}`) || { col: 0, colCount: 1 };
+                  const leftPct = (col / colCount) * 100;
+                  const widthPct = 100 / colCount;
                   return (
                     <div
                       key={ev.id}
@@ -2550,8 +2609,11 @@ function TimeGridView({
                         dragDisplayRef.current = initDd;
                         setDragDisplay(initDd);
                       }}
-                      className={`absolute left-1 right-1 rounded px-2 py-1 text-[11px] font-medium text-white overflow-visible shadow-sm group/ev ${movingEventId === ev.id || isDragging ? "opacity-40" : isResizing ? "brightness-110 shadow-lg" : "hover:brightness-110 hover:shadow-md"} transition-all duration-150 select-none ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
-                      style={{ top: topPx, height: heightPx, zIndex: isResizing ? 30 : 10, backgroundColor: evColor }}
+                      className={`absolute rounded px-2 py-1 text-[11px] font-medium text-white overflow-visible shadow-sm group/ev ${movingEventId === ev.id || isDragging ? "opacity-40" : isResizing ? "brightness-110 shadow-lg" : "hover:brightness-110 hover:shadow-md"} transition-all duration-150 select-none ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
+                      style={{
+                        top: topPx, height: heightPx, zIndex: isResizing ? 30 : (10 + col), backgroundColor: evColor,
+                        left: `calc(${leftPct}% + 3px)`, width: `calc(${widthPct}% - 6px)`,
+                      }}
                     >
                       {isResizing ? (
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden">
@@ -2590,12 +2652,18 @@ function TimeGridView({
                   const topPx = (start.getHours() + start.getMinutes() / 60) * HOUR_HEIGHT;
                   const durationH = Math.max((end.getTime() - start.getTime()) / 3600000, 0.33);
                   const heightPx = durationH * HOUR_HEIGHT - 2;
+                  const { col, colCount } = overlapLayout.get(`gcal-${ev.id}`) || { col: 0, colCount: 1 };
+                  const leftPct = (col / colCount) * 100;
+                  const widthPct = 100 / colCount;
                   return (
                     <div
                       key={ev.id}
                       onClick={e => { e.stopPropagation(); onGcalEventClick(ev, { x: e.clientX, y: e.clientY }); }}
-                      className="absolute left-1 right-1 rounded px-2 py-1 text-[11px] font-medium text-white cursor-pointer overflow-hidden shadow-sm bg-blue-500 hover:bg-blue-600 hover:shadow-md transition-all duration-150"
-                      style={{ top: topPx, height: heightPx, zIndex: 10 }}
+                      className="absolute rounded px-2 py-1 text-[11px] font-medium text-white cursor-pointer overflow-hidden shadow-sm bg-blue-500 hover:bg-blue-600 hover:shadow-md transition-all duration-150"
+                      style={{
+                        top: topPx, height: heightPx, zIndex: 10 + col,
+                        left: `calc(${leftPct}% + 3px)`, width: `calc(${widthPct}% - 6px)`,
+                      }}
                     >
                       <div className="font-semibold truncate leading-tight">{ev.summary}</div>
                       <div className="text-white/80 text-[10px] leading-tight">
