@@ -105,7 +105,7 @@ function requestGoogleCalendarToken(): Promise<string> {
   });
 }
 
-async function createGoogleMeetEvent(token: string, data: { title: string; description?: string | null; start_at: string; end_at: string }) {
+async function createGoogleMeetEvent(token: string, data: { title: string; description?: string | null; start_at: string; end_at: string; guestEmail?: string | null }) {
   const res = await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1", {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -120,6 +120,9 @@ async function createGoogleMeetEvent(token: string, data: { title: string; descr
           conferenceSolutionKey: { type: "hangoutsMeet" },
         },
       },
+      // Sin esto el correo queda guardado en el ERP pero Google Calendar
+      // nunca le manda la invitación con el enlace de Meet al invitado.
+      ...(data.guestEmail?.trim() ? { attendees: [{ email: data.guestEmail.trim() }] } : {}),
     }),
   });
   const json = await safeJson(res);
@@ -5172,7 +5175,7 @@ export default function ExpedienteDetail() {
   const [agendaLoading, setAgendaLoading] = useState(false);
   const [showAgendaForm, setShowAgendaForm] = useState(false);
   const [agendaSaving, setAgendaSaving] = useState(false);
-  const [agendaForm, setAgendaForm] = useState({ title: "", type: "cita", start_at: "", end_at: "", all_day: false, description: "", status: "pendiente", with_meet: false });
+  const [agendaForm, setAgendaForm] = useState({ title: "", type: "cita", start_at: "", end_at: "", all_day: false, description: "", status: "pendiente", with_meet: false, guest_email: "" });
   // Reutiliza la misma sesion de Google Calendar que el modulo Agenda (mismo
   // sessionStorage) -- si ya se conecto alli, aqui funciona sin volver a pedir permiso.
   const [gcalToken, setGcalToken] = useState<string | null>(() => {
@@ -6218,6 +6221,7 @@ export default function ExpedienteDetail() {
                         description: body.description,
                         start_at: startAt,
                         end_at: endAt || startAt,
+                        guestEmail: agendaForm.guest_email,
                       });
                       const meetUrl = googleCreated?.hangoutLink
                         || googleCreated?.conferenceData?.entryPoints?.[0]?.uri
@@ -6243,7 +6247,7 @@ export default function ExpedienteDetail() {
 
                   setAgendaEvents(prev => [savedEvent, ...(prev || [])]);
                   setShowAgendaForm(false);
-                  setAgendaForm({ title: "", type: "cita", start_at: "", end_at: "", all_day: false, description: "", status: "pendiente", with_meet: false });
+                  setAgendaForm({ title: "", type: "cita", start_at: "", end_at: "", all_day: false, description: "", status: "pendiente", with_meet: false, guest_email: linkedClient?.email || "" });
                 } finally {
                   setAgendaSaving(false);
                 }
@@ -6263,7 +6267,7 @@ export default function ExpedienteDetail() {
                             onClick={() => {
                               const now = new Date();
                               const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-                              setAgendaForm(f => ({ ...f, start_at: local }));
+                              setAgendaForm(f => ({ ...f, start_at: local, guest_email: f.guest_email || linkedClient?.email || "" }));
                               setShowAgendaForm(v => !v);
                             }}
                             className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
@@ -6342,6 +6346,18 @@ export default function ExpedienteDetail() {
                               )
                             )}
                           </div>
+                          {agendaForm.with_meet && (
+                            <div className="sm:col-span-2">
+                              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Invitar por correo (opcional)</label>
+                              <input
+                                type="email"
+                                value={agendaForm.guest_email}
+                                onChange={e => setAgendaForm(f => ({ ...f, guest_email: e.target.value }))}
+                                placeholder="correo@ejemplo.com"
+                                className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-red-400 bg-white mt-1"
+                              />
+                            </div>
+                          )}
                           {gcalError && <p className="sm:col-span-2 text-[11px] text-red-500">{gcalError}</p>}
                           <div>
                             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Inicio *</label>
