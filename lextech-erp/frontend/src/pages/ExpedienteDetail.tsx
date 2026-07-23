@@ -4849,19 +4849,15 @@ function initialsFromName(name?: string | null) {
 }
 
 // ── Panel lateral de indicadores del expediente ───────────────
-function PanelIndicadoresExpediente({ expedienteId, onTabChange }: { expedienteId: string; onTabChange: (tab: string) => void }) {
+function PanelIndicadoresExpediente({ expedienteId, onTabChange, collapsed, onToggleCollapsed }: {
+  expedienteId: string;
+  onTabChange: (tab: string) => void;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
+}) {
   const { getToken } = useAuth();
   const [ind, setInd] = useState<any>(null);
   const [error, setError] = useState('');
-  const [collapsed, setCollapsed] = useState(() => localStorage.getItem('exp_indicadores_collapsed') === '1');
-
-  const toggleCollapsed = () => {
-    setCollapsed(prev => {
-      const next = !prev;
-      localStorage.setItem('exp_indicadores_collapsed', next ? '1' : '0');
-      return next;
-    });
-  };
 
   useEffect(() => {
     if (!expedienteId) return;
@@ -4888,7 +4884,7 @@ function PanelIndicadoresExpediente({ expedienteId, onTabChange }: { expedienteI
       <aside className="relative w-4 shrink-0 flex flex-col min-h-0 transition-all duration-200">
         <button
           type="button"
-          onClick={toggleCollapsed}
+          onClick={onToggleCollapsed}
           title="Mostrar indicadores"
           className="absolute -left-3 top-3 z-10 h-6 w-6 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-400 hover:text-red-600 hover:border-red-200 transition-colors"
         >
@@ -4902,7 +4898,7 @@ function PanelIndicadoresExpediente({ expedienteId, onTabChange }: { expedienteI
     <aside className="relative w-52 shrink-0 flex flex-col min-h-0 transition-all duration-200">
       <button
         type="button"
-        onClick={toggleCollapsed}
+        onClick={onToggleCollapsed}
         title="Ocultar indicadores"
         className="absolute -left-3 top-3 z-10 h-6 w-6 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-400 hover:text-red-600 hover:border-red-200 transition-colors"
       >
@@ -5183,6 +5179,14 @@ export default function ExpedienteDetail() {
     try { return sessionStorage.getItem(GCAL_TOKEN_KEY); } catch { return null; }
   });
   const [gcalError, setGcalError] = useState<string | null>(null);
+  const [indCollapsed, setIndCollapsed] = useState(() => localStorage.getItem('exp_indicadores_collapsed') === '1');
+  const toggleIndCollapsed = () => {
+    setIndCollapsed(prev => {
+      const next = !prev;
+      localStorage.setItem('exp_indicadores_collapsed', next ? '1' : '0');
+      return next;
+    });
+  };
   const [notificaciones, setNotificaciones] = useState<any[] | null>(null);
   const [notifLoading, setNotifLoading] = useState(false);
   const [historial, setHistorial] = useState<any[] | null>(null);
@@ -6447,10 +6451,15 @@ export default function ExpedienteDetail() {
 
           {/* Columna 3: Panel indicadores */}
           {id && (
-            <div className={`anim-fade-up w-full flex-shrink-0 ${isCollapsed ? "md:w-[280px] md:sticky md:top-6" : "lg:w-[280px] xl:w-[300px] lg:sticky lg:top-6"}`} style={{ animationDelay: '200ms' }}>
+            <div
+              className={`anim-fade-up w-full flex-shrink-0 ${indCollapsed ? "!w-4" : ""} ${isCollapsed ? "md:w-[280px] md:sticky md:top-6" : "lg:w-[280px] xl:w-[300px] lg:sticky lg:top-6"}`}
+              style={{ animationDelay: '200ms' }}
+            >
               <PanelIndicadoresExpediente
                 expedienteId={id}
                 onTabChange={(t) => setTab(t as any)}
+                collapsed={indCollapsed}
+                onToggleCollapsed={toggleIndCollapsed}
               />
             </div>
           )}
