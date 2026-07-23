@@ -236,16 +236,21 @@ function fmtHour(h: number): string {
 
 // Cuando varios eventos del día se solapan en el tiempo, antes se dibujaban
 // todos a ancho completo uno encima de otro (texto ilegible superpuesto).
-// Este algoritmo agrupa los eventos en "clusters" de solape mutuo y les
+// Este algoritmo agrupa los eventos en "clusters" de solape mutuo, les
 // asigna una columna dentro del cluster (primera libre, estilo Google
-// Calendar/Outlook), para poder pintarlos lado a lado en vez de apilados.
+// Calendar/Outlook) y además deja que cada evento se EXPANDA hacia las
+// columnas contiguas con las que ya no solapa de verdad (p. ej. si a las
+// 3pm ya terminaron los eventos de las columnas de al lado, el que sigue
+// activo ocupa ese hueco en vez de quedarse encogido en su columna original).
 interface OverlapLayoutItem { key: string; startMs: number; endMs: number }
-interface OverlapLayoutResult { col: number; colCount: number }
+interface OverlapLayoutResult { col: number; colCount: number; span: number }
 function layoutOverlappingEvents(items: OverlapLayoutItem[]): Map<string, OverlapLayoutResult> {
   const sorted = [...items].sort((a, b) => a.startMs - b.startMs || a.endMs - b.endMs);
   const result = new Map<string, OverlapLayoutResult>();
   let cluster: OverlapLayoutItem[] = [];
   let clusterEnd = -Infinity;
+
+  const overlaps = (a: OverlapLayoutItem, b: OverlapLayoutItem) => a.startMs < b.endMs && b.startMs < a.endMs;
 
   const flushCluster = () => {
     if (!cluster.length) return;
@@ -258,7 +263,15 @@ function layoutOverlappingEvents(items: OverlapLayoutItem[]): Map<string, Overla
       placed.push({ item, col });
     }
     const colCount = colEnds.length;
-    for (const { item, col } of placed) result.set(item.key, { col, colCount });
+    for (const { item, col } of placed) {
+      let span = 1;
+      for (let c = col + 1; c < colCount; c++) {
+        const blocked = placed.some((p) => p.col === c && overlaps(p.item, item));
+        if (blocked) break;
+        span++;
+      }
+      result.set(item.key, { col, colCount, span });
+    }
     cluster = [];
   };
 
@@ -2583,9 +2596,9 @@ function TimeGridView({
                   const durationH = Math.max((end.getTime() - start.getTime()) / 3600000, 0.25);
                   const heightPx = durationH * HOUR_HEIGHT - 2;
                   const evColor = getEventColor(ev);
-                  const { col, colCount } = overlapLayout.get(`own-${ev.id}`) || { col: 0, colCount: 1 };
+                  const { col, colCount, span } = overlapLayout.get(`own-${ev.id}`) || { col: 0, colCount: 1, span: 1 };
                   const leftPct = (col / colCount) * 100;
-                  const widthPct = 100 / colCount;
+                  const widthPct = (span / colCount) * 100;
                   return (
                     <div
                       key={ev.id}
@@ -2652,9 +2665,9 @@ function TimeGridView({
                   const topPx = (start.getHours() + start.getMinutes() / 60) * HOUR_HEIGHT;
                   const durationH = Math.max((end.getTime() - start.getTime()) / 3600000, 0.33);
                   const heightPx = durationH * HOUR_HEIGHT - 2;
-                  const { col, colCount } = overlapLayout.get(`gcal-${ev.id}`) || { col: 0, colCount: 1 };
+                  const { col, colCount, span } = overlapLayout.get(`gcal-${ev.id}`) || { col: 0, colCount: 1, span: 1 };
                   const leftPct = (col / colCount) * 100;
-                  const widthPct = 100 / colCount;
+                  const widthPct = (span / colCount) * 100;
                   return (
                     <div
                       key={ev.id}
