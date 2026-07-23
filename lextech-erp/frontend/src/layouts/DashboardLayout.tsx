@@ -611,36 +611,47 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
           como una pastilla que solo asoma una esquina; al pasar el ratón (o
           en cuanto hay una respuesta en curso) sale entero y se redondea en
           círculo. El pulso rojo solo se muestra mientras está trabajando; el
-          punto ámbar de la esquina avisa de una respuesta lista que aún no
-          se ha visto. */}
-      <button
-        onClick={() => setOpen((v) => !v)}
-        title="VantIA — Asistente IA"
-        className={`group fixed bottom-6 right-0 z-50 h-14 w-14 shadow-xl flex items-center justify-center transition-all duration-300 ease-out active:scale-90 ${
-          open || loading
-            ? "-translate-x-6 rounded-full"
-            : "translate-x-[22px] rounded-2xl hover:-translate-x-6 hover:rounded-full"
-        } ${
-          open
-            ? "bg-neutral-800 shadow-neutral-900/30 rotate-90"
-            : "bg-red-600 shadow-red-700/30 hover:shadow-red-700/50"
-        }`}
-      >
-        {!open && loading && (
-          <span className="absolute inset-0 rounded-full bg-red-500/40 animate-ping [animation-duration:1.2s]" />
-        )}
+          punto verde de la esquina avisa de una respuesta lista que aún no
+          se ha visto.
+          — El área de hover es más grande que el propio botón (el div que
+            envuelve, no el botón), para no depender de acertar justo en la
+            porción visible de 34px cuando está pegado al borde.
+          — El radio de la forma "abierta" se fija en 28px (mitad de 56px)
+            en vez de usar rounded-full (9999px): con un valor tan grande,
+            el navegador interpola linealmente hacia 9999 pero el radio
+            renderizado se clampa a la mitad de la caja casi al instante,
+            así que la transición de forma se veía como un salto en vez de
+            un morph gradual. */}
+      <div className="group fixed bottom-2 right-0 z-50 h-24 w-28 flex items-end justify-end pb-4">
+        <button
+          onClick={() => setOpen((v) => !v)}
+          title="VantIA — Asistente IA"
+          className={`relative h-14 w-14 shadow-xl flex items-center justify-center transition-all duration-300 ease-out active:scale-90 ${
+            open || loading
+              ? "-translate-x-6 rounded-[28px]"
+              : "translate-x-[22px] rounded-2xl group-hover:-translate-x-6 group-hover:rounded-[28px]"
+          } ${
+            open
+              ? "bg-neutral-800 shadow-neutral-900/30 rotate-90"
+              : "bg-red-600 shadow-red-700/30 group-hover:shadow-red-700/50"
+          }`}
+        >
+          {!open && loading && (
+            <span className="absolute inset-0 rounded-[28px] bg-red-500/40 animate-ping [animation-duration:1.2s]" />
+          )}
 
-        {!open && hasUnseenResponse && (
-          <span className="absolute -top-1 -left-1 flex h-3.5 w-3.5">
-            <span className="absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75 animate-ping" />
-            <span className="relative inline-flex h-3.5 w-3.5 rounded-full bg-amber-400 border-2 border-white" />
+          {!open && hasUnseenResponse && (
+            <span className="absolute -top-1 -left-1 flex h-3.5 w-3.5">
+              <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
+              <span className="relative inline-flex h-3.5 w-3.5 rounded-full bg-emerald-400 border-2 border-white" />
+            </span>
+          )}
+
+          <span className={`relative transition-transform duration-200 ${open ? "-rotate-90" : ""}`}>
+            {open ? <X size={18} className="text-white" /> : <Bot size={22} className="text-white" />}
           </span>
-        )}
-
-        <span className={`relative transition-transform duration-200 ${open ? "-rotate-90" : ""}`}>
-          {open ? <X size={18} className="text-white" /> : <Bot size={22} className="text-white" />}
-        </span>
-      </button>
+        </button>
+      </div>
     </>
   );
 }
