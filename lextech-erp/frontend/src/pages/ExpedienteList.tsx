@@ -4254,6 +4254,7 @@ function CounterConfigModal({ onClose, getToken }: { onClose: () => void; getTok
   const [formError,   setFormError]   = useState("");
   const [saving, setSaving] = useState(false);
   const [savedOk, setSavedOk] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Carga rápida de la lista de años
   useEffect(() => {
@@ -4510,6 +4511,7 @@ export default function ExpedienteList() {
     const mode = searchParams.get("mode");
     if (searchParams.get("nuevo") === "1") {
       setEditItem(null);
+      setSaveError(null);
       setShowModal(true);
       setSearchParams(prev => { prev.delete("nuevo"); return prev; }, { replace: true });
     } else if (mode === "csv") {
@@ -4723,6 +4725,7 @@ export default function ExpedienteList() {
   const openManualCreate = () => {
     setShowAltaMenu(false);
     setEditItem(null);
+    setSaveError(null);
     setShowModal(true);
   };
 
@@ -5282,7 +5285,7 @@ export default function ExpedienteList() {
 
   // ── CRUD ──────────────────────────────────────────────────────
   const handleSave = async (form: typeof EXP_EMPTY) => {
-    setSaving(true);
+    setSaving(true); setSaveError(null);
     try {
       const token = await getToken({ skipCache: true });
       const isEdit = !!editItem?.id;
@@ -5293,10 +5296,10 @@ export default function ExpedienteList() {
         body: JSON.stringify(payload),
       });
       const d = await safeJson(res);
-      if (!res.ok) { alert(d.error || "Error al guardar"); return; }
+      if (!res.ok) { setSaveError(d.error || "No se pudo guardar el expediente."); return; }
       setShowModal(false); setEditItem(null);
       fetchExpedientes(true);
-    } catch (e: any) { alert(e.message); }
+    } catch (e: any) { setSaveError(e.message || "No se pudo guardar el expediente."); }
     finally { setSaving(false); }
   };
 
@@ -6383,8 +6386,9 @@ export default function ExpedienteList() {
           } as typeof EXP_EMPTY : EXP_EMPTY}
           clientes={clientes}
           onSave={handleSave}
-          onClose={() => { setShowModal(false); setEditItem(null); }}
+          onClose={() => { setShowModal(false); setEditItem(null); setSaveError(null); }}
           saving={saving}
+          error={saveError}
           onClienteCreated={(cliente) => setClientes((prev) => [...prev, cliente])}
         />
       )}
@@ -6708,7 +6712,7 @@ export default function ExpedienteList() {
                             : "No hay expedientes todavía"}
                         </p>
                         {!hasActiveFilters && filters.length === 1 && (
-                          <button onClick={() => setShowModal(true)}
+                          <button onClick={() => { setEditItem(null); setSaveError(null); setShowModal(true); }}
                             className="text-red-600 text-xs font-bold hover:underline">
                             + Crear el primer expediente
                           </button>

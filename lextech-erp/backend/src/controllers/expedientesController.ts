@@ -34,15 +34,47 @@ function nullableNumeric(value: any) {
   return value;
 }
 
+// Nombres legibles de las columnas de "expedientes" que tienen restricción
+// NOT NULL, para poder señalar el campo exacto que falta en vez de un
+// mensaje genérico.
+const EXPEDIENTE_FIELD_LABELS: Record<string, string> = {
+  anio: 'Año', num_exp: 'Número de expediente', descripcion: 'Descripción',
+  cliente_id: 'Cliente', tipo: 'Tipo de expediente', estado: 'Estado',
+  organizacion_id: 'Organización',
+};
+
 function friendlyExpedienteError(e: any) {
   const raw = String(e?.message || '');
+
   if (e?.code === '22P02' && /type numeric/i.test(raw)) {
-    return 'No se pudo actualizar el expediente porque algún importe o número relacionado venía vacío o con formato inválido.';
+    return 'No se pudo guardar el expediente porque algún importe o número relacionado venía vacío o con formato inválido.';
   }
   if (e?.code === '22P02' && /date/i.test(raw)) {
-    return 'No se pudo actualizar el expediente porque alguna fecha no tiene un formato válido.';
+    return 'No se pudo guardar el expediente porque alguna fecha no tiene un formato válido.';
   }
-  return raw || 'Error al guardar el expediente';
+  if (e?.code === '23502') { // not_null_violation -- pg expone la columna exacta en e.column
+    const campo = EXPEDIENTE_FIELD_LABELS[e.column as string] || 'un campo obligatorio';
+    return `Falta rellenar el campo obligatorio "${campo}".`;
+  }
+  if (e?.code === '23505') { // unique_violation
+    return 'Ya existe un expediente con ese mismo número para este año. Prueba a cambiar el número o deja que se asigne automáticamente.';
+  }
+  if (e?.code === '23503') { // foreign_key_violation
+    return 'El cliente seleccionado no es válido o ya no existe. Actualiza la página e inténtalo de nuevo.';
+  }
+
+  // Error inesperado (típicamente un bug de programación, no algo que el
+  // usuario haya hecho mal): no le enseñamos el mensaje técnico de Postgres
+  // -- solo queda en el log del servidor para poder diagnosticarlo.
+  console.error('❌ expedientesController:', raw, e?.code ? `| code: ${e.code}` : '');
+  return 'No se pudo guardar el expediente por un error inesperado. Inténtalo de nuevo; si persiste, contacta con soporte.';
+}
+
+// Códigos de Postgres que son "culpa" de los datos enviados (400, corregible
+// por el usuario) frente a un fallo inesperado del servidor (500).
+const EXPEDIENTE_CLIENT_ERROR_CODES = new Set(['22P02', '23502', '23505', '23503']);
+function expedienteHttpStatus(e: any): number {
+  return EXPEDIENTE_CLIENT_ERROR_CODES.has(e?.code) ? 400 : 500;
 }
 
 function normalizeExpedienteRelationPair(a: string, b: string): [string, string] {
@@ -582,7 +614,7 @@ export const createExpediente = async (req: any, res: Response) => {
               indeterminado, etapa, persona_contacto, contacto, centro, color,
               procurador_contrario, abogado_propio, abogado_contrario,
               created_by, organizacion_id)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35)
            RETURNING *`,
           [
             yr, numExp,
@@ -624,7 +656,7 @@ export const createExpediente = async (req: any, res: Response) => {
     logActivityForReq(req, `Expediente creado: ${yr}/${numExp} - ${descripcion || ''}`, 'EXPEDIENTE', r.rows[0].id);
     res.status(201).json({ data: r.rows[0] });
   } catch (e: any) {
-    res.status(e?.code === '22P02' ? 400 : 500).json({ error: friendlyExpedienteError(e) });
+    res.status(expedienteHttpStatus(e)).json({ error: friendlyExpedienteError(e) });
   }
 };
 
@@ -703,7 +735,7 @@ export const updateExpediente = async (req: any, res: Response) => {
     logActivityForReq(req, `Expediente actualizado: ${label}`, 'EXPEDIENTE', exp.id, 'UPDATE' as any);
     res.json({ data: exp });
   } catch (e: any) {
-    res.status(e?.code === '22P02' ? 400 : 500).json({ error: friendlyExpedienteError(e) });
+    res.status(expedienteHttpStatus(e)).json({ error: friendlyExpedienteError(e) });
   }
 };
 
@@ -735,7 +767,7 @@ export const linkExpedienteCliente = async (req: any, res: Response) => {
     logActivityForReq(req, `Expediente vinculado a cliente: ${label} → ${nombre}`, 'EXPEDIENTE', exp.id, 'UPDATE' as any);
     res.json({ data: exp });
   } catch (e: any) {
-    res.status(e?.code === '22P02' ? 400 : 500).json({ error: friendlyExpedienteError(e) });
+    res.status(expedienteHttpStatus(e)).json({ error: friendlyExpedienteError(e) });
   }
 };
 

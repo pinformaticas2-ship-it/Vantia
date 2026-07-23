@@ -477,7 +477,7 @@ export function AdjuntosPanel({ entityId, entityName, onOpenFull }: {
 }
 
 // ── Modal de alta / edición ───────────────────────────────────
-export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, saving, onClienteCreated }: {
+export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, saving, onClienteCreated, error }: {
   initial: typeof EXP_EMPTY;
   editId?: string;
   clientes: any[];
@@ -485,6 +485,7 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
   onClose: () => void;
   saving: boolean;
   onClienteCreated?: (cliente: any) => void;
+  error?: string | null;
 }) {
   const { getToken } = useAuth();
   const [form, setForm]       = useState(initial);
@@ -497,6 +498,10 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
     set("cliente_id", id);
     set("cliente_nombre", c ? `${c.first_name || ""} ${c.last_name || ""}`.trim() : "");
   };
+
+  const missingFields: string[] = [];
+  if (!form.descripcion.trim()) missingFields.push("la descripción");
+  if (!form.cliente_id) missingFields.push("el cliente");
 
   // ── Alta rápida de cliente sin salir del formulario del expediente ──
   const [showNewCliente, setShowNewCliente]         = useState(false);
@@ -570,14 +575,22 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={() => onSave(form)}
-            disabled={saving || !form.descripcion.trim() || !form.cliente_id}
-            className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-40 border border-red-700 rounded-md shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-red-500/50 active:scale-[0.98]"
-          >
-            {saving && <Loader2 size={13} className="animate-spin" />}
-            {editId ? "Guardar cambios" : "Crear expediente"}
-          </button>
+          <div className="flex flex-col items-start gap-1">
+            <button
+              onClick={() => onSave(form)}
+              disabled={saving || missingFields.length > 0}
+              title={missingFields.length > 0 ? `Falta rellenar ${missingFields.join(" y ")}` : undefined}
+              className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-40 border border-red-700 rounded-md shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-red-500/50 active:scale-[0.98]"
+            >
+              {saving && <Loader2 size={13} className="animate-spin" />}
+              {editId ? "Guardar cambios" : "Crear expediente"}
+            </button>
+            {!saving && missingFields.length > 0 && (
+              <p className="text-[11px] font-medium text-slate-400 whitespace-nowrap">
+                Falta rellenar {missingFields.join(" y ")}
+              </p>
+            )}
+          </div>
           <button onClick={onClose}
             className="px-4 py-2.5 text-sm font-semibold text-slate-600 bg-white hover:bg-slate-50 border border-slate-200 rounded-md shadow-sm transition-colors focus:outline-none">
             Cancelar
@@ -610,6 +623,13 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
           </button>
         </div>
       </div>
+
+      {error && (
+        <div className="px-6 sm:px-8 py-3 bg-red-50 border-b border-red-100 flex items-start gap-2.5 flex-shrink-0 animate-fade-in">
+          <AlertTriangle size={15} className="text-red-500 shrink-0 mt-0.5" />
+          <p className="text-sm text-red-700 font-medium">{error}</p>
+        </div>
+      )}
 
       {/* ── Cuerpo ── */}
       <main className="modules-scrollbar flex-1 min-h-0 overflow-y-auto overscroll-contain bg-white p-5 sm:p-7">
