@@ -234,6 +234,14 @@ function renderMarkdownLite(text: string): React.ReactNode {
 function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opts?: { skipCache?: boolean }) => Promise<string | null> }) {
   const [open, setOpen] = useState(false);
   const [everOpened, setEverOpened] = useState(false);
+  // "Brillito" que avisa de una respuesta lista mientras el chat está
+  // cerrado -- openRef existe porque send()/retryLast()/regenerate() son
+  // async y pueden tardar más que un cierre del panel a mitad de camino;
+  // leer el state "open" directamente ahí capturaría el valor de cuando se
+  // lanzó la petición, no el actual.
+  const [hasUnseenResponse, setHasUnseenResponse] = useState(false);
+  const openRef = useRef(open);
+  useEffect(() => { openRef.current = open; }, [open]);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -248,7 +256,7 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
   const revealTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    if (open) setEverOpened(true);
+    if (open) { setEverOpened(true); setHasUnseenResponse(false); }
   }, [open]);
 
   // Efecto "máquina de escribir": revela el texto ya recibido poco a poco en
@@ -347,10 +355,12 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
       setLoading(false);
       await streamReveal(idx, reply);
       setRetryText("");
+      if (!openRef.current) setHasUnseenResponse(true);
     } catch (err: any) {
       setRetryText(text);
       setMessages([...newHistory, { role: "model", text: `❌ ${err.message}` }]);
       setLoading(false);
+      if (!openRef.current) setHasUnseenResponse(true);
     }
   };
 
@@ -368,10 +378,12 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
       setMessages([...withUser, { role: "model", text: "" }]);
       setLoading(false);
       await streamReveal(idx, reply);
+      if (!openRef.current) setHasUnseenResponse(true);
     } catch (err: any) {
       setRetryText(text);
       setMessages([...withUser, { role: "model", text: `❌ ${err.message}` }]);
       setLoading(false);
+      if (!openRef.current) setHasUnseenResponse(true);
     }
   };
 
@@ -418,11 +430,14 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
+    <>
 
       {/* Panel de chat — se mantiene montado tras abrirse la primera vez, para
-          poder animar también el cierre en vez de desaparecer de golpe */}
+          poder animar también el cierre en vez de desaparecer de golpe. Va en
+          su propio contenedor fijo (el botón ya no vive en el mismo flex de
+          antes, porque ahora el botón se ancla al borde y el panel no). */}
       {everOpened && (
+        <div className="fixed bottom-24 right-6 z-50">
         <div
           className={`w-[360px] bg-white rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.18)] flex flex-col overflow-hidden border border-slate-200/60 origin-bottom-right transition-all duration-200 ease-out ${
             open ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-3 pointer-events-none"
@@ -589,24 +604,44 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
             </p>
           </div>
         </div>
+        </div>
       )}
 
-      {/* Botón flotante VantIA */}
+      {/* Botón flotante VantIA — en reposo vive "pegado" al borde derecho
+          como una pastilla que solo asoma una esquina; al pasar el ratón (o
+          en cuanto hay una respuesta en curso) sale entero y se redondea en
+          círculo. El pulso rojo solo se muestra mientras está trabajando; el
+          punto ámbar de la esquina avisa de una respuesta lista que aún no
+          se ha visto. */}
       <button
         onClick={() => setOpen((v) => !v)}
-        className={`relative h-14 w-14 rounded-full shadow-xl flex items-center justify-center transition-all duration-200 active:scale-90 ${
+        title="VantIA — Asistente IA"
+        className={`group fixed bottom-6 right-0 z-50 h-14 w-14 shadow-xl flex items-center justify-center transition-all duration-300 ease-out active:scale-90 ${
+          open || loading
+            ? "-translate-x-6 rounded-full"
+            : "translate-x-[22px] rounded-2xl hover:-translate-x-6 hover:rounded-full"
+        } ${
           open
             ? "bg-neutral-800 shadow-neutral-900/30 rotate-90"
-            : "bg-red-600 shadow-red-700/30 hover:shadow-red-700/50 hover:scale-105"
+            : "bg-red-600 shadow-red-700/30 hover:shadow-red-700/50"
         }`}
-        title="VantIA — Asistente IA"
       >
-        {!open && <span className="absolute inset-0 rounded-full bg-red-500/40 animate-ping [animation-duration:2.5s]" />}
+        {!open && loading && (
+          <span className="absolute inset-0 rounded-full bg-red-500/40 animate-ping [animation-duration:1.2s]" />
+        )}
+
+        {!open && hasUnseenResponse && (
+          <span className="absolute -top-1 -left-1 flex h-3.5 w-3.5">
+            <span className="absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75 animate-ping" />
+            <span className="relative inline-flex h-3.5 w-3.5 rounded-full bg-amber-400 border-2 border-white" />
+          </span>
+        )}
+
         <span className={`relative transition-transform duration-200 ${open ? "-rotate-90" : ""}`}>
           {open ? <X size={18} className="text-white" /> : <Bot size={22} className="text-white" />}
         </span>
       </button>
-    </div>
+    </>
   );
 }
 
