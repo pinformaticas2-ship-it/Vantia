@@ -5941,6 +5941,7 @@ export default function ExpedienteDetail() {
                 correo:                  { label: "Correo",              Icon: Mail         as HistIcon, iconBg: "bg-sky-100",      iconColor: "text-sky-600",      badge: "bg-sky-50 text-sky-700 border-sky-200"              },
                 correo_borrador:         { label: "Borrador correo",     Icon: MessageSquare as HistIcon,iconBg: "bg-slate-100",    iconColor: "text-slate-500",    badge: "bg-slate-50 text-slate-500 border-slate-200"        },
                 agenda:                  { label: "Evento agenda",       Icon: Calendar     as HistIcon, iconBg: "bg-orange-100",   iconColor: "text-orange-600",   badge: "bg-orange-50 text-orange-700 border-orange-200"     },
+                relacionado:             { label: "Exp. relacionado",    Icon: Link2        as HistIcon, iconBg: "bg-cyan-100",     iconColor: "text-cyan-600",     badge: "bg-cyan-50 text-cyan-700 border-cyan-200"           },
               };
 
               const fmtFull   = (d: string) => new Date(d).toLocaleString("es-ES", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" });

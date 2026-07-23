@@ -424,6 +424,17 @@ export const addRelatedExpediente = async (req: any, res: Response) => {
       [leftId, rightId, reqUserName(req)]
     );
 
+    // Se registra en el historial de AMBOS expedientes (no solo el que
+    // originó la acción) para que la relación se vea reflejada consultando
+    // cualquiera de los dos.
+    const [thisInfo, otherInfo] = await Promise.all([
+      pool.query(`SELECT anio, num_exp, descripcion FROM expedientes WHERE id = $1`, [expedienteId]),
+      pool.query(`SELECT anio, num_exp, descripcion FROM expedientes WHERE id = $1`, [relatedExpedienteId]),
+    ]);
+    const label = (row: any) => row ? `${row.anio}/${row.num_exp}${row.descripcion ? ' - ' + row.descripcion : ''}` : 'expediente';
+    logActivityForReq(req, `Expediente relacionado: ${label(otherInfo.rows[0])}`, 'EXPEDIENTE', expedienteId, 'UPDATE' as any);
+    logActivityForReq(req, `Expediente relacionado: ${label(thisInfo.rows[0])}`, 'EXPEDIENTE', relatedExpedienteId, 'UPDATE' as any);
+
     const related = await pool.query(
       `SELECT e.*
        FROM expediente_relations rel
@@ -457,6 +468,15 @@ export const removeRelatedExpediente = async (req: any, res: Response) => {
        WHERE expediente_id = $1 AND related_expediente_id = $2`,
       [leftId, rightId]
     );
+
+    const [thisInfo, otherInfo] = await Promise.all([
+      pool.query(`SELECT anio, num_exp, descripcion FROM expedientes WHERE id = $1`, [expedienteId]),
+      pool.query(`SELECT anio, num_exp, descripcion FROM expedientes WHERE id = $1`, [relatedId]),
+    ]);
+    const label = (row: any) => row ? `${row.anio}/${row.num_exp}${row.descripcion ? ' - ' + row.descripcion : ''}` : 'expediente';
+    logActivityForReq(req, `Relación quitada con: ${label(otherInfo.rows[0])}`, 'EXPEDIENTE', expedienteId, 'UPDATE' as any);
+    logActivityForReq(req, `Relación quitada con: ${label(thisInfo.rows[0])}`, 'EXPEDIENTE', relatedId, 'UPDATE' as any);
+
     res.json({ ok: true });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
@@ -856,8 +876,9 @@ export const getExpedienteHistorial = async (req: any, res: Response) => {
     for (const a of actRes.rows) {
       if (SKIP_PATTERN.test(a.action_type)) continue;
       let type = 'cambio';
-      if (/Archivo eliminado:/i.test(a.action_type))  type = 'archivo_eliminado';
-      else if (/reapert/i.test(a.action_type))        type = 'reapertura';
+      if (/Archivo eliminado:/i.test(a.action_type))       type = 'archivo_eliminado';
+      else if (/reapert/i.test(a.action_type))             type = 'reapertura';
+      else if (/^(Expediente relacionado|Relación quitada)/i.test(a.action_type)) type = 'relacionado';
       events.push({ type, timestamp: a.created_at, title: a.action_type, user_name: a.user_name });
     }
 
