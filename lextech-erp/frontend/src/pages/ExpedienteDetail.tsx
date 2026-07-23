@@ -126,7 +126,10 @@ async function createGoogleMeetEvent(token: string, data: { title: string; descr
     }),
   });
   const json = await safeJson(res);
-  if (!res.ok) throw new Error(json?.error?.message || "No se pudo crear el evento en Google Calendar.");
+  if (!res.ok) {
+    if (res.status === 401) throw new Error("GCAL_AUTH_EXPIRED");
+    throw new Error(json?.error?.message || "No se pudo crear el evento en Google Calendar.");
+  }
   return json;
 }
 
@@ -6239,9 +6242,23 @@ export default function ExpedienteDetail() {
                         }),
                       });
                       const syncJson = await safeJson(syncRes);
-                      if (syncRes.ok) savedEvent = syncJson.data;
+                      if (syncRes.ok) {
+                        savedEvent = syncJson.data;
+                      } else {
+                        setGcalError(`El evento se guardó, pero no se pudo enlazar el Meet: ${syncJson?.error || "error desconocido"}.`);
+                      }
                     } catch (meetErr: any) {
-                      setGcalError(meetErr.message || "El evento se guardó, pero no se pudo generar el enlace de Meet.");
+                      if (meetErr.message === "GCAL_AUTH_EXPIRED") {
+                        // La sesión de Google caducó a mitad de camino (los tokens
+                        // de acceso duran ~1h) -- se limpia para que el botón
+                        // vuelva a pedir "Conectar Google Meet" en vez de seguir
+                        // fallando en silencio con un token que ya no sirve.
+                        setGcalToken(null);
+                        try { sessionStorage.removeItem(GCAL_TOKEN_KEY); } catch {}
+                        setGcalError("El evento se guardó, pero tu sesión de Google había caducado. Conecta Google Meet de nuevo y añádelo editando el evento.");
+                      } else {
+                        setGcalError(`El evento se guardó, pero no se pudo generar el enlace de Meet: ${meetErr.message || "error desconocido"}.`);
+                      }
                     }
                   }
 
@@ -6268,6 +6285,7 @@ export default function ExpedienteDetail() {
                               const now = new Date();
                               const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
                               setAgendaForm(f => ({ ...f, start_at: local, guest_email: f.guest_email || linkedClient?.email || "" }));
+                              setGcalError(null);
                               setShowAgendaForm(v => !v);
                             }}
                             className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
@@ -6280,6 +6298,18 @@ export default function ExpedienteDetail() {
                         </Link>
                       </div>
                     </div>
+
+                    {/* Aviso de sincronización con Google (persiste aunque el
+                        formulario de creación ya se haya cerrado, para que no
+                        se pierda de vista en cuanto se guarda el evento) */}
+                    {gcalError && (
+                      <div className="flex items-start justify-between gap-2 px-5 py-2.5 bg-amber-50 border-b border-amber-100 text-[11px] text-amber-800">
+                        <span>{gcalError}</span>
+                        <button type="button" onClick={() => setGcalError(null)} className="shrink-0 text-amber-500 hover:text-amber-700">
+                          <X size={12} />
+                        </button>
+                      </div>
+                    )}
 
                     {/* Formulario de creación rápida */}
                     {showAgendaForm && (
@@ -6358,7 +6388,6 @@ export default function ExpedienteDetail() {
                               />
                             </div>
                           )}
-                          {gcalError && <p className="sm:col-span-2 text-[11px] text-red-500">{gcalError}</p>}
                           <div>
                             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Inicio *</label>
                             <input
