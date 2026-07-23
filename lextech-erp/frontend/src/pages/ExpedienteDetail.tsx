@@ -6219,11 +6219,17 @@ export default function ExpedienteDetail() {
                   // igual que hace el módulo Agenda general.
                   if (agendaForm.with_meet && gcalToken && !agendaForm.all_day) {
                     try {
+                      // OJO: se usan savedEvent.start_at/end_at (lo que devolvió el
+                      // backend tras guardarlo, ya en formato completo con zona
+                      // horaria), no las variables startAt/endAt de más arriba --
+                      // esas vienen tal cual del <input type="datetime-local">
+                      // ("2026-07-23T15:14", sin segundos ni zona horaria), y
+                      // Google Calendar rechaza ese formato con "Bad Request".
                       const googleCreated = await createGoogleMeetEvent(gcalToken, {
                         title: body.title,
                         description: body.description,
-                        start_at: startAt,
-                        end_at: endAt || startAt,
+                        start_at: savedEvent.start_at,
+                        end_at: savedEvent.end_at || savedEvent.start_at,
                         guestEmail: agendaForm.guest_email,
                       });
                       const meetUrl = googleCreated?.hangoutLink
