@@ -2062,6 +2062,17 @@ function ActuacionAdjuntosPanel({ taskId, locked = false }: { taskId: string; lo
     } catch (_) {}
   }, [getToken, taskId]);
 
+  const handleDownload = async (fileId: string, fileName: string) => {
+    const token = await getToken({ skipCache: true });
+    const res = await fetch(`/api/tasks/${taskId}/files/${fileId}/download`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = fileName;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  };
+
   const handlePrimaryOpen = useCallback((file: any) => {
     if (isWordAct(file.mimetype || "", file.original_name || "") || isExcelAct(file.mimetype || "", file.original_name || "")) {
       void openWithApp(file);
@@ -2144,17 +2155,6 @@ function ActuacionAdjuntosPanel({ taskId, locked = false }: { taskId: string; lo
       setFiles((prev) => prev.map((item) => item.id === editingFile.id ? data.data : item));
       setEditingFile(null);
     } else { setError(data?.error || "No se pudo actualizar el adjunto."); }
-  };
-
-  const handleDownload = async (fileId: string, fileName: string) => {
-    const token = await getToken({ skipCache: true });
-    const res = await fetch(`/api/tasks/${taskId}/files/${fileId}/download`, { headers: { Authorization: `Bearer ${token}` } });
-    if (!res.ok) return;
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = fileName;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 10_000);
   };
 
   const handleDelete = (fileId: string) => {
@@ -2785,6 +2785,7 @@ function ActuacionModal({
   setForm,
   selectedActuacion,
   getToken,
+  locked = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -2797,6 +2798,7 @@ function ActuacionModal({
   setForm: React.Dispatch<React.SetStateAction<TareaForm>>;
   selectedActuacion: any | null;
   getToken: any;
+  locked?: boolean;
 }) {
   if (!open || typeof document === "undefined") return null;
 
@@ -3286,6 +3288,7 @@ function TabActuacion({
         setForm={setForm}
         selectedActuacion={selectedActuacion}
         getToken={getToken}
+        locked={locked}
       />
     </div>
   );
