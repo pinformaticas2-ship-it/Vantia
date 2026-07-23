@@ -52,6 +52,7 @@ import {
   FileX,
   FileText,
   MessageSquare,
+  Video,
 } from "lucide-react";
 import { safeJson, resolveApiUrl } from "../lib/api";
 import { Spinner } from "../components/Spinner";
@@ -69,6 +70,61 @@ import { EtapaSelect } from "../components/EtapaSelect";
 import BackButton from "../components/BackButton";
 import { UndoToast } from "../components/UndoToast";
 import { useUndoDelete } from "../lib/useUndoDelete";
+
+// ── Google Meet (vía Google Calendar) para el evento rápido del expediente ──
+// Mismas claves que el módulo Agenda (Agenda.tsx) para compartir la sesión
+// de Google ya conectada por el usuario sin pedirle que se autentique dos veces.
+const GCAL_TOKEN_KEY = "lextech-gcal-token-v1";
+const GCAL_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
+const GCAL_SCOPES = "https://www.googleapis.com/auth/calendar";
+
+function requestGoogleCalendarToken(): Promise<string> {
+  return new Promise((resolve, reject) => {
+    if (!GCAL_CLIENT_ID || GCAL_CLIENT_ID === "TU_CLIENT_ID.apps.googleusercontent.com") {
+      reject(new Error("Configura VITE_GOOGLE_CLIENT_ID en el archivo .env del frontend."));
+      return;
+    }
+    const google = (window as any).google;
+    if (!google?.accounts?.oauth2) {
+      reject(new Error("El script de Google aún no está cargado. Recarga la página."));
+      return;
+    }
+    const client = google.accounts.oauth2.initTokenClient({
+      client_id: GCAL_CLIENT_ID,
+      scope: GCAL_SCOPES,
+      callback: (resp: { access_token?: string; error?: string }) => {
+        if (resp.error || !resp.access_token) {
+          reject(new Error("Error al autenticar con Google: " + (resp.error || "desconocido")));
+          return;
+        }
+        resolve(resp.access_token);
+      },
+    });
+    client.requestAccessToken();
+  });
+}
+
+async function createGoogleMeetEvent(token: string, data: { title: string; description?: string | null; start_at: string; end_at: string }) {
+  const res = await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      summary: data.title,
+      description: data.description || "",
+      start: { dateTime: data.start_at },
+      end: { dateTime: data.end_at },
+      conferenceData: {
+        createRequest: {
+          requestId: `meet-${crypto.randomUUID()}`,
+          conferenceSolutionKey: { type: "hangoutsMeet" },
+        },
+      },
+    }),
+  });
+  const json = await safeJson(res);
+  if (!res.ok) throw new Error(json?.error?.message || "No se pudo crear el evento en Google Calendar.");
+  return json;
+}
 
 function fmtDate(d: string | null | undefined) {
   if (!d) return "—";
@@ -3274,7 +3330,10 @@ function TabCorreoExpediente({
   // Viewer
   const [viewEmail, setViewEmail] = useState<string | null>(null);
   const [viewBody, setViewBody] = useState<string>("");
+  const [viewAttachments, setViewAttachments] = useState<Array<{ filename: string; contentType?: string; size?: number }>>([]);
   const [viewLoading, setViewLoading] = useState(false);
+  const [downloadingAttachment, setDownloadingAttachment] = useState<number | null>(null);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
 
   const authHdr = useCallback(async () => {
     const token = await getToken({ skipCache: true });
@@ -3422,15 +3481,39 @@ function TabCorreoExpediente({
   };
 
   const handleViewEmail = async (email: any) => {
-    if (viewEmail === email.id) { setViewEmail(null); setViewBody(""); return; }
-    setViewEmail(email.id); setViewLoading(true);
+    if (viewEmail === email.id) { setViewEmail(null); setViewBody(""); setViewAttachments([]); return; }
+    setViewEmail(email.id); setViewLoading(true); setViewAttachments([]);
     try {
       const headers = await authHdr();
       const res = await fetch(`/api/email/messages/${email.id}`, { headers });
       const d = await safeJson(res);
-      if (res.ok) setViewBody(d.data?.body_html || d.data?.body_text || d.data?.snippet || "Sin contenido");
+      if (res.ok) {
+        setViewBody(d.data?.body_html || d.data?.body_text || d.data?.snippet || "Sin contenido");
+        setViewAttachments(Array.isArray(d.data?.attachments) ? d.data.attachments : []);
+      }
     } finally {
       setViewLoading(false);
+    }
+  };
+
+  const downloadEmailAttachment = async (emailId: string, index: number, filename: string) => {
+    setDownloadingAttachment(index); setAttachmentError(null);
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/email/messages/${emailId}/attachments/${index}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("No se pudo descargar el adjunto");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = filename || "adjunto";
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      setAttachmentError(e.message || "No se pudo descargar el adjunto.");
+    } finally {
+      setDownloadingAttachment(null);
     }
   };
 
@@ -3750,8 +3833,28 @@ function TabCorreoExpediente({
                       {viewLoading && viewEmail === email.id ? (
                         <div className="flex items-center justify-center py-6"><Spinner size="sm" muted label="Cargando..." /></div>
                       ) : (
-                        <div className="text-sm text-slate-700 leading-relaxed bg-white rounded-xl border border-slate-100 p-4 max-h-80 overflow-y-auto"
-                          dangerouslySetInnerHTML={{ __html: viewBody }} />
+                        <>
+                          {!!viewAttachments.length && (
+                            <div className="flex flex-wrap gap-2 mb-2">
+                              {viewAttachments.map((att, idx) => (
+                                <button
+                                  key={`${att.filename}-${idx}`}
+                                  type="button"
+                                  onClick={() => downloadEmailAttachment(email.id, idx, att.filename)}
+                                  disabled={downloadingAttachment === idx}
+                                  title={`Descargar ${att.filename}`}
+                                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:border-red-300 hover:bg-red-50 hover:text-red-700 transition-colors disabled:opacity-50">
+                                  {downloadingAttachment === idx ? <Loader2 size={12} className="animate-spin shrink-0" /> : <Paperclip size={12} className="shrink-0 text-slate-400" />}
+                                  <span className="max-w-[160px] truncate">{att.filename}</span>
+                                  {!!att.size && <span className="text-slate-400">{fmtSizeAct(att.size)}</span>}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          {attachmentError && <p className="text-xs text-red-500 mb-2">{attachmentError}</p>}
+                          <div className="text-sm text-slate-700 leading-relaxed bg-white rounded-xl border border-slate-100 p-4 max-h-80 overflow-y-auto"
+                            dangerouslySetInnerHTML={{ __html: viewBody }} />
+                        </>
                       )}
                     </div>
                   )}
@@ -5037,7 +5140,13 @@ export default function ExpedienteDetail() {
   const [agendaLoading, setAgendaLoading] = useState(false);
   const [showAgendaForm, setShowAgendaForm] = useState(false);
   const [agendaSaving, setAgendaSaving] = useState(false);
-  const [agendaForm, setAgendaForm] = useState({ title: "", type: "cita", start_at: "", end_at: "", all_day: false, description: "", status: "pendiente" });
+  const [agendaForm, setAgendaForm] = useState({ title: "", type: "cita", start_at: "", end_at: "", all_day: false, description: "", status: "pendiente", with_meet: false });
+  // Reutiliza la misma sesion de Google Calendar que el modulo Agenda (mismo
+  // sessionStorage) -- si ya se conecto alli, aqui funciona sin volver a pedir permiso.
+  const [gcalToken, setGcalToken] = useState<string | null>(() => {
+    try { return sessionStorage.getItem(GCAL_TOKEN_KEY); } catch { return null; }
+  });
+  const [gcalError, setGcalError] = useState<string | null>(null);
   const [notificaciones, setNotificaciones] = useState<any[] | null>(null);
   const [notifLoading, setNotifLoading] = useState(false);
   const [historial, setHistorial] = useState<any[] | null>(null);
@@ -6017,17 +6126,32 @@ export default function ExpedienteDetail() {
               };
               const expEvents = (agendaEvents || []).filter((e: any) => e.expediente_id === id);
 
+              const connectGcal = async () => {
+                setGcalError(null);
+                try {
+                  const token = await requestGoogleCalendarToken();
+                  setGcalToken(token);
+                  try { sessionStorage.setItem(GCAL_TOKEN_KEY, token); } catch {}
+                } catch (e: any) {
+                  setGcalError(e.message || "No se pudo conectar con Google Calendar.");
+                }
+              };
+
               const handleCreateEvent = async (e: React.FormEvent) => {
                 e.preventDefault();
                 if (!agendaForm.title.trim() || !agendaForm.start_at) return;
                 setAgendaSaving(true);
                 try {
                   const token = await getToken({ skipCache: true });
+                  const startAt = agendaForm.all_day ? agendaForm.start_at + "T00:00:00" : agendaForm.start_at;
+                  const endAt = agendaForm.end_at
+                    ? (agendaForm.all_day ? agendaForm.end_at + "T23:59:00" : agendaForm.end_at)
+                    : null;
                   const body = {
                     title: agendaForm.title.trim(),
                     type: agendaForm.type,
-                    start_at: agendaForm.all_day ? agendaForm.start_at + "T00:00:00" : agendaForm.start_at,
-                    end_at: agendaForm.end_at ? (agendaForm.all_day ? agendaForm.end_at + "T23:59:00" : agendaForm.end_at) : null,
+                    start_at: startAt,
+                    end_at: endAt,
                     all_day: agendaForm.all_day,
                     description: agendaForm.description || null,
                     status: agendaForm.status,
@@ -6041,9 +6165,44 @@ export default function ExpedienteDetail() {
                   });
                   const d = await safeJson(res);
                   if (!res.ok) { alert(d.error || "Error al crear el evento"); return; }
-                  setAgendaEvents(prev => [d.data, ...(prev || [])]);
+                  let savedEvent = d.data;
+
+                  // Si se pidió Meet y hay sesión de Google, se crea el evento allí
+                  // (con el enlace de videollamada) y se enlaza con el del ERP --
+                  // igual que hace el módulo Agenda general.
+                  if (agendaForm.with_meet && gcalToken && !agendaForm.all_day) {
+                    try {
+                      const googleCreated = await createGoogleMeetEvent(gcalToken, {
+                        title: body.title,
+                        description: body.description,
+                        start_at: startAt,
+                        end_at: endAt || startAt,
+                      });
+                      const meetUrl = googleCreated?.hangoutLink
+                        || googleCreated?.conferenceData?.entryPoints?.[0]?.uri
+                        || null;
+                      const syncRes = await fetch(`/api/agenda/${savedEvent.id}`, {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                        body: JSON.stringify({
+                          ...savedEvent,
+                          source: "manual",
+                          external_provider: "google",
+                          external_id: googleCreated?.id,
+                          external_url: googleCreated?.htmlLink,
+                          meet_url: meetUrl,
+                        }),
+                      });
+                      const syncJson = await safeJson(syncRes);
+                      if (syncRes.ok) savedEvent = syncJson.data;
+                    } catch (meetErr: any) {
+                      setGcalError(meetErr.message || "El evento se guardó, pero no se pudo generar el enlace de Meet.");
+                    }
+                  }
+
+                  setAgendaEvents(prev => [savedEvent, ...(prev || [])]);
                   setShowAgendaForm(false);
-                  setAgendaForm({ title: "", type: "cita", start_at: "", end_at: "", all_day: false, description: "", status: "pendiente" });
+                  setAgendaForm({ title: "", type: "cita", start_at: "", end_at: "", all_day: false, description: "", status: "pendiente", with_meet: false });
                 } finally {
                   setAgendaSaving(false);
                 }
@@ -6113,15 +6272,36 @@ export default function ExpedienteDetail() {
                               <option value="cancelado">Cancelado</option>
                             </select>
                           </div>
-                          <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={agendaForm.all_day}
-                              onChange={e => setAgendaForm(f => ({ ...f, all_day: e.target.checked }))}
-                              className="rounded"
-                            />
-                            Todo el día
-                          </label>
+                          <div className="flex items-center gap-4">
+                            <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={agendaForm.all_day}
+                                onChange={e => setAgendaForm(f => ({ ...f, all_day: e.target.checked, with_meet: e.target.checked ? false : f.with_meet }))}
+                                className="rounded"
+                              />
+                              Todo el día
+                            </label>
+                            {!agendaForm.all_day && (
+                              gcalToken ? (
+                                <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={agendaForm.with_meet}
+                                    onChange={e => setAgendaForm(f => ({ ...f, with_meet: e.target.checked }))}
+                                    className="rounded"
+                                  />
+                                  <Video size={12} className="text-emerald-600" /> Añadir Google Meet
+                                </label>
+                              ) : (
+                                <button type="button" onClick={connectGcal}
+                                  className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-emerald-600 transition-colors">
+                                  <Video size={12} /> Conectar Google Meet
+                                </button>
+                              )
+                            )}
+                          </div>
+                          {gcalError && <p className="sm:col-span-2 text-[11px] text-red-500">{gcalError}</p>}
                           <div>
                             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Inicio *</label>
                             <input
@@ -6192,7 +6372,18 @@ export default function ExpedienteDetail() {
                         <tbody className="divide-y divide-slate-50">
                           {expEvents.map((e: any) => (
                             <tr key={e.id} className="hover:bg-slate-50 transition-colors">
-                              <td className="px-5 py-3 text-xs text-slate-700 font-medium">{e.title}</td>
+                              <td className="px-5 py-3 text-xs text-slate-700 font-medium">
+                                <div className="flex items-center gap-1.5">
+                                  {e.title}
+                                  {e.meet_url && (
+                                    <a href={e.meet_url} target="_blank" rel="noreferrer" onClick={ev => ev.stopPropagation()}
+                                      title="Unirse a Google Meet"
+                                      className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full shrink-0">
+                                      <Video size={10} /> Meet
+                                    </a>
+                                  )}
+                                </div>
+                              </td>
                               <td className="px-5 py-3">
                                 <span className={`inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold capitalize ${TYPE_BADGE[e.type] || "bg-slate-100 text-slate-600"}`}>
                                   {e.type || "—"}
