@@ -2533,7 +2533,11 @@ function PanelFavoritos({ canalId, getToken, onClose, onGoTo, onToggleFavorite, 
   );
 }
 
-function MensajeItem({ msg, prevMsg, currentUserId, isHighlighted, isFreshIncoming = false, showReadReceipt = false, isReadByRecipient = false, onReply, onReact, onEdit, onDelete, onPin, onFavorite, isFavorite, resolveDisplayName, resolveAvatarUrl }: {
+// Envuelto en React.memo: la lista de mensajes puede tener cientos de
+// elementos y el componente padre repinta con cada poll (cada ~700ms
+// mientras la pestaña está visible) -- sin memo, cada mensaje se volvía a
+// renderizar entero en cada ciclo aunque su contenido no hubiera cambiado.
+const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserId, isHighlighted, isFreshIncoming = false, showReadReceipt = false, isReadByRecipient = false, onReply, onReact, onEdit, onDelete, onPin, onFavorite, isFavorite, resolveDisplayName, resolveAvatarUrl }: {
   msg: Mensaje; prevMsg: Mensaje|null; currentUserId: string; isHighlighted: boolean; isFreshIncoming?: boolean;
   showReadReceipt?: boolean; isReadByRecipient?: boolean;
   onReply:(m:Mensaje)=>void; onReact:(id:string,e:string)=>void;
@@ -2805,7 +2809,7 @@ function MensajeItem({ msg, prevMsg, currentUserId, isHighlighted, isFreshIncomi
       )}
     </div>
   );
-}
+});
 
 // ══════════════════════════════════════════════════════════════════════════════
 // DATE SEPARATOR
@@ -4141,7 +4145,11 @@ export default function Chat() {
     void refreshUnread();
   };
 
-  const handleReact = async (msgId: string, emoji: string) => {
+  // useCallback con identidad estable: se pasan como prop a MensajeItem
+  // (envuelto en React.memo), y una función recreada en cada render del
+  // componente padre (que repinta cada ~700ms por el polling) invalidaría
+  // el memo de cada mensaje de la lista aunque nada suyo hubiera cambiado.
+  const handleReact = useCallback(async (msgId: string, emoji: string) => {
     const h = await hdr();
     const res = await fetch(`/api/chat/mensajes/${msgId}/reacciones`, {
       method:"POST", headers: h, body: JSON.stringify({ emoji }),
@@ -4161,21 +4169,22 @@ export default function Chat() {
         reacciones:[...reac,{emoji, user_id:currentUserId, user_name: user?.fullName||user?.username||"Tú"}],
       };
     }));
-  };
+  }, [hdr, currentUserId, user]);
 
-  const handleDelete = async (msgId: string) => {
+  const handleDelete = useCallback(async (msgId: string) => {
     const h = await hdr();
     const res = await fetch(`/api/chat/mensajes/${msgId}`, { method:"DELETE", headers: h });
     if (res.ok) setMensajes(prev=>prev.map(m=>m.id===msgId?{...m,deleted_at:new Date().toISOString()}:m));
-  };
+  }, [hdr]);
 
-  const handlePin = async (msgId: string) => {
-    if (!canalActivo) return;
+  const handlePin = useCallback(async (msgId: string) => {
+    const canal = canalActivoRef.current;
+    if (!canal) return;
     const h = await hdr();
-    await fetch(`/api/chat/canales/${canalActivo.id}/fijar/${msgId}`, { method:"POST", headers: h });
-  };
+    await fetch(`/api/chat/canales/${canal.id}/fijar/${msgId}`, { method:"POST", headers: h });
+  }, [hdr]);
 
-  const handleFavorite = async (msgId: string) => {
+  const handleFavorite = useCallback(async (msgId: string) => {
     const h = await hdr();
     const res = await fetch(`/api/chat/mensajes/${msgId}/favorito`, { method:"POST", headers: h });
     const d = await safeJson(res);
@@ -4186,7 +4195,7 @@ export default function Chat() {
       else next.add(msgId);
       return next;
     });
-  };
+  }, [hdr]);
 
   const handleLeave = async () => {
     if (!canalActivo) return;
