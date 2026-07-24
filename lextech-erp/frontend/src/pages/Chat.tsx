@@ -2609,7 +2609,11 @@ function MensajeItem({ msg, prevMsg, currentUserId, isHighlighted, isFreshIncomi
   }, []);
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.pointerType === "mouse" && event.button !== 0) return;
+    // El gesto de "arrastrar para responder" es solo para tactil/lápiz (estilo
+    // WhatsApp) -- con ratón capturaba cualquier arrastre (incluida la
+    // selección de texto dentro del mensaje) y la convertía en un swipe de
+    // respuesta. En escritorio ya existe el botón "Responder" del hover.
+    if (event.pointerType !== "touch" && event.pointerType !== "pen") return;
     dragStartRef.current = { x: event.clientX, y: event.clientY, pointerId: event.pointerId };
     didTriggerReplyRef.current = false;
     setDragOffset(0);
@@ -3886,6 +3890,22 @@ export default function Chat() {
     if (atBottom.current) setNewMsgCount(0);
     if (el.scrollTop < 100 && hasMore && !loadingMore) loadMore();
   };
+
+  // Al abrir una conversación (o al llegar mensajes nuevos) se manda al fondo
+  // con un scrollTop fijo, pero si el contenido sigue creciendo después
+  // (imágenes/adjuntos que tardan en cargar y expanden la altura de la
+  // lista) ese scrollTop ya no llega al final real. Este observer reengancha
+  // el scroll al fondo mientras atBottom siga siendo true, para que abrir
+  // una conversación siempre termine mostrando el último mensaje de verdad.
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      if (atBottom.current) el.scrollTop = el.scrollHeight;
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const loadMore = useCallback(async () => {
     if (!canalActivo || !mensajes.length || loadingMore || loadMoreInFlightRef.current) return;
     loadMoreInFlightRef.current = true;
