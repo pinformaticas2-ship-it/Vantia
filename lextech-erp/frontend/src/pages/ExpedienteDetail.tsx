@@ -6135,9 +6135,19 @@ export default function ExpedienteDetail() {
                                         De: {ev.meta.from}
                                       </span>
                                     )}
+                                    {ev.meta.to && (
+                                      <span className="text-[10px] bg-sky-50 text-sky-600 border border-sky-200 px-2 py-0.5 rounded-md font-medium max-w-[200px] truncate">
+                                        Para: {ev.meta.to}
+                                      </span>
+                                    )}
                                     {ev.meta.type && (
                                       <span className="text-[10px] bg-orange-50 text-orange-600 border border-orange-200 px-2 py-0.5 rounded-md font-medium capitalize">
                                         {ev.meta.type}
+                                      </span>
+                                    )}
+                                    {ev.meta.end_at && (
+                                      <span className="text-[10px] bg-orange-50 text-orange-600 border border-orange-200 px-2 py-0.5 rounded-md font-medium">
+                                        hasta {fmtTime(ev.meta.end_at)}
                                       </span>
                                     )}
                                     {ev.meta.snippet && (

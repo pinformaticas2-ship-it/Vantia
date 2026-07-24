@@ -680,6 +680,27 @@ export const createExpediente = async (req: any, res: Response) => {
   }
 };
 
+// Nombres legibles de los campos editables de "expedientes", para poder
+// decir en el historial QUÉ cambió en vez de un genérico "actualizado".
+const EXPEDIENTE_EDITABLE_FIELD_LABELS: Record<string, string> = {
+  ref_propia: 'Ref. propia', ref_expediente: 'Ref. expediente', descripcion: 'Descripción', tipo: 'Tipo',
+  cliente_id: 'Cliente', contrario: 'Parte contraria', procurador: 'Procurador', procurador_contrario: 'Procurador contrario',
+  abogado_propio: 'Abogado propio', abogado_contrario: 'Abogado contrario', juzgado: 'Juzgado', tipo_proc: 'Tipo de procedimiento',
+  num_autos: 'Núm. autos', nig: 'NIG', estado: 'Estado', observaciones: 'Observaciones', fecha_inicio: 'Fecha de inicio',
+  fecha_cierre: 'Fecha de cierre', importe: 'Importe', tipos_asunto: 'Tipo de asunto', cuantia_principal: 'Cuantía principal',
+  intereses: 'Intereses', costas: 'Costas', cuantia_total: 'Cuantía total', indeterminado: 'Indeterminado', etapa: 'Etapa',
+  persona_contacto: 'Persona de contacto', contacto: 'Contacto', centro: 'Centro', color: 'Color',
+};
+
+function summarizeExpedienteChanges(before: any, after: any): string {
+  const changed = Object.entries(EXPEDIENTE_EDITABLE_FIELD_LABELS)
+    .filter(([key]) => String(before?.[key] ?? '') !== String(after?.[key] ?? ''))
+    .map(([, label]) => label);
+  if (changed.length === 0) return 'sin cambios en los campos';
+  if (changed.length <= 4) return changed.join(', ');
+  return `${changed.slice(0, 4).join(', ')} y ${changed.length - 4} más`;
+}
+
 export const updateExpediente = async (req: any, res: Response) => {
   const {
     ref_propia, ref_expediente, descripcion, tipo, cliente_id, cliente_nombre,
@@ -690,6 +711,9 @@ export const updateExpediente = async (req: any, res: Response) => {
   } = req.body;
 
   try {
+    const beforeR = await pool.query(`SELECT * FROM expedientes WHERE id=$1 AND organizacion_id=$2`, [req.params.id, req.organizacionId]);
+    const before = beforeR.rows[0] || null;
+
     let nombre = cliente_nombre || null;
     let resolvedClienteId = cliente_id || null;
     if (resolvedClienteId) {
@@ -752,7 +776,8 @@ export const updateExpediente = async (req: any, res: Response) => {
     if (!r.rows.length) return res.status(404).json({ error: 'Expediente no encontrado' });
     const exp = r.rows[0];
     const label = exp.descripcion ? `${exp.anio}/${exp.num_exp} - ${exp.descripcion}` : `${exp.anio}/${exp.num_exp}`;
-    logActivityForReq(req, `Expediente actualizado: ${label}`, 'EXPEDIENTE', exp.id, 'UPDATE' as any);
+    const changeSummary = summarizeExpedienteChanges(before, exp);
+    logActivityForReq(req, `Expediente actualizado (${changeSummary}): ${label}`, 'EXPEDIENTE', exp.id, 'UPDATE' as any);
     res.json({ data: exp });
   } catch (e: any) {
     res.status(expedienteHttpStatus(e)).json({ error: friendlyExpedienteError(e) });
@@ -992,7 +1017,8 @@ export const getExpedienteHistorial = async (req: any, res: Response) => {
         timestamp: a.start_at,
         title: a.title,
         user_name: a.user_name,
-        meta: { type: a.type, status: a.status, end_at: a.end_at },
+        // "estado" (no "status") -- es la clave que pinta el chip genérico en el frontend
+        meta: { type: a.type, estado: a.status, end_at: a.end_at },
       });
     }
 
