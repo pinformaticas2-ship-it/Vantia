@@ -430,7 +430,7 @@ function EventModal({
   return createPortal(
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-[30px] border border-slate-200 bg-[#fbfcfe] shadow-[0_40px_100px_rgba(15,23,42,0.22)] animate-in zoom-in-95 duration-200">
+      <div className="relative flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-[30px] border border-slate-200 bg-[#fbfcfe] shadow-[0_40px_100px_rgba(15,23,42,0.22)] animate-in zoom-in-95 duration-200">
         {/* cabecera -- flex-shrink-0: el modal completo (cabecera + Guardar +
             el area de detalles) no puede superar el 90vh de arriba, así que
             la cabecera se queda fija y solo el formulario de más abajo
@@ -506,7 +506,7 @@ function EventModal({
           </div>
         )}
 
-        <form id="agenda-event-form" onSubmit={handleSubmit} className="grid min-h-0 flex-1 gap-6 overflow-y-auto px-6 py-6 lg:grid-cols-[minmax(0,1.4fr)_320px]">
+        <form id="agenda-event-form" onSubmit={handleSubmit} className="grid min-h-0 flex-1 gap-6 overflow-y-auto px-6 py-6 lg:grid-cols-[minmax(0,1fr)_320px]">
           {/* Título */}
           <div className="hidden">
             <label className="block text-xs font-bold text-slate-700 mb-1">Título <span className="text-red-500">*</span></label>
