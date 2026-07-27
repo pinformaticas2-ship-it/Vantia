@@ -1229,8 +1229,13 @@ function TabTareas({
             setGcalError("La tarea se guardó, pero no se pudo enlazar con un evento de agenda para añadirle la videollamada.");
           } else {
             try {
-              const startAt = `${form.plazo}T${meetHora}:00`;
-              const endAt = new Date(new Date(startAt).getTime() + 3600000).toISOString().slice(0, 19);
+              // Google Calendar exige RFC3339 completo (con zona horaria) en
+              // start.dateTime/end.dateTime -- un "2026-07-30T10:00:00" suelto
+              // (sin Z ni offset) lo rechaza con 400 Bad Request. new Date(...)
+              // interpreta la hora local del navegador y toISOString() la
+              // convierte a UTC con el sufijo Z, que sí es válido.
+              const startAt = new Date(`${form.plazo}T${meetHora}:00`).toISOString();
+              const endAt = new Date(new Date(startAt).getTime() + 3600000).toISOString();
               const existingRes = await fetch(`/api/agenda/${linkedAgendaId}`, { headers: { Authorization: `Bearer ${token}` } });
               const existingData = await safeJson(existingRes);
               const baseEvent = existingRes.ok ? existingData.data : {};
@@ -1400,6 +1405,16 @@ function TabTareas({
           <AlertTriangle size={13} className="shrink-0" /> Expediente cerrado — no se pueden añadir ni modificar tareas.
         </div>
       )}
+      {/* Persiste aunque el formulario de creación ya se haya cerrado --
+          si solo viviera dentro del formulario, se perdía de vista en
+          cuanto la tarea se guardaba (el formulario se cierra siempre,
+          haya fallado o no la videollamada). */}
+      {gcalError && (
+        <div className="flex items-start justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-800">
+          <span>{gcalError}</span>
+          <button type="button" onClick={() => setGcalError(null)} className="shrink-0 text-amber-500 hover:text-amber-700"><X size={12} /></button>
+        </div>
+      )}
       <div className="space-y-2">
         <div className="flex flex-wrap justify-between items-center gap-3">
           <div className="flex gap-1 bg-slate-100 rounded-xl p-1 text-xs">
@@ -1511,12 +1526,6 @@ function TabTareas({
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Invitar por correo (opcional)</label>
                   <input type="email" value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)} placeholder="correo@ejemplo.com" className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-red-400 mt-0.5 bg-white" />
                 </div>
-              </div>
-            )}
-            {gcalError && (
-              <div className="flex items-start justify-between gap-2 mt-2 text-[11px] text-amber-700">
-                <span>{gcalError}</span>
-                <button type="button" onClick={() => setGcalError(null)} className="shrink-0 text-amber-500 hover:text-amber-700"><X size={11} /></button>
               </div>
             )}
           </div>
