@@ -1282,7 +1282,7 @@ function QuickEventPopover({
       <div className="fixed inset-0 z-[190]" onClick={onClose} />
       <div
         ref={cardRef}
-        className="fixed z-[200] w-[480px] flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_24px_64px_rgba(15,23,42,0.20)] quick-popup popup-card"
+        className="fixed z-[200] w-[480px] flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_24px_64px_rgba(15,23,42,0.20)]"
         style={{
           left: pos?.left ?? position.x,
           top: pos?.top ?? position.y,
@@ -1296,6 +1296,17 @@ function QuickEventPopover({
         }}
         onClick={e => e.stopPropagation()}
       >
+      {/* La animación de entrada vive en este wrapper interno, no en el div que
+          se mide (arriba) -- estaba en el mismo elemento que ref={cardRef}, y
+          getBoundingClientRect() devuelve el tamaño YA transformado. Como la
+          medición ocurre en useLayoutEffect (antes de pintar, justo al 0% de
+          la animación: scale(0.82)), calculaba un alto ~18% menor que el real,
+          así que "top" dejaba de reservar sitio suficiente y el pie con
+          Guardar/Cancelar acababa saliéndose por abajo. El transform no afecta
+          la caja de layout del wrapper (solo su pintado), así que este div
+          exterior mide siempre el tamaño real sin importar en qué punto vaya
+          la animación. */}
+      <div className="flex flex-1 min-h-0 flex-col quick-popup popup-card">
         {/* Cabecera */}
         <div className="flex flex-shrink-0 items-center justify-between bg-slate-50 px-4 py-2.5 border-b border-slate-100">
           <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Nuevo evento</span>
@@ -1733,6 +1744,7 @@ function QuickEventPopover({
             )}
           </div>
         </div>
+      </div>
       </div>
 
       {showBookingSettings && (
