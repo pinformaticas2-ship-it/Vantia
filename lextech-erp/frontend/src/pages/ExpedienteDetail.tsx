@@ -1212,54 +1212,59 @@ function TabTareas({
       });
       const data = await safeJson(res);
       if (res.ok) {
-        setTareas((prev) => [data.data, ...prev]);
+        let createdTask = data.data;
 
-        // Videollamada opcional: crea además un evento de agenda (con Meet)
-        // en la fecha límite, para que la tarea también tenga hueco en el
-        // calendario y un enlace al que unirse -- igual que ya hace la
-        // pestaña Agenda del expediente.
+        // Videollamada opcional. La tarea, si tiene fecha límite o de aviso,
+        // ya se sincroniza SOLA con un evento de agenda (backend, tabla
+        // client_tasks.agenda_event_id) -- en vez de crear un evento nuevo
+        // (que quedaría duplicado y sin enlazar con la tarea, así que nunca
+        // se vería "unirse a la llamada" en la propia tarea), se reutiliza
+        // ese evento ya vinculado: se le pone la hora exacta de la llamada
+        // (en vez de quedarse como bloque de "todo el día") y se le añade
+        // el Meet. El meet_url resultante se guarda también en la propia
+        // tarea para poder mostrar el botón de unirse en la lista.
         if (withMeet && gcalToken && form.plazo) {
-          try {
-            const startAt = `${form.plazo}T${meetHora}:00`;
-            const endAt = new Date(new Date(startAt).getTime() + 3600000).toISOString().slice(0, 19);
-            const agRes = await fetch("/api/agenda", {
-              method: "POST",
-              headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-              body: JSON.stringify({
-                title: form.titulo.trim(), type: "cita", start_at: startAt, end_at: endAt,
-                all_day: false, description: form.descripcion || null, status: "pendiente",
-                expediente_id: expedienteId, source: "manual",
-              }),
-            });
-            const agData = await safeJson(agRes);
-            if (agRes.ok) {
-              const savedAgenda = agData.data;
+          const linkedAgendaId = createdTask.agenda_event_id;
+          if (!linkedAgendaId) {
+            setGcalError("La tarea se guardó, pero no se pudo enlazar con un evento de agenda para añadirle la videollamada.");
+          } else {
+            try {
+              const startAt = `${form.plazo}T${meetHora}:00`;
+              const endAt = new Date(new Date(startAt).getTime() + 3600000).toISOString().slice(0, 19);
+              const existingRes = await fetch(`/api/agenda/${linkedAgendaId}`, { headers: { Authorization: `Bearer ${token}` } });
+              const existingData = await safeJson(existingRes);
+              const baseEvent = existingRes.ok ? existingData.data : {};
               const googleCreated = await createGoogleMeetEvent(gcalToken, {
-                title: savedAgenda.title, description: savedAgenda.description,
-                start_at: savedAgenda.start_at, end_at: savedAgenda.end_at || savedAgenda.start_at,
-                guestEmail,
+                title: form.titulo.trim(), description: form.descripcion || null,
+                start_at: startAt, end_at: endAt, guestEmail,
               });
               const meetUrl = googleCreated?.hangoutLink || googleCreated?.conferenceData?.entryPoints?.[0]?.uri || null;
-              await fetch(`/api/agenda/${savedAgenda.id}`, {
+              const putRes = await fetch(`/api/agenda/${linkedAgendaId}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
                 body: JSON.stringify({
-                  ...savedAgenda, source: "manual", external_provider: "google",
+                  ...baseEvent,
+                  start_at: startAt, end_at: endAt, all_day: false, type: "cita", status: "pendiente",
+                  source: "manual", external_provider: "google",
                   external_id: googleCreated?.id, external_url: googleCreated?.htmlLink, meet_url: meetUrl,
                 }),
               });
-            }
-          } catch (meetErr: any) {
-            if (meetErr.message === "GCAL_AUTH_EXPIRED") {
-              setGcalToken(null);
-              try { sessionStorage.removeItem(GCAL_TOKEN_KEY); } catch {}
-              setGcalError("La tarea se guardó, pero tu sesión de Google había caducado y no se pudo crear la videollamada. Conecta de nuevo e inténtalo otra vez.");
-            } else {
-              setGcalError(`La tarea se guardó, pero no se pudo crear la videollamada: ${meetErr.message || "error desconocido"}.`);
+              if (putRes.ok && meetUrl) {
+                createdTask = { ...createdTask, meet_url: meetUrl };
+              }
+            } catch (meetErr: any) {
+              if (meetErr.message === "GCAL_AUTH_EXPIRED") {
+                setGcalToken(null);
+                try { sessionStorage.removeItem(GCAL_TOKEN_KEY); } catch {}
+                setGcalError("La tarea se guardó, pero tu sesión de Google había caducado y no se pudo crear la videollamada. Conecta de nuevo e inténtalo otra vez.");
+              } else {
+                setGcalError(`La tarea se guardó, pero no se pudo crear la videollamada: ${meetErr.message || "error desconocido"}.`);
+              }
             }
           }
         }
 
+        setTareas((prev) => [createdTask, ...prev]);
         setForm({
           ...TAREA_EMPTY,
           expediente: expedienteRef || "",
@@ -1667,6 +1672,12 @@ function TabTareas({
                     {t.importe != null && Number(t.importe) > 0 && <span className="flex items-center gap-1 text-emerald-600 font-semibold">{Number(t.importe).toLocaleString("es-ES", { minimumFractionDigits: 2 })} €</span>}
                     {t.etapa && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">{t.etapa}</span>}
                     {t.created_by && <span className="flex items-center gap-1 text-slate-400"><User size={10} /> {/^user_[A-Za-z0-9]+$/.test(t.created_by) ? "Usuario" : t.created_by}</span>}
+                    {t.meet_url && (
+                      <a href={t.meet_url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors">
+                        <Video size={10} /> Unirse a videollamada
+                      </a>
+                    )}
                   </div>
                   {t.notas && <div className="mt-2 px-2 py-1.5 bg-amber-50 border border-amber-100 rounded-lg text-[11px] text-amber-800 leading-relaxed"><span className="font-bold">Nota: </span>{t.notas}</div>}
                 </div>

@@ -156,9 +156,11 @@ export const getMyTasks = async (req: any, res: Response) => {
   try {
     const result = await pool.query(
       `SELECT ct.*,
-              COALESCE(e.commercial_name, e.first_name || ' ' || COALESCE(e.last_name,'')) AS client_name_resolved
+              COALESCE(e.commercial_name, e.first_name || ' ' || COALESCE(e.last_name,'')) AS client_name_resolved,
+              ag.meet_url AS meet_url
        FROM client_tasks ct
        LEFT JOIN entities e ON e.id = ct.client_id
+       LEFT JOIN agenda_events ag ON ag.id = ct.agenda_event_id
        WHERE ct.user_id = $1
        ORDER BY
          CASE ct.estado WHEN 'urgente' THEN 0 WHEN 'pendiente' THEN 1 ELSE 2 END,
