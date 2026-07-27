@@ -430,9 +430,15 @@ function EventModal({
   return createPortal(
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative w-full max-w-6xl overflow-hidden rounded-[30px] border border-slate-200 bg-[#fbfcfe] shadow-[0_40px_100px_rgba(15,23,42,0.22)] animate-in zoom-in-95 duration-200">
-        {/* cabecera */}
-        <div className="border-b border-slate-200 bg-white px-6 pb-5 pt-5">
+      <div className="relative flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-[30px] border border-slate-200 bg-[#fbfcfe] shadow-[0_40px_100px_rgba(15,23,42,0.22)] animate-in zoom-in-95 duration-200">
+        {/* cabecera -- flex-shrink-0: el modal completo (cabecera + Guardar +
+            el area de detalles) no puede superar el 90vh de arriba, así que
+            la cabecera se queda fija y solo el formulario de más abajo
+            scrollea por dentro; antes, sin este límite, si el contenido era
+            más alto que la ventana el modal se salía sin ninguna forma de
+            hacer scroll para llegar a verlo entero (ni siquiera con scroll
+            de página, porque vive en un contenedor position:fixed). */}
+        <div className="flex-shrink-0 border-b border-slate-200 bg-white px-6 pb-5 pt-5">
           <div className="flex items-start justify-between gap-4">
             <div className="flex min-w-0 flex-1 items-start gap-3">
               <BackButton onClick={onClose} />
@@ -495,12 +501,12 @@ function EventModal({
         </div>
 
         {errorMsg && (
-          <div className="px-5 py-2 bg-red-50 border-b border-red-200 text-xs text-red-700 font-medium">
+          <div className="flex-shrink-0 px-5 py-2 bg-red-50 border-b border-red-200 text-xs text-red-700 font-medium">
             {errorMsg}
           </div>
         )}
 
-        <form id="agenda-event-form" onSubmit={handleSubmit} className="grid gap-6 overflow-y-auto max-h-[72vh] px-6 py-6 lg:grid-cols-[minmax(0,1.4fr)_320px]">
+        <form id="agenda-event-form" onSubmit={handleSubmit} className="grid min-h-0 flex-1 gap-6 overflow-y-auto px-6 py-6 lg:grid-cols-[minmax(0,1.4fr)_320px]">
           {/* Título */}
           <div className="hidden">
             <label className="block text-xs font-bold text-slate-700 mb-1">Título <span className="text-red-500">*</span></label>
