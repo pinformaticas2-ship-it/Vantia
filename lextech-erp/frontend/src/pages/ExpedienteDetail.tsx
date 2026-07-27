@@ -1116,6 +1116,28 @@ function TabTareas({
   const [search, setSearch] = useState("");
   const [confirmDeleteTareaId, setConfirmDeleteTareaId] = useState<string | null>(null);
 
+  // Videollamada (Google Meet) opcional al crear la tarea/plazo -- mismo
+  // patrón y misma sesión de Google (sessionStorage compartido) que la
+  // pestaña Agenda del expediente.
+  const [gcalToken, setGcalToken] = useState<string | null>(() => {
+    try { return sessionStorage.getItem(GCAL_TOKEN_KEY); } catch { return null; }
+  });
+  const [gcalError, setGcalError] = useState<string | null>(null);
+  const [withMeet, setWithMeet] = useState(false);
+  const [meetHora, setMeetHora] = useState("10:00");
+  const [guestEmail, setGuestEmail] = useState("");
+
+  const connectGcal = async () => {
+    setGcalError(null);
+    try {
+      const token = await requestGoogleCalendarToken();
+      setGcalToken(token);
+      try { sessionStorage.setItem(GCAL_TOKEN_KEY, token); } catch {}
+    } catch (e: any) {
+      setGcalError(e.message || "No se pudo conectar con Google Calendar.");
+    }
+  };
+
   const { pending: pendingTareaDelete, startDelete: startTareaDelete, undo: undoTareaDelete, dismiss: dismissTareaDelete } = useUndoDelete<any>({
     onDelete: async (id: string) => {
       const token = await getToken({ skipCache: true });
@@ -1191,6 +1213,53 @@ function TabTareas({
       const data = await safeJson(res);
       if (res.ok) {
         setTareas((prev) => [data.data, ...prev]);
+
+        // Videollamada opcional: crea además un evento de agenda (con Meet)
+        // en la fecha límite, para que la tarea también tenga hueco en el
+        // calendario y un enlace al que unirse -- igual que ya hace la
+        // pestaña Agenda del expediente.
+        if (withMeet && gcalToken && form.plazo) {
+          try {
+            const startAt = `${form.plazo}T${meetHora}:00`;
+            const endAt = new Date(new Date(startAt).getTime() + 3600000).toISOString().slice(0, 19);
+            const agRes = await fetch("/api/agenda", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+              body: JSON.stringify({
+                title: form.titulo.trim(), type: "cita", start_at: startAt, end_at: endAt,
+                all_day: false, description: form.descripcion || null, status: "pendiente",
+                expediente_id: expedienteId, source: "manual",
+              }),
+            });
+            const agData = await safeJson(agRes);
+            if (agRes.ok) {
+              const savedAgenda = agData.data;
+              const googleCreated = await createGoogleMeetEvent(gcalToken, {
+                title: savedAgenda.title, description: savedAgenda.description,
+                start_at: savedAgenda.start_at, end_at: savedAgenda.end_at || savedAgenda.start_at,
+                guestEmail,
+              });
+              const meetUrl = googleCreated?.hangoutLink || googleCreated?.conferenceData?.entryPoints?.[0]?.uri || null;
+              await fetch(`/api/agenda/${savedAgenda.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                body: JSON.stringify({
+                  ...savedAgenda, source: "manual", external_provider: "google",
+                  external_id: googleCreated?.id, external_url: googleCreated?.htmlLink, meet_url: meetUrl,
+                }),
+              });
+            }
+          } catch (meetErr: any) {
+            if (meetErr.message === "GCAL_AUTH_EXPIRED") {
+              setGcalToken(null);
+              try { sessionStorage.removeItem(GCAL_TOKEN_KEY); } catch {}
+              setGcalError("La tarea se guardó, pero tu sesión de Google había caducado y no se pudo crear la videollamada. Conecta de nuevo e inténtalo otra vez.");
+            } else {
+              setGcalError(`La tarea se guardó, pero no se pudo crear la videollamada: ${meetErr.message || "error desconocido"}.`);
+            }
+          }
+        }
+
         setForm({
           ...TAREA_EMPTY,
           expediente: expedienteRef || "",
@@ -1198,6 +1267,7 @@ function TabTareas({
           juzgado: juzgado || "",
           num_proc: numProc || "",
         });
+        setWithMeet(false); setGuestEmail("");
         setShowForm(false);
         window.dispatchEvent(new CustomEvent("historial-changed"));
       } else {
@@ -1409,6 +1479,43 @@ function TabTareas({
               </select>
             </div>
           </div>
+
+          <div className="rounded-lg border border-slate-100 bg-slate-50/60 p-3">
+            <div className="flex flex-wrap items-center gap-4">
+              {gcalToken ? (
+                <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
+                  <input type="checkbox" checked={withMeet} onChange={(e) => setWithMeet(e.target.checked)} className="rounded" disabled={!form.plazo} />
+                  <Video size={12} className="text-emerald-600" /> Añadir videollamada (Google Meet)
+                </label>
+              ) : (
+                <button type="button" onClick={connectGcal} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-emerald-600 transition-colors">
+                  <Video size={12} /> Conectar Google Meet
+                </button>
+              )}
+              {gcalToken && !form.plazo && (
+                <span className="text-[11px] text-slate-400">Indica la fecha límite para poder añadir la videollamada ahí.</span>
+              )}
+            </div>
+            {withMeet && form.plazo && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Hora de la videollamada</label>
+                  <input type="time" value={meetHora} onChange={(e) => setMeetHora(e.target.value)} className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-red-400 mt-0.5 bg-white" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Invitar por correo (opcional)</label>
+                  <input type="email" value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)} placeholder="correo@ejemplo.com" className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-red-400 mt-0.5 bg-white" />
+                </div>
+              </div>
+            )}
+            {gcalError && (
+              <div className="flex items-start justify-between gap-2 mt-2 text-[11px] text-amber-700">
+                <span>{gcalError}</span>
+                <button type="button" onClick={() => setGcalError(null)} className="shrink-0 text-amber-500 hover:text-amber-700"><X size={11} /></button>
+              </div>
+            )}
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Expediente</label>
