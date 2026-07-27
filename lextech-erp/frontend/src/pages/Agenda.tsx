@@ -507,6 +507,15 @@ function EventModal({
         )}
 
         <form id="agenda-event-form" onSubmit={handleSubmit} className="grid min-h-0 flex-1 gap-6 overflow-y-auto px-6 py-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+          {/* Todas las tarjetas de esta columna van agrupadas en un único grid
+              item (en vez de cada una suelta con lg:col-start-1): sin este
+              wrapper, el grid las auto-colocaba cada una en su propia fila
+              (fila 1, 2, 3, 4...) y "Resumen" -- sin fila explícita, más
+              abajo en el DOM -- se auto-colocaba DESPUÉS de todas ellas en
+              vez de alinearse con la primera, dejando vacías las filas 1-3
+              de la columna derecha (el hueco que se veía arriba a la
+              derecha) y "Resumen" aparecía mucho más abajo de lo esperado. */}
+          <div className="space-y-6 lg:col-start-1">
           {/* Título */}
           <div className="hidden">
             <label className="block text-xs font-bold text-slate-700 mb-1">Título <span className="text-red-500">*</span></label>
@@ -520,7 +529,7 @@ function EventModal({
           </div>
 
           {/* Tipo + Estado */}
-          <div className={`rounded-[28px] border p-5 shadow-[0_16px_40px_rgba(15,23,42,0.05)] lg:col-start-1 ${activeTab === "details" ? "border-red-100 bg-gradient-to-br from-white to-red-50/40" : "border-red-100 bg-white"}`}>
+          <div className={`rounded-[28px] border p-5 shadow-[0_16px_40px_rgba(15,23,42,0.05)] ${activeTab === "details" ? "border-red-100 bg-gradient-to-br from-white to-red-50/40" : "border-red-100 bg-white"}`}>
             <div className="mb-5 flex items-center gap-6 border-b border-slate-200 pb-3 text-sm font-semibold">
               <button
                 type="button"
@@ -639,7 +648,7 @@ function EventModal({
           </div>
 
           {/* Lugar */}
-          <div className={`rounded-[28px] border p-5 shadow-[0_16px_40px_rgba(15,23,42,0.05)] lg:col-start-1 ${activeTab === "details" ? "border-red-100 bg-white" : "hidden"}`}>
+          <div className={`rounded-[28px] border p-5 shadow-[0_16px_40px_rgba(15,23,42,0.05)] ${activeTab === "details" ? "border-red-100 bg-white" : "hidden"}`}>
             <label className="block text-xs font-bold text-slate-700 mb-1">Lugar / ubicación</label>
             <input
               value={form.location}
@@ -650,7 +659,7 @@ function EventModal({
           </div>
 
           {/* Descripción */}
-          <div className={`rounded-[28px] border p-5 shadow-[0_16px_40px_rgba(15,23,42,0.05)] lg:col-start-1 ${activeTab === "details" ? "border-red-100 bg-white" : "hidden"}`}>
+          <div className={`rounded-[28px] border p-5 shadow-[0_16px_40px_rgba(15,23,42,0.05)] ${activeTab === "details" ? "border-red-100 bg-white" : "hidden"}`}>
             <label className="block text-xs font-bold text-slate-700 mb-1">Notas</label>
             <textarea
               value={form.description}
@@ -661,7 +670,7 @@ function EventModal({
             />
           </div>
 
-          <div className={`rounded-[28px] border p-5 shadow-[0_16px_40px_rgba(15,23,42,0.05)] lg:col-start-1 ${activeTab === "organization" ? "border-red-100 bg-gradient-to-br from-white to-red-50/40" : "hidden"}`}>
+          <div className={`rounded-[28px] border p-5 shadow-[0_16px_40px_rgba(15,23,42,0.05)] ${activeTab === "organization" ? "border-red-100 bg-gradient-to-br from-white to-red-50/40" : "hidden"}`}>
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Contexto</label>
@@ -740,6 +749,7 @@ function EventModal({
                 <p className="mt-1">Puedes seleccionar un expediente existente, un usuario existente vinculado a ese expediente y dejar por escrito el contexto del evento.</p>
               </div>
             </div>
+          </div>
           </div>
 
           <div className="space-y-4 lg:col-start-2">
