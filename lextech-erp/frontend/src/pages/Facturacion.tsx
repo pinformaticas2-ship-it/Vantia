@@ -14,6 +14,7 @@ import {
   Clock,
   ExternalLink,
   FileSpreadsheet,
+  Landmark,
   LineChart,
   Link as LinkIcon,
   Loader2,
@@ -2087,9 +2088,9 @@ function FacturacionContent() {
 
   useEffect(() => {
     if (!quipuStatus.connected) return;
-    if ((tab === "dashboard" || tab === "bank_accounts") && quipuBankAccounts.length === 0) loadQuipuBankAccounts();
+    if ((tab === "dashboard" || tab === "bank_accounts" || tab === "analitica") && quipuBankAccounts.length === 0) loadQuipuBankAccounts();
     if (tab === "contacts"      && quipuContacts.length === 0)     loadQuipuContacts();
-    if (tab === "receipts"      && quipuReceipts.length === 0)     loadQuipuReceipts();
+    if ((tab === "receipts" || tab === "analitica") && quipuReceipts.length === 0) loadQuipuReceipts();
   }, [tab, quipuStatus.connected]);
 
   useEffect(() => {
@@ -2993,6 +2994,57 @@ function FacturacionContent() {
                         </div>
                       </OdooSection>
                     </div>
+
+                    {/* Datos de Quipu (en vivo, complementarios al ERP) */}
+                    {(() => {
+                      const quipuBalanceTotal = quipuBankAccounts.reduce((s, a) => s + (a.balance || 0), 0);
+                      const quipuCobrosAnio = quipuReceipts.filter((r) => r.settlementDate?.startsWith(String(filterYear)));
+                      const quipuCobrosTotal = quipuCobrosAnio.reduce((s, r) => s + (r.amount || 0), 0);
+                      return (
+                        <OdooSection
+                          title="Datos de Quipu"
+                          subtitle="Saldo bancario y cobros reales desde Quipu, en tiempo real (no incluidos en los KPIs del ERP de arriba)."
+                          action={
+                            quipuStatus.connected ? (
+                              <button onClick={() => { loadQuipuBankAccounts(); loadQuipuReceipts(); }} disabled={loadingQuipu} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50">
+                                <RefreshCw size={12} className={loadingQuipu ? "animate-spin" : ""} /> Actualizar
+                              </button>
+                            ) : undefined
+                          }
+                        >
+                          {!quipuStatus.connected ? (
+                            <div className="flex flex-col items-center gap-3 py-6 text-center">
+                              <p className="text-sm text-slate-400">Conecta Quipu para ver aquí el saldo bancario y los cobros reales.</p>
+                              <button onClick={() => { setTab("config"); }} className="inline-flex items-center gap-2 rounded-xl bg-red-700 px-4 py-2 text-xs font-bold text-white hover:bg-red-800">
+                                <ExternalLink size={13} /> Ir a Configuración
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col gap-5">
+                              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <AnaliticaKpiCard icon={Landmark} iconBg="bg-teal-100" iconColor="text-teal-600"
+                                  label="Saldo en cuentas bancarias" value={fmtEur(quipuBalanceTotal)}
+                                  footer={<span className="text-[10px] text-slate-400">{quipuBankAccounts.length} {quipuBankAccounts.length === 1 ? "cuenta sincronizada" : "cuentas sincronizadas"}</span>} />
+                                <AnaliticaKpiCard icon={Banknote} iconBg="bg-emerald-100" iconColor="text-emerald-600"
+                                  label="Cobros registrados en Quipu" value={fmtEur(quipuCobrosTotal)}
+                                  footer={<span className="text-[10px] text-slate-400">{quipuCobrosAnio.length} cobros · Año {filterYear}</span>} />
+                              </div>
+                              {quipuBankAccounts.length > 0 && (
+                                <div className="flex flex-col gap-1.5">
+                                  {quipuBankAccounts.map((a) => (
+                                    <div key={a.id} className="flex items-center gap-2 text-xs">
+                                      <Building2 size={13} className="shrink-0 text-slate-400" />
+                                      <span className="flex-1 truncate text-slate-600">{a.name}{a.bankName ? ` · ${a.bankName}` : ""}</span>
+                                      <span className="font-bold text-slate-800">{fmtEur(a.balance)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </OdooSection>
+                      );
+                    })()}
                   </div>
                 );
               })()}
