@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AlertTriangle, Bell, Building2, Camera, Check, Loader2, Lock, Palette, Plug, Plus, ShieldCheck, Trash2, UsersRound, X } from 'lucide-react';
+import { AlertTriangle, Bell, BookOpen, Building2, Camera, Check, Loader2, Lock, Palette, Plug, Plus, ShieldCheck, Trash2, UsersRound, X } from 'lucide-react';
 import { useAuth } from '@clerk/clerk-react';
 import { useTheme, AppTheme } from '../lib/ThemeContext';
 import { apiFetch, resolveUploadUrl, setActiveOrganizacionId } from '../lib/api';
 import { useOrganizacion, OrgRol } from '../lib/useOrganizacion';
+import ManualPanel from './ManualPanel';
 
 const PALETTES: {
   id: AppTheme;
@@ -37,7 +38,7 @@ const PALETTES: {
   },
 ];
 
-type SectionKey = 'apariencia' | 'notificaciones' | 'despacho' | 'seguridad' | 'integraciones' | 'usuarios';
+type SectionKey = 'apariencia' | 'manual' | 'notificaciones' | 'despacho' | 'seguridad' | 'integraciones' | 'usuarios';
 
 const OTHER_SECTIONS: { key: SectionKey; label: string; desc: string; icon: any }[] = [
   { key: 'notificaciones', label: 'Notificaciones',        desc: 'Configura alertas por email y avisos emergentes del sistema.',            icon: Bell },
@@ -869,6 +870,14 @@ export default function Configuracion() {
             >
               <Palette size={16} className={activeSection === 'apariencia' ? 'text-red-500' : 'text-slate-400'} /> Apariencia
             </button>
+            <button
+              onClick={() => setActiveSection('manual')}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg font-semibold text-sm transition-colors text-left ${
+                activeSection === 'manual' ? 'bg-red-50 text-red-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium'
+              }`}
+            >
+              <BookOpen size={16} className={activeSection === 'manual' ? 'text-red-500' : 'text-slate-400'} /> Manual de usuario
+            </button>
             {OTHER_SECTIONS.map((s, i) => {
               const Icon = s.icon;
               const active = activeSection === s.key;
@@ -948,6 +957,8 @@ export default function Configuracion() {
                 </div>
               </section>
             </>
+          ) : activeSection === 'manual' ? (
+            <ManualPanel />
           ) : activeSection === 'despacho' ? (
             <DespachoPanel />
           ) : activeSection === 'usuarios' ? (
