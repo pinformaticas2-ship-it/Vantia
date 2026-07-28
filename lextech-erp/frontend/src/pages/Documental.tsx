@@ -365,6 +365,8 @@ export default function Documental() {
     const hasAdvanced = Object.values(boeAdvanced).some((item) => item.trim());
     if (!value && !hasAdvanced) {
       setBoeError("Escribe un identificador BOE, una referencia o usa algún filtro avanzado.");
+      setBoeDocument(null);
+      setBoeSearchMode(null);
       return;
     }
 
@@ -512,6 +514,31 @@ export default function Documental() {
             </div>
           )}
 
+          {boeRecent.length > 0 && (
+            <div className="mt-4">
+              <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-400">
+                <Clock size={12} /> Consultadas recientemente
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {boeRecent.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => { setBoeId(item.id); setBoeSearchMode("id"); setBoeSearchResults([]); setBoeError(null); void fetchBoeDocument(item.id); }}
+                    title={item.titulo || item.id}
+                    className={`max-w-[240px] truncate rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors ${
+                      boeDocument?.id === item.id
+                        ? "border-[#ab0433]/30 bg-red-50/60 text-[#ab0433]"
+                        : "border-slate-200 bg-white text-slate-600 hover:border-[#ab0433]/30 hover:bg-red-50/40"
+                    }`}
+                  >
+                    {item.titulo || item.id}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {boeError && (
             <div className="mt-4 flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               <AlertCircle size={14} className="shrink-0" /> {boeError}
@@ -567,27 +594,6 @@ export default function Documental() {
             <div className="mt-5 flex flex-col items-center gap-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 px-6 py-10 text-center">
               <Landmark size={28} className="text-slate-300" />
               <p className="text-sm text-slate-400">Escribe un identificador BOE o texto para buscar normas consolidadas</p>
-            </div>
-          )}
-
-          {!boeDocument && boeSearchMode !== "search" && boeRecent.length > 0 && (
-            <div className="mt-4">
-              <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-400">
-                <Clock size={12} /> Consultadas recientemente
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {boeRecent.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => { setBoeId(item.id); setBoeSearchMode("id"); void fetchBoeDocument(item.id); }}
-                    title={item.titulo || item.id}
-                    className="max-w-[240px] truncate rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-medium text-slate-600 hover:border-[#ab0433]/30 hover:bg-red-50/40 transition-colors"
-                  >
-                    {item.titulo || item.id}
-                  </button>
-                ))}
-              </div>
             </div>
           )}
 
