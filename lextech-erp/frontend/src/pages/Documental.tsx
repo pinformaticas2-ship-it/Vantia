@@ -1,12 +1,37 @@
-﻿import { useCallback, useEffect, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import { Spinner } from "../components/Spinner";
 import { createPortal } from "react-dom";
 import { useAuth } from "@clerk/clerk-react";
 import {
   Library, Landmark, Scale, ShieldCheck, Search, Loader2, ExternalLink,
   FileText, BookOpen, Link2, AlertCircle, CheckCircle2, X, ChevronDown,
+  Copy, Check, BookmarkPlus, Clock, Briefcase,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
+
+// ── Búsquedas recientes (localStorage) ──────────────────────────────────────
+// Puramente local: no hay endpoint de "historial de búsquedas" en el backend,
+// y no hace falta uno para algo tan ligero -- guardamos las últimas consultas
+// BOE vistas para no obligar a repetir la búsqueda cada vez que se vuelve al
+// módulo.
+const BOE_RECENT_KEY = "vantia_boe_recientes_v1";
+const BOE_RECENT_MAX = 8;
+interface BoeRecentItem { id: string; titulo: string | null; viewedAt: string }
+function loadBoeRecent(): BoeRecentItem[] {
+  try {
+    const raw = localStorage.getItem(BOE_RECENT_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch { return []; }
+}
+function pushBoeRecent(item: BoeRecentItem) {
+  try {
+    const current = loadBoeRecent().filter((entry) => entry.id !== item.id);
+    const next = [item, ...current].slice(0, BOE_RECENT_MAX);
+    localStorage.setItem(BOE_RECENT_KEY, JSON.stringify(next));
+    return next;
+  } catch { return loadBoeRecent(); }
+}
 
 interface ProviderInfo {
   key: string;
@@ -77,6 +102,147 @@ interface BoeAdvancedFilters {
   yearTo: string;
 }
 
+interface ExpedienteOption {
+  id: string;
+  anio: number;
+  num_exp: number;
+  descripcion: string | null;
+  cliente_nombre: string | null;
+}
+
+// ── Guardar una referencia (documento o bloque) como nota del expediente ────
+// Reutiliza POST /api/expedientes/:id/notes (categoría "legal", ya existente
+// para cualquier nota) en vez de montar una tabla/endpoint nuevo solo para
+// esto -- es justo lo que esa categoría ya está pensada para guardar.
+function GuardarEnExpedienteModal({ content, onClose, getToken }: {
+  content: { titulo: string; cuerpo: string };
+  onClose: (saved: boolean) => void;
+  getToken: (opts?: { skipCache?: boolean }) => Promise<string | null>;
+}) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<ExpedienteOption[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [selected, setSelected] = useState<ExpedienteOption | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    const handle = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const data = await apiFetch(`/api/expedientes?limit=8${query.trim() ? `&q=${encodeURIComponent(query.trim())}` : ""}`, { getToken });
+        setResults(data?.data || []);
+      } catch {
+        setResults([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 250);
+    return () => clearTimeout(handle);
+  }, [query, getToken]);
+
+  const handleSave = async () => {
+    if (!selected) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const data = await apiFetch(`/api/expedientes/${selected.id}/notes`, {
+        getToken,
+        method: "POST",
+        body: JSON.stringify({ content: content.cuerpo, category: "legal" }),
+      });
+      if (data?.success === false) throw new Error(data.error || "No se pudo guardar la referencia.");
+      setSaved(true);
+      setTimeout(() => onClose(true), 900);
+    } catch (e: any) {
+      setError(e.message || "No se pudo guardar la referencia.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 z-[110] bg-black/30 backdrop-blur-sm flex items-center justify-center px-4" onClick={() => onClose(false)}>
+      <div className="w-full max-w-md overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-[#ab0433]">Guardar en expediente</p>
+            <h3 className="mt-1 truncate text-sm font-semibold text-slate-900">{content.titulo}</h3>
+          </div>
+          <button type="button" onClick={() => onClose(false)} className="shrink-0 rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors">
+            <X size={15} />
+          </button>
+        </div>
+
+        <div className="px-5 py-4 space-y-3">
+          {saved ? (
+            <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+              <CheckCircle2 size={16} /> Guardado como nota del expediente.
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 focus-within:border-emerald-300 focus-within:bg-white transition-colors">
+                <Search size={13} className="text-slate-400 shrink-0" />
+                <input
+                  autoFocus
+                  value={query}
+                  onChange={(e) => { setQuery(e.target.value); setSelected(null); }}
+                  placeholder="Buscar expediente por referencia, cliente..."
+                  className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
+                />
+                {searching && <Loader2 size={13} className="animate-spin text-slate-400 shrink-0" />}
+              </div>
+
+              <div className="max-h-56 space-y-1.5 overflow-y-auto">
+                {results.length === 0 && !searching && (
+                  <p className="px-1 py-2 text-xs text-slate-400">
+                    {query.trim() ? "Sin expedientes con esa búsqueda." : "Escribe para buscar o elige de los más recientes."}
+                  </p>
+                )}
+                {results.map((exp) => (
+                  <button
+                    key={exp.id}
+                    type="button"
+                    onClick={() => setSelected(exp)}
+                    className={`w-full flex items-center gap-2.5 rounded-xl border px-3.5 py-2.5 text-left transition-colors ${
+                      selected?.id === exp.id ? "border-emerald-300 bg-emerald-50" : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                    }`}
+                  >
+                    <Briefcase size={13} className="shrink-0 text-slate-400" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-bold text-slate-700">{exp.anio}/{exp.num_exp}</p>
+                      <p className="truncate text-xs text-slate-500">{exp.descripcion || exp.cliente_nombre || "Sin descripción"}</p>
+                    </div>
+                    {selected?.id === exp.id && <Check size={14} className="shrink-0 text-emerald-600" />}
+                  </button>
+                ))}
+              </div>
+
+              {error && (
+                <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs text-red-700">
+                  <AlertCircle size={13} className="shrink-0" /> {error}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={!selected || saving}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#ab0433] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#92042c] disabled:opacity-50 transition-colors"
+              >
+                {saving ? <Loader2 size={14} className="animate-spin" /> : <BookmarkPlus size={14} />}
+                Guardar como nota
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 export default function Documental() {
   const { getToken } = useAuth();
   const [providers, setProviders] = useState<Record<string, ProviderInfo> | null>(null);
@@ -106,6 +272,29 @@ export default function Documental() {
   const [activeTab, setActiveTab] = useState<"boe" | "cendoj" | "lexnet">("boe");
   const [showBoeAdvanced, setShowBoeAdvanced] = useState(false);
 
+  const [boeRecent, setBoeRecent] = useState<BoeRecentItem[]>(() => loadBoeRecent());
+  const [copiedCitation, setCopiedCitation] = useState<string | null>(null);
+  const [saveTarget, setSaveTarget] = useState<{ titulo: string; cuerpo: string } | null>(null);
+
+  const copyToClipboard = useCallback(async (text: string, key: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedCitation(key);
+      setTimeout(() => setCopiedCitation((k) => (k === key ? null : k)), 1600);
+    } catch { /* portapapeles no disponible (permiso denegado, http sin TLS...) */ }
+  }, []);
+
+  const documentCitation = useMemo(() => {
+    if (!boeDocument) return "";
+    const titulo = boeDocument.titulo || "Norma BOE";
+    const meta = [
+      boeDocument.rango,
+      boeDocument.id,
+      boeDocument.fecha_publicacion ? `BOE de ${boeDocument.fecha_publicacion}` : null,
+    ].filter(Boolean).join(", ");
+    return `${titulo}${meta ? ` (${meta})` : ""}. ${boeDocument.urlHtml}`;
+  }, [boeDocument]);
+
   const fetchProviders = useCallback(async () => {
     try {
       setLoadingProviders(true);
@@ -128,6 +317,9 @@ export default function Documental() {
       const data = await apiFetch(`/api/documental/boe/document/${encodeURIComponent(id.trim())}`, { getToken });
       if (data?.success === false) throw new Error(data.error || "No se pudo consultar el BOE.");
       setBoeDocument(data.data || null);
+      if (data.data?.id) {
+        setBoeRecent(pushBoeRecent({ id: data.data.id, titulo: data.data.titulo, viewedAt: new Date().toISOString() }));
+      }
     } catch (e: any) {
       setBoeDocument(null);
       setBoeError(e.message || "No se pudo consultar el BOE.");
@@ -378,6 +570,27 @@ export default function Documental() {
             </div>
           )}
 
+          {!boeDocument && boeSearchMode !== "search" && boeRecent.length > 0 && (
+            <div className="mt-4">
+              <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-400">
+                <Clock size={12} /> Consultadas recientemente
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {boeRecent.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => { setBoeId(item.id); setBoeSearchMode("id"); void fetchBoeDocument(item.id); }}
+                    title={item.titulo || item.id}
+                    className="max-w-[240px] truncate rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-medium text-slate-600 hover:border-[#ab0433]/30 hover:bg-red-50/40 transition-colors"
+                  >
+                    {item.titulo || item.id}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {boeDocument && (
             <div className="mt-5 space-y-4">
               <div className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-5">
@@ -397,7 +610,22 @@ export default function Documental() {
                       </div>
                     )}
                   </div>
-                  <div className="flex gap-2 shrink-0">
+                  <div className="flex flex-wrap justify-end gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => void copyToClipboard(documentCitation, "document")}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                    >
+                      {copiedCitation === "document" ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                      {copiedCitation === "document" ? "Copiada" : "Copiar cita"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSaveTarget({ titulo: boeDocument.titulo || boeDocument.id, cuerpo: `📚 ${documentCitation}` })}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                    >
+                      <BookmarkPlus size={12} /> Guardar en expediente
+                    </button>
                     <a href={boeDocument.urlHtml} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
                       <ExternalLink size={12} /> Abrir BOE
                     </a>
@@ -580,6 +808,31 @@ export default function Documental() {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cita = `${selectedBlock.titulo || selectedBlock.id || "Artículo"} — ${selectedBlock.documentId}. ${selectedBlock.htmlUrl}`;
+                      void copyToClipboard(cita, "block");
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                  >
+                    {copiedCitation === "block" ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                    {copiedCitation === "block" ? "Copiada" : "Copiar cita"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cuerpo = [
+                        `📚 ${selectedBlock.titulo || selectedBlock.id || "Artículo"} (${selectedBlock.documentId})`,
+                        selectedBlock.paragraphs[0] || null,
+                        selectedBlock.htmlUrl,
+                      ].filter(Boolean).join("\n\n");
+                      setSaveTarget({ titulo: selectedBlock.titulo || selectedBlock.id || "Artículo BOE", cuerpo });
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                  >
+                    <BookmarkPlus size={12} /> Guardar en expediente
+                  </button>
                   <a href={selectedBlock.htmlUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
                     <ExternalLink size={12} /> Abrir en BOE
                   </a>
@@ -593,6 +846,14 @@ export default function Documental() {
         </div>
       </div>,
       document.body
+    )}
+
+    {saveTarget && (
+      <GuardarEnExpedienteModal
+        content={saveTarget}
+        getToken={getToken}
+        onClose={() => setSaveTarget(null)}
+      />
     )}
     </>
   );
