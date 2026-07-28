@@ -3298,6 +3298,8 @@ function BankAccountsTab({
   });
 
   const pendingCount = transactions.filter(tx => !reviewed.has(tx.id)).length;
+  const totalBalance = manualAccounts.reduce((s, a) => s + a.balance, 0) + accounts.reduce((s, a) => s + a.balance, 0);
+  const hasAnyAccount = manualAccounts.length > 0 || accounts.length > 0;
 
   if (!connected) {
     return <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-8 text-center text-sm text-amber-700">Conecta Quipu para ver cuentas bancarias.</div>;
@@ -3308,8 +3310,15 @@ function BankAccountsTab({
       {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h3 className="text-base font-bold text-slate-800">Bancos</h3>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <h3 className="text-base font-bold text-slate-800">Bancos</h3>
+          {!selectedId && hasAnyAccount && (
+            <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold ${totalBalance >= 0 ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-700"}`}>
+              <Landmark size={12} /> Saldo total: {fmtEur(totalBalance)}
+            </span>
+          )}
+        </div>
         <button onClick={onRefresh} disabled={loading} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50">
           <RefreshCw size={12} className={loading ? "animate-spin" : ""} /> Actualizar
         </button>
@@ -3356,10 +3365,26 @@ function BankAccountsTab({
 
       {/* Account cards */}
       {!selectedId ? (
+        !hasAnyAccount && !loading ? (
+          <div className="flex flex-col items-center justify-center gap-4 rounded-3xl border-2 border-dashed border-slate-200 bg-gradient-to-b from-white to-slate-50 px-8 py-16 text-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-red-100 text-red-600">
+              <Landmark size={28} />
+            </div>
+            <div>
+              <h4 className="text-base font-bold text-slate-800">Aún no tienes cuentas bancarias</h4>
+              <p className="mt-1.5 max-w-sm text-sm text-slate-500">
+                Añade una cuenta manualmente para llevar el control del saldo, o sincroniza Quipu desde Configuración para importarlas automáticamente.
+              </p>
+            </div>
+            <button onClick={() => openForm()} className="inline-flex items-center gap-2 rounded-xl bg-red-700 px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-red-800 transition-colors">
+              <Plus size={14} /> Añadir cuenta bancaria
+            </button>
+          </div>
+        ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {/* Manual accounts */}
           {manualAccounts.map(acc => (
-            <div key={acc.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div key={acc.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
               <div className="flex items-start justify-between gap-2 mb-4">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 border border-slate-200 shrink-0">
@@ -3375,15 +3400,15 @@ function BankAccountsTab({
                   <button onClick={() => deleteAcc(acc.id)} className="rounded-lg border border-red-200 p-1.5 hover:bg-red-50"><Trash2 size={12} className="text-red-500" /></button>
                 </div>
               </div>
-              <p className={`text-2xl font-bold ${acc.balance >= 0 ? "text-slate-900" : "text-red-600"}`}>{fmtEur(acc.balance)}</p>
-              <p className="text-[11px] text-slate-400 mt-2">{acc.currency} · Introducida manualmente</p>
+              <p className={`text-2xl font-bold ${acc.balance >= 0 ? "text-emerald-600" : "text-red-600"}`}>{fmtEur(acc.balance)}</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mt-2">{acc.currency} · Introducida manualmente</p>
             </div>
           ))}
 
           {/* Add account button */}
-          <button onClick={() => openForm()} className="rounded-2xl border-2 border-dashed border-slate-300 bg-white p-5 text-center hover:border-blue-300 hover:bg-blue-50 transition-colors group min-h-[140px] flex flex-col items-center justify-center">
-            <Plus size={24} className="text-slate-400 group-hover:text-blue-500 mb-2" />
-            <p className="text-sm font-semibold text-slate-500 group-hover:text-blue-600">Añadir cuenta bancaria</p>
+          <button onClick={() => openForm()} className="rounded-2xl border-2 border-dashed border-slate-300 bg-white p-5 text-center hover:border-red-300 hover:bg-red-50/50 transition-colors group min-h-[140px] flex flex-col items-center justify-center">
+            <Plus size={24} className="text-slate-400 group-hover:text-red-600 mb-2 transition-colors" />
+            <p className="text-sm font-semibold text-slate-500 group-hover:text-red-700 transition-colors">Añadir cuenta bancaria</p>
             <p className="text-xs text-slate-400 mt-1">Introduce el saldo manualmente</p>
           </button>
 
@@ -3392,10 +3417,10 @@ function BankAccountsTab({
           ) : null}
           {accounts.map(acc => (
             <button key={acc.id} onClick={() => onSelectAccount(acc.id)}
-              className="rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm hover:border-blue-300 hover:shadow-md transition-all group">
+              className="rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm hover:border-teal-300 hover:shadow-md transition-all group">
               <div className="flex items-center gap-3 mb-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 border border-blue-100">
-                  <Building2 size={18} className="text-blue-600" />
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-50 border border-teal-100">
+                  <Landmark size={18} className="text-teal-600" />
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-bold text-slate-800 truncate">{acc.name}</p>
@@ -3404,7 +3429,7 @@ function BankAccountsTab({
                   </p>
                 </div>
               </div>
-              <p className={`text-2xl font-bold ${acc.balance >= 0 ? "text-slate-900" : "text-red-600"}`}>
+              <p className={`text-2xl font-bold ${acc.balance >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                 {fmtEur(acc.balance)}
               </p>
               <div className="mt-3 flex items-center justify-between">
@@ -3419,6 +3444,7 @@ function BankAccountsTab({
             </button>
           ))}
         </div>
+        )
       ) : (
         /* Transaction detail view */
         <div className="space-y-4">
@@ -3427,15 +3453,15 @@ function BankAccountsTab({
             <button onClick={() => onSelectAccount(null)} className="text-slate-400 hover:text-slate-700 transition-colors">
               <X size={16} />
             </button>
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 border border-blue-100 shrink-0">
-              <Building2 size={18} className="text-blue-600" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-50 border border-teal-100 shrink-0">
+              <Landmark size={18} className="text-teal-600" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-slate-800">{selectedAcc?.name}</p>
               <p className="text-xs text-slate-500">{selectedAcc?.bankName}{ibanShort ? ` ${ibanShort}` : ""}</p>
             </div>
             <div className="text-right shrink-0">
-              <p className={`text-xl font-bold ${(selectedAcc?.balance ?? 0) >= 0 ? "text-slate-900" : "text-red-600"}`}>
+              <p className={`text-xl font-bold ${(selectedAcc?.balance ?? 0) >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                 {fmtEur(selectedAcc?.balance ?? 0)}
               </p>
               {lastSyncAt && <p className="text-[11px] text-slate-400">Última sincronización {fmtDate(lastSyncAt)}</p>}
