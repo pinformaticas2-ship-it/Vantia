@@ -117,6 +117,11 @@ export function pickSidebarStyle(hex: string): 'light' | 'dark' {
   return relativeLuminance(hex) < 0.45 ? 'dark' : 'light';
 }
 
+/** Texto blanco o casi-negro, el que mejor contraste dé sobre ese fondo. */
+export function contrastText(hex: string): string {
+  return relativeLuminance(hex) > 0.5 ? '#0f172a' : '#ffffff';
+}
+
 /** Deriva un color de borde razonable a partir del color de fondo elegido para la barra lateral. */
 export function autoSidebarBorder(hex: string, style: 'light' | 'dark'): string {
   const [r, g, b] = hexToRgb(hex);
@@ -371,5 +376,17 @@ ${t} .erp-orb-top-right, ${t} .erp-orb-bottom-left {
   background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.8), ${rgba(ramp[600], 0.06)});
 }
 ${t} .erp-panel-bottom-right { border-color: ${rgba(ramp[600], 0.08)}; }
+/* ── Contraste automático: si el color de marca sale claro (posible con un
+   acento personalizado muy claro), el texto/icono blanco que se le pone
+   encima por defecto pasaría a ser invisible — se fuerza texto oscuro. ── */
+${t} .bg-red-500.text-white { color: ${contrastText(ramp[500])} !important; }
+${t} .bg-red-600.text-white { color: ${contrastText(ramp[600])} !important; }
+${t} .bg-red-700.text-white { color: ${contrastText(ramp[700])} !important; }
+${t} .bg-red-800.text-white { color: ${contrastText(ramp[800])} !important; }
+${t} .bg-red-900.text-white { color: ${contrastText(ramp[900])} !important; }
+${t} .bg-\\[\\#ab0433\\].text-white { color: ${contrastText(ramp[600])} !important; }
+${t} .bg-\\[\\#92042c\\].text-white { color: ${contrastText(ramp[700])} !important; }
+${t} .bg-\\[\\#8f022a\\].text-white { color: ${contrastText(ramp[700])} !important; }
+${t} .erp-sidebar-badge.text-white { color: ${contrastText(secondary600)} !important; }
 `.trim();
 }

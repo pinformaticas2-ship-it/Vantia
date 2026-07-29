@@ -194,6 +194,15 @@
   background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.8), rgba(37, 99, 235, 0.06));
 }
 [data-theme="azul"] .erp-panel-bottom-right { border-color: rgba(37, 99, 235, 0.08); }
+[data-theme="azul"] .bg-red-500.text-white { color: #ffffff !important; }
+[data-theme="azul"] .bg-red-600.text-white { color: #ffffff !important; }
+[data-theme="azul"] .bg-red-700.text-white { color: #ffffff !important; }
+[data-theme="azul"] .bg-red-800.text-white { color: #ffffff !important; }
+[data-theme="azul"] .bg-red-900.text-white { color: #ffffff !important; }
+[data-theme="azul"] .bg-\[\#ab0433\].text-white { color: #ffffff !important; }
+[data-theme="azul"] .bg-\[\#92042c\].text-white { color: #ffffff !important; }
+[data-theme="azul"] .bg-\[\#8f022a\].text-white { color: #ffffff !important; }
+[data-theme="azul"] .erp-sidebar-badge.text-white { color: #ffffff !important; }
 
 /* ═══ TEMA VERDE — generado por themeCss.ts ═══ */
 [data-theme="verde"] {
@@ -353,6 +362,15 @@
   background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.8), rgba(5, 150, 105, 0.06));
 }
 [data-theme="verde"] .erp-panel-bottom-right { border-color: rgba(5, 150, 105, 0.08); }
+[data-theme="verde"] .bg-red-500.text-white { color: #ffffff !important; }
+[data-theme="verde"] .bg-red-600.text-white { color: #ffffff !important; }
+[data-theme="verde"] .bg-red-700.text-white { color: #ffffff !important; }
+[data-theme="verde"] .bg-red-800.text-white { color: #ffffff !important; }
+[data-theme="verde"] .bg-red-900.text-white { color: #ffffff !important; }
+[data-theme="verde"] .bg-\[\#ab0433\].text-white { color: #ffffff !important; }
+[data-theme="verde"] .bg-\[\#92042c\].text-white { color: #ffffff !important; }
+[data-theme="verde"] .bg-\[\#8f022a\].text-white { color: #ffffff !important; }
+[data-theme="verde"] .erp-sidebar-badge.text-white { color: #0f172a !important; }
 
 /* ═══ TEMA VIOLETA — generado por themeCss.ts ═══ */
 [data-theme="violeta"] {
@@ -512,6 +530,15 @@
   background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.8), rgba(124, 58, 237, 0.06));
 }
 [data-theme="violeta"] .erp-panel-bottom-right { border-color: rgba(124, 58, 237, 0.08); }
+[data-theme="violeta"] .bg-red-500.text-white { color: #ffffff !important; }
+[data-theme="violeta"] .bg-red-600.text-white { color: #ffffff !important; }
+[data-theme="violeta"] .bg-red-700.text-white { color: #ffffff !important; }
+[data-theme="violeta"] .bg-red-800.text-white { color: #ffffff !important; }
+[data-theme="violeta"] .bg-red-900.text-white { color: #ffffff !important; }
+[data-theme="violeta"] .bg-\[\#ab0433\].text-white { color: #ffffff !important; }
+[data-theme="violeta"] .bg-\[\#92042c\].text-white { color: #ffffff !important; }
+[data-theme="violeta"] .bg-\[\#8f022a\].text-white { color: #ffffff !important; }
+[data-theme="violeta"] .erp-sidebar-badge.text-white { color: #ffffff !important; }
 
 /* ═══ TEMA GRAFITO — generado por themeCss.ts ═══ */
 [data-theme="grafito"] {
@@ -671,6 +698,15 @@
   background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.8), rgba(13, 148, 136, 0.06));
 }
 [data-theme="grafito"] .erp-panel-bottom-right { border-color: rgba(13, 148, 136, 0.08); }
+[data-theme="grafito"] .bg-red-500.text-white { color: #ffffff !important; }
+[data-theme="grafito"] .bg-red-600.text-white { color: #ffffff !important; }
+[data-theme="grafito"] .bg-red-700.text-white { color: #ffffff !important; }
+[data-theme="grafito"] .bg-red-800.text-white { color: #ffffff !important; }
+[data-theme="grafito"] .bg-red-900.text-white { color: #ffffff !important; }
+[data-theme="grafito"] .bg-\[\#ab0433\].text-white { color: #ffffff !important; }
+[data-theme="grafito"] .bg-\[\#92042c\].text-white { color: #ffffff !important; }
+[data-theme="grafito"] .bg-\[\#8f022a\].text-white { color: #ffffff !important; }
+[data-theme="grafito"] .erp-sidebar-badge.text-white { color: #0f172a !important; }
 
 /* ═══ TEMA INDIGO — generado por themeCss.ts ═══ */
 [data-theme="indigo"] {
@@ -830,6 +866,15 @@
   background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.8), rgba(79, 70, 229, 0.06));
 }
 [data-theme="indigo"] .erp-panel-bottom-right { border-color: rgba(79, 70, 229, 0.08); }
+[data-theme="indigo"] .bg-red-500.text-white { color: #ffffff !important; }
+[data-theme="indigo"] .bg-red-600.text-white { color: #ffffff !important; }
+[data-theme="indigo"] .bg-red-700.text-white { color: #ffffff !important; }
+[data-theme="indigo"] .bg-red-800.text-white { color: #ffffff !important; }
+[data-theme="indigo"] .bg-red-900.text-white { color: #ffffff !important; }
+[data-theme="indigo"] .bg-\[\#ab0433\].text-white { color: #ffffff !important; }
+[data-theme="indigo"] .bg-\[\#92042c\].text-white { color: #ffffff !important; }
+[data-theme="indigo"] .bg-\[\#8f022a\].text-white { color: #ffffff !important; }
+[data-theme="indigo"] .erp-sidebar-badge.text-white { color: #ffffff !important; }
 
 @keyframes popIn {
   from { opacity: 0; transform: scale(0.93); }
