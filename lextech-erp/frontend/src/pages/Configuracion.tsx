@@ -1004,36 +1004,52 @@ export default function Configuracion() {
               {/* Color personalizado */}
               <section>
                 <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">Color personalizado</h3>
-                <div className="mt-6 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center">
-                  <div className="relative shrink-0">
-                    <input
-                      type="color"
-                      value={draftColorValid ? draftColor : customColor}
-                      onChange={(e) => setDraftColor(e.target.value)}
-                      className="h-14 w-14 cursor-pointer rounded-2xl border border-slate-200 bg-transparent p-0"
-                      title="Elegir color"
-                    />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-bold text-slate-800">Elige tu propio acento</p>
-                    <p className="mt-0.5 text-xs text-slate-500">Cualquier color se convierte en el acento de toda la aplicación, no solo en un par de botones.</p>
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                <div className="mt-6 flex flex-col gap-6 lg:flex-row lg:items-start">
+                  <div className="flex flex-1 flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center">
+                    <div className="relative shrink-0">
                       <input
-                        type="text"
-                        value={draftColor}
-                        onChange={(e) => setDraftColor(e.target.value)}
-                        placeholder="#0f766e"
-                        maxLength={7}
-                        className="w-28 rounded-xl border border-slate-200 px-3 py-2 text-sm font-mono uppercase text-slate-700"
+                        type="color"
+                        value={draftColorValid ? draftColor : customColor}
+                        onChange={(e) => { setDraftColor(e.target.value); setCustomColor(e.target.value); }}
+                        className="h-14 w-14 cursor-pointer rounded-2xl border border-slate-200 bg-transparent p-0"
+                        title="Elegir color"
                       />
-                      <button
-                        onClick={() => setCustomColor(draftColor)}
-                        disabled={!draftColorValid}
-                        className="inline-flex items-center gap-2 rounded-xl bg-red-700 px-4 py-2 text-sm font-bold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        {theme === 'custom' && draftColor.toLowerCase() === customColor.toLowerCase() ? 'En uso' : 'Aplicar'}
-                      </button>
                     </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold text-slate-800">Elige tu propio acento</p>
+                      <p className="mt-0.5 text-xs text-slate-500">Se aplica al instante en toda la aplicación, no solo en un par de botones.</p>
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <input
+                          type="text"
+                          value={draftColor}
+                          onChange={(e) => setDraftColor(e.target.value)}
+                          onBlur={() => { if (draftColorValid) setCustomColor(draftColor); }}
+                          onKeyDown={(e) => { if (e.key === 'Enter' && draftColorValid) setCustomColor(draftColor); }}
+                          placeholder="#0f766e"
+                          maxLength={7}
+                          className="w-28 rounded-xl border border-slate-200 px-3 py-2 text-sm font-mono uppercase text-slate-700"
+                        />
+                        <span className="text-xs font-bold text-slate-400">
+                          {theme === 'custom' && draftColor.toLowerCase() === customColor.toLowerCase() ? 'En uso' : draftColorValid ? 'Pulsa Intro para aplicar' : 'Formato: #RRGGBB'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="w-full lg:w-72 lg:shrink-0">
+                    <PaletteCard
+                      p={{
+                        id: 'custom',
+                        name: 'Tu color',
+                        description: draftColorValid ? draftColor.toUpperCase() : customColor.toUpperCase(),
+                        sidebar: '#ffffff',
+                        sidebarBorder: '#e2e8f0',
+                        accent: draftColorValid ? draftColor : customColor,
+                        bg: '#f8fafc',
+                        bars: ['#e2e8f0', draftColorValid ? draftColor : customColor, '#e2e8f0', '#f1f5f9', '#e2e8f0'],
+                      }}
+                      active={theme === 'custom' && draftColor.toLowerCase() === customColor.toLowerCase()}
+                      onClick={() => { if (draftColorValid) setCustomColor(draftColor); }}
+                    />
                   </div>
                 </div>
               </section>

@@ -103,23 +103,30 @@ export function hexToHslCss(hex: string): string {
   return `${h.toFixed(0)} ${s.toFixed(0)}% ${l.toFixed(0)}%`;
 }
 
-// Lightness aproximada, por escalón, de una rampa Tailwind típica muy saturada
-// (blue/emerald/violet siguen esta curva con bastante fidelidad). Se usa para
-// derivar el resto de la rampa a partir de un único color elegido por el usuario,
-// preservando ESE color exacto como el escalón 600 (el que se usa en botones/acentos).
-const REFERENCE_L: Record<keyof ColorRamp, number> = {
-  50: 97, 100: 93, 200: 87, 300: 78, 400: 67, 500: 58, 600: 50, 700: 42, 800: 35, 900: 28, 950: 20,
+// Lightness objetivo (absoluta, no relativa) por escalón, calcada de una rampa
+// Tailwind típica muy saturada (blue/emerald/violet la siguen con fidelidad).
+// IMPORTANTE: es absoluta a propósito, no "lightness del color elegido + delta":
+// con un delta relativo, un color elegido inusualmente oscuro o claro (p.ej. un
+// verde azulado oscuro con L≈26%) desplazaba TODA la rampa fuera de rango y el
+// escalón "50" salía como un tono vivo en vez de un tinte casi blanco.
+const TARGET_L: Record<Exclude<keyof ColorRamp, 600>, number> = {
+  50: 97, 100: 93, 200: 86, 300: 77, 400: 66, 500: 57, 700: 42, 800: 35, 900: 29, 950: 20,
 };
+const LIGHT_SHADES = new Set([50, 100, 200, 300, 400, 500]);
 
 /** Genera una rampa de 11 tonos a partir de un único color (tratado como el escalón 600). */
 export function rampFromAccent(hex: string): ColorRamp {
   const [r, g, b] = hexToRgb(hex);
   const [h, s, l] = rgbToHsl(r, g, b);
-  const ramp = {} as ColorRamp;
-  (Object.keys(REFERENCE_L) as unknown as (keyof ColorRamp)[]).forEach((shade) => {
-    const delta = REFERENCE_L[shade] - REFERENCE_L[600];
-    const targetL = Math.min(98, Math.max(2, l + delta));
-    ramp[shade] = shade === 600 ? hex : hslToHex(h, s, targetL);
+  const ramp = { 600: hex } as ColorRamp;
+  (Object.keys(TARGET_L) as unknown as Exclude<keyof ColorRamp, 600>[]).forEach((shade) => {
+    // La rampa absoluta es el punto de partida, pero SIEMPRE se fuerza a quedar
+    // por encima (escalones claros) o por debajo (escalones oscuros) del color
+    // elegido, para que el orden claro→oscuro nunca se invierta ni se salga del
+    // hueco disponible cuando el color de partida ya es muy oscuro o muy claro.
+    const bound = LIGHT_SHADES.has(shade) ? Math.max(TARGET_L[shade], l + 3) : Math.min(TARGET_L[shade], l - 3);
+    const targetL = Math.min(98, Math.max(2, bound));
+    ramp[shade] = hslToHex(h, s, targetL);
   });
   return ramp;
 }

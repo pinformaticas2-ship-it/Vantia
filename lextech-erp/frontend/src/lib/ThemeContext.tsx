@@ -41,6 +41,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return localStorage.getItem('app-theme-custom-color') || DEFAULT_CUSTOM_COLOR;
   });
   const hasSyncedFromServer = useRef(false);
+  const saveCustomColorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const applyTheme = (t: AppTheme, color: string) => {
     document.documentElement.setAttribute('data-theme', t);
@@ -66,12 +67,18 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setThemeState('custom');
     localStorage.setItem('app-theme', 'custom');
     applyTheme('custom', hex);
+    // El picker nativo dispara onChange en cada tick mientras se arrastra;
+    // aplicar es instantáneo (arriba) pero el guardado en servidor se
+    // agrupa para no disparar un PUT por cada frame de arrastre.
     if (isSignedIn) {
-      apiFetch('/api/preferences', {
-        method: 'PUT',
-        body: JSON.stringify({ theme: 'custom', themeCustomColor: hex }),
-        getToken,
-      }).catch(() => {});
+      if (saveCustomColorTimer.current) clearTimeout(saveCustomColorTimer.current);
+      saveCustomColorTimer.current = setTimeout(() => {
+        apiFetch('/api/preferences', {
+          method: 'PUT',
+          body: JSON.stringify({ theme: 'custom', themeCustomColor: hex }),
+          getToken,
+        }).catch(() => {});
+      }, 400);
     }
   };
 
