@@ -26,6 +26,7 @@ import quipuRoutes          from './routes/quipu';
 import quickLinksRoutes     from './routes/quickLinks';
 import directorioRoutes     from './routes/directorio';
 import organizacionRoutes   from './routes/organizacion';
+import preferencesRoutes    from './routes/preferences';
 import { syncAllQuipuUsers } from './controllers/quipuController';
 import { clerkMiddleware } from '@clerk/express';
 import { resolveOrg } from './middleware/resolveOrg';
@@ -156,6 +157,7 @@ app.use('/api/quipu',             quipuRoutes);
 app.use('/api/quick-links',       quickLinksRoutes);
 app.use('/api/directorio',        directorioRoutes);
 app.use('/api/organizacion',      organizacionRoutes);
+app.use('/api/preferences',       preferencesRoutes);
 
 // Health check básico
 app.get('/health', (_req, res) => {

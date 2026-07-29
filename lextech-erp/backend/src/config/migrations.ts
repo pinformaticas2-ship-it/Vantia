@@ -1716,6 +1716,16 @@ export async function runMigrations(): Promise<void> {
       } catch (_e: any) {}
     }
 
+    // ── Preferencias de usuario (tema de la interfaz, entre otras futuras) ──
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS user_preferences (
+        user_id            VARCHAR(150) PRIMARY KEY,
+        theme              VARCHAR(20)  NOT NULL DEFAULT 'rojo',
+        theme_custom_color VARCHAR(7),
+        updated_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      );
+    `);
+
     // VACUUM ANALYZE para mantener las estadísticas de consulta frescas
     try {
       await client.query(`ANALYZE entities;`);

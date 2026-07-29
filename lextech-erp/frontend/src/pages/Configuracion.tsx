@@ -36,6 +36,26 @@ const PALETTES: {
     bg: '#f0f5ff',
     bars: ['#e2e8f0', '#2563eb', '#e2e8f0', '#f1f5f9', '#e2e8f0'],
   },
+  {
+    id: 'verde',
+    name: 'Verde Bosque',
+    description: 'Claro y fresco. Barra lateral clara con acento verde esmeralda.',
+    sidebar: '#ffffff',
+    sidebarBorder: '#e2e8f0',
+    accent: '#059669',
+    bg: '#f3fcf9',
+    bars: ['#e2e8f0', '#059669', '#e2e8f0', '#f1f5f9', '#e2e8f0'],
+  },
+  {
+    id: 'violeta',
+    name: 'Violeta Studio',
+    description: 'Claro y elegante. Barra lateral clara con acento violeta.',
+    sidebar: '#ffffff',
+    sidebarBorder: '#e2e8f0',
+    accent: '#7c3aed',
+    bg: '#f6f3fc',
+    bars: ['#e2e8f0', '#7c3aed', '#e2e8f0', '#f1f5f9', '#e2e8f0'],
+  },
 ];
 
 type SectionKey = 'apariencia' | 'manual' | 'notificaciones' | 'despacho' | 'seguridad' | 'integraciones' | 'usuarios';
@@ -854,7 +874,10 @@ function UsuariosPanel() {
 }
 
 export default function Configuracion() {
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, customColor, setCustomColor } = useTheme();
+  const [draftColor, setDraftColor] = useState(customColor);
+  useEffect(() => { setDraftColor(customColor); }, [customColor]);
+  const draftColorValid = /^#[0-9a-fA-F]{6}$/.test(draftColor);
   const currentAccent = PALETTES.find((p) => p.id === theme)?.accent ?? PALETTES[0].accent;
   const [activeSection, setActiveSection] = useState<SectionKey>('apariencia');
   const activeOther = OTHER_SECTIONS.find((s) => s.key === activeSection);
@@ -948,6 +971,43 @@ export default function Configuracion() {
                       onClick={() => setTheme(p.id)}
                     />
                   ))}
+                </div>
+              </section>
+
+              {/* Color personalizado */}
+              <section>
+                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">Color personalizado</h3>
+                <div className="mt-6 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center">
+                  <div className="relative shrink-0">
+                    <input
+                      type="color"
+                      value={draftColorValid ? draftColor : customColor}
+                      onChange={(e) => setDraftColor(e.target.value)}
+                      className="h-14 w-14 cursor-pointer rounded-2xl border border-slate-200 bg-transparent p-0"
+                      title="Elegir color"
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-slate-800">Elige tu propio acento</p>
+                    <p className="mt-0.5 text-xs text-slate-500">Cualquier color se convierte en el acento de toda la aplicación, no solo en un par de botones.</p>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <input
+                        type="text"
+                        value={draftColor}
+                        onChange={(e) => setDraftColor(e.target.value)}
+                        placeholder="#0f766e"
+                        maxLength={7}
+                        className="w-28 rounded-xl border border-slate-200 px-3 py-2 text-sm font-mono uppercase text-slate-700"
+                      />
+                      <button
+                        onClick={() => setCustomColor(draftColor)}
+                        disabled={!draftColorValid}
+                        className="inline-flex items-center gap-2 rounded-xl bg-red-700 px-4 py-2 text-sm font-bold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {theme === 'custom' && draftColor.toLowerCase() === customColor.toLowerCase() ? 'En uso' : 'Aplicar'}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </section>
             </>
