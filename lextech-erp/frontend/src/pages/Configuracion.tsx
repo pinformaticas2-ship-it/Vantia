@@ -40,13 +40,21 @@ const PALETTES: {
 
 type SectionKey = 'apariencia' | 'manual' | 'notificaciones' | 'despacho' | 'seguridad' | 'integraciones' | 'usuarios';
 
-const OTHER_SECTIONS: { key: SectionKey; label: string; desc: string; icon: any }[] = [
-  { key: 'notificaciones', label: 'Notificaciones',        desc: 'Configura alertas por email y avisos emergentes del sistema.',            icon: Bell },
-  { key: 'despacho',       label: 'Mi Despacho',           desc: 'Información fiscal del despacho, logotipo y textos legales para facturas.', icon: Building2 },
-  { key: 'seguridad',      label: 'Seguridad',             desc: 'Cambio de contraseñas, autenticación en dos pasos (2FA) y sesiones activas.', icon: ShieldCheck },
-  { key: 'integraciones',  label: 'Integraciones',         desc: 'Conecta Vantia con herramientas y servicios externos.',                    icon: Plug },
-  { key: 'usuarios',       label: 'Gestión de Usuarios',   desc: 'Administra los usuarios y permisos del despacho.',                          icon: UsersRound },
+const OTHER_SECTIONS: { key: SectionKey; label: string; desc: string; icon: any; color: string }[] = [
+  { key: 'notificaciones', label: 'Notificaciones',        desc: 'Configura alertas por email y avisos emergentes del sistema.',            icon: Bell,        color: 'amber' },
+  { key: 'despacho',       label: 'Mi Despacho',           desc: 'Información fiscal del despacho, logotipo y textos legales para facturas.', icon: Building2,   color: 'blue' },
+  { key: 'seguridad',      label: 'Seguridad',             desc: 'Cambio de contraseñas, autenticación en dos pasos (2FA) y sesiones activas.', icon: ShieldCheck, color: 'emerald' },
+  { key: 'integraciones',  label: 'Integraciones',         desc: 'Conecta Vantia con herramientas y servicios externos.',                    icon: Plug,        color: 'violet' },
+  { key: 'usuarios',       label: 'Gestión de Usuarios',   desc: 'Administra los usuarios y permisos del despacho.',                          icon: UsersRound,  color: 'rose' },
 ];
+
+const SECTION_ICON_COLORS: Record<string, string> = {
+  amber:   'bg-amber-50 text-amber-600 group-hover:bg-amber-100',
+  blue:    'bg-blue-50 text-blue-600 group-hover:bg-blue-100',
+  emerald: 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-100',
+  violet:  'bg-violet-50 text-violet-600 group-hover:bg-violet-100',
+  rose:    'bg-rose-50 text-rose-600 group-hover:bg-rose-100',
+};
 
 function PaletteCard({ p, active, onClick }: {
   p: typeof PALETTES[0];
@@ -54,15 +62,33 @@ function PaletteCard({ p, active, onClick }: {
   onClick: () => void;
 }) {
   return (
-    <button
-      onClick={onClick}
-      className={`relative text-left rounded-2xl border-2 transition-all duration-300 overflow-hidden group ${
-        active ? 'shadow-xl scale-[1.01]' : 'border-slate-200 hover:border-slate-300 hover:shadow-lg hover:scale-[1.005]'
-      }`}
-      style={active ? { borderColor: p.accent, boxShadow: `0 20px 25px -5px ${p.accent}26, 0 8px 10px -6px ${p.accent}26` } : undefined}
-    >
+    <div className="relative">
+      {/* ── Resplandor ambiental cuando está activo ── */}
+      {active && (
+        <div
+          className="pointer-events-none absolute -inset-3 -z-10 rounded-[28px] opacity-40 blur-2xl transition-opacity duration-500"
+          style={{ background: `radial-gradient(circle at 30% 20%, ${p.accent}, transparent 70%)` }}
+        />
+      )}
+      <button
+        onClick={onClick}
+        className={`relative w-full text-left rounded-2xl border-2 transition-all duration-300 overflow-hidden group ${
+          active ? 'shadow-xl -translate-y-0.5' : 'border-slate-200 hover:border-slate-300 hover:shadow-lg hover:-translate-y-0.5'
+        }`}
+        style={active ? { borderColor: p.accent, boxShadow: `0 20px 25px -5px ${p.accent}26, 0 8px 10px -6px ${p.accent}26` } : undefined}
+      >
+      {/* ── Badge ACTIVO ── */}
+      {active && (
+        <span
+          className="absolute right-3 top-3 z-10 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow-lg"
+          style={{ backgroundColor: p.accent }}
+        >
+          <Check size={11} strokeWidth={3} /> Activo
+        </span>
+      )}
+
       {/* ── Mini app preview ── */}
-      <div className="h-36 flex overflow-hidden select-none pointer-events-none" style={{ backgroundColor: p.bg }}>
+      <div className="h-40 flex overflow-hidden select-none pointer-events-none transition-transform duration-500 group-hover:scale-[1.03]" style={{ backgroundColor: p.bg }}>
         {/* Sidebar */}
         <div
           className="w-16 h-full flex flex-col pt-3 px-2 gap-1.5 shrink-0"
@@ -123,28 +149,26 @@ function PaletteCard({ p, active, onClick }: {
       <div className="px-4 py-3.5 border-t border-slate-100 flex items-center justify-between gap-3 bg-white">
         <div className="flex items-center gap-3 min-w-0">
           {/* Color swatches */}
-          <div className="flex gap-1 shrink-0">
-            <div className="w-4 h-4 rounded-full border border-white shadow-sm" style={{ backgroundColor: p.sidebar === '#ffffff' ? '#e2e8f0' : p.sidebar }} />
-            <div className="w-4 h-4 rounded-full border border-white shadow-sm" style={{ backgroundColor: p.accent }} />
+          <div className="flex -space-x-1.5 shrink-0">
+            <div className="w-5 h-5 rounded-full border-2 border-white shadow-sm" style={{ backgroundColor: p.sidebar === '#ffffff' ? '#e2e8f0' : p.sidebar }} />
+            <div className="w-5 h-5 rounded-full border-2 border-white shadow-sm" style={{ backgroundColor: p.accent }} />
           </div>
           <div className="min-w-0">
             <p className="text-sm font-bold text-slate-800 leading-tight">{p.name}</p>
             <p className="text-xs text-slate-400 leading-snug mt-0.5 truncate">{p.description}</p>
           </div>
         </div>
-        <div
-          className={`w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-all duration-200 ${active ? 'shadow-md' : 'border-slate-300'}`}
-          style={active ? { backgroundColor: p.accent, borderColor: p.accent, boxShadow: `0 4px 6px -1px ${p.accent}4d` } : undefined}
-        >
-          {active && <Check size={11} className="text-white" strokeWidth={3} />}
-        </div>
+        <span className={`shrink-0 text-[11px] font-bold transition-colors ${active ? '' : 'text-slate-300 group-hover:text-slate-400'}`} style={active ? { color: p.accent } : undefined}>
+          {active ? 'En uso' : 'Aplicar'}
+        </span>
       </div>
 
       {/* Active glow overlay */}
       {active && (
         <div className="absolute inset-0 rounded-2xl pointer-events-none" style={{ boxShadow: `inset 0 0 0 2px ${p.accent}33` }} />
       )}
-    </button>
+      </button>
+    </div>
   );
 }
 
@@ -849,6 +873,7 @@ function UsuariosPanel() {
 
 export default function Configuracion() {
   const { theme, setTheme } = useTheme();
+  const currentAccent = PALETTES.find((p) => p.id === theme)?.accent ?? PALETTES[0].accent;
   const [activeSection, setActiveSection] = useState<SectionKey>('apariencia');
   const activeOther = OTHER_SECTIONS.find((s) => s.key === activeSection);
 
@@ -905,15 +930,34 @@ export default function Configuracion() {
 
           {activeSection === 'apariencia' ? (
             <>
-              <div className="mb-8">
-                <h1 className="text-2xl font-extrabold text-slate-800 mb-1">Apariencia</h1>
-                <p className="text-sm text-slate-500">Personaliza la paleta de colores y el comportamiento visual del sistema para adaptarlo a tus preferencias.</p>
+              {/* ── Cabecera ── */}
+              <div className="relative mb-9 overflow-hidden rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-8 text-white shadow-sm">
+                <div
+                  className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full opacity-30 blur-3xl transition-colors duration-500"
+                  style={{ backgroundColor: currentAccent }}
+                />
+                <div
+                  className="pointer-events-none absolute -bottom-20 left-1/3 h-48 w-48 rounded-full opacity-20 blur-3xl transition-colors duration-500"
+                  style={{ backgroundColor: currentAccent }}
+                />
+                <div className="relative flex items-center gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/10 backdrop-blur">
+                    <Palette size={22} />
+                  </div>
+                  <div>
+                    <h1 className="text-2xl font-extrabold">Apariencia</h1>
+                    <p className="mt-1 text-sm text-slate-300">
+                      Personaliza la paleta de colores y el comportamiento visual del sistema para adaptarlo a tus
+                      preferencias.
+                    </p>
+                  </div>
+                </div>
               </div>
 
               {/* Tema del sistema */}
               <section className="mb-10">
                 <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">Tema del Entorno de Trabajo</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-10 mt-6">
                   {PALETTES.map((p) => (
                     <PaletteCard
                       key={p.id}
@@ -928,29 +972,30 @@ export default function Configuracion() {
               {/* Otros módulos */}
               <section>
                 <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">Otros Módulos de Configuración</h3>
-                <div className="flex flex-col border border-slate-200 rounded-xl bg-white shadow-sm overflow-hidden mt-6">
-                  {OTHER_SECTIONS.map((s, i) => {
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 mt-6">
+                  {OTHER_SECTIONS.map((s) => {
                     const Icon = s.icon;
+                    const disponible = s.key === 'despacho' || s.key === 'usuarios';
                     return (
                       <button
                         key={s.key}
                         onClick={() => setActiveSection(s.key)}
-                        className={`flex items-center justify-between p-5 hover:bg-slate-50 transition-colors text-left group ${
-                          i < OTHER_SECTIONS.length - 1 ? 'border-b border-slate-100' : ''
-                        }`}
+                        className="group flex items-start gap-4 rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
                       >
-                        <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-lg bg-slate-100 text-slate-500 flex items-center justify-center group-hover:bg-white group-hover:shadow-sm transition-all border border-transparent group-hover:border-slate-200">
-                            <Icon size={18} />
-                          </div>
-                          <div>
-                            <h4 className="text-sm font-bold text-slate-800 group-hover:text-slate-900">{s.label}</h4>
-                            <p className="text-xs text-slate-500 mt-0.5">{s.desc}</p>
-                          </div>
+                        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-colors ${SECTION_ICON_COLORS[s.color]}`}>
+                          <Icon size={19} />
                         </div>
-                        {s.key !== 'despacho' && s.key !== 'usuarios' && (
-                          <span className="px-2.5 py-1 bg-slate-100 text-slate-500 text-[10px] font-bold uppercase tracking-wider rounded-md border border-slate-200 shrink-0">Próximamente</span>
-                        )}
+                        <div className="min-w-0 flex-1">
+                          <h4 className="text-sm font-bold text-slate-800">{s.label}</h4>
+                          <p className="mt-0.5 text-xs text-slate-500">{s.desc}</p>
+                          <span
+                            className={`mt-3 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                              disponible ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'
+                            }`}
+                          >
+                            {disponible ? 'Disponible' : 'Próximamente'}
+                          </span>
+                        </div>
                       </button>
                     );
                   })}
