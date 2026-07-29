@@ -40,21 +40,13 @@ const PALETTES: {
 
 type SectionKey = 'apariencia' | 'manual' | 'notificaciones' | 'despacho' | 'seguridad' | 'integraciones' | 'usuarios';
 
-const OTHER_SECTIONS: { key: SectionKey; label: string; desc: string; icon: any; color: string }[] = [
-  { key: 'notificaciones', label: 'Notificaciones',        desc: 'Configura alertas por email y avisos emergentes del sistema.',            icon: Bell,        color: 'amber' },
-  { key: 'despacho',       label: 'Mi Despacho',           desc: 'Información fiscal del despacho, logotipo y textos legales para facturas.', icon: Building2,   color: 'blue' },
-  { key: 'seguridad',      label: 'Seguridad',             desc: 'Cambio de contraseñas, autenticación en dos pasos (2FA) y sesiones activas.', icon: ShieldCheck, color: 'emerald' },
-  { key: 'integraciones',  label: 'Integraciones',         desc: 'Conecta Vantia con herramientas y servicios externos.',                    icon: Plug,        color: 'violet' },
-  { key: 'usuarios',       label: 'Gestión de Usuarios',   desc: 'Administra los usuarios y permisos del despacho.',                          icon: UsersRound,  color: 'rose' },
+const OTHER_SECTIONS: { key: SectionKey; label: string; desc: string; icon: any }[] = [
+  { key: 'notificaciones', label: 'Notificaciones',        desc: 'Configura alertas por email y avisos emergentes del sistema.',            icon: Bell },
+  { key: 'despacho',       label: 'Mi Despacho',           desc: 'Información fiscal del despacho, logotipo y textos legales para facturas.', icon: Building2 },
+  { key: 'seguridad',      label: 'Seguridad',             desc: 'Cambio de contraseñas, autenticación en dos pasos (2FA) y sesiones activas.', icon: ShieldCheck },
+  { key: 'integraciones',  label: 'Integraciones',         desc: 'Conecta Vantia con herramientas y servicios externos.',                    icon: Plug },
+  { key: 'usuarios',       label: 'Gestión de Usuarios',   desc: 'Administra los usuarios y permisos del despacho.',                          icon: UsersRound },
 ];
-
-const SECTION_ICON_COLORS: Record<string, string> = {
-  amber:   'bg-amber-50 text-amber-600 group-hover:bg-amber-100',
-  blue:    'bg-blue-50 text-blue-600 group-hover:bg-blue-100',
-  emerald: 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-100',
-  violet:  'bg-violet-50 text-violet-600 group-hover:bg-violet-100',
-  rose:    'bg-rose-50 text-rose-600 group-hover:bg-rose-100',
-};
 
 function PaletteCard({ p, active, onClick }: {
   p: typeof PALETTES[0];
@@ -956,31 +948,6 @@ export default function Configuracion() {
                       onClick={() => setTheme(p.id)}
                     />
                   ))}
-                </div>
-              </section>
-
-              {/* Otros módulos */}
-              <section>
-                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">Otros Módulos de Configuración</h3>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 mt-6">
-                  {OTHER_SECTIONS.map((s) => {
-                    const Icon = s.icon;
-                    return (
-                      <button
-                        key={s.key}
-                        onClick={() => setActiveSection(s.key)}
-                        className="group flex items-start gap-4 rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
-                      >
-                        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-colors ${SECTION_ICON_COLORS[s.color]}`}>
-                          <Icon size={19} />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <h4 className="text-sm font-bold text-slate-800">{s.label}</h4>
-                          <p className="mt-0.5 text-xs text-slate-500">{s.desc}</p>
-                        </div>
-                      </button>
-                    );
-                  })}
                 </div>
               </section>
             </>
