@@ -77,16 +77,6 @@ function PaletteCard({ p, active, onClick }: {
         }`}
         style={active ? { borderColor: p.accent, boxShadow: `0 20px 25px -5px ${p.accent}26, 0 8px 10px -6px ${p.accent}26` } : undefined}
       >
-      {/* ── Badge ACTIVO ── */}
-      {active && (
-        <span
-          className="absolute right-3 top-3 z-10 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow-lg"
-          style={{ backgroundColor: p.accent }}
-        >
-          <Check size={11} strokeWidth={3} /> Activo
-        </span>
-      )}
-
       {/* ── Mini app preview ── */}
       <div className="h-40 flex overflow-hidden select-none pointer-events-none transition-transform duration-500 group-hover:scale-[1.03]" style={{ backgroundColor: p.bg }}>
         {/* Sidebar */}
@@ -975,7 +965,6 @@ export default function Configuracion() {
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 mt-6">
                   {OTHER_SECTIONS.map((s) => {
                     const Icon = s.icon;
-                    const disponible = s.key === 'despacho' || s.key === 'usuarios';
                     return (
                       <button
                         key={s.key}
@@ -988,13 +977,6 @@ export default function Configuracion() {
                         <div className="min-w-0 flex-1">
                           <h4 className="text-sm font-bold text-slate-800">{s.label}</h4>
                           <p className="mt-0.5 text-xs text-slate-500">{s.desc}</p>
-                          <span
-                            className={`mt-3 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                              disponible ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'
-                            }`}
-                          >
-                            {disponible ? 'Disponible' : 'Próximamente'}
-                          </span>
                         </div>
                       </button>
                     );
