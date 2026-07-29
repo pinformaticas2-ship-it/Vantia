@@ -29,6 +29,14 @@ export const TAILWIND_RAMPS: Record<string, ColorRamp> = {
     50: '#f5f3ff', 100: '#ede9fe', 200: '#ddd6fe', 300: '#c4b5fd', 400: '#a78bfa',
     500: '#8b5cf6', 600: '#7c3aed', 700: '#6d28d9', 800: '#5b21b6', 900: '#4c1d95', 950: '#2e1065',
   },
+  teal: {
+    50: '#f0fdfa', 100: '#ccfbf1', 200: '#99f6e4', 300: '#5eead4', 400: '#2dd4bf',
+    500: '#14b8a6', 600: '#0d9488', 700: '#0f766e', 800: '#115e59', 900: '#134e4a', 950: '#042f2e',
+  },
+  indigo: {
+    50: '#eef2ff', 100: '#e0e7ff', 200: '#c7d2fe', 300: '#a5b4fc', 400: '#818cf8',
+    500: '#6366f1', 600: '#4f46e5', 700: '#4338ca', 800: '#3730a3', 900: '#312e81', 950: '#1e1b4b',
+  },
 };
 
 // ── Utilidades de color ──────────────────────────────────────────
@@ -123,13 +131,80 @@ function veryLightTint(hex: string, lightness: number): string {
   return hslToHex(h, Math.min(s, 60), lightness);
 }
 
+export interface ThemeOptions {
+  /** Color de acento secundario (insignias/notificaciones) — si se omite, se usa la rampa principal. */
+  secondary?: string;
+  /** 'light' = barra lateral clara (comportamiento histórico). 'dark' = barra lateral oscura, como el tema Rojo. */
+  sidebarStyle?: 'light' | 'dark';
+  /** Solo con sidebarStyle 'dark': color base y de borde de la barra lateral. */
+  sidebarBg?: string;
+  sidebarBorder?: string;
+}
+
 // ── Plantilla de reglas (mismo alcance que el bloque manual [data-theme="azul"]) ──
 
-export function buildThemeCss(themeId: string, ramp: ColorRamp): string {
+export function buildThemeCss(themeId: string, ramp: ColorRamp, opts: ThemeOptions = {}): string {
   const t = `[data-theme="${themeId}"]`;
   const hsl600 = hexToHslCss(ramp[600]);
   const bgTint1 = veryLightTint(ramp[600], 97);
   const bgTint2 = veryLightTint(ramp[600], 95);
+  const secondary600 = opts.secondary ?? ramp[600];
+  const secondary500 = opts.secondary ?? ramp[500];
+  const sidebarStyle = opts.sidebarStyle ?? 'light';
+  const sidebarBg = opts.sidebarBg ?? '#0f172a';
+  const sidebarBorder = opts.sidebarBorder ?? '#1e293b';
+
+  const chromeLight = `
+${t} .erp-sidebar { background-color: #ffffff !important; border-right-color: #e2e8f0 !important; }
+${t} .erp-sidebar-logo-border { border-bottom-color: #e2e8f0 !important; }
+${t} .erp-sidebar-group-label { color: #94a3b8 !important; }
+${t} .erp-sidebar-divider { background-color: #e2e8f0 !important; }
+${t} .erp-sidebar-nav-inactive { color: #475569 !important; border-color: transparent !important; }
+${t} .erp-sidebar-nav-inactive:hover { background-color: ${ramp[50]} !important; color: ${ramp[700]} !important; }
+${t} .erp-sidebar-nav-active { background-color: ${ramp[50]} !important; color: ${ramp[700]} !important; border-color: ${ramp[600]} !important; }
+${t} .erp-sidebar-icon-active { color: ${ramp[600]} !important; }
+${t} .erp-sidebar-icon-inactive { color: #94a3b8 !important; }
+${t} .erp-sidebar-collapse { color: #94a3b8 !important; }
+${t} .erp-sidebar-collapse:hover { background-color: #f1f5f9 !important; color: #475569 !important; }
+${t} .erp-sidebar-user { background-color: #f8fafc !important; border-color: #e2e8f0 !important; }
+${t} .erp-sidebar-user:hover { background-color: #f1f5f9 !important; }
+${t} .erp-sidebar-username { color: #1e293b !important; }
+${t} .erp-sidebar-active-dot { background-color: ${ramp[600]} !important; }
+${t} .erp-company-btn { background-color: #f8fafc !important; border-color: #e2e8f0 !important; }
+${t} .erp-company-btn:hover { background-color: ${ramp[50]} !important; border-color: ${ramp[200]} !important; }
+${t} .erp-company-logo { background-color: #ffffff !important; border-color: #e2e8f0 !important; }
+${t} .erp-company-icon { background-color: #f1f5f9 !important; border-color: #e2e8f0 !important; }
+${t} .erp-company-icon:hover { background-color: ${ramp[50]} !important; }
+${t} .erp-company-name { color: #1e293b !important; }
+${t} .erp-company-sub  { color: #94a3b8 !important; }
+${t} .erp-company-chevron { color: #cbd5e1 !important; }`;
+
+  const chromeDark = `
+${t} .erp-sidebar { background-color: ${sidebarBg} !important; border-right-color: ${sidebarBorder} !important; }
+${t} .erp-sidebar-logo-border { border-bottom-color: ${sidebarBorder} !important; }
+${t} .erp-sidebar-group-label { color: #64748b !important; }
+${t} .erp-sidebar-divider { background-color: ${sidebarBorder} !important; }
+${t} .erp-sidebar-nav-inactive { color: #94a3b8 !important; border-color: transparent !important; }
+${t} .erp-sidebar-nav-inactive:hover { background-color: rgba(255,255,255,0.05) !important; color: #ffffff !important; }
+${t} .erp-sidebar-nav-active { background-color: ${rgba(ramp[500], 0.1)} !important; color: #ffffff !important; border-color: ${ramp[500]} !important; }
+${t} .erp-sidebar-icon-active { color: ${ramp[400]} !important; }
+${t} .erp-sidebar-icon-inactive { color: #64748b !important; }
+${t} .erp-sidebar-collapse { color: #64748b !important; }
+${t} .erp-sidebar-collapse:hover { background-color: rgba(255,255,255,0.05) !important; color: #ffffff !important; }
+${t} .erp-sidebar-user { background-color: rgba(255,255,255,0.03) !important; border-color: ${sidebarBorder} !important; }
+${t} .erp-sidebar-user:hover { background-color: rgba(255,255,255,0.06) !important; }
+${t} .erp-sidebar-username { color: #ffffff !important; }
+${t} .erp-sidebar-active-dot { background-color: ${ramp[400]} !important; }
+${t} .erp-company-btn { background-color: rgba(255,255,255,0.03) !important; border-color: ${sidebarBorder} !important; }
+${t} .erp-company-btn:hover { background-color: rgba(255,255,255,0.06) !important; border-color: #64748b !important; }
+${t} .erp-company-logo { background-color: rgba(255,255,255,0.06) !important; border-color: ${sidebarBorder} !important; }
+${t} .erp-company-icon { background-color: rgba(255,255,255,0.05) !important; border-color: ${sidebarBorder} !important; }
+${t} .erp-company-icon:hover { background-color: rgba(255,255,255,0.1) !important; }
+${t} .erp-company-name { color: #ffffff !important; }
+${t} .erp-company-sub  { color: #94a3b8 !important; }
+${t} .erp-company-chevron { color: #64748b !important; }`;
+
+  const chrome = sidebarStyle === 'dark' ? chromeDark : chromeLight;
 
   return `
 /* ═══ TEMA ${themeId.toUpperCase()} — generado por themeCss.ts ═══ */
@@ -240,31 +315,8 @@ ${t} .agenda-google-topbar > div:first-child > div:first-child {
   box-shadow: 0 10px 30px ${rgba(ramp[600], 0.08)} !important;
 }
 ${t} .agenda-google-topbar > div:first-child > div:first-child svg { color: ${ramp[600]} !important; }
-${t} .erp-sidebar { background-color: #ffffff !important; border-right-color: #e2e8f0 !important; }
-${t} .erp-sidebar-logo-border { border-bottom-color: #e2e8f0 !important; }
-${t} .erp-sidebar-group-label { color: #94a3b8 !important; }
-${t} .erp-sidebar-divider { background-color: #e2e8f0 !important; }
-${t} .erp-sidebar-nav-inactive { color: #475569 !important; border-color: transparent !important; }
-${t} .erp-sidebar-nav-inactive:hover { background-color: ${ramp[50]} !important; color: ${ramp[700]} !important; }
-${t} .erp-sidebar-nav-active { background-color: ${ramp[50]} !important; color: ${ramp[700]} !important; border-color: ${ramp[600]} !important; }
-${t} .erp-sidebar-icon-active { color: ${ramp[600]} !important; }
-${t} .erp-sidebar-icon-inactive { color: #94a3b8 !important; }
-${t} .erp-sidebar-badge { background-color: ${ramp[600]} !important; }
-${t} .erp-sidebar-badge-dot { background-color: ${ramp[500]} !important; --tw-ring-color: #ffffff !important; }
-${t} .erp-sidebar-collapse { color: #94a3b8 !important; }
-${t} .erp-sidebar-collapse:hover { background-color: #f1f5f9 !important; color: #475569 !important; }
-${t} .erp-sidebar-user { background-color: #f8fafc !important; border-color: #e2e8f0 !important; }
-${t} .erp-sidebar-user:hover { background-color: #f1f5f9 !important; }
-${t} .erp-sidebar-username { color: #1e293b !important; }
-${t} .erp-sidebar-active-dot { background-color: ${ramp[600]} !important; }
-${t} .erp-company-btn { background-color: #f8fafc !important; border-color: #e2e8f0 !important; }
-${t} .erp-company-btn:hover { background-color: ${ramp[50]} !important; border-color: ${ramp[200]} !important; }
-${t} .erp-company-logo { background-color: #ffffff !important; border-color: #e2e8f0 !important; }
-${t} .erp-company-icon { background-color: #f1f5f9 !important; border-color: #e2e8f0 !important; }
-${t} .erp-company-icon:hover { background-color: ${ramp[50]} !important; }
-${t} .erp-company-name { color: #1e293b !important; }
-${t} .erp-company-sub  { color: #94a3b8 !important; }
-${t} .erp-company-chevron { color: #cbd5e1 !important; }
+${t} .erp-sidebar-badge { background-color: ${secondary600} !important; }
+${t} .erp-sidebar-badge-dot { background-color: ${secondary500} !important; --tw-ring-color: #ffffff !important; }${chrome}
 ${t} .erp-sidebar .bg-emerald-900\\/20 { background-color: rgb(236 253 245 / 0.8) !important; }
 ${t} .erp-sidebar .border-emerald-800\\/30 { border-color: rgb(167 243 208 / 0.6) !important; }
 ${t} .bg-\\[\\#ab0433\\]       { background-color: ${ramp[600]} !important; }

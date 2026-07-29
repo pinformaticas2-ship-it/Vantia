@@ -3,7 +3,7 @@ import pool from '../config/database';
 
 const pgErr = (e: any) => `${e?.message || String(e)}${e?.code ? ' | code: ' + e.code : ''}`;
 
-const VALID_THEMES = new Set(['rojo', 'azul', 'verde', 'violeta', 'custom']);
+const VALID_THEMES = new Set(['rojo', 'azul', 'verde', 'violeta', 'grafito', 'indigo', 'custom']);
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
 export const getMyPreferences = async (req: any, res: Response) => {

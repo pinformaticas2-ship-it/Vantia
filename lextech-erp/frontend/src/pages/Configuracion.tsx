@@ -13,13 +13,14 @@ const PALETTES: {
   sidebar: string;
   sidebarBorder: string;
   accent: string;
+  secondary?: string;
   bg: string;
   bars: string[];
 }[] = [
   {
     id: 'rojo',
-    name: 'Avalentia Pro',
-    description: 'Corporativo. Barra lateral oscura con acento rojo intenso.',
+    name: 'Rojo y Negro',
+    description: 'Corporativo. Barra lateral negra con acento rojo intenso.',
     sidebar: '#0f172a',
     sidebarBorder: '#1e293b',
     accent: '#dc2626',
@@ -28,33 +29,58 @@ const PALETTES: {
   },
   {
     id: 'azul',
-    name: 'Claro Minimalista',
-    description: 'Moderno y limpio. Barra lateral clara con acento azul.',
+    name: 'Azul y Ámbar',
+    description: 'Base clara con acento azul y detalles en ámbar para insignias y avisos.',
     sidebar: '#ffffff',
     sidebarBorder: '#e2e8f0',
     accent: '#2563eb',
+    secondary: '#f59e0b',
     bg: '#f0f5ff',
-    bars: ['#e2e8f0', '#2563eb', '#e2e8f0', '#f1f5f9', '#e2e8f0'],
+    bars: ['#e2e8f0', '#2563eb', '#f59e0b', '#f1f5f9', '#e2e8f0'],
   },
   {
     id: 'verde',
-    name: 'Verde Bosque',
-    description: 'Claro y fresco. Barra lateral clara con acento verde esmeralda.',
+    name: 'Verde y Oro',
+    description: 'Base clara con acento verde esmeralda y detalles dorados para insignias y avisos.',
     sidebar: '#ffffff',
     sidebarBorder: '#e2e8f0',
     accent: '#059669',
+    secondary: '#fbbf24',
     bg: '#f3fcf9',
-    bars: ['#e2e8f0', '#059669', '#e2e8f0', '#f1f5f9', '#e2e8f0'],
+    bars: ['#e2e8f0', '#059669', '#fbbf24', '#f1f5f9', '#e2e8f0'],
   },
   {
     id: 'violeta',
-    name: 'Violeta Studio',
-    description: 'Claro y elegante. Barra lateral clara con acento violeta.',
+    name: 'Violeta y Rosa',
+    description: 'Base clara con acento violeta y detalles en rosa para insignias y avisos.',
     sidebar: '#ffffff',
     sidebarBorder: '#e2e8f0',
     accent: '#7c3aed',
+    secondary: '#f43f5e',
     bg: '#f6f3fc',
-    bars: ['#e2e8f0', '#7c3aed', '#e2e8f0', '#f1f5f9', '#e2e8f0'],
+    bars: ['#e2e8f0', '#7c3aed', '#f43f5e', '#f1f5f9', '#e2e8f0'],
+  },
+  {
+    id: 'grafito',
+    name: 'Grafito y Turquesa',
+    description: 'Barra lateral grafito oscuro con acento turquesa y detalles en ámbar.',
+    sidebar: '#1f2937',
+    sidebarBorder: '#374151',
+    accent: '#0d9488',
+    secondary: '#fbbf24',
+    bg: '#f2fbfa',
+    bars: ['#374151', '#0d9488', '#fbbf24', '#4b5563', '#374151'],
+  },
+  {
+    id: 'indigo',
+    name: 'Índigo y Coral',
+    description: 'Base clara con acento índigo y detalles en coral para insignias y avisos.',
+    sidebar: '#ffffff',
+    sidebarBorder: '#e2e8f0',
+    accent: '#4f46e5',
+    secondary: '#f97316',
+    bg: '#f1f1fe',
+    bars: ['#e2e8f0', '#4f46e5', '#f97316', '#f1f5f9', '#e2e8f0'],
   },
 ];
 
@@ -129,7 +155,7 @@ function PaletteCard({ p, active, onClick }: {
                 className="flex-1 rounded-xl p-2 space-y-1"
                 style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}
               >
-                <div className="rounded h-1.5" style={{ backgroundColor: p.accent, width: `${w * 60}%` }} />
+                <div className="rounded h-1.5" style={{ backgroundColor: i === 2 ? (p.secondary ?? p.accent) : p.accent, width: `${w * 60}%` }} />
                 <div className="rounded h-1.5 bg-slate-100" style={{ width: '80%' }} />
                 <div className="rounded h-1.5 bg-slate-100" style={{ width: '55%' }} />
               </div>
@@ -142,7 +168,7 @@ function PaletteCard({ p, active, onClick }: {
           >
             <div className="rounded-full h-3 w-3" style={{ backgroundColor: p.accent, opacity: 0.3 }} />
             <div className="rounded h-1.5 flex-1 bg-slate-100" />
-            <div className="rounded h-4 w-8" style={{ backgroundColor: p.accent, opacity: 0.8 }} />
+            <div className="rounded h-4 w-8" style={{ backgroundColor: p.secondary ?? p.accent, opacity: 0.85 }} />
           </div>
         </div>
       </div>
@@ -154,6 +180,7 @@ function PaletteCard({ p, active, onClick }: {
           <div className="flex -space-x-1.5 shrink-0">
             <div className="w-5 h-5 rounded-full border-2 border-white shadow-sm" style={{ backgroundColor: p.sidebar === '#ffffff' ? '#e2e8f0' : p.sidebar }} />
             <div className="w-5 h-5 rounded-full border-2 border-white shadow-sm" style={{ backgroundColor: p.accent }} />
+            {p.secondary && <div className="w-5 h-5 rounded-full border-2 border-white shadow-sm" style={{ backgroundColor: p.secondary }} />}
           </div>
           <div className="min-w-0">
             <p className="text-sm font-bold text-slate-800 leading-tight">{p.name}</p>

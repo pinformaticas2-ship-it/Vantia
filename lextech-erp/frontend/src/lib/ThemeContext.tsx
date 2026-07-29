@@ -3,7 +3,7 @@ import { useAuth } from '@clerk/clerk-react';
 import { apiFetch } from './api';
 import { buildThemeCss, rampFromAccent } from './themeCss';
 
-export type AppTheme = 'rojo' | 'azul' | 'verde' | 'violeta' | 'custom';
+export type AppTheme = 'rojo' | 'azul' | 'verde' | 'violeta' | 'grafito' | 'indigo' | 'custom';
 
 const DEFAULT_CUSTOM_COLOR = '#0f766e';
 const CUSTOM_STYLE_TAG_ID = 'vantia-theme-custom';
