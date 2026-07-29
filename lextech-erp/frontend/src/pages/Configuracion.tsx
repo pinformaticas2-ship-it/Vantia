@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertTriangle, Bell, BookOpen, Building2, Camera, Check, Loader2, Lock, Palette, Plug, Plus, ShieldCheck, Trash2, UsersRound, X } from 'lucide-react';
 import { useAuth } from '@clerk/clerk-react';
 import { useTheme, AppTheme } from '../lib/ThemeContext';
+import { pickSidebarStyle, autoSidebarBorder } from '../lib/themeCss';
 import { apiFetch, resolveUploadUrl, setActiveOrganizacionId } from '../lib/api';
 import { useOrganizacion, OrgRol } from '../lib/useOrganizacion';
 import ManualPanel from './ManualPanel';
@@ -900,11 +901,51 @@ function UsuariosPanel() {
   );
 }
 
+function ColorField({ label, value, onChange, onCommit, valid }: {
+  label: string; value: string; onChange: (v: string) => void; onCommit: (v: string) => void; valid: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <input
+        type="color"
+        value={valid ? value : '#000000'}
+        onChange={(e) => { onChange(e.target.value); onCommit(e.target.value); }}
+        className="h-11 w-11 shrink-0 cursor-pointer rounded-xl border border-slate-200 bg-transparent p-0"
+        title={label}
+      />
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{label}</p>
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onBlur={() => { if (valid) onCommit(value); }}
+          onKeyDown={(e) => { if (e.key === 'Enter' && valid) onCommit(value); }}
+          maxLength={7}
+          className="mt-0.5 w-full rounded-lg border border-slate-200 px-2 py-1 text-sm font-mono uppercase text-slate-700"
+        />
+      </div>
+    </div>
+  );
+}
+
 export default function Configuracion() {
-  const { theme, setTheme, customColor, setCustomColor } = useTheme();
-  const [draftColor, setDraftColor] = useState(customColor);
-  useEffect(() => { setDraftColor(customColor); }, [customColor]);
-  const draftColorValid = /^#[0-9a-fA-F]{6}$/.test(draftColor);
+  const { theme, setTheme, customColor, customSecondary, customSidebar, setCustomColors } = useTheme();
+  const [draftPrimary, setDraftPrimary] = useState(customColor);
+  const [draftSecondary, setDraftSecondary] = useState(customSecondary);
+  const [draftSidebar, setDraftSidebar] = useState(customSidebar);
+  useEffect(() => { setDraftPrimary(customColor); }, [customColor]);
+  useEffect(() => { setDraftSecondary(customSecondary); }, [customSecondary]);
+  useEffect(() => { setDraftSidebar(customSidebar); }, [customSidebar]);
+  const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+  const draftPrimaryValid = HEX_RE.test(draftPrimary);
+  const draftSecondaryValid = HEX_RE.test(draftSecondary);
+  const draftSidebarValid = HEX_RE.test(draftSidebar);
+  const allDraftsValid = draftPrimaryValid && draftSecondaryValid && draftSidebarValid;
+  const isCustomInUse = theme === 'custom'
+    && draftPrimary.toLowerCase() === customColor.toLowerCase()
+    && draftSecondary.toLowerCase() === customSecondary.toLowerCase()
+    && draftSidebar.toLowerCase() === customSidebar.toLowerCase();
   const currentAccent = PALETTES.find((p) => p.id === theme)?.accent ?? PALETTES[0].accent;
   const [activeSection, setActiveSection] = useState<SectionKey>('apariencia');
   const activeOther = OTHER_SECTIONS.find((s) => s.key === activeSection);
@@ -1004,54 +1045,69 @@ export default function Configuracion() {
               {/* Color personalizado */}
               <section>
                 <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">Color personalizado</h3>
-                <div className="mt-6 flex flex-col gap-6 lg:flex-row lg:items-start">
-                  <div className="flex flex-1 flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center">
-                    <div className="relative shrink-0">
-                      <input
-                        type="color"
-                        value={draftColorValid ? draftColor : customColor}
-                        onChange={(e) => { setDraftColor(e.target.value); setCustomColor(e.target.value); }}
-                        className="h-14 w-14 cursor-pointer rounded-2xl border border-slate-200 bg-transparent p-0"
-                        title="Elegir color"
-                      />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-bold text-slate-800">Elige tu propio acento</p>
-                      <p className="mt-0.5 text-xs text-slate-500">Se aplica al instante en toda la aplicación, no solo en un par de botones.</p>
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        <input
-                          type="text"
-                          value={draftColor}
-                          onChange={(e) => setDraftColor(e.target.value)}
-                          onBlur={() => { if (draftColorValid) setCustomColor(draftColor); }}
-                          onKeyDown={(e) => { if (e.key === 'Enter' && draftColorValid) setCustomColor(draftColor); }}
-                          placeholder="#0f766e"
-                          maxLength={7}
-                          className="w-28 rounded-xl border border-slate-200 px-3 py-2 text-sm font-mono uppercase text-slate-700"
-                        />
+                {(() => {
+                  const previewAccent = draftPrimaryValid ? draftPrimary : customColor;
+                  const previewSecondary = draftSecondaryValid ? draftSecondary : customSecondary;
+                  const previewSidebarBg = draftSidebarValid ? draftSidebar : customSidebar;
+                  const previewIsDark = pickSidebarStyle(previewSidebarBg) === 'dark';
+                  const previewSidebarBorder = autoSidebarBorder(previewSidebarBg, previewIsDark ? 'dark' : 'light');
+                  const previewBars = previewIsDark
+                    ? ['#374151', previewAccent, previewSecondary, '#4b5563', '#374151']
+                    : ['#e2e8f0', previewAccent, previewSecondary, '#f1f5f9', '#e2e8f0'];
+                  return (
+                    <div className="mt-6 flex flex-col gap-6 lg:flex-row lg:items-start">
+                      <div className="flex flex-1 flex-col gap-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                        <div>
+                          <p className="text-sm font-bold text-slate-800">Elige tus propios colores</p>
+                          <p className="mt-0.5 text-xs text-slate-500">Primario, secundario y barra lateral — se aplican al instante en toda la aplicación.</p>
+                        </div>
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                          <ColorField
+                            label="Primario (acentos)"
+                            value={draftPrimary}
+                            onChange={setDraftPrimary}
+                            onCommit={(v) => setCustomColors({ primary: v })}
+                            valid={draftPrimaryValid}
+                          />
+                          <ColorField
+                            label="Secundario (insignias)"
+                            value={draftSecondary}
+                            onChange={setDraftSecondary}
+                            onCommit={(v) => setCustomColors({ secondary: v })}
+                            valid={draftSecondaryValid}
+                          />
+                          <ColorField
+                            label="Barra lateral"
+                            value={draftSidebar}
+                            onChange={setDraftSidebar}
+                            onCommit={(v) => setCustomColors({ sidebar: v })}
+                            valid={draftSidebarValid}
+                          />
+                        </div>
                         <span className="text-xs font-bold text-slate-400">
-                          {theme === 'custom' && draftColor.toLowerCase() === customColor.toLowerCase() ? 'En uso' : draftColorValid ? 'Pulsa Intro para aplicar' : 'Formato: #RRGGBB'}
+                          {isCustomInUse ? 'En uso' : allDraftsValid ? 'Pulsa Intro en cada campo, o haz clic en la vista previa para aplicar los tres' : 'Formato: #RRGGBB'}
                         </span>
                       </div>
+                      <div className="w-full lg:w-72 lg:shrink-0">
+                        <PaletteCard
+                          p={{
+                            id: 'custom',
+                            name: 'Tu combinación',
+                            description: `${previewAccent.toUpperCase()} · ${previewSecondary.toUpperCase()}`,
+                            sidebar: previewSidebarBg,
+                            sidebarBorder: previewSidebarBorder,
+                            accent: previewAccent,
+                            secondary: previewSecondary,
+                            bg: '#f8fafc',
+                            bars: previewBars,
+                          }}
+                          active={isCustomInUse}
+                          onClick={() => { if (allDraftsValid) setCustomColors({ primary: draftPrimary, secondary: draftSecondary, sidebar: draftSidebar }); }}
+                        />
+                      </div>
                     </div>
-                  </div>
-                  <div className="w-full lg:w-72 lg:shrink-0">
-                    <PaletteCard
-                      p={{
-                        id: 'custom',
-                        name: 'Tu color',
-                        description: draftColorValid ? draftColor.toUpperCase() : customColor.toUpperCase(),
-                        sidebar: '#ffffff',
-                        sidebarBorder: '#e2e8f0',
-                        accent: draftColorValid ? draftColor : customColor,
-                        bg: '#f8fafc',
-                        bars: ['#e2e8f0', draftColorValid ? draftColor : customColor, '#e2e8f0', '#f1f5f9', '#e2e8f0'],
-                      }}
-                      active={theme === 'custom' && draftColor.toLowerCase() === customColor.toLowerCase()}
-                      onClick={() => { if (draftColorValid) setCustomColor(draftColor); }}
-                    />
-                  </div>
-                </div>
+                  );
+                })()}
               </section>
             </>
           ) : activeSection === 'manual' ? (

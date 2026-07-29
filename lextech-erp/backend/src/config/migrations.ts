@@ -1725,6 +1725,12 @@ export async function runMigrations(): Promise<void> {
         updated_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW()
       );
     `);
+    for (const col of [
+      `ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS theme_custom_secondary VARCHAR(7)`,
+      `ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS theme_custom_sidebar   VARCHAR(7)`,
+    ]) {
+      try { await client.query(col); } catch (_e: any) {}
+    }
 
     // VACUUM ANALYZE para mantener las estadísticas de consulta frescas
     try {

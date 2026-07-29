@@ -152,7 +152,7 @@
 [data-theme="azul"] .erp-sidebar-divider { background-color: #e2e8f0 !important; }
 [data-theme="azul"] .erp-sidebar-nav-inactive { color: #475569 !important; border-color: transparent !important; }
 [data-theme="azul"] .erp-sidebar-nav-inactive:hover { background-color: #eff6ff !important; color: #1d4ed8 !important; }
-[data-theme="azul"] .erp-sidebar-nav-active { background-color: #eff6ff !important; color: #1d4ed8 !important; border-color: #2563eb !important; }
+[data-theme="azul"] .erp-sidebar-nav-active { background-color: #eff6ff !important; color: #1d4ed8 !important; border-color: #f59e0b !important; }
 [data-theme="azul"] .erp-sidebar-icon-active { color: #2563eb !important; }
 [data-theme="azul"] .erp-sidebar-icon-inactive { color: #94a3b8 !important; }
 [data-theme="azul"] .erp-sidebar-collapse { color: #94a3b8 !important; }
@@ -160,7 +160,7 @@
 [data-theme="azul"] .erp-sidebar-user { background-color: #f8fafc !important; border-color: #e2e8f0 !important; }
 [data-theme="azul"] .erp-sidebar-user:hover { background-color: #f1f5f9 !important; }
 [data-theme="azul"] .erp-sidebar-username { color: #1e293b !important; }
-[data-theme="azul"] .erp-sidebar-active-dot { background-color: #2563eb !important; }
+[data-theme="azul"] .erp-sidebar-active-dot { background-color: #f59e0b !important; }
 [data-theme="azul"] .erp-company-btn { background-color: #f8fafc !important; border-color: #e2e8f0 !important; }
 [data-theme="azul"] .erp-company-btn:hover { background-color: #eff6ff !important; border-color: #bfdbfe !important; }
 [data-theme="azul"] .erp-company-logo { background-color: #ffffff !important; border-color: #e2e8f0 !important; }
@@ -311,7 +311,7 @@
 [data-theme="verde"] .erp-sidebar-divider { background-color: #e2e8f0 !important; }
 [data-theme="verde"] .erp-sidebar-nav-inactive { color: #475569 !important; border-color: transparent !important; }
 [data-theme="verde"] .erp-sidebar-nav-inactive:hover { background-color: #ecfdf5 !important; color: #047857 !important; }
-[data-theme="verde"] .erp-sidebar-nav-active { background-color: #ecfdf5 !important; color: #047857 !important; border-color: #059669 !important; }
+[data-theme="verde"] .erp-sidebar-nav-active { background-color: #ecfdf5 !important; color: #047857 !important; border-color: #fbbf24 !important; }
 [data-theme="verde"] .erp-sidebar-icon-active { color: #059669 !important; }
 [data-theme="verde"] .erp-sidebar-icon-inactive { color: #94a3b8 !important; }
 [data-theme="verde"] .erp-sidebar-collapse { color: #94a3b8 !important; }
@@ -319,7 +319,7 @@
 [data-theme="verde"] .erp-sidebar-user { background-color: #f8fafc !important; border-color: #e2e8f0 !important; }
 [data-theme="verde"] .erp-sidebar-user:hover { background-color: #f1f5f9 !important; }
 [data-theme="verde"] .erp-sidebar-username { color: #1e293b !important; }
-[data-theme="verde"] .erp-sidebar-active-dot { background-color: #059669 !important; }
+[data-theme="verde"] .erp-sidebar-active-dot { background-color: #fbbf24 !important; }
 [data-theme="verde"] .erp-company-btn { background-color: #f8fafc !important; border-color: #e2e8f0 !important; }
 [data-theme="verde"] .erp-company-btn:hover { background-color: #ecfdf5 !important; border-color: #a7f3d0 !important; }
 [data-theme="verde"] .erp-company-logo { background-color: #ffffff !important; border-color: #e2e8f0 !important; }
@@ -470,7 +470,7 @@
 [data-theme="violeta"] .erp-sidebar-divider { background-color: #e2e8f0 !important; }
 [data-theme="violeta"] .erp-sidebar-nav-inactive { color: #475569 !important; border-color: transparent !important; }
 [data-theme="violeta"] .erp-sidebar-nav-inactive:hover { background-color: #f5f3ff !important; color: #6d28d9 !important; }
-[data-theme="violeta"] .erp-sidebar-nav-active { background-color: #f5f3ff !important; color: #6d28d9 !important; border-color: #7c3aed !important; }
+[data-theme="violeta"] .erp-sidebar-nav-active { background-color: #f5f3ff !important; color: #6d28d9 !important; border-color: #f43f5e !important; }
 [data-theme="violeta"] .erp-sidebar-icon-active { color: #7c3aed !important; }
 [data-theme="violeta"] .erp-sidebar-icon-inactive { color: #94a3b8 !important; }
 [data-theme="violeta"] .erp-sidebar-collapse { color: #94a3b8 !important; }
@@ -478,7 +478,7 @@
 [data-theme="violeta"] .erp-sidebar-user { background-color: #f8fafc !important; border-color: #e2e8f0 !important; }
 [data-theme="violeta"] .erp-sidebar-user:hover { background-color: #f1f5f9 !important; }
 [data-theme="violeta"] .erp-sidebar-username { color: #1e293b !important; }
-[data-theme="violeta"] .erp-sidebar-active-dot { background-color: #7c3aed !important; }
+[data-theme="violeta"] .erp-sidebar-active-dot { background-color: #f43f5e !important; }
 [data-theme="violeta"] .erp-company-btn { background-color: #f8fafc !important; border-color: #e2e8f0 !important; }
 [data-theme="violeta"] .erp-company-btn:hover { background-color: #f5f3ff !important; border-color: #ddd6fe !important; }
 [data-theme="violeta"] .erp-company-logo { background-color: #ffffff !important; border-color: #e2e8f0 !important; }
@@ -629,7 +629,7 @@
 [data-theme="grafito"] .erp-sidebar-divider { background-color: #374151 !important; }
 [data-theme="grafito"] .erp-sidebar-nav-inactive { color: #94a3b8 !important; border-color: transparent !important; }
 [data-theme="grafito"] .erp-sidebar-nav-inactive:hover { background-color: rgba(255,255,255,0.05) !important; color: #ffffff !important; }
-[data-theme="grafito"] .erp-sidebar-nav-active { background-color: rgba(20, 184, 166, 0.1) !important; color: #ffffff !important; border-color: #14b8a6 !important; }
+[data-theme="grafito"] .erp-sidebar-nav-active { background-color: rgba(20, 184, 166, 0.1) !important; color: #ffffff !important; border-color: #fbbf24 !important; }
 [data-theme="grafito"] .erp-sidebar-icon-active { color: #2dd4bf !important; }
 [data-theme="grafito"] .erp-sidebar-icon-inactive { color: #64748b !important; }
 [data-theme="grafito"] .erp-sidebar-collapse { color: #64748b !important; }
@@ -637,7 +637,7 @@
 [data-theme="grafito"] .erp-sidebar-user { background-color: rgba(255,255,255,0.03) !important; border-color: #374151 !important; }
 [data-theme="grafito"] .erp-sidebar-user:hover { background-color: rgba(255,255,255,0.06) !important; }
 [data-theme="grafito"] .erp-sidebar-username { color: #ffffff !important; }
-[data-theme="grafito"] .erp-sidebar-active-dot { background-color: #2dd4bf !important; }
+[data-theme="grafito"] .erp-sidebar-active-dot { background-color: #fbbf24 !important; }
 [data-theme="grafito"] .erp-company-btn { background-color: rgba(255,255,255,0.03) !important; border-color: #374151 !important; }
 [data-theme="grafito"] .erp-company-btn:hover { background-color: rgba(255,255,255,0.06) !important; border-color: #64748b !important; }
 [data-theme="grafito"] .erp-company-logo { background-color: rgba(255,255,255,0.06) !important; border-color: #374151 !important; }
@@ -788,7 +788,7 @@
 [data-theme="indigo"] .erp-sidebar-divider { background-color: #e2e8f0 !important; }
 [data-theme="indigo"] .erp-sidebar-nav-inactive { color: #475569 !important; border-color: transparent !important; }
 [data-theme="indigo"] .erp-sidebar-nav-inactive:hover { background-color: #eef2ff !important; color: #4338ca !important; }
-[data-theme="indigo"] .erp-sidebar-nav-active { background-color: #eef2ff !important; color: #4338ca !important; border-color: #4f46e5 !important; }
+[data-theme="indigo"] .erp-sidebar-nav-active { background-color: #eef2ff !important; color: #4338ca !important; border-color: #f97316 !important; }
 [data-theme="indigo"] .erp-sidebar-icon-active { color: #4f46e5 !important; }
 [data-theme="indigo"] .erp-sidebar-icon-inactive { color: #94a3b8 !important; }
 [data-theme="indigo"] .erp-sidebar-collapse { color: #94a3b8 !important; }
@@ -796,7 +796,7 @@
 [data-theme="indigo"] .erp-sidebar-user { background-color: #f8fafc !important; border-color: #e2e8f0 !important; }
 [data-theme="indigo"] .erp-sidebar-user:hover { background-color: #f1f5f9 !important; }
 [data-theme="indigo"] .erp-sidebar-username { color: #1e293b !important; }
-[data-theme="indigo"] .erp-sidebar-active-dot { background-color: #4f46e5 !important; }
+[data-theme="indigo"] .erp-sidebar-active-dot { background-color: #f97316 !important; }
 [data-theme="indigo"] .erp-company-btn { background-color: #f8fafc !important; border-color: #e2e8f0 !important; }
 [data-theme="indigo"] .erp-company-btn:hover { background-color: #eef2ff !important; border-color: #c7d2fe !important; }
 [data-theme="indigo"] .erp-company-logo { background-color: #ffffff !important; border-color: #e2e8f0 !important; }

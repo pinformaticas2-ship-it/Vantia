@@ -103,6 +103,28 @@ export function hexToHslCss(hex: string): string {
   return `${h.toFixed(0)} ${s.toFixed(0)}% ${l.toFixed(0)}%`;
 }
 
+/** Luminancia relativa (0-1, fórmula WCAG) — para decidir si un color de fondo es "oscuro" o "claro". */
+export function relativeLuminance(hex: string): number {
+  const [r, g, b] = hexToRgb(hex).map((v) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** A partir de un color de fondo cualquiera, decide si la barra lateral debe tratarse como clara u oscura. */
+export function pickSidebarStyle(hex: string): 'light' | 'dark' {
+  return relativeLuminance(hex) < 0.45 ? 'dark' : 'light';
+}
+
+/** Deriva un color de borde razonable a partir del color de fondo elegido para la barra lateral. */
+export function autoSidebarBorder(hex: string, style: 'light' | 'dark'): string {
+  const [r, g, b] = hexToRgb(hex);
+  const [h, s, l] = rgbToHsl(r, g, b);
+  const targetL = style === 'dark' ? Math.min(98, l + 8) : Math.max(2, l - 10);
+  return hslToHex(h, Math.min(s, 30), targetL);
+}
+
 // Lightness objetivo (absoluta, no relativa) por escalón, calcada de una rampa
 // Tailwind típica muy saturada (blue/emerald/violet la siguen con fidelidad).
 // IMPORTANTE: es absoluta a propósito, no "lightness del color elegido + delta":
@@ -139,11 +161,11 @@ function veryLightTint(hex: string, lightness: number): string {
 }
 
 export interface ThemeOptions {
-  /** Color de acento secundario (insignias/notificaciones) — si se omite, se usa la rampa principal. */
+  /** Color de acento secundario (insignias, avisos y el borde del ítem de menú activo) — si se omite, se usa la rampa principal. */
   secondary?: string;
   /** 'light' = barra lateral clara (comportamiento histórico). 'dark' = barra lateral oscura, como el tema Rojo. */
   sidebarStyle?: 'light' | 'dark';
-  /** Solo con sidebarStyle 'dark': color base y de borde de la barra lateral. */
+  /** Color de fondo/borde de la barra lateral. En 'light' por defecto es blanco; en 'dark', navy oscuro. */
   sidebarBg?: string;
   sidebarBorder?: string;
 }
@@ -158,29 +180,29 @@ export function buildThemeCss(themeId: string, ramp: ColorRamp, opts: ThemeOptio
   const secondary600 = opts.secondary ?? ramp[600];
   const secondary500 = opts.secondary ?? ramp[500];
   const sidebarStyle = opts.sidebarStyle ?? 'light';
-  const sidebarBg = opts.sidebarBg ?? '#0f172a';
-  const sidebarBorder = opts.sidebarBorder ?? '#1e293b';
+  const sidebarBg = opts.sidebarBg ?? (sidebarStyle === 'dark' ? '#0f172a' : '#ffffff');
+  const sidebarBorder = opts.sidebarBorder ?? (sidebarStyle === 'dark' ? '#1e293b' : '#e2e8f0');
 
   const chromeLight = `
-${t} .erp-sidebar { background-color: #ffffff !important; border-right-color: #e2e8f0 !important; }
-${t} .erp-sidebar-logo-border { border-bottom-color: #e2e8f0 !important; }
+${t} .erp-sidebar { background-color: ${sidebarBg} !important; border-right-color: ${sidebarBorder} !important; }
+${t} .erp-sidebar-logo-border { border-bottom-color: ${sidebarBorder} !important; }
 ${t} .erp-sidebar-group-label { color: #94a3b8 !important; }
-${t} .erp-sidebar-divider { background-color: #e2e8f0 !important; }
+${t} .erp-sidebar-divider { background-color: ${sidebarBorder} !important; }
 ${t} .erp-sidebar-nav-inactive { color: #475569 !important; border-color: transparent !important; }
 ${t} .erp-sidebar-nav-inactive:hover { background-color: ${ramp[50]} !important; color: ${ramp[700]} !important; }
-${t} .erp-sidebar-nav-active { background-color: ${ramp[50]} !important; color: ${ramp[700]} !important; border-color: ${ramp[600]} !important; }
+${t} .erp-sidebar-nav-active { background-color: ${ramp[50]} !important; color: ${ramp[700]} !important; border-color: ${secondary600} !important; }
 ${t} .erp-sidebar-icon-active { color: ${ramp[600]} !important; }
 ${t} .erp-sidebar-icon-inactive { color: #94a3b8 !important; }
 ${t} .erp-sidebar-collapse { color: #94a3b8 !important; }
 ${t} .erp-sidebar-collapse:hover { background-color: #f1f5f9 !important; color: #475569 !important; }
-${t} .erp-sidebar-user { background-color: #f8fafc !important; border-color: #e2e8f0 !important; }
+${t} .erp-sidebar-user { background-color: #f8fafc !important; border-color: ${sidebarBorder} !important; }
 ${t} .erp-sidebar-user:hover { background-color: #f1f5f9 !important; }
 ${t} .erp-sidebar-username { color: #1e293b !important; }
-${t} .erp-sidebar-active-dot { background-color: ${ramp[600]} !important; }
-${t} .erp-company-btn { background-color: #f8fafc !important; border-color: #e2e8f0 !important; }
+${t} .erp-sidebar-active-dot { background-color: ${secondary600} !important; }
+${t} .erp-company-btn { background-color: #f8fafc !important; border-color: ${sidebarBorder} !important; }
 ${t} .erp-company-btn:hover { background-color: ${ramp[50]} !important; border-color: ${ramp[200]} !important; }
-${t} .erp-company-logo { background-color: #ffffff !important; border-color: #e2e8f0 !important; }
-${t} .erp-company-icon { background-color: #f1f5f9 !important; border-color: #e2e8f0 !important; }
+${t} .erp-company-logo { background-color: #ffffff !important; border-color: ${sidebarBorder} !important; }
+${t} .erp-company-icon { background-color: #f1f5f9 !important; border-color: ${sidebarBorder} !important; }
 ${t} .erp-company-icon:hover { background-color: ${ramp[50]} !important; }
 ${t} .erp-company-name { color: #1e293b !important; }
 ${t} .erp-company-sub  { color: #94a3b8 !important; }
@@ -193,7 +215,7 @@ ${t} .erp-sidebar-group-label { color: #64748b !important; }
 ${t} .erp-sidebar-divider { background-color: ${sidebarBorder} !important; }
 ${t} .erp-sidebar-nav-inactive { color: #94a3b8 !important; border-color: transparent !important; }
 ${t} .erp-sidebar-nav-inactive:hover { background-color: rgba(255,255,255,0.05) !important; color: #ffffff !important; }
-${t} .erp-sidebar-nav-active { background-color: ${rgba(ramp[500], 0.1)} !important; color: #ffffff !important; border-color: ${ramp[500]} !important; }
+${t} .erp-sidebar-nav-active { background-color: ${rgba(ramp[500], 0.1)} !important; color: #ffffff !important; border-color: ${secondary500} !important; }
 ${t} .erp-sidebar-icon-active { color: ${ramp[400]} !important; }
 ${t} .erp-sidebar-icon-inactive { color: #64748b !important; }
 ${t} .erp-sidebar-collapse { color: #64748b !important; }
@@ -201,7 +223,7 @@ ${t} .erp-sidebar-collapse:hover { background-color: rgba(255,255,255,0.05) !imp
 ${t} .erp-sidebar-user { background-color: rgba(255,255,255,0.03) !important; border-color: ${sidebarBorder} !important; }
 ${t} .erp-sidebar-user:hover { background-color: rgba(255,255,255,0.06) !important; }
 ${t} .erp-sidebar-username { color: #ffffff !important; }
-${t} .erp-sidebar-active-dot { background-color: ${ramp[400]} !important; }
+${t} .erp-sidebar-active-dot { background-color: ${secondary500} !important; }
 ${t} .erp-company-btn { background-color: rgba(255,255,255,0.03) !important; border-color: ${sidebarBorder} !important; }
 ${t} .erp-company-btn:hover { background-color: rgba(255,255,255,0.06) !important; border-color: #64748b !important; }
 ${t} .erp-company-logo { background-color: rgba(255,255,255,0.06) !important; border-color: ${sidebarBorder} !important; }
