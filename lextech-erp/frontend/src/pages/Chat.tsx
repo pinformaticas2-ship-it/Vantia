@@ -1650,7 +1650,7 @@ function GifPicker({
           </div>
         ) : error ? (
           <div className="rounded-2xl border border-dashed border-red-200 bg-red-50 px-4 py-5 text-center">
-            <p className="text-sm font-medium text-red-700">{error}</p>
+            <p className="text-sm font-medium text-rose-700">{error}</p>
             <p className="mt-1 text-xs text-red-500">Añade la clave en `frontend/.env` y reinicia Vite.</p>
           </div>
         ) : gifs.length === 0 ? (
@@ -2123,7 +2123,7 @@ function ModalCrearCanal({ sysUsers, getToken, onClose, onCreate }: {
                 </label>
               </div>
 
-              {errorMsg && <p className="text-red-500 text-sm">{errorMsg}</p>}
+              {errorMsg && <p className="text-rose-500 text-sm">{errorMsg}</p>}
 
               {/* Footer paso 1 */}
               <div className="flex justify-end pt-1">
@@ -2216,7 +2216,7 @@ function ModalCrearCanal({ sysUsers, getToken, onClose, onCreate }: {
                 )}
               </div>
 
-              {errorMsg && <p className="text-red-500 text-sm">{errorMsg}</p>}
+              {errorMsg && <p className="text-rose-500 text-sm">{errorMsg}</p>}
             </div>
 
             {/* Footer paso 2 */}

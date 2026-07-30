@@ -4696,7 +4696,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
             ) : error ? (
               <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
                 <AlertCircle size={32} className="text-red-500 mb-3" />
-                <p className="text-sm text-red-600 mb-4">{error}</p>
+                <p className="text-sm text-rose-600 mb-4">{error}</p>
                 {!gmail && (
                   <button
                     onClick={connectGoogle}

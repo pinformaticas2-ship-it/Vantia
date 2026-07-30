@@ -1482,7 +1482,7 @@ function CsvImportHistoryView({
                 const hasErrors = row.error_count > 0;
                 return (
                   <tr key={row.id} className={`group transition-colors ${
-                    hasErrors ? "bg-red-50/30 hover:bg-red-50/50" : "hover:bg-slate-50/80"
+                    hasErrors ? "bg-rose-50/30 hover:bg-rose-50/50" : "hover:bg-slate-50/80"
                   }`}>
                     <td className="pl-6 lg:pl-8 pr-6 py-4 whitespace-nowrap text-[13px] text-slate-700 font-medium">
                       {fmtDateTime(row.created_at)}
@@ -2033,7 +2033,7 @@ function CsvImportReviewView({
               {previewRows.map((row, idx) => {
                 const rowHasError = validationSummary.issues.some((i) => i.rowNumber === idx + 1);
                 return (
-                  <tr key={idx} className={`transition-colors ${rowHasError ? "bg-red-50/50 hover:bg-red-50" : "hover:bg-slate-50"}`}>
+                  <tr key={idx} className={`transition-colors ${rowHasError ? "bg-rose-50/50 hover:bg-rose-50" : "hover:bg-slate-50"}`}>
                     <td className="pl-6 lg:pl-8 pr-4 py-4 whitespace-nowrap text-sm text-slate-700 font-medium">{getMappedValue(row, "ref_propia")}</td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-slate-700">{getMappedValue(row, "descripcion")}</td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-slate-700">{getMappedValue(row, "num_proc")}</td>
@@ -2193,10 +2193,10 @@ function CsvImportCompleteView({
             <p className="mt-1 text-xs text-slate-500">registros correctos</p>
           </div>
 
-          <div className={`rounded-2xl p-4 border ${hasErrors ? "border-red-100 bg-red-50/60" : "border-slate-100 bg-slate-50/60"}`}>
+          <div className={`rounded-2xl p-4 border ${hasErrors ? "border-rose-100 bg-rose-50/60" : "border-slate-100 bg-slate-50/60"}`}>
             <div className="flex items-center gap-2 mb-3">
-              <div className={`h-7 w-7 rounded-lg flex items-center justify-center ${hasErrors ? "bg-red-100" : "bg-slate-100"}`}>
-                <AlertCircle size={14} className={hasErrors ? "text-red-500" : "text-slate-400"} />
+              <div className={`h-7 w-7 rounded-lg flex items-center justify-center ${hasErrors ? "bg-rose-100" : "bg-slate-100"}`}>
+                <AlertCircle size={14} className={hasErrors ? "text-rose-500" : "text-slate-400"} />
               </div>
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Con errores</p>
             </div>
@@ -2377,7 +2377,7 @@ function CsvImportErrorDetailView({
                   <span className="font-semibold text-slate-700">{errorPct}%</span>
                 </div>
                 <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
-                  <div className="h-full rounded-full bg-red-500" style={{ width: `${Math.max(errorPct, 8)}%` }} />
+                  <div className="h-full rounded-full bg-rose-500" style={{ width: `${Math.max(errorPct, 8)}%` }} />
                 </div>
               </div>
             </div>
@@ -2392,7 +2392,7 @@ function CsvImportErrorDetailView({
                 <p className="text-xs text-slate-500">({completedPct.toFixed(2)}%)</p>
               </div>
               <div className="rounded-2xl bg-red-50 px-4 py-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Errores</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">Errores</p>
                 <p className="mt-2 text-xl font-bold text-slate-900">{errorCount}</p>
                 <p className="text-xs text-slate-500">({errorPct.toFixed(2)}%)</p>
               </div>
@@ -2546,7 +2546,7 @@ function CsvImportErrorDetailView({
                       <tr key={record.rowNumber} className="bg-white">
                         <td className="px-4 py-3">
                           <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                            record.status === "error" ? "bg-red-600 text-white" : "bg-emerald-100 text-emerald-700"
+                            record.status === "error" ? "bg-rose-600 text-white" : "bg-emerald-100 text-emerald-700"
                           }`}>
                             {record.status === "error" ? "Error" : "Correcto"}
                           </span>
@@ -2995,7 +2995,7 @@ function DocumentImportView({
                     ? `${zipFile.name} · ${(zipFile.size / (1024 * 1024)).toFixed(2)} MB`
                     : "El sistema extraerá texto de cada documento."}
                 </p>
-                {importError && <p className="mt-1 text-xs font-medium text-red-600">{importError}</p>}
+                {importError && <p className="mt-1 text-xs font-medium text-rose-600">{importError}</p>}
                 {importBusy && (() => {
                   // Mientras se sube el ZIP, el % viene del propio XHR. Una vez subido,
                   // el servidor procesa documento a documento y cada uno va apareciendo
@@ -3123,7 +3123,7 @@ function DocumentImportView({
                       <div className="min-w-0">
                         {item.status === "completed" ? <p className="truncate text-slate-700">{expedienteLabel}</p>
                         : item.status === "uploaded" ? <p className="truncate text-amber-700">Listo para revisión</p>
-                        : <p className="truncate text-red-600">{item.payload?.userError || item.error_message || "No se pudo procesar"}</p>}
+                        : <p className="truncate text-rose-600">{item.payload?.userError || item.error_message || "No se pudo procesar"}</p>}
                       </div>
                       <div className="flex flex-col gap-1">
                         {(item.status === "uploaded" || item.status === "failed") && (
@@ -3166,7 +3166,7 @@ function DocumentImportView({
           </div>
 
           <div className="modules-scrollbar flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-2.5 bg-slate-50/30">
-            {historyError && <p className="text-sm text-red-600 px-2 py-1">{historyError}</p>}
+            {historyError && <p className="text-sm text-rose-600 px-2 py-1">{historyError}</p>}
             {loadingHistory ? (
               <div className="flex items-center justify-center gap-2 text-sm text-slate-400 py-10">
                 <Loader2 size={15} className="animate-spin" />
@@ -4092,7 +4092,7 @@ function DocumentImportHistoryView({
                       {" · "}
                       <span className="font-medium text-slate-700">{batch.completed_count}/{batch.total_count} creados</span>
                       {batch.error_count > 0 && (
-                        <span className="text-red-500 ml-1">· {batch.error_count} error{batch.error_count !== 1 ? "es" : ""}</span>
+                        <span className="text-rose-500 ml-1">· {batch.error_count} error{batch.error_count !== 1 ? "es" : ""}</span>
                       )}
                     </p>
                   </div>

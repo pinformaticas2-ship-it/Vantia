@@ -569,9 +569,9 @@ export default function Trazabilidad() {
                             </div>
 
                             {/* Tarjeta del evento */}
-                            <div className={`flex-1 bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow border ${cfg.isError ? "border-red-200" : "border-slate-200"}`}>
+                            <div className={`flex-1 bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow border ${cfg.isError ? "border-rose-200" : "border-slate-200"}`}>
                               <div className="flex items-start justify-between gap-4 mb-1">
-                                <h3 className={`text-sm font-bold ${cfg.isError ? "text-red-700" : "text-slate-800"}`}>
+                                <h3 className={`text-sm font-bold ${cfg.isError ? "text-rose-700" : "text-slate-800"}`}>
                                   {cfg.title}
                                 </h3>
                                 <span className="text-xs font-medium text-slate-400 shrink-0">
@@ -580,15 +580,15 @@ export default function Trazabilidad() {
                               </div>
 
                               {showDescription && (
-                                <p className={`text-xs mt-1 ${cfg.isError ? "text-red-500/80" : "text-slate-500"}`}>
+                                <p className={`text-xs mt-1 ${cfg.isError ? "text-rose-500/80" : "text-slate-500"}`}>
                                   {item.action_type}
                                 </p>
                               )}
 
                               {/* Metadata chips */}
-                              <div className={`flex flex-wrap items-center gap-2 mt-3 pt-3 border-t ${cfg.isError ? "border-red-50" : "border-slate-100"}`}>
+                              <div className={`flex flex-wrap items-center gap-2 mt-3 pt-3 border-t ${cfg.isError ? "border-rose-50" : "border-slate-100"}`}>
                                 {item.ip_address && (
-                                  <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-semibold ${cfg.isError ? "bg-red-50 text-red-700" : "bg-slate-100 text-slate-600"}`}>
+                                  <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-semibold ${cfg.isError ? "bg-rose-50 text-rose-700" : "bg-slate-100 text-slate-600"}`}>
                                     <Globe size={10} /> {item.ip_address}
                                   </span>
                                 )}

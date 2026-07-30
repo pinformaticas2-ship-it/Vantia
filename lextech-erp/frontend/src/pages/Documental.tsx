@@ -792,7 +792,7 @@ export default function Documental() {
                 <Spinner size="sm" muted /> Cargando contenido del bloque...
               </div>
             ) : selectedBlockError ? (
-              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{selectedBlockError}</div>
+              <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{selectedBlockError}</div>
             ) : selectedBlock ? (
               <div className="space-y-4">
                 <div className="flex flex-wrap gap-1.5">

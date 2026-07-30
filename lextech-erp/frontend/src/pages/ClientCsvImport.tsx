@@ -917,7 +917,7 @@ function CsvImportReviewView({
                 const rowHasError = validationSummary.issues.some((i) => i.rowNumber === idx + 1);
                 const nombre = [getMappedValue(row, "first_name"), getMappedValue(row, "last_name")].filter(v => v !== "-").join(" ") || "-";
                 return (
-                  <tr key={idx} className={`transition-colors ${rowHasError ? "bg-red-50/50 hover:bg-red-50" : "hover:bg-slate-50"}`}>
+                  <tr key={idx} className={`transition-colors ${rowHasError ? "bg-rose-50/50 hover:bg-rose-50" : "hover:bg-slate-50"}`}>
                     <td className="pl-6 lg:pl-8 pr-4 py-4 whitespace-nowrap text-sm text-slate-700 font-medium">{nombre}</td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-slate-700">{getMappedValue(row, "nif_cif")}</td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-slate-700">{getMappedValue(row, "email")}</td>
@@ -1029,10 +1029,10 @@ function CsvImportCompleteView({
             <p className="mt-1 text-xs text-slate-500">clientes correctos</p>
           </div>
 
-          <div className={`rounded-2xl p-4 border ${hasErrors ? "border-red-100 bg-red-50/60" : "border-slate-100 bg-slate-50/60"}`}>
+          <div className={`rounded-2xl p-4 border ${hasErrors ? "border-rose-100 bg-rose-50/60" : "border-slate-100 bg-slate-50/60"}`}>
             <div className="flex items-center gap-2 mb-3">
-              <div className={`h-7 w-7 rounded-lg flex items-center justify-center ${hasErrors ? "bg-red-100" : "bg-slate-100"}`}>
-                <AlertCircle size={14} className={hasErrors ? "text-red-500" : "text-slate-400"} />
+              <div className={`h-7 w-7 rounded-lg flex items-center justify-center ${hasErrors ? "bg-rose-100" : "bg-slate-100"}`}>
+                <AlertCircle size={14} className={hasErrors ? "text-rose-500" : "text-slate-400"} />
               </div>
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Con errores</p>
             </div>
@@ -1146,7 +1146,7 @@ function CsvImportErrorDetailView({
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Estado del lote</p>
                 <h2 className="mt-2 text-xl font-bold text-slate-900">Importación con incidencias</h2>
               </div>
-              <span className="inline-flex rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-600">Error</span>
+              <span className="inline-flex rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-600">Error</span>
             </div>
             <div className="mt-5 space-y-4">
               <div>
@@ -1164,7 +1164,7 @@ function CsvImportErrorDetailView({
                   <span className="font-semibold text-slate-700">{errorPct}%</span>
                 </div>
                 <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
-                  <div className="h-full rounded-full bg-red-500" style={{ width: `${Math.max(errorPct, 8)}%` }} />
+                  <div className="h-full rounded-full bg-rose-500" style={{ width: `${Math.max(errorPct, 8)}%` }} />
                 </div>
               </div>
             </div>
@@ -1178,7 +1178,7 @@ function CsvImportErrorDetailView({
                 <p className="mt-2 text-xl font-bold text-slate-900">{successCount}</p>
               </div>
               <div className="rounded-2xl bg-red-50 px-4 py-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Errores</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">Errores</p>
                 <p className="mt-2 text-xl font-bold text-slate-900">{errorCount}</p>
               </div>
               <div className="rounded-2xl bg-slate-100 px-4 py-3 col-span-2">
@@ -1216,7 +1216,7 @@ function CsvImportErrorDetailView({
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredRecords.map((r) => (
-                  <tr key={r.rowNumber} className={r.status === "error" ? "bg-red-50/50" : ""}>
+                  <tr key={r.rowNumber} className={r.status === "error" ? "bg-rose-50/50" : ""}>
                     <td className="px-4 py-3 text-sm text-slate-500">{r.rowNumber}</td>
                     <td className="px-4 py-3 text-sm text-slate-700 font-medium">{r.nombre}</td>
                     <td className="px-4 py-3 text-sm text-slate-700">{r.nif}</td>
@@ -1384,7 +1384,7 @@ function CsvImportHistoryDetailView({
       </div>
 
       {error && (
-        <div className="flex-shrink-0 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">{error}</div>
+        <div className="flex-shrink-0 px-4 py-3 bg-rose-50 border border-rose-200 rounded-xl text-sm text-rose-700">{error}</div>
       )}
 
       {loading ? (
@@ -1403,7 +1403,7 @@ function CsvImportHistoryDetailView({
               <p className="mt-1 text-xl font-bold text-slate-900">{batch.completed_count}</p>
             </div>
             <div className="rounded-2xl bg-red-50 px-4 py-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Errores</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">Errores</p>
               <p className="mt-1 text-xl font-bold text-slate-900">{batch.error_count}</p>
             </div>
             <div className="rounded-2xl bg-slate-100 px-4 py-3">

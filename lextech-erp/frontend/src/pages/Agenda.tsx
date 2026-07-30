@@ -1722,7 +1722,7 @@ function QuickEventPopover({
 
           {/* Error inline */}
           {errorMsg && (
-            <p className="rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-600">{errorMsg}</p>
+            <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs font-medium text-rose-600">{errorMsg}</p>
           )}
         </form>
 

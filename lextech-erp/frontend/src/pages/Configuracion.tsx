@@ -317,7 +317,7 @@ function DeleteOrganizacionModal({ nombre, onClose }: { nombre: string; onClose:
             </>
           )}
 
-          {error && <p className="text-xs text-red-600">{error}</p>}
+          {error && <p className="text-xs text-rose-600">{error}</p>}
         </div>
 
         <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-2.5 bg-slate-50">
@@ -596,7 +596,7 @@ function DespachoPanel() {
               Solo el propietario o un administrador pueden ver y editar el NIF/CIF, la dirección fiscal y el texto legal de esta organización.
             </div>
           )}
-          {error && <p className="text-xs text-red-600">{error}</p>}
+          {error && <p className="text-xs text-rose-600">{error}</p>}
           {canEdit && (
             <button
               onClick={save}
@@ -848,7 +848,7 @@ function UsuariosPanel() {
               Añadir
             </button>
           </div>
-          {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
+          {error && <p className="text-xs text-rose-600 mt-2">{error}</p>}
           <p className="text-xs text-slate-400 mt-2">La persona debe haber iniciado sesión al menos una vez en Vantia antes de poder añadirla.</p>
         </section>
       )}
