@@ -3140,10 +3140,10 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
 
             {/* Tab: DocPlant — split layout */}
             {templateTab === 'docplant' && (
-              <div className="flex flex-1 overflow-hidden">
+              <div className="flex flex-1 flex-col md:flex-row overflow-hidden">
 
                 {/* LEFT: árbol de carpetas/archivos */}
-                <div className="w-72 shrink-0 border-r border-slate-100 flex flex-col overflow-hidden bg-white">
+                <div className="w-full md:w-72 max-h-56 md:max-h-none shrink-0 border-b md:border-b-0 md:border-r border-slate-100 flex flex-col overflow-hidden bg-white">
                   {/* Search */}
                   <div className="px-3 py-2.5 border-b border-slate-100 shrink-0">
                     <div className="relative">
