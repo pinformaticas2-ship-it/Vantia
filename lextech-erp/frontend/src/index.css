@@ -49,11 +49,11 @@
 [data-theme="azul"] input:focus, [data-theme="azul"] textarea:focus, [data-theme="azul"] select:focus {
   box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.08) !important;
 }
-[data-theme="azul"] .bg-red-50  { background-color: #eff6ff !important; }
-[data-theme="azul"] .bg-red-100 { background-color: #dbeafe !important; }
-[data-theme="azul"] .bg-red-200 { background-color: #bfdbfe !important; }
-[data-theme="azul"] .bg-red-300 { background-color: #93c5fd !important; }
-[data-theme="azul"] .bg-red-400 { background-color: #60a5fa !important; }
+/* Los tonos 50-400 se dejan FUERA a propósito: en el resto de la app se
+   usan casi siempre para estados semánticos (error, vencido, urgente...),
+   no para marca. Recolorearlos hacía que un aviso de error se viera del
+   color del tema en vez de rojo/alarma. Solo se tematizan 500-900, que
+   son los que usan los botones y superficies de marca de verdad. */
 [data-theme="azul"] .bg-red-500 { background-color: #3b82f6 !important; }
 [data-theme="azul"] .bg-red-600 { background-color: #2563eb !important; }
 [data-theme="azul"] .bg-red-700 { background-color: #1d4ed8 !important; }
@@ -63,49 +63,27 @@
 [data-theme="azul"] .bg-red-500\/20 { background-color: rgb(59 130 246 / 0.2) !important; }
 [data-theme="azul"] .bg-red-600\/10 { background-color: rgb(37 99 235 / 0.1) !important; }
 [data-theme="azul"] .bg-red-600\/20 { background-color: rgb(37 99 235 / 0.2) !important; }
-[data-theme="azul"] .text-red-100 { color: #dbeafe !important; }
-[data-theme="azul"] .text-red-200 { color: #bfdbfe !important; }
-[data-theme="azul"] .text-red-300 { color: #93c5fd !important; }
-[data-theme="azul"] .text-red-400 { color: #60a5fa !important; }
 [data-theme="azul"] .text-red-500 { color: #3b82f6 !important; }
 [data-theme="azul"] .text-red-600 { color: #2563eb !important; }
 [data-theme="azul"] .text-red-700 { color: #1d4ed8 !important; }
 [data-theme="azul"] .text-red-800 { color: #1e40af !important; }
-[data-theme="azul"] .border-red-100 { border-color: #dbeafe !important; }
-[data-theme="azul"] .border-red-200 { border-color: #bfdbfe !important; }
-[data-theme="azul"] .border-red-300 { border-color: #93c5fd !important; }
-[data-theme="azul"] .border-red-400 { border-color: #60a5fa !important; }
 [data-theme="azul"] .border-red-500 { border-color: #3b82f6 !important; }
 [data-theme="azul"] .border-red-600 { border-color: #2563eb !important; }
 [data-theme="azul"] .border-red-700 { border-color: #1d4ed8 !important; }
-[data-theme="azul"] .hover\:bg-red-50:hover  { background-color: #eff6ff !important; }
-[data-theme="azul"] .hover\:bg-red-100:hover { background-color: #dbeafe !important; }
-[data-theme="azul"] .hover\:bg-red-200:hover { background-color: #bfdbfe !important; }
 [data-theme="azul"] .hover\:bg-red-500:hover { background-color: #3b82f6 !important; }
 [data-theme="azul"] .hover\:bg-red-600:hover { background-color: #2563eb !important; }
 [data-theme="azul"] .hover\:bg-red-700:hover { background-color: #1e40af !important; }
-[data-theme="azul"] .hover\:text-red-400:hover { color: #60a5fa !important; }
 [data-theme="azul"] .hover\:text-red-500:hover { color: #3b82f6 !important; }
 [data-theme="azul"] .hover\:text-red-600:hover { color: #2563eb !important; }
 [data-theme="azul"] .hover\:text-red-700:hover { color: #1d4ed8 !important; }
-[data-theme="azul"] .hover\:border-red-100:hover { border-color: #dbeafe !important; }
-[data-theme="azul"] .hover\:border-red-200:hover { border-color: #bfdbfe !important; }
-[data-theme="azul"] .hover\:border-red-300:hover { border-color: #93c5fd !important; }
-[data-theme="azul"] .hover\:border-red-400:hover { border-color: #60a5fa !important; }
 [data-theme="azul"] .hover\:border-red-500:hover { border-color: #3b82f6 !important; }
-[data-theme="azul"] .focus\:ring-red-400:focus { --tw-ring-color: rgba(96, 165, 250, 0.5) !important; }
 [data-theme="azul"] .focus\:ring-red-500:focus { --tw-ring-color: rgba(59, 130, 246, 0.5) !important; }
-[data-theme="azul"] .focus\:border-red-400:focus { border-color: #60a5fa !important; }
 [data-theme="azul"] .focus\:border-red-500:focus { border-color: #3b82f6 !important; }
-[data-theme="azul"] .ring-red-400 { --tw-ring-color: rgba(96, 165, 250, 0.5) !important; }
 [data-theme="azul"] .ring-red-500 { --tw-ring-color: rgba(59, 130, 246, 0.5) !important; }
-[data-theme="azul"] .from-red-300 { --tw-gradient-from: #93c5fd !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgb(147 197 253 / 0)) !important; }
-[data-theme="azul"] .from-red-400 { --tw-gradient-from: #60a5fa !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgb(96 165 250 / 0)) !important; }
 [data-theme="azul"] .from-red-500 { --tw-gradient-from: #3b82f6 !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgb(59 130 246 / 0)) !important; }
 [data-theme="azul"] .from-red-600 { --tw-gradient-from: #2563eb !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgb(37 99 235 / 0)) !important; }
 [data-theme="azul"] .from-red-700 { --tw-gradient-from: #1d4ed8 !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgb(29 78 216 / 0)) !important; }
 [data-theme="azul"] .from-red-800 { --tw-gradient-from: #1e40af !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgb(30 64 175 / 0)) !important; }
-[data-theme="azul"] .to-red-400   { --tw-gradient-to: #60a5fa !important; }
 [data-theme="azul"] .to-red-500   { --tw-gradient-to: #3b82f6 !important; }
 [data-theme="azul"] .to-red-600   { --tw-gradient-to: #2563eb !important; }
 [data-theme="azul"] .to-red-700   { --tw-gradient-to: #1d4ed8 !important; }
@@ -113,20 +91,12 @@
 [data-theme="azul"] .to-red-900   { --tw-gradient-to: #1e3a8a !important; }
 [data-theme="azul"] .via-red-600  { --tw-gradient-via: #2563eb !important; }
 [data-theme="azul"] .via-red-700  { --tw-gradient-via: #1d4ed8 !important; }
-[data-theme="azul"] .border-t-red-400 { border-top-color: #60a5fa !important; }
 [data-theme="azul"] .border-t-red-500 { border-top-color: #3b82f6 !important; }
 [data-theme="azul"] .border-t-red-600 { border-top-color: #2563eb !important; }
 [data-theme="azul"] .border-t-red-700 { border-top-color: #1d4ed8 !important; }
-[data-theme="azul"] .border-b-red-200 { border-bottom-color: #bfdbfe !important; }
 [data-theme="azul"] .border-b-red-500 { border-bottom-color: #3b82f6 !important; }
 [data-theme="azul"] .border-b-red-600 { border-bottom-color: #2563eb !important; }
-[data-theme="azul"] .border-l-red-300 { border-left-color: #93c5fd !important; }
-[data-theme="azul"] .border-l-red-400 { border-left-color: #60a5fa !important; }
 [data-theme="azul"] .border-l-red-500 { border-left-color: #3b82f6 !important; }
-[data-theme="azul"] .border-r-red-200 { border-right-color: #bfdbfe !important; }
-[data-theme="azul"] .shadow-red-100  { --tw-shadow-color: #dbeafe !important; }
-[data-theme="azul"] .shadow-red-200  { --tw-shadow-color: #bfdbfe !important; }
-[data-theme="azul"] .shadow-red-300  { --tw-shadow-color: #93c5fd !important; }
 [data-theme="azul"] .shadow-red-500\/20 { --tw-shadow-color: rgba(59, 130, 246, 0.2) !important; }
 [data-theme="azul"] .shadow-red-700\/30 { --tw-shadow-color: rgba(29, 78, 216, 0.3) !important; }
 [data-theme="azul"] .shadow-red-700\/50 { --tw-shadow-color: rgba(29, 78, 216, 0.5) !important; }
@@ -194,6 +164,9 @@
   background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.8), rgba(37, 99, 235, 0.06));
 }
 [data-theme="azul"] .erp-panel-bottom-right { border-color: rgba(37, 99, 235, 0.08); }
+/* ── Contraste automático: si el color de marca sale claro (posible con un
+   acento personalizado muy claro), el texto/icono blanco que se le pone
+   encima por defecto pasaría a ser invisible — se fuerza texto oscuro. ── */
 [data-theme="azul"] .bg-red-500.text-white { color: #ffffff !important; }
 [data-theme="azul"] .bg-red-600.text-white { color: #ffffff !important; }
 [data-theme="azul"] .bg-red-700.text-white { color: #ffffff !important; }
@@ -217,11 +190,11 @@
 [data-theme="verde"] input:focus, [data-theme="verde"] textarea:focus, [data-theme="verde"] select:focus {
   box-shadow: 0 0 0 4px rgba(5, 150, 105, 0.08) !important;
 }
-[data-theme="verde"] .bg-red-50  { background-color: #ecfdf5 !important; }
-[data-theme="verde"] .bg-red-100 { background-color: #d1fae5 !important; }
-[data-theme="verde"] .bg-red-200 { background-color: #a7f3d0 !important; }
-[data-theme="verde"] .bg-red-300 { background-color: #6ee7b7 !important; }
-[data-theme="verde"] .bg-red-400 { background-color: #34d399 !important; }
+/* Los tonos 50-400 se dejan FUERA a propósito: en el resto de la app se
+   usan casi siempre para estados semánticos (error, vencido, urgente...),
+   no para marca. Recolorearlos hacía que un aviso de error se viera del
+   color del tema en vez de rojo/alarma. Solo se tematizan 500-900, que
+   son los que usan los botones y superficies de marca de verdad. */
 [data-theme="verde"] .bg-red-500 { background-color: #10b981 !important; }
 [data-theme="verde"] .bg-red-600 { background-color: #059669 !important; }
 [data-theme="verde"] .bg-red-700 { background-color: #047857 !important; }
@@ -231,49 +204,27 @@
 [data-theme="verde"] .bg-red-500\/20 { background-color: rgb(16 185 129 / 0.2) !important; }
 [data-theme="verde"] .bg-red-600\/10 { background-color: rgb(5 150 105 / 0.1) !important; }
 [data-theme="verde"] .bg-red-600\/20 { background-color: rgb(5 150 105 / 0.2) !important; }
-[data-theme="verde"] .text-red-100 { color: #d1fae5 !important; }
-[data-theme="verde"] .text-red-200 { color: #a7f3d0 !important; }
-[data-theme="verde"] .text-red-300 { color: #6ee7b7 !important; }
-[data-theme="verde"] .text-red-400 { color: #34d399 !important; }
 [data-theme="verde"] .text-red-500 { color: #10b981 !important; }
 [data-theme="verde"] .text-red-600 { color: #059669 !important; }
 [data-theme="verde"] .text-red-700 { color: #047857 !important; }
 [data-theme="verde"] .text-red-800 { color: #065f46 !important; }
-[data-theme="verde"] .border-red-100 { border-color: #d1fae5 !important; }
-[data-theme="verde"] .border-red-200 { border-color: #a7f3d0 !important; }
-[data-theme="verde"] .border-red-300 { border-color: #6ee7b7 !important; }
-[data-theme="verde"] .border-red-400 { border-color: #34d399 !important; }
 [data-theme="verde"] .border-red-500 { border-color: #10b981 !important; }
 [data-theme="verde"] .border-red-600 { border-color: #059669 !important; }
 [data-theme="verde"] .border-red-700 { border-color: #047857 !important; }
-[data-theme="verde"] .hover\:bg-red-50:hover  { background-color: #ecfdf5 !important; }
-[data-theme="verde"] .hover\:bg-red-100:hover { background-color: #d1fae5 !important; }
-[data-theme="verde"] .hover\:bg-red-200:hover { background-color: #a7f3d0 !important; }
 [data-theme="verde"] .hover\:bg-red-500:hover { background-color: #10b981 !important; }
 [data-theme="verde"] .hover\:bg-red-600:hover { background-color: #059669 !important; }
 [data-theme="verde"] .hover\:bg-red-700:hover { background-color: #065f46 !important; }
-[data-theme="verde"] .hover\:text-red-400:hover { color: #34d399 !important; }
 [data-theme="verde"] .hover\:text-red-500:hover { color: #10b981 !important; }
 [data-theme="verde"] .hover\:text-red-600:hover { color: #059669 !important; }
 [data-theme="verde"] .hover\:text-red-700:hover { color: #047857 !important; }
-[data-theme="verde"] .hover\:border-red-100:hover { border-color: #d1fae5 !important; }
-[data-theme="verde"] .hover\:border-red-200:hover { border-color: #a7f3d0 !important; }
-[data-theme="verde"] .hover\:border-red-300:hover { border-color: #6ee7b7 !important; }
-[data-theme="verde"] .hover\:border-red-400:hover { border-color: #34d399 !important; }
 [data-theme="verde"] .hover\:border-red-500:hover { border-color: #10b981 !important; }
-[data-theme="verde"] .focus\:ring-red-400:focus { --tw-ring-color: rgba(52, 211, 153, 0.5) !important; }
 [data-theme="verde"] .focus\:ring-red-500:focus { --tw-ring-color: rgba(16, 185, 129, 0.5) !important; }
-[data-theme="verde"] .focus\:border-red-400:focus { border-color: #34d399 !important; }
 [data-theme="verde"] .focus\:border-red-500:focus { border-color: #10b981 !important; }
-[data-theme="verde"] .ring-red-400 { --tw-ring-color: rgba(52, 211, 153, 0.5) !important; }
 [data-theme="verde"] .ring-red-500 { --tw-ring-color: rgba(16, 185, 129, 0.5) !important; }
-[data-theme="verde"] .from-red-300 { --tw-gradient-from: #6ee7b7 !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgb(110 231 183 / 0)) !important; }
-[data-theme="verde"] .from-red-400 { --tw-gradient-from: #34d399 !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgb(52 211 153 / 0)) !important; }
 [data-theme="verde"] .from-red-500 { --tw-gradient-from: #10b981 !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgb(16 185 129 / 0)) !important; }
 [data-theme="verde"] .from-red-600 { --tw-gradient-from: #059669 !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgb(5 150 105 / 0)) !important; }
 [data-theme="verde"] .from-red-700 { --tw-gradient-from: #047857 !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgb(4 120 87 / 0)) !important; }
 [data-theme="verde"] .from-red-800 { --tw-gradient-from: #065f46 !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgb(6 95 70 / 0)) !important; }
-[data-theme="verde"] .to-red-400   { --tw-gradient-to: #34d399 !important; }
 [data-theme="verde"] .to-red-500   { --tw-gradient-to: #10b981 !important; }
 [data-theme="verde"] .to-red-600   { --tw-gradient-to: #059669 !important; }
 [data-theme="verde"] .to-red-700   { --tw-gradient-to: #047857 !important; }
@@ -281,20 +232,12 @@
 [data-theme="verde"] .to-red-900   { --tw-gradient-to: #064e3b !important; }
 [data-theme="verde"] .via-red-600  { --tw-gradient-via: #059669 !important; }
 [data-theme="verde"] .via-red-700  { --tw-gradient-via: #047857 !important; }
-[data-theme="verde"] .border-t-red-400 { border-top-color: #34d399 !important; }
 [data-theme="verde"] .border-t-red-500 { border-top-color: #10b981 !important; }
 [data-theme="verde"] .border-t-red-600 { border-top-color: #059669 !important; }
 [data-theme="verde"] .border-t-red-700 { border-top-color: #047857 !important; }
-[data-theme="verde"] .border-b-red-200 { border-bottom-color: #a7f3d0 !important; }
 [data-theme="verde"] .border-b-red-500 { border-bottom-color: #10b981 !important; }
 [data-theme="verde"] .border-b-red-600 { border-bottom-color: #059669 !important; }
-[data-theme="verde"] .border-l-red-300 { border-left-color: #6ee7b7 !important; }
-[data-theme="verde"] .border-l-red-400 { border-left-color: #34d399 !important; }
 [data-theme="verde"] .border-l-red-500 { border-left-color: #10b981 !important; }
-[data-theme="verde"] .border-r-red-200 { border-right-color: #a7f3d0 !important; }
-[data-theme="verde"] .shadow-red-100  { --tw-shadow-color: #d1fae5 !important; }
-[data-theme="verde"] .shadow-red-200  { --tw-shadow-color: #a7f3d0 !important; }
-[data-theme="verde"] .shadow-red-300  { --tw-shadow-color: #6ee7b7 !important; }
 [data-theme="verde"] .shadow-red-500\/20 { --tw-shadow-color: rgba(16, 185, 129, 0.2) !important; }
 [data-theme="verde"] .shadow-red-700\/30 { --tw-shadow-color: rgba(4, 120, 87, 0.3) !important; }
 [data-theme="verde"] .shadow-red-700\/50 { --tw-shadow-color: rgba(4, 120, 87, 0.5) !important; }
@@ -362,6 +305,9 @@
   background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.8), rgba(5, 150, 105, 0.06));
 }
 [data-theme="verde"] .erp-panel-bottom-right { border-color: rgba(5, 150, 105, 0.08); }
+/* ── Contraste automático: si el color de marca sale claro (posible con un
+   acento personalizado muy claro), el texto/icono blanco que se le pone
+   encima por defecto pasaría a ser invisible — se fuerza texto oscuro. ── */
 [data-theme="verde"] .bg-red-500.text-white { color: #ffffff !important; }
 [data-theme="verde"] .bg-red-600.text-white { color: #ffffff !important; }
 [data-theme="verde"] .bg-red-700.text-white { color: #ffffff !important; }
@@ -385,11 +331,11 @@
 [data-theme="violeta"] input:focus, [data-theme="violeta"] textarea:focus, [data-theme="violeta"] select:focus {
   box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.08) !important;
 }
-[data-theme="violeta"] .bg-red-50  { background-color: #f5f3ff !important; }
-[data-theme="violeta"] .bg-red-100 { background-color: #ede9fe !important; }
-[data-theme="violeta"] .bg-red-200 { background-color: #ddd6fe !important; }
-[data-theme="violeta"] .bg-red-300 { background-color: #c4b5fd !important; }
-[data-theme="violeta"] .bg-red-400 { background-color: #a78bfa !important; }
+/* Los tonos 50-400 se dejan FUERA a propósito: en el resto de la app se
+   usan casi siempre para estados semánticos (error, vencido, urgente...),
+   no para marca. Recolorearlos hacía que un aviso de error se viera del
+   color del tema en vez de rojo/alarma. Solo se tematizan 500-900, que
+   son los que usan los botones y superficies de marca de verdad. */
 [data-theme="violeta"] .bg-red-500 { background-color: #8b5cf6 !important; }
 [data-theme="violeta"] .bg-red-600 { background-color: #7c3aed !important; }
 [data-theme="violeta"] .bg-red-700 { background-color: #6d28d9 !important; }
@@ -399,49 +345,27 @@
 [data-theme="violeta"] .bg-red-500\/20 { background-color: rgb(139 92 246 / 0.2) !important; }
 [data-theme="violeta"] .bg-red-600\/10 { background-color: rgb(124 58 237 / 0.1) !important; }
 [data-theme="violeta"] .bg-red-600\/20 { background-color: rgb(124 58 237 / 0.2) !important; }
-[data-theme="violeta"] .text-red-100 { color: #ede9fe !important; }
-[data-theme="violeta"] .text-red-200 { color: #ddd6fe !important; }
-[data-theme="violeta"] .text-red-300 { color: #c4b5fd !important; }
-[data-theme="violeta"] .text-red-400 { color: #a78bfa !important; }
 [data-theme="violeta"] .text-red-500 { color: #8b5cf6 !important; }
 [data-theme="violeta"] .text-red-600 { color: #7c3aed !important; }
 [data-theme="violeta"] .text-red-700 { color: #6d28d9 !important; }
 [data-theme="violeta"] .text-red-800 { color: #5b21b6 !important; }
-[data-theme="violeta"] .border-red-100 { border-color: #ede9fe !important; }
-[data-theme="violeta"] .border-red-200 { border-color: #ddd6fe !important; }
-[data-theme="violeta"] .border-red-300 { border-color: #c4b5fd !important; }
-[data-theme="violeta"] .border-red-400 { border-color: #a78bfa !important; }
 [data-theme="violeta"] .border-red-500 { border-color: #8b5cf6 !important; }
 [data-theme="violeta"] .border-red-600 { border-color: #7c3aed !important; }
 [data-theme="violeta"] .border-red-700 { border-color: #6d28d9 !important; }
-[data-theme="violeta"] .hover\:bg-red-50:hover  { background-color: #f5f3ff !important; }
-[data-theme="violeta"] .hover\:bg-red-100:hover { background-color: #ede9fe !important; }
-[data-theme="violeta"] .hover\:bg-red-200:hover { background-color: #ddd6fe !important; }
 [data-theme="violeta"] .hover\:bg-red-500:hover { background-color: #8b5cf6 !important; }
 [data-theme="violeta"] .hover\:bg-red-600:hover { background-color: #7c3aed !important; }
 [data-theme="violeta"] .hover\:bg-red-700:hover { background-color: #5b21b6 !important; }
-[data-theme="violeta"] .hover\:text-red-400:hover { color: #a78bfa !important; }
 [data-theme="violeta"] .hover\:text-red-500:hover { color: #8b5cf6 !important; }
 [data-theme="violeta"] .hover\:text-red-600:hover { color: #7c3aed !important; }
 [data-theme="violeta"] .hover\:text-red-700:hover { color: #6d28d9 !important; }
-[data-theme="violeta"] .hover\:border-red-100:hover { border-color: #ede9fe !important; }
-[data-theme="violeta"] .hover\:border-red-200:hover { border-color: #ddd6fe !important; }
-[data-theme="violeta"] .hover\:border-red-300:hover { border-color: #c4b5fd !important; }
-[data-theme="violeta"] .hover\:border-red-400:hover { border-color: #a78bfa !important; }
 [data-theme="violeta"] .hover\:border-red-500:hover { border-color: #8b5cf6 !important; }
-[data-theme="violeta"] .focus\:ring-red-400:focus { --tw-ring-color: rgba(167, 139, 250, 0.5) !important; }
 [data-theme="violeta"] .focus\:ring-red-500:focus { --tw-ring-color: rgba(139, 92, 246, 0.5) !important; }
-[data-theme="violeta"] .focus\:border-red-400:focus { border-color: #a78bfa !important; }
 [data-theme="violeta"] .focus\:border-red-500:focus { border-color: #8b5cf6 !important; }
-[data-theme="violeta"] .ring-red-400 { --tw-ring-color: rgba(167, 139, 250, 0.5) !important; }
 [data-theme="violeta"] .ring-red-500 { --tw-ring-color: rgba(139, 92, 246, 0.5) !important; }
-[data-theme="violeta"] .from-red-300 { --tw-gradient-from: #c4b5fd !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgb(196 181 253 / 0)) !important; }
-[data-theme="violeta"] .from-red-400 { --tw-gradient-from: #a78bfa !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgb(167 139 250 / 0)) !important; }
 [data-theme="violeta"] .from-red-500 { --tw-gradient-from: #8b5cf6 !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgb(139 92 246 / 0)) !important; }
 [data-theme="violeta"] .from-red-600 { --tw-gradient-from: #7c3aed !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgb(124 58 237 / 0)) !important; }
 [data-theme="violeta"] .from-red-700 { --tw-gradient-from: #6d28d9 !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgb(109 40 217 / 0)) !important; }
 [data-theme="violeta"] .from-red-800 { --tw-gradient-from: #5b21b6 !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgb(91 33 182 / 0)) !important; }
-[data-theme="violeta"] .to-red-400   { --tw-gradient-to: #a78bfa !important; }
 [data-theme="violeta"] .to-red-500   { --tw-gradient-to: #8b5cf6 !important; }
 [data-theme="violeta"] .to-red-600   { --tw-gradient-to: #7c3aed !important; }
 [data-theme="violeta"] .to-red-700   { --tw-gradient-to: #6d28d9 !important; }
@@ -449,20 +373,12 @@
 [data-theme="violeta"] .to-red-900   { --tw-gradient-to: #4c1d95 !important; }
 [data-theme="violeta"] .via-red-600  { --tw-gradient-via: #7c3aed !important; }
 [data-theme="violeta"] .via-red-700  { --tw-gradient-via: #6d28d9 !important; }
-[data-theme="violeta"] .border-t-red-400 { border-top-color: #a78bfa !important; }
 [data-theme="violeta"] .border-t-red-500 { border-top-color: #8b5cf6 !important; }
 [data-theme="violeta"] .border-t-red-600 { border-top-color: #7c3aed !important; }
 [data-theme="violeta"] .border-t-red-700 { border-top-color: #6d28d9 !important; }
-[data-theme="violeta"] .border-b-red-200 { border-bottom-color: #ddd6fe !important; }
 [data-theme="violeta"] .border-b-red-500 { border-bottom-color: #8b5cf6 !important; }
 [data-theme="violeta"] .border-b-red-600 { border-bottom-color: #7c3aed !important; }
-[data-theme="violeta"] .border-l-red-300 { border-left-color: #c4b5fd !important; }
-[data-theme="violeta"] .border-l-red-400 { border-left-color: #a78bfa !important; }
 [data-theme="violeta"] .border-l-red-500 { border-left-color: #8b5cf6 !important; }
-[data-theme="violeta"] .border-r-red-200 { border-right-color: #ddd6fe !important; }
-[data-theme="violeta"] .shadow-red-100  { --tw-shadow-color: #ede9fe !important; }
-[data-theme="violeta"] .shadow-red-200  { --tw-shadow-color: #ddd6fe !important; }
-[data-theme="violeta"] .shadow-red-300  { --tw-shadow-color: #c4b5fd !important; }
 [data-theme="violeta"] .shadow-red-500\/20 { --tw-shadow-color: rgba(139, 92, 246, 0.2) !important; }
 [data-theme="violeta"] .shadow-red-700\/30 { --tw-shadow-color: rgba(109, 40, 217, 0.3) !important; }
 [data-theme="violeta"] .shadow-red-700\/50 { --tw-shadow-color: rgba(109, 40, 217, 0.5) !important; }
@@ -530,6 +446,9 @@
   background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.8), rgba(124, 58, 237, 0.06));
 }
 [data-theme="violeta"] .erp-panel-bottom-right { border-color: rgba(124, 58, 237, 0.08); }
+/* ── Contraste automático: si el color de marca sale claro (posible con un
+   acento personalizado muy claro), el texto/icono blanco que se le pone
+   encima por defecto pasaría a ser invisible — se fuerza texto oscuro. ── */
 [data-theme="violeta"] .bg-red-500.text-white { color: #ffffff !important; }
 [data-theme="violeta"] .bg-red-600.text-white { color: #ffffff !important; }
 [data-theme="violeta"] .bg-red-700.text-white { color: #ffffff !important; }
@@ -553,11 +472,11 @@
 [data-theme="grafito"] input:focus, [data-theme="grafito"] textarea:focus, [data-theme="grafito"] select:focus {
   box-shadow: 0 0 0 4px rgba(13, 148, 136, 0.08) !important;
 }
-[data-theme="grafito"] .bg-red-50  { background-color: #f0fdfa !important; }
-[data-theme="grafito"] .bg-red-100 { background-color: #ccfbf1 !important; }
-[data-theme="grafito"] .bg-red-200 { background-color: #99f6e4 !important; }
-[data-theme="grafito"] .bg-red-300 { background-color: #5eead4 !important; }
-[data-theme="grafito"] .bg-red-400 { background-color: #2dd4bf !important; }
+/* Los tonos 50-400 se dejan FUERA a propósito: en el resto de la app se
+   usan casi siempre para estados semánticos (error, vencido, urgente...),
+   no para marca. Recolorearlos hacía que un aviso de error se viera del
+   color del tema en vez de rojo/alarma. Solo se tematizan 500-900, que
+   son los que usan los botones y superficies de marca de verdad. */
 [data-theme="grafito"] .bg-red-500 { background-color: #14b8a6 !important; }
 [data-theme="grafito"] .bg-red-600 { background-color: #0d9488 !important; }
 [data-theme="grafito"] .bg-red-700 { background-color: #0f766e !important; }
@@ -567,49 +486,27 @@
 [data-theme="grafito"] .bg-red-500\/20 { background-color: rgb(20 184 166 / 0.2) !important; }
 [data-theme="grafito"] .bg-red-600\/10 { background-color: rgb(13 148 136 / 0.1) !important; }
 [data-theme="grafito"] .bg-red-600\/20 { background-color: rgb(13 148 136 / 0.2) !important; }
-[data-theme="grafito"] .text-red-100 { color: #ccfbf1 !important; }
-[data-theme="grafito"] .text-red-200 { color: #99f6e4 !important; }
-[data-theme="grafito"] .text-red-300 { color: #5eead4 !important; }
-[data-theme="grafito"] .text-red-400 { color: #2dd4bf !important; }
 [data-theme="grafito"] .text-red-500 { color: #14b8a6 !important; }
 [data-theme="grafito"] .text-red-600 { color: #0d9488 !important; }
 [data-theme="grafito"] .text-red-700 { color: #0f766e !important; }
 [data-theme="grafito"] .text-red-800 { color: #115e59 !important; }
-[data-theme="grafito"] .border-red-100 { border-color: #ccfbf1 !important; }
-[data-theme="grafito"] .border-red-200 { border-color: #99f6e4 !important; }
-[data-theme="grafito"] .border-red-300 { border-color: #5eead4 !important; }
-[data-theme="grafito"] .border-red-400 { border-color: #2dd4bf !important; }
 [data-theme="grafito"] .border-red-500 { border-color: #14b8a6 !important; }
 [data-theme="grafito"] .border-red-600 { border-color: #0d9488 !important; }
 [data-theme="grafito"] .border-red-700 { border-color: #0f766e !important; }
-[data-theme="grafito"] .hover\:bg-red-50:hover  { background-color: #f0fdfa !important; }
-[data-theme="grafito"] .hover\:bg-red-100:hover { background-color: #ccfbf1 !important; }
-[data-theme="grafito"] .hover\:bg-red-200:hover { background-color: #99f6e4 !important; }
 [data-theme="grafito"] .hover\:bg-red-500:hover { background-color: #14b8a6 !important; }
 [data-theme="grafito"] .hover\:bg-red-600:hover { background-color: #0d9488 !important; }
 [data-theme="grafito"] .hover\:bg-red-700:hover { background-color: #115e59 !important; }
-[data-theme="grafito"] .hover\:text-red-400:hover { color: #2dd4bf !important; }
 [data-theme="grafito"] .hover\:text-red-500:hover { color: #14b8a6 !important; }
 [data-theme="grafito"] .hover\:text-red-600:hover { color: #0d9488 !important; }
 [data-theme="grafito"] .hover\:text-red-700:hover { color: #0f766e !important; }
-[data-theme="grafito"] .hover\:border-red-100:hover { border-color: #ccfbf1 !important; }
-[data-theme="grafito"] .hover\:border-red-200:hover { border-color: #99f6e4 !important; }
-[data-theme="grafito"] .hover\:border-red-300:hover { border-color: #5eead4 !important; }
-[data-theme="grafito"] .hover\:border-red-400:hover { border-color: #2dd4bf !important; }
 [data-theme="grafito"] .hover\:border-red-500:hover { border-color: #14b8a6 !important; }
-[data-theme="grafito"] .focus\:ring-red-400:focus { --tw-ring-color: rgba(45, 212, 191, 0.5) !important; }
 [data-theme="grafito"] .focus\:ring-red-500:focus { --tw-ring-color: rgba(20, 184, 166, 0.5) !important; }
-[data-theme="grafito"] .focus\:border-red-400:focus { border-color: #2dd4bf !important; }
 [data-theme="grafito"] .focus\:border-red-500:focus { border-color: #14b8a6 !important; }
-[data-theme="grafito"] .ring-red-400 { --tw-ring-color: rgba(45, 212, 191, 0.5) !important; }
 [data-theme="grafito"] .ring-red-500 { --tw-ring-color: rgba(20, 184, 166, 0.5) !important; }
-[data-theme="grafito"] .from-red-300 { --tw-gradient-from: #5eead4 !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgb(94 234 212 / 0)) !important; }
-[data-theme="grafito"] .from-red-400 { --tw-gradient-from: #2dd4bf !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgb(45 212 191 / 0)) !important; }
 [data-theme="grafito"] .from-red-500 { --tw-gradient-from: #14b8a6 !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgb(20 184 166 / 0)) !important; }
 [data-theme="grafito"] .from-red-600 { --tw-gradient-from: #0d9488 !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgb(13 148 136 / 0)) !important; }
 [data-theme="grafito"] .from-red-700 { --tw-gradient-from: #0f766e !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgb(15 118 110 / 0)) !important; }
 [data-theme="grafito"] .from-red-800 { --tw-gradient-from: #115e59 !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgb(17 94 89 / 0)) !important; }
-[data-theme="grafito"] .to-red-400   { --tw-gradient-to: #2dd4bf !important; }
 [data-theme="grafito"] .to-red-500   { --tw-gradient-to: #14b8a6 !important; }
 [data-theme="grafito"] .to-red-600   { --tw-gradient-to: #0d9488 !important; }
 [data-theme="grafito"] .to-red-700   { --tw-gradient-to: #0f766e !important; }
@@ -617,20 +514,12 @@
 [data-theme="grafito"] .to-red-900   { --tw-gradient-to: #134e4a !important; }
 [data-theme="grafito"] .via-red-600  { --tw-gradient-via: #0d9488 !important; }
 [data-theme="grafito"] .via-red-700  { --tw-gradient-via: #0f766e !important; }
-[data-theme="grafito"] .border-t-red-400 { border-top-color: #2dd4bf !important; }
 [data-theme="grafito"] .border-t-red-500 { border-top-color: #14b8a6 !important; }
 [data-theme="grafito"] .border-t-red-600 { border-top-color: #0d9488 !important; }
 [data-theme="grafito"] .border-t-red-700 { border-top-color: #0f766e !important; }
-[data-theme="grafito"] .border-b-red-200 { border-bottom-color: #99f6e4 !important; }
 [data-theme="grafito"] .border-b-red-500 { border-bottom-color: #14b8a6 !important; }
 [data-theme="grafito"] .border-b-red-600 { border-bottom-color: #0d9488 !important; }
-[data-theme="grafito"] .border-l-red-300 { border-left-color: #5eead4 !important; }
-[data-theme="grafito"] .border-l-red-400 { border-left-color: #2dd4bf !important; }
 [data-theme="grafito"] .border-l-red-500 { border-left-color: #14b8a6 !important; }
-[data-theme="grafito"] .border-r-red-200 { border-right-color: #99f6e4 !important; }
-[data-theme="grafito"] .shadow-red-100  { --tw-shadow-color: #ccfbf1 !important; }
-[data-theme="grafito"] .shadow-red-200  { --tw-shadow-color: #99f6e4 !important; }
-[data-theme="grafito"] .shadow-red-300  { --tw-shadow-color: #5eead4 !important; }
 [data-theme="grafito"] .shadow-red-500\/20 { --tw-shadow-color: rgba(20, 184, 166, 0.2) !important; }
 [data-theme="grafito"] .shadow-red-700\/30 { --tw-shadow-color: rgba(15, 118, 110, 0.3) !important; }
 [data-theme="grafito"] .shadow-red-700\/50 { --tw-shadow-color: rgba(15, 118, 110, 0.5) !important; }
@@ -698,6 +587,9 @@
   background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.8), rgba(13, 148, 136, 0.06));
 }
 [data-theme="grafito"] .erp-panel-bottom-right { border-color: rgba(13, 148, 136, 0.08); }
+/* ── Contraste automático: si el color de marca sale claro (posible con un
+   acento personalizado muy claro), el texto/icono blanco que se le pone
+   encima por defecto pasaría a ser invisible — se fuerza texto oscuro. ── */
 [data-theme="grafito"] .bg-red-500.text-white { color: #ffffff !important; }
 [data-theme="grafito"] .bg-red-600.text-white { color: #ffffff !important; }
 [data-theme="grafito"] .bg-red-700.text-white { color: #ffffff !important; }
@@ -721,11 +613,11 @@
 [data-theme="indigo"] input:focus, [data-theme="indigo"] textarea:focus, [data-theme="indigo"] select:focus {
   box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.08) !important;
 }
-[data-theme="indigo"] .bg-red-50  { background-color: #eef2ff !important; }
-[data-theme="indigo"] .bg-red-100 { background-color: #e0e7ff !important; }
-[data-theme="indigo"] .bg-red-200 { background-color: #c7d2fe !important; }
-[data-theme="indigo"] .bg-red-300 { background-color: #a5b4fc !important; }
-[data-theme="indigo"] .bg-red-400 { background-color: #818cf8 !important; }
+/* Los tonos 50-400 se dejan FUERA a propósito: en el resto de la app se
+   usan casi siempre para estados semánticos (error, vencido, urgente...),
+   no para marca. Recolorearlos hacía que un aviso de error se viera del
+   color del tema en vez de rojo/alarma. Solo se tematizan 500-900, que
+   son los que usan los botones y superficies de marca de verdad. */
 [data-theme="indigo"] .bg-red-500 { background-color: #6366f1 !important; }
 [data-theme="indigo"] .bg-red-600 { background-color: #4f46e5 !important; }
 [data-theme="indigo"] .bg-red-700 { background-color: #4338ca !important; }
@@ -735,49 +627,27 @@
 [data-theme="indigo"] .bg-red-500\/20 { background-color: rgb(99 102 241 / 0.2) !important; }
 [data-theme="indigo"] .bg-red-600\/10 { background-color: rgb(79 70 229 / 0.1) !important; }
 [data-theme="indigo"] .bg-red-600\/20 { background-color: rgb(79 70 229 / 0.2) !important; }
-[data-theme="indigo"] .text-red-100 { color: #e0e7ff !important; }
-[data-theme="indigo"] .text-red-200 { color: #c7d2fe !important; }
-[data-theme="indigo"] .text-red-300 { color: #a5b4fc !important; }
-[data-theme="indigo"] .text-red-400 { color: #818cf8 !important; }
 [data-theme="indigo"] .text-red-500 { color: #6366f1 !important; }
 [data-theme="indigo"] .text-red-600 { color: #4f46e5 !important; }
 [data-theme="indigo"] .text-red-700 { color: #4338ca !important; }
 [data-theme="indigo"] .text-red-800 { color: #3730a3 !important; }
-[data-theme="indigo"] .border-red-100 { border-color: #e0e7ff !important; }
-[data-theme="indigo"] .border-red-200 { border-color: #c7d2fe !important; }
-[data-theme="indigo"] .border-red-300 { border-color: #a5b4fc !important; }
-[data-theme="indigo"] .border-red-400 { border-color: #818cf8 !important; }
 [data-theme="indigo"] .border-red-500 { border-color: #6366f1 !important; }
 [data-theme="indigo"] .border-red-600 { border-color: #4f46e5 !important; }
 [data-theme="indigo"] .border-red-700 { border-color: #4338ca !important; }
-[data-theme="indigo"] .hover\:bg-red-50:hover  { background-color: #eef2ff !important; }
-[data-theme="indigo"] .hover\:bg-red-100:hover { background-color: #e0e7ff !important; }
-[data-theme="indigo"] .hover\:bg-red-200:hover { background-color: #c7d2fe !important; }
 [data-theme="indigo"] .hover\:bg-red-500:hover { background-color: #6366f1 !important; }
 [data-theme="indigo"] .hover\:bg-red-600:hover { background-color: #4f46e5 !important; }
 [data-theme="indigo"] .hover\:bg-red-700:hover { background-color: #3730a3 !important; }
-[data-theme="indigo"] .hover\:text-red-400:hover { color: #818cf8 !important; }
 [data-theme="indigo"] .hover\:text-red-500:hover { color: #6366f1 !important; }
 [data-theme="indigo"] .hover\:text-red-600:hover { color: #4f46e5 !important; }
 [data-theme="indigo"] .hover\:text-red-700:hover { color: #4338ca !important; }
-[data-theme="indigo"] .hover\:border-red-100:hover { border-color: #e0e7ff !important; }
-[data-theme="indigo"] .hover\:border-red-200:hover { border-color: #c7d2fe !important; }
-[data-theme="indigo"] .hover\:border-red-300:hover { border-color: #a5b4fc !important; }
-[data-theme="indigo"] .hover\:border-red-400:hover { border-color: #818cf8 !important; }
 [data-theme="indigo"] .hover\:border-red-500:hover { border-color: #6366f1 !important; }
-[data-theme="indigo"] .focus\:ring-red-400:focus { --tw-ring-color: rgba(129, 140, 248, 0.5) !important; }
 [data-theme="indigo"] .focus\:ring-red-500:focus { --tw-ring-color: rgba(99, 102, 241, 0.5) !important; }
-[data-theme="indigo"] .focus\:border-red-400:focus { border-color: #818cf8 !important; }
 [data-theme="indigo"] .focus\:border-red-500:focus { border-color: #6366f1 !important; }
-[data-theme="indigo"] .ring-red-400 { --tw-ring-color: rgba(129, 140, 248, 0.5) !important; }
 [data-theme="indigo"] .ring-red-500 { --tw-ring-color: rgba(99, 102, 241, 0.5) !important; }
-[data-theme="indigo"] .from-red-300 { --tw-gradient-from: #a5b4fc !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgb(165 180 252 / 0)) !important; }
-[data-theme="indigo"] .from-red-400 { --tw-gradient-from: #818cf8 !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgb(129 140 248 / 0)) !important; }
 [data-theme="indigo"] .from-red-500 { --tw-gradient-from: #6366f1 !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgb(99 102 241 / 0)) !important; }
 [data-theme="indigo"] .from-red-600 { --tw-gradient-from: #4f46e5 !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgb(79 70 229 / 0)) !important; }
 [data-theme="indigo"] .from-red-700 { --tw-gradient-from: #4338ca !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgb(67 56 202 / 0)) !important; }
 [data-theme="indigo"] .from-red-800 { --tw-gradient-from: #3730a3 !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgb(55 48 163 / 0)) !important; }
-[data-theme="indigo"] .to-red-400   { --tw-gradient-to: #818cf8 !important; }
 [data-theme="indigo"] .to-red-500   { --tw-gradient-to: #6366f1 !important; }
 [data-theme="indigo"] .to-red-600   { --tw-gradient-to: #4f46e5 !important; }
 [data-theme="indigo"] .to-red-700   { --tw-gradient-to: #4338ca !important; }
@@ -785,20 +655,12 @@
 [data-theme="indigo"] .to-red-900   { --tw-gradient-to: #312e81 !important; }
 [data-theme="indigo"] .via-red-600  { --tw-gradient-via: #4f46e5 !important; }
 [data-theme="indigo"] .via-red-700  { --tw-gradient-via: #4338ca !important; }
-[data-theme="indigo"] .border-t-red-400 { border-top-color: #818cf8 !important; }
 [data-theme="indigo"] .border-t-red-500 { border-top-color: #6366f1 !important; }
 [data-theme="indigo"] .border-t-red-600 { border-top-color: #4f46e5 !important; }
 [data-theme="indigo"] .border-t-red-700 { border-top-color: #4338ca !important; }
-[data-theme="indigo"] .border-b-red-200 { border-bottom-color: #c7d2fe !important; }
 [data-theme="indigo"] .border-b-red-500 { border-bottom-color: #6366f1 !important; }
 [data-theme="indigo"] .border-b-red-600 { border-bottom-color: #4f46e5 !important; }
-[data-theme="indigo"] .border-l-red-300 { border-left-color: #a5b4fc !important; }
-[data-theme="indigo"] .border-l-red-400 { border-left-color: #818cf8 !important; }
 [data-theme="indigo"] .border-l-red-500 { border-left-color: #6366f1 !important; }
-[data-theme="indigo"] .border-r-red-200 { border-right-color: #c7d2fe !important; }
-[data-theme="indigo"] .shadow-red-100  { --tw-shadow-color: #e0e7ff !important; }
-[data-theme="indigo"] .shadow-red-200  { --tw-shadow-color: #c7d2fe !important; }
-[data-theme="indigo"] .shadow-red-300  { --tw-shadow-color: #a5b4fc !important; }
 [data-theme="indigo"] .shadow-red-500\/20 { --tw-shadow-color: rgba(99, 102, 241, 0.2) !important; }
 [data-theme="indigo"] .shadow-red-700\/30 { --tw-shadow-color: rgba(67, 56, 202, 0.3) !important; }
 [data-theme="indigo"] .shadow-red-700\/50 { --tw-shadow-color: rgba(67, 56, 202, 0.5) !important; }
@@ -866,6 +728,9 @@
   background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.8), rgba(79, 70, 229, 0.06));
 }
 [data-theme="indigo"] .erp-panel-bottom-right { border-color: rgba(79, 70, 229, 0.08); }
+/* ── Contraste automático: si el color de marca sale claro (posible con un
+   acento personalizado muy claro), el texto/icono blanco que se le pone
+   encima por defecto pasaría a ser invisible — se fuerza texto oscuro. ── */
 [data-theme="indigo"] .bg-red-500.text-white { color: #ffffff !important; }
 [data-theme="indigo"] .bg-red-600.text-white { color: #ffffff !important; }
 [data-theme="indigo"] .bg-red-700.text-white { color: #ffffff !important; }

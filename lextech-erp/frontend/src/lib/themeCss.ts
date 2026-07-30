@@ -254,11 +254,11 @@ ${t} {
 ${t} input:focus, ${t} textarea:focus, ${t} select:focus {
   box-shadow: 0 0 0 4px ${rgba(ramp[600], 0.08)} !important;
 }
-${t} .bg-red-50  { background-color: ${ramp[50]} !important; }
-${t} .bg-red-100 { background-color: ${ramp[100]} !important; }
-${t} .bg-red-200 { background-color: ${ramp[200]} !important; }
-${t} .bg-red-300 { background-color: ${ramp[300]} !important; }
-${t} .bg-red-400 { background-color: ${ramp[400]} !important; }
+/* Los tonos 50-400 se dejan FUERA a propósito: en el resto de la app se
+   usan casi siempre para estados semánticos (error, vencido, urgente...),
+   no para marca. Recolorearlos hacía que un aviso de error se viera del
+   color del tema en vez de rojo/alarma. Solo se tematizan 500-900, que
+   son los que usan los botones y superficies de marca de verdad. */
 ${t} .bg-red-500 { background-color: ${ramp[500]} !important; }
 ${t} .bg-red-600 { background-color: ${ramp[600]} !important; }
 ${t} .bg-red-700 { background-color: ${ramp[700]} !important; }
@@ -268,49 +268,27 @@ ${t} .bg-red-500\\/10 { background-color: ${rgbSlash(ramp[500], 0.1)} !important
 ${t} .bg-red-500\\/20 { background-color: ${rgbSlash(ramp[500], 0.2)} !important; }
 ${t} .bg-red-600\\/10 { background-color: ${rgbSlash(ramp[600], 0.1)} !important; }
 ${t} .bg-red-600\\/20 { background-color: ${rgbSlash(ramp[600], 0.2)} !important; }
-${t} .text-red-100 { color: ${ramp[100]} !important; }
-${t} .text-red-200 { color: ${ramp[200]} !important; }
-${t} .text-red-300 { color: ${ramp[300]} !important; }
-${t} .text-red-400 { color: ${ramp[400]} !important; }
 ${t} .text-red-500 { color: ${ramp[500]} !important; }
 ${t} .text-red-600 { color: ${ramp[600]} !important; }
 ${t} .text-red-700 { color: ${ramp[700]} !important; }
 ${t} .text-red-800 { color: ${ramp[800]} !important; }
-${t} .border-red-100 { border-color: ${ramp[100]} !important; }
-${t} .border-red-200 { border-color: ${ramp[200]} !important; }
-${t} .border-red-300 { border-color: ${ramp[300]} !important; }
-${t} .border-red-400 { border-color: ${ramp[400]} !important; }
 ${t} .border-red-500 { border-color: ${ramp[500]} !important; }
 ${t} .border-red-600 { border-color: ${ramp[600]} !important; }
 ${t} .border-red-700 { border-color: ${ramp[700]} !important; }
-${t} .hover\\:bg-red-50:hover  { background-color: ${ramp[50]} !important; }
-${t} .hover\\:bg-red-100:hover { background-color: ${ramp[100]} !important; }
-${t} .hover\\:bg-red-200:hover { background-color: ${ramp[200]} !important; }
 ${t} .hover\\:bg-red-500:hover { background-color: ${ramp[500]} !important; }
 ${t} .hover\\:bg-red-600:hover { background-color: ${ramp[600]} !important; }
 ${t} .hover\\:bg-red-700:hover { background-color: ${ramp[800]} !important; }
-${t} .hover\\:text-red-400:hover { color: ${ramp[400]} !important; }
 ${t} .hover\\:text-red-500:hover { color: ${ramp[500]} !important; }
 ${t} .hover\\:text-red-600:hover { color: ${ramp[600]} !important; }
 ${t} .hover\\:text-red-700:hover { color: ${ramp[700]} !important; }
-${t} .hover\\:border-red-100:hover { border-color: ${ramp[100]} !important; }
-${t} .hover\\:border-red-200:hover { border-color: ${ramp[200]} !important; }
-${t} .hover\\:border-red-300:hover { border-color: ${ramp[300]} !important; }
-${t} .hover\\:border-red-400:hover { border-color: ${ramp[400]} !important; }
 ${t} .hover\\:border-red-500:hover { border-color: ${ramp[500]} !important; }
-${t} .focus\\:ring-red-400:focus { --tw-ring-color: ${rgba(ramp[400], 0.5)} !important; }
 ${t} .focus\\:ring-red-500:focus { --tw-ring-color: ${rgba(ramp[500], 0.5)} !important; }
-${t} .focus\\:border-red-400:focus { border-color: ${ramp[400]} !important; }
 ${t} .focus\\:border-red-500:focus { border-color: ${ramp[500]} !important; }
-${t} .ring-red-400 { --tw-ring-color: ${rgba(ramp[400], 0.5)} !important; }
 ${t} .ring-red-500 { --tw-ring-color: ${rgba(ramp[500], 0.5)} !important; }
-${t} .from-red-300 { --tw-gradient-from: ${ramp[300]} !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, ${rgbSlash(ramp[300], 0)}) !important; }
-${t} .from-red-400 { --tw-gradient-from: ${ramp[400]} !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, ${rgbSlash(ramp[400], 0)}) !important; }
 ${t} .from-red-500 { --tw-gradient-from: ${ramp[500]} !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, ${rgbSlash(ramp[500], 0)}) !important; }
 ${t} .from-red-600 { --tw-gradient-from: ${ramp[600]} !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, ${rgbSlash(ramp[600], 0)}) !important; }
 ${t} .from-red-700 { --tw-gradient-from: ${ramp[700]} !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, ${rgbSlash(ramp[700], 0)}) !important; }
 ${t} .from-red-800 { --tw-gradient-from: ${ramp[800]} !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, ${rgbSlash(ramp[800], 0)}) !important; }
-${t} .to-red-400   { --tw-gradient-to: ${ramp[400]} !important; }
 ${t} .to-red-500   { --tw-gradient-to: ${ramp[500]} !important; }
 ${t} .to-red-600   { --tw-gradient-to: ${ramp[600]} !important; }
 ${t} .to-red-700   { --tw-gradient-to: ${ramp[700]} !important; }
@@ -318,20 +296,12 @@ ${t} .to-red-800   { --tw-gradient-to: ${ramp[800]} !important; }
 ${t} .to-red-900   { --tw-gradient-to: ${ramp[900]} !important; }
 ${t} .via-red-600  { --tw-gradient-via: ${ramp[600]} !important; }
 ${t} .via-red-700  { --tw-gradient-via: ${ramp[700]} !important; }
-${t} .border-t-red-400 { border-top-color: ${ramp[400]} !important; }
 ${t} .border-t-red-500 { border-top-color: ${ramp[500]} !important; }
 ${t} .border-t-red-600 { border-top-color: ${ramp[600]} !important; }
 ${t} .border-t-red-700 { border-top-color: ${ramp[700]} !important; }
-${t} .border-b-red-200 { border-bottom-color: ${ramp[200]} !important; }
 ${t} .border-b-red-500 { border-bottom-color: ${ramp[500]} !important; }
 ${t} .border-b-red-600 { border-bottom-color: ${ramp[600]} !important; }
-${t} .border-l-red-300 { border-left-color: ${ramp[300]} !important; }
-${t} .border-l-red-400 { border-left-color: ${ramp[400]} !important; }
 ${t} .border-l-red-500 { border-left-color: ${ramp[500]} !important; }
-${t} .border-r-red-200 { border-right-color: ${ramp[200]} !important; }
-${t} .shadow-red-100  { --tw-shadow-color: ${ramp[100]} !important; }
-${t} .shadow-red-200  { --tw-shadow-color: ${ramp[200]} !important; }
-${t} .shadow-red-300  { --tw-shadow-color: ${ramp[300]} !important; }
 ${t} .shadow-red-500\\/20 { --tw-shadow-color: ${rgba(ramp[500], 0.2)} !important; }
 ${t} .shadow-red-700\\/30 { --tw-shadow-color: ${rgba(ramp[700], 0.3)} !important; }
 ${t} .shadow-red-700\\/50 { --tw-shadow-color: ${rgba(ramp[700], 0.5)} !important; }

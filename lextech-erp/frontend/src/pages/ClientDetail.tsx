@@ -208,7 +208,7 @@ function TabExpedientes({ clientId, clientName }: { clientId: string; clientName
   );
 
   if (error) return (
-    <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center text-red-700 text-sm">{error}</div>
+    <div className="bg-rose-50 border border-rose-200 rounded-xl p-6 text-center text-rose-700 text-sm">{error}</div>
   );
 
   return (
