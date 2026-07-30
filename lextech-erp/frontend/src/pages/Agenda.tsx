@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { safeJson } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
+import { useIsMobile } from "../lib/useIsMobile";
 import { createPortal } from "react-dom";
 import BackButton from "../components/BackButton";
 import { BookingPageSettingsModal, type BookingPage } from "../components/BookingPageSettingsModal";
@@ -2734,6 +2735,12 @@ export default function Agenda() {
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [selectedDay, setSelectedDay] = useState<string>(isoDate(today));
   const [view, setView] = useState<"month" | "week" | "day">("week");
+  const isMobile = useIsMobile();
+
+  // En móvil la vista semana/mes no cabe: por defecto se muestra solo el día.
+  useEffect(() => {
+    if (isMobile && view !== "day") setView("day");
+  }, [isMobile]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Datos LexTech
   const [events,   setEvents]   = useState<AgendaEvent[]>([]);
