@@ -657,10 +657,10 @@ export default function DashboardHome() {
               <ChevronRight size={14} className="text-slate-300 group-hover:text-red-500 transition-colors" />
             </div>
             <div className="p-4 grid grid-cols-2 gap-3 mb-1">
-              <div className="bg-red-50/50 border border-red-100 rounded-xl p-4">
-                <p className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-2">Vencidas</p>
-                <p className={`text-4xl font-black leading-none ${taskStats.vencidas>0?"text-red-600":"text-slate-200"}`}>{taskStats.vencidas}</p>
-                <p className="text-[10px] text-red-300 mt-2">revisar hoy</p>
+              <div className="bg-rose-50/50 border border-rose-100 rounded-xl p-4">
+                <p className="text-[10px] font-bold text-rose-400 uppercase tracking-widest mb-2">Vencidas</p>
+                <p className={`text-4xl font-black leading-none ${taskStats.vencidas>0?"text-rose-600":"text-slate-200"}`}>{taskStats.vencidas}</p>
+                <p className="text-[10px] text-rose-300 mt-2">revisar hoy</p>
               </div>
               <div className="bg-amber-50/50 border border-amber-100 rounded-xl p-4">
                 <p className="text-[10px] font-bold text-amber-400 uppercase tracking-widest mb-2">Próximas</p>

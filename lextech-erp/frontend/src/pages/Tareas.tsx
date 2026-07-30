@@ -79,7 +79,7 @@ const TIPO_CONFIG: Record<string, { label: string; color: string; bar: string }>
 
 const ESTADO_CONFIG: Record<string, { label: string; cls: string }> = {
   pendiente:  { label: "Pendiente",  cls: "text-amber-600"   },
-  urgente:    { label: "Urgente",    cls: "text-red-600"     },
+  urgente:    { label: "Urgente",    cls: "text-rose-600"    },
   completada: { label: "Completada", cls: "text-emerald-600" },
 };
 
@@ -284,7 +284,7 @@ function TaskPanel({
                   {tipoConf.label}
                 </span>
                 {overdue && !done && (
-                  <span className="flex items-center gap-1 text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-md">
+                  <span className="flex items-center gap-1 text-[10px] font-bold text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md">
                     <AlertTriangle size={9} /> Vencida
                   </span>
                 )}
@@ -679,7 +679,7 @@ function TaskRow({
       <div className="w-[110px] flex items-center justify-center shrink-0 px-2 pr-4">
         <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border ${
           done ? "bg-emerald-50 text-emerald-600 border-emerald-200" :
-          task.estado === "urgente" ? "bg-red-50 text-red-600 border-red-200" :
+          task.estado === "urgente" ? "bg-rose-50 text-rose-600 border-rose-200" :
           "bg-amber-50 text-amber-600 border-amber-200"
         }`}>
           {ESTADO_CONFIG[task.estado]?.label}
@@ -783,7 +783,7 @@ function KanbanCardContent({
             {(PRIO_CONFIG[task.prioridad] ?? PRIO_CONFIG.media).label}
           </span>
           {overdue && !done && (
-            <span className="flex items-center gap-1 text-[10px] font-bold text-red-600 bg-red-50 border border-red-100 px-2 py-0.5 rounded-md">
+            <span className="flex items-center gap-1 text-[10px] font-bold text-rose-600 bg-rose-50 border border-rose-100 px-2 py-0.5 rounded-md">
               <AlertTriangle size={9} /> Vencida
             </span>
           )}
@@ -898,9 +898,9 @@ function KanbanLane({ id, title, accent, badgeCls, tasks, onToggle, onEdit, onAd
       <div ref={setNodeRef}
         className={`flex-1 overflow-y-auto p-3 flex flex-col gap-2.5 transition-colors ${isOver ? "bg-indigo-50/50" : ""}`}>
         {overdueCount > 0 && (
-          <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200/70 rounded-xl shrink-0">
-            <AlertTriangle size={10} className="text-red-500 shrink-0" />
-            <span className="text-[10px] font-extrabold text-red-600 uppercase tracking-widest">
+          <div className="flex items-center gap-2 px-3 py-2 bg-rose-50 border border-rose-200/70 rounded-xl shrink-0">
+            <AlertTriangle size={10} className="text-rose-500 shrink-0" />
+            <span className="text-[10px] font-extrabold text-rose-600 uppercase tracking-widest">
               {overdueCount} {overdueCount === 1 ? "vencida" : "vencidas"}
             </span>
           </div>
@@ -1096,7 +1096,7 @@ function GanttBoard({ tasks, onEdit, onUpdatePlazo }: {
             const tipoConf       = TIPO_CONFIG[task.tipo] || TIPO_CONFIG.otro;
             const overdue        = isOverdue(task.plazo, task.estado);
             const barTone        = task.estado === "completada" ? "bg-emerald-500/90" :
-                                   task.estado === "urgente" || overdue ? "bg-red-500/90" : "bg-indigo-500/90";
+                                   task.estado === "urgente" || overdue ? "bg-rose-500/90" : "bg-indigo-500/90";
             const isDraggingThis = dragging?.taskId === task.id;
             const deltaDays      = isDraggingThis ? dragging!.deltaDays : 0;
             const visualSpan     = Math.max(1, baseSpan + deltaDays);
@@ -1542,7 +1542,7 @@ export default function Tareas() {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {([
-          { label: "VENCIDAS",    val: stats.vencidas,    cls: "text-red-600",     labelCls: "text-red-400",     bg: "bg-red-50/70",     border: "border-red-100",     Icon: AlertTriangle as React.FC<{ size?: number; className?: string; strokeWidth?: number }> },
+          { label: "VENCIDAS",    val: stats.vencidas,    cls: "text-rose-600",    labelCls: "text-rose-400",    bg: "bg-rose-50/70",    border: "border-rose-100",    Icon: AlertTriangle as React.FC<{ size?: number; className?: string; strokeWidth?: number }> },
           { label: "URGENTES",    val: stats.urgentes,    cls: "text-orange-500",  labelCls: "text-orange-400",  bg: "bg-orange-50/70",  border: "border-orange-100",  Icon: Zap           as React.FC<{ size?: number; className?: string; strokeWidth?: number }> },
           { label: "PENDIENTES",  val: stats.pendientes,  cls: "text-amber-600",   labelCls: "text-amber-500",   bg: "bg-amber-50/70",   border: "border-amber-100",   Icon: Clock         as React.FC<{ size?: number; className?: string; strokeWidth?: number }> },
           { label: "COMPLETADAS", val: stats.completadas, cls: "text-emerald-600", labelCls: "text-emerald-500", bg: "bg-emerald-50/70", border: "border-emerald-100", Icon: CheckCircle2  as React.FC<{ size?: number; className?: string; strokeWidth?: number }> },
@@ -1699,13 +1699,13 @@ export default function Tareas() {
 
                 {overdueTasks.length > 0 && (
                   <>
-                    <div className="flex items-center gap-2 px-4 py-2 bg-red-50/70 border-b border-red-100">
-                      <AlertTriangle size={11} className="text-red-500 shrink-0" />
-                      <span className="text-[10px] font-extrabold uppercase tracking-widest text-red-600">
+                    <div className="flex items-center gap-2 px-4 py-2 bg-rose-50/70 border-b border-rose-100">
+                      <AlertTriangle size={11} className="text-rose-500 shrink-0" />
+                      <span className="text-[10px] font-extrabold uppercase tracking-widest text-rose-600">
                         Vencidas · {overdueTasks.length}
                       </span>
                     </div>
-                    <div className="border-l-[3px] border-red-400">
+                    <div className="border-l-[3px] border-rose-400">
                       {overdueTasks.map(t => (
                         <TaskRow key={t.id} task={t} onToggle={handleToggle} onEdit={openEdit}
                           selected={selectedIds.has(t.id)} onSelect={toggleSelect} />

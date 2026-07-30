@@ -952,7 +952,7 @@ function TabNotas({ clientId }: { clientId: string }) {
                     {categorias.find(c => c.valor === n.category)?.nombre || n.category}
                   </span>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                    n.priority === "urgente" ? "bg-red-100 text-red-600" :
+                    n.priority === "urgente" ? "bg-rose-100 text-rose-600" :
                     n.priority === "alta" ? "bg-orange-100 text-orange-600" :
                     n.priority === "normal" ? "bg-blue-100 text-blue-600" :
                     "bg-slate-100 text-slate-600"
@@ -1117,7 +1117,7 @@ function TabTareas({ clientId, autoOpen = false, initialTaskType = "" }: { clien
 
   const estadoStyle: Record<string, string> = {
     pendiente:  "bg-amber-100 text-amber-700",
-    urgente:    "bg-red-100 text-red-700",
+    urgente:    "bg-rose-100 text-rose-700",
     completada: "bg-emerald-100 text-emerald-700",
   };
   const estadoLabel: Record<string, string> = {
@@ -3573,9 +3573,9 @@ function PanelIndicadores({ clientId, onTabChange }: { clientId: string; onTabCh
           <Indicador label="Pendientes"        value={fmt(ind?.tareas_pendientes)}
             color={ind?.tareas_pendientes > 0 ? "text-amber-600" : "text-slate-700"} />
           <Indicador label="Urgentes"          value={fmt(ind?.tareas_urgentes)}
-            color={ind?.tareas_urgentes > 0 ? "text-red-600" : "text-slate-700"} />
+            color={ind?.tareas_urgentes > 0 ? "text-rose-600" : "text-slate-700"} />
           <Indicador label="Vencidas"          value={fmt(ind?.tareas_vencidas)}
-            color={ind?.tareas_vencidas > 0 ? "text-red-700 font-bold" : "text-slate-700"} />
+            color={ind?.tareas_vencidas > 0 ? "text-rose-700 font-bold" : "text-slate-700"} />
           <Indicador label="Completadas"       value={fmt(ind?.tareas_completadas)}
             color={ind?.tareas_completadas > 0 ? "text-emerald-600" : "text-slate-700"} />
 
@@ -3639,7 +3639,7 @@ function TabEconomico({ clientId }: { clientId: string }) {
   const ESTADO_BADGE: Record<string, string> = {
     cobrada:  "bg-emerald-100 text-emerald-700",
     pendiente:"bg-amber-100 text-amber-700",
-    vencida:  "bg-red-100 text-red-700",
+    vencida:  "bg-rose-100 text-rose-700",
   };
 
   const clientFacturas = (billing?.facturas || []).filter((f: any) => f.client_id === clientId);

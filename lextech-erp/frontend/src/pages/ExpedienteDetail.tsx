@@ -963,7 +963,7 @@ function TabNotas({
                     {categorias.find((c) => c.valor === n.category)?.nombre || n.category}
                   </span>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                    n.priority === "urgente" ? "bg-red-100 text-red-600" :
+                    n.priority === "urgente" ? "bg-rose-100 text-rose-600" :
                     n.priority === "alta" ? "bg-orange-100 text-orange-600" :
                     n.priority === "normal" ? "bg-blue-100 text-blue-600" :
                     "bg-slate-100 text-slate-600"
@@ -1173,7 +1173,7 @@ function TabTareas({
 
   const estadoStyle: Record<string, string> = {
     pendiente: "bg-amber-100 text-amber-700",
-    urgente: "bg-red-100 text-red-700",
+    urgente: "bg-rose-100 text-rose-700",
     completada: "bg-emerald-100 text-emerald-700",
   };
   const estadoLabel: Record<string, string> = {
@@ -5054,9 +5054,9 @@ function PanelIndicadoresExpediente({ expedienteId, onTabChange, collapsed, onTo
             <Indicador label="Pendientes"      value={fmt(ind.tareas_pendientes)}
               color={ind.tareas_pendientes > 0 ? 'text-amber-600' : 'text-slate-700'} />
             <Indicador label="Urgentes"        value={fmt(ind.tareas_urgentes)}
-              color={ind.tareas_urgentes > 0 ? 'text-red-600' : 'text-slate-700'} />
+              color={ind.tareas_urgentes > 0 ? 'text-rose-600' : 'text-slate-700'} />
             <Indicador label="Vencidas"        value={fmt(ind.tareas_vencidas)}
-              color={ind.tareas_vencidas > 0 ? 'text-red-600' : 'text-slate-700'} />
+              color={ind.tareas_vencidas > 0 ? 'text-rose-600' : 'text-slate-700'} />
             <Indicador label="Completadas"     value={fmt(ind.tareas_completadas)}
               color={ind.tareas_completadas > 0 ? 'text-emerald-600' : 'text-slate-700'} />
 
@@ -5949,7 +5949,7 @@ export default function ExpedienteDetail() {
               const ESTADO_BADGE: Record<string, string> = {
                 cobrada:  "bg-emerald-100 text-emerald-700",
                 pendiente:"bg-amber-100 text-amber-700",
-                vencida:  "bg-red-100 text-red-700",
+                vencida:  "bg-rose-100 text-rose-700",
               };
               const FacturaRow = ({ f, dim }: { f: any; dim?: boolean }) => (
                 <tr key={f.id} className={`hover:bg-slate-50 transition-colors ${dim ? "opacity-60" : ""}`}>
@@ -6220,7 +6220,7 @@ export default function ExpedienteDetail() {
                                     )}
                                     {ev.meta.priority && ev.meta.priority !== 'normal' && (
                                       <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold border ${
-                                        ev.meta.priority === 'urgente' ? 'bg-red-50 text-red-700 border-red-200' :
+                                        ev.meta.priority === 'urgente' ? 'bg-rose-50 text-rose-700 border-rose-200' :
                                         ev.meta.priority === 'alta'    ? 'bg-orange-50 text-orange-700 border-orange-200' :
                                         'bg-slate-50 text-slate-600 border-slate-200'
                                       }`}>
@@ -6230,7 +6230,7 @@ export default function ExpedienteDetail() {
                                     {ev.meta.estado && (
                                       <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold border ${
                                         ev.meta.estado === 'completada' || ev.meta.estado === 'pagada'  ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                                        ev.meta.estado === 'urgente'    || ev.meta.estado === 'vencida'  ? 'bg-red-50 text-red-700 border-red-200' :
+                                        ev.meta.estado === 'urgente'    || ev.meta.estado === 'vencida'  ? 'bg-rose-50 text-rose-700 border-rose-200' :
                                         ev.meta.estado === 'pendiente'                                   ? 'bg-amber-50 text-amber-700 border-amber-200' :
                                         'bg-slate-50 text-slate-600 border-slate-200'
                                       }`}>

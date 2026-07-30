@@ -421,7 +421,7 @@ const buildPayloadForApi = (type: BillingFormType, payload: any) => {
 
 function EstadoBadge({ estado }: { estado: string }) {
   const map: Record<string, string> = {
-    vencida: "bg-red-100 text-red-700",
+    vencida: "bg-rose-100 text-rose-700",
     pendiente: "bg-amber-100 text-amber-700",
     enviada: "bg-blue-100 text-blue-700",
     cobrada: "bg-emerald-100 text-emerald-700",
