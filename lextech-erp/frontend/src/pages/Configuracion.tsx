@@ -999,7 +999,7 @@ export default function Configuracion() {
 
       {/* ── Contenido del ajuste ── */}
       <div className="flex-1 overflow-y-auto modules-scrollbar p-8 lg:p-12 bg-[#f4f6f8]">
-        <div className="max-w-4xl">
+        <div className={activeSection === 'apariencia' ? 'max-w-6xl' : 'max-w-4xl'}>
 
           {activeSection === 'apariencia' ? (
             <>
@@ -1030,7 +1030,7 @@ export default function Configuracion() {
               {/* Tema del sistema */}
               <section className="mb-10">
                 <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">Tema del Entorno de Trabajo</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-10 mt-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-x-6 gap-y-10 mt-6">
                   {PALETTES.map((p) => (
                     <PaletteCard
                       key={p.id}
