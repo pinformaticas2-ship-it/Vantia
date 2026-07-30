@@ -5680,31 +5680,32 @@ export default function ExpedienteDetail() {
           {/* Columna 1: Nav vertical */}
           <div className={`anim-fade-up w-full flex-shrink-0 ${isCollapsed ? "md:w-56 md:sticky md:top-6" : "lg:w-56 lg:sticky lg:top-6"}`} style={{ animationDelay: '60ms' }}>
             <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 mb-3">Secciones del Expediente</h3>
-            <nav className="flex flex-col gap-0.5">
+            <nav className="flex gap-1.5 overflow-x-auto pb-1 modules-scrollbar sm:flex-col sm:gap-0.5 sm:overflow-visible sm:pb-0">
               {DETAIL_TABS.slice(0, 8).map((tabItem) => {
                 const Icon = tabItem.icon;
                 const active = tab === tabItem.key;
                 return (
                   <button key={tabItem.key} onClick={() => setTab(tabItem.key)}
-                    className={`rounded-xl px-4 py-2.5 flex items-center gap-3 text-sm transition-all text-left ${active ? "bg-white text-red-600 shadow-sm ring-1 ring-slate-200/50 font-semibold" : "text-slate-600 hover:bg-white hover:shadow-sm hover:text-slate-900 font-medium"}`}
+                    className={`shrink-0 rounded-xl px-4 py-2.5 flex items-center gap-2 sm:gap-3 text-sm whitespace-nowrap transition-all text-left ${active ? "bg-white text-red-600 shadow-sm ring-1 ring-slate-200/50 font-semibold" : "text-slate-600 hover:bg-white hover:shadow-sm hover:text-slate-900 font-medium"}`}
                   >
                     <Icon size={14} className={active ? "text-red-500 shrink-0" : "text-slate-400 shrink-0"} />
                     {tabItem.label}
-                    {active && <div className="w-1.5 h-1.5 rounded-full bg-red-500 ml-auto shrink-0 shadow-[0_0_6px_rgba(239,68,68,0.7)]" />}
+                    {active && <div className="hidden sm:block w-1.5 h-1.5 rounded-full bg-red-500 ml-auto shrink-0 shadow-[0_0_6px_rgba(239,68,68,0.7)]" />}
                   </button>
                 );
               })}
-              <div className="h-px w-full bg-slate-200 my-1.5" />
+              <div className="hidden sm:block h-px w-full bg-slate-200 my-1.5" />
+              <div className="shrink-0 w-px self-stretch bg-slate-200 sm:hidden" />
               {DETAIL_TABS.slice(8).map((tabItem) => {
                 const Icon = tabItem.icon;
                 const active = tab === tabItem.key;
                 return (
                   <button key={tabItem.key} onClick={() => setTab(tabItem.key)}
-                    className={`rounded-xl px-4 py-2.5 flex items-center gap-3 text-sm transition-all text-left ${active ? "bg-white text-red-600 shadow-sm ring-1 ring-slate-200/50 font-semibold" : "text-slate-600 hover:bg-white hover:shadow-sm hover:text-slate-900 font-medium"}`}
+                    className={`shrink-0 rounded-xl px-4 py-2.5 flex items-center gap-2 sm:gap-3 text-sm whitespace-nowrap transition-all text-left ${active ? "bg-white text-red-600 shadow-sm ring-1 ring-slate-200/50 font-semibold" : "text-slate-600 hover:bg-white hover:shadow-sm hover:text-slate-900 font-medium"}`}
                   >
                     <Icon size={14} className={active ? "text-red-500 shrink-0" : "text-slate-400 shrink-0"} />
                     {tabItem.label}
-                    {active && <div className="w-1.5 h-1.5 rounded-full bg-red-500 ml-auto shrink-0 shadow-[0_0_6px_rgba(239,68,68,0.7)]" />}
+                    {active && <div className="hidden sm:block w-1.5 h-1.5 rounded-full bg-red-500 ml-auto shrink-0 shadow-[0_0_6px_rgba(239,68,68,0.7)]" />}
                   </button>
                 );
               })}
