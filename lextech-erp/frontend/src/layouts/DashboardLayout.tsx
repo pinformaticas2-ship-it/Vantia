@@ -16,6 +16,7 @@ import {
 import { UserButton, useUser, useAuth, useClerk } from "@clerk/clerk-react";
 import { getDeviceId, safeJson, waitForClientIp, resolveUploadUrl } from "../lib/api";
 import { useOrganizacion } from "../lib/useOrganizacion";
+import { useIsMobile } from "../lib/useIsMobile";
 import { useChatUnread } from "../contexts/ChatUnreadContext";
 import { useEmailUnread } from "../contexts/EmailUnreadContext";
 import { useWhatsAppUnread, WA_LAST_SEEN_KEY } from "../contexts/WhatsAppUnreadContext";
@@ -439,10 +440,10 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
       {everOpened && (
         <div className="fixed bottom-24 right-6 z-50">
         <div
-          className={`w-[360px] bg-white rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.18)] flex flex-col overflow-hidden border border-slate-200/60 origin-bottom-right transition-all duration-200 ease-out ${
+          className={`w-[360px] max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.18)] flex flex-col overflow-hidden border border-slate-200/60 origin-bottom-right transition-all duration-200 ease-out ${
             open ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-3 pointer-events-none"
           }`}
-          style={{ height: "580px" }}
+          style={{ height: "min(580px, calc(100vh - 140px))" }}
         >
 
           {/* Header */}
@@ -744,7 +745,7 @@ function notificationIcon(kind: UnifiedNotification["kind"]) {
 
 function NotificationsPanel({ notifs, loading, onClose }: { notifs: UnifiedNotification[]; loading: boolean; onClose: () => void }) {
   return (
-    <div className="absolute right-0 top-14 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden">
+    <div className="absolute right-0 top-14 w-[calc(100vw-1.5rem)] max-w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden">
       <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
         <h3 className="font-bold text-slate-800 text-sm">Notificaciones</h3>
         <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={14} /></button>
@@ -1311,6 +1312,7 @@ export default function DashboardLayout() {
   const { totalUnread: chatTotalUnread } = useChatUnread();
   const { latestToast: latestWaToast, clearToast: clearWaToast, markSeen: markWaSeen, markAllSeen: markAllWaSeen } = useWhatsAppUnread();
 
+  const isMobile = useIsMobile();
   const [isMobileOpen,    setIsMobileOpen]    = useState(false);
   const [isCollapsed,     setIsCollapsed]     = useState(() => localStorage.getItem("sidebar_collapsed") === "1");
   const [isNotifOpen,     setIsNotifOpen]     = useState(false);
@@ -1696,36 +1698,43 @@ export default function DashboardLayout() {
       </aside>
 
       {/* Menú Móvil */}
-      {isMobileOpen && (
-        <div className="fixed inset-0 z-50 flex md:hidden">
-          <div className="fixed inset-0 bg-slate-900/80" onClick={() => setIsMobileOpen(false)} />
-          <div className="relative w-64 h-full shadow-2xl">
-            <button onClick={() => setIsMobileOpen(false)} className="absolute right-4 top-6 text-slate-400 hover:text-white z-10">
-              <X className="h-6 w-6" />
-            </button>
-            <SidebarContent pathname={location.pathname} search={location.search} onClose={() => setIsMobileOpen(false)} onSignOut={handleSignOut} />
-          </div>
+      <div
+        className={`fixed inset-0 z-50 flex md:hidden transition-opacity duration-300 ${
+          isMobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        }`}
+        aria-hidden={!isMobileOpen}
+      >
+        <div className="fixed inset-0 bg-slate-900/80" onClick={() => setIsMobileOpen(false)} />
+        <div
+          className={`relative w-72 max-w-[85vw] h-full shadow-2xl transition-transform duration-300 ease-out ${
+            isMobileOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
+        >
+          <button onClick={() => setIsMobileOpen(false)} className="absolute right-4 top-6 text-slate-400 hover:text-white z-10">
+            <X className="h-6 w-6" />
+          </button>
+          <SidebarContent pathname={location.pathname} search={location.search} onClose={() => setIsMobileOpen(false)} onSignOut={handleSignOut} />
         </div>
-      )}
+      </div>
 
       {/* Contenedor principal */}
       <main className={`relative flex-1 flex flex-col min-w-0 overflow-hidden transition-all duration-300 ${isCollapsed ? "md:pl-16" : "md:pl-64"}`}>
 
         {/* Topbar */}
-        <header className="h-16 border-b border-slate-200 bg-white shadow-sm flex items-center gap-4 px-5 md:px-8 sticky top-0 z-20">
+        <header className="h-16 border-b border-slate-200 bg-white shadow-sm flex items-center gap-2 sm:gap-4 px-3 sm:px-5 md:px-8 sticky top-0 z-20">
           <button className="md:hidden p-2 rounded-lg hover:bg-slate-100 text-slate-600 shrink-0" onClick={() => setIsMobileOpen(true)}>
             <Menu className="h-5 w-5" />
           </button>
 
           {/* Búsqueda */}
-          <div ref={searchRef} className="relative flex-1 max-w-2xl">
+          <div ref={searchRef} className="relative flex-1 min-w-0 max-w-2xl">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
             <input
               type="search"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => setSearchFocused(true)}
-              placeholder="Buscar módulos, clientes, expedientes..."
+              placeholder={isMobile ? "Buscar..." : "Buscar módulos, clientes, expedientes..."}
               className="pl-10 h-10 w-full rounded-lg border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:ring-2 focus:ring-red-500/20 focus:border-red-400 outline-none transition-all"
             />
             {searchFocused && searchQuery && (
@@ -1733,8 +1742,8 @@ export default function DashboardLayout() {
             )}
           </div>
 
-          {/* Links de interés (por usuario) */}
-          <div ref={linksRef} className="relative shrink-0">
+          {/* Links de interés (por usuario) — se oculta en móviles muy estrechos para dejar sitio al buscador y las notificaciones */}
+          <div ref={linksRef} className="relative shrink-0 hidden sm:block">
             <button
               onClick={() => setIsLinksOpen(v => !v)}
               className="relative p-2.5 rounded-full hover:bg-slate-100 text-slate-500 transition-colors"
@@ -1797,7 +1806,7 @@ function EmailToast({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed bottom-6 right-24 z-50 w-[360px] max-w-[calc(100vw-2rem)] rounded-2xl border border-red-100 bg-white shadow-2xl overflow-hidden">
+    <div className="fixed bottom-28 right-4 sm:bottom-6 sm:right-24 z-50 w-[360px] max-w-[calc(100vw-2rem)] rounded-2xl border border-red-100 bg-white shadow-2xl overflow-hidden">
       <div className="flex items-start gap-3 px-4 py-4 bg-gradient-to-r from-red-50 to-white">
         <div className="h-10 w-10 rounded-2xl bg-[#ab0433] text-white flex items-center justify-center shrink-0">
           <Mail className="h-5 w-5" />
@@ -1837,7 +1846,7 @@ function WaToast({ name, message, onOpen, onClose }: { name: string; message: st
   }, [onClose]);
 
   return (
-    <div className="fixed bottom-6 right-24 z-50 w-[360px] max-w-[calc(100vw-2rem)] rounded-2xl border border-green-100 bg-white shadow-2xl overflow-hidden">
+    <div className="fixed bottom-28 right-4 sm:bottom-6 sm:right-24 z-50 w-[360px] max-w-[calc(100vw-2rem)] rounded-2xl border border-green-100 bg-white shadow-2xl overflow-hidden">
       <div className="flex items-start gap-3 px-4 py-4 bg-gradient-to-r from-green-50 to-white">
         <div className="h-10 w-10 rounded-2xl bg-[#25D366] text-white flex items-center justify-center shrink-0">
           <MessageCircle className="h-5 w-5" />
@@ -1908,7 +1917,7 @@ function ChatToast({ title, meta, onOpen, onClose }: { title: string; meta?: str
       onKeyDown={(e) => { if (e.key === "Enter") onOpen(); }}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
-      className={`fixed bottom-6 right-24 z-50 w-[360px] max-w-[calc(100vw-2rem)] rounded-2xl border border-indigo-100 bg-white shadow-2xl shadow-indigo-900/10 overflow-hidden cursor-pointer transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-indigo-900/20 ${
+      className={`fixed bottom-28 right-4 sm:bottom-6 sm:right-24 z-50 w-[360px] max-w-[calc(100vw-2rem)] rounded-2xl border border-indigo-100 bg-white shadow-2xl shadow-indigo-900/10 overflow-hidden cursor-pointer transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-indigo-900/20 ${
         visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"
       }`}
     >

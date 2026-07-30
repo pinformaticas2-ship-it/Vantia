@@ -98,8 +98,8 @@ export default function ColumnVisibilityModal({
   );
 
   return createPortal(
-    <div className="fixed inset-0 z-[140] flex items-center justify-center bg-transparent p-5">
-      <div className="w-full max-w-6xl overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl shadow-slate-900/15">
+    <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/30 p-3 sm:p-5">
+      <div className="w-full max-w-6xl max-h-[95vh] overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl shadow-slate-900/15">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-50">
@@ -120,7 +120,7 @@ export default function ColumnVisibilityModal({
           </button>
         </div>
 
-        <div className="grid grid-cols-[minmax(0,1fr)_84px_minmax(0,1fr)] gap-6 px-6 py-6">
+        <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_84px_minmax(0,1fr)] gap-6 px-4 sm:px-6 py-6 max-h-[75vh] overflow-y-auto modules-scrollbar">
           <div className="min-w-0">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
