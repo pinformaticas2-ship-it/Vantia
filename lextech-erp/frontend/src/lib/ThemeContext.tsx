@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { apiFetch } from './api';
-import { buildThemeCss, rampFromAccent, pickSidebarStyle, autoSidebarBorder } from './themeCss';
+import { buildThemeCss, rampFromAccent, pickSidebarStyle, autoSidebarBorder, muteSidebarColor } from './themeCss';
 
 export type AppTheme = 'rojo' | 'azul' | 'verde' | 'violeta' | 'grafito' | 'indigo' | 'custom';
 
@@ -37,11 +37,12 @@ function applyCustomStyle(primary: string, secondary: string, sidebar: string) {
     document.head.appendChild(tag);
   }
   const sidebarStyle = pickSidebarStyle(sidebar);
+  const mutedSidebar = muteSidebarColor(sidebar);
   tag.textContent = buildThemeCss('custom', rampFromAccent(primary), {
     secondary,
     sidebarStyle,
-    sidebarBg: sidebar,
-    sidebarBorder: autoSidebarBorder(sidebar, sidebarStyle),
+    sidebarBg: mutedSidebar,
+    sidebarBorder: autoSidebarBorder(mutedSidebar, sidebarStyle),
   });
 }
 

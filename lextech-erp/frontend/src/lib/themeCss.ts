@@ -117,6 +117,22 @@ export function pickSidebarStyle(hex: string): 'light' | 'dark' {
   return relativeLuminance(hex) < 0.45 ? 'dark' : 'light';
 }
 
+/**
+ * Suaviza el color elegido para la barra lateral: las paletas fijas usan blanco
+ * puro o un grafito neutro (nunca un color saturado a pantalla completa), así
+ * que el color personalizado se acerca a ese mismo lenguaje en vez de pintar
+ * la barra entera de un tono vivo — se nota el matiz elegido, pero como detalle
+ * elegante, no como un bloque de color invasivo.
+ */
+export function muteSidebarColor(hex: string): string {
+  const [r, g, b] = hexToRgb(hex);
+  const [h, s, l] = rgbToHsl(r, g, b);
+  const dark = pickSidebarStyle(hex) === 'dark';
+  const targetL = dark ? Math.min(26, Math.max(14, l)) : Math.max(96, l);
+  const targetS = Math.min(s, dark ? 22 : 15);
+  return hslToHex(h, targetS, targetL);
+}
+
 /** Texto blanco o casi-negro, el que mejor contraste dé sobre ese fondo. */
 export function contrastText(hex: string): string {
   return relativeLuminance(hex) > 0.5 ? '#0f172a' : '#ffffff';

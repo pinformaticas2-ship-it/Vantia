@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertTriangle, Bell, BookOpen, Building2, Camera, Check, Loader2, Lock, Palette, Plug, Plus, ShieldCheck, Trash2, UsersRound, X } from 'lucide-react';
 import { useAuth } from '@clerk/clerk-react';
 import { useTheme, AppTheme } from '../lib/ThemeContext';
-import { pickSidebarStyle, autoSidebarBorder } from '../lib/themeCss';
+import { pickSidebarStyle, autoSidebarBorder, muteSidebarColor } from '../lib/themeCss';
 import { apiFetch, resolveUploadUrl, setActiveOrganizacionId } from '../lib/api';
 import { useOrganizacion, OrgRol } from '../lib/useOrganizacion';
 import ManualPanel from './ManualPanel';
@@ -1048,8 +1048,9 @@ export default function Configuracion() {
                 {(() => {
                   const previewAccent = draftPrimaryValid ? draftPrimary : customColor;
                   const previewSecondary = draftSecondaryValid ? draftSecondary : customSecondary;
-                  const previewSidebarBg = draftSidebarValid ? draftSidebar : customSidebar;
-                  const previewIsDark = pickSidebarStyle(previewSidebarBg) === 'dark';
+                  const previewSidebarRaw = draftSidebarValid ? draftSidebar : customSidebar;
+                  const previewIsDark = pickSidebarStyle(previewSidebarRaw) === 'dark';
+                  const previewSidebarBg = muteSidebarColor(previewSidebarRaw);
                   const previewSidebarBorder = autoSidebarBorder(previewSidebarBg, previewIsDark ? 'dark' : 'light');
                   const previewBars = previewIsDark
                     ? ['#374151', previewAccent, previewSecondary, '#4b5563', '#374151']
@@ -1059,7 +1060,7 @@ export default function Configuracion() {
                       <div className="flex flex-1 flex-col gap-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                         <div>
                           <p className="text-sm font-bold text-slate-800">Elige tus propios colores</p>
-                          <p className="mt-0.5 text-xs text-slate-500">Primario, secundario y barra lateral — se aplican al instante en toda la aplicación.</p>
+                          <p className="mt-0.5 text-xs text-slate-500">Primario, secundario y barra lateral — se aplican al instante en toda la aplicación. El color de la barra lateral se suaviza para que quede elegante, no invasivo.</p>
                         </div>
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                           <ColorField
