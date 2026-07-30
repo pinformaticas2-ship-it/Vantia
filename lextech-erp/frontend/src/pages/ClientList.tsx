@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { safeJson } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
+import { useIsMobile } from "../lib/useIsMobile";
 import { AtajosButton } from "../components/AtajosSystem";
 import AdjuntosModal from "../components/AdjuntosModal";
 import { EtapaSelect } from "../components/EtapaSelect";
@@ -1343,7 +1344,13 @@ export default function ClientList() {
   const [loading,   setLoading]   = useState(true);
   const [error,     setError]     = useState<string | null>(null);
   const [selected,  setSelected]  = useState<string | null>(null);
+  const isMobile = useIsMobile();
   const [viewMode,  setViewMode]  = useState<ViewMode>("list");
+
+  // En móvil la tabla densa (min-w 900px) no cabe: forzamos la vista de tarjetas.
+  useEffect(() => {
+    if (isMobile && viewMode === "list") setViewMode("detail");
+  }, [isMobile, viewMode]);
   const [expandedId, setExpandedId] = useState<string | null>(null);         // vista detalle
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());    // vista multiselect
   const [showSelectionDropdown, setShowSelectionDropdown] = useState(false); // dropdown lista seleccionados
@@ -2748,13 +2755,15 @@ export default function ClientList() {
                     {/* ── Controles de vista ── */}
                     <div className="flex items-center gap-0.5 bg-slate-100 rounded-lg p-0.5">
                       {/* Vista lista simple */}
-                      <button
-                        onClick={() => switchView("list")}
-                        title="Vista listado"
-                        className={`p-1.5 rounded-md transition-all ${viewMode === "list" ? "bg-white shadow-sm text-red-600" : "text-slate-400 hover:text-slate-600"}`}
-                      >
-                        <AlignJustify size={13} />
-                      </button>
+                      {!isMobile && (
+                        <button
+                          onClick={() => switchView("list")}
+                          title="Vista listado"
+                          className={`p-1.5 rounded-md transition-all ${viewMode === "list" ? "bg-white shadow-sm text-red-600" : "text-slate-400 hover:text-slate-600"}`}
+                        >
+                          <AlignJustify size={13} />
+                        </button>
+                      )}
 
                       {/* Vista lista + detalle expandible */}
                       <button
@@ -3015,7 +3024,7 @@ export default function ClientList() {
                       </div>
 
                       {/* Nombre + número */}
-                      <div className="w-52 shrink-0">
+                      <div className="min-w-0 flex-1 md:w-52 md:flex-none md:shrink-0">
                         <p className={`font-bold text-sm leading-tight truncate ${isSelected ? colorStyle.cardNameSelected : "text-slate-800"}`}>
                           {client.first_name} {client.last_name}
                         </p>
@@ -3074,8 +3083,8 @@ export default function ClientList() {
                         </div>
                       </div>
 
-                      {/* Botones acción — aparecen al hover */}
-                      <div className="shrink-0 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {/* Botones acción — siempre visibles en móvil, al hover en escritorio */}
+                      <div className="shrink-0 flex items-center gap-1.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                         <Link
                           to={`/dashboard/clientes/${client.id}`}
                           onClick={e => e.stopPropagation()}

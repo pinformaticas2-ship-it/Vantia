@@ -20,6 +20,7 @@ import {
 import AdjuntosModal from "../components/AdjuntosModal";
 import ColumnVisibilityModal from "../components/ColumnVisibilityModal";
 import { Modal } from "../components/Modal";
+import { useIsMobile } from "../lib/useIsMobile";
 import BackButton from "../components/BackButton";
 import { UndoToast } from "../components/UndoToast";
 import { useUndoDelete } from "../lib/useUndoDelete";
@@ -4549,8 +4550,14 @@ export default function ExpedienteList() {
   });
 
   // Vistas
+  const isMobile = useIsMobile();
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const switchView = (v: ViewMode) => { setViewMode(v); if (v !== "multiselect") setSelectedIds(new Set()); };
+
+  // En móvil la tabla densa (min-w 1100px) no cabe: forzamos la vista de tarjetas.
+  useEffect(() => {
+    if (isMobile && viewMode === "list") setViewMode("detail");
+  }, [isMobile, viewMode]);
 
   const PAGE_SIZE = 12;
   const [currentPage, setCurrentPage] = useState(1);
@@ -6651,10 +6658,12 @@ export default function ExpedienteList() {
                   : <span className="text-slate-600">{expedientes.length} {expedientes.length === 1 ? "registro" : "registros"}</span>}
               </span>
               <div className="flex h-8 items-center gap-0.5 rounded-lg border border-slate-200 bg-white p-0.5 shadow-sm">
-                <button onClick={() => switchView("list")} title="Vista listado"
-                  className={`flex h-7 w-7 items-center justify-center rounded-md transition-all ${viewMode === "list" ? "bg-red-50 text-red-600" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}>
-                  <AlignJustify size={12} />
-                </button>
+                {!isMobile && (
+                  <button onClick={() => switchView("list")} title="Vista listado"
+                    className={`flex h-7 w-7 items-center justify-center rounded-md transition-all ${viewMode === "list" ? "bg-red-50 text-red-600" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}>
+                    <AlignJustify size={12} />
+                  </button>
+                )}
                 <button onClick={() => switchView("detail")} title="Vista detalle"
                   className={`flex h-7 w-7 items-center justify-center rounded-md transition-all ${viewMode === "detail" ? "bg-red-50 text-red-600" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}>
                   <LayoutList size={12} />
