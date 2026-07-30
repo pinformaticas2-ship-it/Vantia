@@ -20,6 +20,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { safeJson } from "../lib/api";
+import { useIsMobile } from "../lib/useIsMobile";
 
 interface WhatsAppContact {
   id: string;
@@ -127,6 +128,7 @@ export default function WhatsApp() {
   const [contacts, setContacts] = useState<WhatsAppContact[]>([]);
   const [conversation, setConversation] = useState<WhatsAppMessage[]>([]);
   const [selectedClientId, setSelectedClientId] = useState(initialClientId);
+  const isMobile = useIsMobile();
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadingConversation, setLoadingConversation] = useState(false);
@@ -402,7 +404,7 @@ export default function WhatsApp() {
 
   return (
     <div className="flex h-full overflow-hidden bg-white">
-      <aside className="flex w-[320px] shrink-0 flex-col bg-[linear-gradient(180deg,#1f2334_0%,#111827_100%)] text-white">
+      <aside className={`${isMobile && selectedClientId ? "hidden" : "flex w-full"} md:flex md:w-[320px] shrink-0 flex-col bg-[linear-gradient(180deg,#1f2334_0%,#111827_100%)] text-white`}>
         <div className="border-b border-white/10 px-5 py-5">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -485,15 +487,15 @@ export default function WhatsApp() {
         </div>
       </aside>
 
-      <section className="flex min-w-0 flex-1 flex-col bg-[#f6f8fc]">
+      <section className={`${isMobile && !selectedClientId ? "hidden" : "flex"} min-w-0 flex-1 flex-col bg-[#f6f8fc] md:flex`}>
         <div className="border-b border-slate-200 bg-white px-6 py-4">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => navigate("/dashboard/clientes")}
+                onClick={() => (isMobile ? setSelectedClientId("") : navigate("/dashboard/clientes"))}
                 className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50"
-                title="Volver"
+                title={isMobile ? "Volver a la lista" : "Volver"}
               >
                 <ArrowLeft size={17} />
               </button>

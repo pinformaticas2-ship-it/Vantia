@@ -13,12 +13,13 @@ import {
   Video, Pencil, ChevronUp, Layers, MessagesSquare, Star, Download,
   Share2, ExternalLink, Copy, Minus, RotateCcw, Sparkles, Clock3, Eye,
   PawPrint, UtensilsCrossed, Trophy, Flag, User, FileText, File as FileIcon, Briefcase, type LucideIcon,
-  FileSpreadsheet, FileArchive, FileImage, FileVideo, FileAudio, FileCode,
+  FileSpreadsheet, FileArchive, FileImage, FileVideo, FileAudio, FileCode, ArrowLeft,
 } from "lucide-react";
 import { safeJson, resolveUploadUrl } from "../lib/api";
 import { createPortal } from "react-dom";
 import { useChatUnread } from "../contexts/ChatUnreadContext";
 import BackButton from "../components/BackButton";
+import { useIsMobile } from "../lib/useIsMobile";
 
 // ══════════════════════════════════════════════════════════════════════════════
 // TIPOS
@@ -3413,6 +3414,7 @@ export default function Chat() {
   const { user, isLoaded: userLoaded } = useUser();
   const { totalUnread, unreadByCanal, unreadDMs, unreadLoaded, clearUnread, refreshUnread } = useChatUnread();
   const currentUserId = user?.id || "";
+  const isMobile = useIsMobile();
 
   // Estado principal
   const [canales, setCanales]             = useState<Canal[]>([]);
@@ -4465,7 +4467,7 @@ export default function Chat() {
     <div className="flex h-full min-h-0 overflow-hidden bg-white animate-in fade-in duration-300">
 
       {/* ══ SIDEBAR ══════════════════════════════════════════════════════════ */}
-      <aside className="w-72 shrink-0 flex min-h-0 flex-col overflow-hidden border-r border-slate-200 bg-slate-50">
+      <aside className={`${isMobile && canalActivo ? "hidden" : "flex w-full"} md:flex md:w-72 shrink-0 min-h-0 flex-col overflow-hidden border-r border-slate-200 bg-slate-50`}>
 
         {/* Workspace header — estilo Slack */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 shrink-0 bg-white">
@@ -4699,7 +4701,7 @@ export default function Chat() {
       </aside>
 
       {/* ══ MAIN AREA ════════════════════════════════════════════════════════ */}
-      <div className="flex flex-1 flex-col min-w-0 overflow-hidden bg-[linear-gradient(180deg,_rgba(255,255,255,0.92)_0%,_rgba(248,250,252,0.96)_100%)]">
+      <div className={`${isMobile && !canalActivo ? "hidden" : "flex"} flex-1 flex-col min-w-0 overflow-hidden bg-[linear-gradient(180deg,_rgba(255,255,255,0.92)_0%,_rgba(248,250,252,0.96)_100%)]`}>
         {!canalActivo?(
           <div className="flex flex-col items-center justify-center flex-1 gap-5 bg-[radial-gradient(circle_at_top,_rgba(248,113,113,0.15),_transparent_30%),linear-gradient(180deg,_rgba(248,250,252,0.95),_rgba(241,245,249,0.9))]">
             <div className="w-20 h-20 rounded-[1.7rem] bg-white shadow-lg border border-slate-200 flex items-center justify-center">
@@ -4717,7 +4719,13 @@ export default function Chat() {
         ):(
           <>
             {/* Canal header */}
-            <div className={`flex items-center gap-3 px-6 py-3.5 border-b border-slate-200 shrink-0 bg-white shadow-sm transition-all duration-200 ${isSwitchingChat ? "translate-y-1 opacity-70" : "translate-y-0 opacity-100"}`}>
+            <div className={`flex items-center gap-3 px-3 sm:px-6 py-3.5 border-b border-slate-200 shrink-0 bg-white shadow-sm transition-all duration-200 ${isSwitchingChat ? "translate-y-1 opacity-70" : "translate-y-0 opacity-100"}`}>
+              {isMobile && (
+                <button onClick={() => setCanalActivo(null)} title="Volver a la lista"
+                  className="shrink-0 -ml-1 p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors md:hidden">
+                  <ArrowLeft size={18} />
+                </button>
+              )}
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 {canalActivo.tipo==="directo" ? (
                   <div className="relative shrink-0">
