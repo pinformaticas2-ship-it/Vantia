@@ -951,18 +951,18 @@ export default function Configuracion() {
   const activeOther = OTHER_SECTIONS.find((s) => s.key === activeSection);
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="flex flex-col md:flex-row h-full overflow-hidden">
 
       {/* ── Sub-navegación de Ajustes ── */}
-      <aside className="w-64 flex-shrink-0 flex flex-col bg-white border-r border-slate-200 z-10">
-        <div className="p-6 pb-2">
+      <aside className="w-full md:w-64 flex-shrink-0 flex flex-col bg-white border-b md:border-b-0 md:border-r border-slate-200 z-10">
+        <div className="px-4 pt-4 pb-1 md:p-6 md:pb-2">
           <h2 className="text-lg font-extrabold text-slate-800">Ajustes</h2>
         </div>
-        <div className="flex-1 overflow-y-auto modules-scrollbar p-3">
-          <nav className="space-y-1">
+        <div className="md:flex-1 md:overflow-y-auto modules-scrollbar p-3">
+          <nav className="flex gap-1.5 overflow-x-auto pb-1 modules-scrollbar md:flex-col md:overflow-visible md:pb-0">
             <button
               onClick={() => setActiveSection('apariencia')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg font-semibold text-sm transition-colors text-left ${
+              className={`shrink-0 whitespace-nowrap md:w-full flex items-center gap-3 px-3 py-2.5 rounded-lg font-semibold text-sm transition-colors text-left ${
                 activeSection === 'apariencia' ? 'bg-red-50 text-red-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium'
               }`}
             >
@@ -970,7 +970,7 @@ export default function Configuracion() {
             </button>
             <button
               onClick={() => setActiveSection('manual')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg font-semibold text-sm transition-colors text-left ${
+              className={`shrink-0 whitespace-nowrap md:w-full flex items-center gap-3 px-3 py-2.5 rounded-lg font-semibold text-sm transition-colors text-left ${
                 activeSection === 'manual' ? 'bg-red-50 text-red-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium'
               }`}
             >
@@ -981,10 +981,11 @@ export default function Configuracion() {
               const active = activeSection === s.key;
               return (
                 <React.Fragment key={s.key}>
-                  {i === OTHER_SECTIONS.length - 1 && <div className="my-4 border-t border-slate-200 mx-2" />}
+                  {i === OTHER_SECTIONS.length - 1 && <div className="hidden md:block my-4 border-t border-slate-200 mx-2" />}
+                  {i === OTHER_SECTIONS.length - 1 && <div className="shrink-0 w-px self-stretch bg-slate-200 md:hidden" />}
                   <button
                     onClick={() => setActiveSection(s.key)}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left group ${
+                    className={`shrink-0 whitespace-nowrap md:w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left group ${
                       active ? 'bg-red-50 text-red-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium'
                     }`}
                   >
@@ -998,7 +999,7 @@ export default function Configuracion() {
       </aside>
 
       {/* ── Contenido del ajuste ── */}
-      <div className="flex-1 overflow-y-auto modules-scrollbar p-8 lg:p-12 bg-[#f4f6f8]">
+      <div className="flex-1 overflow-y-auto modules-scrollbar p-4 sm:p-8 lg:p-12 bg-[#f4f6f8]">
         <div className={activeSection === 'apariencia' ? 'max-w-6xl' : 'max-w-4xl'}>
 
           {activeSection === 'apariencia' ? (
