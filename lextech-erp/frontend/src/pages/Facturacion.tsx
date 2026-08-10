@@ -694,12 +694,15 @@ function TableShell({
   headers,
   children,
   headerAction,
+  mobileCards,
 }: {
   title: string;
   count: string;
   headers: string[];
   children: React.ReactNode;
   headerAction?: React.ReactNode;
+  /** Vista alternativa en tarjetas para < md; si no se pasa, la tabla se ve con scroll horizontal en móvil. */
+  mobileCards?: React.ReactNode;
 }) {
   return (
     <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.04)]">
@@ -710,7 +713,8 @@ function TableShell({
         </div>
         {headerAction ? <div className="shrink-0">{headerAction}</div> : null}
       </div>
-      <div className="overflow-x-auto">
+      {mobileCards ? <div className="space-y-2 p-3 md:hidden">{mobileCards}</div> : null}
+      <div className={`overflow-x-auto ${mobileCards ? "hidden md:block" : ""}`}>
         <table className="min-w-full text-left">
           <thead className="border-b border-slate-100">
             <tr>
@@ -723,6 +727,36 @@ function TableShell({
           </thead>
           <tbody className="divide-y divide-slate-50">{children}</tbody>
         </table>
+      </div>
+    </div>
+  );
+}
+
+function FinanceRecordCard({
+  num, title, subtitle, meta, amount, estado, actions,
+}: {
+  num: string;
+  title: string;
+  subtitle?: string;
+  meta?: string;
+  amount: string;
+  estado: string;
+  actions: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-3.5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{num}</p>
+          <p className="mt-0.5 truncate text-sm font-bold text-slate-800">{title}</p>
+          {subtitle && <p className="truncate text-xs text-slate-500">{subtitle}</p>}
+        </div>
+        <div className="shrink-0"><EstadoBadge estado={estado} /></div>
+      </div>
+      {meta && <p className="mt-2 text-xs text-slate-400">{meta}</p>}
+      <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
+        <span className="text-base font-bold text-slate-900">{amount}</span>
+        <div className="flex gap-2">{actions}</div>
       </div>
     </div>
   );
@@ -3050,7 +3084,29 @@ function FacturacionContent() {
               })()}
 
               {tab === "facturas" && (
-                <TableShell title="Facturas de cliente" count={`${filteredFacturas.length} facturas`} headers={["Número", "Cliente", "Expediente", "Área", "Serie", "Vencimiento", "Total", "Estado", ""]}>
+                <TableShell title="Facturas de cliente" count={`${filteredFacturas.length} facturas`} headers={["Número", "Cliente", "Expediente", "Área", "Serie", "Vencimiento", "Total", "Estado", ""]}
+                  mobileCards={filteredFacturas.map((row) => (
+                    <FinanceRecordCard
+                      key={row.id}
+                      num={row.num}
+                      title={row.contacto}
+                      subtitle={row.expedienteRef || "Sin expediente"}
+                      meta={`${AREA_LABELS[row.area]} · Vence ${fmtDate(row.vencimiento)}`}
+                      amount={fmtEur(row.total)}
+                      estado={row.estado}
+                      actions={
+                        <>
+                          <ActionIconButton title="Editar factura" onClick={() => openEditor("factura", row)}>
+                            <Pencil size={14} />
+                          </ActionIconButton>
+                          <ActionIconButton title="Borrar factura" tone="red" onClick={() => removeRecord("factura", row.id)}>
+                            <Trash2 size={14} />
+                          </ActionIconButton>
+                        </>
+                      }
+                    />
+                  ))}
+                >
                   {filteredFacturas.map((row) => (
                     <tr key={row.id} className="transition-colors hover:bg-slate-50/60">
                       <td className="px-5 py-3 text-sm font-semibold text-slate-800">{row.num}</td>
@@ -3099,7 +3155,29 @@ function FacturacionContent() {
               )}
 
               {tab === "gastos" && (
-                <TableShell title="Gastos del despacho" count={`${filteredGastos.length} gastos`} headers={["Número", "Proveedor", "Categoría", "Área", "Responsable", "Fecha", "Total", "Estado", ""]}>
+                <TableShell title="Gastos del despacho" count={`${filteredGastos.length} gastos`} headers={["Número", "Proveedor", "Categoría", "Área", "Responsable", "Fecha", "Total", "Estado", ""]}
+                  mobileCards={filteredGastos.map((row) => (
+                    <FinanceRecordCard
+                      key={row.id}
+                      num={row.num}
+                      title={row.proveedor}
+                      subtitle={row.deducible ? "Deducible" : "No deducible"}
+                      meta={`${row.cat} · ${AREA_LABELS[row.area]} · ${fmtDate(row.fecha)}`}
+                      amount={fmtEur(row.total)}
+                      estado={row.estado}
+                      actions={
+                        <>
+                          <ActionIconButton title="Editar gasto" onClick={() => openEditor("gasto", row)}>
+                            <Pencil size={14} />
+                          </ActionIconButton>
+                          <ActionIconButton title="Borrar gasto" tone="red" onClick={() => removeRecord("gasto", row.id)}>
+                            <Trash2 size={14} />
+                          </ActionIconButton>
+                        </>
+                      }
+                    />
+                  ))}
+                >
                   {filteredGastos.map((row) => (
                     <tr key={row.id} className="transition-colors hover:bg-slate-50/60">
                       <td className="px-5 py-3 text-sm font-semibold text-slate-800">{row.num}</td>
@@ -3129,7 +3207,29 @@ function FacturacionContent() {
               )}
 
               {tab === "presupuestos" && (
-                <TableShell title="Presupuestos y ofertas" count={`${filteredPresupuestos.length} presupuestos`} headers={["Número", "Cliente", "Expediente", "Área", "Fecha", "Total", "Estado", ""]}>
+                <TableShell title="Presupuestos y ofertas" count={`${filteredPresupuestos.length} presupuestos`} headers={["Número", "Cliente", "Expediente", "Área", "Fecha", "Total", "Estado", ""]}
+                  mobileCards={filteredPresupuestos.map((row) => (
+                    <FinanceRecordCard
+                      key={row.id}
+                      num={row.num}
+                      title={row.contacto}
+                      subtitle={row.expedienteRef || "Sin expediente"}
+                      meta={`${AREA_LABELS[row.area]} · ${fmtDate(row.fecha)}`}
+                      amount={fmtEur(row.total)}
+                      estado={row.estado}
+                      actions={
+                        <>
+                          <ActionIconButton title="Editar presupuesto" onClick={() => openEditor("presupuesto", row)}>
+                            <Pencil size={14} />
+                          </ActionIconButton>
+                          <ActionIconButton title="Borrar presupuesto" tone="red" onClick={() => removeRecord("presupuesto", row.id)}>
+                            <Trash2 size={14} />
+                          </ActionIconButton>
+                        </>
+                      }
+                    />
+                  ))}
+                >
                   {filteredPresupuestos.map((row) => (
                     <tr key={row.id} className="transition-colors hover:bg-slate-50/60">
                       <td className="px-5 py-3 text-sm font-semibold text-slate-800">{row.num}</td>
