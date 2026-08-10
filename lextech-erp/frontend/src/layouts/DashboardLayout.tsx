@@ -953,6 +953,23 @@ function hrefMatches(pathname: string, search: string, href: string): boolean {
   return currentQuery === hrefQuery;
 }
 
+// ── Avatar de organización (fallback cuando no hay logo) ──────────────────────
+const ORG_AVATAR_PALETTE = [
+  "from-red-500 to-rose-600", "from-violet-500 to-purple-600", "from-blue-500 to-indigo-600",
+  "from-teal-500 to-cyan-600", "from-emerald-500 to-green-600", "from-orange-500 to-amber-600",
+  "from-pink-500 to-fuchsia-600", "from-sky-500 to-blue-600",
+];
+function orgAvatarGradient(id: string) {
+  let h = 0; for (const c of id) h = (h * 31 + c.charCodeAt(0)) % ORG_AVATAR_PALETTE.length;
+  return ORG_AVATAR_PALETTE[Math.abs(h) % ORG_AVATAR_PALETTE.length];
+}
+function orgInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "?";
+  return parts.length === 1 ? parts[0].slice(0, 2).toUpperCase() : (parts[0][0] + parts[1][0]).toUpperCase();
+}
+const ORG_ROL_LABEL: Record<string, string> = { propietario: "Propietario", admin: "Administrador", miembro: "Miembro" };
+
 // ── Sidebar ──────────────────────────────────────────────────────────────────
 function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onToggleCollapse }: {
   pathname: string;
@@ -1014,6 +1031,10 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
             >
               {organizacion?.logoUrl ? (
                 <img src={resolveUploadUrl(organizacion.logoUrl) || undefined} alt={organizacion.nombre} className="h-full w-full object-contain p-1.5" />
+              ) : organizacion?.nombre ? (
+                <div className={`h-full w-full flex items-center justify-center text-[11px] font-extrabold text-white bg-gradient-to-br ${orgAvatarGradient(organizacion.id)}`}>
+                  {orgInitials(organizacion.nombre)}
+                </div>
               ) : (
                 <img src="/vantia-sidebar-slate.png" alt="Vantia Legis" className="h-6 w-6 object-contain" />
               )}
@@ -1025,11 +1046,17 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
               type="button"
               title="Seleccionar empresa"
               onClick={() => organizaciones.length > 1 && setOrgMenuOpen((v) => !v)}
-              className="erp-company-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-slate-700/60 bg-slate-800/40 hover:bg-slate-700/50 hover:border-slate-600 transition-all duration-200 active:scale-[0.98] group"
+              className={`erp-company-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all duration-200 active:scale-[0.98] group ${
+                orgMenuOpen ? "border-slate-600 bg-slate-700/50" : "border-slate-700/60 bg-slate-800/40 hover:bg-slate-700/50 hover:border-slate-600"
+              }`}
             >
               <div className="erp-company-logo w-9 h-9 rounded-lg bg-slate-800 border border-slate-700/50 flex items-center justify-center shrink-0 overflow-hidden">
                 {organizacion?.logoUrl ? (
                   <img src={resolveUploadUrl(organizacion.logoUrl) || undefined} alt={organizacion.nombre} className="h-full w-full object-contain p-1" />
+                ) : organizacion?.nombre ? (
+                  <div className={`h-full w-full flex items-center justify-center text-xs font-extrabold text-white bg-gradient-to-br ${orgAvatarGradient(organizacion.id)}`}>
+                    {orgInitials(organizacion.nombre)}
+                  </div>
                 ) : (
                   <img src="/vantia-sidebar-slate.png" alt="Vantia Legis" className="h-7 w-7 object-contain" />
                 )}
@@ -1039,7 +1066,13 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
                   {orgLoaded ? (organizacion?.nombre || "Vantia Legis") : "Cargando…"}
                 </p>
                 <p className="erp-company-sub text-[10px] text-slate-500 truncate mt-0.5 flex items-center gap-1">
-                  {orgRol === 'propietario' && <Crown size={9} className="text-amber-500 shrink-0" />}
+                  {orgRol && orgRol !== 'miembro' && (
+                    <span className="inline-flex items-center gap-0.5 shrink-0">
+                      <Crown size={9} className="text-amber-500" />
+                      {ORG_ROL_LABEL[orgRol]}
+                    </span>
+                  )}
+                  {orgRol && orgRol !== 'miembro' && organizaciones.length > 1 && <span className="text-slate-700">·</span>}
                   {organizaciones.length > 1 ? `${organizaciones.length} organizaciones` : "Despacho"}
                 </p>
               </div>
@@ -1049,25 +1082,38 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
             </button>
 
             {orgMenuOpen && organizaciones.length > 1 && (
-              <div className="animate-fade-in absolute left-0 right-0 top-full mt-1.5 bg-slate-800 border border-slate-700 rounded-xl shadow-xl py-1.5 z-20 overflow-hidden origin-top">
-                {organizaciones.map((o) => (
-                  <button
-                    key={o.id}
-                    type="button"
-                    onClick={() => { setOrgMenuOpen(false); if (o.id !== organizacion?.id) switchOrganizacion(o.id); }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-slate-700/50 transition-colors"
-                  >
-                    <div className="w-6 h-6 rounded-md bg-slate-900 border border-slate-700/60 flex items-center justify-center shrink-0 overflow-hidden">
-                      {o.logoUrl ? (
-                        <img src={resolveUploadUrl(o.logoUrl) || undefined} alt={o.nombre} className="h-full w-full object-contain" />
-                      ) : (
-                        <img src="/vantia-sidebar-slate.png" alt="" className="h-4 w-4 object-contain opacity-70" />
-                      )}
-                    </div>
-                    <span className="text-xs font-medium text-slate-200 truncate flex-1">{o.nombre}</span>
-                    {o.id === organizacion?.id && <Check size={13} className="text-red-500 shrink-0" />}
-                  </button>
-                ))}
+              <div className="animate-fade-in absolute left-0 right-0 top-full mt-1.5 bg-slate-800 border border-slate-700 rounded-xl shadow-xl shadow-black/30 py-1.5 z-20 overflow-hidden origin-top">
+                <p className="px-3 pb-1.5 pt-1 text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                  Tus organizaciones
+                </p>
+                {organizaciones.map((o) => {
+                  const active = o.id === organizacion?.id;
+                  return (
+                    <button
+                      key={o.id}
+                      type="button"
+                      onClick={() => { setOrgMenuOpen(false); if (!active) switchOrganizacion(o.id); }}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors ${
+                        active ? "bg-red-500/10" : "hover:bg-slate-700/50"
+                      }`}
+                    >
+                      <div className="w-7 h-7 rounded-lg bg-slate-900 border border-slate-700/60 flex items-center justify-center shrink-0 overflow-hidden">
+                        {o.logoUrl ? (
+                          <img src={resolveUploadUrl(o.logoUrl) || undefined} alt={o.nombre} className="h-full w-full object-contain" />
+                        ) : (
+                          <div className={`h-full w-full flex items-center justify-center text-[10px] font-extrabold text-white bg-gradient-to-br ${orgAvatarGradient(o.id)}`}>
+                            {orgInitials(o.nombre)}
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className={`text-xs font-semibold truncate ${active ? "text-white" : "text-slate-200"}`}>{o.nombre}</p>
+                        <p className="text-[10px] text-slate-500 truncate">{ORG_ROL_LABEL[o.rol] || o.rol}</p>
+                      </div>
+                      {active && <Check size={14} className="text-red-500 shrink-0" />}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
