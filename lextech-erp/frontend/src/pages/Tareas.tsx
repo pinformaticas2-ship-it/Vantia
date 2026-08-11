@@ -21,6 +21,7 @@ import type { DragEndEvent, DragStartEvent, Modifier } from "@dnd-kit/core";
 import { getEventCoordinates } from "@dnd-kit/utilities";
 import { safeJson } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
+import { PlazoCalculator } from "../components/PlazoCalculator";
 import { createPortal } from "react-dom";
 import { EtapaSelect } from "../components/EtapaSelect";
 import BackButton from "../components/BackButton";
@@ -399,6 +400,7 @@ function TaskPanel({
                   <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">📅 Fecha límite</label>
                   <input type="date" value={form.plazo} onChange={e => set("plazo", e.target.value)}
                     className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400" />
+                  <PlazoCalculator onCalculate={(d) => set("plazo", d)} />
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">🔔 Aviso</label>

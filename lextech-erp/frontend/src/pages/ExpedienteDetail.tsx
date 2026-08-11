@@ -71,6 +71,7 @@ import { EtapaSelect } from "../components/EtapaSelect";
 import BackButton from "../components/BackButton";
 import { UndoToast } from "../components/UndoToast";
 import { useUndoDelete } from "../lib/useUndoDelete";
+import { PlazoCalculator } from "../components/PlazoCalculator";
 
 // ── Google Meet (vía Google Calendar) para el evento rápido del expediente ──
 // Mismas claves que el módulo Agenda (Agenda.tsx) para compartir la sesión
@@ -1481,6 +1482,7 @@ function TabTareas({
             <div>
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Fecha límite</label>
               <input type="date" value={form.plazo} onChange={(e) => setForm((p) => ({ ...p, plazo: e.target.value }))} min={new Date().toISOString().split("T")[0]} className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-red-400 mt-0.5" />
+              <PlazoCalculator onCalculate={(d) => setForm((p) => ({ ...p, plazo: d }))} />
             </div>
             <div>
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Estado</label>
