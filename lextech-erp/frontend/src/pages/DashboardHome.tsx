@@ -341,6 +341,8 @@ export default function DashboardHome() {
   const [agendaLoading, setAgendaLoading] = useState(true);
   const [taskStats,     setTaskStats]     = useState({ vencidas:0, proximas:0, urgentes:0, pendientes:0, completadas:0 });
   const [billingRaw,    setBillingRaw]    = useState<{ facturas: any[]; gastos: any[] } | null>(null);
+  const [billingError,  setBillingError]  = useState(false);
+  const [billingRetrying, setBillingRetrying] = useState(false);
   const [activityTotal, setActivityTotal] = useState(0);
   const [expStats,      setExpStats]      = useState({ total: 0, abiertos: 0, este_anio: 0, archivados: 0 });
   const [clientStats,   setClientStats]   = useState({ total: 0, activos: 0, conEmail: 0, conTelefono: 0 });
@@ -354,7 +356,7 @@ export default function DashboardHome() {
   const [emailAccountMenuOpen, setEmailAccountMenuOpen] = useState(false);
   const emailAccountMenuRef = useRef<HTMLDivElement | null>(null);
   const [openMenuEmailId,      setOpenMenuEmailId]      = useState<string | null>(null);
-  const emailMenuRef = useRef<HTMLUListElement | null>(null);
+  const emailMenuRef = useRef<HTMLDivElement | null>(null);
   const [docStats,      setDocStats]      = useState({ providers: 0, activos: 0, lexnet: false });
 
   // Billing period state
@@ -420,6 +422,9 @@ export default function DashboardHome() {
       if (billingRes.ok) {
         const d = billingData.data || billingData;
         setBillingRaw({ facturas: d.facturas || [], gastos: d.gastos || [] });
+        setBillingError(false);
+      } else {
+        setBillingError(true);
       }
       if (expRes.ok) {
         const d = expData.data || {};
@@ -485,8 +490,30 @@ export default function DashboardHome() {
           lexnet: Boolean((providers as any).lexnet?.configured),
         });
       }
-    } catch {/* */} finally {
+    } catch { setBillingError(true); } finally {
       if (!silent) { setActLoading(false); setAgendaLoading(false); }
+    }
+  }, [getToken]);
+
+  // Reintento aislado del bloque de Facturación: evita re-pedir las otras 13
+  // llamadas de fetchData() solo para recuperarse de un fallo puntual de esta.
+  const retryBilling = useCallback(async () => {
+    setBillingRetrying(true);
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch("/api/facturacion/bootstrap", { headers: { Authorization: `Bearer ${token}` } });
+      const d = await safeJson(res);
+      if (res.ok) {
+        const data = d.data || d;
+        setBillingRaw({ facturas: data.facturas || [], gastos: data.gastos || [] });
+        setBillingError(false);
+      } else {
+        setBillingError(true);
+      }
+    } catch {
+      setBillingError(true);
+    } finally {
+      setBillingRetrying(false);
     }
   }, [getToken]);
 
@@ -1053,7 +1080,19 @@ export default function DashboardHome() {
             </div>
           </div>
           {/* Body */}
-          {!billingCalc ? (
+          {billingError ? (
+            <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
+              <p className="text-xs text-slate-500">No se pudieron cargar los datos de facturación.</p>
+              <button
+                onClick={retryBilling}
+                disabled={billingRetrying}
+                className="flex items-center gap-1.5 rounded-lg bg-slate-100 hover:bg-red-50 hover:text-red-600 px-3 py-1.5 text-[11px] font-bold text-slate-600 transition-colors disabled:opacity-50"
+              >
+                {billingRetrying ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
+                Reintentar
+              </button>
+            </div>
+          ) : !billingCalc ? (
             <div className="flex items-center justify-center py-8"><Spinner size="sm" muted /></div>
           ) : (
             <div className="p-4">
