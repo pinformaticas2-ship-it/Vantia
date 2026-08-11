@@ -1731,7 +1731,7 @@ export default function Tareas() {
                 {completedTasks.length > 0 && (
                   <>
                     <button onClick={() => setShowCompletadas(v => !v)}
-                      className="w-full flex items-center gap-2 px-4 py-2 bg-emerald-50/80 border-y border-emerald-100 hover:bg-emerald-100/60 transition-colors">
+                      className="w-full flex items-center gap-2 px-4 py-2 bg-emerald-50/80 border-b border-emerald-100 hover:bg-emerald-100/60 transition-colors">
                       <CheckCircle2 size={11} className="text-emerald-500 shrink-0" />
                       <span className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-600 flex-1 text-left">
                         Completadas · {completedTasks.length}
