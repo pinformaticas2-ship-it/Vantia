@@ -490,6 +490,40 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
   const [showAdj, setShowAdj] = useState(false);
   const set = (k: string, v: any) => setForm(p => ({ ...p, [k]: v }));
 
+  // Sugerencias para autocompletar Parte Contraria / Procurador / Abogado
+  // (propio y contrario): contrarios ya usados en otros expedientes de la
+  // organización, y procuradores/abogados ya dados de alta en el Directorio.
+  const [contrarioSuggestions, setContrarioSuggestions] = useState<string[]>([]);
+  const [procuradorSuggestions, setProcuradorSuggestions] = useState<string[]>([]);
+  const [abogadoSuggestions, setAbogadoSuggestions] = useState<string[]>([]);
+  useEffect(() => {
+    (async () => {
+      try {
+        const token = await getToken({ skipCache: true });
+        const headers = { Authorization: `Bearer ${token}` };
+        const [contrariosRes, procuradoresRes, abogadosRes] = await Promise.all([
+          fetch("/api/expedientes/contrarios", { headers }),
+          fetch("/api/directorio?tipo=PROCURADOR", { headers }),
+          fetch("/api/directorio?tipo=ABOGADO", { headers }),
+        ]);
+        const [contrariosData, procuradoresData, abogadosData] = await Promise.all([
+          safeJson(contrariosRes), safeJson(procuradoresRes), safeJson(abogadosRes),
+        ]);
+        if (contrariosRes.ok) setContrarioSuggestions(contrariosData.data || []);
+        if (procuradoresRes.ok) {
+          setProcuradorSuggestions((procuradoresData.data || []).map((p: any) =>
+            `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.despacho || ""
+          ).filter(Boolean));
+        }
+        if (abogadosRes.ok) {
+          setAbogadoSuggestions((abogadosData.data || []).map((p: any) =>
+            `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.despacho || ""
+          ).filter(Boolean));
+        }
+      } catch { /* autocompletar es un extra, no bloquea el formulario si falla */ }
+    })();
+  }, [getToken]);
+
   const handleClienteChange = (id: string) => {
     const c = clientes.find((x: any) => x.id === id);
     set("cliente_id", id);
@@ -936,32 +970,66 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
                     <label className={`${lbl} text-slate-700`}>Parte Contraria</label>
                   </div>
                   <input value={form.contrario} onChange={e => set("contrario", e.target.value)}
-                    placeholder="Nombre / Razón Social" className={inp} />
+                    placeholder="Nombre / Razón Social" className={inp} list="dl-contrarios" />
                 </div>
 
                 <div className="w-full h-px bg-slate-100" />
 
-                {/* Abogado */}
+                {/* Abogado propio */}
                 <div className="flex flex-col gap-2.5">
                   <div className="flex items-center gap-2">
                     <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
                     <label className={`${lbl} text-slate-700`}>Abogado</label>
                   </div>
                   <input value={(form as any).abogado_propio || ""} onChange={e => set("abogado_propio", e.target.value)}
-                    placeholder="Nombre del abogado" className={inp} />
+                    placeholder="Nombre del abogado" className={inp} list="dl-abogados" />
                 </div>
 
                 <div className="w-full h-px bg-slate-100" />
 
-                {/* Procurador */}
+                {/* Procurador propio */}
                 <div className="flex flex-col gap-2.5">
                   <div className="flex items-center gap-2">
                     <div className="w-2.5 h-2.5 rounded-full bg-purple-500" />
                     <label className={`${lbl} text-slate-700`}>Procurador</label>
                   </div>
                   <input value={form.procurador} onChange={e => set("procurador", e.target.value)}
-                    placeholder="Nombre del procurador" className={inp} />
+                    placeholder="Nombre del procurador" className={inp} list="dl-procuradores" />
                 </div>
+
+                <div className="w-full h-px bg-slate-100" />
+
+                {/* Abogado contrario */}
+                <div className="flex flex-col gap-2.5">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-orange-500" />
+                    <label className={`${lbl} text-slate-700`}>Abogado Contrario</label>
+                  </div>
+                  <input value={(form as any).abogado_contrario || ""} onChange={e => set("abogado_contrario", e.target.value)}
+                    placeholder="Nombre del abogado contrario" className={inp} list="dl-abogados" />
+                </div>
+
+                <div className="w-full h-px bg-slate-100" />
+
+                {/* Procurador contrario */}
+                <div className="flex flex-col gap-2.5">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-teal-500" />
+                    <label className={`${lbl} text-slate-700`}>Procurador Contrario</label>
+                  </div>
+                  <input value={(form as any).procurador_contrario || ""} onChange={e => set("procurador_contrario", e.target.value)}
+                    placeholder="Nombre del procurador contrario" className={inp} list="dl-procuradores" />
+                </div>
+
+                <datalist id="dl-contrarios">
+                  {contrarioSuggestions.map(v => <option key={v} value={v} />)}
+                </datalist>
+                <datalist id="dl-abogados">
+                  {abogadoSuggestions.map(v => <option key={v} value={v} />)}
+                </datalist>
+                <datalist id="dl-procuradores">
+                  {procuradorSuggestions.map(v => <option key={v} value={v} />)}
+                </datalist>
 
               </div>
             </div>

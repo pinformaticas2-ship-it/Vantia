@@ -160,6 +160,26 @@ export const getStats = async (req: any, res: Response) => {
   }
 };
 
+// ── GET /api/expedientes/contrarios ─────────────────────────────
+// Valores ya usados de "contrario" en esta organización, para autocompletar el
+// formulario de expediente -- no es una entidad vinculada como el cliente,
+// solo texto libre, así que esto evita escribir el mismo nombre de dos formas
+// distintas en expedientes diferentes.
+export const getContrarioSuggestions = async (req: any, res: Response) => {
+  try {
+    const r = await pool.query(
+      `SELECT DISTINCT contrario FROM expedientes
+       WHERE organizacion_id = $1 AND contrario IS NOT NULL AND contrario <> ''
+       ORDER BY contrario ASC
+       LIMIT 300`,
+      [req.organizacionId]
+    );
+    res.json({ data: r.rows.map((row: any) => row.contrario) });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+};
+
 export const getImportHistory = async (req: any, res: Response) => {
   try {
     const limit = Math.min(parseInt(req.query.limit as string, 10) || 50, 200);

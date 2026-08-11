@@ -3,6 +3,7 @@ import { requireAuth } from '../middleware/auth';
 import {
   getExpedientes,
   getStats,
+  getContrarioSuggestions,
   getImportHistory,
   getImportBatchDetail,
   getExpediente,
@@ -39,6 +40,7 @@ import noteRoutes from './noteRoutes';
 const router = Router();
 
 router.get('/stats',  requireAuth, getStats);
+router.get('/contrarios', requireAuth, getContrarioSuggestions);
 router.get('/counter-config',        requireAuth, getCounterConfig);
 router.get('/counter-config/:anio',  requireAuth, getCounterConfigYear);
 router.post('/counter-config',       requireAuth, setCounterConfig);
