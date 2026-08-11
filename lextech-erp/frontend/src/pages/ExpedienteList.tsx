@@ -4622,9 +4622,67 @@ export default function ExpedienteList() {
     } catch { /* ignore */ } finally { setBulkStateLoading(false); }
   };
 
+  // Exporta los expedientes seleccionados a un CSV descargable.
+  const csvEscape = (v: any) => {
+    const s = v == null ? "" : String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const handleBulkExport = () => {
+    const items = expedientes.filter(e => selectedIds.has(e.id));
+    const cols: { key: string; label: string }[] = [
+      { key: "anio", label: "Año" }, { key: "num_exp", label: "Núm. Exp" },
+      { key: "ref_propia", label: "Ref. Propia" }, { key: "descripcion", label: "Descripción" },
+      { key: "tipo", label: "Tipo" }, { key: "estado", label: "Estado" },
+      { key: "cliente_nombre", label: "Cliente" }, { key: "contrario", label: "Contrario" },
+      { key: "procurador", label: "Procurador Propio" }, { key: "abogado_propio", label: "Abogado Propio" },
+      { key: "juzgado", label: "Juzgado" }, { key: "tipo_proc", label: "Tipo Procedimiento" },
+      { key: "num_autos", label: "Núm. Autos" }, { key: "nig", label: "NIG" },
+    ];
+    const lines = [
+      cols.map(c => csvEscape(c.label)).join(";"),
+      ...items.map(row => cols.map(c => csvEscape(row[c.key])).join(";")),
+    ];
+    const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `expedientes_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  // Reasigna el abogado responsable (abogado_propio) de los expedientes seleccionados.
+  const [showBulkReassign, setShowBulkReassign] = useState(false);
+  const [bulkReassignValue, setBulkReassignValue] = useState("");
+  const [bulkReassignLoading, setBulkReassignLoading] = useState(false);
+  const bulkReassignRef = useRef<HTMLDivElement>(null);
+  const handleBulkReassign = async () => {
+    const value = bulkReassignValue.trim();
+    if (!value) return;
+    const ids = Array.from(selectedIds);
+    setBulkReassignLoading(true);
+    try {
+      const token = await getToken({ skipCache: true });
+      await Promise.all(ids.map(id =>
+        fetch(`/api/expedientes/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ abogado_propio: value }),
+        })
+      ));
+      setExpedientes(prev => prev.map(e => selectedIds.has(e.id) ? { ...e, abogado_propio: value } : e));
+      setSelectedIds(new Set());
+      setShowBulkReassign(false);
+      setBulkReassignValue("");
+    } catch { /* ignore */ } finally { setBulkReassignLoading(false); }
+  };
+
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (bulkStateMenuRef.current && !bulkStateMenuRef.current.contains(e.target as Node)) setShowBulkStateMenu(false);
+      if (bulkReassignRef.current && !bulkReassignRef.current.contains(e.target as Node)) setShowBulkReassign(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -6905,6 +6963,43 @@ export default function ExpedienteList() {
                         </div>
                       )}
                     </div>
+                    <div className="relative" ref={bulkReassignRef}>
+                      <button
+                        onClick={() => setShowBulkReassign(v => !v)}
+                        disabled={bulkReassignLoading}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        <Users size={12} />
+                        Reasignar
+                      </button>
+                      {showBulkReassign && (
+                        <div className="absolute left-0 top-full mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-xl p-3 min-w-[220px]">
+                          <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Abogado responsable</label>
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              autoFocus
+                              value={bulkReassignValue}
+                              onChange={e => setBulkReassignValue(e.target.value)}
+                              onKeyDown={e => { if (e.key === "Enter") handleBulkReassign(); }}
+                              placeholder="Nombre del abogado"
+                              className="flex-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:border-red-400"
+                            />
+                            <button
+                              onClick={handleBulkReassign}
+                              disabled={!bulkReassignValue.trim() || bulkReassignLoading}
+                              className="shrink-0 flex items-center justify-center w-7 h-7 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-40 transition-colors"
+                            >
+                              {bulkReassignLoading ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <button onClick={handleBulkExport}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition-colors">
+                      <Download size={12} />
+                      Exportar
+                    </button>
                     <button onClick={() => setBulkDeleteConfirm(true)}
                       className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors">
                       <Trash2 size={12} />
