@@ -1334,11 +1334,13 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
         {collapsed ? (
           <ShieldCheck className="h-5 w-5 text-emerald-500" />
         ) : (
-          <div className="p-3 bg-emerald-900/20 rounded-lg border border-emerald-800/30 flex items-center gap-3">
-            <ShieldCheck className="h-4 w-4 text-emerald-500 shrink-0" />
+          <div className="flex items-center gap-2.5 rounded-lg border border-slate-700/50 bg-slate-800/40 px-3 py-2.5">
+            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-emerald-500/10">
+              <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+            </div>
             <div className="min-w-0">
-              <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-tighter truncate">Conexión Segura</p>
-              <p className="text-[9px] text-slate-500 truncate">VANTIA Legis ERP</p>
+              <p className="truncate text-[10px] font-bold uppercase tracking-tighter text-slate-300">Conexión segura</p>
+              <p className="truncate text-[9px] text-slate-500">VANTIA Legis ERP</p>
             </div>
           </div>
         )}
