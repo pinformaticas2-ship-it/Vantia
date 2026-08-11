@@ -4594,10 +4594,14 @@ function TabApuntesEconomicos({ expedienteId, locked = false }: { expedienteId: 
 function TabExpedientesRelacionados({
   expedienteId,
   currentRef,
+  clienteId,
+  contrario,
   locked = false,
 }: {
   expedienteId: string;
   currentRef: string;
+  clienteId?: string | null;
+  contrario?: string | null;
   locked?: boolean;
 }) {
   const { getToken } = useAuth();
@@ -4637,6 +4641,42 @@ function TabExpedientesRelacionados({
   useAutoRefresh(() => loadRelated(true), { intervalMs: 30_000, enabled: !!expedienteId });
 
   const relatedIds = useMemo(() => new Set(related.map((item) => item.id)), [related]);
+
+  // Sugerencias automáticas: expedientes del mismo cliente o con el mismo
+  // contrario, para no tener que buscarlos a mano cada vez -- se muestran
+  // antes de escribir nada en el buscador.
+  const [suggested, setSuggested] = useState<any[]>([]);
+  const [loadingSuggested, setLoadingSuggested] = useState(false);
+  useEffect(() => {
+    if (!showModal) return;
+    if (!clienteId && !contrario?.trim()) { setSuggested([]); return; }
+    (async () => {
+      try {
+        setLoadingSuggested(true);
+        const token = await getToken({ skipCache: true });
+        const headers = { Authorization: `Bearer ${token}` };
+        const [byClientRes, byContrarioRes] = await Promise.all([
+          clienteId
+            ? fetch(`/api/expedientes?limit=20&clienteId=${encodeURIComponent(clienteId)}`, { headers })
+            : Promise.resolve(null),
+          contrario?.trim()
+            ? fetch(`/api/expedientes?limit=20&q=${encodeURIComponent(contrario.trim())}`, { headers })
+            : Promise.resolve(null),
+        ]);
+        const [byClientData, byContrarioData] = await Promise.all([
+          byClientRes ? safeJson(byClientRes) : null,
+          byContrarioRes ? safeJson(byContrarioRes) : null,
+        ]);
+        const merged = new Map<string, any>();
+        for (const item of (byClientData?.data || [])) merged.set(item.id, item);
+        for (const item of (byContrarioData?.data || [])) merged.set(item.id, item);
+        merged.delete(expedienteId);
+        for (const relId of relatedIds) merged.delete(relId);
+        setSuggested(Array.from(merged.values()).slice(0, 8));
+      } catch { setSuggested([]); }
+      finally { setLoadingSuggested(false); }
+    })();
+  }, [showModal, clienteId, contrario, expedienteId, relatedIds, getToken]);
 
   const searchExpedientes = useCallback(async (searchValue: string) => {
     try {
@@ -4698,6 +4738,48 @@ function TabExpedientesRelacionados({
       document.body.style.overflow = prevOverflow;
     };
   }, [showModal]);
+
+  const renderExpItem = (item: any) => {
+    const ref = item.ref_expediente || `${item.anio}/${item.num_exp}`;
+    const tipoConf = TIPOS[item.tipo] || TIPOS.otro;
+    const estadoConf = ESTADOS[item.estado] || ESTADOS.abierto;
+    const meta = [item.cliente_nombre, item.juzgado, item.tipo_proc].filter(Boolean).join(" · ");
+    return (
+      <div key={item.id} className="group flex items-center gap-4 px-4 py-3.5 hover:bg-blue-50/40 transition-colors bg-white">
+        <div className="shrink-0 h-9 w-9 rounded-xl bg-slate-100 group-hover:bg-white group-hover:border group-hover:border-slate-200 flex items-center justify-center text-slate-400 transition-all">
+          <Scale size={15} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="font-mono text-[11px] font-bold bg-slate-100 text-slate-600 rounded px-1.5 py-0.5">
+              {ref}
+            </span>
+            <span className={`text-[10px] font-bold rounded-full px-2 py-0.5 uppercase ${tipoConf.color}`}>
+              {tipoConf.short}
+            </span>
+            <span className={`text-[10px] font-bold rounded-full px-2 py-0.5 uppercase ${estadoConf.color}`}>
+              {estadoConf.label}
+            </span>
+          </div>
+          {item.descripcion && (
+            <p className="mt-1 text-sm font-semibold text-slate-800 truncate">{item.descripcion}</p>
+          )}
+          {meta && (
+            <p className="mt-0.5 text-[11px] text-slate-400 truncate">{meta}</p>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => associateExpediente(item.id)}
+          disabled={savingId === item.id}
+          className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl disabled:opacity-60 disabled:cursor-not-allowed transition-all active:scale-95 shadow-sm"
+        >
+          {savingId === item.id ? <Loader2 size={11} className="animate-spin" /> : <Link2 size={11} />}
+          Asociar
+        </button>
+      </div>
+    );
+  };
 
   const associateExpediente = async (relatedId: string) => {
     try {
@@ -4878,15 +4960,32 @@ function TabExpedientesRelacionados({
 
               <div className="rounded-2xl border border-slate-200 overflow-hidden">
                 {!hasSearched ? (
-                  <div className="flex flex-col items-center justify-center px-6 py-12 bg-slate-50/60 text-center gap-3">
-                    <div className="h-12 w-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-slate-300">
-                      <Search size={20} />
+                  loadingSuggested ? (
+                    <div className="flex items-center justify-center px-5 py-12 bg-slate-50/60">
+                      <Spinner size="sm" muted label="Buscando sugerencias..." />
                     </div>
-                    <div>
-                      <p className="text-sm font-semibold text-slate-600">Busca un expediente</p>
-                      <p className="mt-0.5 text-xs text-slate-400">Escribe la referencia, descripción, NIG o juzgado</p>
+                  ) : suggested.length > 0 ? (
+                    <>
+                      <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border-b border-slate-200">
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">
+                          Sugeridos · mismo cliente o contrario
+                        </span>
+                      </div>
+                      <div className="max-h-[360px] overflow-y-auto divide-y divide-slate-100">
+                        {suggested.map(renderExpItem)}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center px-6 py-12 bg-slate-50/60 text-center gap-3">
+                      <div className="h-12 w-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-slate-300">
+                        <Search size={20} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-slate-600">Busca un expediente</p>
+                        <p className="mt-0.5 text-xs text-slate-400">Escribe la referencia, descripción, NIG o juzgado</p>
+                      </div>
                     </div>
-                  </div>
+                  )
                 ) : searching ? (
                   <div className="flex items-center justify-center px-5 py-12 bg-slate-50/60">
                     <Spinner size="sm" muted label="Buscando expedientes..." />
@@ -5892,6 +5991,8 @@ export default function ExpedienteDetail() {
               <TabExpedientesRelacionados
                 expedienteId={id!}
                 currentRef={exp.ref_expediente || `${exp.anio}/${exp.num_exp}`}
+                clienteId={exp.cliente_id}
+                contrario={exp.contrario}
                 locked={false}
               />
             )}
