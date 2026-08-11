@@ -702,17 +702,33 @@ function summarizeExpedienteChanges(before: any, after: any): string {
 }
 
 export const updateExpediente = async (req: any, res: Response) => {
-  const {
-    ref_propia, ref_expediente, descripcion, tipo, cliente_id, cliente_nombre,
-    contrario, procurador, procurador_contrario, abogado_propio, abogado_contrario, juzgado, tipo_proc, num_autos, nig,
-    estado, observaciones, fecha_inicio, fecha_cierre, importe,
-    tipos_asunto, cuantia_principal, intereses, costas, cuantia_total,
-    indeterminado, etapa, persona_contacto, contacto, centro, color,
-  } = req.body;
+  const body = req.body;
 
   try {
     const beforeR = await pool.query(`SELECT * FROM expedientes WHERE id=$1 AND organizacion_id=$2`, [req.params.id, req.organizacionId]);
     const before = beforeR.rows[0] || null;
+
+    // Actualización parcial: cualquier campo que el cliente NO mande en el body
+    // (p.ej. un "cambiar estado" en bloque que solo envía {estado}) conserva su
+    // valor actual en vez de sobreescribirse a null/vacío. Antes esta función
+    // asumía que SIEMPRE llegaba el objeto completo y borraba en silencio todo
+    // lo que faltara -- un cambio de estado en bloque vaciaba descripción,
+    // contrario, juzgado, importes, etc. de cada expediente afectado.
+    const pick = <K extends string>(key: K) => (body[key] !== undefined ? body[key] : before?.[key]);
+    const ref_propia = pick('ref_propia'), ref_expediente = pick('ref_expediente'),
+      descripcion = pick('descripcion'), tipo = pick('tipo'),
+      cliente_id = pick('cliente_id'), cliente_nombre = pick('cliente_nombre'),
+      contrario = pick('contrario'), procurador = pick('procurador'),
+      procurador_contrario = pick('procurador_contrario'), abogado_propio = pick('abogado_propio'),
+      abogado_contrario = pick('abogado_contrario'), juzgado = pick('juzgado'),
+      tipo_proc = pick('tipo_proc'), num_autos = pick('num_autos'), nig = pick('nig'),
+      estado = pick('estado'), observaciones = pick('observaciones'),
+      fecha_inicio = pick('fecha_inicio'), fecha_cierre = pick('fecha_cierre'), importe = pick('importe'),
+      tipos_asunto = pick('tipos_asunto'), cuantia_principal = pick('cuantia_principal'),
+      intereses = pick('intereses'), costas = pick('costas'), cuantia_total = pick('cuantia_total'),
+      indeterminado = pick('indeterminado'), etapa = pick('etapa'),
+      persona_contacto = pick('persona_contacto'), contacto = pick('contacto'),
+      centro = pick('centro'), color = pick('color');
 
     let nombre = cliente_nombre || null;
     let resolvedClienteId = cliente_id || null;

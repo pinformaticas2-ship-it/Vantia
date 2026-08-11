@@ -4528,12 +4528,16 @@ export default function ExpedienteList() {
   // Confirmación borrado + undo
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
+  // "Dar de baja" archiva (estado=archivado) en vez de borrar físicamente el
+  // registro -- así el expediente sigue existiendo para consultarlo/recuperarlo
+  // más allá de los 15s de deshacer del toast, en vez de perderse para siempre.
   const { pending: pendingDelete, startDelete, undo: undoDelete, dismiss: dismissDelete } = useUndoDelete<any>({
     onDelete: async (id: string) => {
       const token = await getToken({ skipCache: true });
       await fetch(`/api/expedientes/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ estado: "archivado" }),
       });
     },
   });
@@ -4544,7 +4548,11 @@ export default function ExpedienteList() {
     onDelete: async (idsJoined: string) => {
       const token = await getToken({ skipCache: true });
       await Promise.all(idsJoined.split(",").map(id =>
-        fetch(`/api/expedientes/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } })
+        fetch(`/api/expedientes/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ estado: "archivado" }),
+        })
       ));
     },
   });
@@ -6413,13 +6421,13 @@ export default function ExpedienteList() {
         variant="confirm"
         icon={<AlertTriangle size={18} />}
         iconTone="danger"
-        title="¿Eliminar expediente?"
-        subtitle="Tendrás 15 segundos para deshacer la eliminación."
+        title="¿Dar de baja este expediente?"
+        subtitle="Se archiva (no se borra) y puedes deshacerlo en los próximos 15 segundos."
         zIndex={9999}
         footer={
           <>
             <button onClick={() => setDeleteId(null)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
-            <button onClick={() => handleDelete(deleteId!)} className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg active:scale-95">Eliminar</button>
+            <button onClick={() => handleDelete(deleteId!)} className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg active:scale-95">Dar de baja</button>
           </>
         }
       />
@@ -6979,7 +6987,7 @@ export default function ExpedienteList() {
             icon={<AlertTriangle size={18} />}
             iconTone="danger"
             title={`¿Dar de baja ${selectedIds.size} expediente${selectedIds.size !== 1 ? "s" : ""}?`}
-            subtitle="Tendrás 15 segundos para deshacer la eliminación."
+            subtitle="Se archivan (no se borran) y puedes deshacerlo en los próximos 15 segundos."
             zIndex={9999}
             footer={
               <>
