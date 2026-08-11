@@ -3296,6 +3296,44 @@ export default function Agenda() {
     return weeks;
   }, [calDays]);
 
+  // Eventos "todo el día" de varios días en vista mes: una barra por semana que
+  // los muestra (recortada a esa fila), igual que en semana/día pero repetida
+  // fila por fila -- un evento de 3 semanas genera 3 barras, una por fila.
+  const monthSpanningBars = useMemo(() => {
+    return calWeeks.map(week => {
+      const weekKeys = week.map(d => d ? isoDate(d) : null);
+      const realIdxs = weekKeys.reduce<number[]>((acc, k, i) => { if (k) acc.push(i); return acc; }, []);
+      if (!realIdxs.length) return [];
+      const rangeStart = weekKeys[realIdxs[0]]!;
+      const rangeEnd = weekKeys[realIdxs[realIdxs.length - 1]]!;
+      const raw = events
+        .filter(ev => ev.all_day && isSpanning(ev))
+        .map(ev => {
+          const startKey = localDateKey(ev.start_at);
+          const endKey = localDateKey(ev.end_at!);
+          if (endKey < rangeStart || startKey > rangeEnd) return null;
+          const startCol = startKey <= rangeStart ? realIdxs[0] : weekKeys.indexOf(startKey);
+          const endCol = endKey >= rangeEnd ? realIdxs[realIdxs.length - 1] : weekKeys.indexOf(endKey);
+          if (startCol === -1 || endCol === -1 || startCol > endCol) return null;
+          return {
+            ev, startCol, endCol,
+            continuesBefore: startKey < weekKeys[startCol]!,
+            continuesAfter: endKey > weekKeys[endCol]!,
+          };
+        })
+        .filter((x): x is NonNullable<typeof x> => x !== null)
+        .sort((a, b) => a.startCol - b.startCol || (b.endCol - b.startCol) - (a.endCol - a.startCol));
+
+      const lanes: number[] = [];
+      return raw.map(bar => {
+        let lane = lanes.findIndex(endCol => endCol < bar.startCol);
+        if (lane === -1) { lane = lanes.length; lanes.push(bar.endCol); }
+        else lanes[lane] = bar.endCol;
+        return { ...bar, lane };
+      });
+    });
+  }, [calWeeks, events]);
+
   // Días de la semana activa (para vista semana)
   const weekDays = useMemo(() => {
     const monday = getMondayOfWeek(selectedDay);
@@ -3859,18 +3897,25 @@ export default function Agenda() {
             ) : (
               <div className="flex flex-col min-h-full">
                 {calWeeks.map((week, weekIdx) => {
+                  const weekBars = monthSpanningBars[weekIdx] || [];
+                  const weekSpanningIds = new Set(weekBars.map(b => b.ev.id));
+                  const laneCount = weekBars.length ? Math.max(...weekBars.map(b => b.lane)) + 1 : 0;
                   return (
                     <div key={weekIdx} className="flex-1 relative flex flex-col">
                       {/* ── Celdas de días ── */}
-                      <div className="grid grid-cols-7 flex-1">
+                      <div className="grid grid-cols-7 flex-1" style={{ gridAutoRows: "min-content" }}>
                         {week.map((date, colIdx) => {
                           if (!date) {
-                            return <div key={`empty-${weekIdx}-${colIdx}`} className="border-b border-r border-slate-50 bg-slate-50/40 min-h-[80px]" />;
+                            return (
+                              <div key={`empty-${weekIdx}-${colIdx}`}
+                                className="border-b border-r border-slate-50 bg-slate-50/40 min-h-[80px]"
+                                style={{ gridColumn: colIdx + 1, gridRow: "1 / -1" }} />
+                            );
                           }
                           const key     = isoDate(date);
                           const isToday = key === todayStr;
                           const isSel   = key === selectedDay;
-                          const dayEvs  = (eventsByDay[key] || []);
+                          const dayEvs  = (eventsByDay[key] || []).filter(ev => !weekSpanningIds.has(ev.id));
                           const dayGcal = gcalEventsByDay[key] || [];
                           const maxShow = 3;
                           const lexShow = dayEvs.slice(0, maxShow);
@@ -3878,48 +3923,59 @@ export default function Agenda() {
                           const overflow = (dayEvs.length + dayGcal.length) - lexShow.length - gcalShow.length;
 
                           return (
-                            <div
-                              key={key}
-                              onDragOver={e => {
-                                if (!draggingEventId) return;
-                                e.preventDefault();
-                                if (dragOverDay !== key) setDragOverDay(key);
-                              }}
-                              onDragLeave={() => { if (dragOverDay === key) setDragOverDay(null); }}
-                              onDrop={async e => {
-                                e.preventDefault();
-                                const eventId = e.dataTransfer.getData("text/plain");
-                                const draggedEvent = events.find(item => item.id === eventId);
-                                if (!draggedEvent) { setDraggingEventId(null); setDragOverDay(null); return; }
-                                await handleQuickMoveEvent(draggedEvent, key);
-                              }}
-                              onClick={e => {
-                                if (draggingEventId) return;
-                                setSelectedDay(key);
-                                openNew(key, e);
-                              }}
-                              className={`border-b border-r border-slate-100 min-h-[80px] p-1.5 cursor-pointer transition-all ${
-                                dragOverDay === key ? "bg-emerald-50/90 ring-2 ring-inset ring-emerald-300"
-                                : isSel   ? "bg-red-50/60"
-                                : isToday ? "bg-amber-50/40"
-                                : "hover:bg-slate-50"
-                              }`}
-                            >
-                              <div className="flex items-center justify-between mb-1">
-                                <span className={`text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full ${
+                            <React.Fragment key={key}>
+                              {/* Fondo de la celda: click/drag/borde para todo el alto de la fila */}
+                              <div
+                                onDragOver={e => {
+                                  if (!draggingEventId) return;
+                                  e.preventDefault();
+                                  if (dragOverDay !== key) setDragOverDay(key);
+                                }}
+                                onDragLeave={() => { if (dragOverDay === key) setDragOverDay(null); }}
+                                onDrop={async e => {
+                                  e.preventDefault();
+                                  const eventId = e.dataTransfer.getData("text/plain");
+                                  const draggedEvent = events.find(item => item.id === eventId);
+                                  if (!draggedEvent) { setDraggingEventId(null); setDragOverDay(null); return; }
+                                  await handleQuickMoveEvent(draggedEvent, key);
+                                }}
+                                onClick={e => {
+                                  if (draggingEventId) return;
+                                  setSelectedDay(key);
+                                  openNew(key, e);
+                                }}
+                                className={`border-b border-r border-slate-100 min-h-[80px] p-1.5 cursor-pointer transition-all ${
+                                  dragOverDay === key ? "bg-emerald-50/90 ring-2 ring-inset ring-emerald-300"
+                                  : isSel   ? "bg-red-50/60"
+                                  : isToday ? "bg-amber-50/40"
+                                  : "hover:bg-slate-50"
+                                }`}
+                                style={{ gridColumn: colIdx + 1, gridRow: "1 / -1" }}
+                              />
+
+                              {/* Cabecera: número de día + botón añadir (encima del fondo, no bloquea el resto) */}
+                              <div
+                                className="flex items-center justify-between px-1.5 pt-1.5 pointer-events-none"
+                                style={{ gridColumn: colIdx + 1, gridRow: 1, alignSelf: "start" }}
+                              >
+                                <span className={`pointer-events-auto text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full ${
                                   isToday ? "bg-red-600 text-white" : isSel ? "text-red-600" : "text-slate-600"
                                 }`}>
                                   {date.getDate()}
                                 </span>
                                 <button
                                   onClick={e => { e.stopPropagation(); openNew(key, e); }}
-                                  className="opacity-0 hover:opacity-100 p-0.5 text-slate-300 hover:text-red-500 transition-opacity"
+                                  className="pointer-events-auto opacity-0 hover:opacity-100 p-0.5 text-slate-300 hover:text-red-500 transition-opacity"
                                 >
                                   <Plus size={11} />
                                 </button>
                               </div>
 
-                              <div className="space-y-0.5">
+                              {/* Lista de eventos de un solo día, debajo de las barras de varios días */}
+                              <div
+                                className="space-y-0.5 px-1.5 pb-1.5"
+                                style={{ gridColumn: colIdx + 1, gridRow: `${2 + laneCount} / -1`, alignSelf: "start" }}
+                              >
                                 {lexShow.map(ev => {
                                   const evColor = getEventColor(ev);
                                   return (
@@ -3966,9 +4022,28 @@ export default function Agenda() {
                                   <div className="text-[10px] text-slate-400 font-semibold px-1.5">+{overflow} más</div>
                                 )}
                               </div>
-                            </div>
+                            </React.Fragment>
                           );
                         })}
+
+                        {/* Barras de eventos de varios días, un carril por fila */}
+                        {weekBars.map(bar => (
+                          <div
+                            key={bar.ev.id}
+                            onClick={e => { e.stopPropagation(); const d = week[bar.startCol]; if (d) setSelectedDay(isoDate(d)); openViewPopover(bar.ev, { x: e.clientX, y: e.clientY }); }}
+                            title={bar.ev.title}
+                            className="mx-0.5 flex min-w-0 items-center gap-1 truncate rounded px-1.5 py-0.5 text-[10px] font-semibold text-white cursor-pointer select-none"
+                            style={{
+                              gridColumn: `${bar.startCol + 1} / ${bar.endCol + 2}`,
+                              gridRow: 2 + bar.lane,
+                              backgroundColor: getEventColor(bar.ev),
+                            }}
+                          >
+                            {bar.continuesBefore && <span className="shrink-0 opacity-70">◀</span>}
+                            <span className="truncate">{bar.ev.title}</span>
+                            {bar.continuesAfter && <span className="shrink-0 opacity-70">▶</span>}
+                          </div>
+                        ))}
                       </div>
                     </div>
                   );
