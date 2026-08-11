@@ -728,7 +728,7 @@ function WhatsAppWidget() {
 // ── Notifications Panel ──────────────────────────────────────────────────────
 type UnifiedNotification = {
   id: string;
-  kind: "chat" | "email" | "whatsapp";
+  kind: "chat" | "email" | "whatsapp" | "plazo";
   title: string;
   subtitle?: string;
   meta?: string;
@@ -740,6 +740,7 @@ type UnifiedNotification = {
 function notificationIcon(kind: UnifiedNotification["kind"]) {
   if (kind === "chat") return "💬";
   if (kind === "email") return "✉️";
+  if (kind === "plazo") return "⏰";
   return "🟢";
 }
 
@@ -1473,8 +1474,12 @@ export default function DashboardLayout() {
     if (location.pathname.startsWith("/dashboard/correo")) hidden.add("email");
     if (location.pathname.startsWith("/dashboard/chat")) hidden.add("chat");
     if (location.pathname.startsWith("/dashboard/whatsapp")) hidden.add("whatsapp");
+    if (location.pathname.startsWith("/dashboard/tareas")) hidden.add("plazo");
     return hidden;
   }, [location.pathname]);
+
+  // Ventana de aviso para plazos próximos a vencer en la campana de notificaciones.
+  const PLAZO_ALERT_DAYS = 3;
 
   const fetchNotifications = useCallback(async (showLoader = false) => {
     if (notifBusyRef.current) return;
@@ -1484,16 +1489,18 @@ export default function DashboardLayout() {
       const token = await getToken({ skipCache: true });
       if (!token) return;
       const headers = { Authorization: `Bearer ${token}` };
-      const [chatRes, emailRes, waRes] = await Promise.all([
+      const [chatRes, emailRes, waRes, tasksRes] = await Promise.all([
         fetch("/api/chat/canales", { headers }),
         fetch("/api/email/messages?folder=INBOX&unread=1&page=1&pageSize=50", { headers }),
         fetch("/api/whatsapp/contacts", { headers }),
+        fetch("/api/tasks/me", { headers }),
       ]);
 
-      const [chatData, emailData, waData] = await Promise.all([
+      const [chatData, emailData, waData, tasksData] = await Promise.all([
         safeJson(chatRes),
         safeJson(emailRes),
         safeJson(waRes),
+        safeJson(tasksRes),
       ]);
 
       const next: UnifiedNotification[] = [];
@@ -1590,6 +1597,36 @@ export default function DashboardLayout() {
             onClick: () => {
               markWaSeen(item.id);
               navigate(`/dashboard/whatsapp?clientId=${encodeURIComponent(item.id)}&mode=thread`);
+            },
+          });
+        }
+      }
+
+      if (tasksRes.ok) {
+        const taskItems = Array.isArray(tasksData?.data) ? tasksData.data : [];
+        const now = new Date(); now.setHours(0, 0, 0, 0);
+        const alertLimit = new Date(now); alertLimit.setDate(alertLimit.getDate() + PLAZO_ALERT_DAYS);
+        const nowIso = new Date().toISOString();
+        for (const t of taskItems) {
+          if (!t?.plazo || t?.estado === "completada") continue;
+          const plazoDate = new Date(t.plazo);
+          if (Number.isNaN(plazoDate.getTime()) || plazoDate > alertLimit) continue;
+          const diffDays = Math.round((plazoDate.getTime() - now.getTime()) / 86_400_000);
+          const subtitle =
+            diffDays < 0  ? `Vencida hace ${Math.abs(diffDays)} día${Math.abs(diffDays) === 1 ? "" : "s"}` :
+            diffDays === 0 ? "Vence hoy" :
+            diffDays === 1 ? "Vence mañana" :
+            `Vence en ${diffDays} días`;
+          next.push({
+            id: `plazo-${t.id}`,
+            kind: "plazo",
+            title: t.titulo || "Tarea sin título",
+            subtitle,
+            meta: t.expediente || t.client_name_resolved || undefined,
+            created_at: nowIso,
+            onClick: () => {
+              if (t.expediente_id) navigate(`/dashboard/expedientes/${t.expediente_id}?tab=tareas`);
+              else navigate("/dashboard/tareas");
             },
           });
         }
