@@ -1907,7 +1907,7 @@ function encodeVantiaPayload(payload: unknown) {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
-function ActuacionAdjuntosPanel({ taskId, locked = false }: { taskId: string; locked?: boolean }) {
+function ActuacionAdjuntosPanel({ taskId, expedienteId, locked = false }: { taskId: string; expedienteId?: string | null; locked?: boolean }) {
   const { getToken } = useAuth();
   const [files, setFiles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2316,12 +2316,16 @@ function ActuacionAdjuntosPanel({ taskId, locked = false }: { taskId: string; lo
     } finally { setDocPlantLoading(false); }
   }, [getToken]);
 
-  const attachTemplate = async () => {
+  const attachTemplate = async (autofill = false) => {
     if (!selectedTpl) return;
     setUploading(true);
     try {
       const token = await getToken({ skipCache: true });
-      const res = await fetch(`/api/files/templates/download?path=${encodeURIComponent(selectedTpl.path)}`, { headers: { Authorization: `Bearer ${token}` } });
+      const canAutofill = autofill && !!expedienteId && selectedTpl.name.toLowerCase().endsWith(".docx");
+      const url = canAutofill
+        ? `/api/files/templates/merge?path=${encodeURIComponent(selectedTpl.path)}&expedienteId=${encodeURIComponent(expedienteId!)}`
+        : `/api/files/templates/download?path=${encodeURIComponent(selectedTpl.path)}`;
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) return;
       const blob = await res.blob();
       const file = new File([blob], selectedTpl.name, { type: blob.type || "application/octet-stream" });
@@ -2866,7 +2870,14 @@ function ActuacionAdjuntosPanel({ taskId, locked = false }: { taskId: string; lo
                 </div>
                 <div className="flex justify-end gap-2 pt-4">
                   <button type="button" onClick={() => setShowTemplates(false)} className="px-4 py-2 text-sm font-semibold text-slate-600 rounded-xl border border-slate-200 hover:bg-slate-50">Cancelar</button>
-                  <button type="button" onClick={attachTemplate} disabled={!selectedTpl || uploading} className="px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-xl">Usar plantilla</button>
+                  <button type="button" onClick={() => attachTemplate(false)} disabled={!selectedTpl || uploading} className="px-4 py-2 text-sm font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50 rounded-xl">Usar tal cual</button>
+                  {!!expedienteId && selectedTpl?.name.toLowerCase().endsWith(".docx") && (
+                    <button type="button" onClick={() => attachTemplate(true)} disabled={uploading}
+                      title="Rellena {{cliente_nombre}}, {{contrario}}, {{juzgado}}, etc. con los datos de este expediente"
+                      className="flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-xl">
+                      <Sparkles size={13} /> Usar y autorrellenar
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -3117,7 +3128,7 @@ function ActuacionModal({
             </div>
             {selectedActuacion ? (
               <div className="p-5">
-                <ActuacionAdjuntosPanel taskId={selectedActuacion.id} locked={locked} />
+                <ActuacionAdjuntosPanel taskId={selectedActuacion.id} expedienteId={expedienteId} locked={locked} />
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center text-center px-8 py-14">

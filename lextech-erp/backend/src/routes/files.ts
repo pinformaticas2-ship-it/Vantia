@@ -5,7 +5,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 const uuidv4 = () => crypto.randomUUID();
 import { requireAuth } from '../middleware/auth';
-import { listFiles, uploadFiles, downloadFile, deleteFile, UPLOADS_ROOT, listTemplates, downloadTemplate, downloadBlank, createBlankDocument, updateFileMetadata, openFileLocally, previewDocxAsHtml, previewExcelAsHtml, previewTemplateAsHtml, testPreviewImages, previewWordAsPdf, previewTemplateAsPdf, createTempToken, downloadByToken, launchWithOffice, officeBridgePage, syncClientFileByToken } from '../controllers/filesController';
+import { listFiles, uploadFiles, downloadFile, deleteFile, UPLOADS_ROOT, listTemplates, downloadTemplate, downloadMergedTemplate, downloadBlank, createBlankDocument, updateFileMetadata, openFileLocally, previewDocxAsHtml, previewExcelAsHtml, previewTemplateAsHtml, testPreviewImages, previewWordAsPdf, previewTemplateAsPdf, createTempToken, downloadByToken, launchWithOffice, officeBridgePage, syncClientFileByToken } from '../controllers/filesController';
 const router = Router();
 const rawBinary = express.raw({ type: 'application/octet-stream', limit: '100mb' });
 
@@ -39,6 +39,7 @@ router.get('/templates',              requireAuth, listTemplates);
 router.get('/templates/preview-pdf',  requireAuth, previewTemplateAsPdf);
 router.get('/templates/preview',      requireAuth, previewTemplateAsHtml);
 router.get('/templates/download',     requireAuth, downloadTemplate);
+router.get('/templates/merge',        requireAuth, downloadMergedTemplate);
 router.get('/templates/blank.docx',   requireAuth, downloadBlank);
 router.get('/test-preview',           requireAuth, testPreviewImages);
 

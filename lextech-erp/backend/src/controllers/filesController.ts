@@ -2,6 +2,7 @@ import { Response } from 'express';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
+import AdmZip = require('adm-zip');
 import pool from '../config/database';
 import { logActivity, logActivityForReq } from './activityController';
 import { CLIENT_FILES_ROOT as LOCAL_CLIENT_FILES_ROOT, DATA_ROOT, TEMP_ROOT, UPLOADS_CLIENTS_ROOT as UPLOADS_ROOT } from '../config/paths';
@@ -2782,6 +2783,94 @@ export const downloadTemplate = (req: any, res: Response) => {
   res.setHeader('Content-Type', mime);
   res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(path.basename(resolved))}"`);
   res.sendFile(resolved);
+};
+
+// ── Autorrelleno de plantillas ──────────────────────────────────────────────
+// "Plantillas del despacho" solo dejaba descargar el archivo tal cual, sin
+// ningún dato del cliente/expediente puesto. Esto sustituye tokens {{clave}}
+// en word/document.xml directamente sobre el .docx (que es un zip) con
+// AdmZip, ya usado en el backend para extracción de texto -- sin añadir
+// ninguna dependencia nueva. Limitación conocida: si Word partió el token en
+// varias "runs" internas (p.ej. por autocorrección), ese token concreto se
+// queda sin sustituir en vez de arriesgarse a corromper el documento --
+// mejor un {{token}} visible que un .docx roto.
+function xmlEscape(value: string): string {
+  return value
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+}
+
+function mergeDocxTemplate(filePath: string, tokens: Record<string, string>): Buffer {
+  const zip = new AdmZip(filePath);
+  const entry = zip.getEntry('word/document.xml');
+  if (!entry) throw new Error('El archivo no es una plantilla .docx válida.');
+  let xml = entry.getData().toString('utf-8');
+  for (const [key, rawValue] of Object.entries(tokens)) {
+    const value = xmlEscape(String(rawValue ?? ''));
+    const re = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g');
+    xml = xml.replace(re, value);
+  }
+  zip.updateFile('word/document.xml', Buffer.from(xml, 'utf-8'));
+  return zip.toBuffer();
+}
+
+async function buildMergeTokens(organizacionId: string, expedienteId?: string): Promise<Record<string, string>> {
+  const tokens: Record<string, string> = {
+    fecha_hoy: new Date().toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }),
+  };
+  if (!expedienteId) return tokens;
+  const { rows } = await pool.query(
+    `SELECT e.*, ent.first_name, ent.last_name, ent.nif_cif,
+            ent.address_street, ent.address_town, ent.address_province
+     FROM expedientes e
+     LEFT JOIN entities ent ON ent.id = e.cliente_id
+     WHERE e.id = $1 AND e.organizacion_id = $2`,
+    [expedienteId, organizacionId]
+  );
+  const exp = rows[0];
+  if (!exp) return tokens;
+  tokens.cliente_nombre = exp.cliente_nombre || `${exp.first_name || ''} ${exp.last_name || ''}`.trim();
+  tokens.cliente_nif = exp.nif_cif || '';
+  tokens.cliente_direccion = [exp.address_street, exp.address_town, exp.address_province].filter(Boolean).join(', ');
+  tokens.expediente_num = `${exp.anio}/${exp.num_exp}`;
+  tokens.expediente_descripcion = exp.descripcion || '';
+  tokens.expediente_tipo = exp.tipo || '';
+  tokens.contrario = exp.contrario || '';
+  tokens.procurador = exp.procurador || '';
+  tokens.abogado_propio = exp.abogado_propio || '';
+  tokens.juzgado = exp.juzgado || '';
+  tokens.num_autos = exp.num_autos || '';
+  tokens.nig = exp.nig || '';
+  return tokens;
+}
+
+// GET /api/files/templates/merge?path=...&expedienteId=... — descarga la
+// plantilla con los tokens {{clave}} ya sustituidos por los datos reales.
+export const downloadMergedTemplate = async (req: any, res: Response) => {
+  const filePath = req.query.path as string | undefined;
+  const expedienteId = req.query.expedienteId as string | undefined;
+  if (!filePath) return res.status(400).json({ success: false, error: 'Parámetro path requerido.' });
+  const { root } = getDocPlantRoot();
+  const resolved = path.resolve(root, filePath);
+  const normalizedRoot = path.resolve(root);
+  if (!resolved.startsWith(normalizedRoot + path.sep) && resolved !== normalizedRoot) {
+    return res.status(403).json({ success: false, error: 'Acceso denegado.' });
+  }
+  if (!fs.existsSync(resolved)) {
+    return res.status(404).json({ success: false, error: 'Plantilla no encontrada.' });
+  }
+  if (path.extname(resolved).toLowerCase() !== '.docx') {
+    return res.status(400).json({ success: false, error: 'El autorrelleno solo está disponible para plantillas .docx.' });
+  }
+  try {
+    const tokens = await buildMergeTokens(req.organizacionId, expedienteId);
+    const merged = mergeDocxTemplate(resolved, tokens);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(path.basename(resolved))}"`);
+    res.send(merged);
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e.message || 'No se pudo generar el documento.' });
+  }
 };
 
 // GET /api/files/templates/blank.docx
