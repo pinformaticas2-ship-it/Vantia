@@ -2031,6 +2031,7 @@ function DayEventsPopover({
 // ── Vista de rejilla horaria (Semana / Día) ───────────────────────────────────
 function TimeGridView({
   days,
+  allEvents,
   eventsByDay,
   gcalEventsByDay,
   selectedDay,
@@ -2046,6 +2047,7 @@ function TimeGridView({
   onMoveEvent,
 }: {
   days: string[];
+  allEvents: AgendaEvent[];
   eventsByDay: Record<string, AgendaEvent[]>;
   gcalEventsByDay: Record<string, GCalEvent[]>;
   selectedDay: string;
@@ -2061,6 +2063,41 @@ function TimeGridView({
   onMoveEvent: (id: string, newStartAt: string, newEndAt: string | null, allDay?: boolean) => Promise<void>;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // ── Eventos "todo el día" que abarcan más de un día ────────────────────────
+  // eventsByDay solo indexa cada evento bajo su día de INICIO, así que un evento
+  // como "Vacaciones" de una semana entera solo aparecía como una píldora suelta
+  // el primer día. Aquí se calculan como barras que ocupan las columnas que
+  // realmente cubren (recortadas al rango visible), repartidas en "carriles"
+  // para que dos que se solapan no se pisen.
+  const spanningBars = useMemo(() => {
+    if (!days.length) return [];
+    const dayIndex = new Map(days.map((d, i) => [d, i]));
+    const rangeStart = days[0];
+    const rangeEnd = days[days.length - 1];
+    const raw = allEvents
+      .filter(ev => ev.all_day && isSpanning(ev))
+      .map(ev => {
+        const startKey = localDateKey(ev.start_at);
+        const endKey = localDateKey(ev.end_at!);
+        if (endKey < rangeStart || startKey > rangeEnd) return null;
+        const startCol = startKey < rangeStart ? 0 : dayIndex.get(startKey)!;
+        const endCol = endKey > rangeEnd ? days.length - 1 : dayIndex.get(endKey)!;
+        return { ev, startCol, endCol, continuesBefore: startKey < rangeStart, continuesAfter: endKey > rangeEnd };
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null)
+      .sort((a, b) => a.startCol - b.startCol || (b.endCol - b.startCol) - (a.endCol - a.startCol));
+
+    const lanes: number[] = []; // último endCol ocupado en cada carril
+    return raw.map(bar => {
+      let lane = lanes.findIndex(endCol => endCol < bar.startCol);
+      if (lane === -1) { lane = lanes.length; lanes.push(bar.endCol); }
+      else lanes[lane] = bar.endCol;
+      return { ...bar, lane };
+    });
+  }, [allEvents, days]);
+  const spanningIds = useMemo(() => new Set(spanningBars.map(b => b.ev.id)), [spanningBars]);
+  const spanLaneCount = spanningBars.length ? Math.max(...spanningBars.map(b => b.lane)) + 1 : 0;
 
   // ── Drag-to-move state ───────────────────────────────────────────────────────
   const [draggingId,    setDraggingId]    = useState<string | null>(null);
@@ -2383,15 +2420,45 @@ function TimeGridView({
       </div>
 
       {/* Banda de eventos de todo el día */}
-      <div className="flex shrink-0 border-b border-gray-200 bg-white min-h-[28px]">
-        <div className="w-16 shrink-0 border-r border-gray-100 flex items-end justify-end pr-2 pb-1">
+      <div
+        className="grid shrink-0 border-b border-gray-200 bg-white"
+        style={{ gridTemplateColumns: `4rem repeat(${days.length}, 1fr)` }}
+      >
+        <div
+          className="border-r border-gray-100 flex items-end justify-end pr-2 pb-1"
+          style={{ gridColumn: 1, gridRow: `1 / -1` }}
+        >
           <span className="text-[9px] text-gray-400 select-none">Todo el día</span>
         </div>
-        {days.map(dateStr => {
-          const allDayLex = (eventsByDay[dateStr] || []).filter(ev => ev.all_day);
+
+        {/* Barras que abarcan varios días, una por "carril" para no solaparse */}
+        {spanningBars.map(bar => (
+          <div
+            key={bar.ev.id}
+            onClick={e => onEventClick(bar.ev, { x: e.clientX, y: e.clientY })}
+            title={bar.ev.title}
+            className="mx-0.5 my-[1px] flex min-w-0 items-center gap-1 truncate rounded px-2 py-0.5 text-[11px] font-medium text-white cursor-pointer select-none"
+            style={{
+              gridColumn: `${bar.startCol + 2} / ${bar.endCol + 3}`,
+              gridRow: bar.lane + 1,
+              backgroundColor: getEventColor(bar.ev),
+            }}
+          >
+            {bar.continuesBefore && <span className="shrink-0 opacity-70">◀</span>}
+            <span className="truncate">{bar.ev.title}</span>
+            {bar.continuesAfter && <span className="shrink-0 opacity-70">▶</span>}
+          </div>
+        ))}
+
+        {days.map((dateStr, dayIdx) => {
+          const allDayLex = (eventsByDay[dateStr] || []).filter(ev => ev.all_day && !spanningIds.has(ev.id));
           const allDayGcal = (gcalEventsByDay[dateStr] || []).filter(ev => !ev.start.dateTime);
           return (
-            <div key={dateStr} className="flex-1 border-l border-gray-100 px-0.5 py-0.5 space-y-0.5">
+            <div
+              key={dateStr}
+              className="min-h-[22px] border-l border-gray-100 px-0.5 py-0.5 space-y-0.5"
+              style={{ gridColumn: dayIdx + 2, gridRow: `${spanLaneCount + 1} / -1` }}
+            >
               {allDayLex.map(ev => {
                 const tc = EVENT_TYPES[ev.type] || EVENT_TYPES.otro;
                 const isBeingDragged = allDayDragDisplay?.id === ev.id;
@@ -3752,6 +3819,7 @@ export default function Agenda() {
           ) : (
             <TimeGridView
               days={view === "week" ? weekDays : [selectedDay]}
+              allEvents={events}
               eventsByDay={eventsByDay}
               gcalEventsByDay={gcalEventsByDay}
               selectedDay={selectedDay}
