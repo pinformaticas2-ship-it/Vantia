@@ -5177,21 +5177,36 @@ export default function ExpedienteList() {
   };
 
   // ── Carga de expedientes ──────────────────────────────────────
+  // El backend limita "limit" a 500 por página (aunque se pida más), así que
+  // un despacho con más de 500 expedientes se quedaba sin ver el resto -- no
+  // había paginación de seguimiento tras la primera página. Ahora, si el total
+  // que devuelve el backend supera lo ya cargado, se piden las páginas
+  // restantes (offset 500, 1000, ...) hasta traerlas todas.
+  const EXPEDIENTES_PAGE_SIZE = 500;
   const fetchExpedientes = useCallback(async (silent = false, _retry = false) => {
     try {
       if (!silent) { setLoading(true); setError(null); }
       const token = await getToken({ skipCache: true });
-      const res = await fetch("/api/expedientes?limit=500", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const headers = { Authorization: `Bearer ${token}` };
+      const res = await fetch(`/api/expedientes?limit=${EXPEDIENTES_PAGE_SIZE}&offset=0`, { headers });
       // Backend recien arrancado: si devuelve 401, esperar y reintentar una vez
       if (res.status === 401 && !_retry) {
         await new Promise(r => setTimeout(r, 1500));
         return fetchExpedientes(silent, true);
       }
       const d = await safeJson(res);
-      if (res.ok) setExpedientes(d.data || []);
-      else throw new Error(d.error || "Error al cargar expedientes");
+      if (!res.ok) throw new Error(d.error || "Error al cargar expedientes");
+      let all: any[] = d.data || [];
+      const total = Number(d.total || all.length);
+      let offset = all.length;
+      while (offset < total) {
+        const pageRes = await fetch(`/api/expedientes?limit=${EXPEDIENTES_PAGE_SIZE}&offset=${offset}`, { headers });
+        const pageData = await safeJson(pageRes);
+        if (!pageRes.ok || !Array.isArray(pageData.data) || !pageData.data.length) break;
+        all = all.concat(pageData.data);
+        offset += pageData.data.length;
+      }
+      setExpedientes(all);
     } catch (e: any) {
       if (!silent) setError(e.message);
     } finally {
