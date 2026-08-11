@@ -5334,9 +5334,17 @@ export default function ExpedienteList() {
   const clearAllFilters = () => setFilters([{ id: nextId++, field: "any", value: "" }]);
   const hasActiveFilters = filters.some(f => f.value.trim() !== "");
 
+  // Los expedientes archivados ("dar de baja") ya no se borran de la base de
+  // datos -- si se mostraran siempre en el listado, después de los 15s de
+  // deshacer reaparecerían en el siguiente refresco y parecería que "no se
+  // borran". Se ocultan por defecto, salvo que el usuario los busque
+  // explícitamente (filtro de Estado, o "cualquier criterio" con "archivado").
+  const showingArchived = filters.some(f => f.value.trim().toLowerCase().includes("archivado"));
+
   // ── Filtrado + ordenación ──────────────────────────────────────
   const filtered = useMemo(() => {
     let rows = expedientes.filter(e => filters.every(f => matchesFilter(e, f.field, f.value)));
+    if (!showingArchived) rows = rows.filter(e => e.estado !== "archivado");
     rows = [...rows].sort((a, b) => {
       let av: any = a[sort] ?? ""; let bv: any = b[sort] ?? "";
       if (sort === "num_exp" || sort === "anio") { av = Number(av); bv = Number(bv); }
@@ -6508,7 +6516,7 @@ export default function ExpedienteList() {
       {/* ── Undo toast ──────────────────────────────────────── */}
       {pendingDelete && (
         <UndoToast
-          message="Expediente eliminado"
+          message="Expediente archivado"
           startedAt={pendingDelete.startedAt}
           onUndo={handleUndoDelete}
           onDismiss={dismissDelete}
@@ -6516,7 +6524,7 @@ export default function ExpedienteList() {
       )}
       {pendingBulkDelete && (
         <UndoToast
-          message={`${pendingBulkDelete.item.length} expediente${pendingBulkDelete.item.length !== 1 ? "s" : ""} eliminado${pendingBulkDelete.item.length !== 1 ? "s" : ""}`}
+          message={`${pendingBulkDelete.item.length} expediente${pendingBulkDelete.item.length !== 1 ? "s" : ""} archivado${pendingBulkDelete.item.length !== 1 ? "s" : ""}`}
           startedAt={pendingBulkDelete.startedAt}
           onUndo={handleUndoBulkDelete}
           onDismiss={dismissBulkDelete}
