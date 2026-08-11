@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { UndoToast } from "../components/UndoToast";
+import { Modal } from "../components/Modal";
 import { useUndoDelete } from "../lib/useUndoDelete";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
@@ -852,20 +853,24 @@ function StructuredBillingEditorModal({
   const subtitle = isFactura ? "factura" : isGasto ? "gasto" : "presupuesto";
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-transparent p-4">
-      <div className="flex min-h-full items-center justify-center">
-      <div className="my-auto w-full max-w-5xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-400">Facturación</p>
-            <h3 className="mt-1 text-2xl font-bold text-slate-900">{title} {subtitle}</h3>
-          </div>
-          <button onClick={onClose} className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 text-slate-500 hover:bg-slate-50">
-            <X size={18} />
+    <Modal
+      open
+      onClose={onClose}
+      title={`${title} ${subtitle}`}
+      subtitle="Facturación"
+      maxWidth="max-w-5xl"
+      footer={
+        <>
+          <button onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">
+            Cancelar
           </button>
-        </div>
-
-        <div className="grid grid-cols-1 gap-5 px-6 py-6 lg:grid-cols-[1.15fr_0.85fr]">
+          <button onClick={submit} className="inline-flex items-center gap-2 rounded-xl bg-red-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-800">
+            <Save size={14} /> Guardar
+          </button>
+        </>
+      }
+    >
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.15fr_0.85fr]">
           <div className="space-y-5">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <label className="space-y-2">
@@ -1004,18 +1009,7 @@ function StructuredBillingEditorModal({
             </label>
           </div>
         </div>
-
-        <div className="flex items-center justify-end gap-3 border-t border-slate-100 px-6 py-5">
-          <button onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">
-            Cancelar
-          </button>
-          <button onClick={submit} className="inline-flex items-center gap-2 rounded-xl bg-red-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-800">
-            <Save size={14} /> Guardar
-          </button>
-        </div>
-      </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -1489,40 +1483,14 @@ function QuipuConnectModal({
   const [ownerSlug, setOwnerSlug] = useState(initialOwnerSlug || "");
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-transparent p-4">
-      <div className="flex min-h-full items-center justify-center">
-      <div className="my-auto w-full max-w-2xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-400">Integración</p>
-            <h3 className="mt-1 text-2xl font-bold text-slate-900">Conectar Quipu</h3>
-          </div>
-          <button onClick={onClose} className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 text-slate-500 hover:bg-slate-50">
-            <X size={18} />
-          </button>
-        </div>
-        <div className="grid grid-cols-1 gap-4 px-6 py-6">
-          <label className="space-y-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">App ID</span>
-            <input value={appId} onChange={(e) => setAppId(e.target.value)} placeholder={alreadyConnected ? "Dejalo vacio para conservar el actual" : ""} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
-          </label>
-          <label className="space-y-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">App Secret</span>
-            <input value={appSecret} onChange={(e) => setAppSecret(e.target.value)} placeholder={alreadyConnected ? "Dejalo vacio para conservar el actual" : ""} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
-          </label>
-          <label className="space-y-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Base URL</span>
-            <input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
-          </label>
-          <label className="space-y-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Owner Slug</span>
-            <input value={ownerSlug} onChange={(e) => setOwnerSlug(e.target.value)} placeholder="ej. mi-despacho" className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
-          </label>
-          <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
-            Quipu usa OAuth2 con <code>app_id</code> y <code>app_secret</code>. El backend ya está preparado para validar la conexión y sincronizar contactos, facturas y series de numeración.
-          </div>
-        </div>
-        <div className="flex items-center justify-end gap-3 border-t border-slate-100 px-6 py-5">
+    <Modal
+      open
+      onClose={onClose}
+      title="Conectar Quipu"
+      subtitle="Integración"
+      maxWidth="max-w-2xl"
+      footer={
+        <>
           <button onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">
             Cancelar
           </button>
@@ -1532,10 +1500,31 @@ function QuipuConnectModal({
           >
             <Save size={14} /> Guardar y validar
           </button>
+        </>
+      }
+    >
+      <div className="grid grid-cols-1 gap-4">
+        <label className="space-y-2">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-500">App ID</span>
+          <input value={appId} onChange={(e) => setAppId(e.target.value)} placeholder={alreadyConnected ? "Dejalo vacio para conservar el actual" : ""} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+        </label>
+        <label className="space-y-2">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-500">App Secret</span>
+          <input value={appSecret} onChange={(e) => setAppSecret(e.target.value)} placeholder={alreadyConnected ? "Dejalo vacio para conservar el actual" : ""} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+        </label>
+        <label className="space-y-2">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Base URL</span>
+          <input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+        </label>
+        <label className="space-y-2">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Owner Slug</span>
+          <input value={ownerSlug} onChange={(e) => setOwnerSlug(e.target.value)} placeholder="ej. mi-despacho" className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+        </label>
+        <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+          Quipu usa OAuth2 con <code>app_id</code> y <code>app_secret</code>. El backend ya está preparado para validar la conexión y sincronizar contactos, facturas y series de numeración.
         </div>
       </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -3425,43 +3414,40 @@ function BankAccountsTab({
       </div>
 
       {/* Add account modal */}
-      {showForm && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-transparent p-4">
-          <div className="flex min-h-full items-center justify-center">
-          <div className="my-auto w-full max-w-md overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-              <h3 className="text-lg font-bold text-slate-900">{editingAcc ? "Editar cuenta" : "Nueva cuenta bancaria"}</h3>
-              <button onClick={() => setShowForm(false)} className="rounded-xl border border-slate-200 p-2 hover:bg-slate-50"><X size={16} /></button>
-            </div>
-            <div className="space-y-4 px-6 py-5">
-              <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">Nombre *</span>
-                <input value={form.name} onChange={e => setForm(f => ({...f, name: e.target.value}))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" placeholder="Ej: Cuenta corriente Sabadell" /></label>
-              <div className="grid grid-cols-2 gap-3">
-                <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">Banco</span>
-                  <input value={form.bank_name} onChange={e => setForm(f => ({...f, bank_name: e.target.value}))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" placeholder="Sabadell" /></label>
-                <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">IBAN</span>
-                  <input value={form.iban} onChange={e => setForm(f => ({...f, iban: e.target.value}))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-mono" placeholder="ES12 1234..." /></label>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">Saldo (€)</span>
-                  <input type="number" step="0.01" value={form.balance} onChange={e => setForm(f => ({...f, balance: e.target.value}))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" /></label>
-                <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">Divisa</span>
-                  <select value={form.currency} onChange={e => setForm(f => ({...f, currency: e.target.value}))} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm">
-                    <option>EUR</option><option>USD</option><option>GBP</option></select></label>
-              </div>
-              <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">Notas</span>
-                <input value={form.notes} onChange={e => setForm(f => ({...f, notes: e.target.value}))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" /></label>
-            </div>
-            <div className="flex justify-end gap-3 border-t border-slate-100 px-6 py-4">
-              <button onClick={() => setShowForm(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancelar</button>
-              <button onClick={saveForm} disabled={saving || !form.name.trim()} className="inline-flex items-center gap-2 rounded-xl bg-red-700 px-4 py-2 text-sm font-bold text-white hover:bg-red-800 disabled:opacity-50">
-                {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Guardar
-              </button>
-            </div>
+      <Modal
+        open={showForm}
+        onClose={() => setShowForm(false)}
+        title={editingAcc ? "Editar cuenta" : "Nueva cuenta bancaria"}
+        maxWidth="max-w-md"
+        footer={
+          <>
+            <button onClick={() => setShowForm(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancelar</button>
+            <button onClick={saveForm} disabled={saving || !form.name.trim()} className="inline-flex items-center gap-2 rounded-xl bg-red-700 px-4 py-2 text-sm font-bold text-white hover:bg-red-800 disabled:opacity-50">
+              {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Guardar
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">Nombre *</span>
+            <input value={form.name} onChange={e => setForm(f => ({...f, name: e.target.value}))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" placeholder="Ej: Cuenta corriente Sabadell" /></label>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">Banco</span>
+              <input value={form.bank_name} onChange={e => setForm(f => ({...f, bank_name: e.target.value}))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" placeholder="Sabadell" /></label>
+            <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">IBAN</span>
+              <input value={form.iban} onChange={e => setForm(f => ({...f, iban: e.target.value}))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-mono" placeholder="ES12 1234..." /></label>
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">Saldo (€)</span>
+              <input type="number" step="0.01" value={form.balance} onChange={e => setForm(f => ({...f, balance: e.target.value}))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" /></label>
+            <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">Divisa</span>
+              <select value={form.currency} onChange={e => setForm(f => ({...f, currency: e.target.value}))} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm">
+                <option>EUR</option><option>USD</option><option>GBP</option></select></label>
           </div>
+          <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">Notas</span>
+            <input value={form.notes} onChange={e => setForm(f => ({...f, notes: e.target.value}))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" /></label>
         </div>
-      )}
+      </Modal>
 
       {/* Account cards */}
       {!selectedId ? (
@@ -4018,20 +4004,38 @@ function ContactEditorModal({
   const inp = "w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 outline-none focus:border-slate-300 focus:bg-white transition-colors";
 
   return (
-    <div className="fixed inset-0 z-[200] overflow-y-auto bg-transparent px-4" onClick={onClose}>
-      <div className="flex min-h-full items-center justify-center">
-      <div className="my-auto w-full max-w-md rounded-3xl border border-slate-200 bg-white overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-slate-100">
-          <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-blue-100 flex items-center justify-center"><Users size={15} className="text-blue-600" /></div>
-            <div>
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Contacto Quipu</p>
-              <h3 className="text-base font-bold text-slate-900">{initial ? "Editar contacto" : "Nuevo contacto"}</h3>
-            </div>
-          </div>
-          <button onClick={onClose} className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-400 hover:text-slate-700 transition-colors"><X size={15} /></button>
-        </div>
-        <div className="p-5 space-y-4">
+    <Modal
+      open
+      onClose={onClose}
+      title={initial ? "Editar contacto" : "Nuevo contacto"}
+      subtitle="Contacto Quipu"
+      icon={<Users size={16} />}
+      maxWidth="max-w-md"
+      footer={
+        <>
+          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 rounded-xl transition-colors">Cancelar</button>
+          <button
+            onClick={() => form.name.trim() && onSave({
+              ...form,
+              name: form.name.trim(),
+              taxId: form.taxId.trim(),
+              email: form.email.trim(),
+              phone: form.phone.trim(),
+              address: form.address.trim(),
+              town: form.town.trim(),
+              zipCode: form.zipCode.trim(),
+              country: form.country.trim(),
+              countryCode: form.countryCode.trim() || "ES",
+            })}
+            disabled={!form.name.trim() || saving}
+            className="inline-flex items-center gap-2 px-5 py-2 text-sm font-bold text-white bg-red-700 hover:bg-red-800 disabled:opacity-40 rounded-xl active:scale-95 transition-all">
+            {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            {initial ? "Guardar cambios" : "Crear contacto"}
+          </button>
+        </>
+      }
+    >
+        <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={lbl}>Tipo</label>
@@ -4079,29 +4083,6 @@ function ContactEditorModal({
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2 px-5 py-3.5 border-t border-slate-100 bg-slate-50">
-          <button
-            onClick={() => form.name.trim() && onSave({
-              ...form,
-              name: form.name.trim(),
-              taxId: form.taxId.trim(),
-              email: form.email.trim(),
-              phone: form.phone.trim(),
-              address: form.address.trim(),
-              town: form.town.trim(),
-              zipCode: form.zipCode.trim(),
-              country: form.country.trim(),
-              countryCode: form.countryCode.trim() || "ES",
-            })}
-            disabled={!form.name.trim() || saving}
-            className="inline-flex items-center gap-2 px-5 py-2 text-sm font-bold text-white bg-red-700 hover:bg-red-800 disabled:opacity-40 rounded-xl active:scale-95 transition-all">
-            {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-            {initial ? "Guardar cambios" : "Crear contacto"}
-          </button>
-          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 rounded-xl transition-colors">Cancelar</button>
-        </div>
-      </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
