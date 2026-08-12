@@ -857,7 +857,17 @@ export const chatVantiaStream = async (req: any, res: Response) => {
     'Connection': 'keep-alive',
     'X-Accel-Buffering': 'no', // evita que un proxy intermedio (nginx, etc.) bufferee el stream
   });
+  // Fuerza el envío inmediato de las cabeceras: sin esto, Node/el proxy puede
+  // retenerlas hasta el primer res.write() con datos, y ese primer write no
+  // llega hasta que buildEntityContext() + la primera respuesta de Gemini
+  // resuelven -- si eso tarda más que el timeout de "primer byte" del proxy
+  // de turno, la conexión se corta y el fetch() del navegador falla con un
+  // genérico "Failed to fetch" en vez de un error legible.
+  res.flushHeaders?.();
   const emit = (obj: object) => { res.write(`data: ${JSON.stringify(obj)}\n\n`); };
+  // Comentario SSE (ignorado por el parser del cliente, que solo mira líneas
+  // "data:") solo para garantizar que algo viaja por el socket cuanto antes.
+  res.write(': connected\n\n');
 
   let closed = false;
   req.on('close', () => { closed = true; });
