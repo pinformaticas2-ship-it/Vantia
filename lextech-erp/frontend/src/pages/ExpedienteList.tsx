@@ -5354,6 +5354,7 @@ export default function ExpedienteList() {
   const hasActiveFilters = filters.some(f => f.value.trim() !== "");
 
   const archivedFilterActive = filters.some(f => f.field === "estado" && f.value.trim().toLowerCase() === "archivado");
+  const deleteTargetIsArchived = !!deleteId && expedientes.find(e => e.id === deleteId)?.estado === "archivado";
   const toggleShowArchived = () => {
     if (archivedFilterActive) {
       setFilters(prev => {
@@ -5443,6 +5444,20 @@ export default function ExpedienteList() {
   const handleUndoDelete = () => {
     const item = undoDelete();
     if (item) setExpedientes(prev => [...prev, item]);
+  };
+
+  // Si el expediente ya está archivado, "dar de baja" otra vez no tiene
+  // sentido -- el diálogo de confirmación cambia a borrado definitivo.
+  const [hardDeleteSingleLoading, setHardDeleteSingleLoading] = useState(false);
+  const handleHardDeleteSingle = async (id: string) => {
+    setHardDeleteSingleLoading(true);
+    try {
+      const token = await getToken({ skipCache: true });
+      await fetch(`/api/expedientes/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      setExpedientes(prev => prev.filter(x => x.id !== id));
+      if (selected === id) setSelected(null);
+      setDeleteId(null);
+    } catch { /* ignore */ } finally { setHardDeleteSingleLoading(false); }
   };
 
   // ── Acciones toolbar ──────────────────────────────────────────
@@ -6533,13 +6548,23 @@ export default function ExpedienteList() {
         variant="confirm"
         icon={<AlertTriangle size={18} />}
         iconTone="danger"
-        title="¿Dar de baja este expediente?"
-        subtitle="Se archiva (no se borra) y puedes deshacerlo en los próximos 15 segundos."
+        title={deleteTargetIsArchived ? "¿Eliminar definitivamente este expediente?" : "¿Dar de baja este expediente?"}
+        subtitle={deleteTargetIsArchived
+          ? "Ya está archivado. Esto SÍ borra el registro de la base de datos. No hay deshacer."
+          : "Se archiva (no se borra) y puedes deshacerlo en los próximos 15 segundos."}
         zIndex={9999}
         footer={
           <>
             <button onClick={() => setDeleteId(null)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
-            <button onClick={() => handleDelete(deleteId!)} className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg active:scale-95">Dar de baja</button>
+            {deleteTargetIsArchived ? (
+              <button onClick={() => handleHardDeleteSingle(deleteId!)} disabled={hardDeleteSingleLoading}
+                className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-red-700 hover:bg-red-800 disabled:opacity-50 rounded-lg active:scale-95">
+                {hardDeleteSingleLoading ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                Eliminar definitivamente
+              </button>
+            ) : (
+              <button onClick={() => handleDelete(deleteId!)} className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg active:scale-95">Dar de baja</button>
+            )}
           </>
         }
       />
