@@ -4056,7 +4056,8 @@ function TabClienteVinculado({ exp, clientes, linkedClient, linkedClientDisplayN
     setLinkSaving(false);
   };
 
-  const isClosed = exp?.estado === "cerrado";
+  // Un expediente archivado es de solo lectura igual que uno cerrado.
+  const isClosed = exp?.estado === "cerrado" || exp?.estado === "archivado";
 
   return (
     <div className="space-y-4">
@@ -4258,7 +4259,8 @@ function TabContrarios({ exp, onPatch }: { exp: any; onPatch: (fields: Record<st
     }
   }, [exp.contrario, exp.procurador_contrario, exp.abogado_contrario]);
 
-  const isClosed = exp?.estado === "cerrado";
+  // Un expediente archivado es de solo lectura igual que uno cerrado.
+  const isClosed = exp?.estado === "cerrado" || exp?.estado === "archivado";
   const hasData = !!(exp.contrario || exp.procurador_contrario || exp.abogado_contrario);
 
   const handleSaveContrario = async () => {
@@ -5637,6 +5639,30 @@ export default function ExpedienteDetail() {
     }
   };
 
+  // "Reabrir expediente" (handleToggleEstado) da por hecho que el estado
+  // actual es "cerrado" -- para uno archivado hace falta este aparte, que
+  // siempre restaura a "abierto" en vez de intentar togglear cerrado/abierto.
+  const handleUnarchive = async () => {
+    if (!exp) return;
+    setSaving(true);
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/expedientes/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ estado: "abierto" }),
+      });
+      const d = await safeJson(res);
+      if (!res.ok) { alert(d.error || "Error al desarchivar"); return; }
+      await fetchExp();
+      setHistorial(null);
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh]">
@@ -5689,7 +5715,7 @@ export default function ExpedienteDetail() {
   ].filter(Boolean);
 
   const startEdit = () => {
-    if (exp?.estado === "cerrado") return;
+    if (exp?.estado === "cerrado" || exp?.estado === "archivado") return;
     setEditForm({
       anio: exp.anio,
       num_exp: exp.num_exp,
@@ -5768,6 +5794,10 @@ export default function ExpedienteDetail() {
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Guardar cambios
               </button>
             </>
+          ) : exp?.estado === "archivado" ? (
+            <button onClick={handleUnarchive} disabled={saving} className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-50 rounded-xl shadow-sm active:scale-95 transition-all">
+              {saving ? <Loader2 size={14} className="animate-spin" /> : <FolderOpen size={14} />} Quitar de archivado
+            </button>
           ) : exp?.estado === "cerrado" ? (
             <button onClick={handleToggleEstado} disabled={saving} className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-50 rounded-xl shadow-sm active:scale-95 transition-all">
               {saving ? <Loader2 size={14} className="animate-spin" /> : <FolderOpen size={14} />} Reabrir expediente
@@ -5826,6 +5856,12 @@ export default function ExpedienteDetail() {
 
           {/* Columna 2: Contenido principal */}
           <div className="anim-fade-up flex-1 min-w-0 flex flex-col gap-6 w-full" style={{ animationDelay: '130ms' }}>
+            {exp.estado === "archivado" && !editing && (
+              <div className="flex items-center gap-3 px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm text-slate-500 shadow-sm">
+                <X size={15} className="shrink-0 text-slate-400" />
+                <span>Este expediente está <strong className="text-slate-700">archivado</strong>. No se pueden realizar modificaciones. Pulsa <strong className="text-emerald-700">Quitar de archivado</strong> para editarlo.</span>
+              </div>
+            )}
             {exp.estado === "cerrado" && !editing && (
               <div className="flex items-center gap-3 px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm text-slate-500 shadow-sm">
                 <X size={15} className="shrink-0 text-slate-400" />
@@ -5978,7 +6014,7 @@ export default function ExpedienteDetail() {
                 expedienteId={id!}
                 legacyNote={exp.observaciones}
                 onLegacyUpdated={(next) => setExp((prev: any) => (prev ? { ...prev, observaciones: next || null } : prev))}
-                locked={exp?.estado === "cerrado"}
+                locked={exp?.estado === "cerrado" || exp?.estado === "archivado"}
               />
             )}
 
@@ -6029,7 +6065,7 @@ export default function ExpedienteDetail() {
                 numProc={exp.num_autos}
                 initialCreate={shouldOpenNuevaTarea}
                 initialType={initialTareaType}
-                locked={exp?.estado === "cerrado"}
+                locked={exp?.estado === "cerrado" || exp?.estado === "archivado"}
               />
             )}
             {tab === "actuacion" && (
@@ -6040,13 +6076,13 @@ export default function ExpedienteDetail() {
                 juzgado={exp.juzgado}
                 numProc={exp.num_autos}
                 initialCreate={shouldOpenNuevaActuacion}
-                locked={exp?.estado === "cerrado"}
+                locked={exp?.estado === "cerrado" || exp?.estado === "archivado"}
               />
             )}
             {tab === "adjuntos" && (
               <TabAdjuntosExpediente
                 expedienteId={id!}
-                locked={exp?.estado === "cerrado"}
+                locked={exp?.estado === "cerrado" || exp?.estado === "archivado"}
               />
             )}
             {tab === "economico" && (() => {
@@ -6095,7 +6131,7 @@ export default function ExpedienteDetail() {
               return (
                 <div className="space-y-5">
                   {/* Apuntes contables */}
-                  <TabApuntesEconomicos expedienteId={id!} locked={exp?.estado === "cerrado"} />
+                  <TabApuntesEconomicos expedienteId={id!} locked={exp?.estado === "cerrado" || exp?.estado === "archivado"} />
 
                   {/* Divisor */}
                   <div className="flex items-center gap-3 pt-2">
@@ -6189,7 +6225,7 @@ export default function ExpedienteDetail() {
                 loading={notifLoading}
                 getToken={getToken}
                 onRefresh={() => setNotificaciones(null)}
-                locked={exp?.estado === "cerrado"}
+                locked={exp?.estado === "cerrado" || exp?.estado === "archivado"}
               />
             )}
 
@@ -6197,7 +6233,7 @@ export default function ExpedienteDetail() {
               <TabCorreoExpediente
                 expedienteId={id!}
                 expedienteRef={exp.ref_expediente || `${exp.anio}/${exp.num_exp}`}
-                locked={exp?.estado === "cerrado"}
+                locked={exp?.estado === "cerrado" || exp?.estado === "archivado"}
               />
             )}
 
@@ -6537,7 +6573,7 @@ export default function ExpedienteDetail() {
                         <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Eventos de agenda</h3>
                       </div>
                       <div className="flex items-center gap-2">
-                        {exp?.estado !== "cerrado" && (
+                        {exp?.estado !== "cerrado" && exp?.estado !== "archivado" && (
                           <button
                             onClick={() => {
                               const now = new Date();
@@ -6696,7 +6732,7 @@ export default function ExpedienteDetail() {
                       <div className="flex flex-col items-center justify-center py-12 gap-2 text-slate-300">
                         <Calendar size={28} className="opacity-30" />
                         <p className="text-sm font-medium text-slate-400">Sin eventos vinculados a este expediente</p>
-                        {exp?.estado !== "cerrado" && (
+                        {exp?.estado !== "cerrado" && exp?.estado !== "archivado" && (
                           <button onClick={() => setShowAgendaForm(true)} className="mt-1 text-xs font-bold text-red-500 hover:underline">
                             + Crear primer evento
                           </button>

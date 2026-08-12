@@ -5389,12 +5389,15 @@ export default function ExpedienteList() {
     }
   };
 
+  // Los archivados se ven aparte del listado normal (como una papelera), pero
+  // se comportan como un expediente cerrado mientras estén así: de solo
+  // lectura hasta que se desarchiven.
+  const showingArchived = filters.some(f => f.value.trim().toLowerCase().includes("archivado"));
+
   // ── Filtrado + ordenación ──────────────────────────────────────
-  // Los archivados se muestran en el listado igual que los cerrados -- son
-  // un estado más, no algo que haya que ocultar aparte ni ir a buscar a un
-  // sitio especial.
   const filtered = useMemo(() => {
     let rows = expedientes.filter(e => filters.every(f => matchesFilter(e, f.field, f.value)));
+    if (!showingArchived) rows = rows.filter(e => e.estado !== "archivado");
     rows = [...rows].sort((a, b) => {
       let av: any = a[sort] ?? ""; let bv: any = b[sort] ?? "";
       if (sort === "num_exp" || sort === "anio") { av = Number(av); bv = Number(bv); }
@@ -5494,6 +5497,8 @@ export default function ExpedienteList() {
 
   // ── Acciones toolbar ──────────────────────────────────────────
   const selectedExp = useMemo(() => expedientes.find(e => e.id === selected), [expedientes, selected]);
+  // Un expediente archivado es de solo lectura, igual que uno cerrado, hasta que se desarchiva.
+  const selectedExpLocked = selectedExp?.estado === "cerrado" || selectedExp?.estado === "archivado";
   const expedienteAvailableColumnItems = useMemo(
     () => EXPEDIENTE_LIST_COLUMNS.filter((column) => !visibleColumns[column.key]).map((column) => ({ key: column.key, label: column.label })),
     [visibleColumns]
@@ -6675,7 +6680,7 @@ export default function ExpedienteList() {
               {selectedExp?.estado === "archivado" && (
                 <ToolBtn icon={FolderOpen} label="Quitar de archivado" disabled={unarchiveSingleLoading} onClick={() => selected && handleUnarchiveSingle(selected)} />
               )}
-              <ToolBtn icon={Edit3} label="Modificar" disabled={!selected || selectedExp?.estado === "cerrado"} onClick={() => selected && selectedExp?.estado !== "cerrado" && navigate(`/dashboard/expedientes/${selected}?edit=1`)} />
+              <ToolBtn icon={Edit3} label="Modificar" disabled={!selected || selectedExpLocked} onClick={() => selected && !selectedExpLocked && navigate(`/dashboard/expedientes/${selected}?edit=1`)} />
 
               <div className="w-px h-5 bg-slate-200 mx-1" />
 
@@ -6703,12 +6708,12 @@ export default function ExpedienteList() {
 
               {/* Sign, Tareas, Asociar, Adjuntos */}
               <ToolBtn icon={PenLine} label="Sign" disabled={!selected} onClick={() => selected && navigate(`/dashboard/expedientes/${selected}#firma`)} />
-              <DropdownToolBtn icon={ClipboardList} label="Tareas" disabled={!selected || selectedExp?.estado === "cerrado"} items={[
+              <DropdownToolBtn icon={ClipboardList} label="Tareas" disabled={!selected || selectedExpLocked} items={[
                 { label: "Nueva actuación", icon: Activity, onClick: () => selected && navigate(`/dashboard/expedientes/${selected}?tab=actuacion&newActuacion=1`) },
                 { label: "Crear obligaciones", icon: ClipboardList, onClick: () => selected && navigate(`/dashboard/expedientes/${selected}?tab=tareas&newTarea=1&type=plazo_procesal`) },
               ]} />
               <ToolBtn icon={GitMerge} label="Asociar" disabled={!selectedExp} onClick={openRelacionarModal} />
-              <ToolBtn icon={Paperclip} label="Adjuntos" disabled={!selected || selectedExp?.estado === "cerrado"} onClick={() => selected && selectedExp?.estado !== "cerrado" && setShowAdjuntos(true)} />
+              <ToolBtn icon={Paperclip} label="Adjuntos" disabled={!selected || selectedExpLocked} onClick={() => selected && !selectedExpLocked && setShowAdjuntos(true)} />
 
               <div className="w-px h-5 bg-slate-200 mx-1" />
 
