@@ -4653,6 +4653,66 @@ export default function ExpedienteList() {
     } catch { /* ignore */ } finally { setUnarchiveLoading(false); }
   };
 
+  // Asociar en bloque: relaciona entre sí TODOS los expedientes marcados
+  // (cada par), en vez de tener que abrir el buscador uno por uno.
+  const [bulkAsociarLoading, setBulkAsociarLoading] = useState(false);
+  const handleBulkAsociar = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length < 2) return;
+    setBulkAsociarLoading(true);
+    try {
+      const token = await getToken({ skipCache: true });
+      const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+      const pairs: [string, string][] = [];
+      for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) pairs.push([ids[i], ids[j]]);
+      await Promise.all(pairs.map(([a, b]) =>
+        fetch(`/api/expedientes/${a}/related`, { method: "POST", headers, body: JSON.stringify({ related_expediente_id: b }) })
+      ));
+      setSelectedIds(new Set());
+    } catch { /* ignore */ } finally { setBulkAsociarLoading(false); }
+  };
+
+  // Tareas en bloque: crea la MISMA tarea (título + tipo) para cada
+  // expediente marcado, en vez de crearla en cada uno por separado. Cada
+  // expediente necesita cliente_id -- se avisa si alguno no lo tiene.
+  const [showBulkTareaForm, setShowBulkTareaForm] = useState(false);
+  const [bulkTareaTitulo, setBulkTareaTitulo] = useState("");
+  const [bulkTareaTipo, setBulkTareaTipo] = useState<"tarea" | "plazo">("tarea");
+  const [bulkTareaLoading, setBulkTareaLoading] = useState(false);
+  const [bulkTareaError, setBulkTareaError] = useState("");
+  const handleBulkCreateTarea = async () => {
+    const titulo = bulkTareaTitulo.trim();
+    if (!titulo) return;
+    const items = Array.from(selectedIds).map(id => expedientes.find(e => e.id === id)).filter(Boolean) as any[];
+    const withClient = items.filter(e => e.cliente_id);
+    if (!withClient.length) { setBulkTareaError("Ninguno de los expedientes marcados tiene un cliente asociado."); return; }
+    setBulkTareaLoading(true);
+    setBulkTareaError("");
+    try {
+      const token = await getToken({ skipCache: true });
+      const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+      await Promise.all(withClient.map(exp =>
+        fetch(`/api/tasks/client/${exp.cliente_id}`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            titulo,
+            tipo: bulkTareaTipo === "plazo" ? "plazo_procesal" : "tarea",
+            expediente_id: exp.id,
+            expediente: exp.ref_expediente || `${exp.anio}/${exp.num_exp}`,
+          }),
+        })
+      ));
+      setShowBulkTareaForm(false);
+      setBulkTareaTitulo("");
+      setSelectedIds(new Set());
+      if (withClient.length < items.length) {
+        alert(`Creada en ${withClient.length} de ${items.length}: ${items.length - withClient.length} no tienen cliente asociado.`);
+      }
+    } catch { setBulkTareaError("No se pudo crear la tarea en todos los expedientes."); }
+    finally { setBulkTareaLoading(false); }
+  };
+
   const handleBulkChangeState = async (estado: string) => {
     const ids = Array.from(selectedIds);
     setShowBulkStateMenu(false);
@@ -6739,13 +6799,17 @@ export default function ExpedienteList() {
 
               <div className="w-px h-5 bg-slate-200 mx-1" />
 
-              {/* Sign, Tareas, Asociar, Adjuntos */}
+              {/* Sign, Tareas, Asociar, Adjuntos -- Tareas/Asociar trabajan en bloque con 2+ marcados */}
               <ToolBtn icon={PenLine} label="Sign" disabled={!toolbarSelected} onClick={() => toolbarSelected && navigate(`/dashboard/expedientes/${toolbarSelected}#firma`)} />
-              <DropdownToolBtn icon={ClipboardList} label="Tareas" disabled={!toolbarSelected || selectedExpLocked} items={[
-                { label: "Nueva actuación", icon: Activity, onClick: () => toolbarSelected && navigate(`/dashboard/expedientes/${toolbarSelected}?tab=actuacion&newActuacion=1`) },
-                { label: "Crear obligaciones", icon: ClipboardList, onClick: () => toolbarSelected && navigate(`/dashboard/expedientes/${toolbarSelected}?tab=tareas&newTarea=1&type=plazo_procesal`) },
-              ]} />
-              <ToolBtn icon={GitMerge} label="Asociar" disabled={!selectedExp} onClick={openRelacionarModal} />
+              {selectedIds.size >= 2 ? (
+                <ToolBtn icon={ClipboardList} label={`Tareas (${selectedIds.size})`} onClick={() => setShowBulkTareaForm(true)} />
+              ) : (
+                <DropdownToolBtn icon={ClipboardList} label="Tareas" disabled={!toolbarSelected || selectedExpLocked} items={[
+                  { label: "Nueva actuación", icon: Activity, onClick: () => toolbarSelected && navigate(`/dashboard/expedientes/${toolbarSelected}?tab=actuacion&newActuacion=1`) },
+                  { label: "Crear obligaciones", icon: ClipboardList, onClick: () => toolbarSelected && navigate(`/dashboard/expedientes/${toolbarSelected}?tab=tareas&newTarea=1&type=plazo_procesal`) },
+                ]} />
+              )}
+              <ToolBtn icon={GitMerge} label={selectedIds.size >= 2 ? `Asociar ${selectedIds.size}` : "Asociar"} disabled={!selectedExp && selectedIds.size < 2} onClick={() => selectedIds.size >= 2 ? handleBulkAsociar() : openRelacionarModal()} />
               <ToolBtn icon={Paperclip} label="Adjuntos" disabled={!toolbarSelected || selectedExpLocked} onClick={() => toolbarSelected && !selectedExpLocked && setShowAdjuntos(true)} />
 
               <div className="w-px h-5 bg-slate-200 mx-1" />
@@ -7291,6 +7355,50 @@ export default function ExpedienteList() {
               </>
             }
           />
+
+          {/* ── Crear tarea en bloque (varios expedientes a la vez) ── */}
+          <Modal
+            open={showBulkTareaForm}
+            onClose={() => { setShowBulkTareaForm(false); setBulkTareaError(""); }}
+            variant="confirm"
+            icon={<ClipboardList size={18} />}
+            title={`Crear tarea en ${selectedIds.size} expedientes`}
+            subtitle="Se crea la misma tarea en cada uno de los expedientes marcados."
+            zIndex={9999}
+            footer={
+              <>
+                <button onClick={() => { setShowBulkTareaForm(false); setBulkTareaError(""); }} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
+                <button onClick={handleBulkCreateTarea} disabled={!bulkTareaTitulo.trim() || bulkTareaLoading}
+                  className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-lg active:scale-95">
+                  {bulkTareaLoading ? <Loader2 size={12} className="animate-spin" /> : <ClipboardList size={12} />}
+                  Crear
+                </button>
+              </>
+            }
+          >
+            <div className="space-y-3">
+              <label className="block">
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Título</span>
+                <input
+                  autoFocus
+                  value={bulkTareaTitulo}
+                  onChange={e => setBulkTareaTitulo(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter" && bulkTareaTitulo.trim()) handleBulkCreateTarea(); }}
+                  placeholder="Ej. Revisar plazo de contestación"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-red-400"
+                />
+              </label>
+              <label className="block">
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Tipo</span>
+                <select value={bulkTareaTipo} onChange={e => setBulkTareaTipo(e.target.value as "tarea" | "plazo")}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-red-400 bg-white">
+                  <option value="tarea">Tarea</option>
+                  <option value="plazo">Plazo procesal</option>
+                </select>
+              </label>
+              {bulkTareaError && <p className="text-xs text-red-600">{bulkTareaError}</p>}
+            </div>
+          </Modal>
 
           {viewMode === "detail" && (
             <div className="overflow-auto flex-1 p-4">
