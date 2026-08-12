@@ -6846,6 +6846,7 @@ export default function ExpedienteList() {
               {selectedExp?.estado === "archivado" && (
                 <ToolBtn icon={FolderOpen} label="Quitar de archivado" disabled={unarchiveSingleLoading} onClick={() => toolbarSelected && handleUnarchiveSingle(toolbarSelected)} />
               )}
+              <ToolBtn icon={ExternalLink} label="Abrir" disabled={!toolbarSelected} onClick={() => toolbarSelected && navigate(`/dashboard/expedientes/${toolbarSelected}`)} />
               <ToolBtn icon={Edit3} label="Modificar" disabled={!toolbarSelected || selectedExpLocked} onClick={() => toolbarSelected && !selectedExpLocked && navigate(`/dashboard/expedientes/${toolbarSelected}?edit=1`)} />
               <ToolBtn icon={Copy} label={duplicateTargets.length > 1 ? `Duplicar ${duplicateTargets.length}` : "Duplicar"} disabled={!duplicateTargets.length}
                 onClick={() => setDuplicateConfirm(true)} />

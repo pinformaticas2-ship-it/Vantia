@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import pool from '../config/database';
 import { TEMP_ROOT, UPLOADS_CLIENTS_ROOT as CLIENT_UPLOADS_ROOT } from '../config/paths';
 import { logActivity, logActivityForReq, resolveUserName } from './activityController';
+import { setFlagsFromString } from 'v8';
 
 const LIBREOFFICE_ENABLED =
   String(process.env.ENABLE_LIBREOFFICE_PREVIEW || "true").trim().toLowerCase() !== "false";
@@ -1231,6 +1232,7 @@ export const getIndicators = async (req: any, res: Response) => {
         tareas_pendientes:  Number(t.tareas_pendientes),
         tareas_urgentes:    Number(t.tareas_urgentes),
         tareas_vencidas:    Number(t.tareas_vencidas),
+        
         tareas_completadas: Number(t.tareas_completadas),
         total_archivos:     Number(filesQ.rows[0].total_archivos),
         total_notas:        Number(notesQ.rows[0].total_notas),
@@ -1396,7 +1398,7 @@ export const reorderEtapas = async (req: any, res: Response) => {
   if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'ids es obligatorio' });
   const client = await pool.connect();
   try {
-    await client.query('BEGIN');
+    await client.query('BEGIN'); 
     for (let i = 0; i < ids.length; i++) {
       await client.query(`UPDATE task_etapas SET orden = $1 WHERE id = $2`, [i, ids[i]]);
     }
