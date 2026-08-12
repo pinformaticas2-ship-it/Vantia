@@ -54,9 +54,15 @@ function moduleInstructions(moduleId: string): string {
 }
 
 // ── Contexto dinámico por entidad en pantalla ─────────────────────────────────
-async function buildEntityContext(moduleId: string, userId: string, organizacionId: string): Promise<string> {
+// `linkedExpedienteId` es distinto de la detección automática por URL: lo manda
+// explícitamente el frontend cuando el usuario vincula un expediente a mano a
+// una conversación de Chat IA independiente (que no vive bajo /expedientes/,
+// así que la detección por moduleId nunca lo encontraría por sí sola).
+async function buildEntityContext(moduleId: string, userId: string, organizacionId: string, linkedExpedienteId?: string | null): Promise<string> {
   const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
   const entityId = UUID_RE.exec(moduleId)?.[0];
+  const autoExpedienteId = entityId && moduleId.includes('/expedientes/') ? entityId : null;
+  const expedienteId = autoExpedienteId || linkedExpedienteId || null;
   const lines: string[] = [];
 
   try {
@@ -85,15 +91,15 @@ async function buildEntityContext(moduleId: string, userId: string, organizacion
       }
     }
 
-    // ── Entidad expediente ───────────────────────────────────────────────────
-    if (entityId && moduleId.includes('/expedientes/')) {
+    // ── Entidad expediente (en pantalla o vinculado a mano al chat) ─────────
+    if (expedienteId) {
       const [eRes, statsRes] = await Promise.all([
         pool.query(
           `SELECT e.anio, e.num_exp, e.descripcion, e.estado, e.fecha_inicio, e.fecha_cierre,
                   ent.commercial_name, ent.first_name, ent.last_name
            FROM expedientes e
            LEFT JOIN entities ent ON e.cliente_id = ent.id
-           WHERE e.id=$1 AND e.organizacion_id=$2`, [entityId, organizacionId]
+           WHERE e.id=$1 AND e.organizacion_id=$2`, [expedienteId, organizacionId]
         ),
         pool.query(
           `SELECT
@@ -103,14 +109,15 @@ async function buildEntityContext(moduleId: string, userId: string, organizacion
              (SELECT COUNT(*)::int FROM client_tasks WHERE expediente_id=$1 AND plazo<NOW() AND estado!='completada') AS vencidas,
              (SELECT COUNT(*)::int FROM client_files WHERE client_id=$1)                              AS archivos,
              (SELECT COUNT(*)::int FROM notes WHERE expediente_id=$1)                                 AS notas`,
-          [entityId]
+          [expedienteId]
         ),
       ]);
       if (eRes.rows.length) {
         const e  = eRes.rows[0];
         const s  = statsRes.rows[0];
         const cn = e.commercial_name || `${e.first_name || ''} ${e.last_name || ''}`.trim();
-        lines.push(`ENTIDAD EN PANTALLA → Expediente ${e.anio}/${e.num_exp} (${e.estado}) | Descripción: "${e.descripcion || 'Sin descripción'}" | Cliente: ${cn || '—'} | Inicio: ${e.fecha_inicio ? new Date(e.fecha_inicio).toLocaleDateString('es-ES') : '—'}${e.fecha_cierre ? ` | Cierre: ${new Date(e.fecha_cierre).toLocaleDateString('es-ES')}` : ''}`);
+        const tag = autoExpedienteId ? 'ENTIDAD EN PANTALLA' : 'EXPEDIENTE VINCULADO A ESTA CONVERSACIÓN';
+        lines.push(`${tag} → Expediente ${e.anio}/${e.num_exp} (${e.estado}) | Descripción: "${e.descripcion || 'Sin descripción'}" | Cliente: ${cn || '—'} | Inicio: ${e.fecha_inicio ? new Date(e.fecha_inicio).toLocaleDateString('es-ES') : '—'}${e.fecha_cierre ? ` | Cierre: ${new Date(e.fecha_cierre).toLocaleDateString('es-ES')}` : ''}`);
         lines.push(`Resumen: ${s.urgentes} tarea(s) urgente(s), ${s.pendientes} pendiente(s), ${s.vencidas} vencida(s), ${s.completadas} completada(s), ${s.archivos} archivo(s), ${s.notas} nota(s).`);
       }
     }
@@ -300,6 +307,24 @@ const TOOLS = [{
     },
   ],
 }];
+
+// ── Etiquetas en español de cada herramienta, para mostrar en el frontend
+// mientras VantIA está consultando datos reales (p.ej. "Buscando clientes…") ──
+const TOOL_LABELS: Record<string, string> = {
+  estadisticas_generales: 'Consultando estadísticas del despacho…',
+  buscar_clientes:        'Buscando clientes…',
+  listar_clientes:        'Consultando listado de clientes…',
+  expedientes_cliente:    'Consultando expedientes del cliente…',
+  listar_expedientes:     'Consultando expedientes…',
+  obtener_tareas:         'Consultando tareas…',
+  listar_facturas:        'Consultando facturas…',
+  listar_gastos:          'Consultando gastos…',
+  listar_presupuestos:    'Consultando presupuestos…',
+  agenda_proxima:         'Consultando la agenda…',
+  buscar_notas:           'Buscando notas…',
+  tareas_expediente:      'Consultando tareas del expediente…',
+  archivos_expediente:    'Consultando archivos del expediente…',
+};
 
 // ── Dispatcher de herramientas ────────────────────────────────────────────────
 async function callTool(name: string, args: Record<string, any>, userId: string, organizacionId: string): Promise<object> {
@@ -768,5 +793,198 @@ export const chatVantia = async (req: any, res: Response) => {
     const msg = error?.message || String(error);
     console.error('❌ VantIA error:', msg);
     res.status(500).json({ success: false, error: msg });
+  }
+};
+
+// ── Streaming real de Gemini (SSE) ──────────────────────────────────────────
+// La API de Gemini, con `alt=sse`, va mandando el texto en fragmentos que hay
+// que ir concatenando (no manda el texto acumulado, sino solo lo nuevo de
+// cada fragmento). Esta función lee el cuerpo de la respuesta a mano (no hay
+// cliente oficial en uso aquí, todo va por `fetch` crudo) y va entregando
+// cada objeto JSON de cada evento `data: ...` según llega.
+async function* geminiStreamChunks(url: string, body: any): AsyncGenerator<any> {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok || !res.body) {
+    const err: any = await res.json().catch(() => ({}));
+    throw new Error(err?.error?.message || `HTTP ${res.status}`);
+  }
+  const reader  = res.body.getReader();
+  const decoder = new TextDecoder('utf-8');
+  let buffer = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let sep: number;
+    while ((sep = buffer.indexOf('\n\n')) !== -1) {
+      const rawEvent = buffer.slice(0, sep);
+      buffer = buffer.slice(sep + 2);
+      const dataLine = rawEvent.split('\n').find(l => l.startsWith('data:'));
+      if (!dataLine) continue;
+      const jsonStr = dataLine.slice(5).trim();
+      if (!jsonStr) continue;
+      try { yield JSON.parse(jsonStr); } catch { /* fragmento incompleto o basura -- se ignora */ }
+    }
+  }
+}
+
+// ── POST /api/vantia/chat/stream ── versión con streaming real (SSE) + avisos
+// de uso de herramientas en vivo, usada por la página Chat IA. El widget
+// flotante sigue en /chat (sin streaming) para no tocar ese componente aparte.
+export const chatVantiaStream = async (req: any, res: Response) => {
+  const {
+    message,
+    history  = [],
+    moduleId,
+    linkedExpedienteId,
+  }: { message: string; history: any[]; moduleId: string; linkedExpedienteId?: string } = req.body;
+
+  const userId = req.auth?.userId;
+
+  if (!message?.trim())     return res.status(400).json({ success: false, error: 'El mensaje no puede estar vacío.' });
+  if (!userId || !moduleId) return res.status(400).json({ success: false, error: 'Falta userId o moduleId.' });
+
+  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+  if (!apiKey) return res.status(503).json({ success: false, error: 'VantIA no está configurada. Añade GEMINI_API_KEY al .env del backend.' });
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream; charset=utf-8',
+    'Cache-Control': 'no-cache, no-transform',
+    'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no', // evita que un proxy intermedio (nginx, etc.) bufferee el stream
+  });
+  const emit = (obj: object) => { res.write(`data: ${JSON.stringify(obj)}\n\n`); };
+
+  let closed = false;
+  req.on('close', () => { closed = true; });
+
+  try {
+    const entityCtx = await buildEntityContext(moduleId, userId, req.organizacionId, linkedExpedienteId);
+    const fullSystemPrompt = BASE_PROMPT + '\n\n' + moduleInstructions(moduleId) + entityCtx;
+
+    const cleanHistory: any[] = [...history];
+    while (cleanHistory.length > 0 && cleanHistory[0].role === 'model') cleanHistory.shift();
+
+    const contents: any[] = [
+      { role: 'user',  parts: [{ text: fullSystemPrompt }] },
+      { role: 'model', parts: [{ text: 'Entendido. Soy VantIA, listo para ayudarte.' }] },
+      ...cleanHistory.map((h: any) => ({ role: h.role, parts: [{ text: h.text }] })),
+      { role: 'user', parts: [{ text: message }] },
+    ];
+
+    let fullReply = '';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:streamGenerateContent?alt=sse&key=${apiKey}`;
+
+    for (let round = 0; round < MAX_TOOL_ROUNDS && !closed; round++) {
+      const roundParts: any[] = [];
+
+      for await (const chunk of geminiStreamChunks(url, {
+        contents,
+        tools: TOOLS,
+        generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },
+      })) {
+        if (closed) break;
+        const parts: any[] = chunk?.candidates?.[0]?.content?.parts || [];
+        for (const p of parts) {
+          roundParts.push(p);
+          if (p.text) {
+            fullReply += p.text;
+            emit({ type: 'text', delta: p.text });
+          }
+        }
+      }
+      if (closed) break;
+
+      const fnCalls = roundParts.filter(p => p.functionCall);
+      if (fnCalls.length === 0) break; // ronda final: ya no pide más herramientas
+
+      console.log(`🤖 VantIA (stream) ronda ${round + 1}: ${fnCalls.map((f: any) => f.functionCall.name).join(', ')}`);
+
+      const toolResults: { name: string; result: object }[] = [];
+      for (const part of fnCalls) {
+        if (closed) break;
+        const { name, args } = part.functionCall;
+        emit({ type: 'tool_start', name, label: TOOL_LABELS[name] || `Consultando ${name}…` });
+        const result = await callTool(name, args ?? {}, userId, req.organizacionId);
+        toolResults.push({ name, result });
+        emit({ type: 'tool_end', name });
+      }
+
+      contents.push({ role: 'model', parts: roundParts.length ? roundParts : [{ text: '' }] });
+      contents.push({
+        role: 'user',
+        parts: toolResults.map(tr => ({ functionResponse: { name: tr.name, response: tr.result } })),
+      });
+    }
+
+    if (!fullReply) fullReply = 'He procesado la consulta pero no pude generar una respuesta. Inténtalo de nuevo.';
+
+    if (!closed) {
+      emit({ type: 'done', reply: fullReply });
+      res.end();
+    }
+
+    // Guardar historial en segundo plano, igual que en /chat
+    const isChatIa = moduleId.startsWith('chat-ia:');
+    const autoTitle = (isChatIa && history.length === 0) ? message.slice(0, 100) : null;
+    pool.query(
+      `INSERT INTO vantia_chat_history (user_id, module_id, history, title)
+       VALUES ($1,$2,$3,$4)
+       ON CONFLICT (user_id, module_id) DO UPDATE SET
+         history = EXCLUDED.history,
+         updated_at = NOW(),
+         title = COALESCE(vantia_chat_history.title, EXCLUDED.title)`,
+      [userId, moduleId, JSON.stringify([
+        ...history,
+        { role: 'user',  text: message },
+        { role: 'model', text: fullReply },
+      ]), autoTitle]
+    ).catch(() => {});
+
+  } catch (error: any) {
+    const msg = error?.message || String(error);
+    console.error('❌ VantIA stream error:', msg);
+    if (!closed) {
+      emit({ type: 'error', message: msg });
+      res.end();
+    }
+  }
+};
+
+// ── POST /api/vantia/feedback ── 👍/👎 sobre una respuesta concreta de VantIA.
+// Guarda un único voto por (usuario, conversación, índice de mensaje); mandar
+// rating:null borra el voto (el frontend lo usa para "deshacer" un clic).
+export const submitFeedback = async (req: any, res: Response) => {
+  const { moduleId, messageIndex, rating, messageExcerpt } = req.body as {
+    moduleId?: string; messageIndex?: number; rating?: 'up' | 'down'; messageExcerpt?: string;
+  };
+  const userId = req.auth?.userId;
+  if (!userId) return res.status(401).json({ success: false });
+  if (!moduleId || typeof messageIndex !== 'number' || (rating !== 'up' && rating !== 'down' && rating !== null)) {
+    return res.status(400).json({ success: false, error: 'Parámetros inválidos.' });
+  }
+  try {
+    if (rating === null) {
+      await pool.query(
+        `DELETE FROM vantia_message_feedback WHERE user_id=$1 AND module_id=$2 AND message_index=$3`,
+        [userId, moduleId, messageIndex]
+      );
+      return res.json({ success: true, rating: null });
+    }
+    await pool.query(
+      `INSERT INTO vantia_message_feedback (user_id, module_id, message_index, rating, message_excerpt)
+       VALUES ($1,$2,$3,$4,$5)
+       ON CONFLICT (user_id, module_id, message_index) DO UPDATE SET
+         rating = EXCLUDED.rating, message_excerpt = EXCLUDED.message_excerpt, created_at = NOW()`,
+      [userId, moduleId, messageIndex, rating, (messageExcerpt || '').slice(0, 500)]
+    );
+    res.json({ success: true, rating });
+  } catch (err: any) {
+    console.error('❌ Error guardando feedback de VantIA:', err?.message);
+    res.status(500).json({ success: false, error: 'Error interno del servidor.' });
   }
 };

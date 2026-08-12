@@ -1732,6 +1732,25 @@ export async function runMigrations(): Promise<void> {
       try { await client.query(col); } catch (_e: any) {}
     }
 
+    // ── Feedback (👍/👎) sobre respuestas de VantIA ─────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS vantia_message_feedback (
+        id              UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id         VARCHAR(150) NOT NULL,
+        module_id       VARCHAR(255) NOT NULL,
+        message_index   INTEGER      NOT NULL,
+        rating          VARCHAR(10)  NOT NULL CHECK (rating IN ('up','down')),
+        message_excerpt TEXT,
+        created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      );
+    `);
+    try {
+      await client.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_vantia_feedback_unique
+        ON vantia_message_feedback (user_id, module_id, message_index);
+      `);
+    } catch (_e: any) {}
+
     // VACUUM ANALYZE para mantener las estadísticas de consulta frescas
     try {
       await client.query(`ANALYZE entities;`);

@@ -3,6 +3,7 @@ import { useAuth, useUser } from '@clerk/clerk-react';
 import {
   Plus, Trash2, Copy, RotateCcw, ThumbsUp, ThumbsDown,
   Paperclip, Link2, Send, MessageSquare, Sparkles, MoreHorizontal, Loader2,
+  Check, X, Search, StopCircle, Download, FileText,
 } from 'lucide-react';
 import { resolveApiUrl } from '../lib/api';
 
@@ -54,10 +55,25 @@ interface Conversation {
   updated_at: string;
 }
 
+interface ToolEvent {
+  name: string;
+  label: string;
+  done: boolean;
+}
+
+interface LinkedExpedienteRef {
+  id: string;
+  ref: string;
+  descripcion?: string | null;
+}
+
 interface Message {
   role: 'user' | 'model';
   text: string;
   ts: Date;
+  toolEvents?: ToolEvent[];       // solo mensajes de VantIA en curso/recién generados
+  attachmentName?: string;        // solo mensajes de usuario con archivo adjunto
+  linkedExpediente?: LinkedExpedienteRef; // solo mensajes de usuario con expediente vinculado
 }
 
 // ─── Markdown renderer ────────────────────────────────────────────────────────
@@ -138,6 +154,38 @@ function ShimmerLine({ w = 'w-full', h = 'h-4' }: { w?: string; h?: string }) {
   return <div className={`${w} ${h} rounded-lg cia-shimmer`} />;
 }
 
+// ─── Puntos de "escribiendo…" (se usan mientras el streaming aún no ha
+// entregado el primer fragmento de texto) ──────────────────────────────────
+function TypingDots() {
+  return (
+    <span className="inline-flex items-center gap-1 py-1.5">
+      {[0, 1, 2].map(i => (
+        <span
+          key={i}
+          className="h-1.5 w-1.5 rounded-full bg-red-300 cia-wave-dot"
+          style={{ animationDelay: `${i * 0.15}s` }}
+        />
+      ))}
+    </span>
+  );
+}
+
+// ─── Aviso en vivo de que VantIA está usando una herramienta (consultando
+// datos reales del despacho) — pasa de "en curso" a "hecho" según llegan los
+// eventos tool_start/tool_end del streaming ─────────────────────────────────
+function ToolPill({ label, done }: { label: string; done: boolean }) {
+  return (
+    <div
+      className={`cia-fade-up inline-flex items-center gap-1.5 text-[11px] font-medium rounded-full px-2.5 py-1 w-fit transition-colors duration-300 ${
+        done ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'
+      }`}
+    >
+      {done ? <Check className="h-3 w-3" /> : <Loader2 className="h-3 w-3 cia-spin" />}
+      {label}
+    </div>
+  );
+}
+
 // ─── Suggestion prompts ───────────────────────────────────────────────────────
 
 const PROMPTS = [
@@ -165,27 +213,94 @@ export default function ChatIA() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [copiedIdx,      setCopiedIdx]      = useState<number | null>(null);
   const [deletingId,     setDeletingId]     = useState<string | null>(null);
+  const [feedback,       setFeedback]       = useState<Record<number, 'up' | 'down'>>({});
+
+  // Adjuntar archivo de texto a la conversación
+  const [attachedFile, setAttachedFile] = useState<{ name: string; content: string } | null>(null);
+  const [attachError,  setAttachError]  = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Vincular un expediente a la conversación (le da a VantIA su contexto real)
+  const [linkedExpediente, setLinkedExpediente] = useState<LinkedExpedienteRef | null>(null);
+  const [showLinkPicker,   setShowLinkPicker]   = useState(false);
+  const [linkQuery,        setLinkQuery]        = useState('');
+  const [linkResults,      setLinkResults]      = useState<LinkedExpedienteRef[]>([]);
+  const [linkSearching,    setLinkSearching]    = useState(false);
+  const linkPickerRef = useRef<HTMLDivElement>(null);
+
+  // Menú "···" del topbar
+  const [showTopMenu, setShowTopMenu] = useState(false);
+  const topMenuRef = useRef<HTMLDivElement>(null);
 
   const bottomRef   = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const revealTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const streamAbortRef = useRef<AbortController | null>(null);
 
-  // Efecto "máquina de escribir": revela el texto ya recibido poco a poco en
-  // vez de volcarlo de golpe, igual que en el widget flotante de VantIA.
-  useEffect(() => () => { if (revealTimerRef.current) clearInterval(revealTimerRef.current); }, []);
-  const streamReveal = (idx: number, fullText: string): Promise<void> =>
-    new Promise((resolve) => {
-      if (revealTimerRef.current) clearInterval(revealTimerRef.current);
-      let pos = 0;
-      revealTimerRef.current = setInterval(() => {
-        pos = Math.min(pos + 3, fullText.length);
-        setMessages(prev => prev.map((m, i) => (i === idx ? { ...m, text: fullText.slice(0, pos) } : m)));
-        if (pos >= fullText.length) {
-          if (revealTimerRef.current) { clearInterval(revealTimerRef.current); revealTimerRef.current = null; }
-          resolve();
-        }
-      }, 18);
+  // ── Streaming real ──────────────────────────────────────────────────────────
+  // Consume el SSE de /api/vantia/chat/stream y va actualizando en vivo el
+  // mensaje en `targetIdx`: texto según llega token a token, y una pill por
+  // cada herramienta que VantIA use mientras consulta datos reales.
+  const streamChat = async (
+    text: string,
+    historyToSend: { role: string; text: string }[],
+    moduleId: string,
+    targetIdx: number,
+    expedienteId?: string,
+  ): Promise<string> => {
+    const token = await getToken();
+    const controller = new AbortController();
+    streamAbortRef.current = controller;
+
+    const res = await fetch(resolveApiUrl('/api/vantia/chat/stream'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ message: text, history: historyToSend, moduleId, linkedExpedienteId: expedienteId }),
+      signal: controller.signal,
     });
+    if (!res.ok || !res.body) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || `HTTP ${res.status}`);
+    }
+
+    const reader  = res.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+    let finalReply = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let sep: number;
+      while ((sep = buffer.indexOf('\n\n')) !== -1) {
+        const rawEvent = buffer.slice(0, sep);
+        buffer = buffer.slice(sep + 2);
+        const dataLine = rawEvent.split('\n').find(l => l.startsWith('data:'));
+        if (!dataLine) continue;
+        const jsonStr = dataLine.slice(5).trim();
+        if (!jsonStr) continue;
+        let evt: any;
+        try { evt = JSON.parse(jsonStr); } catch { continue; }
+
+        if (evt.type === 'text') {
+          setMessages(prev => prev.map((m, i) => (i === targetIdx ? { ...m, text: m.text + evt.delta } : m)));
+        } else if (evt.type === 'tool_start') {
+          setMessages(prev => prev.map((m, i) => (i === targetIdx
+            ? { ...m, toolEvents: [...(m.toolEvents || []), { name: evt.name, label: evt.label, done: false }] }
+            : m)));
+        } else if (evt.type === 'tool_end') {
+          setMessages(prev => prev.map((m, i) => (i === targetIdx
+            ? { ...m, toolEvents: (m.toolEvents || []).map(te => (te.name === evt.name && !te.done ? { ...te, done: true } : te)) }
+            : m)));
+        } else if (evt.type === 'done') {
+          finalReply = evt.reply;
+        } else if (evt.type === 'error') {
+          throw new Error(evt.message || 'Error al generar la respuesta.');
+        }
+      }
+    }
+    return finalReply;
+  };
 
   // ── Load conversations ──────────────────────────────────────────────────────
 
@@ -228,6 +343,9 @@ export default function ChatIA() {
     setActiveModuleId(conv.module_id);
     setActiveId(conv.id);
     setMessages([]);
+    setFeedback({});
+    setLinkedExpediente(null);
+    setAttachedFile(null);
     setHistoryLoading(true);
     try {
       const token = await getToken();
@@ -251,6 +369,9 @@ export default function ChatIA() {
     setActiveModuleId(moduleId);
     setActiveId(null);
     setMessages([]);
+    setFeedback({});
+    setLinkedExpediente(null);
+    setAttachedFile(null);
     if (prefillText) setInput(prefillText);
     setTimeout(() => textareaRef.current?.focus(), 50);
   };
@@ -270,77 +391,181 @@ export default function ChatIA() {
     } catch { /**/ } finally { setDeletingId(null); }
   };
 
+  // ── Attach text file ────────────────────────────────────────────────────────
+
+  const ATTACHMENT_ACCEPT = '.txt,.md,.markdown,.csv,.json,.log,.yml,.yaml';
+  const MAX_ATTACHMENT_BYTES = 200_000; // de sobra para dar contexto de texto plano
+
+  const onFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // permite volver a elegir el mismo archivo después
+    if (!file) return;
+    setAttachError(null);
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      setAttachError(`"${file.name}" pesa demasiado (máx. ${Math.round(MAX_ATTACHMENT_BYTES / 1000)} KB de texto).`);
+      setTimeout(() => setAttachError(null), 4000);
+      return;
+    }
+    try {
+      const content = await file.text();
+      setAttachedFile({ name: file.name, content });
+    } catch {
+      setAttachError(`No se pudo leer "${file.name}".`);
+      setTimeout(() => setAttachError(null), 4000);
+    }
+  };
+
+  // ── Link an expediente to the conversation ──────────────────────────────────
+
+  useEffect(() => {
+    if (!showLinkPicker) return;
+    const h = (e: MouseEvent) => { if (linkPickerRef.current && !linkPickerRef.current.contains(e.target as Node)) setShowLinkPicker(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [showLinkPicker]);
+
+  useEffect(() => {
+    if (!showLinkPicker) return;
+    const t = setTimeout(async () => {
+      setLinkSearching(true);
+      try {
+        const token = await getToken();
+        const q     = linkQuery.trim();
+        const res   = await fetch(
+          resolveApiUrl(`/api/expedientes?limit=8${q ? `&q=${encodeURIComponent(q)}` : ''}`),
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        const data  = await res.json();
+        setLinkResults((data.data || []).map((e: any) => ({
+          id: e.id, ref: `${e.anio}/${e.num_exp}`, descripcion: e.descripcion,
+        })));
+      } catch { setLinkResults([]); } finally { setLinkSearching(false); }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [linkQuery, showLinkPicker, getToken]);
+
+  const selectLinkedExpediente = (exp: LinkedExpedienteRef) => {
+    setLinkedExpediente(exp);
+    setShowLinkPicker(false);
+    setLinkQuery('');
+  };
+
+  // ── Feedback (👍/👎) ─────────────────────────────────────────────────────────
+
+  const rateMessage = async (idx: number, rating: 'up' | 'down') => {
+    const next: 'up' | 'down' | null = feedback[idx] === rating ? null : rating;
+    setFeedback(prev => {
+      const copy = { ...prev };
+      if (next) copy[idx] = next; else delete copy[idx];
+      return copy;
+    });
+    try {
+      const token = await getToken();
+      await fetch(resolveApiUrl('/api/vantia/feedback'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ moduleId: activeModuleId, messageIndex: idx, rating: next, messageExcerpt: messages[idx]?.text.slice(0, 300) }),
+      });
+    } catch { /* mejor esfuerzo -- no bloquea la UI si falla */ }
+  };
+
+  // ── Topbar menu: export / delete current conversation ───────────────────────
+
+  useEffect(() => {
+    if (!showTopMenu) return;
+    const h = (e: MouseEvent) => { if (topMenuRef.current && !topMenuRef.current.contains(e.target as Node)) setShowTopMenu(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [showTopMenu]);
+
+  const exportConversation = () => {
+    const text = messages.map(m => `${m.role === 'user' ? 'Tú' : 'VantIA'}: ${m.text}`).join('\n\n');
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = `vantia-chat-${new Date().toISOString().slice(0, 10)}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setShowTopMenu(false);
+  };
+
+  const deleteCurrentConversation = async () => {
+    setShowTopMenu(false);
+    if (!activeId) { setActiveModuleId(null); setMessages([]); return; }
+    const conv = conversations.find(c => c.id === activeId);
+    if (!conv) return;
+    await handleDelete(conv, { stopPropagation() {} } as React.MouseEvent);
+  };
+
   // ── Send message ────────────────────────────────────────────────────────────
 
   const sendMessage = async () => {
     const text = input.trim();
-    if (!text || sending) return;
+    if ((!text && !attachedFile) || sending) return;
 
     let moduleId = activeModuleId;
     if (!moduleId) { moduleId = `chat-ia:${crypto.randomUUID()}`; setActiveModuleId(moduleId); }
 
     const isNew         = messages.length === 0;
     const historyToSend = messages.map(m => ({ role: m.role, text: m.text }));
-    const newHistory: Message[] = [...messages, { role: 'user', text, ts: new Date() }];
 
-    setMessages(newHistory);
+    // Lo que se manda a VantIA puede incluir el contenido del archivo adjunto;
+    // el usuario en pantalla solo ve su texto + una chip con el nombre del fichero.
+    const messageForApi = attachedFile
+      ? `Archivo adjunto "${attachedFile.name}":\n\`\`\`\n${attachedFile.content}\n\`\`\`\n\n${text || 'Analiza este archivo.'}`
+      : text;
+
+    const userMsg: Message = {
+      role: 'user',
+      text: text || `Archivo adjunto: ${attachedFile?.name}`,
+      ts: new Date(),
+      attachmentName: attachedFile?.name,
+      linkedExpediente: linkedExpediente || undefined,
+    };
+    const newHistory: Message[] = [...messages, userMsg];
+    const targetIdx = newHistory.length;
+
+    setMessages([...newHistory, { role: 'model', text: '', ts: new Date(), toolEvents: [] }]);
     setInput('');
+    setAttachedFile(null);
     setSending(true);
 
     try {
-      const token = await getToken();
-      const res   = await fetch(resolveApiUrl('/api/vantia/chat'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ message: text, history: historyToSend, moduleId }),
-      });
-      const data = await res.json();
-
-      if (data.success) {
-        const idx = newHistory.length;
-        setMessages([...newHistory, { role: 'model', text: '', ts: new Date() }]);
-        setSending(false);
-
-        if (isNew) {
-          const stub: Conversation = {
-            id: '', module_id: moduleId!, title: text.slice(0,100),
-            first_message: text, updated_at: new Date().toISOString(),
-          };
-          setConversations(prev => [stub, ...prev]);
-          setTimeout(async () => {
-            const tok = await getToken();
-            const r   = await fetch(resolveApiUrl('/api/vantia/conversations'), { headers: { Authorization: `Bearer ${tok}` } });
-            const d   = await r.json();
-            if (d.success) {
-              setConversations(d.conversations);
-              const found = (d.conversations as Conversation[]).find(c => c.module_id === moduleId);
-              if (found) setActiveId(found.id);
-            }
-          }, 700);
-        } else {
-          setConversations(prev => prev.map(c =>
-            c.module_id === moduleId ? { ...c, updated_at: new Date().toISOString() } : c
-          ));
-        }
-
-        await streamReveal(idx, data.reply);
-      } else {
-        setMessages(prev => [...prev, {
-          role: 'model',
-          text: `⚠️ Error: ${data.error || 'No se pudo obtener respuesta.'}`,
-          ts: new Date(),
-        }]);
-        setSending(false);
-      }
-    } catch {
-      setMessages(prev => [...prev, {
-        role: 'model',
-        text: '⚠️ Error de conexión. Comprueba tu red e inténtalo de nuevo.',
-        ts: new Date(),
-      }]);
+      const reply = await streamChat(messageForApi, historyToSend, moduleId, targetIdx, linkedExpediente?.id);
       setSending(false);
+      if (reply) setMessages(prev => prev.map((m, i) => (i === targetIdx ? { ...m, text: reply } : m)));
+
+      if (isNew) {
+        const stub: Conversation = {
+          id: '', module_id: moduleId!, title: text.slice(0,100) || attachedFile?.name || 'Nueva conversación',
+          first_message: text, updated_at: new Date().toISOString(),
+        };
+        setConversations(prev => [stub, ...prev]);
+        setTimeout(async () => {
+          const tok = await getToken();
+          const r   = await fetch(resolveApiUrl('/api/vantia/conversations'), { headers: { Authorization: `Bearer ${tok}` } });
+          const d   = await r.json();
+          if (d.success) {
+            setConversations(d.conversations);
+            const found = (d.conversations as Conversation[]).find(c => c.module_id === moduleId);
+            if (found) setActiveId(found.id);
+          }
+        }, 700);
+      } else {
+        setConversations(prev => prev.map(c =>
+          c.module_id === moduleId ? { ...c, updated_at: new Date().toISOString() } : c
+        ));
+      }
+    } catch (err: any) {
+      setSending(false);
+      if (err?.name === 'AbortError') return; // detenido a mano: se deja el texto parcial tal cual
+      setMessages(prev => prev.map((m, i) => (i === targetIdx
+        ? { ...m, text: `⚠️ Error: ${err?.message || 'No se pudo obtener respuesta.'}`, toolEvents: [] }
+        : m)));
     }
   };
+
+  const abortStreaming = () => streamAbortRef.current?.abort();
 
   const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
@@ -354,30 +579,25 @@ export default function ChatIA() {
   };
 
   const regenerate = async () => {
-    if (messages.length < 2 || sending) return;
+    if (messages.length < 2 || sending || !activeModuleId) return;
     const lastUser = [...messages].reverse().find(m => m.role === 'user');
     if (!lastUser) return;
     const histWoLast = messages.slice(0,-2).map(m => ({role:m.role, text:m.text}));
     const base = messages.slice(0,-1);
-    setMessages(base);
+    const targetIdx = base.length;
+    setMessages([...base, { role: 'model', text: '', ts: new Date(), toolEvents: [] }]);
     setSending(true);
     try {
-      const token = await getToken();
-      const res   = await fetch(resolveApiUrl('/api/vantia/chat'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ message: lastUser.text, history: histWoLast, moduleId: activeModuleId }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        const idx = base.length;
-        setMessages([...base, { role: 'model', text: '', ts: new Date() }]);
-        setSending(false);
-        await streamReveal(idx, data.reply);
-      } else {
-        setSending(false);
-      }
-    } catch { setSending(false); }
+      const reply = await streamChat(lastUser.text, histWoLast, activeModuleId, targetIdx, lastUser.linkedExpediente?.id);
+      setSending(false);
+      if (reply) setMessages(prev => prev.map((m, i) => (i === targetIdx ? { ...m, text: reply } : m)));
+    } catch (err: any) {
+      setSending(false);
+      if (err?.name === 'AbortError') return;
+      setMessages(prev => prev.map((m, i) => (i === targetIdx
+        ? { ...m, text: `⚠️ Error: ${err?.message || 'No se pudo obtener respuesta.'}`, toolEvents: [] }
+        : m)));
+    }
   };
 
   const userInitials = user?.firstName
@@ -525,9 +745,34 @@ export default function ChatIA() {
                   Copiar chat
                 </button>
               )}
-              <button className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 border border-slate-200 hover:border-slate-300 px-3 py-1.5 rounded-lg transition-all hover:bg-slate-50 active:scale-95">
-                <MoreHorizontal className="h-3.5 w-3.5" />
-              </button>
+              <div className="relative" ref={topMenuRef}>
+                <button
+                  onClick={() => setShowTopMenu(v => !v)}
+                  disabled={!activeModuleId}
+                  className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 border border-slate-200 hover:border-slate-300 px-3 py-1.5 rounded-lg transition-all hover:bg-slate-50 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <MoreHorizontal className="h-3.5 w-3.5" />
+                </button>
+                {showTopMenu && (
+                  <div className="cia-fade-up absolute right-0 top-10 w-52 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-20">
+                    <button
+                      onClick={exportConversation}
+                      disabled={messages.length === 0}
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-800 transition-colors disabled:opacity-40"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      Exportar conversación (.txt)
+                    </button>
+                    <button
+                      onClick={deleteCurrentConversation}
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Eliminar esta conversación
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -606,10 +851,31 @@ export default function ChatIA() {
                   <div className={`flex flex-col gap-1 max-w-[76%] ${msg.role==='user'?'items-end':''}`}>
                     {msg.role === 'model' ? (
                       <div className="text-sm px-1 pt-1">
-                        {renderMd(msg.text)}
+                        {msg.toolEvents && msg.toolEvents.length > 0 && (
+                          <div className="flex flex-col gap-1.5 mb-2.5">
+                            {msg.toolEvents.map((te, ti) => <ToolPill key={ti} label={te.label} done={te.done} />)}
+                          </div>
+                        )}
+                        {msg.text
+                          ? renderMd(msg.text)
+                          : (sending && idx === messages.length - 1 ? <TypingDots /> : null)}
                       </div>
                     ) : (
-                      <div className="bg-gradient-to-br from-red-600 to-red-700 text-white rounded-2xl rounded-tr-sm px-5 py-3.5 shadow-sm">
+                      <div className="bg-gradient-to-br from-red-600 to-red-700 text-white rounded-2xl rounded-tr-sm px-5 py-3.5 shadow-sm max-w-full">
+                        {(msg.attachmentName || msg.linkedExpediente) && (
+                          <div className="flex flex-wrap gap-1.5 mb-2">
+                            {msg.attachmentName && (
+                              <span className="inline-flex items-center gap-1 text-[10.5px] font-medium bg-white/15 text-white px-2 py-0.5 rounded-full">
+                                <FileText className="h-3 w-3" /> {msg.attachmentName}
+                              </span>
+                            )}
+                            {msg.linkedExpediente && (
+                              <span className="inline-flex items-center gap-1 text-[10.5px] font-medium bg-white/15 text-white px-2 py-0.5 rounded-full">
+                                <Link2 className="h-3 w-3" /> {msg.linkedExpediente.ref}
+                              </span>
+                            )}
+                          </div>
+                        )}
                         <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.text}</p>
                       </div>
                     )}
@@ -621,20 +887,26 @@ export default function ChatIA() {
                         title="Copiar">
                         <Copy className="h-3.5 w-3.5" />
                       </button>
-                      {msg.role === 'model' && idx === messages.length - 1 && (
+                      {msg.role === 'model' && idx === messages.length - 1 && !sending && (
                         <button onClick={regenerate}
                           className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-300 hover:text-slate-600 transition-colors active:scale-95"
                           title="Regenerar">
                           <RotateCcw className="h-3.5 w-3.5" />
                         </button>
                       )}
-                      {msg.role === 'model' && (
+                      {msg.role === 'model' && msg.text && (
                         <>
-                          <button className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-300 hover:text-green-500 transition-colors active:scale-95" title="Útil">
-                            <ThumbsUp className="h-3.5 w-3.5" />
+                          <button onClick={() => rateMessage(idx, 'up')}
+                            className={`p-1.5 rounded-lg transition-colors active:scale-95 ${
+                              feedback[idx] === 'up' ? 'text-green-600 bg-green-50' : 'text-slate-300 hover:bg-slate-100 hover:text-green-500'
+                            }`} title="Útil">
+                            <ThumbsUp className="h-3.5 w-3.5" fill={feedback[idx] === 'up' ? 'currentColor' : 'none'} />
                           </button>
-                          <button className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-300 hover:text-red-400 transition-colors active:scale-95" title="No útil">
-                            <ThumbsDown className="h-3.5 w-3.5" />
+                          <button onClick={() => rateMessage(idx, 'down')}
+                            className={`p-1.5 rounded-lg transition-colors active:scale-95 ${
+                              feedback[idx] === 'down' ? 'text-red-600 bg-red-50' : 'text-slate-300 hover:bg-slate-100 hover:text-red-400'
+                            }`} title="No útil">
+                            <ThumbsDown className="h-3.5 w-3.5" fill={feedback[idx] === 'down' ? 'currentColor' : 'none'} />
                           </button>
                         </>
                       )}
@@ -648,18 +920,6 @@ export default function ChatIA() {
                 </div>
               ))}
 
-              {/* ── Typing indicator ────────────────────────────────── */}
-              {sending && (
-                <div className="flex gap-3 mb-5 cia-msg-ai">
-                  <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-red-500 to-red-900 flex items-center justify-center shrink-0 shadow-sm shadow-red-200 mt-1">
-                    <Sparkles className="h-3.5 w-3.5 text-white" />
-                  </div>
-                  <div className="flex items-center pt-2.5">
-                    <Loader2 className="h-4 w-4 text-red-400 cia-spin" />
-                  </div>
-                </div>
-              )}
-
               <div ref={bottomRef} />
             </div>
           </div>
@@ -667,9 +927,47 @@ export default function ChatIA() {
           {/* ── Input bar ─────────────────────────────────────────────────── */}
           <div className="cia-input-bar shrink-0 px-4 pb-4 pt-2 bg-gradient-to-t from-white via-white/95 to-transparent">
             <div className="max-w-3xl mx-auto">
-              <div className="bg-white rounded-2xl border border-slate-200 hover:border-slate-300 focus-within:border-red-300 focus-within:ring-4 focus-within:ring-red-100 transition-all duration-200 shadow-sm">
+
+              {/* Chips: archivo adjunto / expediente vinculado / error de adjunto */}
+              {(attachedFile || linkedExpediente || attachError) && (
+                <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                  {attachedFile && (
+                    <span className="cia-fade-up inline-flex items-center gap-1.5 text-xs font-medium bg-slate-100 text-slate-600 pl-2.5 pr-1.5 py-1 rounded-full">
+                      <FileText className="h-3.5 w-3.5" /> {attachedFile.name}
+                      <button onClick={() => setAttachedFile(null)} className="p-0.5 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors">
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  )}
+                  {linkedExpediente && (
+                    <span className="cia-fade-up inline-flex items-center gap-1.5 text-xs font-medium bg-red-50 text-red-600 pl-2.5 pr-1.5 py-1 rounded-full max-w-xs">
+                      <Link2 className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">{linkedExpediente.ref}{linkedExpediente.descripcion ? ` · ${linkedExpediente.descripcion}` : ''}</span>
+                      <button onClick={() => setLinkedExpediente(null)} className="p-0.5 rounded-full hover:bg-red-100 text-red-400 hover:text-red-600 transition-colors shrink-0">
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  )}
+                  {attachError && (
+                    <span className="text-[11px] text-red-500 font-medium">{attachError}</span>
+                  )}
+                </div>
+              )}
+
+              <div className="bg-white rounded-2xl border border-slate-200 hover:border-slate-300 focus-within:border-red-300 focus-within:ring-4 focus-within:ring-red-100 transition-all duration-200 shadow-sm relative">
                 <div className="flex items-end gap-2 px-4 py-3">
-                  <button className="p-2 rounded-xl text-slate-300 hover:text-slate-500 hover:bg-slate-100 transition-colors active:scale-95 shrink-0 mb-0.5">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept={ATTACHMENT_ACCEPT}
+                    onChange={onFileSelected}
+                    className="hidden"
+                  />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="p-2 rounded-xl text-slate-300 hover:text-slate-500 hover:bg-slate-100 transition-colors active:scale-95 shrink-0 mb-0.5"
+                    title="Adjuntar archivo de texto"
+                  >
                     <Paperclip className="h-4 w-4" />
                   </button>
 
@@ -688,22 +986,62 @@ export default function ChatIA() {
                   />
 
                   <div className="flex items-center gap-1.5 shrink-0 mb-0.5">
-                    <button className="p-2 rounded-xl text-slate-300 hover:text-slate-500 hover:bg-slate-100 transition-colors active:scale-95" title="Vincular expediente">
-                      <Link2 className="h-4 w-4" />
-                    </button>
+                    <div className="relative" ref={linkPickerRef}>
+                      <button
+                        onClick={() => setShowLinkPicker(v => !v)}
+                        className={`p-2 rounded-xl transition-colors active:scale-95 ${
+                          linkedExpediente ? 'text-red-600 bg-red-50' : 'text-slate-300 hover:text-slate-500 hover:bg-slate-100'
+                        }`}
+                        title="Vincular expediente"
+                      >
+                        <Link2 className="h-4 w-4" />
+                      </button>
+                      {showLinkPicker && (
+                        <div className="cia-fade-up absolute bottom-11 right-0 w-72 bg-white rounded-xl shadow-xl border border-slate-200 p-2 z-20">
+                          <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 mb-1.5">
+                            <Search className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                            <input
+                              autoFocus
+                              value={linkQuery}
+                              onChange={e => setLinkQuery(e.target.value)}
+                              placeholder="Buscar expediente…"
+                              className="flex-1 min-w-0 bg-transparent outline-none text-xs text-slate-700 placeholder:text-slate-400"
+                            />
+                          </div>
+                          <div className="max-h-52 overflow-y-auto">
+                            {linkSearching ? (
+                              <div className="px-2.5 py-3 text-center"><Loader2 className="h-4 w-4 mx-auto text-slate-300 cia-spin" /></div>
+                            ) : linkResults.length === 0 ? (
+                              <p className="px-2.5 py-3 text-center text-xs text-slate-400">Sin resultados</p>
+                            ) : (
+                              linkResults.map(exp => (
+                                <button
+                                  key={exp.id}
+                                  onClick={() => selectLinkedExpediente(exp)}
+                                  className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-slate-50 transition-colors"
+                                >
+                                  <p className="text-xs font-semibold text-slate-700">{exp.ref}</p>
+                                  {exp.descripcion && <p className="text-[11px] text-slate-400 truncate">{exp.descripcion}</p>}
+                                </button>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                     <button
-                      onClick={sendMessage}
-                      disabled={!input.trim() || sending}
+                      onClick={sending ? abortStreaming : sendMessage}
+                      disabled={!sending && !input.trim() && !attachedFile}
                       className={`p-2.5 rounded-xl text-white transition-all duration-150 active:scale-90 ${
-                        input.trim() && !sending
-                          ? 'bg-gradient-to-br from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 shadow-sm shadow-red-200 hover:shadow-md'
-                          : 'bg-slate-200 cursor-not-allowed'
+                        sending
+                          ? 'bg-slate-700 hover:bg-slate-800'
+                          : (input.trim() || attachedFile)
+                            ? 'bg-gradient-to-br from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 shadow-sm shadow-red-200 hover:shadow-md'
+                            : 'bg-slate-200 cursor-not-allowed'
                       }`}
+                      title={sending ? 'Detener' : 'Enviar'}
                     >
-                      {sending
-                        ? <span className="block h-4 w-4 rounded-full border-2 border-white/40 border-t-white cia-spin" />
-                        : <Send className="h-4 w-4" />
-                      }
+                      {sending ? <StopCircle className="h-4 w-4" /> : <Send className="h-4 w-4" />}
                     </button>
                   </div>
                 </div>

@@ -117,7 +117,15 @@ app.use('/api', (_req, res, next) => {
 });
 
 // ── Compresión gzip de respuestas para velocidad ─────────────
-app.use(compression());
+// El endpoint de streaming de VantIA (SSE) queda excluido: compression()
+// bufferea la salida hasta acumular un bloque para comprimir, lo que rompe
+// el streaming en vivo (el cliente no vería nada hasta el final).
+app.use(compression({
+  filter: (req, res) => {
+    if (req.path === '/api/vantia/chat/stream') return false;
+    return compression.filter(req, res);
+  },
+}));
 
 // Servir archivos estáticos (fotos DNI subidas, etc.)
 // El frontend y el backend viven en dominios distintos (Vercel/Railway), asi que
