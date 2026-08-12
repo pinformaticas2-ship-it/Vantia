@@ -4560,7 +4560,16 @@ export default function ExpedienteList() {
   // Vistas
   const isMobile = useIsMobile();
   const [viewMode, setViewMode] = useState<ViewMode>("list");
-  const switchView = (v: ViewMode) => { setViewMode(v); if (v !== "multiselect") setSelectedIds(new Set()); };
+  // La barra de herramientas de arriba (Baja/Modificar/Correo/...) actúa sobre
+  // "selected" (una sola fila), algo distinto de "selectedIds" (checkboxes de
+  // selección múltiple). Si no se limpia "selected" al entrar en multiselect,
+  // esos botones se quedan activos sobre una fila que ya no se ve marcada en
+  // la tabla -- fácil confundirse y accionar sobre el expediente equivocado.
+  const switchView = (v: ViewMode) => {
+    setViewMode(v);
+    if (v !== "multiselect") setSelectedIds(new Set());
+    else setSelected(null);
+  };
 
   // En móvil la tabla densa (min-w 1100px) no cabe: forzamos la vista de tarjetas.
   useEffect(() => {
