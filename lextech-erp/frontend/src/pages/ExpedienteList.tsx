@@ -4852,6 +4852,21 @@ export default function ExpedienteList() {
     setShowModal(true);
   };
 
+  // Duplicar: abre el modal de alta pre-rellenado con los datos del
+  // expediente elegido, pero sin id ni núm. de expediente -- al guardar se
+  // crea uno NUEVO (número propio, asignado igual que cualquier alta), no se
+  // modifica el original.
+  const handleDuplicate = (exp: any) => {
+    const { id, num_exp, created_at, updated_at, ...rest } = exp;
+    setEditItem({
+      ...rest,
+      descripcion: exp.descripcion ? `${exp.descripcion} (copia)` : "",
+      estado: "abierto",
+    });
+    setSaveError(null);
+    setShowModal(true);
+  };
+
   const openCsvImport = () => {
     setShowAltaMenu(false);
     setViewMode("csvImport");
@@ -5505,7 +5520,15 @@ export default function ExpedienteList() {
   };
 
   // ── Acciones toolbar ──────────────────────────────────────────
-  const selectedExp = useMemo(() => expedientes.find(e => e.id === selected), [expedientes, selected]);
+  // En selección múltiple "selected" (fila única) se limpia al entrar --
+  // pero si hay exactamente UNA casilla marcada, la barra de herramientas de
+  // un solo expediente (Modificar/Correo/Tareas/Adjuntos...) puede seguir
+  // operando sobre esa, igual que en Gmail o similares: con 1 marcado se
+  // habilitan también las acciones de un solo elemento.
+  const toolbarSelected = viewMode === "multiselect"
+    ? (selectedIds.size === 1 ? Array.from(selectedIds)[0] : null)
+    : selected;
+  const selectedExp = useMemo(() => expedientes.find(e => e.id === toolbarSelected), [expedientes, toolbarSelected]);
   // Un expediente archivado es de solo lectura, igual que uno cerrado, hasta que se desarchiva.
   const selectedExpLocked = selectedExp?.estado === "cerrado" || selectedExp?.estado === "archivado";
   const expedienteAvailableColumnItems = useMemo(
@@ -5611,7 +5634,7 @@ export default function ExpedienteList() {
   }, [getToken]);
 
   const searchRelacionarExpedientes = useCallback(async (searchValue: string) => {
-    if (!selected) return;
+    if (!selectedExp) return;
     try {
       setRelacionarSearching(true);
       setRelacionarSearchError("");
@@ -5625,17 +5648,17 @@ export default function ExpedienteList() {
       });
       const data = await safeJson(res);
       if (!res.ok) throw new Error(data.error || "No se pudieron buscar expedientes");
-      setRelacionarResults((data.data || []).filter((item: any) => item.id !== selected && !relatedExpedienteIds.has(item.id)));
+      setRelacionarResults((data.data || []).filter((item: any) => item.id !== selectedExp.id && !relatedExpedienteIds.has(item.id)));
     } catch (e: any) {
       setRelacionarResults([]);
       setRelacionarSearchError(e?.message || "No se pudieron buscar expedientes");
     } finally {
       setRelacionarSearching(false);
     }
-  }, [getToken, relatedExpedienteIds, selected]);
+  }, [getToken, relatedExpedienteIds, selectedExp]);
 
   const openRelacionarModal = useCallback(async () => {
-    if (!selected || !selectedExp) return;
+    if (!selectedExp) return;
     setShowRelacionarModal(true);
     setRelacionarQuery("");
     setRelacionarResults([]);
@@ -5644,7 +5667,7 @@ export default function ExpedienteList() {
     setRelacionarAssociateError("");
     await loadRelatedExpedientes(selectedExp.id);
     await searchRelacionarExpedientes("");
-  }, [loadRelatedExpedientes, searchRelacionarExpedientes, selected, selectedExp]);
+  }, [loadRelatedExpedientes, searchRelacionarExpedientes, selectedExp]);
 
   const handleRelacionarSearchSubmit = useCallback(async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -6078,9 +6101,9 @@ export default function ExpedienteList() {
   return (
     <>
       {/* ── Modal Adjuntos ──────────────────────────────────── */}
-      {showAdjuntos && selected && (
+      {showAdjuntos && toolbarSelected && (
         <AdjuntosModal
-          entityId={selected}
+          entityId={toolbarSelected}
           autoOpenAfterAttach={false}
           entityName={selectedExp ? `${selectedExp.ref_expediente || selectedExp.ref_propia || "Exp."} — ${selectedExp.descripcion || ""}` : "Expediente"}
           onClose={() => setShowAdjuntos(false)}
@@ -6684,17 +6707,18 @@ export default function ExpedienteList() {
 
               <div className="w-px h-5 bg-slate-200 mx-1" />
 
-              {/* Baja, Modificar */}
-              <ToolBtn icon={Trash2} label="Baja" danger disabled={!selected} onClick={() => selected && setDeleteId(selected)} />
+              {/* Baja, Modificar, Duplicar */}
+              <ToolBtn icon={Trash2} label="Baja" danger disabled={!toolbarSelected} onClick={() => toolbarSelected && setDeleteId(toolbarSelected)} />
               {selectedExp?.estado === "archivado" && (
-                <ToolBtn icon={FolderOpen} label="Quitar de archivado" disabled={unarchiveSingleLoading} onClick={() => selected && handleUnarchiveSingle(selected)} />
+                <ToolBtn icon={FolderOpen} label="Quitar de archivado" disabled={unarchiveSingleLoading} onClick={() => toolbarSelected && handleUnarchiveSingle(toolbarSelected)} />
               )}
-              <ToolBtn icon={Edit3} label="Modificar" disabled={!selected || selectedExpLocked} onClick={() => selected && !selectedExpLocked && navigate(`/dashboard/expedientes/${selected}?edit=1`)} />
+              <ToolBtn icon={Edit3} label="Modificar" disabled={!toolbarSelected || selectedExpLocked} onClick={() => toolbarSelected && !selectedExpLocked && navigate(`/dashboard/expedientes/${toolbarSelected}?edit=1`)} />
+              <ToolBtn icon={Copy} label="Duplicar" disabled={!selectedExp} onClick={() => selectedExp && handleDuplicate(selectedExp)} />
 
               <div className="w-px h-5 bg-slate-200 mx-1" />
 
               {/* Correo, WhatsApp */}
-              <DropdownToolBtn icon={Mail} label="Enviar Correo" disabled={!selected} items={[
+              <DropdownToolBtn icon={Mail} label="Enviar Correo" disabled={!toolbarSelected} items={[
                 { label: "Nuevo", icon: Mail, onClick: () => { if (!selectedExp) return; const params = new URLSearchParams({ compose: '1', subject: `Expediente ${selectedExp.anio}/${selectedExp.num_exp} - ${selectedExp.descripcion || ''}`, ...(selectedExp.cliente_email ? { to: selectedExp.cliente_email } : {}), expediente_id: selectedExp.id }); navigate(`/dashboard/correo?${params.toString()}`); } },
                 { label: "Con Plantilla", icon: FileText, onClick: () => { if (!selectedExp) return; const params = new URLSearchParams({ compose: '1', subject: `Expediente ${selectedExp.anio}/${selectedExp.num_exp} - ${selectedExp.descripcion || ''}`, ...(selectedExp.cliente_email ? { to: selectedExp.cliente_email } : {}), expediente_id: selectedExp.id, open_templates: '1' }); navigate(`/dashboard/correo?${params.toString()}`); } },
                 { divider: true, label: '' },
@@ -6703,26 +6727,26 @@ export default function ExpedienteList() {
                   { label: "Con Plantilla", icon: FileText, onClick: () => { if (!selectedExp) return; const params = new URLSearchParams({ compose: '1', subject: `Expediente ${selectedExp.anio}/${selectedExp.num_exp} - ${selectedExp.descripcion || ''}`, ...(selectedExp.cliente_email ? { to: selectedExp.cliente_email } : {}), expediente_id: selectedExp.id, open_templates: '1', open_attachments: '1' }); navigate(`/dashboard/correo?${params.toString()}`); } },
                 ]},
                 { divider: true, label: '' },
-                { label: "MN Sign", icon: Pencil, onClick: () => selected && navigate(`/dashboard/expedientes/${selected}#firma`) },
+                { label: "MN Sign", icon: Pencil, onClick: () => toolbarSelected && navigate(`/dashboard/expedientes/${toolbarSelected}#firma`) },
               ]} />
               <DropdownToolBtn icon={MessageCircle} label="Enviar WhatsApp" disabled={!selectedExp?.cliente_id} items={[
                 { label: "Nuevo", icon: MessageCircle, onClick: () => { if (!selectedExp?.cliente_id) return; navigate(`/dashboard/whatsapp?clientId=${selectedExp.cliente_id}&mode=new`); } },
                 { label: "Con Plantilla", icon: FileSpreadsheet, onClick: () => { if (!selectedExp?.cliente_id) return; navigate(`/dashboard/whatsapp?clientId=${selectedExp.cliente_id}&mode=template`); } },
                 { label: "Programar WhatsApp", icon: Bell, onClick: () => { if (!selectedExp?.cliente_id) return; navigate(`/dashboard/whatsapp?clientId=${selectedExp.cliente_id}&mode=schedule`); } },
-                { label: "Sign", icon: Pencil, onClick: () => selected && navigate(`/dashboard/expedientes/${selected}#firma`) },
+                { label: "Sign", icon: Pencil, onClick: () => toolbarSelected && navigate(`/dashboard/expedientes/${toolbarSelected}#firma`) },
                 { label: "Ver Conversación", icon: ExternalLink, onClick: () => { if (!selectedExp?.cliente_id) return; navigate(`/dashboard/whatsapp?clientId=${selectedExp.cliente_id}&mode=thread`); } },
               ]} />
 
               <div className="w-px h-5 bg-slate-200 mx-1" />
 
               {/* Sign, Tareas, Asociar, Adjuntos */}
-              <ToolBtn icon={PenLine} label="Sign" disabled={!selected} onClick={() => selected && navigate(`/dashboard/expedientes/${selected}#firma`)} />
-              <DropdownToolBtn icon={ClipboardList} label="Tareas" disabled={!selected || selectedExpLocked} items={[
-                { label: "Nueva actuación", icon: Activity, onClick: () => selected && navigate(`/dashboard/expedientes/${selected}?tab=actuacion&newActuacion=1`) },
-                { label: "Crear obligaciones", icon: ClipboardList, onClick: () => selected && navigate(`/dashboard/expedientes/${selected}?tab=tareas&newTarea=1&type=plazo_procesal`) },
+              <ToolBtn icon={PenLine} label="Sign" disabled={!toolbarSelected} onClick={() => toolbarSelected && navigate(`/dashboard/expedientes/${toolbarSelected}#firma`)} />
+              <DropdownToolBtn icon={ClipboardList} label="Tareas" disabled={!toolbarSelected || selectedExpLocked} items={[
+                { label: "Nueva actuación", icon: Activity, onClick: () => toolbarSelected && navigate(`/dashboard/expedientes/${toolbarSelected}?tab=actuacion&newActuacion=1`) },
+                { label: "Crear obligaciones", icon: ClipboardList, onClick: () => toolbarSelected && navigate(`/dashboard/expedientes/${toolbarSelected}?tab=tareas&newTarea=1&type=plazo_procesal`) },
               ]} />
               <ToolBtn icon={GitMerge} label="Asociar" disabled={!selectedExp} onClick={openRelacionarModal} />
-              <ToolBtn icon={Paperclip} label="Adjuntos" disabled={!selected || selectedExpLocked} onClick={() => selected && !selectedExpLocked && setShowAdjuntos(true)} />
+              <ToolBtn icon={Paperclip} label="Adjuntos" disabled={!toolbarSelected || selectedExpLocked} onClick={() => toolbarSelected && !selectedExpLocked && setShowAdjuntos(true)} />
 
               <div className="w-px h-5 bg-slate-200 mx-1" />
 
@@ -6763,7 +6787,7 @@ export default function ExpedienteList() {
                       </button>
                       <div className={`absolute right-full -mr-px top-[-1px] z-50 bg-white border border-slate-200 rounded-xl shadow-xl min-w-[180px] py-1 ${opcionesSubmenu === "ir_a" ? "block" : "hidden"}`}>
                         <button onClick={() => { selectedExp?.cliente_id && navigate(`/dashboard/clientes/${selectedExp.cliente_id}`); }} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><Users size={13} className="text-slate-400 shrink-0" /> Ir a Cliente</button>
-                        <button onClick={() => { selected && navigate(`/dashboard/expedientes/${selected}`); }} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><FolderOpen size={13} className="text-slate-400 shrink-0" /> Ir a Expediente</button>
+                        <button onClick={() => { toolbarSelected && navigate(`/dashboard/expedientes/${toolbarSelected}`); }} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><FolderOpen size={13} className="text-slate-400 shrink-0" /> Ir a Expediente</button>
                         <button onClick={() => alert("Ir a Juzgado")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><ClipboardList size={13} className="text-slate-400 shrink-0" /> Ir a Juzgado</button>
                       </div>
                     </div>
