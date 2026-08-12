@@ -5334,6 +5334,18 @@ export default function ExpedienteList() {
   const clearAllFilters = () => setFilters([{ id: nextId++, field: "any", value: "" }]);
   const hasActiveFilters = filters.some(f => f.value.trim() !== "");
 
+  const archivedFilterActive = filters.some(f => f.field === "estado" && f.value.trim().toLowerCase() === "archivado");
+  const toggleShowArchived = () => {
+    if (archivedFilterActive) {
+      setFilters(prev => {
+        const next = prev.filter(f => !(f.field === "estado" && f.value.trim().toLowerCase() === "archivado"));
+        return next.length ? next : [{ id: nextId++, field: "any", value: "" }];
+      });
+    } else {
+      setFilters(prev => [...prev, { id: nextId++, field: "estado", value: "archivado" }]);
+    }
+  };
+
   // Los expedientes archivados ("dar de baja") ya no se borran de la base de
   // datos -- si se mostraran siempre en el listado, después de los 15s de
   // deshacer reaparecerían en el siguiente refresco y parecería que "no se
@@ -6738,6 +6750,14 @@ export default function ExpedienteList() {
               <button onClick={clearAllFilters} title="Limpiar filtros"
                 className={`flex items-center justify-center w-8 h-8 rounded-lg border bg-white shadow-sm transition-colors ${hasActiveFilters || filters.length > 1 ? "border-red-300 text-red-500 hover:bg-red-50" : "border-slate-200 text-slate-300"}`}>
                 <ListFilter size={12} />
+              </button>
+              <div className="w-px h-5 bg-slate-200" />
+              <button onClick={toggleShowArchived} title="Los expedientes dados de baja se archivan, no se borran -- aquí se ven"
+                className={`flex items-center gap-1.5 h-8 px-3 rounded-lg border text-xs font-semibold shadow-sm transition-colors ${
+                  archivedFilterActive ? "border-red-300 bg-red-50 text-red-600" : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+                }`}>
+                <FolderOpen size={12} />
+                {archivedFilterActive ? "Viendo archivados" : "Ver archivados"}
               </button>
             </div>
             <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
