@@ -4604,8 +4604,8 @@ export default function ExpedienteList() {
     if (items) setExpedientes(prev => [...prev, ...items]);
   };
 
-  // Borrado definitivo (sin deshacer) -- solo para expedientes ya archivados,
-  // pensado como "vaciar la papelera" desde la vista de "Ver archivados".
+  // Borrado definitivo (sin deshacer) -- solo actúa sobre los expedientes YA
+  // archivados dentro de la selección, aunque haya otros mezclados.
   const [hardDeleteConfirm, setHardDeleteConfirm] = useState(false);
   const [hardDeleteLoading, setHardDeleteLoading] = useState(false);
   const handleBulkHardDelete = async () => {
@@ -4621,6 +4621,27 @@ export default function ExpedienteList() {
       setSelectedIds(new Set());
       setHardDeleteConfirm(false);
     } catch { /* ignore */ } finally { setHardDeleteLoading(false); }
+  };
+
+  // Quitar de archivado (restaura a "abierto") -- igual, solo afecta a los
+  // archivados dentro de la selección.
+  const [unarchiveLoading, setUnarchiveLoading] = useState(false);
+  const handleBulkUnarchive = async () => {
+    const ids = Array.from(selectedIds).filter(id => expedientes.find(e => e.id === id)?.estado === "archivado");
+    if (!ids.length) return;
+    setUnarchiveLoading(true);
+    try {
+      const token = await getToken({ skipCache: true });
+      await Promise.all(ids.map(id =>
+        fetch(`/api/expedientes/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ estado: "abierto" }),
+        })
+      ));
+      setExpedientes(prev => prev.map(e => ids.includes(e.id) ? { ...e, estado: "abierto" } : e));
+      setSelectedIds(new Set());
+    } catch { /* ignore */ } finally { setUnarchiveLoading(false); }
   };
 
   const handleBulkChangeState = async (estado: string) => {
@@ -5355,6 +5376,8 @@ export default function ExpedienteList() {
 
   const archivedFilterActive = filters.some(f => f.field === "estado" && f.value.trim().toLowerCase() === "archivado");
   const deleteTargetIsArchived = !!deleteId && expedientes.find(e => e.id === deleteId)?.estado === "archivado";
+  const selectedArchivedCount = Array.from(selectedIds).filter(id => expedientes.find(e => e.id === id)?.estado === "archivado").length;
+  const selectedHasArchived = selectedArchivedCount > 0;
   const toggleShowArchived = () => {
     if (archivedFilterActive) {
       setFilters(prev => {
@@ -5366,17 +5389,12 @@ export default function ExpedienteList() {
     }
   };
 
-  // Los expedientes archivados ("dar de baja") ya no se borran de la base de
-  // datos -- si se mostraran siempre en el listado, después de los 15s de
-  // deshacer reaparecerían en el siguiente refresco y parecería que "no se
-  // borran". Se ocultan por defecto, salvo que el usuario los busque
-  // explícitamente (filtro de Estado, o "cualquier criterio" con "archivado").
-  const showingArchived = filters.some(f => f.value.trim().toLowerCase().includes("archivado"));
-
   // ── Filtrado + ordenación ──────────────────────────────────────
+  // Los archivados se muestran en el listado igual que los cerrados -- son
+  // un estado más, no algo que haya que ocultar aparte ni ir a buscar a un
+  // sitio especial.
   const filtered = useMemo(() => {
     let rows = expedientes.filter(e => filters.every(f => matchesFilter(e, f.field, f.value)));
-    if (!showingArchived) rows = rows.filter(e => e.estado !== "archivado");
     rows = [...rows].sort((a, b) => {
       let av: any = a[sort] ?? ""; let bv: any = b[sort] ?? "";
       if (sort === "num_exp" || sort === "anio") { av = Number(av); bv = Number(bv); }
@@ -5458,6 +5476,20 @@ export default function ExpedienteList() {
       if (selected === id) setSelected(null);
       setDeleteId(null);
     } catch { /* ignore */ } finally { setHardDeleteSingleLoading(false); }
+  };
+
+  const [unarchiveSingleLoading, setUnarchiveSingleLoading] = useState(false);
+  const handleUnarchiveSingle = async (id: string) => {
+    setUnarchiveSingleLoading(true);
+    try {
+      const token = await getToken({ skipCache: true });
+      await fetch(`/api/expedientes/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ estado: "abierto" }),
+      });
+      setExpedientes(prev => prev.map(e => e.id === id ? { ...e, estado: "abierto" } : e));
+    } catch { /* ignore */ } finally { setUnarchiveSingleLoading(false); }
   };
 
   // ── Acciones toolbar ──────────────────────────────────────────
@@ -6640,6 +6672,9 @@ export default function ExpedienteList() {
 
               {/* Baja, Modificar */}
               <ToolBtn icon={Trash2} label="Baja" danger disabled={!selected} onClick={() => selected && setDeleteId(selected)} />
+              {selectedExp?.estado === "archivado" && (
+                <ToolBtn icon={FolderOpen} label="Quitar de archivado" disabled={unarchiveSingleLoading} onClick={() => selected && handleUnarchiveSingle(selected)} />
+              )}
               <ToolBtn icon={Edit3} label="Modificar" disabled={!selected || selectedExp?.estado === "cerrado"} onClick={() => selected && selectedExp?.estado !== "cerrado" && navigate(`/dashboard/expedientes/${selected}?edit=1`)} />
 
               <div className="w-px h-5 bg-slate-200 mx-1" />
@@ -7072,18 +7107,24 @@ export default function ExpedienteList() {
                       <Download size={12} />
                       Exportar
                     </button>
-                    {archivedFilterActive ? (
-                      <button onClick={() => setHardDeleteConfirm(true)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-red-700 hover:bg-red-800 border border-red-800 rounded-lg transition-colors">
-                        <Trash2 size={12} />
-                        Eliminar definitivamente {selectedIds.size}
-                      </button>
-                    ) : (
-                      <button onClick={() => setBulkDeleteConfirm(true)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors">
-                        <Trash2 size={12} />
-                        Dar de baja {selectedIds.size}
-                      </button>
+                    <button onClick={() => setBulkDeleteConfirm(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors">
+                      <Trash2 size={12} />
+                      Dar de baja {selectedIds.size}
+                    </button>
+                    {selectedHasArchived && (
+                      <>
+                        <button onClick={handleBulkUnarchive} disabled={unarchiveLoading}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50 rounded-lg transition-colors">
+                          {unarchiveLoading ? <Loader2 size={12} className="animate-spin" /> : <FolderOpen size={12} />}
+                          Quitar de archivado
+                        </button>
+                        <button onClick={() => setHardDeleteConfirm(true)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-red-700 hover:bg-red-800 border border-red-800 rounded-lg transition-colors">
+                          <Trash2 size={12} />
+                          Eliminar definitivamente
+                        </button>
+                      </>
                     )}
                     <button onClick={deselectAll}
                       className="ml-auto flex items-center gap-1 px-2.5 py-1.5 text-xs text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
@@ -7194,8 +7235,12 @@ export default function ExpedienteList() {
             variant="confirm"
             icon={<AlertTriangle size={18} />}
             iconTone="danger"
-            title={`¿Eliminar definitivamente ${selectedIds.size} expediente${selectedIds.size !== 1 ? "s" : ""}?`}
-            subtitle="Esto SÍ borra el registro de la base de datos. No hay deshacer."
+            title={`¿Eliminar definitivamente ${selectedArchivedCount} expediente${selectedArchivedCount !== 1 ? "s" : ""}?`}
+            subtitle={
+              selectedArchivedCount < selectedIds.size
+                ? `Esto SÍ borra el registro de la base de datos. No hay deshacer. Los ${selectedIds.size - selectedArchivedCount} seleccionados que no están archivados no se tocan.`
+                : "Esto SÍ borra el registro de la base de datos. No hay deshacer."
+            }
             zIndex={9999}
             footer={
               <>
