@@ -4713,30 +4713,6 @@ export default function ExpedienteList() {
     finally { setBulkTareaLoading(false); }
   };
 
-  // Duplicar en bloque: crea una copia (sin id ni núm. de expediente, así que
-  // cada una recibe su propio número) por cada expediente marcado.
-  const [bulkDuplicateLoading, setBulkDuplicateLoading] = useState(false);
-  const handleBulkDuplicate = async () => {
-    const items = Array.from(selectedIds).map(id => expedientes.find(e => e.id === id)).filter(Boolean) as any[];
-    if (!items.length) return;
-    if (!window.confirm(`¿Duplicar ${items.length} expediente${items.length !== 1 ? "s" : ""}? Se crearán ${items.length} expediente${items.length !== 1 ? "s" : ""} nuevo${items.length !== 1 ? "s" : ""}.`)) return;
-    setBulkDuplicateLoading(true);
-    try {
-      const token = await getToken({ skipCache: true });
-      const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
-      await Promise.all(items.map(exp => {
-        const { id, num_exp, anio, created_at, updated_at, ...rest } = exp;
-        return fetch("/api/expedientes", {
-          method: "POST",
-          headers,
-          body: JSON.stringify({ ...rest, descripcion: exp.descripcion ? `${exp.descripcion} (copia)` : "", estado: "abierto" }),
-        });
-      }));
-      setSelectedIds(new Set());
-      fetchExpedientes(true);
-    } catch { /* ignore */ } finally { setBulkDuplicateLoading(false); }
-  };
-
   // Enviar correo en bloque: abre un único borrador con todos los emails de
   // cliente de los marcados como destinatarios (el usuario revisa y envía).
   const handleBulkComposeEmail = () => {
@@ -4986,21 +4962,6 @@ export default function ExpedienteList() {
   const openManualCreate = () => {
     setShowAltaMenu(false);
     setEditItem(null);
-    setSaveError(null);
-    setShowModal(true);
-  };
-
-  // Duplicar: abre el modal de alta pre-rellenado con los datos del
-  // expediente elegido, pero sin id ni núm. de expediente -- al guardar se
-  // crea uno NUEVO (número propio, asignado igual que cualquier alta), no se
-  // modifica el original.
-  const handleDuplicate = (exp: any) => {
-    const { id, num_exp, created_at, updated_at, ...rest } = exp;
-    setEditItem({
-      ...rest,
-      descripcion: exp.descripcion ? `${exp.descripcion} (copia)` : "",
-      estado: "abierto",
-    });
     setSaveError(null);
     setShowModal(true);
   };
@@ -5669,6 +5630,39 @@ export default function ExpedienteList() {
   const selectedExp = useMemo(() => expedientes.find(e => e.id === toolbarSelected), [expedientes, toolbarSelected]);
   // Un expediente archivado es de solo lectura, igual que uno cerrado, hasta que se desarchiva.
   const selectedExpLocked = selectedExp?.estado === "cerrado" || selectedExp?.estado === "archivado";
+
+  // Duplicar: UNA sola lógica para 1 o varios, en cualquier vista -- crea
+  // copias (sin id ni núm. de expediente, así que cada una recibe su propio
+  // número) de los expedientes elegidos. Siempre pasa por un diálogo de
+  // revisión antes de crear nada (antes el de 1 abría el formulario completo
+  // y el de varios usaba un confirm() nativo del navegador sin ver nada de
+  // lo que se iba a duplicar -- comportamiento distinto e inconsistente).
+  const duplicateTargets = useMemo(() => {
+    if (selectedIds.size >= 1) return Array.from(selectedIds).map(id => expedientes.find(e => e.id === id)).filter(Boolean) as any[];
+    return selectedExp ? [selectedExp] : [];
+  }, [selectedIds, selectedExp, expedientes]);
+  const [duplicateConfirm, setDuplicateConfirm] = useState(false);
+  const [duplicateLoading, setDuplicateLoading] = useState(false);
+  const handleDuplicateConfirm = async () => {
+    if (!duplicateTargets.length) return;
+    setDuplicateLoading(true);
+    try {
+      const token = await getToken({ skipCache: true });
+      const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+      await Promise.all(duplicateTargets.map(exp => {
+        const { id, num_exp, anio, created_at, updated_at, ...rest } = exp;
+        return fetch("/api/expedientes", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ ...rest, descripcion: exp.descripcion ? `${exp.descripcion} (copia)` : "", estado: "abierto" }),
+        });
+      }));
+      setDuplicateConfirm(false);
+      setSelectedIds(new Set());
+      fetchExpedientes(true);
+    } catch { /* ignore */ } finally { setDuplicateLoading(false); }
+  };
+
   const expedienteAvailableColumnItems = useMemo(
     () => EXPEDIENTE_LIST_COLUMNS.filter((column) => !visibleColumns[column.key]).map((column) => ({ key: column.key, label: column.label })),
     [visibleColumns]
@@ -6853,8 +6847,8 @@ export default function ExpedienteList() {
                 <ToolBtn icon={FolderOpen} label="Quitar de archivado" disabled={unarchiveSingleLoading} onClick={() => toolbarSelected && handleUnarchiveSingle(toolbarSelected)} />
               )}
               <ToolBtn icon={Edit3} label="Modificar" disabled={!toolbarSelected || selectedExpLocked} onClick={() => toolbarSelected && !selectedExpLocked && navigate(`/dashboard/expedientes/${toolbarSelected}?edit=1`)} />
-              <ToolBtn icon={Copy} label={selectedIds.size >= 2 ? `Duplicar ${selectedIds.size}` : "Duplicar"} disabled={!selectedExp && selectedIds.size < 2}
-                onClick={() => selectedIds.size >= 2 ? handleBulkDuplicate() : selectedExp && handleDuplicate(selectedExp)} />
+              <ToolBtn icon={Copy} label={duplicateTargets.length > 1 ? `Duplicar ${duplicateTargets.length}` : "Duplicar"} disabled={!duplicateTargets.length}
+                onClick={() => setDuplicateConfirm(true)} />
 
               <div className="w-px h-5 bg-slate-200 mx-1" />
 
@@ -7482,6 +7476,36 @@ export default function ExpedienteList() {
               </label>
               {bulkTareaError && <p className="text-xs text-red-600">{bulkTareaError}</p>}
             </div>
+          </Modal>
+
+          {/* ── Duplicar (1 o varios, misma ventana de revisión siempre) ── */}
+          <Modal
+            open={duplicateConfirm}
+            onClose={() => setDuplicateConfirm(false)}
+            variant="confirm"
+            icon={<Copy size={18} />}
+            title={duplicateTargets.length > 1 ? `¿Duplicar ${duplicateTargets.length} expedientes?` : "¿Duplicar este expediente?"}
+            subtitle="Se crea una copia con número propio de cada uno; el original no se toca."
+            zIndex={9999}
+            footer={
+              <>
+                <button onClick={() => setDuplicateConfirm(false)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
+                <button onClick={handleDuplicateConfirm} disabled={!duplicateTargets.length || duplicateLoading}
+                  className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-lg active:scale-95">
+                  {duplicateLoading ? <Loader2 size={12} className="animate-spin" /> : <Copy size={12} />}
+                  Duplicar
+                </button>
+              </>
+            }
+          >
+            <ul className="max-h-48 overflow-y-auto space-y-1.5 text-sm">
+              {duplicateTargets.map(exp => (
+                <li key={exp.id} className="flex items-center gap-2 text-slate-600">
+                  <span className="font-mono text-xs font-bold text-slate-400 shrink-0">{exp.anio}/{exp.num_exp}</span>
+                  <span className="truncate">{exp.descripcion || "Sin descripción"}</span>
+                </li>
+              ))}
+            </ul>
           </Modal>
 
           {/* ── Enviar WhatsApp en bloque ── */}
