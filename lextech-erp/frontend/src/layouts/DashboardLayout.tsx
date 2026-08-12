@@ -11,7 +11,7 @@ import {
   MessageSquare, LogOut, Mail, Library, Receipt, Sparkles, ChevronsUpDown,
   MoreVertical, RotateCcw, Copy, Check, Crown,
   Pen, AlertTriangle, RefreshCw, Link2, Plus, Trash2, Scale, Gavel, ChevronDown,
-  Wallet, CreditCard, Building2, BarChart3, FileText, Calculator,
+  Wallet, CreditCard, Building2, BarChart3, FileText, Calculator, Square,
 } from "lucide-react";
 import { UserButton, useUser, useAuth, useClerk } from "@clerk/clerk-react";
 import { getDeviceId, safeJson, waitForClientIp, resolveUploadUrl } from "../lib/api";
@@ -163,7 +163,8 @@ function actionIcon(t: string) {
 }
 
 // ── VantIA flotante (siempre visible, contextual) ───────────────────────────
-interface ChatMsg { role: "user" | "model"; text: string }
+interface ToolEvent { name: string; label: string; done: boolean }
+interface ChatMsg { role: "user" | "model"; text: string; toolEvents?: ToolEvent[] }
 
 // Markdown ligero para las respuestas de VantIA: negrita, cursiva, código
 // inline, listas con guion/asterisco y listas numeradas. No es un parser
@@ -254,29 +255,74 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const revealTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const streamAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (open) { setEverOpened(true); setHasUnseenResponse(false); }
   }, [open]);
 
-  // Efecto "máquina de escribir": revela el texto ya recibido poco a poco en
-  // vez de volcarlo de golpe, para que se vea como si VantIA lo fuera
-  // escribiendo (igual que Gemini), sin depender de streaming real del backend.
-  useEffect(() => () => { if (revealTimerRef.current) clearInterval(revealTimerRef.current); }, []);
-  const streamReveal = (idx: number, fullText: string): Promise<void> =>
-    new Promise((resolve) => {
-      if (revealTimerRef.current) clearInterval(revealTimerRef.current);
-      let pos = 0;
-      revealTimerRef.current = setInterval(() => {
-        pos = Math.min(pos + 3, fullText.length);
-        setMessages((prev) => prev.map((m, i) => (i === idx ? { ...m, text: fullText.slice(0, pos) } : m)));
-        if (pos >= fullText.length) {
-          if (revealTimerRef.current) { clearInterval(revealTimerRef.current); revealTimerRef.current = null; }
-          resolve();
-        }
-      }, 18);
+  // Streaming real: consume el SSE de /api/vantia/chat/stream y va
+  // actualizando en vivo el mensaje en `targetIdx` -- texto según llega
+  // token a token, y una pill por cada herramienta que VantIA use mientras
+  // consulta datos reales del despacho (igual que en la página Chat IA).
+  const streamChat = async (text: string, history: ChatMsg[], targetIdx: number): Promise<string> => {
+    const token = await getToken({ skipCache: true });
+    const historyForApi = history.length === 1 && history[0].role === "model" ? [] : history;
+    const controller = new AbortController();
+    streamAbortRef.current = controller;
+
+    const res = await fetch("/api/vantia/chat/stream", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ message: text, history: historyForApi, moduleId: pathname }),
+      signal: controller.signal,
     });
+    if (!res.ok || !res.body) {
+      const data = await safeJson(res);
+      throw new Error(data.error || "Error en la API de VantIA");
+    }
+
+    const reader  = res.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let buffer = "";
+    let finalReply = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let sep: number;
+      while ((sep = buffer.indexOf("\n\n")) !== -1) {
+        const rawEvent = buffer.slice(0, sep);
+        buffer = buffer.slice(sep + 2);
+        const dataLine = rawEvent.split("\n").find((l) => l.startsWith("data:"));
+        if (!dataLine) continue;
+        const jsonStr = dataLine.slice(5).trim();
+        if (!jsonStr) continue;
+        let evt: any;
+        try { evt = JSON.parse(jsonStr); } catch { continue; }
+
+        if (evt.type === "text") {
+          setMessages((prev) => prev.map((m, i) => (i === targetIdx ? { ...m, text: m.text + evt.delta } : m)));
+        } else if (evt.type === "tool_start") {
+          setMessages((prev) => prev.map((m, i) => (i === targetIdx
+            ? { ...m, toolEvents: [...(m.toolEvents || []), { name: evt.name, label: evt.label, done: false }] }
+            : m)));
+        } else if (evt.type === "tool_end") {
+          setMessages((prev) => prev.map((m, i) => (i === targetIdx
+            ? { ...m, toolEvents: (m.toolEvents || []).map((te) => (te.name === evt.name && !te.done ? { ...te, done: true } : te)) }
+            : m)));
+        } else if (evt.type === "done") {
+          finalReply = evt.reply;
+        } else if (evt.type === "error") {
+          throw new Error(evt.message || "Error al generar la respuesta.");
+        }
+      }
+    }
+    return finalReply;
+  };
+
+  const abortStreaming = () => streamAbortRef.current?.abort();
 
   useEffect(() => {
     if (!showMenu) return;
@@ -328,39 +374,27 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
     el.style.height = `${Math.min(el.scrollHeight, 100)}px`;
   };
 
-  const callApi = async (text: string, history: ChatMsg[]): Promise<string> => {
-    const token = await getToken({ skipCache: true });
-    const historyForApi = history.length === 1 && history[0].role === "model" ? [] : history;
-    const res = await fetch("/api/vantia/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ message: text, history: historyForApi, systemPrompt: getVantIAContext(pathname), moduleId: pathname }),
-    });
-    const data = await safeJson(res);
-    if (!res.ok) throw new Error(data.error || "Error en la API de VantIA");
-    return data.reply as string;
-  };
-
   const send = async () => {
     const text = input.trim();
     if (!text || loading) return;
     setInput("");
     if (textareaRef.current) { textareaRef.current.style.height = "44px"; }
+    const baseHistory = messages;
     const newHistory: ChatMsg[] = [...messages, { role: "user", text }];
-    setMessages(newHistory);
+    const targetIdx = newHistory.length;
+    setMessages([...newHistory, { role: "model", text: "", toolEvents: [] }]);
     setLoading(true);
     try {
-      const reply = await callApi(text, messages);
-      const idx = newHistory.length;
-      setMessages([...newHistory, { role: "model", text: "" }]);
+      const reply = await streamChat(text, baseHistory, targetIdx);
       setLoading(false);
-      await streamReveal(idx, reply);
+      if (reply) setMessages((prev) => prev.map((m, i) => (i === targetIdx ? { ...m, text: reply } : m)));
       setRetryText("");
       if (!openRef.current) setHasUnseenResponse(true);
     } catch (err: any) {
-      setRetryText(text);
-      setMessages([...newHistory, { role: "model", text: `❌ ${err.message}` }]);
       setLoading(false);
+      if (err?.name === "AbortError") return; // detenido a mano: se deja el texto parcial tal cual
+      setRetryText(text);
+      setMessages((prev) => prev.map((m, i) => (i === targetIdx ? { ...m, text: `❌ ${err.message}`, toolEvents: [] } : m)));
       if (!openRef.current) setHasUnseenResponse(true);
     }
   };
@@ -370,20 +404,20 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
     const text = retryText;
     const prevMessages = messages.slice(0, -2);
     const withUser: ChatMsg[] = [...prevMessages, { role: "user", text }];
-    setMessages(withUser);
+    const targetIdx = withUser.length;
+    setMessages([...withUser, { role: "model", text: "", toolEvents: [] }]);
     setLoading(true);
     setRetryText("");
     try {
-      const reply = await callApi(text, prevMessages);
-      const idx = withUser.length;
-      setMessages([...withUser, { role: "model", text: "" }]);
+      const reply = await streamChat(text, prevMessages, targetIdx);
       setLoading(false);
-      await streamReveal(idx, reply);
+      if (reply) setMessages((prev) => prev.map((m, i) => (i === targetIdx ? { ...m, text: reply } : m)));
       if (!openRef.current) setHasUnseenResponse(true);
     } catch (err: any) {
-      setRetryText(text);
-      setMessages([...withUser, { role: "model", text: `❌ ${err.message}` }]);
       setLoading(false);
+      if (err?.name === "AbortError") return;
+      setRetryText(text);
+      setMessages((prev) => prev.map((m, i) => (i === targetIdx ? { ...m, text: `❌ ${err.message}`, toolEvents: [] } : m)));
       if (!openRef.current) setHasUnseenResponse(true);
     }
   };
@@ -395,15 +429,16 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
     const userMsg = messages[idx - 1];
     if (!userMsg || userMsg.role !== "user") return;
     const prevMessages = messages.slice(0, idx - 1);
+    setMessages((prev) => prev.map((m, i) => (i === idx ? { role: "model", text: "", toolEvents: [] } : m)));
     setRegeneratingIdx(idx);
     try {
-      const reply = await callApi(userMsg.text, prevMessages);
-      setMessages((prev) => prev.map((m, i) => (i === idx ? { role: "model", text: "" } : m)));
+      const reply = await streamChat(userMsg.text, prevMessages, idx);
       setRegeneratingIdx(null);
-      await streamReveal(idx, reply);
+      if (reply) setMessages((prev) => prev.map((m, i) => (i === idx ? { ...m, text: reply } : m)));
     } catch (err: any) {
-      setMessages((prev) => prev.map((m, i) => (i === idx ? { role: "model", text: `❌ ${err.message}` } : m)));
       setRegeneratingIdx(null);
+      if (err?.name === "AbortError") return;
+      setMessages((prev) => prev.map((m, i) => (i === idx ? { ...m, text: `❌ ${err.message}`, toolEvents: [] } : m)));
     }
   };
 
@@ -529,7 +564,27 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
                     </div>
                     <div className="flex-1 flex flex-col gap-1.5 min-w-0 pt-0.5">
                       <div className={`text-slate-700 text-[13px] leading-relaxed break-words transition-opacity ${isRegenerating ? "opacity-40" : ""}`}>
-                        {renderMarkdownLite(msg.text)}
+                        {msg.toolEvents && msg.toolEvents.length > 0 && (
+                          <div className="flex flex-col gap-1.5 mb-2">
+                            {msg.toolEvents.map((te, ti) => (
+                              <div key={ti} className={`inline-flex items-center gap-1.5 text-[10.5px] font-medium rounded-full px-2.5 py-1 w-fit transition-colors duration-300 ${
+                                te.done ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-500"
+                              }`}>
+                                {te.done ? <Check size={11} /> : <Loader2 size={11} className="animate-spin" />}
+                                {te.label}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {msg.text ? renderMarkdownLite(msg.text) : (
+                          loading && i === messages.length - 1 ? (
+                            <span className="inline-flex items-center gap-1 py-1">
+                              {[0, 1, 2].map((d) => (
+                                <span key={d} className="h-1.5 w-1.5 rounded-full bg-red-300 animate-bounce" style={{ animationDelay: `${d * 0.15}s` }} />
+                              ))}
+                            </span>
+                          ) : null
+                        )}
                       </div>
                       <div className={`flex items-center gap-3.5 transition-opacity duration-200 ${isRegenerating ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
                         <button
@@ -563,17 +618,6 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
               );
             })}
 
-            {loading && (
-              <div className="flex items-start gap-3 animate-fade-in">
-                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-red-500 to-red-700 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
-                  <Bot size={13} />
-                </div>
-                <div className="flex items-center pt-2.5">
-                  <Loader2 size={16} className="text-red-400 animate-spin" />
-                </div>
-              </div>
-            )}
-
             <div ref={bottomRef} />
           </div>
 
@@ -593,11 +637,14 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
                 />
               </div>
               <button
-                onClick={send}
-                disabled={!input.trim() || loading}
-                className="w-10 h-10 rounded-full bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white flex items-center justify-center shrink-0 shadow-md shadow-red-500/20 transition-all mb-0.5 active:scale-95 focus:outline-none"
+                onClick={loading ? abortStreaming : send}
+                disabled={!loading && !input.trim()}
+                title={loading ? "Detener" : "Enviar"}
+                className={`w-10 h-10 rounded-full disabled:opacity-40 text-white flex items-center justify-center shrink-0 shadow-md transition-all mb-0.5 active:scale-95 focus:outline-none ${
+                  loading ? "bg-slate-700 hover:bg-slate-800 shadow-slate-500/20" : "bg-red-600 hover:bg-red-700 shadow-red-500/20"
+                }`}
               >
-                <Send size={13} className="-translate-x-[1px] translate-y-[1px]" />
+                {loading ? <Square size={12} /> : <Send size={13} className="-translate-x-[1px] translate-y-[1px]" />}
               </button>
             </div>
             <p className="text-center text-[9px] text-slate-400 font-medium mt-3">
