@@ -4604,6 +4604,25 @@ export default function ExpedienteList() {
     if (items) setExpedientes(prev => [...prev, ...items]);
   };
 
+  // Borrado definitivo (sin deshacer) -- solo para expedientes ya archivados,
+  // pensado como "vaciar la papelera" desde la vista de "Ver archivados".
+  const [hardDeleteConfirm, setHardDeleteConfirm] = useState(false);
+  const [hardDeleteLoading, setHardDeleteLoading] = useState(false);
+  const handleBulkHardDelete = async () => {
+    const ids = Array.from(selectedIds).filter(id => expedientes.find(e => e.id === id)?.estado === "archivado");
+    if (!ids.length) { setHardDeleteConfirm(false); return; }
+    setHardDeleteLoading(true);
+    try {
+      const token = await getToken({ skipCache: true });
+      await Promise.all(ids.map(id =>
+        fetch(`/api/expedientes/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } })
+      ));
+      setExpedientes(prev => prev.filter(e => !ids.includes(e.id)));
+      setSelectedIds(new Set());
+      setHardDeleteConfirm(false);
+    } catch { /* ignore */ } finally { setHardDeleteLoading(false); }
+  };
+
   const handleBulkChangeState = async (estado: string) => {
     const ids = Array.from(selectedIds);
     setShowBulkStateMenu(false);
@@ -7028,11 +7047,19 @@ export default function ExpedienteList() {
                       <Download size={12} />
                       Exportar
                     </button>
-                    <button onClick={() => setBulkDeleteConfirm(true)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors">
-                      <Trash2 size={12} />
-                      Dar de baja {selectedIds.size}
-                    </button>
+                    {archivedFilterActive ? (
+                      <button onClick={() => setHardDeleteConfirm(true)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-red-700 hover:bg-red-800 border border-red-800 rounded-lg transition-colors">
+                        <Trash2 size={12} />
+                        Eliminar definitivamente {selectedIds.size}
+                      </button>
+                    ) : (
+                      <button onClick={() => setBulkDeleteConfirm(true)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors">
+                        <Trash2 size={12} />
+                        Dar de baja {selectedIds.size}
+                      </button>
+                    )}
                     <button onClick={deselectAll}
                       className="ml-auto flex items-center gap-1 px-2.5 py-1.5 text-xs text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
                       <X size={11} /> Limpiar
@@ -7131,6 +7158,28 @@ export default function ExpedienteList() {
               <>
                 <button onClick={() => setBulkDeleteConfirm(false)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
                 <button onClick={handleBulkDelete} className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg active:scale-95">Dar de baja</button>
+              </>
+            }
+          />
+
+          {/* ── Confirmar borrado definitivo (sin deshacer) ── */}
+          <Modal
+            open={hardDeleteConfirm}
+            onClose={() => setHardDeleteConfirm(false)}
+            variant="confirm"
+            icon={<AlertTriangle size={18} />}
+            iconTone="danger"
+            title={`¿Eliminar definitivamente ${selectedIds.size} expediente${selectedIds.size !== 1 ? "s" : ""}?`}
+            subtitle="Esto SÍ borra el registro de la base de datos. No hay deshacer."
+            zIndex={9999}
+            footer={
+              <>
+                <button onClick={() => setHardDeleteConfirm(false)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
+                <button onClick={handleBulkHardDelete} disabled={hardDeleteLoading}
+                  className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-red-700 hover:bg-red-800 disabled:opacity-50 rounded-lg active:scale-95">
+                  {hardDeleteLoading ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                  Eliminar definitivamente
+                </button>
               </>
             }
           />
