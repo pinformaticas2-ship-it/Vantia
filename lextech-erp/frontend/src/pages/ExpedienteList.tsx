@@ -4713,6 +4713,84 @@ export default function ExpedienteList() {
     finally { setBulkTareaLoading(false); }
   };
 
+  // Duplicar en bloque: crea una copia (sin id ni núm. de expediente, así que
+  // cada una recibe su propio número) por cada expediente marcado.
+  const [bulkDuplicateLoading, setBulkDuplicateLoading] = useState(false);
+  const handleBulkDuplicate = async () => {
+    const items = Array.from(selectedIds).map(id => expedientes.find(e => e.id === id)).filter(Boolean) as any[];
+    if (!items.length) return;
+    if (!window.confirm(`¿Duplicar ${items.length} expediente${items.length !== 1 ? "s" : ""}? Se crearán ${items.length} expediente${items.length !== 1 ? "s" : ""} nuevo${items.length !== 1 ? "s" : ""}.`)) return;
+    setBulkDuplicateLoading(true);
+    try {
+      const token = await getToken({ skipCache: true });
+      const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+      await Promise.all(items.map(exp => {
+        const { id, num_exp, anio, created_at, updated_at, ...rest } = exp;
+        return fetch("/api/expedientes", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ ...rest, descripcion: exp.descripcion ? `${exp.descripcion} (copia)` : "", estado: "abierto" }),
+        });
+      }));
+      setSelectedIds(new Set());
+      fetchExpedientes(true);
+    } catch { /* ignore */ } finally { setBulkDuplicateLoading(false); }
+  };
+
+  // Enviar correo en bloque: abre un único borrador con todos los emails de
+  // cliente de los marcados como destinatarios (el usuario revisa y envía).
+  const handleBulkComposeEmail = () => {
+    const items = Array.from(selectedIds).map(id => expedientes.find(e => e.id === id)).filter(Boolean) as any[];
+    const emails = Array.from(new Set(
+      items.map(exp => clientes.find((c: any) => c.id === exp.cliente_id)?.email).filter(Boolean)
+    ));
+    if (!emails.length) { alert("Ninguno de los expedientes marcados tiene un cliente con email."); return; }
+    const params = new URLSearchParams({ compose: "1", to: emails.join(","), subject: `${items.length} expedientes` });
+    navigate(`/dashboard/correo?${params.toString()}`);
+  };
+
+  // Enviar WhatsApp en bloque: a diferencia del correo, aquí SÍ se envía de
+  // verdad al confirmar (no es un borrador) -- por eso pasa por un formulario
+  // propio en vez de disparar el envío directamente desde la barra.
+  const [showBulkWaForm, setShowBulkWaForm] = useState(false);
+  const [bulkWaMessage, setBulkWaMessage] = useState("");
+  const [bulkWaLoading, setBulkWaLoading] = useState(false);
+  const [bulkWaError, setBulkWaError] = useState("");
+  const bulkWaRecipients = useMemo(() => {
+    const items = Array.from(selectedIds).map(id => expedientes.find(e => e.id === id)).filter(Boolean) as any[];
+    const seen = new Set<string>();
+    const out: any[] = [];
+    for (const exp of items) {
+      const c = clientes.find((c: any) => c.id === exp.cliente_id);
+      const phone = c?.phone_mobile || c?.phone_1;
+      if (c && phone && !seen.has(c.id)) { seen.add(c.id); out.push(c); }
+    }
+    return out;
+  }, [selectedIds, expedientes, clientes]);
+  const handleBulkSendWhatsApp = async () => {
+    const text = bulkWaMessage.trim();
+    if (!text || !bulkWaRecipients.length) return;
+    setBulkWaLoading(true);
+    setBulkWaError("");
+    try {
+      const token = await getToken({ skipCache: true });
+      const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+      const results = await Promise.all(bulkWaRecipients.map((c: any) =>
+        fetch("/api/whatsapp/messages", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ clientId: c.id, to: c.phone_mobile || c.phone_1, body: text }),
+        })
+      ));
+      const failed = results.filter(r => !r.ok).length;
+      setShowBulkWaForm(false);
+      setBulkWaMessage("");
+      setSelectedIds(new Set());
+      if (failed > 0) alert(`No se pudo enviar a ${failed} de ${bulkWaRecipients.length} destinatarios.`);
+    } catch { setBulkWaError("No se pudo enviar el mensaje."); }
+    finally { setBulkWaLoading(false); }
+  };
+
   const handleBulkChangeState = async (estado: string) => {
     const ids = Array.from(selectedIds);
     setShowBulkStateMenu(false);
@@ -6767,35 +6845,46 @@ export default function ExpedienteList() {
 
               <div className="w-px h-5 bg-slate-200 mx-1" />
 
-              {/* Baja, Modificar, Duplicar */}
-              <ToolBtn icon={Trash2} label="Baja" danger disabled={!toolbarSelected} onClick={() => toolbarSelected && setDeleteId(toolbarSelected)} />
+              {/* Baja, Modificar, Duplicar -- Baja/Duplicar trabajan en bloque con 2+ marcados */}
+              <ToolBtn icon={Trash2} label={selectedIds.size >= 2 ? `Baja (${selectedIds.size})` : "Baja"} danger
+                disabled={!toolbarSelected && selectedIds.size < 2}
+                onClick={() => selectedIds.size >= 2 ? setBulkDeleteConfirm(true) : toolbarSelected && setDeleteId(toolbarSelected)} />
               {selectedExp?.estado === "archivado" && (
                 <ToolBtn icon={FolderOpen} label="Quitar de archivado" disabled={unarchiveSingleLoading} onClick={() => toolbarSelected && handleUnarchiveSingle(toolbarSelected)} />
               )}
               <ToolBtn icon={Edit3} label="Modificar" disabled={!toolbarSelected || selectedExpLocked} onClick={() => toolbarSelected && !selectedExpLocked && navigate(`/dashboard/expedientes/${toolbarSelected}?edit=1`)} />
-              <ToolBtn icon={Copy} label="Duplicar" disabled={!selectedExp} onClick={() => selectedExp && handleDuplicate(selectedExp)} />
+              <ToolBtn icon={Copy} label={selectedIds.size >= 2 ? `Duplicar ${selectedIds.size}` : "Duplicar"} disabled={!selectedExp && selectedIds.size < 2}
+                onClick={() => selectedIds.size >= 2 ? handleBulkDuplicate() : selectedExp && handleDuplicate(selectedExp)} />
 
               <div className="w-px h-5 bg-slate-200 mx-1" />
 
-              {/* Correo, WhatsApp */}
-              <DropdownToolBtn icon={Mail} label="Enviar Correo" disabled={!toolbarSelected} items={[
-                { label: "Nuevo", icon: Mail, onClick: () => { if (!selectedExp) return; const params = new URLSearchParams({ compose: '1', subject: `Expediente ${selectedExp.anio}/${selectedExp.num_exp} - ${selectedExp.descripcion || ''}`, ...(selectedExp.cliente_email ? { to: selectedExp.cliente_email } : {}), expediente_id: selectedExp.id }); navigate(`/dashboard/correo?${params.toString()}`); } },
-                { label: "Con Plantilla", icon: FileText, onClick: () => { if (!selectedExp) return; const params = new URLSearchParams({ compose: '1', subject: `Expediente ${selectedExp.anio}/${selectedExp.num_exp} - ${selectedExp.descripcion || ''}`, ...(selectedExp.cliente_email ? { to: selectedExp.cliente_email } : {}), expediente_id: selectedExp.id, open_templates: '1' }); navigate(`/dashboard/correo?${params.toString()}`); } },
-                { divider: true, label: '' },
-                { label: "Con Adjuntos", icon: Paperclip, children: [
-                  { label: "Nuevo", icon: Mail, onClick: () => { if (!selectedExp) return; const params = new URLSearchParams({ compose: '1', subject: `Expediente ${selectedExp.anio}/${selectedExp.num_exp} - ${selectedExp.descripcion || ''} (con adjuntos)`, ...(selectedExp.cliente_email ? { to: selectedExp.cliente_email } : {}), expediente_id: selectedExp.id, open_attachments: '1' }); navigate(`/dashboard/correo?${params.toString()}`); } },
-                  { label: "Con Plantilla", icon: FileText, onClick: () => { if (!selectedExp) return; const params = new URLSearchParams({ compose: '1', subject: `Expediente ${selectedExp.anio}/${selectedExp.num_exp} - ${selectedExp.descripcion || ''}`, ...(selectedExp.cliente_email ? { to: selectedExp.cliente_email } : {}), expediente_id: selectedExp.id, open_templates: '1', open_attachments: '1' }); navigate(`/dashboard/correo?${params.toString()}`); } },
-                ]},
-                { divider: true, label: '' },
-                { label: "MN Sign", icon: Pencil, onClick: () => toolbarSelected && navigate(`/dashboard/expedientes/${toolbarSelected}#firma`) },
-              ]} />
-              <DropdownToolBtn icon={MessageCircle} label="Enviar WhatsApp" disabled={!selectedExp?.cliente_id} items={[
-                { label: "Nuevo", icon: MessageCircle, onClick: () => { if (!selectedExp?.cliente_id) return; navigate(`/dashboard/whatsapp?clientId=${selectedExp.cliente_id}&mode=new`); } },
-                { label: "Con Plantilla", icon: FileSpreadsheet, onClick: () => { if (!selectedExp?.cliente_id) return; navigate(`/dashboard/whatsapp?clientId=${selectedExp.cliente_id}&mode=template`); } },
-                { label: "Programar WhatsApp", icon: Bell, onClick: () => { if (!selectedExp?.cliente_id) return; navigate(`/dashboard/whatsapp?clientId=${selectedExp.cliente_id}&mode=schedule`); } },
-                { label: "Sign", icon: Pencil, onClick: () => toolbarSelected && navigate(`/dashboard/expedientes/${toolbarSelected}#firma`) },
-                { label: "Ver Conversación", icon: ExternalLink, onClick: () => { if (!selectedExp?.cliente_id) return; navigate(`/dashboard/whatsapp?clientId=${selectedExp.cliente_id}&mode=thread`); } },
-              ]} />
+              {/* Correo, WhatsApp -- en bloque con 2+ marcados */}
+              {selectedIds.size >= 2 ? (
+                <ToolBtn icon={Mail} label={`Correo (${selectedIds.size})`} onClick={handleBulkComposeEmail} />
+              ) : (
+                <DropdownToolBtn icon={Mail} label="Enviar Correo" disabled={!toolbarSelected} items={[
+                  { label: "Nuevo", icon: Mail, onClick: () => { if (!selectedExp) return; const params = new URLSearchParams({ compose: '1', subject: `Expediente ${selectedExp.anio}/${selectedExp.num_exp} - ${selectedExp.descripcion || ''}`, ...(selectedExp.cliente_email ? { to: selectedExp.cliente_email } : {}), expediente_id: selectedExp.id }); navigate(`/dashboard/correo?${params.toString()}`); } },
+                  { label: "Con Plantilla", icon: FileText, onClick: () => { if (!selectedExp) return; const params = new URLSearchParams({ compose: '1', subject: `Expediente ${selectedExp.anio}/${selectedExp.num_exp} - ${selectedExp.descripcion || ''}`, ...(selectedExp.cliente_email ? { to: selectedExp.cliente_email } : {}), expediente_id: selectedExp.id, open_templates: '1' }); navigate(`/dashboard/correo?${params.toString()}`); } },
+                  { divider: true, label: '' },
+                  { label: "Con Adjuntos", icon: Paperclip, children: [
+                    { label: "Nuevo", icon: Mail, onClick: () => { if (!selectedExp) return; const params = new URLSearchParams({ compose: '1', subject: `Expediente ${selectedExp.anio}/${selectedExp.num_exp} - ${selectedExp.descripcion || ''} (con adjuntos)`, ...(selectedExp.cliente_email ? { to: selectedExp.cliente_email } : {}), expediente_id: selectedExp.id, open_attachments: '1' }); navigate(`/dashboard/correo?${params.toString()}`); } },
+                    { label: "Con Plantilla", icon: FileText, onClick: () => { if (!selectedExp) return; const params = new URLSearchParams({ compose: '1', subject: `Expediente ${selectedExp.anio}/${selectedExp.num_exp} - ${selectedExp.descripcion || ''}`, ...(selectedExp.cliente_email ? { to: selectedExp.cliente_email } : {}), expediente_id: selectedExp.id, open_templates: '1', open_attachments: '1' }); navigate(`/dashboard/correo?${params.toString()}`); } },
+                  ]},
+                  { divider: true, label: '' },
+                  { label: "MN Sign", icon: Pencil, onClick: () => toolbarSelected && navigate(`/dashboard/expedientes/${toolbarSelected}#firma`) },
+                ]} />
+              )}
+              {selectedIds.size >= 2 ? (
+                <ToolBtn icon={MessageCircle} label={`WhatsApp (${selectedIds.size})`} onClick={() => setShowBulkWaForm(true)} />
+              ) : (
+                <DropdownToolBtn icon={MessageCircle} label="Enviar WhatsApp" disabled={!selectedExp?.cliente_id} items={[
+                  { label: "Nuevo", icon: MessageCircle, onClick: () => { if (!selectedExp?.cliente_id) return; navigate(`/dashboard/whatsapp?clientId=${selectedExp.cliente_id}&mode=new`); } },
+                  { label: "Con Plantilla", icon: FileSpreadsheet, onClick: () => { if (!selectedExp?.cliente_id) return; navigate(`/dashboard/whatsapp?clientId=${selectedExp.cliente_id}&mode=template`); } },
+                  { label: "Programar WhatsApp", icon: Bell, onClick: () => { if (!selectedExp?.cliente_id) return; navigate(`/dashboard/whatsapp?clientId=${selectedExp.cliente_id}&mode=schedule`); } },
+                  { label: "Sign", icon: Pencil, onClick: () => toolbarSelected && navigate(`/dashboard/expedientes/${toolbarSelected}#firma`) },
+                  { label: "Ver Conversación", icon: ExternalLink, onClick: () => { if (!selectedExp?.cliente_id) return; navigate(`/dashboard/whatsapp?clientId=${selectedExp.cliente_id}&mode=thread`); } },
+                ]} />
+              )}
 
               <div className="w-px h-5 bg-slate-200 mx-1" />
 
@@ -7209,11 +7298,6 @@ export default function ExpedienteList() {
                       <Download size={12} />
                       Exportar
                     </button>
-                    <button onClick={() => setBulkDeleteConfirm(true)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors">
-                      <Trash2 size={12} />
-                      Dar de baja {selectedIds.size}
-                    </button>
                     {selectedHasArchived && (
                       <>
                         <button onClick={handleBulkUnarchive} disabled={unarchiveLoading}
@@ -7397,6 +7481,46 @@ export default function ExpedienteList() {
                 </select>
               </label>
               {bulkTareaError && <p className="text-xs text-red-600">{bulkTareaError}</p>}
+            </div>
+          </Modal>
+
+          {/* ── Enviar WhatsApp en bloque ── */}
+          <Modal
+            open={showBulkWaForm}
+            onClose={() => { setShowBulkWaForm(false); setBulkWaError(""); }}
+            variant="confirm"
+            icon={<MessageCircle size={18} />}
+            title={`Enviar WhatsApp a ${bulkWaRecipients.length} de ${selectedIds.size} marcados`}
+            subtitle={
+              bulkWaRecipients.length < selectedIds.size
+                ? "El resto no tiene un cliente con teléfono asociado. Se envía de verdad al confirmar, no es un borrador."
+                : "Se envía de verdad al confirmar, no es un borrador."
+            }
+            zIndex={9999}
+            footer={
+              <>
+                <button onClick={() => { setShowBulkWaForm(false); setBulkWaError(""); }} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
+                <button onClick={handleBulkSendWhatsApp} disabled={!bulkWaMessage.trim() || !bulkWaRecipients.length || bulkWaLoading}
+                  className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg active:scale-95">
+                  {bulkWaLoading ? <Loader2 size={12} className="animate-spin" /> : <MessageCircle size={12} />}
+                  Enviar
+                </button>
+              </>
+            }
+          >
+            <div className="space-y-3">
+              <label className="block">
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Mensaje</span>
+                <textarea
+                  autoFocus
+                  rows={4}
+                  value={bulkWaMessage}
+                  onChange={e => setBulkWaMessage(e.target.value)}
+                  placeholder="Escribe el mensaje que recibirán todos los destinatarios"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-red-400 resize-none"
+                />
+              </label>
+              {bulkWaError && <p className="text-xs text-red-600">{bulkWaError}</p>}
             </div>
           </Modal>
 
