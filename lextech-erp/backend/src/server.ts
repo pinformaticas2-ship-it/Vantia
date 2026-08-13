@@ -117,15 +117,20 @@ app.use('/api', (_req, res, next) => {
 });
 
 // ── Compresión gzip de respuestas para velocidad ─────────────
-// El endpoint de streaming de VantIA (SSE) queda excluido: compression()
-// bufferea la salida hasta acumular un bloque para comprimir, lo que rompe
-// el streaming en vivo (el cliente no vería nada hasta el final).
-app.use(compression({
-  filter: (req, res) => {
-    if (req.path === '/api/vantia/chat/stream') return false;
-    return compression.filter(req, res);
-  },
-}));
+// El endpoint de streaming de VantIA (SSE) queda FUERA por completo del
+// middleware, no solo desactivado vía `filter`: compression() sobreescribe
+// res.write/res.end/res._implicitHeader nada más entrar (para poder decidir
+// si comprime al ver el primer chunk), y esa envoltura se queda puesta pase
+// lo que pase con el filtro. Con una respuesta larga y en trozos como esta
+// (muchos res.write() a lo largo de varios segundos) esa envoltura extra es
+// justo el tipo de cosa que puede desordenar el framing HTTP y provocar
+// cortes de conexión con el navegador. Saltarse compression() del todo para
+// esta ruta, en vez de solo decirle "no comprimas", es la manera segura.
+const compressionMw = compression();
+app.use((req, res, next) => {
+  if (req.path === '/api/vantia/chat/stream') return next();
+  return compressionMw(req, res, next);
+});
 
 // Servir archivos estáticos (fotos DNI subidas, etc.)
 // El frontend y el backend viven en dominios distintos (Vercel/Railway), asi que
