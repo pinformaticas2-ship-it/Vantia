@@ -199,6 +199,33 @@ app.get('/api/health/storage', (_req, res) => {
   });
 });
 
+// Diagnóstico temporal: SSE mínimo sin Gemini ni BD, mismo patrón exacto de
+// cabeceras que /api/vantia/chat/stream, para aislar si el corte con
+// net::ERR_HTTP2_PROTOCOL_ERROR es de la plataforma (Railway/Node con
+// streaming largo por HTTP/2) o de algo específico del código de VantIA.
+// Visitar directamente desde el navegador (sin auth, GET) y ver si en
+// Network se completa "1..2..3..4..5..fin" o se corta igual.
+app.get('/api/health/sse-test', (_req, res) => {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream; charset=utf-8',
+    'Cache-Control': 'no-cache, no-transform',
+    'X-Accel-Buffering': 'no',
+  });
+  res.flushHeaders?.();
+  res.write(': connected\n\n');
+  let n = 0;
+  const timer = setInterval(() => {
+    n++;
+    res.write(`data: ${JSON.stringify({ n })}\n\n`);
+    if (n >= 5) {
+      clearInterval(timer);
+      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      res.end();
+    }
+  }, 1000);
+  _req.on('close', () => clearInterval(timer));
+});
+
 app.get('/api/health/version', (_req, res) => {
   res.json({
     status: 'ok',
