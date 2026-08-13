@@ -213,16 +213,17 @@ app.all('/api/health/sse-test', (_req, res) => {
   });
   res.flushHeaders?.();
   res.write(': connected\n\n');
+  const totalTicks = Number(_req.query.ticks) || 30; // 30 ticks x 2s = 60s por defecto
   let n = 0;
   const timer = setInterval(() => {
     n++;
-    res.write(`data: ${JSON.stringify({ n })}\n\n`);
-    if (n >= 5) {
+    res.write(`data: ${JSON.stringify({ n, elapsedMs: n * 2000 })}\n\n`);
+    if (n >= totalTicks) {
       clearInterval(timer);
       res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
       res.end();
     }
-  }, 1000);
+  }, 2000);
   _req.on('close', () => clearInterval(timer));
 });
 
