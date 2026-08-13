@@ -1015,7 +1015,8 @@ export const diagRelay = async (_req: Request, res: Response) => {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:streamGenerateContent?alt=sse&key=${apiKey}`;
     let n = 0;
     for await (const chunk of geminiStreamChunks(url, {
-      contents: [{ role: 'user', parts: [{ text: 'Escribe un párrafo corto (3-4 frases) explicando qué es un contrato de arrendamiento.' }] }],
+      contents: [{ role: 'user', parts: [{ text: 'Dime hola en una palabra' }] }],
+      tools: TOOLS, // TEMPORAL: mismo catálogo real que chatVantiaStream, para aislar si el problema es esto
       generationConfig: { temperature: 0.7, maxOutputTokens: 500 },
     })) {
       if (closed) break;
