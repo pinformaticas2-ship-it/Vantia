@@ -215,9 +215,47 @@ app.get('/api/health/version', (_req, res) => {
 // responde o no -- sin exponer la key. Pensado para depurar "VantIA no
 // contesta" sin depender de una sesión de navegador autenticada. Quitar una
 // vez confirmado que todo funciona.
-app.get('/api/health/vantia', async (_req, res) => {
+app.get('/api/health/vantia', async (req, res) => {
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
   if (!apiKey) return res.json({ status: 'error', reason: 'GEMINI_API_KEY no está configurada en este entorno.' });
+
+  // ?stream=1 prueba el mismo camino que usa chatVantiaStream de verdad
+  // (fetch + res.body.getReader() sobre streamGenerateContent), para aislar
+  // si el problema está en LEER el stream de Gemini en este runtime, o en
+  // escribírselo al navegador (framing HTTP, proxy intermedio, etc.).
+  if (req.query.stream) {
+    const started = Date.now();
+    try {
+      const r = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'Cuenta del 1 al 5' }] }] }),
+        }
+      );
+      if (!r.ok || !r.body) {
+        const data: any = await r.json().catch(() => ({}));
+        return res.json({ status: 'error', httpStatus: r.status, googleError: data?.error?.message || 'sin body' });
+      }
+      const reader = r.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let chunks = 0, bytes = 0, text = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks++;
+        bytes += value.length;
+        text += decoder.decode(value, { stream: true });
+        if (Date.now() - started > 20000) { return res.json({ status: 'timeout', chunks, bytes, ms: Date.now() - started, sample: text.slice(0, 300) }); }
+      }
+      res.json({ status: 'ok', chunks, bytes, ms: Date.now() - started, sample: text.slice(0, 500) });
+    } catch (e: any) {
+      res.json({ status: 'error', ms: Date.now() - started, reason: e?.message || String(e) });
+    }
+    return;
+  }
+
   try {
     const r = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
