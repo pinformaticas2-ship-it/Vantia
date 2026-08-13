@@ -205,7 +205,7 @@ app.get('/api/health/storage', (_req, res) => {
 // streaming largo por HTTP/2) o de algo específico del código de VantIA.
 // Visitar directamente desde el navegador (sin auth, GET) y ver si en
 // Network se completa "1..2..3..4..5..fin" o se corta igual.
-app.get('/api/health/sse-test', (_req, res) => {
+app.all('/api/health/sse-test', (_req, res) => {
   res.writeHead(200, {
     'Content-Type': 'text/event-stream; charset=utf-8',
     'Cache-Control': 'no-cache, no-transform',
