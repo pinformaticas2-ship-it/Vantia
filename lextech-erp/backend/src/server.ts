@@ -210,6 +210,34 @@ app.get('/api/health/version', (_req, res) => {
   });
 });
 
+// Diagnóstico temporal de VantIA: hace una llamada real y mínima a Gemini con
+// la key configurada en ESTE entorno (Railway, no el .env local) y dice si
+// responde o no -- sin exponer la key. Pensado para depurar "VantIA no
+// contesta" sin depender de una sesión de navegador autenticada. Quitar una
+// vez confirmado que todo funciona.
+app.get('/api/health/vantia', async (_req, res) => {
+  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+  if (!apiKey) return res.json({ status: 'error', reason: 'GEMINI_API_KEY no está configurada en este entorno.' });
+  try {
+    const r = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'Responde solo con la palabra: ok' }] }] }),
+      }
+    );
+    const data: any = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      return res.json({ status: 'error', httpStatus: r.status, googleError: data?.error?.message || JSON.stringify(data).slice(0, 300), keyPrefix: apiKey.slice(0, 6) });
+    }
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || null;
+    res.json({ status: 'ok', sample: text, keyPrefix: apiKey.slice(0, 6) });
+  } catch (e: any) {
+    res.json({ status: 'error', reason: e?.message || String(e) });
+  }
+});
+
 // Health check de base de datos — visita http://localhost:4000/api/health/db para diagnosticar
 app.get('/api/files/setup/vantia-protocol.ps1', (_req, res) => {
   const fs = require('fs');
