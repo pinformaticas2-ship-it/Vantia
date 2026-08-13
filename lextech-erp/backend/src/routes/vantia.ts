@@ -15,5 +15,6 @@ router.post('/chat',                  requireAuth, chatVantia);
 router.post('/chat/stream',           requireAuth, chatVantiaStream);
 router.post('/feedback',              requireAuth, submitFeedback);
 router.get('/diag-relay',             diagRelay); // temporal, sin auth -- ver comentario en el controller
+router.get('/diag-relay-auth',        requireAuth, diagRelay); // temporal: mismo handler, pero CON requireAuth
 
 export default router;

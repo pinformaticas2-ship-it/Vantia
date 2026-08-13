@@ -248,6 +248,32 @@ export default function ChatIA() {
       setDiagRunning(false);
     }
   };
+  const runDiag2 = async () => {
+    setDiagLines([]);
+    setDiagRunning(true);
+    setDiagOpen(true);
+    try {
+      logDiag('Pidiendo token...');
+      const token = await getToken({ skipCache: true });
+      logDiag(`Token OK (${token ? token.length : 0} chars). Llamando a /api/vantia/diag-relay-auth (GET, con requireAuth)...`);
+      const res = await fetch(resolveApiUrl('/api/vantia/diag-relay-auth'), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      logDiag(`Respuesta: status ${res.status} ${res.statusText}`);
+      if (!res.body) { logDiag('❌ Sin body en la respuesta.'); return; }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) { logDiag('✅ TERMINADO OK (stream cerrado limpio).'); break; }
+        logDiag(`chunk (${value.length} bytes): ${decoder.decode(value).slice(0, 200)}`);
+      }
+    } catch (err: any) {
+      logDiag(`❌ FALLO: ${err?.name || 'Error'} — ${err?.message || String(err)}`);
+    } finally {
+      setDiagRunning(false);
+    }
+  };
 
   // Adjuntar archivo de texto a la conversación
   const [attachedFile, setAttachedFile] = useState<{ name: string; content: string } | null>(null);
@@ -775,6 +801,14 @@ export default function ChatIA() {
                 title="Prueba temporal de conexión con VantIA"
               >
                 {diagRunning ? <Loader2 className="h-3.5 w-3.5 cia-spin" /> : '🔧'} Diagnóstico
+              </button>
+              <button
+                onClick={runDiag2}
+                disabled={diagRunning}
+                className="flex items-center gap-1.5 text-xs font-semibold text-purple-700 border border-purple-300 bg-purple-50 hover:bg-purple-100 px-3 py-1.5 rounded-lg transition-all active:scale-95 disabled:opacity-50"
+                title="Prueba temporal: mismo endpoint que funciona pero con requireAuth"
+              >
+                {diagRunning ? <Loader2 className="h-3.5 w-3.5 cia-spin" /> : '🔧'} Diag. auth
               </button>
               {activeModuleId && messages.length > 0 && (
                 <button
