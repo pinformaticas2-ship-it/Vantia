@@ -973,6 +973,49 @@ export const chatVantiaStream = async (req: any, res: Response) => {
   }
 };
 
+// ── GET /api/vantia/diag-relay ── (SIN AUTH, temporal) ──────────────────────
+// Repite exactamente el núcleo de chatVantiaStream (writeHead + flushHeaders
+// + geminiStreamChunks + relé de deltas por SSE al navegador) pero sin
+// autenticación, sin BD, sin historial ni herramientas -- para aislar si el
+// corte con ERR_HTTP2_PROTOCOL_ERROR pasa específicamente cuando se hace un
+// fetch() saliente a Gemini MIENTRAS se está escribiendo la respuesta al
+// cliente (el test SSE genérico con setInterval no lo prueba, porque no
+// hace ningún fetch saliente).
+export const diagRelay = async (_req: Request, res: Response) => {
+  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+  if (!apiKey) return res.status(503).json({ error: 'sin key' });
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream; charset=utf-8',
+    'Cache-Control': 'no-cache, no-transform',
+    'X-Accel-Buffering': 'no',
+  });
+  res.flushHeaders?.();
+  res.write(': connected\n\n');
+
+  let closed = false;
+  _req.on('close', () => { closed = true; });
+
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:streamGenerateContent?alt=sse&key=${apiKey}`;
+    let n = 0;
+    for await (const chunk of geminiStreamChunks(url, {
+      contents: [{ role: 'user', parts: [{ text: 'Escribe un párrafo corto (3-4 frases) explicando qué es un contrato de arrendamiento.' }] }],
+      generationConfig: { temperature: 0.7, maxOutputTokens: 500 },
+    })) {
+      if (closed) break;
+      n++;
+      const parts: any[] = chunk?.candidates?.[0]?.content?.parts || [];
+      for (const p of parts) {
+        if (p.text) res.write(`data: ${JSON.stringify({ n, text: p.text })}\n\n`);
+      }
+    }
+    if (!closed) { res.write(`data: ${JSON.stringify({ done: true, totalChunks: n })}\n\n`); res.end(); }
+  } catch (e: any) {
+    if (!closed) { res.write(`data: ${JSON.stringify({ error: e?.message || String(e) })}\n\n`); res.end(); }
+  }
+};
+
 // ── POST /api/vantia/feedback ── 👍/👎 sobre una respuesta concreta de VantIA.
 // Guarda un único voto por (usuario, conversación, índice de mensaje); mandar
 // rating:null borra el voto (el frontend lo usa para "deshacer" un clic).

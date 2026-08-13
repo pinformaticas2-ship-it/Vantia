@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { requireAuth } from '../middleware/auth';
 import {
   chatVantia, chatVantiaStream, getChatHistory, clearChatHistory,
-  listConversations, deleteConversation, submitFeedback,
+  listConversations, deleteConversation, submitFeedback, diagRelay,
 } from '../controllers/vantiaController';
 
 const router = Router();
@@ -14,5 +14,6 @@ router.delete('/chat/history',        requireAuth, clearChatHistory);
 router.post('/chat',                  requireAuth, chatVantia);
 router.post('/chat/stream',           requireAuth, chatVantiaStream);
 router.post('/feedback',              requireAuth, submitFeedback);
+router.get('/diag-relay',             diagRelay); // temporal, sin auth -- ver comentario en el controller
 
 export default router;
