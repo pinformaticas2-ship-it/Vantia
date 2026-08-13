@@ -878,7 +878,15 @@ export const chatVantiaStream = async (req: any, res: Response) => {
   res.write(': connected\n\n');
 
   let closed = false;
-  req.on('close', () => { closed = true; });
+  req.on('close', () => { closed = true; clearInterval(heartbeat); });
+
+  // Latido cada 5s: Gemini con el catálogo de herramientas puesto tarda bastante
+  // más en soltar el primer token que sin herramientas (tiene que "pensar" si
+  // usa alguna) -- confirmado en depuración: 14s de silencio total entre el
+  // build de contexto y el siguiente byte bastan para que la conexión se corte
+  // (net::ERR_... / "network error"). Un comentario SSE vacío de vez en cuando
+  // mantiene la conexión "viva" a ojos del proxy sin afectar al contenido real.
+  const heartbeat = setInterval(() => { if (!closed) res.write(': hb\n\n'); }, 5000);
 
   try {
     emit({ type: 'debug', step: 'buildEntityContext:start' }); // TEMPORAL -- quitar tras depurar
@@ -945,6 +953,7 @@ export const chatVantiaStream = async (req: any, res: Response) => {
 
     if (!fullReply) fullReply = 'He procesado la consulta pero no pude generar una respuesta. Inténtalo de nuevo.';
 
+    clearInterval(heartbeat);
     if (!closed) {
       emit({ type: 'done', reply: fullReply });
       res.end();
@@ -970,6 +979,7 @@ export const chatVantiaStream = async (req: any, res: Response) => {
   } catch (error: any) {
     const msg = error?.message || String(error);
     console.error('❌ VantIA stream error:', msg);
+    clearInterval(heartbeat);
     if (!closed) {
       emit({ type: 'error', message: msg });
       res.end();
