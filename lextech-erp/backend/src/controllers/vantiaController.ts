@@ -851,10 +851,14 @@ export const chatVantiaStream = async (req: any, res: Response) => {
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
   if (!apiKey) return res.status(503).json({ success: false, error: 'VantIA no está configurada. Añade GEMINI_API_KEY al .env del backend.' });
 
+  // OJO: nada de 'Connection: keep-alive' aquí -- es una cabecera hop-by-hop
+  // exclusiva de HTTP/1.1, prohibida en HTTP/2 (RFC 7540 §8.1.2.2). Railway
+  // habla HTTP/2 con el navegador; si esa cabecera llega tal cual al cliente
+  // provoca net::ERR_HTTP2_PROTOCOL_ERROR a media respuesta (la conexión
+  // arranca con 200 pero se corta en cuanto el navegador la valida).
   res.writeHead(200, {
     'Content-Type': 'text/event-stream; charset=utf-8',
     'Cache-Control': 'no-cache, no-transform',
-    'Connection': 'keep-alive',
     'X-Accel-Buffering': 'no', // evita que un proxy intermedio (nginx, etc.) bufferee el stream
   });
   // Fuerza el envío inmediato de las cabeceras: sin esto, Node/el proxy puede
