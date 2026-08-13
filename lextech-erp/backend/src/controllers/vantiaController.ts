@@ -881,7 +881,9 @@ export const chatVantiaStream = async (req: any, res: Response) => {
   req.on('close', () => { closed = true; });
 
   try {
+    emit({ type: 'debug', step: 'buildEntityContext:start' }); // TEMPORAL -- quitar tras depurar
     const entityCtx = await buildEntityContext(moduleId, userId, req.organizacionId, linkedExpedienteId);
+    emit({ type: 'debug', step: 'buildEntityContext:done' }); // TEMPORAL
     const fullSystemPrompt = BASE_PROMPT + '\n\n' + moduleInstructions(moduleId) + entityCtx;
 
     const cleanHistory: any[] = [...history];
@@ -899,6 +901,7 @@ export const chatVantiaStream = async (req: any, res: Response) => {
 
     for (let round = 0; round < MAX_TOOL_ROUNDS && !closed; round++) {
       const roundParts: any[] = [];
+      emit({ type: 'debug', step: `round${round}:gemini:start` }); // TEMPORAL
 
       for await (const chunk of geminiStreamChunks(url, {
         contents,
@@ -906,6 +909,7 @@ export const chatVantiaStream = async (req: any, res: Response) => {
         generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },
       })) {
         if (closed) break;
+        emit({ type: 'debug', step: `round${round}:gemini:chunk` }); // TEMPORAL
         const parts: any[] = chunk?.candidates?.[0]?.content?.parts || [];
         for (const p of parts) {
           roundParts.push(p);
