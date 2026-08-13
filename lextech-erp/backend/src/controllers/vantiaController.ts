@@ -886,7 +886,8 @@ export const chatVantiaStream = async (req: any, res: Response) => {
   // build de contexto y el siguiente byte bastan para que la conexión se corte
   // (net::ERR_... / "network error"). Un comentario SSE vacío de vez en cuando
   // mantiene la conexión "viva" a ojos del proxy sin afectar al contenido real.
-  const heartbeat = setInterval(() => { if (!closed) res.write(': hb\n\n'); }, 5000);
+  const startedAt = Date.now(); // TEMPORAL, para depurar
+  const heartbeat = setInterval(() => { if (!closed) res.write(`: hb ${Date.now() - startedAt}ms\n\n`); }, 1000);
 
   try {
     emit({ type: 'debug', step: 'buildEntityContext:start' }); // TEMPORAL -- quitar tras depurar
