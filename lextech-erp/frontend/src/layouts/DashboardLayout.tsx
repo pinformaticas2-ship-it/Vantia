@@ -290,7 +290,7 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      buffer += decoder.decode(value, { stream: true });
+      buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n');
       let sep: number;
       while ((sep = buffer.indexOf("\n\n")) !== -1) {
         const rawEvent = buffer.slice(0, sep);

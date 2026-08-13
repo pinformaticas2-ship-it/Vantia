@@ -818,7 +818,11 @@ async function* geminiStreamChunks(url: string, body: any): AsyncGenerator<any> 
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
-    buffer += decoder.decode(value, { stream: true });
+    // Gemini separa cada evento SSE con \r\n\r\n (CRLF), no \n\n -- normalizar
+    // a LF aquí antes de buscar el separador es lo que hace que esto
+    // funcione. Sin esto, indexOf('\n\n') no encuentra NUNCA el separador
+    // real y el buffer crece sin soltar ni un solo fragmento de texto.
+    buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n');
     let sep: number;
     while ((sep = buffer.indexOf('\n\n')) !== -1) {
       const rawEvent = buffer.slice(0, sep);
