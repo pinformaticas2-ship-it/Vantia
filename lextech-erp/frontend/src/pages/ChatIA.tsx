@@ -568,7 +568,7 @@ export default function ChatIA() {
           first_message: text, updated_at: new Date().toISOString(),
         };
         setConversations(prev => [stub, ...prev]);
-        setTimeout(async () => {
+        const refreshConversations = async () => {
           const tok = await getToken();
           const r   = await fetch(resolveApiUrl('/api/vantia/conversations'), { headers: { Authorization: `Bearer ${tok}` } });
           const d   = await r.json();
@@ -577,7 +577,12 @@ export default function ChatIA() {
             const found = (d.conversations as Conversation[]).find(c => c.module_id === moduleId);
             if (found) setActiveId(found.id);
           }
-        }, 700);
+        };
+        // Primer refresco: recoge el id real de la conversación ya guardada.
+        // Segundo refresco (más tarde): recoge el título-resumen generado por
+        // IA, que se calcula aparte y tarda un poco más en estar listo.
+        setTimeout(refreshConversations, 700);
+        setTimeout(refreshConversations, 3500);
       } else {
         setConversations(prev => prev.map(c =>
           c.module_id === moduleId ? { ...c, updated_at: new Date().toISOString() } : c

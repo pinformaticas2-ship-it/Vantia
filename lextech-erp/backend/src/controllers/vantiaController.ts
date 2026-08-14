@@ -150,6 +150,43 @@ async function buildEntityContext(moduleId: string, userId: string, organizacion
   return lines.length ? '\n\n---\n' + lines.join('\n') : '';
 }
 
+// ── Título automático de conversación (Chat IA) ──────────────────────────────
+// En vez de usar el propio mensaje del usuario tal cual (que a veces es una
+// sola palabra, o texto sin sentido si solo se está probando), le pedimos a
+// Gemini un resumen cortito de qué trata la conversación -- igual que hacen
+// ChatGPT/Claude con sus títulos automáticos. Se llama SIEMPRE después de
+// haber respondido ya al usuario (no añade latencia a la respuesta), así que
+// un fallo aquí no afecta al chat en sí -- por eso el catch en el punto de
+// llamada usa el propio mensaje como título de reserva.
+async function generateConversationTitle(userMessage: string, assistantReply: string): Promise<string | null> {
+  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+  if (!apiKey) return null;
+  try {
+    const prompt = `Resume esta conversación en un título muy corto (máximo 6 palabras), como el título de una pestaña de chat. Sin comillas, sin punto final, sin emojis. Solo el título, nada más.
+
+Usuario: ${userMessage.slice(0, 500)}
+Asistente: ${assistantReply.slice(0, 500)}`;
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.4, maxOutputTokens: 30 },
+        }),
+      }
+    );
+    if (!res.ok) return null;
+    const data: any = await res.json();
+    let title: string = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    title = title.trim().replace(/^["'“”]+|["'“”]+$/g, '').replace(/\.$/, '').trim();
+    return title ? title.slice(0, 100) : null;
+  } catch {
+    return null;
+  }
+}
+
 // ── Herramientas disponibles ──────────────────────────────────────────────────
 const TOOLS = [{
   function_declarations: [
@@ -774,7 +811,8 @@ export const chatVantia = async (req: any, res: Response) => {
 
     // Guardar historial en segundo plano (con título automático en primer mensaje)
     const isChatIa = moduleId.startsWith('chat-ia:');
-    const autoTitle = (isChatIa && history.length === 0) ? message.slice(0, 100) : null;
+    const isFirstMessage = isChatIa && history.length === 0;
+    const fallbackTitle = isFirstMessage ? message.slice(0, 100) : null;
     pool.query(
       `INSERT INTO vantia_chat_history (user_id, module_id, history, title)
        VALUES ($1,$2,$3,$4)
@@ -786,8 +824,17 @@ export const chatVantia = async (req: any, res: Response) => {
         ...history,
         { role: 'user',  text: message },
         { role: 'model', text: reply },
-      ]), autoTitle]
-    ).catch(() => {});
+      ]), fallbackTitle]
+    ).then(() => {
+      // Sustituye el título de reserva (el propio mensaje) por un resumen
+      // generado por IA en cuanto está listo -- no bloquea nada, ya se
+      // guardó la conversación al instante con el título provisional.
+      if (!isFirstMessage) return;
+      generateConversationTitle(message, reply).then(title => {
+        if (!title) return;
+        pool.query(`UPDATE vantia_chat_history SET title=$1 WHERE user_id=$2 AND module_id=$3`, [title, userId, moduleId]).catch(() => {});
+      }).catch(() => {});
+    }).catch(() => {});
 
   } catch (error: any) {
     const msg = error?.message || String(error);
@@ -964,7 +1011,8 @@ export const chatVantiaStream = async (req: any, res: Response) => {
 
     // Guardar historial en segundo plano, igual que en /chat
     const isChatIa = moduleId.startsWith('chat-ia:');
-    const autoTitle = (isChatIa && history.length === 0) ? message.slice(0, 100) : null;
+    const isFirstMessage = isChatIa && history.length === 0;
+    const fallbackTitle = isFirstMessage ? message.slice(0, 100) : null;
     pool.query(
       `INSERT INTO vantia_chat_history (user_id, module_id, history, title)
        VALUES ($1,$2,$3,$4)
@@ -976,8 +1024,14 @@ export const chatVantiaStream = async (req: any, res: Response) => {
         ...history,
         { role: 'user',  text: message },
         { role: 'model', text: fullReply },
-      ]), autoTitle]
-    ).catch(() => {});
+      ]), fallbackTitle]
+    ).then(() => {
+      if (!isFirstMessage) return;
+      generateConversationTitle(message, fullReply).then(title => {
+        if (!title) return;
+        pool.query(`UPDATE vantia_chat_history SET title=$1 WHERE user_id=$2 AND module_id=$3`, [title, userId, moduleId]).catch(() => {});
+      }).catch(() => {});
+    }).catch(() => {});
 
   } catch (error: any) {
     const msg = error?.message || String(error);
