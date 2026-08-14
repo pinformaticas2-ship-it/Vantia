@@ -282,44 +282,70 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
       throw new Error(data.error || "Error en la API de VantIA");
     }
 
-    const reader  = res.body.getReader();
-    const decoder = new TextDecoder("utf-8");
-    let buffer = "";
-    let finalReply = "";
+    // Revelado suave: Gemini no manda el texto letra a letra, sino en trozos
+    // de tamaño variable (a veces frases enteras de golpe), lo que se veía
+    // como saltos bruscos. El texto que llega se guarda en un buffer y un
+    // intervalo aparte lo va soltando poco a poco, desacoplando "cuándo
+    // llega del servidor" de "cuándo se ve en pantalla".
+    let pending = "";
+    let networkDone = false;
+    let revealTimer: ReturnType<typeof setInterval> | null = null;
+    let resolveReveal: () => void = () => {};
+    const revealFinished = new Promise<void>((resolve) => { resolveReveal = resolve; });
+    revealTimer = setInterval(() => {
+      if (pending.length > 0) {
+        const take = pending.slice(0, 3);
+        pending = pending.slice(3);
+        setMessages((prev) => prev.map((m, i) => (i === targetIdx ? { ...m, text: m.text + take } : m)));
+      } else if (networkDone) {
+        resolveReveal();
+      }
+    }, 18);
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n');
-      let sep: number;
-      while ((sep = buffer.indexOf("\n\n")) !== -1) {
-        const rawEvent = buffer.slice(0, sep);
-        buffer = buffer.slice(sep + 2);
-        const dataLine = rawEvent.split("\n").find((l) => l.startsWith("data:"));
-        if (!dataLine) continue;
-        const jsonStr = dataLine.slice(5).trim();
-        if (!jsonStr) continue;
-        let evt: any;
-        try { evt = JSON.parse(jsonStr); } catch { continue; }
+    try {
+      const reader  = res.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+      let buffer = "";
+      let finalReply = "";
 
-        if (evt.type === "text") {
-          setMessages((prev) => prev.map((m, i) => (i === targetIdx ? { ...m, text: m.text + evt.delta } : m)));
-        } else if (evt.type === "tool_start") {
-          setMessages((prev) => prev.map((m, i) => (i === targetIdx
-            ? { ...m, toolEvents: [...(m.toolEvents || []), { name: evt.name, label: evt.label, done: false }] }
-            : m)));
-        } else if (evt.type === "tool_end") {
-          setMessages((prev) => prev.map((m, i) => (i === targetIdx
-            ? { ...m, toolEvents: (m.toolEvents || []).map((te) => (te.name === evt.name && !te.done ? { ...te, done: true } : te)) }
-            : m)));
-        } else if (evt.type === "done") {
-          finalReply = evt.reply;
-        } else if (evt.type === "error") {
-          throw new Error(evt.message || "Error al generar la respuesta.");
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n');
+        let sep: number;
+        while ((sep = buffer.indexOf("\n\n")) !== -1) {
+          const rawEvent = buffer.slice(0, sep);
+          buffer = buffer.slice(sep + 2);
+          const dataLine = rawEvent.split("\n").find((l) => l.startsWith("data:"));
+          if (!dataLine) continue;
+          const jsonStr = dataLine.slice(5).trim();
+          if (!jsonStr) continue;
+          let evt: any;
+          try { evt = JSON.parse(jsonStr); } catch { continue; }
+
+          if (evt.type === "text") {
+            pending += evt.delta;
+          } else if (evt.type === "tool_start") {
+            setMessages((prev) => prev.map((m, i) => (i === targetIdx
+              ? { ...m, toolEvents: [...(m.toolEvents || []), { name: evt.name, label: evt.label, done: false }] }
+              : m)));
+          } else if (evt.type === "tool_end") {
+            setMessages((prev) => prev.map((m, i) => (i === targetIdx
+              ? { ...m, toolEvents: (m.toolEvents || []).map((te) => (te.name === evt.name && !te.done ? { ...te, done: true } : te)) }
+              : m)));
+          } else if (evt.type === "done") {
+            finalReply = evt.reply;
+          } else if (evt.type === "error") {
+            throw new Error(evt.message || "Error al generar la respuesta.");
+          }
         }
       }
+      networkDone = true;
+      await revealFinished;
+      return finalReply;
+    } finally {
+      if (revealTimer) clearInterval(revealTimer);
     }
-    return finalReply;
   };
 
   const abortStreaming = () => streamAbortRef.current?.abort();
