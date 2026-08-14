@@ -996,7 +996,7 @@ export const chatVantiaStream = async (req: any, res: Response) => {
 // fetch() saliente a Gemini MIENTRAS se está escribiendo la respuesta al
 // cliente (el test SSE genérico con setInterval no lo prueba, porque no
 // hace ningún fetch saliente).
-export const diagRelay = async (_req: Request, res: Response) => {
+export const diagRelay = async (_req: any, res: Response) => {
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
   if (!apiKey) return res.status(503).json({ error: 'sin key' });
 
@@ -1012,6 +1012,16 @@ export const diagRelay = async (_req: Request, res: Response) => {
   _req.on('close', () => { closed = true; });
 
   try {
+    // TEMPORAL: si viene con auth (diag-relay-auth), repite también el paso de
+    // buildEntityContext -- es la única pieza real de chatVantiaStream que
+    // esta prueba no había tocado todavía.
+    const userId = _req.auth?.userId;
+    if (userId) {
+      res.write(`data: ${JSON.stringify({ type: 'debug', step: 'buildEntityContext:start' })}\n\n`);
+      await buildEntityContext('chat-ia:diag-test', userId, _req.organizacionId, undefined);
+      res.write(`data: ${JSON.stringify({ type: 'debug', step: 'buildEntityContext:done' })}\n\n`);
+    }
+
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:streamGenerateContent?alt=sse&key=${apiKey}`;
     let n = 0;
     for await (const chunk of geminiStreamChunks(url, {
