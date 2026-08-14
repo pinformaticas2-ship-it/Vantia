@@ -215,66 +215,6 @@ export default function ChatIA() {
   const [deletingId,     setDeletingId]     = useState<string | null>(null);
   const [feedback,       setFeedback]       = useState<Record<number, 'up' | 'down'>>({});
 
-  // ── Panel de diagnóstico temporal (quitar una vez resuelto lo de streaming) ──
-  const [diagOpen, setDiagOpen] = useState(false);
-  const [diagLines, setDiagLines] = useState<string[]>([]);
-  const [diagRunning, setDiagRunning] = useState(false);
-  const logDiag = (line: string) => setDiagLines(prev => [...prev, `${new Date().toLocaleTimeString('es-ES')} — ${line}`]);
-  const runDiag = async () => {
-    setDiagLines([]);
-    setDiagRunning(true);
-    setDiagOpen(true);
-    try {
-      logDiag('Pidiendo token...');
-      const token = await getToken({ skipCache: true });
-      logDiag(`Token OK (${token ? token.length : 0} chars). Llamando a /api/vantia/chat/stream...`);
-      const res = await fetch(resolveApiUrl('/api/vantia/chat/stream'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ message: 'Dime hola en una palabra', history: [], moduleId: 'chat-ia:diag-test' }),
-      });
-      logDiag(`Respuesta: status ${res.status} ${res.statusText}`);
-      if (!res.body) { logDiag('❌ Sin body en la respuesta.'); return; }
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) { logDiag('✅ TERMINADO OK (stream cerrado limpio).'); break; }
-        logDiag(`chunk (${value.length} bytes): ${decoder.decode(value).slice(0, 200)}`);
-      }
-    } catch (err: any) {
-      logDiag(`❌ FALLO: ${err?.name || 'Error'} — ${err?.message || String(err)}`);
-    } finally {
-      setDiagRunning(false);
-    }
-  };
-  const runDiag2 = async () => {
-    setDiagLines([]);
-    setDiagRunning(true);
-    setDiagOpen(true);
-    try {
-      logDiag('Pidiendo token...');
-      const token = await getToken({ skipCache: true });
-      logDiag(`Token OK (${token ? token.length : 0} chars). Llamando a /api/vantia/diag-relay-auth (GET, con requireAuth)...`);
-      const res = await fetch(resolveApiUrl('/api/vantia/diag-relay-auth'), {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      logDiag(`Respuesta: status ${res.status} ${res.statusText}`);
-      if (!res.body) { logDiag('❌ Sin body en la respuesta.'); return; }
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) { logDiag('✅ TERMINADO OK (stream cerrado limpio).'); break; }
-        logDiag(`chunk (${value.length} bytes): ${decoder.decode(value).slice(0, 200)}`);
-      }
-    } catch (err: any) {
-      logDiag(`❌ FALLO: ${err?.name || 'Error'} — ${err?.message || String(err)}`);
-    } finally {
-      setDiagRunning(false);
-    }
-  };
-
   // Adjuntar archivo de texto a la conversación
   const [attachedFile, setAttachedFile] = useState<{ name: string; content: string } | null>(null);
   const [attachError,  setAttachError]  = useState<string | null>(null);
@@ -794,22 +734,6 @@ export default function ChatIA() {
             </div>
 
             <div className="flex items-center gap-2">
-              <button
-                onClick={runDiag}
-                disabled={diagRunning}
-                className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 border border-amber-300 bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-lg transition-all active:scale-95 disabled:opacity-50"
-                title="Prueba temporal de conexión con VantIA"
-              >
-                {diagRunning ? <Loader2 className="h-3.5 w-3.5 cia-spin" /> : '🔧'} Diagnóstico
-              </button>
-              <button
-                onClick={runDiag2}
-                disabled={diagRunning}
-                className="flex items-center gap-1.5 text-xs font-semibold text-purple-700 border border-purple-300 bg-purple-50 hover:bg-purple-100 px-3 py-1.5 rounded-lg transition-all active:scale-95 disabled:opacity-50"
-                title="Prueba temporal: mismo endpoint que funciona pero con requireAuth"
-              >
-                {diagRunning ? <Loader2 className="h-3.5 w-3.5 cia-spin" /> : '🔧'} Diag. auth
-              </button>
               {activeModuleId && messages.length > 0 && (
                 <button
                   onClick={() => navigator.clipboard.writeText(
@@ -851,21 +775,6 @@ export default function ChatIA() {
               </div>
             </div>
           </div>
-
-          {diagOpen && (
-            <div className="shrink-0 border-b border-amber-200 bg-amber-50/80 px-4 py-2.5 max-h-48 overflow-y-auto">
-              <div className="flex items-center justify-between mb-1.5">
-                <p className="text-[11px] font-bold text-amber-800 uppercase tracking-wide">Diagnóstico de conexión</p>
-                <button onClick={() => setDiagOpen(false)} className="text-amber-600 hover:text-amber-900 text-xs font-semibold">Cerrar ×</button>
-              </div>
-              <div className="space-y-0.5">
-                {diagLines.length === 0 && <p className="text-xs text-amber-500 italic">Ejecutando...</p>}
-                {diagLines.map((l, i) => (
-                  <p key={i} className="text-[11px] font-mono text-amber-900 break-all leading-relaxed">{l}</p>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Messages scroll area */}
           <div className="flex-1 overflow-y-auto">

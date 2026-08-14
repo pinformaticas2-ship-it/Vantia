@@ -877,22 +877,26 @@ export const chatVantiaStream = async (req: any, res: Response) => {
   // "data:") solo para garantizar que algo viaja por el socket cuanto antes.
   res.write(': connected\n\n');
 
+  // OJO: esto tiene que ir en `res` (la respuesta), no en `req` (la petición).
+  // `req.on('close')` se dispara en cuanto Node termina de LEER el cuerpo de
+  // la petición entrante -- que para un POST con body ya está consumido
+  // (por express.json()) prácticamente al llegar aquí -- no cuando el
+  // cliente deja de escuchar la respuesta. Usarlo aquí marcaba `closed=true`
+  // casi al instante, así que el bucle de abajo (con `&& !closed`) nunca
+  // llegaba ni a arrancar: la respuesta se quedaba abierta sin hacer nada
+  // hasta que el requestTimeout por defecto de Node (5 minutos) la mataba.
+  // Esto explicaba el "no genera respuesta" que costó tanto depurar.
   let closed = false;
-  req.on('close', () => { closed = true; clearInterval(heartbeat); });
+  res.on('close', () => { closed = true; clearInterval(heartbeat); });
 
-  // Latido cada 5s: Gemini con el catálogo de herramientas puesto tarda bastante
-  // más en soltar el primer token que sin herramientas (tiene que "pensar" si
-  // usa alguna) -- confirmado en depuración: 14s de silencio total entre el
-  // build de contexto y el siguiente byte bastan para que la conexión se corte
-  // (net::ERR_... / "network error"). Un comentario SSE vacío de vez en cuando
-  // mantiene la conexión "viva" a ojos del proxy sin afectar al contenido real.
-  const startedAt = Date.now(); // TEMPORAL, para depurar
-  const heartbeat = setInterval(() => { if (!closed) res.write(`: hb ${Date.now() - startedAt}ms\n\n`); }, 1000);
+  // Latido de seguridad: mantiene la conexión "viva" a ojos de cualquier
+  // proxy intermedio durante los huecos sin datos (p.ej. mientras Gemini
+  // genera), sin afectar al contenido real (comentario SSE, el parser del
+  // cliente solo mira líneas "data:").
+  const heartbeat = setInterval(() => { if (!closed) res.write(': hb\n\n'); }, 10000);
 
   try {
-    emit({ type: 'debug', step: 'buildEntityContext:start' }); // TEMPORAL -- quitar tras depurar
     const entityCtx = await buildEntityContext(moduleId, userId, req.organizacionId, linkedExpedienteId);
-    emit({ type: 'debug', step: 'buildEntityContext:done' }); // TEMPORAL
     const fullSystemPrompt = BASE_PROMPT + '\n\n' + moduleInstructions(moduleId) + entityCtx;
 
     const cleanHistory: any[] = [...history];
@@ -910,7 +914,6 @@ export const chatVantiaStream = async (req: any, res: Response) => {
 
     for (let round = 0; round < MAX_TOOL_ROUNDS && !closed; round++) {
       const roundParts: any[] = [];
-      emit({ type: 'debug', step: `round${round}:gemini:start` }); // TEMPORAL
 
       for await (const chunk of geminiStreamChunks(url, {
         contents,
@@ -918,7 +921,6 @@ export const chatVantiaStream = async (req: any, res: Response) => {
         generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },
       })) {
         if (closed) break;
-        emit({ type: 'debug', step: `round${round}:gemini:chunk` }); // TEMPORAL
         const parts: any[] = chunk?.candidates?.[0]?.content?.parts || [];
         for (const p of parts) {
           roundParts.push(p);
@@ -985,60 +987,6 @@ export const chatVantiaStream = async (req: any, res: Response) => {
       emit({ type: 'error', message: msg });
       res.end();
     }
-  }
-};
-
-// ── GET /api/vantia/diag-relay ── (SIN AUTH, temporal) ──────────────────────
-// Repite exactamente el núcleo de chatVantiaStream (writeHead + flushHeaders
-// + geminiStreamChunks + relé de deltas por SSE al navegador) pero sin
-// autenticación, sin BD, sin historial ni herramientas -- para aislar si el
-// corte con ERR_HTTP2_PROTOCOL_ERROR pasa específicamente cuando se hace un
-// fetch() saliente a Gemini MIENTRAS se está escribiendo la respuesta al
-// cliente (el test SSE genérico con setInterval no lo prueba, porque no
-// hace ningún fetch saliente).
-export const diagRelay = async (_req: any, res: Response) => {
-  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-  if (!apiKey) return res.status(503).json({ error: 'sin key' });
-
-  res.writeHead(200, {
-    'Content-Type': 'text/event-stream; charset=utf-8',
-    'Cache-Control': 'no-cache, no-transform',
-    'X-Accel-Buffering': 'no',
-  });
-  res.flushHeaders?.();
-  res.write(': connected\n\n');
-
-  let closed = false;
-  _req.on('close', () => { closed = true; });
-
-  try {
-    // TEMPORAL: si viene con auth (diag-relay-auth), repite también el paso de
-    // buildEntityContext -- es la única pieza real de chatVantiaStream que
-    // esta prueba no había tocado todavía.
-    const userId = _req.auth?.userId;
-    if (userId) {
-      res.write(`data: ${JSON.stringify({ type: 'debug', step: 'buildEntityContext:start' })}\n\n`);
-      await buildEntityContext('chat-ia:diag-test', userId, _req.organizacionId, undefined);
-      res.write(`data: ${JSON.stringify({ type: 'debug', step: 'buildEntityContext:done' })}\n\n`);
-    }
-
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:streamGenerateContent?alt=sse&key=${apiKey}`;
-    let n = 0;
-    for await (const chunk of geminiStreamChunks(url, {
-      contents: [{ role: 'user', parts: [{ text: 'Dime hola en una palabra' }] }],
-      tools: TOOLS, // TEMPORAL: mismo catálogo real que chatVantiaStream, para aislar si el problema es esto
-      generationConfig: { temperature: 0.7, maxOutputTokens: 500 },
-    })) {
-      if (closed) break;
-      n++;
-      const parts: any[] = chunk?.candidates?.[0]?.content?.parts || [];
-      for (const p of parts) {
-        if (p.text) res.write(`data: ${JSON.stringify({ n, text: p.text })}\n\n`);
-      }
-    }
-    if (!closed) { res.write(`data: ${JSON.stringify({ done: true, totalChunks: n })}\n\n`); res.end(); }
-  } catch (e: any) {
-    if (!closed) { res.write(`data: ${JSON.stringify({ error: e?.message || String(e) })}\n\n`); res.end(); }
   }
 };
 

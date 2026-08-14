@@ -199,34 +199,6 @@ app.get('/api/health/storage', (_req, res) => {
   });
 });
 
-// Diagnóstico temporal: SSE mínimo sin Gemini ni BD, mismo patrón exacto de
-// cabeceras que /api/vantia/chat/stream, para aislar si el corte con
-// net::ERR_HTTP2_PROTOCOL_ERROR es de la plataforma (Railway/Node con
-// streaming largo por HTTP/2) o de algo específico del código de VantIA.
-// Visitar directamente desde el navegador (sin auth, GET) y ver si en
-// Network se completa "1..2..3..4..5..fin" o se corta igual.
-app.all('/api/health/sse-test', (_req, res) => {
-  res.writeHead(200, {
-    'Content-Type': 'text/event-stream; charset=utf-8',
-    'Cache-Control': 'no-cache, no-transform',
-    'X-Accel-Buffering': 'no',
-  });
-  res.flushHeaders?.();
-  res.write(': connected\n\n');
-  const totalTicks = Number(_req.query.ticks) || 30; // 30 ticks x 2s = 60s por defecto
-  let n = 0;
-  const timer = setInterval(() => {
-    n++;
-    res.write(`data: ${JSON.stringify({ n, elapsedMs: n * 2000 })}\n\n`);
-    if (n >= totalTicks) {
-      clearInterval(timer);
-      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
-      res.end();
-    }
-  }, 2000);
-  _req.on('close', () => clearInterval(timer));
-});
-
 app.get('/api/health/version', (_req, res) => {
   res.json({
     status: 'ok',
@@ -241,72 +213,6 @@ app.get('/api/health/version', (_req, res) => {
       'unknown',
     deployedAt: new Date().toISOString(),
   });
-});
-
-// Diagnóstico temporal de VantIA: hace una llamada real y mínima a Gemini con
-// la key configurada en ESTE entorno (Railway, no el .env local) y dice si
-// responde o no -- sin exponer la key. Pensado para depurar "VantIA no
-// contesta" sin depender de una sesión de navegador autenticada. Quitar una
-// vez confirmado que todo funciona.
-app.get('/api/health/vantia', async (req, res) => {
-  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-  if (!apiKey) return res.json({ status: 'error', reason: 'GEMINI_API_KEY no está configurada en este entorno.' });
-
-  // ?stream=1 prueba el mismo camino que usa chatVantiaStream de verdad
-  // (fetch + res.body.getReader() sobre streamGenerateContent), para aislar
-  // si el problema está en LEER el stream de Gemini en este runtime, o en
-  // escribírselo al navegador (framing HTTP, proxy intermedio, etc.).
-  if (req.query.stream) {
-    const started = Date.now();
-    try {
-      const r = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'Cuenta del 1 al 5' }] }] }),
-        }
-      );
-      if (!r.ok || !r.body) {
-        const data: any = await r.json().catch(() => ({}));
-        return res.json({ status: 'error', httpStatus: r.status, googleError: data?.error?.message || 'sin body' });
-      }
-      const reader = r.body.getReader();
-      const decoder = new TextDecoder('utf-8');
-      let chunks = 0, bytes = 0, text = '';
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks++;
-        bytes += value.length;
-        text += decoder.decode(value, { stream: true });
-        if (Date.now() - started > 20000) { return res.json({ status: 'timeout', chunks, bytes, ms: Date.now() - started, sample: text.slice(0, 300) }); }
-      }
-      res.json({ status: 'ok', chunks, bytes, ms: Date.now() - started, sample: text.slice(0, 500) });
-    } catch (e: any) {
-      res.json({ status: 'error', ms: Date.now() - started, reason: e?.message || String(e) });
-    }
-    return;
-  }
-
-  try {
-    const r = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'Responde solo con la palabra: ok' }] }] }),
-      }
-    );
-    const data: any = await r.json().catch(() => ({}));
-    if (!r.ok) {
-      return res.json({ status: 'error', httpStatus: r.status, googleError: data?.error?.message || JSON.stringify(data).slice(0, 300), keyPrefix: apiKey.slice(0, 6) });
-    }
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || null;
-    res.json({ status: 'ok', sample: text, keyPrefix: apiKey.slice(0, 6) });
-  } catch (e: any) {
-    res.json({ status: 'error', reason: e?.message || String(e) });
-  }
 });
 
 // Health check de base de datos — visita http://localhost:4000/api/health/db para diagnosticar
