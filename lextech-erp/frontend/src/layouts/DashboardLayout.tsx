@@ -3,6 +3,7 @@
 export const SidebarContext = createContext({ isCollapsed: false });
 export function useSidebar() { return useContext(SidebarContext); }
 import { Spinner } from "../components/Spinner";
+import { createPortal } from "react-dom";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Briefcase, Users, Settings,
@@ -1061,9 +1062,20 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
   const { organizacion, organizaciones, rol: orgRol, switchOrganizacion, isLoaded: orgLoaded } = useOrganizacion();
   const [orgMenuOpen, setOrgMenuOpen] = useState(false);
   const orgMenuRef = useRef<HTMLDivElement>(null);
+  // El desplegable de la vista colapsada se pinta en un portal (ver más abajo,
+  // "erp-company-icon-collapsed") porque el contenedor del sidebar tiene
+  // overflow-hidden y lo recortaba -- se abría pero no se veía. Al vivir fuera
+  // del árbol del sidebar, el click-fuera necesita comprobar también esta ref.
+  const orgMenuPortalRef = useRef<HTMLDivElement>(null);
+  const [orgMenuPos, setOrgMenuPos] = useState<{ top: number; left: number } | null>(null);
   useEffect(() => {
     if (!orgMenuOpen) return;
-    const h = (e: MouseEvent) => { if (orgMenuRef.current && !orgMenuRef.current.contains(e.target as Node)) setOrgMenuOpen(false); };
+    const h = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (orgMenuRef.current?.contains(target)) return;
+      if (orgMenuPortalRef.current?.contains(target)) return;
+      setOrgMenuOpen(false);
+    };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, [orgMenuOpen]);
@@ -1102,7 +1114,14 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
             <button
               type="button"
               title={organizacion?.nombre || "Vantia Legis"}
-              onClick={() => organizaciones.length > 1 && setOrgMenuOpen((v) => !v)}
+              onClick={(e) => {
+                if (organizaciones.length <= 1) return;
+                if (!orgMenuOpen) {
+                  const r = e.currentTarget.getBoundingClientRect();
+                  setOrgMenuPos({ top: r.top, left: r.right + 8 });
+                }
+                setOrgMenuOpen((v) => !v);
+              }}
               className="erp-company-icon w-10 h-10 rounded-xl border border-slate-700/60 bg-slate-800/50 flex items-center justify-center cursor-pointer overflow-hidden transition-all duration-200 hover:scale-105 active:scale-95"
             >
               {organizacion?.logoUrl ? (
@@ -1116,8 +1135,16 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
               )}
             </button>
 
-            {orgMenuOpen && organizaciones.length > 1 && (
-              <div className="animate-fade-in absolute left-full ml-2 top-0 w-56 bg-slate-800 border border-slate-700 rounded-xl shadow-xl shadow-black/30 py-1.5 z-20 overflow-hidden origin-top-left">
+            {/* Portal: el contenedor del sidebar tiene overflow-hidden, así que
+                un desplegable posicionado "absolute" dentro de él se abre pero
+                queda recortado (invisible). Pintarlo en document.body con
+                position:fixed usando las coordenadas del botón lo evita. */}
+            {orgMenuOpen && organizaciones.length > 1 && orgMenuPos && createPortal(
+              <div
+                ref={orgMenuPortalRef}
+                style={{ position: "fixed", top: orgMenuPos.top, left: orgMenuPos.left }}
+                className="animate-fade-in w-56 bg-slate-800 border border-slate-700 rounded-xl shadow-xl shadow-black/30 py-1.5 z-[999] overflow-hidden origin-top-left"
+              >
                 <p className="px-3 pb-1.5 pt-1 text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500">
                   Tus organizaciones
                 </p>
@@ -1149,7 +1176,8 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
                     </button>
                   );
                 })}
-              </div>
+              </div>,
+              document.body
             )}
           </div>
         ) : (
