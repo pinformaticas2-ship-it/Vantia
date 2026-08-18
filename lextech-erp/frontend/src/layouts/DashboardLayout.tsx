@@ -1098,10 +1098,12 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
       {/* Logo / selector empresa */}
       <div className={`erp-sidebar-logo-border border-b border-slate-800 shrink-0 transition-all duration-300 ${collapsed ? "px-2 py-3" : "px-3 py-3"}`}>
         {collapsed ? (
-          <div className="flex justify-center">
-            <div
-              className="erp-company-icon w-10 h-10 rounded-xl border border-slate-700/60 bg-slate-800/50 flex items-center justify-center cursor-pointer overflow-hidden transition-all duration-200 hover:scale-105 active:scale-95"
+          <div className="relative flex justify-center" ref={orgMenuRef}>
+            <button
+              type="button"
               title={organizacion?.nombre || "Vantia Legis"}
+              onClick={() => organizaciones.length > 1 && setOrgMenuOpen((v) => !v)}
+              className="erp-company-icon w-10 h-10 rounded-xl border border-slate-700/60 bg-slate-800/50 flex items-center justify-center cursor-pointer overflow-hidden transition-all duration-200 hover:scale-105 active:scale-95"
             >
               {organizacion?.logoUrl ? (
                 <img src={resolveUploadUrl(organizacion.logoUrl) || undefined} alt={organizacion.nombre} className="h-full w-full object-contain p-1.5" />
@@ -1112,7 +1114,43 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
               ) : (
                 <img src="/vantia-sidebar-slate.png" alt="Vantia Legis" className="h-6 w-6 object-contain" />
               )}
-            </div>
+            </button>
+
+            {orgMenuOpen && organizaciones.length > 1 && (
+              <div className="animate-fade-in absolute left-full ml-2 top-0 w-56 bg-slate-800 border border-slate-700 rounded-xl shadow-xl shadow-black/30 py-1.5 z-20 overflow-hidden origin-top-left">
+                <p className="px-3 pb-1.5 pt-1 text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                  Tus organizaciones
+                </p>
+                {organizaciones.map((o) => {
+                  const active = o.id === organizacion?.id;
+                  return (
+                    <button
+                      key={o.id}
+                      type="button"
+                      onClick={() => { setOrgMenuOpen(false); if (!active) switchOrganizacion(o.id); }}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors ${
+                        active ? "bg-red-500/10" : "hover:bg-slate-700/50"
+                      }`}
+                    >
+                      <div className="w-7 h-7 rounded-lg bg-slate-900 border border-slate-700/60 flex items-center justify-center shrink-0 overflow-hidden">
+                        {o.logoUrl ? (
+                          <img src={resolveUploadUrl(o.logoUrl) || undefined} alt={o.nombre} className="h-full w-full object-contain" />
+                        ) : (
+                          <div className={`h-full w-full flex items-center justify-center text-[10px] font-extrabold text-white bg-gradient-to-br ${orgAvatarGradient(o.id)}`}>
+                            {orgInitials(o.nombre)}
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className={`text-xs font-semibold truncate ${active ? "text-white" : "text-slate-200"}`}>{o.nombre}</p>
+                        <p className="text-[10px] text-slate-500 truncate">{ORG_ROL_LABEL[o.rol] || o.rol}</p>
+                      </div>
+                      {active && <Check size={14} className="text-red-500 shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         ) : (
           <div className="relative" ref={orgMenuRef}>
