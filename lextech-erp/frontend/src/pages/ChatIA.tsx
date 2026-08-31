@@ -3,7 +3,7 @@ import { useAuth, useUser } from '@clerk/clerk-react';
 import {
   Plus, Trash2, Copy, RotateCcw, ThumbsUp, ThumbsDown,
   Paperclip, Link2, Send, MessageSquare, Sparkles, MoreHorizontal, Loader2,
-  Check, X, Search, StopCircle, Download, FileText,
+  Check, X, Search, StopCircle, Download, FileText, ChevronDown,
 } from 'lucide-react';
 import { resolveApiUrl } from '../lib/api';
 
@@ -197,6 +197,30 @@ const PROMPTS = [
   { icon: '🔍', label: 'Jurisprudencia',        text: 'Busca jurisprudencia del TS sobre cláusulas abusivas' },
 ];
 
+// ─── Modelos ──────────────────────────────────────────────────────────────────
+// Solo las variantes de Gemini están conectadas de verdad (misma API, mismo
+// backend, solo cambia el id del modelo). ChatGPT, Claude y Vincent AI (el
+// asistente de vLex) se muestran como opciones del selector a petición del
+// usuario, pero sin backend detrás todavía -- hace falta su API key
+// correspondiente antes de poder activarlas.
+const MODEL_STORAGE_KEY = 'vantia_model_v1';
+
+interface AiModelOption {
+  id: string;
+  label: string;
+  provider: string;
+  desc: string;
+  available: boolean;
+}
+
+const AI_MODELS: AiModelOption[] = [
+  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', provider: 'Google', desc: 'Rápido, el que usa VantIA hoy',      available: true },
+  { id: 'gemini-2.5-pro',   label: 'Gemini 2.5 Pro',   provider: 'Google', desc: 'Más potente, respuestas más lentas', available: true },
+  { id: 'chatgpt',          label: 'ChatGPT',          provider: 'OpenAI',    desc: 'Próximamente',                   available: false },
+  { id: 'claude',           label: 'Claude',           provider: 'Anthropic', desc: 'Próximamente',                   available: false },
+  { id: 'vincent',          label: 'Vincent AI',       provider: 'vLex',      desc: 'Próximamente',                   available: false },
+];
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function ChatIA() {
@@ -232,6 +256,32 @@ export default function ChatIA() {
   const [showTopMenu, setShowTopMenu] = useState(false);
   const topMenuRef = useRef<HTMLDivElement>(null);
 
+  // Selector de modelo/agente de IA
+  const [selectedModel, setSelectedModel] = useState<string>(() => {
+    const saved = localStorage.getItem(MODEL_STORAGE_KEY);
+    return AI_MODELS.some(m => m.id === saved && m.available) ? saved! : AI_MODELS[0].id;
+  });
+  const [showModelPicker, setShowModelPicker] = useState(false);
+  const modelPickerRef = useRef<HTMLDivElement>(null);
+  const activeModel = AI_MODELS.find(m => m.id === selectedModel) || AI_MODELS[0];
+
+  useEffect(() => {
+    if (!showModelPicker) return;
+    const onClick = (e: MouseEvent) => {
+      if (modelPickerRef.current && !modelPickerRef.current.contains(e.target as Node)) setShowModelPicker(false);
+    };
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, [showModelPicker]);
+
+  const chooseModel = (id: string) => {
+    const opt = AI_MODELS.find(m => m.id === id);
+    if (!opt || !opt.available) return;
+    setSelectedModel(id);
+    localStorage.setItem(MODEL_STORAGE_KEY, id);
+    setShowModelPicker(false);
+  };
+
   const bottomRef   = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const streamAbortRef = useRef<AbortController | null>(null);
@@ -254,7 +304,7 @@ export default function ChatIA() {
     const res = await fetch(resolveApiUrl('/api/vantia/chat/stream'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ message: text, history: historyToSend, moduleId, linkedExpedienteId: expedienteId }),
+      body: JSON.stringify({ message: text, history: historyToSend, moduleId, linkedExpedienteId: expedienteId, model: selectedModel }),
       signal: controller.signal,
     });
     if (!res.ok || !res.body) {
@@ -756,11 +806,42 @@ export default function ChatIA() {
               </div>
               <div>
                 <h1 className="text-sm font-bold text-slate-800 leading-tight">VantIA Legal Pro</h1>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="relative h-1.5 w-1.5 inline-block cia-ring">
-                    <span className="block h-1.5 w-1.5 rounded-full bg-green-500" />
-                  </span>
-                  <span className="text-[10px] text-slate-400">En línea · Gemini 2.5 Flash</span>
+                <div className="relative mt-0.5" ref={modelPickerRef}>
+                  <button
+                    onClick={() => setShowModelPicker(v => !v)}
+                    className="flex items-center gap-1.5 text-[10px] text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                    <span className="relative h-1.5 w-1.5 inline-block cia-ring">
+                      <span className="block h-1.5 w-1.5 rounded-full bg-green-500" />
+                    </span>
+                    En línea · {activeModel.label}
+                    <ChevronDown className={`h-2.5 w-2.5 transition-transform ${showModelPicker ? 'rotate-180' : ''}`} />
+                  </button>
+                  {showModelPicker && (
+                    <div className="cia-fade-up absolute left-0 top-6 w-64 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-30">
+                      <p className="px-3.5 pt-1 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-300">Modelo / agente de IA</p>
+                      {AI_MODELS.map(m => (
+                        <button
+                          key={m.id}
+                          onClick={() => chooseModel(m.id)}
+                          disabled={!m.available}
+                          className={`w-full flex items-center justify-between gap-2 px-3.5 py-2 text-left transition-colors ${
+                            m.id === selectedModel ? 'bg-red-50' : m.available ? 'hover:bg-slate-50' : 'cursor-not-allowed'
+                          }`}
+                        >
+                          <div className="min-w-0">
+                            <p className={`text-xs font-semibold truncate ${m.available ? 'text-slate-700' : 'text-slate-400'}`}>{m.label}</p>
+                            <p className="text-[10px] text-slate-400 truncate">{m.provider} · {m.desc}</p>
+                          </div>
+                          {m.id === selectedModel ? (
+                            <Check className="h-3.5 w-3.5 text-red-600 shrink-0" />
+                          ) : !m.available ? (
+                            <span className="shrink-0 text-[9px] font-bold uppercase tracking-wide text-slate-300 bg-slate-100 rounded-full px-1.5 py-0.5">Próx.</span>
+                          ) : null}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

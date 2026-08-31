@@ -4,6 +4,13 @@ import pool from '../config/database';
 const GEMINI_MODEL   = 'gemini-2.5-flash';
 const MAX_TOOL_ROUNDS = 5;
 
+// Modelos que el selector del frontend puede pedir de verdad (el resto de
+// "proveedores" que ofrece el selector -- ChatGPT, Claude, Vincent AI -- son
+// opciones de cara al usuario sin backend detrás todavía; si llega uno de
+// esos ids aquí, o cualquier otra cosa no reconocida, se cae al modelo por
+// defecto en vez de fallar.
+const ALLOWED_GEMINI_MODELS = new Set(['gemini-2.5-flash', 'gemini-2.5-pro']);
+
 // ── Prompt base — identidad + capacidades ────────────────────────────────────
 const BASE_PROMPT = `Eres VantIA, la inteligencia artificial integrada en VANTIA Legis ERP. Eres un asistente completo, culto y capaz de ayudar con absolutamente cualquier cosa.
 
@@ -892,9 +899,11 @@ export const chatVantiaStream = async (req: any, res: Response) => {
     history  = [],
     moduleId,
     linkedExpedienteId,
-  }: { message: string; history: any[]; moduleId: string; linkedExpedienteId?: string } = req.body;
+    model,
+  }: { message: string; history: any[]; moduleId: string; linkedExpedienteId?: string; model?: string } = req.body;
 
   const userId = req.auth?.userId;
+  const geminiModel = ALLOWED_GEMINI_MODELS.has(model as string) ? (model as string) : GEMINI_MODEL;
 
   if (!message?.trim())     return res.status(400).json({ success: false, error: 'El mensaje no puede estar vacío.' });
   if (!userId || !moduleId) return res.status(400).json({ success: false, error: 'Falta userId o moduleId.' });
@@ -957,7 +966,7 @@ export const chatVantiaStream = async (req: any, res: Response) => {
     ];
 
     let fullReply = '';
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:streamGenerateContent?alt=sse&key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:streamGenerateContent?alt=sse&key=${apiKey}`;
 
     for (let round = 0; round < MAX_TOOL_ROUNDS && !closed; round++) {
       const roundParts: any[] = [];
