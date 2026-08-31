@@ -1751,6 +1751,50 @@ export async function runMigrations(): Promise<void> {
       `);
     } catch (_e: any) {}
 
+    // ── Fusionar canales directos (DM) duplicados ──────────────────
+    // getOrCreateDM tenía una condición de carrera (comprobar-si-existe +
+    // crear no era atómico) que permitía crear dos canales 'directo' entre
+    // las mismas dos personas si se pedían casi a la vez (doble clic, dos
+    // pestañas...) -- se veían como contactos repetidos en "Mensajes
+    // Directos". Ya está arreglado en el controlador (bloqueo consultivo),
+    // pero esto limpia los duplicados que ya se llegaron a crear: por cada
+    // pareja de usuarios con más de un canal directo, se queda el más
+    // antiguo, se mueven los mensajes de los demás a ese, y se borran los
+    // sobrantes (sus miembros se van solos por el ON DELETE CASCADE). Es
+    // idempotente: una vez fusionados, no vuelve a encontrar nada que hacer.
+    try {
+      await client.query(`
+        DO $$
+        DECLARE
+          grp RECORD;
+          keep_id UUID;
+          dup_id UUID;
+          i INT;
+        BEGIN
+          FOR grp IN
+            SELECT pair, array_agg(canal_id ORDER BY created_at ASC) AS canal_ids
+            FROM (
+              SELECT c.id AS canal_id, c.created_at,
+                     (SELECT string_agg(m.user_id, ',' ORDER BY m.user_id) FROM chat_miembros m WHERE m.canal_id = c.id) AS pair,
+                     (SELECT COUNT(*) FROM chat_miembros m WHERE m.canal_id = c.id) AS n_miembros
+              FROM chat_canales c
+              WHERE c.tipo = 'directo'
+            ) t
+            WHERE n_miembros = 2
+            GROUP BY pair
+            HAVING COUNT(*) > 1
+          LOOP
+            keep_id := grp.canal_ids[1];
+            FOR i IN 2..array_length(grp.canal_ids, 1) LOOP
+              dup_id := grp.canal_ids[i];
+              UPDATE chat_mensajes SET canal_id = keep_id WHERE canal_id = dup_id;
+              DELETE FROM chat_canales WHERE id = dup_id;
+            END LOOP;
+          END LOOP;
+        END $$;
+      `);
+    } catch (_e: any) {}
+
     // VACUUM ANALYZE para mantener las estadísticas de consulta frescas
     try {
       await client.query(`ANALYZE entities;`);

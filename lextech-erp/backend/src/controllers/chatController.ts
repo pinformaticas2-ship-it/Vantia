@@ -755,15 +755,29 @@ export async function getOrCreateDM(req: Request, res: Response) {
   if (!userId) return err(res, 'No autenticado', 401);
   const { target_user_id, target_user_name, target_avatar_url } = req.body;
   if (!target_user_id) return err(res, 'target_user_id requerido', 400);
+
+  // El "buscar si ya existe, si no crear" de aquí abajo NO es atómico por sí
+  // solo: dos peticiones casi simultáneas (doble clic al abrir el DM, dos
+  // pestañas, etc.) pueden pasar las dos por el SELECT sin ver nada todavía
+  // y acabar creando DOS canales directos entre las mismas dos personas --
+  // esto es justo lo que causaba conversaciones duplicadas en "Mensajes
+  // Directos". Un bloqueo consultivo por pareja de usuarios (orden estable,
+  // para que da igual quién de los dos lo pida) serializa esas peticiones.
+  const client = await pool.connect();
   try {
-    const { rows: existing } = await pool.query(`
+    await client.query('BEGIN');
+    const [a, b] = [userId, target_user_id].sort();
+    await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [`dm:${a}:${b}`]);
+
+    const { rows: existing } = await client.query(`
       SELECT c.* FROM chat_canales c
       WHERE c.tipo = 'directo'
         AND EXISTS (SELECT 1 FROM chat_miembros m WHERE m.canal_id = c.id AND m.user_id = $1)
         AND EXISTS (SELECT 1 FROM chat_miembros m WHERE m.canal_id = c.id AND m.user_id = $2)
-      LIMIT 1
+      ORDER BY c.created_at ASC LIMIT 1
     `, [userId, target_user_id]);
     if (existing.length) {
+      await client.query('COMMIT');
       return ok(res, {
         ...existing[0],
         dm_target_user_id: target_user_id,
@@ -772,13 +786,14 @@ export async function getOrCreateDM(req: Request, res: Response) {
       });
     }
     const nombre = [userName, target_user_name || 'Sin nombre'].sort().join(' · ');
-    const { rows } = await pool.query(`INSERT INTO chat_canales (nombre, tipo, created_by) VALUES ($1, 'directo', $2) RETURNING *`, [nombre, userId]);
+    const { rows } = await client.query(`INSERT INTO chat_canales (nombre, tipo, created_by) VALUES ($1, 'directo', $2) RETURNING *`, [nombre, userId]);
     const canal = rows[0];
-    await pool.query(`
+    await client.query(`
       INSERT INTO chat_miembros (canal_id, user_id, user_name, avatar_url, role, last_read_at)
       VALUES ($1, $2, $3, $4, 'admin', NOW()), ($1, $5, $6, $7, 'miembro', NOW())
       ON CONFLICT (canal_id, user_id) DO NOTHING
     `, [canal.id, userId, userName, avatarUrl, target_user_id, target_user_name || 'Sin nombre', target_avatar_url || null]);
+    await client.query('COMMIT');
     return ok(res, {
       ...canal,
       dm_target_user_id: target_user_id,
@@ -786,7 +801,10 @@ export async function getOrCreateDM(req: Request, res: Response) {
       dm_target_avatar_url: target_avatar_url || null,
     }, 201);
   } catch (e: any) {
+    await client.query('ROLLBACK').catch(() => {});
     return err(res, e.message);
+  } finally {
+    client.release();
   }
 }
 
