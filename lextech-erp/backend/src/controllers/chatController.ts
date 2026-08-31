@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import path from 'path';
 import pool from '../config/database';
 import { sendPushToUsers } from '../utils/webPush';
+import { resolveUserName } from './activityController';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 const ok  = (res: Response, data: any, status = 200) => res.status(status).json({ success: true,  data });
@@ -406,11 +407,16 @@ export async function sendMensaje(req: Request, res: Response) {
         if (!miembros.length) return;
         const isDM = canal.tipo === 'directo';
         const preview = (msg.contenido || fallbackContent || '').slice(0, 140);
+        // userName sale de las claims de la sesión (resolveAuthDisplayName), que en
+        // muchas cuentas no llevan nombre y caen en "Sin nombre" -- para el push se
+        // resuelve el nombre real contra la propia API de Clerk (igual que ya hace
+        // el resto de la app para mostrar nombres de otros usuarios).
+        const senderName = await resolveUserName(userId);
         await sendPushToUsers(
           miembros.map((m: any) => m.user_id),
           {
-            title: isDM ? userName : `#${canal.nombre || 'canal'}`,
-            body: isDM ? preview : `${userName}: ${preview}`,
+            title: isDM ? senderName : `#${canal.nombre || 'canal'}`,
+            body: isDM ? preview : `${senderName}: ${preview}`,
             url: `/dashboard/chat?canal=${id}`,
             tag: `chat-${id}`,
           },
