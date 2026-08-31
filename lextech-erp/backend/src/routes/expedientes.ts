@@ -23,6 +23,7 @@ import {
 } from '../controllers/expedientesController';
 import {
   listNotificaciones,
+  listNotificacionesPendientes,
   createNotificacion,
   updateNotificacion,
   deleteNotificacion,
@@ -46,6 +47,7 @@ router.get('/counter-config/:anio',  requireAuth, getCounterConfigYear);
 router.post('/counter-config',       requireAuth, setCounterConfig);
 router.get('/imports', requireAuth, getImportHistory);
 router.get('/imports/:id', requireAuth, getImportBatchDetail);
+router.get('/notificaciones/pendientes', requireAuth, listNotificacionesPendientes);
 router.use('/:id/notes', noteRoutes);
 router.get('/:id/related', requireAuth, getRelatedExpedientes);
 router.post('/:id/related', requireAuth, addRelatedExpediente);

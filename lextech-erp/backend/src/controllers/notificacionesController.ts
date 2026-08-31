@@ -1,6 +1,31 @@
 import { Request, Response } from 'express';
 import pool from '../config/database';
 
+// Recordatorios pendientes de TODOS los expedientes de la organización activa
+// (para la campana de notificaciones del topbar -- listNotificaciones de
+// arriba es por expediente concreto, esto es la vista agregada "todo lo que
+// tengo pendiente"). El frontend decide cuáles mostrar según lo cerca que
+// esté fecha_limite, igual que ya hace con las tareas de /api/tasks/me.
+export async function listNotificacionesPendientes(req: Request, res: Response) {
+  const organizacionId = (req as any).organizacionId;
+  if (!organizacionId) return res.json({ data: [] });
+  try {
+    const { rows } = await pool.query(
+      `SELECT n.id, n.titulo, n.fecha_limite, n.expediente_id,
+              e.anio, e.num_exp, e.ref_propia, e.cliente_nombre
+         FROM exp_notificaciones n
+         JOIN expedientes e ON e.id = n.expediente_id
+        WHERE n.estado = 'pendiente' AND e.organizacion_id = $1
+        ORDER BY n.fecha_limite ASC NULLS LAST
+        LIMIT 100`,
+      [organizacionId],
+    );
+    res.json({ data: rows });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+}
+
 export async function listNotificaciones(req: Request, res: Response) {
   const { id } = req.params;
   try {

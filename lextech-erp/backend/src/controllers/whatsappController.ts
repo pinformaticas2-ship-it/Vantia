@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import pool from '../config/database';
 import { resolveUserName } from './activityController';
+import { sendPushToAll } from '../utils/webPush';
 
 type WhatsAppConfig = {
   accessToken: string;
@@ -509,6 +510,17 @@ export async function receiveWebhook(req: Request, res: Response) {
               JSON.stringify({ message, contact, metadata: value?.metadata || null }),
             ],
           );
+
+          // WhatsApp todavía es un módulo compartido (no aislado por organización,
+          // ver Fase 1 de multi-organización), así que el push se manda a todo el
+          // que esté suscrito en cualquier despacho -- igual que ya se comparte la
+          // bandeja de conversaciones.
+          void sendPushToAll({
+            title: contactName || 'WhatsApp',
+            body: body || 'Mensaje recibido',
+            url: client?.id ? `/dashboard/whatsapp?clientId=${client.id}&mode=thread` : '/dashboard/whatsapp',
+            tag: `whatsapp-${fromPhone}`,
+          });
         }
       }
     }

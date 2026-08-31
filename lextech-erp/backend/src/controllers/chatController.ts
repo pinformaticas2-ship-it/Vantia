@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import path from 'path';
 import pool from '../config/database';
+import { sendPushToUsers } from '../utils/webPush';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 const ok  = (res: Response, data: any, status = 200) => res.status(status).json({ success: true,  data });
@@ -389,6 +390,34 @@ export async function sendMensaje(req: Request, res: Response) {
     await pool.query(`UPDATE chat_miembros SET avatar_url = COALESCE($1, avatar_url), user_name = $2 WHERE canal_id = $3 AND user_id = $4`,
       [avatarUrl, userName, id, userId]);
     await pool.query(`UPDATE chat_canales SET updated_at = NOW() WHERE id = $1`, [id]);
+
+    // Push a los demás miembros del canal (nunca al propio autor). No se
+    // espera (fire-and-forget): si falla o tarda, no debe retrasar la
+    // respuesta del envío del mensaje.
+    void (async () => {
+      try {
+        const { rows: canalRows } = await pool.query(`SELECT nombre, tipo FROM chat_canales WHERE id = $1`, [id]);
+        const canal = canalRows[0];
+        if (!canal) return;
+        const { rows: miembros } = await pool.query(
+          `SELECT user_id FROM chat_miembros WHERE canal_id = $1 AND user_id <> $2`,
+          [id, userId],
+        );
+        if (!miembros.length) return;
+        const isDM = canal.tipo === 'directo';
+        const preview = (msg.contenido || fallbackContent || '').slice(0, 140);
+        await sendPushToUsers(
+          miembros.map((m: any) => m.user_id),
+          {
+            title: isDM ? userName : `#${canal.nombre || 'canal'}`,
+            body: isDM ? preview : `${userName}: ${preview}`,
+            url: `/dashboard/chat?canal=${id}`,
+            tag: `chat-${id}`,
+          },
+        );
+      } catch { /* el push nunca debe romper el envío del mensaje */ }
+    })();
+
     return ok(res, msg, 201);
   } catch (e: any) {
     return err(res, e.message);

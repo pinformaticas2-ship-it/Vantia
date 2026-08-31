@@ -12,7 +12,7 @@ import {
   MessageSquare, LogOut, Mail, Library, Receipt, Sparkles, ChevronsUpDown,
   MoreVertical, RotateCcw, Copy, Check, Crown,
   Pen, AlertTriangle, RefreshCw, Link2, Plus, Trash2, Scale, Gavel, ChevronDown,
-  Wallet, CreditCard, Building2, BarChart3, FileText, Calculator, Square,
+  Wallet, CreditCard, Building2, BarChart3, FileText, Calculator, Square, BellRing,
 } from "lucide-react";
 import { UserButton, useUser, useAuth, useClerk } from "@clerk/clerk-react";
 import { getDeviceId, safeJson, waitForClientIp, resolveUploadUrl } from "../lib/api";
@@ -22,6 +22,7 @@ import { useChatUnread } from "../contexts/ChatUnreadContext";
 import { useEmailUnread } from "../contexts/EmailUnreadContext";
 import { useWhatsAppUnread, WA_LAST_SEEN_KEY } from "../contexts/WhatsAppUnreadContext";
 import { useDocumentProcessing } from "../contexts/DocumentProcessingContext";
+import { usePushNotifications } from "../lib/usePushNotifications";
 
 // ── Módulos buscables ────────────────────────────────────────────────────────
 const MODULES = [
@@ -818,13 +819,37 @@ function notificationIcon(kind: UnifiedNotification["kind"]) {
   return "🟢";
 }
 
-function NotificationsPanel({ notifs, loading, onClose }: { notifs: UnifiedNotification[]; loading: boolean; onClose: () => void }) {
+function NotificationsPanel({ notifs, loading, onClose, push }: {
+  notifs: UnifiedNotification[];
+  loading: boolean;
+  onClose: () => void;
+  push: ReturnType<typeof usePushNotifications>;
+}) {
+  const [pushJustEnabled, setPushJustEnabled] = useState(false);
   return (
     <div className="absolute right-0 top-14 w-[calc(100vw-1.5rem)] max-w-sm bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden">
       <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
         <h3 className="font-bold text-slate-800 text-sm">Notificaciones</h3>
         <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={14} /></button>
       </div>
+      {push.canOffer && (
+        <button
+          type="button"
+          disabled={push.busy}
+          onClick={async () => { const okd = await push.subscribe(); if (okd) setPushJustEnabled(true); }}
+          className="w-full flex items-center gap-3 px-4 py-2.5 border-b border-slate-100 bg-red-50/60 hover:bg-red-50 text-left transition-colors disabled:opacity-60"
+        >
+          <BellRing className="h-4 w-4 text-red-500 shrink-0" />
+          <span className="flex-1 text-xs text-slate-700">
+            <span className="font-semibold">Activar avisos push</span> — entérate aunque tengas la pestaña cerrada
+          </span>
+        </button>
+      )}
+      {pushJustEnabled && (
+        <div className="px-4 py-2 text-[11px] text-emerald-700 bg-emerald-50 border-b border-emerald-100">
+          Avisos activados en este dispositivo ✓
+        </div>
+      )}
       <div className="max-h-80 overflow-y-auto divide-y divide-slate-50">
         {loading ? (
           <div className="flex items-center justify-center py-8"><Spinner size="sm" muted /></div>
@@ -1504,6 +1529,7 @@ export default function DashboardLayout() {
   const { latestToast: latestWaToast, clearToast: clearWaToast, markSeen: markWaSeen, markAllSeen: markAllWaSeen } = useWhatsAppUnread();
 
   const isMobile = useIsMobile();
+  const pushNotifications = usePushNotifications();
   const [isMobileOpen,    setIsMobileOpen]    = useState(false);
   const [isCollapsed,     setIsCollapsed]     = useState(() => localStorage.getItem("sidebar_collapsed") === "1");
   const [isNotifOpen,     setIsNotifOpen]     = useState(false);
@@ -1631,18 +1657,20 @@ export default function DashboardLayout() {
       const token = await getToken({ skipCache: true });
       if (!token) return;
       const headers = { Authorization: `Bearer ${token}` };
-      const [chatRes, emailRes, waRes, tasksRes] = await Promise.all([
+      const [chatRes, emailRes, waRes, tasksRes, expNotifRes] = await Promise.all([
         fetch("/api/chat/canales", { headers }),
         fetch("/api/email/messages?folder=INBOX&unread=1&page=1&pageSize=50", { headers }),
         fetch("/api/whatsapp/contacts", { headers }),
         fetch("/api/tasks/me", { headers }),
+        fetch("/api/expedientes/notificaciones/pendientes", { headers }),
       ]);
 
-      const [chatData, emailData, waData, tasksData] = await Promise.all([
+      const [chatData, emailData, waData, tasksData, expNotifData] = await Promise.all([
         safeJson(chatRes),
         safeJson(emailRes),
         safeJson(waRes),
         safeJson(tasksRes),
+        safeJson(expNotifRes),
       ]);
 
       const next: UnifiedNotification[] = [];
@@ -1770,6 +1798,33 @@ export default function DashboardLayout() {
               if (t.expediente_id) navigate(`/dashboard/expedientes/${t.expediente_id}?tab=tareas`);
               else navigate("/dashboard/tareas");
             },
+          });
+        }
+      }
+
+      if (expNotifRes.ok) {
+        const expItems = Array.isArray(expNotifData?.data) ? expNotifData.data : [];
+        const now = new Date(); now.setHours(0, 0, 0, 0);
+        const alertLimit = new Date(now); alertLimit.setDate(alertLimit.getDate() + PLAZO_ALERT_DAYS);
+        const nowIso = new Date().toISOString();
+        for (const n of expItems) {
+          if (!n?.fecha_limite) continue;
+          const limitDate = new Date(n.fecha_limite);
+          if (Number.isNaN(limitDate.getTime()) || limitDate > alertLimit) continue;
+          const diffDays = Math.round((limitDate.getTime() - now.getTime()) / 86_400_000);
+          const subtitle =
+            diffDays < 0  ? `Vencida hace ${Math.abs(diffDays)} día${Math.abs(diffDays) === 1 ? "" : "s"}` :
+            diffDays === 0 ? "Vence hoy" :
+            diffDays === 1 ? "Vence mañana" :
+            `Vence en ${diffDays} días`;
+          next.push({
+            id: `plazo-exp-${n.id}`,
+            kind: "plazo",
+            title: n.titulo || "Recordatorio de expediente",
+            subtitle,
+            meta: `Exp. ${n.anio}/${n.num_exp}${n.cliente_nombre ? " · " + n.cliente_nombre : ""}`,
+            created_at: nowIso,
+            onClick: () => navigate(`/dashboard/expedientes/${n.expediente_id}?tab=cronologia`),
           });
         }
       }
@@ -1999,6 +2054,7 @@ export default function DashboardLayout() {
                 notifs={visibleNotifications.slice(0, 10)}
                 loading={notifLoading}
                 onClose={() => setIsNotifOpen(false)}
+                push={pushNotifications}
               />
             )}
           </div>

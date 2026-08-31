@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AlertTriangle, Bell, BookOpen, Building2, Camera, Check, Loader2, Lock, Palette, Plug, Plus, ShieldCheck, Trash2, UsersRound, X } from 'lucide-react';
+import { AlertTriangle, Bell, BellOff, BellRing, BookOpen, Building2, Camera, Check, Loader2, Lock, MessageCircle, Clock3, Mail as MailIcon, Phone, Palette, Plug, Plus, ShieldCheck, Trash2, UsersRound, X } from 'lucide-react';
 import { useAuth } from '@clerk/clerk-react';
 import { useTheme, AppTheme } from '../lib/ThemeContext';
 import { pickSidebarStyle, autoSidebarBorder, muteSidebarColor } from '../lib/themeCss';
 import { apiFetch, resolveUploadUrl, setActiveOrganizacionId } from '../lib/api';
 import { useOrganizacion, OrgRol } from '../lib/useOrganizacion';
 import ManualPanel from './ManualPanel';
+import { usePushNotifications } from '../lib/usePushNotifications';
 
 const PALETTES: {
   id: AppTheme;
@@ -929,6 +930,90 @@ function ColorField({ label, value, onChange, onCommit, valid }: {
   );
 }
 
+function NotificacionesPanel() {
+  const push = usePushNotifications();
+  const [error, setError] = useState<string | null>(null);
+
+  const handleToggle = async () => {
+    setError(null);
+    if (push.subscribed) {
+      await push.unsubscribe();
+      return;
+    }
+    const okd = await push.subscribe();
+    if (!okd) {
+      setError(
+        push.permission === 'denied'
+          ? 'Has bloqueado los avisos para este sitio en el navegador. Actívalos desde los ajustes de notificaciones del navegador y vuelve a intentarlo.'
+          : 'No se ha podido activar. Inténtalo de nuevo.',
+      );
+    }
+  };
+
+  const EVENTS = [
+    { icon: MessageCircle, label: 'Mensajes del chat interno', desc: 'Cuando alguien te escribe en un canal o directo.' },
+    { icon: MailIcon,      label: 'Correo nuevo',              desc: 'Al llegar un correo a tu bandeja de entrada.' },
+    { icon: Phone,         label: 'WhatsApp entrante',         desc: 'Cuando un cliente escribe por WhatsApp.' },
+    { icon: Clock3,        label: 'Plazos y recordatorios',    desc: 'Tareas y notificaciones de expediente próximas a vencer o vencidas.' },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-white rounded-2xl border border-slate-200 p-5">
+        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">Avisos push del navegador</h3>
+
+        {!push.supported ? (
+          <p className="text-sm text-slate-500">Este navegador no admite notificaciones push.</p>
+        ) : !push.serverEnabled ? (
+          <p className="text-sm text-slate-500">Las notificaciones push todavía no están configuradas en el servidor.</p>
+        ) : (
+          <div className="flex items-start gap-4">
+            <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${push.subscribed ? 'bg-emerald-50' : 'bg-slate-100'}`}>
+              {push.subscribed ? <BellRing size={20} className="text-emerald-600" /> : <BellOff size={20} className="text-slate-400" />}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-slate-800">
+                {push.subscribed ? 'Avisos activados en este dispositivo' : 'Avisos desactivados en este dispositivo'}
+              </p>
+              <p className="text-xs text-slate-500 mt-0.5 max-w-md">
+                Recibe un aviso del sistema aunque tengas Vantia cerrado o en segundo plano. Se activa por dispositivo/navegador, no por cuenta.
+              </p>
+              {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
+            </div>
+            <button
+              type="button"
+              onClick={handleToggle}
+              disabled={push.busy}
+              className={`shrink-0 px-4 py-2 rounded-lg text-xs font-semibold transition-colors disabled:opacity-60 ${
+                push.subscribed
+                  ? 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  : 'bg-red-600 text-white hover:bg-red-700'
+              }`}
+            >
+              {push.busy ? 'Un momento…' : push.subscribed ? 'Desactivar' : 'Activar avisos'}
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="bg-white rounded-2xl border border-slate-200 p-5">
+        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">Qué avisa</h3>
+        <div className="space-y-3">
+          {EVENTS.map((e) => (
+            <div key={e.label} className="flex items-start gap-3">
+              <e.icon size={16} className="text-slate-400 mt-0.5 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-slate-700">{e.label}</p>
+                <p className="text-xs text-slate-500">{e.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Configuracion() {
   const { theme, setTheme, customColor, customSecondary, customSidebar, setCustomColors } = useTheme();
   const [draftPrimary, setDraftPrimary] = useState(customColor);
@@ -1116,6 +1201,8 @@ export default function Configuracion() {
             <ManualPanel />
           ) : activeSection === 'despacho' ? (
             <DespachoPanel />
+          ) : activeSection === 'notificaciones' ? (
+            <NotificacionesPanel />
           ) : activeSection === 'usuarios' ? (
             <UsuariosPanel />
           ) : (

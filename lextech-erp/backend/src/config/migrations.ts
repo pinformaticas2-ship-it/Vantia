@@ -1839,6 +1839,33 @@ export async function runMigrations(): Promise<void> {
       `);
     } catch (_e: any) {}
 
+    // ── Notificaciones push del navegador (Web Push) ────────────────
+    // Una fila por dispositivo/navegador suscrito. `endpoint` identifica de
+    // forma única la suscripción que da el navegador -- si el usuario se
+    // suscribe otra vez desde el mismo dispositivo (p.ej. tras borrar datos),
+    // se actualizan las claves en vez de duplicar la fila.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS push_subscriptions (
+        id           UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id      VARCHAR(150) NOT NULL,
+        endpoint     TEXT         NOT NULL UNIQUE,
+        p256dh       TEXT         NOT NULL,
+        auth         TEXT         NOT NULL,
+        user_agent   VARCHAR(300),
+        created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      );
+    `);
+    try {
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user_id ON push_subscriptions (user_id);`);
+    } catch (_e: any) {}
+
+    // Marca de "ya avisado por push" para no reenviar el mismo aviso de plazo
+    // en cada pasada del programador (se re-avisa una vez al día como mucho).
+    try {
+      await client.query(`ALTER TABLE client_tasks      ADD COLUMN IF NOT EXISTS plazo_push_sent_at TIMESTAMPTZ;`);
+      await client.query(`ALTER TABLE exp_notificaciones ADD COLUMN IF NOT EXISTS push_sent_at       TIMESTAMPTZ;`);
+    } catch (_e: any) {}
+
     // VACUUM ANALYZE para mantener las estadísticas de consulta frescas
     try {
       await client.query(`ANALYZE entities;`);

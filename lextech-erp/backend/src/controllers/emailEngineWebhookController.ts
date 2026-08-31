@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import pool from '../config/database';
 import { emitEmailEvent } from '../utils/emailSSE';
+import { sendPushToUser } from '../utils/webPush';
 
 const API_TOKEN = process.env.EMAIL_ENGINE_TOKEN || '';
 
@@ -60,6 +61,14 @@ export async function handleEngineWebhook(req: Request, res: Response) {
           ],
         );
         emitEmailEvent(userId, { type: 'messageNew', accountId, folder: msg.path || 'INBOX' });
+        if ((msg.path || 'INBOX') === 'INBOX' && !msg.flags?.includes('\\Seen')) {
+          void sendPushToUser(userId, {
+            title: msg.from?.name || msg.from?.address || 'Nuevo correo',
+            body: msg.subject || '(Sin asunto)',
+            url: '/dashboard/correo',
+            tag: `email-${accountId}`,
+          });
+        }
         break;
       }
       case 'messageSeen':

@@ -27,11 +27,13 @@ import quickLinksRoutes     from './routes/quickLinks';
 import directorioRoutes     from './routes/directorio';
 import organizacionRoutes   from './routes/organizacion';
 import preferencesRoutes    from './routes/preferences';
+import pushRoutes           from './routes/push';
 import { syncAllQuipuUsers } from './controllers/quipuController';
 import { clerkMiddleware } from '@clerk/express';
 import { resolveOrg } from './middleware/resolveOrg';
 import { runMigrations } from './config/migrations';
 import { startLocalFilesWatcher } from './watchers/localFilesWatcher';
+import { startPlazoPushScheduler } from './services/plazoPushScheduler';
 import { migrateLocalFoldersStructure } from './controllers/filesController';
 import { logServerStart } from './controllers/activityController';
 import pool from './config/database';
@@ -171,6 +173,7 @@ app.use('/api/quick-links',       quickLinksRoutes);
 app.use('/api/directorio',        directorioRoutes);
 app.use('/api/organizacion',      organizacionRoutes);
 app.use('/api/preferences',       preferencesRoutes);
+app.use('/api/push',              pushRoutes);
 
 // Health check básico
 app.get('/health', (_req, res) => {
@@ -283,6 +286,9 @@ runMigrations().then(() => {
     }
     // Registrar arranque en trazabilidad
     try { await logServerStart(); } catch { /**/ }
+
+    // Notificaciones push: aviso de plazos próximos a vencer
+    startPlazoPushScheduler();
 
     // Quipu auto-sync: run once after 30s (let DB settle), then every 30 min
     setTimeout(() => {
