@@ -1751,6 +1751,26 @@ export async function runMigrations(): Promise<void> {
       `);
     } catch (_e: any) {}
 
+    // ── Chat: presencia real (conectado/ausente/desconectado) ──────
+    // Antes el puntito verde de "conectado" era decorativo: en la lista de
+    // DMs estaba cableado a "disponible" siempre (ni se leía el estado real),
+    // y el estado manual (chat_miembros.status) se reseteaba a "disponible"
+    // en cada recarga porque nunca se leía del servidor al entrar. Esta
+    // tabla guarda un latido -- la pestaña manda "sigo aquí" cada pocos
+    // segundos mientras está visible -- para poder calcular de verdad si
+    // alguien está conectado ahora mismo, ausente (pestaña en segundo plano
+    // un rato) o desconectado (sin latido desde hace bastante).
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS chat_presence (
+        user_id         VARCHAR(150) PRIMARY KEY,
+        organizacion_id UUID         NOT NULL REFERENCES organizaciones(id) ON DELETE CASCADE,
+        last_active_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      );
+    `);
+    try {
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_chat_presence_org ON chat_presence (organizacion_id);`);
+    } catch (_e: any) {}
+
     // ── Chat interno: aislamiento por organización ──────────────────
     // El chat (canales, DMs, mensajes...) se quedó fuera a propósito de la
     // Fase 1 de multi-organización -- era el único módulo todavía global,

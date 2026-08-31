@@ -16,6 +16,7 @@ import {
   getSystemUsers, buscarCanalesDisponibles, getUnreadCounts, uploadChatImage, uploadChatFile,
   getTypingStatus, updateTypingStatus,
   getSesionExpediente, iniciarSesionExpediente, cerrarSesionExpediente,
+  getMyStatus, updateHeartbeat, getPresence,
 } from '../controllers/chatController';
 
 const router = Router();
@@ -120,7 +121,12 @@ router.get   ('/miembros',                       requireAuth, getMiembrosGlobal)
 router.post  ('/dm',                             requireAuth, getOrCreateDM);
 
 // Perfil propio
+router.get   ('/me/status',                      requireAuth, getMyStatus);
 router.put   ('/me/status',                      requireAuth, updateMyStatus);
 router.put   ('/me/role',                        requireAuth, updateMyRole);
+router.put   ('/me/heartbeat',                   requireAuth, updateHeartbeat);
+
+// Presencia (conectado/ausente/desconectado)
+router.get   ('/presence',                       requireAuth, getPresence);
 
 export default router;

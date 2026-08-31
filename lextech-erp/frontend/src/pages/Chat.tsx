@@ -60,7 +60,7 @@ interface SesionExpediente {
 }
 interface SysUser {
   user_id: string; user_name: string; avatar_url: string | null;
-  email: string | null; role_label: string;
+  email: string | null; role_label: string; status?: string;
 }
 interface Miembro {
   user_id: string; user_name: string; avatar_url: string | null;
@@ -85,13 +85,41 @@ const EMOJI_CATS = [
   { label:"Símb.",   icon:"✅", emojis:["✅","❌","⭕","🔴","🟡","🟢","🔵","🟣","⚫","⚪","🔶","🔷","🔸","🔹","🔺","🔻","💠","🔘","🔲","🔳","▪️","▫️","◾","◽","◼","◻","⬛","⬜","🔃","🔄","🔙","🔚","🔛","🔜","🔝","🆕","🆙","🆒","🆓","🆗","🆘","🆔","🆚","💯","🔞","📵","🚫","⛔","✳","❇"] },
 ];
 const STATUS_CFG: Record<string, { label: string; color: string }> = {
-  disponible:  { label:"Disponible",  color:"bg-green-500"  },
-  ocupado:     { label:"Ocupado",     color:"bg-yellow-500" },
-  en_juicio:   { label:"En Juicio",   color:"bg-red-600"    },
-  en_reunion:  { label:"En Reunión",  color:"bg-blue-500"   },
-  ausente:     { label:"Ausente",     color:"bg-slate-400"  },
-  no_molestar: { label:"No molestar", color:"bg-red-900"    },
+  disponible:   { label:"Disponible",   color:"bg-green-500"  },
+  ocupado:      { label:"Ocupado",      color:"bg-yellow-500" },
+  en_juicio:    { label:"En Juicio",    color:"bg-red-600"    },
+  en_reunion:   { label:"En Reunión",   color:"bg-blue-500"   },
+  ausente:      { label:"Ausente",      color:"bg-slate-400"  },
+  no_molestar:  { label:"No molestar",  color:"bg-red-900"    },
+  // No seleccionable a mano -- solo sale del cálculo de presencia real (ver
+  // computeEffectiveStatus), cuando no ha llegado un latido reciente.
+  desconectado: { label:"Desconectado", color:"bg-slate-300"  },
 };
+// Estos 4 son señales deliberadas ("estoy en juicio", "no molestar"...) que la
+// persona eligió a mano -- se respetan tal cual mientras siga conectada. Fuera
+// de esos casos (incluido si nunca se ha tocado el selector, o si eligió
+// "Disponible"/"Ausente") el estado real que se muestra sale de si ha
+// mandado un latido hace poco, no de lo último que pulsó en el desplegable.
+const STATUS_OVERRIDES = new Set(["ocupado", "no_molestar", "en_juicio", "en_reunion"]);
+const PRESENCE_ONLINE_MS = 45_000;      // late fresco -> conectado
+const PRESENCE_AWAY_MS   = 5 * 60_000;  // sin latido más de esto -> desconectado
+
+/** Estado real de una persona: combina lo que eligió a mano (si es una señal
+ *  deliberada) con la presencia calculada a partir de su último latido. */
+function computeEffectiveStatus(
+  userId: string | null | undefined,
+  manualStatus: string | null | undefined,
+  presenceByUserId: Record<string, string>,
+): string {
+  if (!userId) return manualStatus || "disponible";
+  const lastActiveIso = presenceByUserId[userId];
+  const ageMs = lastActiveIso ? Date.now() - new Date(lastActiveIso).getTime() : Infinity;
+  if (ageMs > PRESENCE_AWAY_MS) return "desconectado";
+  if (ageMs > PRESENCE_ONLINE_MS) {
+    return manualStatus && STATUS_OVERRIDES.has(manualStatus) ? manualStatus : "ausente";
+  }
+  return manualStatus || "disponible";
+}
 const CHAT_CANALES_CACHE_KEY = "chat-canales-cache-v1";
 const CHAT_USERS_CACHE_KEY = "chat-users-cache-v1";
 const CHAT_DM_ORDER_CACHE_KEY = "chat-dm-order-cache-v1";
@@ -1857,7 +1885,7 @@ function StatusSelector({
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
           <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-400">Estado</p>
           <div className="grid grid-cols-2 gap-2">
-            {Object.entries(STATUS_CFG).map(([k,v])=>(
+            {Object.entries(STATUS_CFG).filter(([k])=>k!=="desconectado").map(([k,v])=>(
               <button type="button" key={k} onClick={()=>onSelect(k)}
                 className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm transition-all duration-150 active:scale-[0.985] ${
                   current===k
@@ -2255,9 +2283,10 @@ function ModalCrearCanal({ sysUsers, getToken, onClose, onCreate }: {
 // ══════════════════════════════════════════════════════════════════════════════
 // PANEL MIEMBROS (derecha)
 // ══════════════════════════════════════════════════════════════════════════════
-function PanelMiembros({ canal, sysUsers, getToken, currentUserId, onClose, onDM, onRefresh }: {
+function PanelMiembros({ canal, sysUsers, getToken, currentUserId, onClose, onDM, onRefresh, presenceByUserId }: {
   canal: Canal; sysUsers: SysUser[]; getToken: ()=>Promise<string|null>;
   currentUserId: string; onClose:()=>void; onDM:(m:Miembro)=>void; onRefresh:()=>void;
+  presenceByUserId: Record<string, string>;
 }) {
   const [miembros, setMiembros] = useState<Miembro[]>([]);
   const [tab, setTab] = useState<"ver"|"añadir">("ver");
@@ -2351,13 +2380,13 @@ function PanelMiembros({ canal, sysUsers, getToken, currentUserId, onClose, onDM
             {admins.length>0&&(
               <>
                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest px-4 pt-3 pb-1.5">Administradores</p>
-                {admins.map(m=><MiembroRow key={m.user_id} m={m} isMe={m.user_id===currentUserId} canAdmin={myRole==="admin"&&m.user_id!==currentUserId} acting={acting} onDM={()=>onDM(m)} onRemove={()=>removeM(m.user_id)}/>)}
+                {admins.map(m=><MiembroRow key={m.user_id} m={m} isMe={m.user_id===currentUserId} canAdmin={myRole==="admin"&&m.user_id!==currentUserId} acting={acting} onDM={()=>onDM(m)} onRemove={()=>removeM(m.user_id)} presenceByUserId={presenceByUserId}/>)}
               </>
             )}
             {members.length>0&&(
               <>
                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest px-4 pt-3 pb-1.5">Miembros — {members.length}</p>
-                {members.map(m=><MiembroRow key={m.user_id} m={m} isMe={m.user_id===currentUserId} canAdmin={myRole==="admin"&&m.user_id!==currentUserId} acting={acting} onDM={()=>onDM(m)} onRemove={()=>removeM(m.user_id)}/>)}
+                {members.map(m=><MiembroRow key={m.user_id} m={m} isMe={m.user_id===currentUserId} canAdmin={myRole==="admin"&&m.user_id!==currentUserId} acting={acting} onDM={()=>onDM(m)} onRemove={()=>removeM(m.user_id)} presenceByUserId={presenceByUserId}/>)}
               </>
             )}
             {miembrosFilt.length===0&&<p className="text-slate-400 text-sm text-center py-6">Sin resultados</p>}
@@ -2388,11 +2417,12 @@ function PanelMiembros({ canal, sysUsers, getToken, currentUserId, onClose, onDM
   );
 }
 
-function MiembroRow({ m, isMe, canAdmin, acting, onDM, onRemove }: {
+function MiembroRow({ m, isMe, canAdmin, acting, onDM, onRemove, presenceByUserId }: {
   m: Miembro; isMe: boolean; canAdmin: boolean; acting: string|null;
-  onDM:()=>void; onRemove:()=>void;
+  onDM:()=>void; onRemove:()=>void; presenceByUserId: Record<string, string>;
 }) {
-  const st = STATUS_CFG[m.status]||STATUS_CFG.disponible;
+  const effectiveStatus = computeEffectiveStatus(m.user_id, m.status, presenceByUserId);
+  const st = STATUS_CFG[effectiveStatus]||STATUS_CFG.disponible;
   return (
     <div className="flex items-center gap-2.5 px-3 py-2.5 hover:bg-slate-50 group transition-colors border-b border-slate-50 last:border-0">
       <div className="relative shrink-0">
@@ -3352,10 +3382,12 @@ function CanalItem({ canal, activo, onClick, unreadCount = 0 }: { canal: Canal; 
 }
 
 // UserDMItem — muestra un usuario del sistema en la sección DMs
-function UserDMItem({ user: u, dmCanal, activo, loading, onClick, unreadCount = 0 }: {
+function UserDMItem({ user: u, dmCanal, activo, loading, onClick, unreadCount = 0, presenceByUserId }: {
   user: SysUser; dmCanal?: Canal; activo: boolean; loading: boolean; onClick:()=>void; unreadCount?: number;
+  presenceByUserId: Record<string, string>;
 }) {
-  const st = STATUS_CFG.disponible; // status por defecto
+  const effectiveStatus = computeEffectiveStatus(u.user_id, u.status, presenceByUserId);
+  const st = STATUS_CFG[effectiveStatus] || STATUS_CFG.disponible;
   const safeUnreadCount = loading ? 0 : unreadCount;
   const hasUnread = safeUnreadCount > 0 && !activo;
   const displayName = u.user_name?.trim() || dmCanal?.dm_target_user_name?.trim() || "Usuario";
@@ -3441,6 +3473,10 @@ export default function Chat() {
   const [editingMsg, setEditingMsg]       = useState<Mensaje|null>(null);
   const [highlightId, setHighlightId]     = useState<string|null>(null);
   const [myStatus, setMyStatus]           = useState("disponible");
+  // user_id → ISO timestamp del último latido de esa persona (organización
+  // activa). Se usa junto con el status manual para calcular quién está
+  // realmente conectado/ausente/desconectado -- ver computeEffectiveStatus.
+  const [presenceByUserId, setPresenceByUserId] = useState<Record<string, string>>({});
   const [showStatus, setShowStatus]       = useState(false);
   const [customStatusLabel, setCustomStatusLabel] = useState(
     () => (typeof window !== "undefined" ? localStorage.getItem(CHAT_CUSTOM_STATUS_KEY) || "" : "")
@@ -3492,6 +3528,8 @@ export default function Chat() {
   const sidebarPollRef   = useRef<ReturnType<typeof setInterval>|null>(null);
   const fetchCanalesRef  = useRef<()=>Promise<void>>(async ()=>{});
   const fetchSysUsersRef = useRef<()=>Promise<void>>(async ()=>{});
+  const fetchPresenceRef = useRef<()=>Promise<void>>(async ()=>{});
+  const presencePollRef  = useRef<ReturnType<typeof setInterval>|null>(null);
   const fetchMensajesRef = useRef<(canal: Canal)=>Promise<void>>(async ()=>{});
   const fetchMiembrosRef = useRef<(canalId: string)=>Promise<void>>(async ()=>{});
   const fetchTypingUsersRef = useRef<(canalId: string)=>Promise<void>>(async ()=>{});
@@ -3644,6 +3682,29 @@ export default function Chat() {
       ) return prev;
       return nextTyping;
     });
+  }, [hdr]);
+
+  // ── Presencia real (conectado/ausente/desconectado) ─────────────────────────
+  const fetchPresence = useCallback(async () => {
+    const h = await hdr();
+    const res = await fetch(`/api/chat/presence`, { headers: h });
+    const d = await safeJson(res);
+    if (!res.ok) return;
+    const map: Record<string, string> = {};
+    for (const row of (d.data || [])) {
+      if (row?.user_id && row?.last_active_at) map[row.user_id] = row.last_active_at;
+    }
+    setPresenceByUserId(map);
+  }, [hdr]);
+
+  // El estado manual (ocupado, en juicio...) se guarda en el servidor -- se
+  // lee aquí al entrar para no resetearlo a "disponible" en cada recarga.
+  const fetchMyStatus = useCallback(async () => {
+    const h = await hdr();
+    const res = await fetch(`/api/chat/me/status`, { headers: h });
+    const d = await safeJson(res);
+    if (!res.ok) return;
+    if (d.data?.status) setMyStatus(d.data.status);
   }, [hdr]);
 
   const updateTypingStatus = useCallback(async (canalId: string, typing: boolean) => {
@@ -3951,6 +4012,7 @@ export default function Chat() {
   // Mantener siempre la versión más reciente de fetchCanales en el ref
   useEffect(() => { fetchCanalesRef.current = fetchCanales; }, [fetchCanales]);
   useEffect(() => { fetchSysUsersRef.current = fetchSysUsers; }, [fetchSysUsers]);
+  useEffect(() => { fetchPresenceRef.current = fetchPresence; }, [fetchPresence]);
   useEffect(() => { fetchMensajesRef.current = fetchMensajes; }, [fetchMensajes]);
   useEffect(() => { fetchMiembrosRef.current = fetchMiembros; }, [fetchMiembros]);
   useEffect(() => { fetchTypingUsersRef.current = fetchTypingUsers; }, [fetchTypingUsers]);
@@ -3970,8 +4032,27 @@ export default function Chat() {
   // ── Effects: carga inicial — usa los refs para no depender de fetchCanales (estable con hdr)
   useEffect(() => {
     if (!authLoaded || !userLoaded || !currentUserId) return;
-    void Promise.all([fetchCanalesRef.current(), fetchSysUsersRef.current()]);
+    void Promise.all([fetchCanalesRef.current(), fetchSysUsersRef.current(), fetchPresenceRef.current(), fetchMyStatus()]);
   }, [authLoaded, userLoaded, currentUserId]); // fetchCanales/fetchSysUsers ya NO son deps — los refs son estables
+
+  // Poll de presencia (conectado/ausente/desconectado): cada 20s mientras la
+  // pestaña está visible, más lento en segundo plano -- no hace falta que sea
+  // instantáneo, solo que no se quede desactualizado mucho rato.
+  useEffect(() => {
+    if (!authLoaded || !userLoaded || !currentUserId) return;
+    const start = () => {
+      if (presencePollRef.current) clearInterval(presencePollRef.current);
+      const visible = document.visibilityState === "visible";
+      presencePollRef.current = setInterval(() => void fetchPresenceRef.current(), visible ? 20_000 : 45_000);
+    };
+    start();
+    const onVisibility = () => { void fetchPresenceRef.current(); start(); };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      if (presencePollRef.current) clearInterval(presencePollRef.current);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [authLoaded, userLoaded, currentUserId]);
   // El intervalo de polling de canales se monta UNA sola vez y nunca se resetea
   // Los no-leídos se sincronizan desde ChatUnreadContext (App.tsx) — sin poll duplicado aquí
   useEffect(() => {
@@ -4325,7 +4406,8 @@ export default function Chat() {
   const canalesPublicos   = canales.filter(c=>c.tipo==="publico");
   const canalesPrivados   = canales.filter(c=>c.tipo==="privado");
   const canalDMs          = canales.filter(c=>c.tipo==="directo");
-  const statusCfg         = STATUS_CFG[myStatus]||STATUS_CFG.disponible;
+  const myEffectiveStatus = computeEffectiveStatus(currentUserId, myStatus, presenceByUserId);
+  const statusCfg         = STATUS_CFG[myEffectiveStatus]||STATUS_CFG.disponible;
   const customStatusColorClass = CUSTOM_STATUS_COLORS.find((color) => color.key === customStatusColor)?.className || "bg-emerald-500";
   const displayedStatusLabel = customStatusLabel.trim()
     ? `${customStatusEmoji || "💼"} ${customStatusLabel.trim()}`
@@ -4629,6 +4711,7 @@ export default function Chat() {
                         loading={dmLoadingId===u.user_id}
                         unreadCount={unreadCount}
                         onClick={()=>{ if (dmCanal) seleccionar(dmCanal); else handleDMUser(u); }}
+                        presenceByUserId={presenceByUserId}
                       />
                     );
                   })}
@@ -4640,6 +4723,7 @@ export default function Chat() {
                       loading={dmLoadingId===u.user_id}
                       unreadCount={unreadDMs[u.user_id] ?? 0}
                       onClick={()=>handleDMUser(u)}
+                      presenceByUserId={presenceByUserId}
                     />
                   ))}
                   {/* Invitar a otros */}
@@ -4981,6 +5065,7 @@ export default function Chat() {
                   onClose={()=>setRightPanel(null)}
                   onDM={m=>{ handleDM(m); setRightPanel(null); }}
                   onRefresh={fetchCanales}
+                  presenceByUserId={presenceByUserId}
                 />
               )}
               {rightPanel==="pinned"&&(

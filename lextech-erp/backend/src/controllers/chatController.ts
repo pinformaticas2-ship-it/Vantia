@@ -235,6 +235,59 @@ export async function updateMyStatus(req: Request, res: Response) {
   }
 }
 
+/** GET /api/chat/me/status — el estado manual que había guardado la última vez,
+ *  para no resetearlo a "disponible" en cada recarga de la página. */
+export async function getMyStatus(req: Request, res: Response) {
+  const userId = (req as any).auth?.userId;
+  if (!userId) return err(res, 'No autenticado', 401);
+  try {
+    const { rows } = await pool.query(`SELECT status FROM chat_miembros WHERE user_id = $1 LIMIT 1`, [userId]);
+    return ok(res, { status: rows[0]?.status || 'disponible' });
+  } catch (e: any) {
+    return err(res, e.message);
+  }
+}
+
+// ── Presencia real (conectado / ausente / desconectado) ─────────────────────
+
+/** PUT /api/chat/me/heartbeat — "sigo aquí"; lo manda el frontend cada pocos
+ *  segundos mientras la pestaña está abierta y visible. */
+export async function updateHeartbeat(req: Request, res: Response) {
+  const userId = (req as any).auth?.userId;
+  if (!userId) return err(res, 'No autenticado', 401);
+  const organizacionId = (req as any).organizacionId;
+  if (!organizacionId) return err(res, 'Organización no resuelta', 400);
+  try {
+    await pool.query(`
+      INSERT INTO chat_presence (user_id, organizacion_id, last_active_at)
+      VALUES ($1, $2, NOW())
+      ON CONFLICT (user_id) DO UPDATE SET organizacion_id = EXCLUDED.organizacion_id, last_active_at = NOW()
+    `, [userId, organizacionId]);
+    return ok(res, { ok: true });
+  } catch (e: any) {
+    return err(res, e.message);
+  }
+}
+
+/** GET /api/chat/presence — último latido de cada persona de la organización
+ *  activa; el frontend calcula con esto si está conectado, ausente o
+ *  desconectado (no se guarda un "estado" fijo en el servidor: el latido
+ *  simplemente va envejeciendo y el cliente decide el umbral). */
+export async function getPresence(req: Request, res: Response) {
+  const userId = (req as any).auth?.userId;
+  if (!userId) return err(res, 'No autenticado', 401);
+  const organizacionId = (req as any).organizacionId;
+  try {
+    const { rows } = await pool.query(
+      `SELECT user_id, last_active_at FROM chat_presence WHERE organizacion_id = $1`,
+      [organizacionId]
+    );
+    return ok(res, rows);
+  } catch (e: any) {
+    return err(res, e.message);
+  }
+}
+
 /** PUT /api/chat/me/role */
 export async function updateMyRole(req: Request, res: Response) {
   const userId = (req as any).auth?.userId;

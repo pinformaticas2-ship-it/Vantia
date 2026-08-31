@@ -102,18 +102,47 @@ export function ChatUnreadProvider({ children }: { children: React.ReactNode }) 
     timerRef.current = setInterval(() => doFetchRef.current(), isVisible ? 1200 : 4000);
   };
 
+  // ── Presencia (conectado/ausente/desconectado) ──────────────────────────────
+  // "Sigo aquí": mientras la pestaña está visible, se manda un latido cada 20s
+  // (el servidor solo guarda cuándo fue el último). En segundo plano se para
+  // del todo a propósito -- así, con el tiempo, la persona pasa sola a
+  // "ausente" y luego a "desconectado" en el cálculo que hace cada cliente al
+  // leer /api/chat/presence, sin que nadie tenga que marcarlo a mano.
+  const heartbeatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const sendHeartbeat = useCallback(async () => {
+    if (!isLoadedRef.current) return;
+    try {
+      const token = await getTokenRef.current();
+      if (!token) return;
+      await fetch("/api/chat/me/heartbeat", { method: "PUT", headers: { Authorization: `Bearer ${token}` } });
+    } catch { /* silencioso */ }
+  }, []);
+  const sendHeartbeatRef = useRef(sendHeartbeat);
+  useEffect(() => { sendHeartbeatRef.current = sendHeartbeat; }, [sendHeartbeat]);
+
+  const startHeartbeat = () => {
+    if (heartbeatTimerRef.current) { clearInterval(heartbeatTimerRef.current); heartbeatTimerRef.current = null; }
+    const isVisible = typeof document === "undefined" || document.visibilityState === "visible";
+    if (!isVisible) return;
+    void sendHeartbeatRef.current();
+    heartbeatTimerRef.current = setInterval(() => sendHeartbeatRef.current(), 20_000);
+  };
+
   // Montar intervalo UNA sola vez — estable
   useEffect(() => {
     doFetchRef.current();
     startPolling();
+    startHeartbeat();
     const handleVisibility = () => {
       void doFetchRef.current();
       startPolling();
+      startHeartbeat();
     };
     window.addEventListener("focus", handleVisibility);
     document.addEventListener("visibilitychange", handleVisibility);
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+      if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
       window.removeEventListener("focus", handleVisibility);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
