@@ -4509,8 +4509,14 @@ export default function Chat() {
   const activeChatAvatarUrl = canalActivo?.tipo === "directo"
     ? activeDirectUser?.avatar_url || canalActivo?.dm_target_avatar_url || null
     : null;
+  const activeChatUserId = canalActivo?.tipo === "directo"
+    ? (canalActivo?.dm_target_user_id || activeDirectUser?.user_id || null)
+    : null;
+  const activeChatStatusCfg = canalActivo?.tipo === "directo"
+    ? STATUS_CFG[computeEffectiveStatus(activeChatUserId, activeDirectUser?.status, presenceByUserId)] || STATUS_CFG.disponible
+    : null;
   const activeChatStatusLabel = canalActivo?.tipo === "directo"
-    ? "Disponible"
+    ? activeChatStatusCfg!.label
     : `${canalActivo?.total_miembros || 0} miembro${(canalActivo?.total_miembros || 0) === 1 ? "" : "s"}`;
   const resolveDisplayName = useCallback((userId?: string | null, name?: string | null, isSelf = false) => {
     if (isSelf || (userId && userId === currentUserId)) return "T\u00FA";
@@ -4824,7 +4830,7 @@ export default function Chat() {
                 {canalActivo.tipo==="directo" ? (
                   <div className="relative shrink-0">
                     <Av url={activeChatAvatarUrl} name={activeChatTitle} size={9} />
-                    <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white bg-emerald-500" />
+                    <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white ${activeChatStatusCfg?.color || "bg-emerald-500"}`} />
                   </div>
                 ) : (
                   <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-500 shrink-0">
@@ -4836,7 +4842,7 @@ export default function Chat() {
                 <div className="min-w-0">
                   <p className="truncate font-bold text-slate-800 text-sm">{activeChatTitle}</p>
                   <div className="flex items-center gap-1.5">
-                    {canalActivo.tipo === "directo" && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}
+                    {canalActivo.tipo === "directo" && <span className={`h-1.5 w-1.5 rounded-full ${activeChatStatusCfg?.color || "bg-emerald-500"}`} />}
                     <p className="truncate text-[11px] text-slate-400">{canalActivo.tipo==="directo" ? activeChatStatusLabel : activeChatSubtitle}</p>
                   </div>
                 </div>
