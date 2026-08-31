@@ -70,7 +70,7 @@ export default function PublicLanding() {
             Plataforma legal
           </div>
 
-          <h1 className="max-w-lg text-3xl font-black leading-tight text-white sm:text-4xl">
+          <h1 className="max-w-md text-xl font-semibold leading-relaxed text-white sm:text-2xl">
             Automatización de expedientes, investigación con IA y gestión integral en una sola plataforma segura.
           </h1>
         </div>
