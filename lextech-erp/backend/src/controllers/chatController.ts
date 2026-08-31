@@ -278,8 +278,16 @@ export async function getPresence(req: Request, res: Response) {
   if (!userId) return err(res, 'No autenticado', 401);
   const organizacionId = (req as any).organizacionId;
   try {
+    // Se manda la antigüedad ya calculada por el propio servidor (en
+    // segundos), no la fecha en bruto -- si mandáramos la fecha, cada
+    // navegador la restaría con SU PROPIO reloj, y si el reloj de alguien
+    // está descuadrado unos minutos (nada raro: VMs, Windows sin hora
+    // automática...) esa persona vería a todo el mundo -- incluido a sí
+    // misma -- como ausente/desconectado aunque los datos reales fueran
+    // correctos. Así el cálculo no depende de qué hora marque cada equipo.
     const { rows } = await pool.query(
-      `SELECT user_id, last_active_at FROM chat_presence WHERE organizacion_id = $1`,
+      `SELECT user_id, EXTRACT(EPOCH FROM (NOW() - last_active_at))::int AS age_seconds
+       FROM chat_presence WHERE organizacion_id = $1`,
       [organizacionId]
     );
     return ok(res, rows);

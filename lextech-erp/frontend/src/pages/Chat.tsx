@@ -105,15 +105,19 @@ const PRESENCE_ONLINE_MS = 45_000;      // late fresco -> conectado
 const PRESENCE_AWAY_MS   = 5 * 60_000;  // sin latido más de esto -> desconectado
 
 /** Estado real de una persona: combina lo que eligió a mano (si es una señal
- *  deliberada) con la presencia calculada a partir de su último latido. */
+ *  deliberada) con la presencia calculada a partir de su último latido.
+ *  `presenceByUserId` guarda, para cada persona, un instante en epoch-ms ya
+ *  anclado al reloj de ESTE navegador (ver fetchPresence) -- así el cálculo
+ *  no depende de si el reloj del servidor o el de otro equipo están bien
+ *  puestos, solo del propio, que es el mismo que usa Date.now() aquí. */
 function computeEffectiveStatus(
   userId: string | null | undefined,
   manualStatus: string | null | undefined,
-  presenceByUserId: Record<string, string>,
+  presenceByUserId: Record<string, number>,
 ): string {
   if (!userId) return manualStatus || "disponible";
-  const lastActiveIso = presenceByUserId[userId];
-  const ageMs = lastActiveIso ? Date.now() - new Date(lastActiveIso).getTime() : Infinity;
+  const lastActiveAtMs = presenceByUserId[userId];
+  const ageMs = lastActiveAtMs ? Date.now() - lastActiveAtMs : Infinity;
   if (ageMs > PRESENCE_AWAY_MS) return "desconectado";
   if (ageMs > PRESENCE_ONLINE_MS) {
     return manualStatus && STATUS_OVERRIDES.has(manualStatus) ? manualStatus : "ausente";
@@ -2286,7 +2290,7 @@ function ModalCrearCanal({ sysUsers, getToken, onClose, onCreate }: {
 function PanelMiembros({ canal, sysUsers, getToken, currentUserId, onClose, onDM, onRefresh, presenceByUserId }: {
   canal: Canal; sysUsers: SysUser[]; getToken: ()=>Promise<string|null>;
   currentUserId: string; onClose:()=>void; onDM:(m:Miembro)=>void; onRefresh:()=>void;
-  presenceByUserId: Record<string, string>;
+  presenceByUserId: Record<string, number>;
 }) {
   const [miembros, setMiembros] = useState<Miembro[]>([]);
   const [tab, setTab] = useState<"ver"|"añadir">("ver");
@@ -2419,7 +2423,7 @@ function PanelMiembros({ canal, sysUsers, getToken, currentUserId, onClose, onDM
 
 function MiembroRow({ m, isMe, canAdmin, acting, onDM, onRemove, presenceByUserId }: {
   m: Miembro; isMe: boolean; canAdmin: boolean; acting: string|null;
-  onDM:()=>void; onRemove:()=>void; presenceByUserId: Record<string, string>;
+  onDM:()=>void; onRemove:()=>void; presenceByUserId: Record<string, number>;
 }) {
   const effectiveStatus = computeEffectiveStatus(m.user_id, m.status, presenceByUserId);
   const st = STATUS_CFG[effectiveStatus]||STATUS_CFG.disponible;
@@ -3384,7 +3388,7 @@ function CanalItem({ canal, activo, onClick, unreadCount = 0 }: { canal: Canal; 
 // UserDMItem — muestra un usuario del sistema en la sección DMs
 function UserDMItem({ user: u, dmCanal, activo, loading, onClick, unreadCount = 0, presenceByUserId }: {
   user: SysUser; dmCanal?: Canal; activo: boolean; loading: boolean; onClick:()=>void; unreadCount?: number;
-  presenceByUserId: Record<string, string>;
+  presenceByUserId: Record<string, number>;
 }) {
   const effectiveStatus = computeEffectiveStatus(u.user_id, u.status, presenceByUserId);
   const st = STATUS_CFG[effectiveStatus] || STATUS_CFG.disponible;
@@ -3476,7 +3480,7 @@ export default function Chat() {
   // user_id → ISO timestamp del último latido de esa persona (organización
   // activa). Se usa junto con el status manual para calcular quién está
   // realmente conectado/ausente/desconectado -- ver computeEffectiveStatus.
-  const [presenceByUserId, setPresenceByUserId] = useState<Record<string, string>>({});
+  const [presenceByUserId, setPresenceByUserId] = useState<Record<string, number>>({});
   const [showStatus, setShowStatus]       = useState(false);
   const [customStatusLabel, setCustomStatusLabel] = useState(
     () => (typeof window !== "undefined" ? localStorage.getItem(CHAT_CUSTOM_STATUS_KEY) || "" : "")
@@ -3685,14 +3689,22 @@ export default function Chat() {
   }, [hdr]);
 
   // ── Presencia real (conectado/ausente/desconectado) ─────────────────────────
+  // El servidor manda la antigüedad ya calculada (age_seconds), no una fecha
+  // en bruto -- así el reloj de este navegador solo se usa para medir un
+  // desplazamiento LOCAL (fetchedAtMs - age), nunca para restar contra la
+  // hora de otro equipo. Si el reloj de este ordenador está descuadrado, el
+  // error se cancela solo (se usa el mismo reloj para anclar y para leer).
   const fetchPresence = useCallback(async () => {
     const h = await hdr();
     const res = await fetch(`/api/chat/presence`, { headers: h });
     const d = await safeJson(res);
     if (!res.ok) return;
-    const map: Record<string, string> = {};
+    const fetchedAtMs = Date.now();
+    const map: Record<string, number> = {};
     for (const row of (d.data || [])) {
-      if (row?.user_id && row?.last_active_at) map[row.user_id] = row.last_active_at;
+      if (row?.user_id && typeof row?.age_seconds === "number") {
+        map[row.user_id] = fetchedAtMs - row.age_seconds * 1000;
+      }
     }
     setPresenceByUserId(map);
   }, [hdr]);
