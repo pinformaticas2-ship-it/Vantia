@@ -18,8 +18,8 @@ self.addEventListener("push", (event) => {
   const title = payload.title || "Vantia";
   const options = {
     body: payload.body || "",
-    icon: "/favicon.svg",
-    badge: "/favicon.svg",
+    icon: "/vantia-mark-192.png",
+    badge: "/vantia-mark-96.png",
     tag: payload.tag || undefined,
     renotify: Boolean(payload.tag),
     data: { url: payload.url || "/dashboard" },
