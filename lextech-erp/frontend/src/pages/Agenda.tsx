@@ -430,8 +430,8 @@ function EventModal({
 
   return createPortal(
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-[30px] border border-slate-200 bg-[#fbfcfe] shadow-[0_40px_100px_rgba(15,23,42,0.22)] animate-in zoom-in-95 duration-200">
+      <div className="absolute inset-0 bg-black/30 animate-overlay-in" onClick={onClose} />
+      <div className="relative flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-[30px] border border-slate-200 bg-[#fbfcfe] shadow-[0_40px_100px_rgba(15,23,42,0.22)] animate-modal-in">
         {/* cabecera -- flex-shrink-0: el modal completo (cabecera + Guardar +
             el area de detalles) no puede superar el 90vh de arriba, así que
             la cabecera se queda fija y solo el formulario de más abajo
