@@ -61,18 +61,23 @@ export default function PublicLanding() {
           <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full border border-white/8" />
         </div>
 
+        {/* 1. Quiénes somos primero: la etiqueta de contexto y, justo debajo,
+               la frase que de verdad explica qué hace la plataforma -- antes
+               esta frase vivía al final del bloque, después de la cita
+               histórica, cuando es lo primero que alguien debería leer. */}
         <div className="relative z-10">
-          <div className="mb-8 inline-flex rounded-full border border-white/20 bg-black/20 px-3 py-1 text-xs font-bold uppercase tracking-[0.24em] text-[#fff1c9]">
+          <div className="mb-5 inline-flex rounded-full border border-white/20 bg-black/20 px-3 py-1 text-xs font-bold uppercase tracking-[0.24em] text-[#fff1c9]">
             Plataforma legal
           </div>
 
-          <QuoteRotator />
-
-          <p className="mt-6 max-w-md text-lg leading-relaxed text-white">
-            Automatizacion de expedientes, investigacion con IA y gestion integral en una sola plataforma segura.
-          </p>
+          <h1 className="max-w-lg text-3xl font-black leading-tight text-white sm:text-4xl">
+            Automatización de expedientes, investigación con IA y gestión integral en una sola plataforma segura.
+          </h1>
         </div>
 
+        {/* 2. La prueba: qué hace concretamente la plataforma, justo después
+               de decirlo -- antes estas tarjetas quedaban al final, compitiendo
+               con la cita por la última mirada antes del pie de página. */}
         <div className="relative z-10 space-y-3">
           <FeatureCard
             emoji="🛡️"
@@ -91,8 +96,14 @@ export default function PublicLanding() {
           />
         </div>
 
+        {/* 3. El cierre editorial: la cita legal rotativa, ahora como colofón
+               de prestigio en vez de ser lo primero que se lee. */}
+        <div className="relative z-10">
+          <QuoteRotator />
+        </div>
+
         <div className="relative z-10 text-sm font-semibold text-white">
-          (c) 2026 Vantia Systems. Enterprise.
+          © 2026 Vantia Systems. Enterprise.
         </div>
       </div>
 
