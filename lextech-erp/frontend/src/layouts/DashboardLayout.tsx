@@ -819,10 +819,11 @@ function notificationIcon(kind: UnifiedNotification["kind"]) {
   return "🟢";
 }
 
-function NotificationsPanel({ notifs, loading, onClose, push }: {
+function NotificationsPanel({ notifs, loading, onClose, onDismiss, push }: {
   notifs: UnifiedNotification[];
   loading: boolean;
   onClose: () => void;
+  onDismiss: (id: string) => void;
   push: ReturnType<typeof usePushNotifications>;
 }) {
   const [pushJustEnabled, setPushJustEnabled] = useState(false);
@@ -859,7 +860,7 @@ function NotificationsPanel({ notifs, loading, onClose, push }: {
           <button
             key={n.id}
             type="button"
-            onClick={() => { n.onClick?.(); onClose(); }}
+            onClick={() => { n.onClick?.(); onDismiss(n.id); onClose(); }}
             className="w-full flex items-start gap-3 px-4 py-3 hover:bg-slate-50 text-left">
             <span className="text-base mt-0.5 shrink-0">{notificationIcon(n.kind)}</span>
             <div className="flex-1 min-w-0">
@@ -1545,6 +1546,7 @@ export default function DashboardLayout() {
   const linksRef           = useRef<HTMLDivElement>(null);
   const loginFiredRef      = useRef<string | null>(null);
   const notifBusyRef       = useRef(false);
+  const dismissedNotifIdsRef = useRef<Set<string>>(new Set());
   const prevChatUnreadRef  = useRef(-1);
   const activeUserIdRef    = useRef<string | null>(null);
 
@@ -1829,8 +1831,19 @@ export default function DashboardLayout() {
         }
       }
 
-      next.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      setNotifications(next.slice(0, 20));
+      // Los avisos que el usuario ya cerró a mano (dismissNotification) no
+      // deben resucitar solos en el próximo sondeo -- se filtran aquí. A la
+      // vez, se olvida la marca de "descartado" en cuanto el propio origen
+      // deja de mandar ese id (p.ej. el mensaje ya se leyó de verdad), para
+      // no acumular ids para siempre.
+      const freshIds = new Set(next.map((n) => n.id));
+      for (const id of dismissedNotifIdsRef.current) {
+        if (!freshIds.has(id)) dismissedNotifIdsRef.current.delete(id);
+      }
+      const filtered = next.filter((n) => !dismissedNotifIdsRef.current.has(n.id));
+
+      filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      setNotifications(filtered.slice(0, 20));
     } catch (_e) {
     } finally {
       notifBusyRef.current = false;
@@ -1842,6 +1855,11 @@ export default function DashboardLayout() {
     setIsNotifOpen(true);
     await fetchNotifications(true);
   }, [fetchNotifications]);
+
+  const dismissNotification = useCallback((id: string) => {
+    dismissedNotifIdsRef.current.add(id);
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  }, []);
 
   useEffect(() => {
     let interval: number | null = null;
@@ -2046,7 +2064,9 @@ export default function DashboardLayout() {
             >
               <Bell className="h-5 w-5" />
               {totalBadge > 0 && (
-                <span className="absolute top-1.5 right-1.5 h-2 w-2 bg-red-500 rounded-full ring-2 ring-white" />
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center ring-2 ring-white">
+                  {totalBadge > 99 ? "99+" : totalBadge}
+                </span>
               )}
             </button>
             {isNotifOpen && (
@@ -2054,6 +2074,7 @@ export default function DashboardLayout() {
                 notifs={visibleNotifications.slice(0, 10)}
                 loading={notifLoading}
                 onClose={() => setIsNotifOpen(false)}
+                onDismiss={dismissNotification}
                 push={pushNotifications}
               />
             )}
