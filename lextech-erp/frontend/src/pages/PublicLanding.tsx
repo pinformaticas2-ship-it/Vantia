@@ -49,6 +49,56 @@ const LEGAL_QUOTES = [
     author: "Jean Giraudoux",
     years: "1882 - 1944",
   },
+  {
+    quote: "No hay peor tiranía que la que se ejerce a la sombra de las leyes y con apariencia de justicia.",
+    author: "Montesquieu",
+    years: "1689 - 1755",
+  },
+  {
+    quote: "La injusticia en cualquier lugar es una amenaza a la justicia en todas partes.",
+    author: "Martin Luther King Jr.",
+    years: "1929 - 1968",
+  },
+  {
+    quote: "Para ser libres no basta con romper las propias cadenas; hay que vivir de forma que se respete y se haga crecer la libertad de los demás.",
+    author: "Nelson Mandela",
+    years: "1918 - 2013",
+  },
+  {
+    quote: "Es preferible que diez culpables escapen a que sufra un solo inocente.",
+    author: "William Blackstone",
+    years: "1723 - 1780",
+  },
+  {
+    quote: "Debemos ser un gobierno de leyes, y no de hombres.",
+    author: "John Adams",
+    years: "1735 - 1826",
+  },
+  {
+    quote: "La ley es la razón libre de toda pasión.",
+    author: "Aristóteles",
+    years: "384 a.C. - 322 a.C.",
+  },
+  {
+    quote: "La justicia es la voluntad constante y perpetua de dar a cada uno lo suyo.",
+    author: "Ulpiano",
+    years: "170 - 228",
+  },
+  {
+    quote: "Se dice que la luz del sol es el mejor de los desinfectantes.",
+    author: "Louis Brandeis",
+    years: "1856 - 1941",
+  },
+  {
+    quote: "La justicia retrasada es justicia denegada.",
+    author: "William Gladstone",
+    years: "1809 - 1898",
+  },
+  {
+    quote: "Si eres neutral en situaciones de injusticia, has elegido el lado del opresor.",
+    author: "Desmond Tutu",
+    years: "1931 - 2021",
+  },
 ];
 
 export default function PublicLanding() {
