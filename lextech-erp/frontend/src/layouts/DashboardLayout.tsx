@@ -820,12 +820,12 @@ function notificationIcon(kind: UnifiedNotification["kind"]) {
 
 function NotificationsPanel({ notifs, loading, onClose }: { notifs: UnifiedNotification[]; loading: boolean; onClose: () => void }) {
   return (
-    <div className="absolute right-0 top-14 w-[calc(100vw-1.5rem)] max-w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden">
+    <div className="absolute right-0 top-14 w-[calc(100vw-1.5rem)] max-w-sm bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden">
       <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
         <h3 className="font-bold text-slate-800 text-sm">Notificaciones</h3>
         <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={14} /></button>
       </div>
-      <div className="max-h-72 overflow-y-auto divide-y divide-slate-50">
+      <div className="max-h-80 overflow-y-auto divide-y divide-slate-50">
         {loading ? (
           <div className="flex items-center justify-center py-8"><Spinner size="sm" muted /></div>
         ) : notifs.length === 0 ? (
@@ -836,15 +836,18 @@ function NotificationsPanel({ notifs, loading, onClose }: { notifs: UnifiedNotif
             type="button"
             onClick={() => { n.onClick?.(); onClose(); }}
             className="w-full flex items-start gap-3 px-4 py-3 hover:bg-slate-50 text-left">
-            <span className="text-base mt-0.5">{notificationIcon(n.kind)}</span>
+            <span className="text-base mt-0.5 shrink-0">{notificationIcon(n.kind)}</span>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-semibold text-slate-700 truncate">{n.title}</p>
               {n.subtitle && <p className="text-[11px] text-slate-500 truncate">{n.subtitle}</p>}
               {n.meta && <p className="text-[11px] text-slate-400 truncate mt-0.5">{n.meta}</p>}
-              <p className="text-[10px] text-slate-400 mt-0.5">{timeAgo(n.created_at)}</p>
+              {/* Para plazos, el "hace X días" ya está en el subtítulo (Vencida hace/Vence en...);
+                  repetirlo aquí con la hora real de creación de la notificación (que es "ahora")
+                  solo contradice al subtítulo -- se omite para ese tipo. */}
+              {n.kind !== "plazo" && <p className="text-[10px] text-slate-400 mt-0.5">{timeAgo(n.created_at)}</p>}
             </div>
             {!!n.count && n.count > 1 && (
-              <span className="ml-2 min-w-[20px] h-5 bg-slate-100 text-slate-600 text-[10px] font-bold rounded-full flex items-center justify-center px-1.5">
+              <span className="ml-2 min-w-[20px] h-5 shrink-0 bg-slate-100 text-slate-600 text-[10px] font-bold rounded-full flex items-center justify-center px-1.5">
                 {n.count > 99 ? "99+" : n.count}
               </span>
             )}
