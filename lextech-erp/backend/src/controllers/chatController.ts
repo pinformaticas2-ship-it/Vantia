@@ -221,12 +221,18 @@ export async function getCanalMiembros(req: Request, res: Response) {
 // ── Status y Rol ──────────────────────────────────────────────────────────────
 
 /** PUT /api/chat/me/status */
+// "Disponible" y "Ausente" ya no son avisos manuales -- se calculan solos a
+// partir del latido de presencia (ver getPresence/computeEffectiveStatus en
+// el frontend). Solo estos 4 representan una señal deliberada de la
+// persona ("estoy en juicio", "no molestar"...); status=null quita
+// cualquier aviso puesto y deja el estado en automático.
+const MANUAL_STATUS_OVERRIDES = new Set(['ocupado', 'no_molestar', 'en_juicio', 'en_reunion']);
+
 export async function updateMyStatus(req: Request, res: Response) {
   const userId = (req as any).auth?.userId;
   if (!userId) return err(res, 'No autenticado', 401);
-  const { status } = req.body;
-  const valid = ['disponible', 'ocupado', 'no_molestar', 'en_juicio', 'en_reunion', 'ausente'];
-  if (!valid.includes(status)) return err(res, 'Status no válido', 400);
+  const { status } = req.body as { status: string | null };
+  if (status !== null && !MANUAL_STATUS_OVERRIDES.has(status)) return err(res, 'Status no válido', 400);
   try {
     await pool.query(`UPDATE chat_miembros SET status = $1 WHERE user_id = $2`, [status, userId]);
     return ok(res, { status });
@@ -235,14 +241,17 @@ export async function updateMyStatus(req: Request, res: Response) {
   }
 }
 
-/** GET /api/chat/me/status — el estado manual que había guardado la última vez,
- *  para no resetearlo a "disponible" en cada recarga de la página. */
+/** GET /api/chat/me/status — el aviso manual que había guardado la última vez
+ *  (o null si no hay ninguno puesto), para no perderlo en cada recarga de la
+ *  página. Los valores antiguos "disponible"/"ausente" (de antes de este
+ *  cambio) se tratan como "sin aviso" -- ya no son avisos manuales válidos. */
 export async function getMyStatus(req: Request, res: Response) {
   const userId = (req as any).auth?.userId;
   if (!userId) return err(res, 'No autenticado', 401);
   try {
     const { rows } = await pool.query(`SELECT status FROM chat_miembros WHERE user_id = $1 LIMIT 1`, [userId]);
-    return ok(res, { status: rows[0]?.status || 'disponible' });
+    const raw = rows[0]?.status;
+    return ok(res, { status: raw && MANUAL_STATUS_OVERRIDES.has(raw) ? raw : null });
   } catch (e: any) {
     return err(res, e.message);
   }

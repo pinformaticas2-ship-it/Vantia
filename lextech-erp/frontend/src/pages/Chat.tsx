@@ -100,7 +100,8 @@ const STATUS_CFG: Record<string, { label: string; color: string }> = {
 // de esos casos (incluido si nunca se ha tocado el selector, o si eligió
 // "Disponible"/"Ausente") el estado real que se muestra sale de si ha
 // mandado un latido hace poco, no de lo último que pulsó en el desplegable.
-const STATUS_OVERRIDES = new Set(["ocupado", "no_molestar", "en_juicio", "en_reunion"]);
+const STATUS_OVERRIDE_LIST = ["ocupado", "no_molestar", "en_juicio", "en_reunion"] as const;
+const STATUS_OVERRIDES = new Set<string>(STATUS_OVERRIDE_LIST);
 const PRESENCE_ONLINE_MS = 45_000;      // late fresco -> conectado
 const PRESENCE_AWAY_MS   = 5 * 60_000;  // sin latido más de esto -> desconectado
 
@@ -115,14 +116,21 @@ function computeEffectiveStatus(
   manualStatus: string | null | undefined,
   presenceByUserId: Record<string, number>,
 ): string {
-  if (!userId) return manualStatus || "disponible";
+  // "Disponible" y "Ausente" YA NO son valores manuales válidos -- si llega
+  // uno de esos dos aquí es un dato antiguo (de antes de este cambio) y se
+  // ignora a propósito, para que no se quede "pegado" para siempre aunque
+  // la persona vuelva a estar conectada. Solo los 4 avisos deliberados
+  // cuentan como override real.
+  const hasOverride = !!manualStatus && STATUS_OVERRIDES.has(manualStatus);
+  if (!userId) return hasOverride ? manualStatus! : "disponible";
   const lastActiveAtMs = presenceByUserId[userId];
   const ageMs = lastActiveAtMs ? Date.now() - lastActiveAtMs : Infinity;
+  // Desconectado de verdad pisa cualquier aviso manual -- si alguien puso
+  // "En juicio" y luego cerró el portátil y se fue a casa, mejor mostrar
+  // que está desconectado que dejar "En juicio" para siempre.
   if (ageMs > PRESENCE_AWAY_MS) return "desconectado";
-  if (ageMs > PRESENCE_ONLINE_MS) {
-    return manualStatus && STATUS_OVERRIDES.has(manualStatus) ? manualStatus : "ausente";
-  }
-  return manualStatus || "disponible";
+  if (hasOverride) return manualStatus!;
+  return ageMs > PRESENCE_ONLINE_MS ? "ausente" : "disponible";
 }
 const CHAT_CANALES_CACHE_KEY = "chat-canales-cache-v1";
 const CHAT_USERS_CACHE_KEY = "chat-users-cache-v1";
@@ -1772,7 +1780,7 @@ function StatusSelector({
   onClose,
 }: {
   anchorRef: React.RefObject<HTMLElement | null>;
-  current: string;
+  current: string | null;
   currentLabel: string;
   currentColorClass: string;
   customStatusText: string;
@@ -1781,7 +1789,7 @@ function StatusSelector({
   userName: string;
   userAvatar?: string | null;
   notificationsPaused: boolean;
-  onSelect:(s:string)=>void;
+  onSelect:(s:string|null)=>void;
   onSaveCustomStatus:(value:string, emoji:string, colorKey:string)=>void;
   onClearCustomStatus:()=>void;
   onToggleNotifications:()=>void;
@@ -1888,19 +1896,35 @@ function StatusSelector({
       <div className="px-4 pb-3">
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
           <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-400">Estado</p>
+          <p className="mb-2 text-[11px] text-slate-400 leading-relaxed">
+            "Disponible" y "Ausente" ahora se calculan solos según si estás usando la app. Elige uno de estos solo si quieres dejar un aviso concreto.
+          </p>
           <div className="grid grid-cols-2 gap-2">
-            {Object.entries(STATUS_CFG).filter(([k])=>k!=="desconectado").map(([k,v])=>(
-              <button type="button" key={k} onClick={()=>onSelect(k)}
-                className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm transition-all duration-150 active:scale-[0.985] ${
-                  current===k
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
-                }`}>
-                <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${v.color}`}/>
-                <span className="truncate">{v.label}</span>
-                {current===k&&<Check size={12} className="ml-auto shrink-0 text-emerald-500"/>}
-              </button>
-            ))}
+            <button type="button" onClick={()=>onSelect(null)}
+              className={`col-span-2 flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm transition-all duration-150 active:scale-[0.985] ${
+                !current
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
+              }`}>
+              <span className="h-2.5 w-2.5 rounded-full shrink-0 bg-green-500"/>
+              <span className="truncate">Automático (según uso real)</span>
+              {!current&&<Check size={12} className="ml-auto shrink-0 text-emerald-500"/>}
+            </button>
+            {STATUS_OVERRIDE_LIST.map(k=>{
+              const v = STATUS_CFG[k];
+              return (
+                <button type="button" key={k} onClick={()=>onSelect(k)}
+                  className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm transition-all duration-150 active:scale-[0.985] ${
+                    current===k
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                      : "border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
+                  }`}>
+                  <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${v.color}`}/>
+                  <span className="truncate">{v.label}</span>
+                  {current===k&&<Check size={12} className="ml-auto shrink-0 text-emerald-500"/>}
+                </button>
+              );
+            })}
           </div>
           <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
             <p className="mb-2 text-sm font-medium text-slate-700">Crear estado personalizado</p>
@@ -3476,7 +3500,10 @@ export default function Chat() {
   const [replyTo, setReplyTo]             = useState<Mensaje|null>(null);
   const [editingMsg, setEditingMsg]       = useState<Mensaje|null>(null);
   const [highlightId, setHighlightId]     = useState<string|null>(null);
-  const [myStatus, setMyStatus]           = useState("disponible");
+  // null = sin aviso manual puesto (el estado se calcula solo a partir de la
+  // presencia real). Solo tiene un valor no-null si elegiste a propósito
+  // Ocupado/No molestar/En juicio/En reunión.
+  const [myStatus, setMyStatus]           = useState<string | null>(null);
   // user_id → ISO timestamp del último latido de esa persona (organización
   // activa). Se usa junto con el status manual para calcular quién está
   // realmente conectado/ausente/desconectado -- ver computeEffectiveStatus.
@@ -3709,14 +3736,15 @@ export default function Chat() {
     setPresenceByUserId(map);
   }, [hdr]);
 
-  // El estado manual (ocupado, en juicio...) se guarda en el servidor -- se
-  // lee aquí al entrar para no resetearlo a "disponible" en cada recarga.
+  // El aviso manual (ocupado, en juicio...) se guarda en el servidor -- se
+  // lee aquí al entrar para no perderlo en cada recarga. null = ninguno
+  // puesto (estado automático).
   const fetchMyStatus = useCallback(async () => {
     const h = await hdr();
     const res = await fetch(`/api/chat/me/status`, { headers: h });
     const d = await safeJson(res);
     if (!res.ok) return;
-    if (d.data?.status) setMyStatus(d.data.status);
+    setMyStatus(d.data?.status ?? null);
   }, [hdr]);
 
   const updateTypingStatus = useCallback(async (canalId: string, typing: boolean) => {
@@ -4362,7 +4390,7 @@ export default function Chat() {
     localStorage.setItem(CHAT_NOTIFICATIONS_PAUSED_KEY, notificationsPaused ? "1" : "0");
   }, [notificationsPaused]);
 
-  const handleStatusChange = async (s: string) => {
+  const handleStatusChange = async (s: string | null) => {
     setMyStatus(s);
     setCustomStatusLabel("");
     setCustomStatusEmoji("");
