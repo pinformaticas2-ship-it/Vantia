@@ -1751,6 +1751,26 @@ export async function runMigrations(): Promise<void> {
       `);
     } catch (_e: any) {}
 
+    // ── Chat interno: aislamiento por organización ──────────────────
+    // El chat (canales, DMs, mensajes...) se quedó fuera a propósito de la
+    // Fase 1 de multi-organización -- era el único módulo todavía global,
+    // compartido por todas las organizaciones del usuario a la vez. Se
+    // añade organizacion_id a chat_canales (el resto de tablas de chat
+    // cuelgan de canal_id, así que quedan aisladas transitivamente) con el
+    // mismo patrón ya usado en entities/expedientes: columna nullable,
+    // backfill a la organización sembrada, y SET NOT NULL.
+    try {
+      await client.query(`ALTER TABLE chat_canales ADD COLUMN IF NOT EXISTS organizacion_id UUID REFERENCES organizaciones(id);`);
+      await client.query(`
+        UPDATE chat_canales SET organizacion_id = (SELECT id FROM organizaciones ORDER BY created_at LIMIT 1)
+        WHERE organizacion_id IS NULL
+      `);
+      await client.query(`ALTER TABLE chat_canales ALTER COLUMN organizacion_id SET NOT NULL;`);
+    } catch (_e: any) {}
+    try {
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_chat_canales_organizacion_id ON chat_canales (organizacion_id);`);
+    } catch (_e: any) {}
+
     // ── Fusionar canales directos (DM) duplicados ──────────────────
     // getOrCreateDM tenía una condición de carrera (comprobar-si-existe +
     // crear no era atómico) que permitía crear dos canales 'directo' entre
@@ -1758,10 +1778,13 @@ export async function runMigrations(): Promise<void> {
     // pestañas...) -- se veían como contactos repetidos en "Mensajes
     // Directos". Ya está arreglado en el controlador (bloqueo consultivo),
     // pero esto limpia los duplicados que ya se llegaron a crear: por cada
-    // pareja de usuarios con más de un canal directo, se queda el más
-    // antiguo, se mueven los mensajes de los demás a ese, y se borran los
-    // sobrantes (sus miembros se van solos por el ON DELETE CASCADE). Es
-    // idempotente: una vez fusionados, no vuelve a encontrar nada que hacer.
+    // pareja de usuarios CON LA MISMA ORGANIZACIÓN con más de un canal
+    // directo, se queda el más antiguo, se mueven los mensajes de los demás
+    // a ese, y se borran los sobrantes (sus miembros se van solos por el ON
+    // DELETE CASCADE). Se agrupa también por organizacion_id a propósito:
+    // dos personas SÍ pueden tener un DM en cada organización a la que
+    // pertenezcan juntas -- eso ya no es un duplicado, es el diseño nuevo.
+    // Idempotente: una vez fusionados, no vuelve a encontrar nada que hacer.
     try {
       await client.query(`
         DO $$
@@ -1772,16 +1795,17 @@ export async function runMigrations(): Promise<void> {
           i INT;
         BEGIN
           FOR grp IN
-            SELECT pair, array_agg(canal_id ORDER BY created_at ASC) AS canal_ids
+            SELECT org_pair, array_agg(canal_id ORDER BY created_at ASC) AS canal_ids
             FROM (
               SELECT c.id AS canal_id, c.created_at,
-                     (SELECT string_agg(m.user_id, ',' ORDER BY m.user_id) FROM chat_miembros m WHERE m.canal_id = c.id) AS pair,
+                     c.organizacion_id::text || ':' ||
+                     (SELECT string_agg(m.user_id, ',' ORDER BY m.user_id) FROM chat_miembros m WHERE m.canal_id = c.id) AS org_pair,
                      (SELECT COUNT(*) FROM chat_miembros m WHERE m.canal_id = c.id) AS n_miembros
               FROM chat_canales c
               WHERE c.tipo = 'directo'
             ) t
             WHERE n_miembros = 2
-            GROUP BY pair
+            GROUP BY org_pair
             HAVING COUNT(*) > 1
           LOOP
             keep_id := grp.canal_ids[1];

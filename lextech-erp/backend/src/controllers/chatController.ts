@@ -25,6 +25,26 @@ const unreadCountExpr = (userParam = '$1') => `
   )::int
 `;
 
+// ── Aislamiento por organización ────────────────────────────────────────────
+// El chat interno era global (compartido por todas las organizaciones) desde
+// que existe -- se quedó fuera de la Fase 1 de multi-organización a
+// propósito. Estos guards comprueban que el canal/mensaje sobre el que se
+// pide una acción pertenece de verdad a la organización activa de quien la
+// pide, para no operar (ni siquiera leer) sobre datos de otra organización.
+async function assertCanalInOrg(canalId: string, organizacionId: string | undefined): Promise<boolean> {
+  if (!canalId || !organizacionId) return false;
+  const { rows } = await pool.query(`SELECT 1 FROM chat_canales WHERE id = $1 AND organizacion_id = $2`, [canalId, organizacionId]);
+  return rows.length > 0;
+}
+async function assertMensajeInOrg(mensajeId: string, organizacionId: string | undefined): Promise<boolean> {
+  if (!mensajeId || !organizacionId) return false;
+  const { rows } = await pool.query(`
+    SELECT 1 FROM chat_mensajes m JOIN chat_canales c ON c.id = m.canal_id
+    WHERE m.id = $1 AND c.organizacion_id = $2
+  `, [mensajeId, organizacionId]);
+  return rows.length > 0;
+}
+
 // ── Canales ───────────────────────────────────────────────────────────────────
 
 export async function getCanales(req: Request, res: Response) {
@@ -70,9 +90,9 @@ export async function getCanales(req: Request, res: Response) {
         ) AS dm_target_avatar_url
       FROM chat_canales c
       JOIN chat_miembros m ON m.canal_id = c.id AND m.user_id = $1
-      WHERE c.archivado = false
+      WHERE c.archivado = false AND c.organizacion_id = $2
       ORDER BY COALESCE(c.updated_at, c.created_at) DESC, c.nombre ASC
-    `, [userId]);
+    `, [userId, (req as any).organizacionId]);
 
     // El nombre/avatar guardados en chat_miembros son una foto fija tomada al crear
     // el DM; si en ese momento Clerk no tenía nombre (o el usuario lo cambió después),
@@ -106,11 +126,13 @@ export async function createCanal(req: Request, res: Response) {
   if (!userId) return err(res, 'No autenticado', 401);
   const { nombre, descripcion, tipo = 'publico', expediente_id, cliente_id } = req.body;
   if (!nombre?.trim()) return err(res, 'Nombre requerido', 400);
+  const organizacionId = (req as any).organizacionId;
+  if (!organizacionId) return err(res, 'Organización no resuelta', 400);
   try {
     const { rows } = await pool.query(`
-      INSERT INTO chat_canales (nombre, descripcion, tipo, expediente_id, cliente_id, created_by)
-      VALUES ($1, $2, $3, $4, $5, $6) RETURNING *
-    `, [nombre.trim(), descripcion || null, tipo, expediente_id || null, cliente_id || null, userId]);
+      INSERT INTO chat_canales (nombre, descripcion, tipo, expediente_id, cliente_id, created_by, organizacion_id)
+      VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *
+    `, [nombre.trim(), descripcion || null, tipo, expediente_id || null, cliente_id || null, userId, organizacionId]);
     const canal = rows[0];
     await pool.query(`
       INSERT INTO chat_miembros (canal_id, user_id, user_name, avatar_url, role, role_label, last_read_at)
@@ -129,6 +151,7 @@ export async function updateCanal(req: Request, res: Response) {
   const { id } = req.params;
   const { nombre, descripcion } = req.body;
   try {
+    if (!(await assertCanalInOrg(id, (req as any).organizacionId))) return err(res, 'Canal no encontrado', 404);
     const { rows } = await pool.query(`
       UPDATE chat_canales SET nombre = COALESCE($1, nombre), descripcion = COALESCE($2, descripcion), updated_at = NOW()
       WHERE id = $3 RETURNING *
@@ -145,6 +168,7 @@ export async function archivarCanal(req: Request, res: Response) {
   if (!userId) return err(res, 'No autenticado', 401);
   const { id } = req.params;
   try {
+    if (!(await assertCanalInOrg(id, (req as any).organizacionId))) return err(res, 'Canal no encontrado', 404);
     await pool.query(`UPDATE chat_canales SET archivado = true WHERE id = $1`, [id]);
     return ok(res, { id });
   } catch (e: any) {
@@ -157,6 +181,7 @@ export async function marcarLeido(req: Request, res: Response) {
   if (!userId) return err(res, 'No autenticado', 401);
   const { id } = req.params;
   try {
+    if (!(await assertCanalInOrg(id, (req as any).organizacionId))) return err(res, 'Canal no encontrado', 404);
     await pool.query(`UPDATE chat_miembros SET last_read_at = NOW() WHERE canal_id = $1 AND user_id = $2`, [id, userId]);
     return ok(res, { ok: true });
   } catch (e: any) {
@@ -181,6 +206,7 @@ export async function getCanalMiembros(req: Request, res: Response) {
   if (!userId) return err(res, 'No autenticado', 401);
   const { id } = req.params;
   try {
+    if (!(await assertCanalInOrg(id, (req as any).organizacionId))) return err(res, 'Canal no encontrado', 404);
     const { rows } = await pool.query(`
       SELECT user_id, user_name, avatar_url, role, role_label, status, joined_at, last_read_at
       FROM chat_miembros WHERE canal_id = $1
@@ -236,6 +262,7 @@ export async function getMensajes(req: Request, res: Response) {
   const { before, since, limit = '60' } = req.query as Record<string, string>;
   const lim = Math.min(parseInt(limit) || 60, 100);
   try {
+    if (!(await assertCanalInOrg(id, (req as any).organizacionId))) return err(res, 'Canal no encontrado', 404);
     let query: string;
     let params: any[];
     const SEL = `
@@ -273,6 +300,7 @@ export async function sendMensaje(req: Request, res: Response) {
   const { contenido, tipo = 'texto', reply_to_id, gif_url, image_url, file_url, file_name, file_mime } = req.body;
   if (!contenido?.trim() && !gif_url && !image_url && !file_url) return err(res, 'Contenido vacío', 400);
   try {
+    if (!(await assertCanalInOrg(id, (req as any).organizacionId))) return err(res, 'Canal no encontrado', 404);
     const normalizedType = file_url ? 'archivo' : image_url ? 'imagen' : gif_url ? 'gif' : tipo;
     const fallbackContent = gif_url ? 'GIF' : image_url ? 'Imagen' : file_url ? (file_name || 'Archivo') : '';
     const { rows } = await pool.query(`
@@ -332,6 +360,7 @@ export async function getSesionExpediente(req: Request, res: Response) {
   if (!userId) return err(res, 'No autenticado', 401);
   const { id } = req.params;
   try {
+    if (!(await assertCanalInOrg(id, (req as any).organizacionId))) return err(res, 'Canal no encontrado', 404);
     const { rows } = await pool.query(
       `SELECT * FROM chat_expediente_sesiones WHERE canal_id = $1 AND cerrado_at IS NULL ORDER BY iniciado_at DESC LIMIT 1`,
       [id]
@@ -347,6 +376,7 @@ export async function iniciarSesionExpediente(req: Request, res: Response) {
   const { expediente_id, expediente_ref } = req.body;
   if (!expediente_id) return err(res, 'expediente_id requerido', 400);
   try {
+    if (!(await assertCanalInOrg(id, (req as any).organizacionId))) return err(res, 'Canal no encontrado', 404);
     // Cerrar sesión activa previa si existe
     await pool.query(
       `UPDATE chat_expediente_sesiones SET cerrado_at = NOW() WHERE canal_id = $1 AND cerrado_at IS NULL`,
@@ -366,6 +396,7 @@ export async function cerrarSesionExpediente(req: Request, res: Response) {
   if (!userId) return err(res, 'No autenticado', 401);
   const { id } = req.params;
   try {
+    if (!(await assertCanalInOrg(id, (req as any).organizacionId))) return err(res, 'Canal no encontrado', 404);
     await pool.query(
       `UPDATE chat_expediente_sesiones SET cerrado_at = NOW() WHERE canal_id = $1 AND cerrado_at IS NULL`,
       [id]
@@ -382,10 +413,10 @@ export async function getConversacionesExpediente(req: Request, res: Response) {
     const { rows: sesiones } = await pool.query(
       `SELECT s.*, c.nombre AS canal_nombre, c.tipo AS canal_tipo
        FROM chat_expediente_sesiones s
-       JOIN chat_canales c ON c.id = s.canal_id
+       JOIN chat_canales c ON c.id = s.canal_id AND c.organizacion_id = $2
        WHERE s.expediente_id = $1
        ORDER BY s.iniciado_at DESC`,
-      [id]
+      [id, (req as any).organizacionId]
     );
     // Para cada sesión, traer un snippet del primer y último mensaje
     const systemUsers = await getCachedSystemUsers();
@@ -485,6 +516,7 @@ export async function getTypingStatus(req: Request, res: Response) {
   if (!userId) return err(res, 'No autenticado', 401);
   const { id } = req.params;
   try {
+    if (!(await assertCanalInOrg(id, (req as any).organizacionId))) return err(res, 'Canal no encontrado', 404);
     await pool.query(
       `DELETE FROM chat_typing_status WHERE canal_id = $1 AND updated_at < NOW() - INTERVAL '10 seconds'`,
       [id]
@@ -512,6 +544,7 @@ export async function updateTypingStatus(req: Request, res: Response) {
   const { id } = req.params;
   const { typing } = req.body as { typing?: boolean };
   try {
+    if (!(await assertCanalInOrg(id, (req as any).organizacionId))) return err(res, 'Canal no encontrado', 404);
     const member = await pool.query(
       `SELECT 1 FROM chat_miembros WHERE canal_id = $1 AND user_id = $2 LIMIT 1`,
       [id, userId]
@@ -542,6 +575,7 @@ export async function editMensaje(req: Request, res: Response) {
   const { contenido } = req.body;
   if (!contenido?.trim()) return err(res, 'Contenido vacío', 400);
   try {
+    if (!(await assertMensajeInOrg(id, (req as any).organizacionId))) return err(res, 'Mensaje no encontrado', 404);
     const { rows } = await pool.query(`
       UPDATE chat_mensajes SET contenido = $1, editado = true, updated_at = NOW()
       WHERE id = $2 AND user_id = $3 AND deleted_at IS NULL RETURNING *
@@ -558,6 +592,7 @@ export async function deleteMensaje(req: Request, res: Response) {
   if (!userId) return err(res, 'No autenticado', 401);
   const { id } = req.params;
   try {
+    if (!(await assertMensajeInOrg(id, (req as any).organizacionId))) return err(res, 'Mensaje no encontrado', 404);
     const { rows } = await pool.query(
       `SELECT id, canal_id, user_id FROM chat_mensajes WHERE id = $1 AND deleted_at IS NULL`,
       [id]
@@ -592,6 +627,7 @@ export async function toggleReaccion(req: Request, res: Response) {
   const { emoji } = req.body;
   if (!emoji) return err(res, 'Emoji requerido', 400);
   try {
+    if (!(await assertMensajeInOrg(id, (req as any).organizacionId))) return err(res, 'Mensaje no encontrado', 404);
     const existing = await pool.query(`SELECT id FROM chat_reacciones WHERE mensaje_id = $1 AND user_id = $2 AND emoji = $3`, [id, userId, emoji]);
     if (existing.rows.length) {
       await pool.query(`DELETE FROM chat_reacciones WHERE id = $1`, [existing.rows[0].id]);
@@ -612,6 +648,7 @@ export async function getFijados(req: Request, res: Response) {
   if (!userId) return err(res, 'No autenticado', 401);
   const { id } = req.params;
   try {
+    if (!(await assertCanalInOrg(id, (req as any).organizacionId))) return err(res, 'Canal no encontrado', 404);
     const { rows } = await pool.query(`
       SELECT f.*, m.contenido, m.user_name, m.avatar_url, m.gif_url, m.image_url, m.tipo, m.created_at AS msg_created_at
       FROM chat_fijados f JOIN chat_mensajes m ON m.id = f.mensaje_id
@@ -628,6 +665,7 @@ export async function fijarMensaje(req: Request, res: Response) {
   if (!userId) return err(res, 'No autenticado', 401);
   const { id, mensajeId } = req.params;
   try {
+    if (!(await assertCanalInOrg(id, (req as any).organizacionId))) return err(res, 'Canal no encontrado', 404);
     await pool.query(`INSERT INTO chat_fijados (canal_id, mensaje_id, fijado_por) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`, [id, mensajeId, userId]);
     return ok(res, { canal_id: id, mensaje_id: mensajeId });
   } catch (e: any) {
@@ -640,6 +678,7 @@ export async function desfijarMensaje(req: Request, res: Response) {
   if (!userId) return err(res, 'No autenticado', 401);
   const { id, mensajeId } = req.params;
   try {
+    if (!(await assertCanalInOrg(id, (req as any).organizacionId))) return err(res, 'Canal no encontrado', 404);
     await pool.query(`DELETE FROM chat_fijados WHERE canal_id = $1 AND mensaje_id = $2`, [id, mensajeId]);
     return ok(res, { id });
   } catch (e: any) {
@@ -654,9 +693,9 @@ export async function getFavoritos(req: Request, res: Response) {
   if (!userId) return err(res, 'No autenticado', 401);
   const { canal_id } = req.query as Record<string, string>;
   try {
-    const params: any[] = [userId];
-    const canalFilter = canal_id ? 'AND f.canal_id = $2' : '';
-    if (canal_id) params.push(canal_id);
+    const params: any[] = [userId, (req as any).organizacionId];
+    let canalFilter = '';
+    if (canal_id) { canalFilter = 'AND f.canal_id = $3'; params.push(canal_id); }
     const { rows } = await pool.query(`
       SELECT
         f.*,
@@ -670,6 +709,7 @@ export async function getFavoritos(req: Request, res: Response) {
         m.created_at AS msg_created_at
       FROM chat_favoritos f
       JOIN chat_mensajes m ON m.id = f.mensaje_id
+      JOIN chat_canales  c ON c.id = f.canal_id AND c.organizacion_id = $2
       WHERE f.user_id = $1 ${canalFilter}
       ORDER BY f.favorito_at DESC
     `, params);
@@ -684,6 +724,7 @@ export async function toggleFavorito(req: Request, res: Response) {
   if (!userId) return err(res, 'No autenticado', 401);
   const { id } = req.params;
   try {
+    if (!(await assertMensajeInOrg(id, (req as any).organizacionId))) return err(res, 'Mensaje no encontrado', 404);
     const existing = await pool.query(
       `SELECT id FROM chat_favoritos WHERE user_id = $1 AND mensaje_id = $2`,
       [userId, id]
@@ -714,13 +755,13 @@ export async function buscarMensajes(req: Request, res: Response) {
   const { q, canal_id } = req.query as Record<string, string>;
   if (!q?.trim()) return ok(res, []);
   try {
-    const params: any[] = [`%${q.trim()}%`, userId];
+    const params: any[] = [`%${q.trim()}%`, userId, (req as any).organizacionId];
     let canalFilter = '';
-    if (canal_id) { canalFilter = `AND m.canal_id = $3`; params.push(canal_id); }
+    if (canal_id) { canalFilter = `AND m.canal_id = $4`; params.push(canal_id); }
     const { rows } = await pool.query(`
       SELECT m.*, c.nombre AS canal_nombre
       FROM chat_mensajes m
-      JOIN chat_canales  c  ON c.id = m.canal_id
+      JOIN chat_canales  c  ON c.id = m.canal_id AND c.organizacion_id = $3
       JOIN chat_miembros mb ON mb.canal_id = c.id AND mb.user_id = $2
       WHERE m.contenido ILIKE $1 AND m.deleted_at IS NULL ${canalFilter}
       ORDER BY m.created_at DESC LIMIT 50
@@ -738,10 +779,12 @@ export async function getMiembrosGlobal(req: Request, res: Response) {
   if (!userId) return err(res, 'No autenticado', 401);
   try {
     const { rows } = await pool.query(`
-      SELECT DISTINCT ON (user_id) user_id, user_name, avatar_url, role_label, status
-      FROM chat_miembros WHERE user_id != $1
-      ORDER BY user_id, user_name ASC
-    `, [userId]);
+      SELECT DISTINCT ON (m.user_id) m.user_id, m.user_name, m.avatar_url, m.role_label, m.status
+      FROM chat_miembros m
+      JOIN chat_canales c ON c.id = m.canal_id AND c.organizacion_id = $2
+      WHERE m.user_id != $1
+      ORDER BY m.user_id, m.user_name ASC
+    `, [userId, (req as any).organizacionId]);
     return ok(res, rows);
   } catch (e: any) {
     return err(res, e.message);
@@ -755,6 +798,8 @@ export async function getOrCreateDM(req: Request, res: Response) {
   if (!userId) return err(res, 'No autenticado', 401);
   const { target_user_id, target_user_name, target_avatar_url } = req.body;
   if (!target_user_id) return err(res, 'target_user_id requerido', 400);
+  const organizacionId = (req as any).organizacionId;
+  if (!organizacionId) return err(res, 'Organización no resuelta', 400);
 
   // El "buscar si ya existe, si no crear" de aquí abajo NO es atómico por sí
   // solo: dos peticiones casi simultáneas (doble clic al abrir el DM, dos
@@ -766,16 +811,29 @@ export async function getOrCreateDM(req: Request, res: Response) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+
+    // No se puede abrir un DM con alguien que no es miembro de la misma
+    // organización activa -- si no, se filtrarían contactos/canales de un
+    // despacho a otro (el chat era completamente global hasta ahora).
+    const { rows: targetMember } = await client.query(
+      `SELECT 1 FROM organizacion_miembros WHERE organizacion_id = $1 AND user_id = $2 LIMIT 1`,
+      [organizacionId, target_user_id]
+    );
+    if (!targetMember.length) {
+      await client.query('ROLLBACK');
+      return err(res, 'Ese usuario no pertenece a esta organización', 403);
+    }
+
     const [a, b] = [userId, target_user_id].sort();
-    await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [`dm:${a}:${b}`]);
+    await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [`dm:${organizacionId}:${a}:${b}`]);
 
     const { rows: existing } = await client.query(`
       SELECT c.* FROM chat_canales c
-      WHERE c.tipo = 'directo'
+      WHERE c.tipo = 'directo' AND c.organizacion_id = $3
         AND EXISTS (SELECT 1 FROM chat_miembros m WHERE m.canal_id = c.id AND m.user_id = $1)
         AND EXISTS (SELECT 1 FROM chat_miembros m WHERE m.canal_id = c.id AND m.user_id = $2)
       ORDER BY c.created_at ASC LIMIT 1
-    `, [userId, target_user_id]);
+    `, [userId, target_user_id, organizacionId]);
     if (existing.length) {
       await client.query('COMMIT');
       return ok(res, {
@@ -786,7 +844,7 @@ export async function getOrCreateDM(req: Request, res: Response) {
       });
     }
     const nombre = [userName, target_user_name || 'Sin nombre'].sort().join(' · ');
-    const { rows } = await client.query(`INSERT INTO chat_canales (nombre, tipo, created_by) VALUES ($1, 'directo', $2) RETURNING *`, [nombre, userId]);
+    const { rows } = await client.query(`INSERT INTO chat_canales (nombre, tipo, created_by, organizacion_id) VALUES ($1, 'directo', $2, $3) RETURNING *`, [nombre, userId, organizacionId]);
     const canal = rows[0];
     await client.query(`
       INSERT INTO chat_miembros (canal_id, user_id, user_name, avatar_url, role, last_read_at)
@@ -819,10 +877,10 @@ export async function getCanalesDisponibles(req: Request, res: Response) {
       SELECT c.id, c.nombre, c.descripcion, c.tipo, c.created_at,
         (SELECT COUNT(*) FROM chat_miembros WHERE canal_id = c.id)::int AS total_miembros
       FROM chat_canales c
-      WHERE c.tipo = 'publico' AND c.archivado = false
+      WHERE c.tipo = 'publico' AND c.archivado = false AND c.organizacion_id = $2
         AND NOT EXISTS (SELECT 1 FROM chat_miembros m WHERE m.canal_id = c.id AND m.user_id = $1)
       ORDER BY total_miembros DESC, c.nombre ASC
-    `, [userId]);
+    `, [userId, (req as any).organizacionId]);
     return ok(res, rows);
   } catch (e: any) {
     return err(res, e.message);
@@ -837,7 +895,7 @@ export async function joinCanal(req: Request, res: Response) {
   if (!userId) return err(res, 'No autenticado', 401);
   const { id } = req.params;
   try {
-    const { rows: canal } = await pool.query(`SELECT * FROM chat_canales WHERE id = $1`, [id]);
+    const { rows: canal } = await pool.query(`SELECT * FROM chat_canales WHERE id = $1 AND organizacion_id = $2`, [id, (req as any).organizacionId]);
     if (!canal.length) return err(res, 'Canal no encontrado', 404);
     if (canal[0].tipo !== 'publico') return err(res, 'Solo puedes unirte a canales públicos directamente', 403);
     await pool.query(`
@@ -871,12 +929,19 @@ export async function addMiembro(req: Request, res: Response) {
   const { id } = req.params;
   const { target_user_id, target_user_name, target_avatar_url, role_label } = req.body;
   if (!target_user_id) return err(res, 'target_user_id requerido', 400);
+  const organizacionId = (req as any).organizacionId;
   try {
     // Verificar que quien invita es miembro del canal
     const { rows: self } = await pool.query(
       `SELECT role FROM chat_miembros WHERE canal_id = $1 AND user_id = $2`, [id, userId]
     );
     if (!self.length) return err(res, 'No eres miembro de este canal', 403);
+    // El invitado tiene que pertenecer a la misma organización que el canal.
+    const { rows: targetMember } = await pool.query(
+      `SELECT 1 FROM organizacion_miembros WHERE organizacion_id = $1 AND user_id = $2 LIMIT 1`,
+      [organizacionId, target_user_id]
+    );
+    if (!targetMember.length) return err(res, 'Ese usuario no pertenece a esta organización', 403);
     await pool.query(`
       INSERT INTO chat_miembros (canal_id, user_id, user_name, avatar_url, role, role_label, last_read_at)
       VALUES ($1, $2, $3, $4, 'miembro', $5, NOW())
@@ -966,18 +1031,33 @@ async function getCachedSystemUsers() {
   }
 }
 
-/** GET /api/chat/usuarios — todos los usuarios de Clerk (caché 60s) */
+/** GET /api/chat/usuarios — usuarios de Clerk que son miembros de la organización activa (caché 60s) */
 export async function getSystemUsers(req: Request, res: Response) {
   const userId = (req as any).auth?.userId;
   if (!userId) return err(res, 'No autenticado', 401);
+  const organizacionId = (req as any).organizacionId;
   try {
-    return ok(res, await getCachedSystemUsers());
+    const allUsers = await getCachedSystemUsers();
+    if (!organizacionId) return ok(res, allUsers);
+    // getCachedSystemUsers() trae TODOS los usuarios de Clerk sin distinguir
+    // organización (Clerk aquí es solo el proveedor de login, no sabe nada
+    // de organizaciones de Vantia) -- se filtra aquí a quienes son miembros
+    // de la organización activa, para no poder empezar un DM ni ver como
+    // contacto a alguien de otro despacho.
+    const { rows: miembros } = await pool.query(
+      `SELECT user_id FROM organizacion_miembros WHERE organizacion_id = $1`,
+      [organizacionId]
+    );
+    const orgUserIds = new Set(miembros.map((m: any) => m.user_id));
+    return ok(res, allUsers.filter((u: any) => orgUserIds.has(u.user_id)));
   } catch (e: any) {
-    // Fallback: devolver los usuarios conocidos desde chat_miembros
+    // Fallback: devolver los usuarios conocidos desde chat_miembros de esta organización
     const { rows } = await pool.query(`
-      SELECT DISTINCT ON (user_id) user_id, user_name, avatar_url, role_label
-      FROM chat_miembros ORDER BY user_id, user_name ASC
-    `);
+      SELECT DISTINCT ON (m.user_id) m.user_id, m.user_name, m.avatar_url, m.role_label
+      FROM chat_miembros m
+      JOIN chat_canales c ON c.id = m.canal_id AND c.organizacion_id = $1
+      ORDER BY m.user_id, m.user_name ASC
+    `, [organizacionId]);
     return ok(res, rows);
   }
 }
@@ -988,15 +1068,15 @@ export async function buscarCanalesDisponibles(req: Request, res: Response) {
   if (!userId) return err(res, 'No autenticado', 401);
   const { q } = req.query as Record<string, string>;
   try {
-    const params: any[] = [userId];
+    const params: any[] = [userId, (req as any).organizacionId];
     let filter = '';
-    if (q?.trim()) { filter = `AND (c.nombre ILIKE $2 OR c.descripcion ILIKE $2)`; params.push(`%${q.trim()}%`); }
+    if (q?.trim()) { filter = `AND (c.nombre ILIKE $3 OR c.descripcion ILIKE $3)`; params.push(`%${q.trim()}%`); }
     const { rows } = await pool.query(`
       SELECT c.id, c.nombre, c.descripcion, c.tipo, c.created_at,
         (SELECT COUNT(*) FROM chat_miembros WHERE canal_id = c.id)::int AS total_miembros,
         EXISTS(SELECT 1 FROM chat_miembros WHERE canal_id = c.id AND user_id = $1) AS ya_unido
       FROM chat_canales c
-      WHERE c.tipo = 'publico' AND c.archivado = false ${filter}
+      WHERE c.tipo = 'publico' AND c.archivado = false AND c.organizacion_id = $2 ${filter}
       ORDER BY total_miembros DESC, c.nombre ASC LIMIT 30
     `, params);
     return ok(res, rows);
@@ -1020,8 +1100,8 @@ export async function getUnreadCounts(req: Request, res: Response) {
         ) AS dm_target_user_id
       FROM chat_canales c
       JOIN chat_miembros m ON m.canal_id = c.id AND m.user_id = $1
-      WHERE c.archivado = false
-    `, [userId]);
+      WHERE c.archivado = false AND c.organizacion_id = $2
+    `, [userId, (req as any).organizacionId]);
     return ok(res, rows);
   } catch (e: any) {
     return err(res, e.message);

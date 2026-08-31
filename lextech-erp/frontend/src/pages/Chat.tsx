@@ -15,7 +15,7 @@ import {
   PawPrint, UtensilsCrossed, Trophy, Flag, User, FileText, File as FileIcon, Briefcase, type LucideIcon,
   FileSpreadsheet, FileArchive, FileImage, FileVideo, FileAudio, FileCode, ArrowLeft,
 } from "lucide-react";
-import { safeJson, resolveUploadUrl } from "../lib/api";
+import { safeJson, resolveUploadUrl, getActiveOrganizacionId } from "../lib/api";
 import { createPortal } from "react-dom";
 import { useChatUnread } from "../contexts/ChatUnreadContext";
 import BackButton from "../components/BackButton";
@@ -95,6 +95,16 @@ const STATUS_CFG: Record<string, { label: string; color: string }> = {
 const CHAT_CANALES_CACHE_KEY = "chat-canales-cache-v1";
 const CHAT_USERS_CACHE_KEY = "chat-users-cache-v1";
 const CHAT_DM_ORDER_CACHE_KEY = "chat-dm-order-cache-v1";
+// El chat ahora está aislado por organización (antes era global) -- estas
+// cachés locales tienen que ir con la organización activa a cuestas, si no,
+// al cambiar de organización (que recarga la página) se vería un instante
+// los canales/contactos de la organización anterior hasta que la petición
+// de verdad responda y los pisara. Mismo patrón ya usado para no filtrar
+// datos entre usuarios que comparten navegador.
+const orgScopedCacheKey = (base: string) => {
+  const org = getActiveOrganizacionId();
+  return org ? `${base}::${org}` : base;
+};
 const CHAT_EMOJI_RECENTS_KEY = "chat-emoji-recents-v1";
 const CHAT_GIF_CACHE_KEY = "chat-gif-cache-v1";
 const CHAT_CUSTOM_STATUS_KEY = "chat-custom-status-v1";
@@ -3511,7 +3521,7 @@ export default function Chat() {
 
   useEffect(() => {
     try {
-      const rawCanales = window.localStorage.getItem(CHAT_CANALES_CACHE_KEY);
+      const rawCanales = window.localStorage.getItem(orgScopedCacheKey(CHAT_CANALES_CACHE_KEY));
       if (rawCanales) {
         const cachedCanales = JSON.parse(rawCanales) as Canal[];
         if (Array.isArray(cachedCanales)) setCanales(cachedCanales);
@@ -3521,7 +3531,7 @@ export default function Chat() {
     }
 
     try {
-      const rawUsers = window.localStorage.getItem(CHAT_USERS_CACHE_KEY);
+      const rawUsers = window.localStorage.getItem(orgScopedCacheKey(CHAT_USERS_CACHE_KEY));
       if (rawUsers) {
         const cachedUsers = JSON.parse(rawUsers) as SysUser[];
         if (Array.isArray(cachedUsers)) setSysUsers(cachedUsers);
@@ -3531,7 +3541,7 @@ export default function Chat() {
     }
 
     try {
-      const rawDmOrder = window.localStorage.getItem(CHAT_DM_ORDER_CACHE_KEY);
+      const rawDmOrder = window.localStorage.getItem(orgScopedCacheKey(CHAT_DM_ORDER_CACHE_KEY));
       if (rawDmOrder) {
         const cachedDmOrder = JSON.parse(rawDmOrder) as string[];
         if (Array.isArray(cachedDmOrder)) setDmOrder(cachedDmOrder.filter(Boolean));
@@ -3553,7 +3563,7 @@ export default function Chat() {
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(CHAT_CANALES_CACHE_KEY, JSON.stringify(canales));
+      window.localStorage.setItem(orgScopedCacheKey(CHAT_CANALES_CACHE_KEY), JSON.stringify(canales));
     } catch {
       // ignorar errores de persistencia
     }
@@ -3561,7 +3571,7 @@ export default function Chat() {
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(CHAT_USERS_CACHE_KEY, JSON.stringify(sysUsers));
+      window.localStorage.setItem(orgScopedCacheKey(CHAT_USERS_CACHE_KEY), JSON.stringify(sysUsers));
     } catch {
       // ignorar errores de persistencia
     }
@@ -3569,7 +3579,7 @@ export default function Chat() {
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(CHAT_DM_ORDER_CACHE_KEY, JSON.stringify(dmOrder));
+      window.localStorage.setItem(orgScopedCacheKey(CHAT_DM_ORDER_CACHE_KEY), JSON.stringify(dmOrder));
     } catch {
       // ignorar errores de persistencia
     }
@@ -3678,7 +3688,7 @@ export default function Chat() {
         setCanales(prev => {
           const merged = mergeCanales(prev, list);
           try {
-            window.localStorage.setItem(CHAT_CANALES_CACHE_KEY, JSON.stringify(merged));
+            window.localStorage.setItem(orgScopedCacheKey(CHAT_CANALES_CACHE_KEY), JSON.stringify(merged));
           } catch {
             // ignorar errores de persistencia
           }
@@ -3720,7 +3730,7 @@ export default function Chat() {
           return list;
         });
         try {
-          window.localStorage.setItem(CHAT_USERS_CACHE_KEY, JSON.stringify(list));
+          window.localStorage.setItem(orgScopedCacheKey(CHAT_USERS_CACHE_KEY), JSON.stringify(list));
         } catch {
           // ignorar errores de persistencia
         }
