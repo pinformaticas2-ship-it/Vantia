@@ -46,7 +46,7 @@ export function useOrganizacion() {
   useEffect(() => { void reload(); }, [reload]);
 
   // Cambia la organización activa y recarga la app entera -- así todo lo que
-  // ya se hubiera cargado (dashboard, listados, VantIA...) se vuelve a pedir
+  // ya se hubiera cargado (dashboard, listados, Vantia...) se vuelve a pedir
   // con la organización nueva, en vez de tener que invalidar cada página a mano.
   const switchOrganizacion = useCallback((id: string) => {
     setActiveOrganizacionId(id);

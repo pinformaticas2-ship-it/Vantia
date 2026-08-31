@@ -119,7 +119,7 @@ app.use('/api', (_req, res, next) => {
 });
 
 // ── Compresión gzip de respuestas para velocidad ─────────────
-// El endpoint de streaming de VantIA (SSE) queda FUERA por completo del
+// El endpoint de streaming de Vantia (SSE) queda FUERA por completo del
 // middleware, no solo desactivado vía `filter`: compression() sobreescribe
 // res.write/res.end/res._implicitHeader nada más entrar (para poder decidir
 // si comprime al ver el primer chunk), y esa envoltura se queda puesta pase
@@ -273,7 +273,7 @@ runMigrations().then(() => {
     // Validar formato de GEMINI_API_KEY en arranque
     const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
     if (!geminiKey) {
-      console.warn('⚠️  GEMINI_API_KEY no configurada — importación de documentos y VantIA desactivados.');
+      console.warn('⚠️  GEMINI_API_KEY no configurada — importación de documentos y Vantia desactivados.');
     } else if (!geminiKey.startsWith('AIzaSy')) {
       console.error('❌ GEMINI_API_KEY inválida (debe empezar por AIzaSy...). La clave actual parece un token OAuth, no una API key de Google AI Studio. Obtén una en https://aistudio.google.com/apikey');
     } else {

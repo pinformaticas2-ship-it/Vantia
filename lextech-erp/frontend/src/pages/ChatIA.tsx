@@ -71,7 +71,7 @@ interface Message {
   role: 'user' | 'model';
   text: string;
   ts: Date;
-  toolEvents?: ToolEvent[];       // solo mensajes de VantIA en curso/recién generados
+  toolEvents?: ToolEvent[];       // solo mensajes de Vantia en curso/recién generados
   attachmentName?: string;        // solo mensajes de usuario con archivo adjunto
   linkedExpediente?: LinkedExpedienteRef; // solo mensajes de usuario con expediente vinculado
 }
@@ -170,7 +170,7 @@ function TypingDots() {
   );
 }
 
-// ─── Aviso en vivo de que VantIA está usando una herramienta (consultando
+// ─── Aviso en vivo de que Vantia está usando una herramienta (consultando
 // datos reales del despacho) — pasa de "en curso" a "hecho" según llegan los
 // eventos tool_start/tool_end del streaming ─────────────────────────────────
 function ToolPill({ label, done }: { label: string; done: boolean }) {
@@ -214,7 +214,7 @@ interface AiModelOption {
 }
 
 const AI_MODELS: AiModelOption[] = [
-  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', provider: 'Google', desc: 'Rápido, el que usa VantIA hoy',      available: true },
+  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', provider: 'Google', desc: 'Rápido, el que usa Vantia hoy',      available: true },
   { id: 'gemini-2.5-pro',   label: 'Gemini 2.5 Pro',   provider: 'Google', desc: 'Más potente, respuestas más lentas', available: true },
   { id: 'chatgpt',          label: 'ChatGPT',          provider: 'OpenAI',    desc: 'Próximamente',                   available: false },
   { id: 'claude',           label: 'Claude',           provider: 'Anthropic', desc: 'Próximamente',                   available: false },
@@ -244,7 +244,7 @@ export default function ChatIA() {
   const [attachError,  setAttachError]  = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Vincular un expediente a la conversación (le da a VantIA su contexto real)
+  // Vincular un expediente a la conversación (le da a Vantia su contexto real)
   const [linkedExpediente, setLinkedExpediente] = useState<LinkedExpedienteRef | null>(null);
   const [showLinkPicker,   setShowLinkPicker]   = useState(false);
   const [linkQuery,        setLinkQuery]        = useState('');
@@ -289,7 +289,7 @@ export default function ChatIA() {
   // ── Streaming real ──────────────────────────────────────────────────────────
   // Consume el SSE de /api/vantia/chat/stream y va actualizando en vivo el
   // mensaje en `targetIdx`: texto según llega token a token, y una pill por
-  // cada herramienta que VantIA use mientras consulta datos reales.
+  // cada herramienta que Vantia use mientras consulta datos reales.
   const streamChat = async (
     text: string,
     historyToSend: { role: string; text: string }[],
@@ -556,7 +556,7 @@ export default function ChatIA() {
   }, [showTopMenu]);
 
   const exportConversation = () => {
-    const text = messages.map(m => `${m.role === 'user' ? 'Tú' : 'VantIA'}: ${m.text}`).join('\n\n');
+    const text = messages.map(m => `${m.role === 'user' ? 'Tú' : 'Vantia'}: ${m.text}`).join('\n\n');
     const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
@@ -586,7 +586,7 @@ export default function ChatIA() {
     const isNew         = messages.length === 0;
     const historyToSend = messages.map(m => ({ role: m.role, text: m.text }));
 
-    // Lo que se manda a VantIA puede incluir el contenido del archivo adjunto;
+    // Lo que se manda a Vantia puede incluir el contenido del archivo adjunto;
     // el usuario en pantalla solo ve su texto + una chip con el nombre del fichero.
     const messageForApi = attachedFile
       ? `Archivo adjunto "${attachedFile.name}":\n\`\`\`\n${attachedFile.content}\n\`\`\`\n\n${text || 'Analiza este archivo.'}`
@@ -707,7 +707,7 @@ export default function ChatIA() {
                 <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-white" />
               </div>
               <div>
-                <p className="text-sm font-bold text-slate-800 leading-tight tracking-tight">VantIA</p>
+                <p className="text-sm font-bold text-slate-800 leading-tight tracking-tight">Vantia</p>
                 <p className="text-[10px] text-slate-400 leading-tight">Legal Pro · Gemini 2.5</p>
               </div>
             </div>
@@ -805,7 +805,7 @@ export default function ChatIA() {
                 <Sparkles className="h-4 w-4 text-white" />
               </div>
               <div>
-                <h1 className="text-sm font-bold text-slate-800 leading-tight">VantIA Legal Pro</h1>
+                <h1 className="text-sm font-bold text-slate-800 leading-tight">Vantia Legal Pro</h1>
                 <div className="relative mt-0.5" ref={modelPickerRef}>
                   <button
                     onClick={() => setShowModelPicker(v => !v)}
@@ -850,7 +850,7 @@ export default function ChatIA() {
               {activeModuleId && messages.length > 0 && (
                 <button
                   onClick={() => navigator.clipboard.writeText(
-                    messages.map(m => `${m.role==='user'?'Tú':'VantIA'}: ${m.text}`).join('\n\n')
+                    messages.map(m => `${m.role==='user'?'Tú':'Vantia'}: ${m.text}`).join('\n\n')
                   )}
                   className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 border border-slate-200 hover:border-slate-300 px-3 py-1.5 rounded-lg transition-all hover:bg-slate-50 active:scale-95"
                 >
@@ -1092,7 +1092,7 @@ export default function ChatIA() {
                     onKeyDown={handleKey}
                     placeholder={activeModuleId
                       ? 'Escribe un mensaje… (↵ enviar · ⇧↵ nueva línea)'
-                      : 'Inicia una conversación con VantIA…'}
+                      : 'Inicia una conversación con Vantia…'}
                     className="flex-1 resize-none bg-transparent outline-none focus:shadow-none text-sm text-slate-700 placeholder:text-slate-300 leading-relaxed py-0.5"
                     style={{ maxHeight: 152, overflowY: 'auto' }}
                     disabled={sending}
@@ -1161,7 +1161,7 @@ export default function ChatIA() {
 
                 <div className="px-4 pb-2.5">
                   <p className="text-[10px] text-slate-300 text-center">
-                    VantIA puede cometer errores · Verifica información crítica antes de actuar
+                    Vantia puede cometer errores · Verifica información crítica antes de actuar
                   </p>
                 </div>
               </div>

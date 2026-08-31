@@ -75,9 +75,9 @@ export default function PublicLanding() {
 
         <div className="relative z-10 space-y-3">
           <FeatureCard
-            emoji="🔒"
-            title="Cifrado Zero-Trust"
-            desc="Cada expediente viaja y se almacena con cifrado de extremo a extremo de grado bancario."
+            emoji="🛡️"
+            title="Seguridad Zero-Trust"
+            desc="Cada expediente viaja y se guarda bajo el mismo nivel de exigencia que un banco, verificado en cada paso."
           />
           <FeatureCard
             emoji="⚡"
@@ -92,7 +92,7 @@ export default function PublicLanding() {
         </div>
 
         <div className="relative z-10 text-sm font-semibold text-white">
-          (c) 2026 VantIA Systems. Enterprise.
+          (c) 2026 Vantia Systems. Enterprise.
         </div>
       </div>
 

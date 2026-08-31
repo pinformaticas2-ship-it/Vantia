@@ -1732,7 +1732,7 @@ export async function runMigrations(): Promise<void> {
       try { await client.query(col); } catch (_e: any) {}
     }
 
-    // ── Feedback (👍/👎) sobre respuestas de VantIA ─────────────────────────
+    // ── Feedback (👍/👎) sobre respuestas de Vantia ─────────────────────────
     await client.query(`
       CREATE TABLE IF NOT EXISTS vantia_message_feedback (
         id              UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),

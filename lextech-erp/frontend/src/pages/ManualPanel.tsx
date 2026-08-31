@@ -123,7 +123,7 @@ const TOC: { n: string; title: string }[] = [
   { n: "10", title: "Correo" },
   { n: "11", title: "WhatsApp" },
   { n: "12", title: "Chat interno" },
-  { n: "13", title: "VantIA — el asistente de inteligencia artificial" },
+  { n: "13", title: "Vantia — el asistente de inteligencia artificial" },
   { n: "14", title: "Configuración" },
   { n: "15", title: "Trazabilidad" },
   { n: "16", title: "Preguntas frecuentes" },
@@ -144,7 +144,7 @@ export default function ManualPanel() {
         <p className="mt-4 max-w-3xl text-sm leading-relaxed text-slate-500">
           Todo lo que necesita el equipo del despacho para gestionar clientes, expedientes, agenda, facturación,
           documentación y comunicaciones desde una sola plataforma, con el apoyo del asistente de inteligencia
-          artificial VantIA.
+          artificial Vantia.
         </p>
         <div className="mt-6 grid grid-cols-1 gap-4 border-t border-slate-100 pt-5 sm:grid-cols-3">
           <div>
@@ -247,10 +247,10 @@ export default function ManualPanel() {
           campana abre el panel de notificaciones, que agrupa avisos de chat, correo y WhatsApp con la indicación de
           cuánto tiempo hace que llegaron.
         </P>
-        <SubHeading>2.4 El widget VantIA</SubHeading>
+        <SubHeading>2.4 El widget Vantia</SubHeading>
         <P>
           En la esquina inferior derecha, visible en cualquier pantalla de la aplicación, hay un botón circular rojo
-          que abre el asistente de inteligencia artificial VantIA. Se explica en detalle en el capítulo 13, pero
+          que abre el asistente de inteligencia artificial Vantia. Se explica en detalle en el capítulo 13, pero
           conviene saber desde ya que está siempre a mano: cambia de «especialidad» según el módulo en el que se
           encuentre (especialista en clientes, en expedientes, en agenda, en correo…) y puede consultar datos reales
           del despacho para responder.
@@ -691,15 +691,15 @@ export default function ManualPanel() {
         </Callout>
       </Chapter>
 
-      {/* ── 13 VantIA ── */}
-      <Chapter n="13" title="VantIA — el asistente de inteligencia artificial">
+      {/* ── 13 Vantia ── */}
+      <Chapter n="13" title="Vantia — el asistente de inteligencia artificial">
         <P>
-          VantIA es el asistente de IA que acompaña toda la aplicación: aparece como un widget flotante en cualquier
+          Vantia es el asistente de IA que acompaña toda la aplicación: aparece como un widget flotante en cualquier
           pantalla y también como un módulo de página completa, Chat IA, con historial de conversaciones.
         </P>
         <SubHeading>13.1 Qué puede pedirle</SubHeading>
         <P>
-          VantIA responde siempre en español y combina conocimiento jurídico (derecho español e internacional,
+          Vantia responde siempre en español y combina conocimiento jurídico (derecho español e internacional,
           jurisprudencia, doctrina) con la capacidad de redactar directamente contratos, escritos, demandas, correos
           y cartas. Algunos ejemplos de lo que puede pedirle, tal y como sugiere la propia aplicación al abrir una
           conversación nueva:
@@ -716,13 +716,13 @@ export default function ManualPanel() {
         />
         <SubHeading>13.2 Un asistente que conoce los datos reales del despacho</SubHeading>
         <Callout tone="pink" label="Con inteligencia artificial">
-          A diferencia de un chat genérico, VantIA puede consultar en tiempo real la información del despacho:
+          A diferencia de un chat genérico, Vantia puede consultar en tiempo real la información del despacho:
           estadísticas generales, buscar y listar clientes, ver los expedientes de un cliente, listar expedientes,
           tareas del usuario (incluidas las vencidas), facturas, gastos y presupuestos, próximos eventos de agenda y
           notas internas. No inventa datos: siempre consulta la base real antes de responder.
         </Callout>
         <P>
-          Si está viendo la ficha de un cliente o de un expediente concreto cuando abre VantIA, el asistente ya
+          Si está viendo la ficha de un cliente o de un expediente concreto cuando abre Vantia, el asistente ya
           conoce esos datos y no necesita que se los repita.
         </P>
         <SubHeading>13.3 Especialidad según el módulo</SubHeading>
@@ -741,7 +741,7 @@ export default function ManualPanel() {
           regenerar la respuesta o reintentar si algo falla.
         </P>
         <Callout tone="amber" label="Importante">
-          VantIA lo indica de forma permanente en su interfaz: «La IA puede cometer errores. Verifica la
+          Vantia lo indica de forma permanente en su interfaz: «La IA puede cometer errores. Verifica la
           información.» Trate cualquier redacción o dato generado por el asistente como un primer borrador que debe
           revisar antes de utilizarlo formalmente.
         </Callout>
@@ -794,7 +794,7 @@ export default function ManualPanel() {
             a: "Sí, en varios módulos (por ejemplo, tareas, notas o enlaces de alta de cliente) al eliminar un registro aparece una notificación temporal con la opción de deshacer la acción.",
           },
           {
-            q: "¿Qué diferencia hay entre el widget VantIA y el módulo Chat IA?",
+            q: "¿Qué diferencia hay entre el widget Vantia y el módulo Chat IA?",
             a: "Son el mismo asistente en dos formatos: el widget flotante está pensado para consultas rápidas sin salir de la pantalla en la que se encuentra, mientras que Chat IA es una página completa con historial organizado, pensada para conversaciones más largas o para redactar documentos extensos.",
           },
           {
@@ -826,7 +826,7 @@ export default function ManualPanel() {
         <InfoTable
           headers={["Término", "Significado en Vantia"]}
           rows={[
-            ["VantIA", "Asistente de inteligencia artificial integrado en toda la aplicación."],
+            ["Vantia", "Asistente de inteligencia artificial integrado en toda la aplicación."],
             ["Atajo", "Acceso rápido personalizado que combina una acción, una plantilla y una carpeta de archivo."],
             ["OCR", "Reconocimiento óptico de caracteres; en Vantia se usa para leer documentos de identidad y documentos judiciales escaneados."],
             ["MRZ", "Banda de lectura mecánica de un documento de identidad, usada para extraer sus datos con más precisión."],

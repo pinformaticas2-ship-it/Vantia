@@ -12,7 +12,7 @@ const MAX_TOOL_ROUNDS = 5;
 const ALLOWED_GEMINI_MODELS = new Set(['gemini-2.5-flash', 'gemini-2.5-pro']);
 
 // ── Prompt base — identidad + capacidades ────────────────────────────────────
-const BASE_PROMPT = `Eres VantIA, la inteligencia artificial integrada en VANTIA Legis ERP. Eres un asistente completo, culto y capaz de ayudar con absolutamente cualquier cosa.
+const BASE_PROMPT = `Eres Vantia, la inteligencia artificial integrada en VANTIA Legis ERP. Eres un asistente completo, culto y capaz de ayudar con absolutamente cualquier cosa.
 
 QUIÉN ERES:
 Eres una IA de última generación con conocimiento amplio en derecho español e internacional, procesal civil y penal, derecho mercantil, fiscal, laboral, hipotecario y constitucional. También dominas redacción jurídica y no jurídica, análisis de documentos, estrategia procesal, doctrina, jurisprudencia del Tribunal Supremo y el TJUE, normativa europea, y conocimiento general en cualquier materia (historia, ciencia, tecnología, economía, medicina, cultura, etc.).
@@ -151,7 +151,7 @@ async function buildEntityContext(moduleId: string, userId: string, organizacion
     }
 
   } catch (e: any) {
-    console.warn('⚠️  VantIA context error:', e?.message);
+    console.warn('⚠️  Vantia context error:', e?.message);
   }
 
   return lines.length ? '\n\n---\n' + lines.join('\n') : '';
@@ -353,7 +353,7 @@ const TOOLS = [{
 }];
 
 // ── Etiquetas en español de cada herramienta, para mostrar en el frontend
-// mientras VantIA está consultando datos reales (p.ej. "Buscando clientes…") ──
+// mientras Vantia está consultando datos reales (p.ej. "Buscando clientes…") ──
 const TOOL_LABELS: Record<string, string> = {
   estadisticas_generales: 'Consultando estadísticas del despacho…',
   buscar_clientes:        'Buscando clientes…',
@@ -636,7 +636,7 @@ async function callTool(name: string, args: Record<string, any>, userId: string,
         return { error: `Herramienta desconocida: ${name}` };
     }
   } catch (e: any) {
-    console.error(`❌ VantIA tool [${name}]:`, e?.message);
+    console.error(`❌ Vantia tool [${name}]:`, e?.message);
     return { error: `Error ejecutando ${name}: ${e?.message}` };
   }
 }
@@ -694,7 +694,7 @@ export const getChatHistory = async (req: Request, res: Response) => {
     );
     res.json({ success: true, history: result.rows[0]?.history || [] });
   } catch (err) {
-    console.error('❌ Error fetching VantIA history:', err);
+    console.error('❌ Error fetching Vantia history:', err);
     res.status(500).json({ success: false, error: 'Error interno del servidor.' });
   }
 };
@@ -714,7 +714,7 @@ export const clearChatHistory = async (req: Request, res: Response) => {
     );
     res.json({ success: true });
   } catch (err) {
-    console.error('❌ Error clearing VantIA history:', err);
+    console.error('❌ Error clearing Vantia history:', err);
     res.status(500).json({ success: false, error: 'Error interno del servidor.' });
   }
 };
@@ -733,7 +733,7 @@ export const chatVantia = async (req: any, res: Response) => {
   if (!userId || !moduleId) return res.status(400).json({ success: false, error: 'Falta userId o moduleId.' });
 
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-  if (!apiKey) return res.status(503).json({ success: false, error: 'VantIA no está configurada. Añade GEMINI_API_KEY al .env del backend.' });
+  if (!apiKey) return res.status(503).json({ success: false, error: 'Vantia no está configurada. Añade GEMINI_API_KEY al .env del backend.' });
 
   try {
     // Construir el system prompt completo con contexto de entidad en paralelo al envío
@@ -755,7 +755,7 @@ export const chatVantia = async (req: any, res: Response) => {
     // (enfoque más compatible con todas las versiones de Gemini)
     let contents: any[] = [
       { role: 'user',  parts: [{ text: fullSystemPrompt }] },
-      { role: 'model', parts: [{ text: 'Entendido. Soy VantIA, listo para ayudarte.' }] },
+      { role: 'model', parts: [{ text: 'Entendido. Soy Vantia, listo para ayudarte.' }] },
       ...cleanHistory.map((h: any) => ({ role: h.role, parts: [{ text: h.text }] })),
       { role: 'user', parts: [{ text: message }] },
     ];
@@ -795,7 +795,7 @@ export const chatVantia = async (req: any, res: Response) => {
         break;
       }
 
-      console.log(`🤖 VantIA ronda ${round + 1}: ${fnCalls.map((f: any) => f.functionCall.name).join(', ')}`);
+      console.log(`🤖 Vantia ronda ${round + 1}: ${fnCalls.map((f: any) => f.functionCall.name).join(', ')}`);
 
       const toolResults = await Promise.all(
         fnCalls.map(async (part: any) => {
@@ -845,7 +845,7 @@ export const chatVantia = async (req: any, res: Response) => {
 
   } catch (error: any) {
     const msg = error?.message || String(error);
-    console.error('❌ VantIA error:', msg);
+    console.error('❌ Vantia error:', msg);
     res.status(500).json({ success: false, error: msg });
   }
 };
@@ -909,7 +909,7 @@ export const chatVantiaStream = async (req: any, res: Response) => {
   if (!userId || !moduleId) return res.status(400).json({ success: false, error: 'Falta userId o moduleId.' });
 
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-  if (!apiKey) return res.status(503).json({ success: false, error: 'VantIA no está configurada. Añade GEMINI_API_KEY al .env del backend.' });
+  if (!apiKey) return res.status(503).json({ success: false, error: 'Vantia no está configurada. Añade GEMINI_API_KEY al .env del backend.' });
 
   // OJO: nada de 'Connection: keep-alive' aquí -- es una cabecera hop-by-hop
   // exclusiva de HTTP/1.1, prohibida en HTTP/2 (RFC 7540 §8.1.2.2). Railway
@@ -960,7 +960,7 @@ export const chatVantiaStream = async (req: any, res: Response) => {
 
     const contents: any[] = [
       { role: 'user',  parts: [{ text: fullSystemPrompt }] },
-      { role: 'model', parts: [{ text: 'Entendido. Soy VantIA, listo para ayudarte.' }] },
+      { role: 'model', parts: [{ text: 'Entendido. Soy Vantia, listo para ayudarte.' }] },
       ...cleanHistory.map((h: any) => ({ role: h.role, parts: [{ text: h.text }] })),
       { role: 'user', parts: [{ text: message }] },
     ];
@@ -991,7 +991,7 @@ export const chatVantiaStream = async (req: any, res: Response) => {
       const fnCalls = roundParts.filter(p => p.functionCall);
       if (fnCalls.length === 0) break; // ronda final: ya no pide más herramientas
 
-      console.log(`🤖 VantIA (stream) ronda ${round + 1}: ${fnCalls.map((f: any) => f.functionCall.name).join(', ')}`);
+      console.log(`🤖 Vantia (stream) ronda ${round + 1}: ${fnCalls.map((f: any) => f.functionCall.name).join(', ')}`);
 
       const toolResults: { name: string; result: object }[] = [];
       for (const part of fnCalls) {
@@ -1044,7 +1044,7 @@ export const chatVantiaStream = async (req: any, res: Response) => {
 
   } catch (error: any) {
     const msg = error?.message || String(error);
-    console.error('❌ VantIA stream error:', msg);
+    console.error('❌ Vantia stream error:', msg);
     clearInterval(heartbeat);
     if (!closed) {
       emit({ type: 'error', message: msg });
@@ -1053,7 +1053,7 @@ export const chatVantiaStream = async (req: any, res: Response) => {
   }
 };
 
-// ── POST /api/vantia/feedback ── 👍/👎 sobre una respuesta concreta de VantIA.
+// ── POST /api/vantia/feedback ── 👍/👎 sobre una respuesta concreta de Vantia.
 // Guarda un único voto por (usuario, conversación, índice de mensaje); mandar
 // rating:null borra el voto (el frontend lo usa para "deshacer" un clic).
 export const submitFeedback = async (req: any, res: Response) => {
@@ -1082,7 +1082,7 @@ export const submitFeedback = async (req: any, res: Response) => {
     );
     res.json({ success: true, rating });
   } catch (err: any) {
-    console.error('❌ Error guardando feedback de VantIA:', err?.message);
+    console.error('❌ Error guardando feedback de Vantia:', err?.message);
     res.status(500).json({ success: false, error: 'Error interno del servidor.' });
   }
 };

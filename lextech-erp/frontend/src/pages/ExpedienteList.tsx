@@ -4324,7 +4324,7 @@ function CounterConfigModal({ onClose, getToken }: { onClose: () => void; getTok
     <div className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl overflow-hidden">
 
-        {/* Header VantIA */}
+        {/* Header Vantia */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
           <div className="flex items-center gap-2.5">
             <div className="h-8 w-8 rounded-xl bg-red-50 flex items-center justify-center shrink-0">

@@ -107,32 +107,32 @@ const NAV_GROUPS = [
   },
 ];
 
-// ── Contexto VantIA por módulo ───────────────────────────────────────────────
-function getVantIAContext(pathname: string): string {
+// ── Contexto Vantia por módulo ───────────────────────────────────────────────
+function getVantiaContext(pathname: string): string {
   if (pathname.startsWith("/dashboard/clientes"))
-    return "Eres VantIA, especializado en gestión de clientes para despachos de abogados. Ayudas con altas de clientes, consultas de datos, LOPD, NIF/CIF, tipos de documentos y todo lo relacionado con la base de clientes del despacho. Responde siempre en español.";
+    return "Eres Vantia, especializado en gestión de clientes para despachos de abogados. Ayudas con altas de clientes, consultas de datos, LOPD, NIF/CIF, tipos de documentos y todo lo relacionado con la base de clientes del despacho. Responde siempre en español.";
   if (pathname.startsWith("/dashboard/expedientes"))
-    return "Eres VantIA, especializado en gestión de expedientes judiciales. Conoces el flujo de un expediente legal, plazos procesales, tipos de procedimientos y cómo gestionar casos en un despacho. Responde siempre en español.";
+    return "Eres Vantia, especializado en gestión de expedientes judiciales. Conoces el flujo de un expediente legal, plazos procesales, tipos de procedimientos y cómo gestionar casos en un despacho. Responde siempre en español.";
   if (pathname.startsWith("/dashboard/agenda"))
-    return "Eres VantIA, especializado en gestión de agenda y citas para un despacho legal. Ayudas con vistas, reuniones, plazos judiciales, y organización del tiempo. Responde siempre en español.";
+    return "Eres Vantia, especializado en gestión de agenda y citas para un despacho legal. Ayudas con vistas, reuniones, plazos judiciales, y organización del tiempo. Responde siempre en español.";
   if (pathname.startsWith("/dashboard/chat-ia"))
-    return "Eres VantIA, asistente IA avanzado del despacho. Ayudas con consultas complejas, uso de herramientas, recuperación de historial y apoyo transversal a todos los módulos. Responde siempre en español.";
+    return "Eres Vantia, asistente IA avanzado del despacho. Ayudas con consultas complejas, uso de herramientas, recuperación de historial y apoyo transversal a todos los módulos. Responde siempre en español.";
   if (pathname.startsWith("/dashboard/chat"))
-    return "Eres VantIA, asistente del despacho. En este momento el usuario está en el chat de equipo. Puedes ayudar a redactar mensajes, resumir conversaciones o resolver dudas jurídicas puntuales. Responde siempre en español.";
+    return "Eres Vantia, asistente del despacho. En este momento el usuario está en el chat de equipo. Puedes ayudar a redactar mensajes, resumir conversaciones o resolver dudas jurídicas puntuales. Responde siempre en español.";
   if (pathname.startsWith("/dashboard/whatsapp"))
-    return "Eres VantIA, asistente de WhatsApp del despacho. Ayudas con mensajería comercial y operativa, respuestas rápidas, seguimiento de conversaciones y comunicación con clientes. Responde siempre en español.";
+    return "Eres Vantia, asistente de WhatsApp del despacho. Ayudas con mensajería comercial y operativa, respuestas rápidas, seguimiento de conversaciones y comunicación con clientes. Responde siempre en español.";
   if (pathname.startsWith("/dashboard/correo"))
-    return "Eres VantIA, asistente de correo del despacho. Ayudas a redactar emails profesionales, responder comunicaciones, resumir correos y organizar la bandeja de entrada. Responde siempre en español.";
+    return "Eres Vantia, asistente de correo del despacho. Ayudas a redactar emails profesionales, responder comunicaciones, resumir correos y organizar la bandeja de entrada. Responde siempre en español.";
   if (pathname.startsWith("/dashboard/documental"))
-    return "Eres VantIA, asistente documental del despacho. Ayudas con búsquedas en el BOE, resúmenes normativos y localización de documentación jurídica. CENDOJ y LexNET solo están disponibles como enlace directo al portal oficial, no tienes acceso a búsqueda automática sobre ellos. Responde siempre en español.";
+    return "Eres Vantia, asistente documental del despacho. Ayudas con búsquedas en el BOE, resúmenes normativos y localización de documentación jurídica. CENDOJ y LexNET solo están disponibles como enlace directo al portal oficial, no tienes acceso a búsqueda automática sobre ellos. Responde siempre en español.";
   if (pathname.startsWith("/dashboard/facturacion"))
-    return "Eres VantIA, asistente de contabilidad y facturación del despacho. Ayudas con honorarios, facturas, cobros, vencimientos y control económico. Responde siempre en español.";
+    return "Eres Vantia, asistente de contabilidad y facturación del despacho. Ayudas con honorarios, facturas, cobros, vencimientos y control económico. Responde siempre en español.";
   if (pathname.startsWith("/dashboard/config"))
-    return "Eres VantIA, asistente de configuración de VANTIA Legis ERP. Ayudas con ajustes del sistema, usuarios, permisos y personalización. Responde siempre en español.";
-  return "Eres VantIA, el asistente inteligente de VANTIA Legis ERP, un ERP para despachos de abogados. Tienes conocimientos generales de derecho español, gestión de despachos, expedientes, clientes y documentación. Eres útil, conciso y profesional. Responde siempre en español.";
+    return "Eres Vantia, asistente de configuración de VANTIA Legis ERP. Ayudas con ajustes del sistema, usuarios, permisos y personalización. Responde siempre en español.";
+  return "Eres Vantia, el asistente inteligente de VANTIA Legis ERP, un ERP para despachos de abogados. Tienes conocimientos generales de derecho español, gestión de despachos, expedientes, clientes y documentación. Eres útil, conciso y profesional. Responde siempre en español.";
 }
 
-function getVantIALabel(pathname: string): string {
+function getVantiaLabel(pathname: string): string {
   if (pathname.startsWith("/dashboard/clientes"))    return "Especialista en Clientes";
   if (pathname.startsWith("/dashboard/expedientes")) return "Especialista en Expedientes";
   if (pathname.startsWith("/dashboard/agenda"))      return "Especialista en Agenda";
@@ -164,11 +164,11 @@ function actionIcon(t: string) {
   return "?";
 }
 
-// ── VantIA flotante (siempre visible, contextual) ───────────────────────────
+// ── Vantia flotante (siempre visible, contextual) ───────────────────────────
 interface ToolEvent { name: string; label: string; done: boolean }
 interface ChatMsg { role: "user" | "model"; text: string; toolEvents?: ToolEvent[] }
 
-// Markdown ligero para las respuestas de VantIA: negrita, cursiva, código
+// Markdown ligero para las respuestas de Vantia: negrita, cursiva, código
 // inline, listas con guion/asterisco y listas numeradas. No es un parser
 // completo de Markdown (no hay tablas, enlaces ni bloques de código) — solo
 // lo que el modelo usa realmente, para no arrastrar una librería entera.
@@ -235,7 +235,7 @@ function renderMarkdownLite(text: string): React.ReactNode {
   return <>{blocks}</>;
 }
 
-function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opts?: { skipCache?: boolean }) => Promise<string | null> }) {
+function VantiaWidget({ pathname, getToken }: { pathname: string; getToken: (opts?: { skipCache?: boolean }) => Promise<string | null> }) {
   const [open, setOpen] = useState(false);
   const [everOpened, setEverOpened] = useState(false);
   // "Brillito" que avisa de una respuesta lista mientras el chat está
@@ -265,7 +265,7 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
 
   // Streaming real: consume el SSE de /api/vantia/chat/stream y va
   // actualizando en vivo el mensaje en `targetIdx` -- texto según llega
-  // token a token, y una pill por cada herramienta que VantIA use mientras
+  // token a token, y una pill por cada herramienta que Vantia use mientras
   // consulta datos reales del despacho (igual que en la página Chat IA).
   const streamChat = async (text: string, history: ChatMsg[], targetIdx: number): Promise<string> => {
     const token = await getToken({ skipCache: true });
@@ -281,7 +281,7 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
     });
     if (!res.ok || !res.body) {
       const data = await safeJson(res);
-      throw new Error(data.error || "Error en la API de VantIA");
+      throw new Error(data.error || "Error en la API de Vantia");
     }
 
     // Revelado suave: Gemini no manda el texto letra a letra, sino en trozos
@@ -359,7 +359,7 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
     return () => document.removeEventListener("mousedown", h);
   }, [showMenu]);
 
-  const greeting = (): ChatMsg => ({ role: "model", text: `¡Hola! Soy VantIA — ${getVantIALabel(pathname)}. ¿En qué puedo ayudarte?` });
+  const greeting = (): ChatMsg => ({ role: "model", text: `¡Hola! Soy Vantia — ${getVantiaLabel(pathname)}. ¿En qué puedo ayudarte?` });
 
   useEffect(() => {
     if (!open) return;
@@ -519,8 +519,8 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
                 <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-emerald-400 border-2 border-red-600 rounded-full" />
               </div>
               <div>
-                <h2 className="text-sm font-bold text-white leading-tight">VantIA</h2>
-                <p className="text-[11px] text-red-100 font-medium tracking-wide">{getVantIALabel(pathname)}</p>
+                <h2 className="text-sm font-bold text-white leading-tight">Vantia</h2>
+                <p className="text-[11px] text-red-100 font-medium tracking-wide">{getVantiaLabel(pathname)}</p>
               </div>
             </div>
             <div className="flex items-center gap-1">
@@ -683,7 +683,7 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
         </div>
       )}
 
-      {/* Botón flotante VantIA — en reposo vive "pegado" al borde derecho
+      {/* Botón flotante Vantia — en reposo vive "pegado" al borde derecho
           como una pastilla que solo asoma una esquina; al pasar el ratón (o
           en cuanto hay una respuesta en curso) sale entero y se redondea en
           círculo. El pulso rojo solo se muestra mientras está trabajando; el
@@ -701,7 +701,7 @@ function VantIAWidget({ pathname, getToken }: { pathname: string; getToken: (opt
       <div className="group fixed bottom-2 right-0 z-50 h-24 w-28 flex items-end justify-end pb-4">
         <button
           onClick={() => setOpen((v) => !v)}
-          title="VantIA — Asistente IA"
+          title="Vantia — Asistente IA"
           className={`relative h-14 w-14 shadow-xl flex items-center justify-center transition-all duration-300 ease-out active:scale-90 ${
             open || loading
               ? "-translate-x-6 rounded-[28px]"
@@ -1987,9 +1987,9 @@ export default function DashboardLayout() {
         />
       )}
 
-      {/* VantIA flotante — oculto en módulos con su propio chat o con controles fijos en la esquina inferior (Correo: barra de "Responder a...") */}
+      {/* Vantia flotante — oculto en módulos con su propio chat o con controles fijos en la esquina inferior (Correo: barra de "Responder a...") */}
       {!location.pathname.startsWith('/dashboard/chat') && !location.pathname.startsWith('/dashboard/correo') && (
-        <VantIAWidget pathname={location.pathname} getToken={getToken} />
+        <VantiaWidget pathname={location.pathname} getToken={getToken} />
       )}
 
       {/* Sidebar Desktop */}
