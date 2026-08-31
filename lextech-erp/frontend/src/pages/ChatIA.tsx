@@ -1012,7 +1012,7 @@ export default function ChatIA() {
                     placeholder={activeModuleId
                       ? 'Escribe un mensaje… (↵ enviar · ⇧↵ nueva línea)'
                       : 'Inicia una conversación con VantIA…'}
-                    className="flex-1 resize-none bg-transparent outline-none text-sm text-slate-700 placeholder:text-slate-300 leading-relaxed py-0.5"
+                    className="flex-1 resize-none bg-transparent outline-none focus:shadow-none text-sm text-slate-700 placeholder:text-slate-300 leading-relaxed py-0.5"
                     style={{ maxHeight: 152, overflowY: 'auto' }}
                     disabled={sending}
                   />
@@ -1037,7 +1037,7 @@ export default function ChatIA() {
                               value={linkQuery}
                               onChange={e => setLinkQuery(e.target.value)}
                               placeholder="Buscar expediente…"
-                              className="flex-1 min-w-0 bg-transparent outline-none text-xs text-slate-700 placeholder:text-slate-400"
+                              className="flex-1 min-w-0 bg-transparent outline-none focus:shadow-none text-xs text-slate-700 placeholder:text-slate-400"
                             />
                           </div>
                           <div className="max-h-52 overflow-y-auto">
