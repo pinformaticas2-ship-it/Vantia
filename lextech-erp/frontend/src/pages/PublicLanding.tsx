@@ -166,16 +166,27 @@ function FeatureCard({ emoji, title, desc }: { emoji: string; title: string; des
   );
 }
 
+// Cuánto tiempo se queda cada frase en pantalla: proporcional a su longitud
+// (antes eran 5s fijos para todas, y la más larga -- la de Beccaria, 280
+// caracteres -- era ilegible en ese tiempo) con un mínimo y un máximo para
+// que ni la más corta pase volando ni la más larga se eternice.
+function quoteDurationMs(quote: string): number {
+  return Math.min(9000, Math.max(4500, 3200 + quote.length * 24));
+}
+
 function QuoteRotator() {
   const [index, setIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
 
   useEffect(() => {
-    const timer = window.setInterval(() => {
+    if (paused) return;
+    const ms = quoteDurationMs(LEGAL_QUOTES[index].quote);
+    const timer = window.setTimeout(() => {
       setIndex((current) => (current + 1) % LEGAL_QUOTES.length);
-    }, 5000);
+    }, ms);
 
-    return () => window.clearInterval(timer);
-  }, []);
+    return () => window.clearTimeout(timer);
+  }, [index, paused]);
 
   const currentQuote = LEGAL_QUOTES[index];
   const quoteLength = currentQuote.quote.length;
@@ -196,17 +207,29 @@ function QuoteRotator() {
           to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
-      <div className="flex h-[320px] flex-col justify-between rounded-[30px] border border-white/14 bg-black/20 p-8">
+      <div
+        onMouseEnter={() => setPaused(true)}
+        onMouseLeave={() => setPaused(false)}
+        className="relative flex h-[320px] flex-col justify-between overflow-hidden rounded-[30px] border border-white/14 bg-black/20 p-8"
+      >
+        {/* Comilla decorativa de fondo -- puro carácter tipográfico, sin SVG */}
+        <span
+          aria-hidden
+          className="pointer-events-none absolute -top-10 left-4 select-none font-black text-[220px] leading-none text-[#d7c08a]/10"
+        >
+          "
+        </span>
+
         <p
           key={index}
-          className={`font-black leading-tight text-white ${quoteSizeClass}`}
+          className={`relative font-black leading-tight text-white ${quoteSizeClass}`}
           style={{ animation: "quoteFadeSlide 700ms ease" }}
         >
           "{currentQuote.quote}"
         </p>
         <div
           key={`${index}-author`}
-          className="mt-6"
+          className="relative mt-6"
           style={{ animation: "quoteFadeSlide 700ms ease" }}
         >
           <p className="text-lg font-bold text-[#fff1c9]">{currentQuote.author}</p>
@@ -214,6 +237,23 @@ function QuoteRotator() {
             {currentQuote.years}
           </p>
         </div>
+      </div>
+
+      {/* Puntos de progreso -- de un vistazo se ve cuántas frases hay y en
+          cuál vas, y se puede saltar directamente a una en concreto. */}
+      <div className="mt-4 flex items-center gap-1.5">
+        {LEGAL_QUOTES.map((q, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => setIndex(i)}
+            aria-label={`Ver frase ${i + 1} de ${LEGAL_QUOTES.length}`}
+            aria-current={i === index}
+            className={`h-1.5 rounded-full transition-all duration-300 ${
+              i === index ? "w-6 bg-[#d7c08a]" : "w-1.5 bg-white/20 hover:bg-white/35"
+            }`}
+          />
+        ))}
       </div>
     </div>
   );
