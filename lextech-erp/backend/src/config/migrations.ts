@@ -1672,6 +1672,21 @@ export async function runMigrations(): Promise<void> {
       );
     `);
 
+    // ── Un único propietario por organización ────────────────────────
+    // Antes se podían dar de alta varios "propietario" a la vez en la misma
+    // organización (sin límite real, solo una comprobación de "no dejar la
+    // organización sin ninguno" al borrar). Ahora "propietario" es un cargo
+    // singular que se transfiere (ver transferirPropiedad en
+    // organizacionesController.ts), nunca se reparte -- este índice único
+    // parcial lo garantiza también a nivel de base de datos, no solo en el
+    // código de la aplicación.
+    try {
+      await client.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_organizacion_miembros_unico_propietario
+          ON organizacion_miembros (organizacion_id) WHERE rol = 'propietario';
+      `);
+    } catch (_e: any) {}
+
     // entities: columna organizacion_id + backfill a la organización sembrada
     try {
       await client.query(`ALTER TABLE entities ADD COLUMN IF NOT EXISTS organizacion_id UUID REFERENCES organizaciones(id);`);

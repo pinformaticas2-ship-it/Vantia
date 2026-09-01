@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AlertTriangle, Bell, BellOff, BellRing, BookOpen, Building2, Camera, Check, Loader2, Lock, MessageCircle, Clock3, Mail as MailIcon, Phone, Palette, Plug, Plus, ShieldCheck, Trash2, UsersRound, X } from 'lucide-react';
+import { AlertTriangle, Bell, BellOff, BellRing, BookOpen, Building2, Camera, Check, Crown, Loader2, Lock, MessageCircle, Clock3, Mail as MailIcon, Phone, Palette, Plug, Plus, ShieldCheck, Trash2, UsersRound, X } from 'lucide-react';
 import { useAuth } from '@clerk/clerk-react';
 import { useTheme, AppTheme } from '../lib/ThemeContext';
 import { pickSidebarStyle, autoSidebarBorder, muteSidebarColor } from '../lib/themeCss';
@@ -768,6 +768,7 @@ function UsuariosPanel() {
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [transferTarget, setTransferTarget] = useState<Miembro | null>(null);
 
   const canManage = myRol === 'propietario' || myRol === 'admin';
 
@@ -814,6 +815,19 @@ function UsuariosPanel() {
     } finally { setBusyId(null); }
   };
 
+  // Ceder la propiedad recarga toda la página a propósito (no solo la lista
+  // de miembros): tu propio rol pasa de propietario a admin, y eso afecta a
+  // cosas que viven fuera de este panel (el menú lateral, qué módulos ves...).
+  const doTransfer = async (confirmNombre: string): Promise<{ ok: boolean; error?: string }> => {
+    if (!transferTarget) return { ok: false, error: 'Selecciona a quién transferir.' };
+    const data = await apiFetch('/api/organizacion/transferir-propiedad', {
+      method: 'POST', getToken,
+      body: JSON.stringify({ toMemberId: transferTarget.id, confirmNombre }),
+    });
+    if (data?.success === false) return { ok: false, error: data.error };
+    return { ok: true };
+  };
+
   return (
     <>
       <div className="mb-8">
@@ -839,7 +853,6 @@ function UsuariosPanel() {
               <option value="miembro">Miembro</option>
               <option value="soporte">Soporte técnico</option>
               <option value="admin">Admin</option>
-              <option value="propietario">Propietario</option>
             </select>
             <button
               onClick={addMiembro}
@@ -868,7 +881,14 @@ function UsuariosPanel() {
                   {m.email && <p className="text-xs text-slate-400 truncate">{m.email}</p>}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  {myRol === 'propietario' ? (
+                  {/* "Propietario" ya no es una opción más del desplegable: es un
+                      cargo único que se cede aparte (botón de la corona), nunca se
+                      elige al vuelo -- ver transferTarget más abajo. */}
+                  {m.rol === 'propietario' ? (
+                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-700 px-2.5 py-1 bg-amber-50 border border-amber-200 rounded-full">
+                      <Crown size={12} /> Propietario
+                    </span>
+                  ) : myRol === 'propietario' ? (
                     <select
                       value={m.rol}
                       onChange={(e) => changeRol(m.id, e.target.value as OrgRol)}
@@ -876,17 +896,29 @@ function UsuariosPanel() {
                       className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:border-red-300 bg-white capitalize"
                     >
                       <option value="miembro">Miembro</option>
+                      <option value="soporte">Soporte técnico</option>
                       <option value="admin">Admin</option>
-                      <option value="propietario">Propietario</option>
                     </select>
                   ) : (
                     <span className="text-xs font-semibold text-slate-500 capitalize px-2.5 py-1 bg-slate-100 rounded-full">{m.rol}</span>
                   )}
-                  {/* Propietario puede quitar a cualquiera; admin solo a miembro/soporte
-                      -- no a otro admin ni al propietario (el backend vuelve a
-                      comprobarlo igual, esto es solo para no ofrecer un botón que
-                      luego el servidor va a rechazar). */}
-                  {(myRol === 'propietario' || (myRol === 'admin' && m.rol !== 'propietario' && m.rol !== 'admin')) && (
+
+                  {myRol === 'propietario' && m.rol !== 'propietario' && (
+                    <button
+                      onClick={() => setTransferTarget(m)}
+                      disabled={busyId === m.id}
+                      className="p-1.5 rounded-lg text-slate-300 hover:text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-40"
+                      title="Transferir la propiedad a esta persona"
+                    >
+                      <Crown size={14} />
+                    </button>
+                  )}
+
+                  {/* Propietario puede quitar a cualquiera (salvo a sí mismo, ver
+                      abajo); admin solo a miembro/soporte -- no a otro admin ni al
+                      propietario (el backend vuelve a comprobarlo igual, esto es
+                      solo para no ofrecer un botón que luego el servidor rechace). */}
+                  {m.rol !== 'propietario' && (myRol === 'propietario' || (myRol === 'admin' && m.rol !== 'admin')) && (
                     <button
                       onClick={() => remove(m.id)}
                       disabled={busyId === m.id}
@@ -905,7 +937,109 @@ function UsuariosPanel() {
       </section>
 
       {canManage && <RolesPermisosPanel editable={myRol === 'propietario'} />}
+
+      {transferTarget && (
+        <TransferOwnershipModal
+          organizacionNombre={organizacion?.nombre || ''}
+          targetNombre={transferTarget.nombre}
+          onClose={() => setTransferTarget(null)}
+          onDone={() => { window.location.reload(); }}
+          transfer={doTransfer}
+        />
+      )}
     </>
+  );
+}
+
+// Modal de "ceder la propiedad" -- mismo patrón de "escribe el nombre de la
+// organización para confirmar" que ya usa el borrado de la organización
+// (DeleteOrganizacionModal), a propósito: es la acción más importante de
+// toda esta pantalla, no debería costar menos confirmarla que borrar algo.
+function TransferOwnershipModal({ organizacionNombre, targetNombre, onClose, onDone, transfer }: {
+  organizacionNombre: string;
+  targetNombre: string;
+  onClose: () => void;
+  onDone: () => void;
+  transfer: (confirmNombre: string) => Promise<{ ok: boolean; error?: string }>;
+}) {
+  const [typedNombre, setTypedNombre] = useState('');
+  const [confirmChecked, setConfirmChecked] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const nameMatches = typedNombre.trim() === organizacionNombre.trim();
+  const canConfirm = nameMatches && confirmChecked && !busy;
+
+  const handleConfirm = async () => {
+    if (!canConfirm) return;
+    setBusy(true); setError('');
+    const res = await transfer(typedNombre.trim());
+    if (res.ok) onDone();
+    else { setError(res.error || 'No se pudo transferir la propiedad.'); setBusy(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm flex items-center justify-center px-4">
+      <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden">
+        <div className="px-6 py-5 border-b border-slate-100 flex items-start gap-3.5 bg-amber-50/60">
+          <div className="h-10 w-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+            <Crown size={20} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-base font-extrabold text-slate-900">Transferir propiedad</h2>
+            <p className="text-sm text-slate-500 mt-0.5">Dejarás de ser propietario y pasarás a administrador.</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 shrink-0"><X size={16} /></button>
+        </div>
+
+        <div className="px-6 py-5 space-y-4">
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3.5 text-sm text-amber-800">
+            <strong>{targetNombre}</strong> pasará a ser el propietario de <strong>{organizacionNombre}</strong>, con control total:
+            podrá gestionar la facturación, eliminar la organización y cambiar el rol de cualquier miembro, incluido el tuyo.
+            Solo puede haber un propietario a la vez.
+          </div>
+
+          <label className="flex items-start gap-2.5 text-sm text-slate-700 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={confirmChecked}
+              onChange={(e) => setConfirmChecked(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-300"
+            />
+            Entiendo lo que implica y quiero ceder la propiedad.
+          </label>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+              Escribe <span className="text-slate-800 normal-case">{organizacionNombre}</span> para confirmar
+            </label>
+            <input
+              value={typedNombre}
+              onChange={(e) => setTypedNombre(e.target.value)}
+              placeholder={organizacionNombre}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-amber-300"
+              autoFocus
+            />
+          </div>
+
+          {error && <p className="text-xs text-rose-600">{error}</p>}
+        </div>
+
+        <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-2.5 bg-slate-50">
+          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm font-semibold text-slate-500 hover:bg-slate-100 transition-colors">
+            Cancelar
+          </button>
+          <button
+            onClick={handleConfirm}
+            disabled={!canConfirm}
+            className="inline-flex items-center gap-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+          >
+            {busy && <Loader2 size={14} className="animate-spin" />}
+            Transferir propiedad
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

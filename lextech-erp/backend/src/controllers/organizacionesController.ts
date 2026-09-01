@@ -313,7 +313,11 @@ export async function addOrganizacionMiembro(req: Request, res: Response) {
       return err(res, 'Solo el propietario o un administrador pueden añadir miembros.', 403);
     }
     const email = String(req.body?.email || '').trim().toLowerCase();
-    const rol: OrgRol = ['admin', 'propietario', 'soporte'].includes(req.body?.rol) ? req.body.rol : 'miembro';
+    // "propietario" no se puede dar de alta así -- solo hay uno por
+    // organización, y se cede con una transferencia deliberada (ver
+    // transferirPropiedad), nunca añadiendo a alguien nuevo directamente con
+    // ese rol.
+    const rol: OrgRol = ['admin', 'soporte'].includes(req.body?.rol) ? req.body.rol : 'miembro';
     if (!email) return err(res, 'Indica un email.', 400);
 
     const clerk = getClerk();
@@ -337,7 +341,12 @@ export async function addOrganizacionMiembro(req: Request, res: Response) {
   }
 }
 
-// PATCH /api/organizacion/miembros/:id — cambiar rol (solo propietario)
+// PATCH /api/organizacion/miembros/:id — cambiar rol (solo propietario).
+// "propietario" queda fuera de este endpoint por completo -- ni se puede
+// ascender a alguien a propietario aquí, ni degradar al propietario actual:
+// eso pasa siempre por transferirPropiedad, que hace las dos cosas a la vez
+// dentro de una transacción (nunca hay un instante con dos propietarios ni
+// con cero).
 export async function updateOrganizacionMiembroRol(req: Request, res: Response) {
   try {
     const ctx = requireOrgContext(req, res);
@@ -346,7 +355,18 @@ export async function updateOrganizacionMiembroRol(req: Request, res: Response) 
       return err(res, 'Solo el propietario puede cambiar roles.', 403);
     }
     const rol: OrgRol = req.body?.rol;
-    if (!['propietario', 'admin', 'miembro', 'soporte'].includes(rol)) return err(res, 'Rol inválido.', 400);
+    if (!['admin', 'miembro', 'soporte'].includes(rol)) {
+      return err(res, 'Rol inválido. Para ceder la propiedad, usa "Transferir propiedad".', 400);
+    }
+
+    const { rows: current } = await pool.query(
+      `SELECT rol FROM organizacion_miembros WHERE id = $1 AND organizacion_id = $2`,
+      [req.params.id, ctx.organizacionId]
+    );
+    if (current.length === 0) return err(res, 'Miembro no encontrado.', 404);
+    if (current[0].rol === 'propietario') {
+      return err(res, 'Para dejar de ser propietario, transfiere antes la propiedad a otro miembro.', 400);
+    }
 
     const { rows } = await pool.query(
       `UPDATE organizacion_miembros SET rol = $1
@@ -354,11 +374,69 @@ export async function updateOrganizacionMiembroRol(req: Request, res: Response) 
         RETURNING id, user_id, rol`,
       [rol, req.params.id, ctx.organizacionId]
     );
-    if (rows.length === 0) return err(res, 'Miembro no encontrado.', 404);
     invalidateUserCache(rows[0].user_id);
     return ok(res, { id: rows[0].id, userId: rows[0].user_id, rol: rows[0].rol });
   } catch (e: any) {
     return err(res, pgErr(e));
+  }
+}
+
+// POST /api/organizacion/transferir-propiedad — cede la propiedad de la
+// organización a otro miembro (solo el propietario actual puede hacerlo, y
+// solo escribiendo el nombre exacto de la organización, igual que al
+// eliminarla -- es la acción más importante que existe en Gestión de
+// Usuarios, no un valor más de un desplegable). El propietario saliente
+// pasa a admin: nunca se queda a mitad de camino sin acceso.
+export async function transferirPropiedad(req: Request, res: Response) {
+  const ctx = requireOrgContext(req, res);
+  if (!ctx) return;
+  if (ctx.organizacionRol !== 'propietario') {
+    return err(res, 'Solo el propietario puede transferir la propiedad.', 403);
+  }
+
+  const client = await pool.connect();
+  try {
+    const { rows: orgRows } = await client.query(`SELECT nombre FROM organizaciones WHERE id = $1`, [ctx.organizacionId]);
+    if (!orgRows.length) return err(res, 'Organización no encontrada.', 404);
+    const nombreReal = String(orgRows[0].nombre || '').trim();
+    const confirmNombre = String(req.body?.confirmNombre || '').trim();
+    if (confirmNombre !== nombreReal) {
+      return err(res, 'El nombre escrito no coincide con el de la organización.', 400);
+    }
+
+    const toMemberId = req.body?.toMemberId;
+    const currentUserId = (req as any).auth?.userId;
+    const { rows: targetRows } = await client.query(
+      `SELECT id, user_id, rol FROM organizacion_miembros WHERE id = $1 AND organizacion_id = $2`,
+      [toMemberId, ctx.organizacionId]
+    );
+    if (!targetRows.length) return err(res, 'Miembro no encontrado.', 404);
+    const target = targetRows[0];
+    if (target.user_id === currentUserId) return err(res, 'Ya eres el propietario.', 400);
+
+    await client.query('BEGIN');
+    try {
+      await client.query(
+        `UPDATE organizacion_miembros SET rol = 'admin' WHERE organizacion_id = $1 AND user_id = $2`,
+        [ctx.organizacionId, currentUserId]
+      );
+      await client.query(
+        `UPDATE organizacion_miembros SET rol = 'propietario' WHERE id = $1`,
+        [target.id]
+      );
+      await client.query('COMMIT');
+    } catch (txErr) {
+      await client.query('ROLLBACK');
+      throw txErr;
+    }
+
+    invalidateUserCache(currentUserId);
+    invalidateUserCache(target.user_id);
+    return ok(res, { newOwnerId: target.id });
+  } catch (e: any) {
+    return err(res, pgErr(e));
+  } finally {
+    client.release();
   }
 }
 
