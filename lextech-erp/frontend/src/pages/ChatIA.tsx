@@ -229,8 +229,11 @@ interface AiModelOption {
 }
 
 const AI_MODELS: AiModelOption[] = [
-  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', provider: 'Google', desc: 'Rápido, el que usa Vantia hoy',      available: true },
-  { id: 'gemini-2.5-pro',   label: 'Gemini 2.5 Pro',   provider: 'Google', desc: 'Más potente, respuestas más lentas', available: true },
+  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', provider: 'Google',    desc: 'Rápido, el que usa Vantia hoy',                   available: true },
+  // gemini-2.5-pro ya no existe (Google lo retiró) y su sustituto,
+  // gemini-3.1-pro-preview, necesita un plan de pago -- con la cuenta
+  // gratuita actual da error 429 (cuota 0), comprobado a mano contra la API.
+  { id: 'gemini-2.5-pro',   label: 'Gemini Pro',       provider: 'Google',    desc: 'Necesita plan de pago de Google', available: false },
   { id: 'chatgpt',          label: 'ChatGPT',          provider: 'OpenAI',    desc: 'Próximamente',                   available: false },
   { id: 'claude',           label: 'Claude',           provider: 'Anthropic', desc: 'Próximamente',                   available: false },
   { id: 'vincent',          label: 'Vincent AI',       provider: 'vLex',      desc: 'Próximamente',                   available: false },

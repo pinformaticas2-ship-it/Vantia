@@ -5,11 +5,14 @@ const GEMINI_MODEL   = 'gemini-2.5-flash';
 const MAX_TOOL_ROUNDS = 5;
 
 // Modelos que el selector del frontend puede pedir de verdad (el resto de
-// "proveedores" que ofrece el selector -- ChatGPT, Claude, Vincent AI -- son
-// opciones de cara al usuario sin backend detrás todavía; si llega uno de
-// esos ids aquí, o cualquier otra cosa no reconocida, se cae al modelo por
-// defecto en vez de fallar.
-const ALLOWED_GEMINI_MODELS = new Set(['gemini-2.5-flash', 'gemini-2.5-pro']);
+// opciones que ofrece el selector -- ChatGPT, Claude, Vincent AI, y también
+// Gemini Pro -- son opciones de cara al usuario sin backend funcional
+// todavía; si llega uno de esos ids aquí, o cualquier otra cosa no
+// reconocida, se cae al modelo por defecto en vez de fallar. gemini-2.5-pro
+// se quitó de esta lista: Google lo retiró (404) y su sustituto,
+// gemini-3.1-pro-preview, da 429 con la cuenta gratuita actual (cuota 0
+// para Pro) -- comprobado a mano contra la API real.
+const ALLOWED_GEMINI_MODELS = new Set(['gemini-2.5-flash']);
 
 // ── Prompt base — identidad + capacidades ────────────────────────────────────
 const BASE_PROMPT = `Eres Vantia, la inteligencia artificial integrada en VANTIA Legis ERP. Eres un asistente completo, culto y capaz de ayudar con absolutamente cualquier cosa.
