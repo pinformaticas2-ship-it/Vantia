@@ -235,6 +235,21 @@ function renderMarkdownLite(text: string): React.ReactNode {
   return <>{blocks}</>;
 }
 
+// Traduce mensajes de error técnicos (los que llegan tal cual del fetch/red,
+// como "Failed to fetch") a algo que un usuario sin conocimientos técnicos
+// entienda. El resto de mensajes (los que ya vienen del propio backend, como
+// "Vantia no está configurada...") se dejan tal cual porque ya son claros.
+function friendlyVantiaError(raw: string): string {
+  const msg = (raw || "").toLowerCase();
+  if (msg.includes("failed to fetch") || msg.includes("networkerror") || msg.includes("load failed") || msg.includes("network request failed")) {
+    return "No se ha podido conectar con el servidor. Comprueba tu conexión e inténtalo de nuevo.";
+  }
+  if (msg.includes("timeout") || msg.includes("timed out")) {
+    return "El servidor está tardando demasiado en responder. Inténtalo de nuevo en unos segundos.";
+  }
+  return raw?.trim() || "Ha ocurrido un error inesperado.";
+}
+
 function VantiaWidget({ pathname, getToken }: { pathname: string; getToken: (opts?: { skipCache?: boolean }) => Promise<string | null> }) {
   const [open, setOpen] = useState(false);
   const [everOpened, setEverOpened] = useState(false);
@@ -377,7 +392,7 @@ function VantiaWidget({ pathname, getToken }: { pathname: string; getToken: (opt
           setMessages([greeting()]);
         }
       } catch (err) {
-        setMessages([{ role: "model", text: `❌ No pude cargar el historial. ${err instanceof Error ? err.message : ""}` }]);
+        setMessages([{ role: "model", text: `❌ No pude cargar el historial. ${err instanceof Error ? friendlyVantiaError(err.message) : ""}` }]);
       } finally {
         setLoading(false);
       }
@@ -407,8 +422,19 @@ function VantiaWidget({ pathname, getToken }: { pathname: string; getToken: (opt
     if (!text || loading) return;
     setInput("");
     if (textareaRef.current) { textareaRef.current.style.height = "44px"; }
-    const baseHistory = messages;
-    const newHistory: ChatMsg[] = [...messages, { role: "user", text }];
+
+    // Si el intento anterior falló y el usuario escribe uno nuevo sin pulsar
+    // "Reintentar", se quita esa tarjeta de error vieja del historial en vez
+    // de dejarla ahí -- si no, cada fallo apila otra tarjeta roja debajo de
+    // la anterior y la conversación se vuelve confusa con dos, tres, cuatro...
+    // Como mucho se ve un error a la vez: el más reciente.
+    const lastMsg = messages[messages.length - 1];
+    const cleanMessages = lastMsg?.role === "model" && lastMsg.text.startsWith("❌")
+      ? messages.slice(0, -2)
+      : messages;
+
+    const baseHistory = cleanMessages;
+    const newHistory: ChatMsg[] = [...cleanMessages, { role: "user", text }];
     const targetIdx = newHistory.length;
     setMessages([...newHistory, { role: "model", text: "", toolEvents: [] }]);
     setLoading(true);
@@ -422,7 +448,7 @@ function VantiaWidget({ pathname, getToken }: { pathname: string; getToken: (opt
       setLoading(false);
       if (err?.name === "AbortError") return; // detenido a mano: se deja el texto parcial tal cual
       setRetryText(text);
-      setMessages((prev) => prev.map((m, i) => (i === targetIdx ? { ...m, text: `❌ ${err.message}`, toolEvents: [] } : m)));
+      setMessages((prev) => prev.map((m, i) => (i === targetIdx ? { ...m, text: `❌ ${friendlyVantiaError(err.message)}`, toolEvents: [] } : m)));
       if (!openRef.current) setHasUnseenResponse(true);
     }
   };
@@ -445,7 +471,7 @@ function VantiaWidget({ pathname, getToken }: { pathname: string; getToken: (opt
       setLoading(false);
       if (err?.name === "AbortError") return;
       setRetryText(text);
-      setMessages((prev) => prev.map((m, i) => (i === targetIdx ? { ...m, text: `❌ ${err.message}`, toolEvents: [] } : m)));
+      setMessages((prev) => prev.map((m, i) => (i === targetIdx ? { ...m, text: `❌ ${friendlyVantiaError(err.message)}`, toolEvents: [] } : m)));
       if (!openRef.current) setHasUnseenResponse(true);
     }
   };
@@ -466,7 +492,7 @@ function VantiaWidget({ pathname, getToken }: { pathname: string; getToken: (opt
     } catch (err: any) {
       setRegeneratingIdx(null);
       if (err?.name === "AbortError") return;
-      setMessages((prev) => prev.map((m, i) => (i === idx ? { ...m, text: `❌ ${err.message}`, toolEvents: [] } : m)));
+      setMessages((prev) => prev.map((m, i) => (i === idx ? { ...m, text: `❌ ${friendlyVantiaError(err.message)}`, toolEvents: [] } : m)));
     }
   };
 

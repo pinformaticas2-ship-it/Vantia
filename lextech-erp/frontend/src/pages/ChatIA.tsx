@@ -131,6 +131,21 @@ function renderMd(text: string): React.ReactNode {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+// Traduce mensajes de error técnicos (los que llegan tal cual del fetch/red,
+// como "Failed to fetch") a algo que un usuario sin conocimientos técnicos
+// entienda. Los que ya vienen del backend (p.ej. "Vantia no está
+// configurada...") se dejan tal cual porque ya son claros.
+function friendlyVantiaError(raw?: string): string {
+  const msg = (raw || '').toLowerCase();
+  if (msg.includes('failed to fetch') || msg.includes('networkerror') || msg.includes('load failed') || msg.includes('network request failed')) {
+    return 'No se ha podido conectar con el servidor. Comprueba tu conexión e inténtalo de nuevo.';
+  }
+  if (msg.includes('timeout') || msg.includes('timed out')) {
+    return 'El servidor está tardando demasiado en responder. Inténtalo de nuevo en unos segundos.';
+  }
+  return raw?.trim() || 'No se pudo obtener respuesta.';
+}
+
 function groupByDate(convs: Conversation[]) {
   const now   = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -583,8 +598,17 @@ export default function ChatIA() {
     let moduleId = activeModuleId;
     if (!moduleId) { moduleId = `chat-ia:${crypto.randomUUID()}`; setActiveModuleId(moduleId); }
 
-    const isNew         = messages.length === 0;
-    const historyToSend = messages.map(m => ({ role: m.role, text: m.text }));
+    // Si el intento anterior falló y se escribe uno nuevo sin regenerar, se
+    // quita esa tarjeta de error vieja en vez de dejarla ahí -- si no, cada
+    // fallo apila otro mensaje de error debajo del anterior y la
+    // conversación se vuelve confusa. Como mucho se ve un error a la vez.
+    const lastMsg = messages[messages.length - 1];
+    const cleanMessages = lastMsg?.role === 'model' && lastMsg.text.startsWith('⚠️ Error:')
+      ? messages.slice(0, -2)
+      : messages;
+
+    const isNew         = cleanMessages.length === 0;
+    const historyToSend = cleanMessages.map(m => ({ role: m.role, text: m.text }));
 
     // Lo que se manda a Vantia puede incluir el contenido del archivo adjunto;
     // el usuario en pantalla solo ve su texto + una chip con el nombre del fichero.
@@ -599,7 +623,7 @@ export default function ChatIA() {
       attachmentName: attachedFile?.name,
       linkedExpediente: linkedExpediente || undefined,
     };
-    const newHistory: Message[] = [...messages, userMsg];
+    const newHistory: Message[] = [...cleanMessages, userMsg];
     const targetIdx = newHistory.length;
 
     setMessages([...newHistory, { role: 'model', text: '', ts: new Date(), toolEvents: [] }]);
@@ -642,7 +666,7 @@ export default function ChatIA() {
       setSending(false);
       if (err?.name === 'AbortError') return; // detenido a mano: se deja el texto parcial tal cual
       setMessages(prev => prev.map((m, i) => (i === targetIdx
-        ? { ...m, text: `⚠️ Error: ${err?.message || 'No se pudo obtener respuesta.'}`, toolEvents: [] }
+        ? { ...m, text: `⚠️ Error: ${friendlyVantiaError(err?.message)}`, toolEvents: [] }
         : m)));
     }
   };
@@ -677,7 +701,7 @@ export default function ChatIA() {
       setSending(false);
       if (err?.name === 'AbortError') return;
       setMessages(prev => prev.map((m, i) => (i === targetIdx
-        ? { ...m, text: `⚠️ Error: ${err?.message || 'No se pudo obtener respuesta.'}`, toolEvents: [] }
+        ? { ...m, text: `⚠️ Error: ${friendlyVantiaError(err?.message)}`, toolEvents: [] }
         : m)));
     }
   };
