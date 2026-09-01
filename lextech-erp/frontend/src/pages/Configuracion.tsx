@@ -882,7 +882,11 @@ function UsuariosPanel() {
                   ) : (
                     <span className="text-xs font-semibold text-slate-500 capitalize px-2.5 py-1 bg-slate-100 rounded-full">{m.rol}</span>
                   )}
-                  {canManage && (
+                  {/* Propietario puede quitar a cualquiera; admin solo a miembro/soporte
+                      -- no a otro admin ni al propietario (el backend vuelve a
+                      comprobarlo igual, esto es solo para no ofrecer un botón que
+                      luego el servidor va a rechazar). */}
+                  {(myRol === 'propietario' || (myRol === 'admin' && m.rol !== 'propietario' && m.rol !== 'admin')) && (
                     <button
                       onClick={() => remove(m.id)}
                       disabled={busyId === m.id}

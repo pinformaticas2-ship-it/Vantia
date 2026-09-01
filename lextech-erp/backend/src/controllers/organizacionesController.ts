@@ -362,7 +362,10 @@ export async function updateOrganizacionMiembroRol(req: Request, res: Response) 
   }
 }
 
-// DELETE /api/organizacion/miembros/:id — quitar miembro (propietario/admin)
+// DELETE /api/organizacion/miembros/:id — quitar miembro. Propietario puede
+// quitar a cualquiera; admin solo puede quitar a miembro/soporte -- no a
+// otro admin ni al propietario (antes un admin podía quitar a cualquiera,
+// incluido otro admin o, si había más de uno, al propio propietario).
 export async function removeOrganizacionMiembro(req: Request, res: Response) {
   try {
     const ctx = requireOrgContext(req, res);
@@ -376,6 +379,10 @@ export async function removeOrganizacionMiembro(req: Request, res: Response) {
       [req.params.id, ctx.organizacionId]
     );
     if (target.length === 0) return err(res, 'Miembro no encontrado.', 404);
+
+    if (ctx.organizacionRol === 'admin' && (target[0].rol === 'propietario' || target[0].rol === 'admin')) {
+      return err(res, 'Solo el propietario puede quitar a otro administrador o al propietario.', 403);
+    }
 
     if (target[0].rol === 'propietario') {
       const { rows: otherOwners } = await pool.query(
