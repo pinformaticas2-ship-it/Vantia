@@ -7,6 +7,7 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import { Spinner } from "../components/Spinner";
+import { ConnectionErrorBanner } from "../components/ConnectionErrorBanner";
 import { safeJson } from "../lib/api";
 import ColumnVisibilityModal from "../components/ColumnVisibilityModal";
 
@@ -321,16 +322,7 @@ export default function DirectorioProfesionales({ tipo, title, singular, desc }:
 
   if (error) return (
     <div className="w-full min-h-[60vh] flex flex-col items-center justify-center p-10">
-      <div className="w-full max-w-md flex items-start gap-3 p-5 bg-rose-50 border border-rose-200 rounded-xl text-rose-700">
-        <AlertCircle size={20} className="shrink-0 mt-0.5" />
-        <div className="flex-1 min-w-0">
-          <p className="font-bold text-sm">Error de conexión con el backend</p>
-          <p className="text-xs mt-0.5 font-mono break-all">{error}</p>
-        </div>
-        <button onClick={() => load(search)} className="shrink-0 flex items-center gap-2 text-xs font-bold px-3 py-1.5 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-colors">
-          <RefreshCw size={12} /> Reintentar
-        </button>
-      </div>
+      <ConnectionErrorBanner error={error} onRetry={() => load(search)} title={`No se han podido cargar los ${desc}`} />
     </div>
   );
 

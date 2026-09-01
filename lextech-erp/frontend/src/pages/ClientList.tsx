@@ -1,5 +1,6 @@
 ﻿import React, { useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef } from "react";
 import { Spinner } from "../components/Spinner";
+import { ConnectionErrorBanner } from "../components/ConnectionErrorBanner";
 import {
   fetchSharedTemplates, createSharedTemplate as apiCreateTpl,
   updateSharedTemplate as apiUpdateTpl, deleteSharedTemplate as apiDeleteTpl,
@@ -1969,16 +1970,7 @@ export default function ClientList() {
   // ── Render: error ──────────────────────────────────────────
   if (error) return (
     <div className="w-full min-h-[60vh] flex flex-col items-center justify-center p-10">
-      <div className="w-full max-w-md flex items-start gap-3 p-5 bg-rose-50 border border-rose-200 rounded-xl text-rose-700">
-        <AlertCircle size={20} className="shrink-0 mt-0.5" />
-        <div className="flex-1 min-w-0">
-          <p className="font-bold text-sm">Error de conexión con el backend</p>
-          <p className="text-xs mt-0.5 font-mono break-all">{error}</p>
-        </div>
-        <button onClick={() => fetchClients()} className="shrink-0 flex items-center gap-2 text-xs font-bold px-3 py-1.5 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-colors">
-          <RefreshCw size={12} /> Reintentar
-        </button>
-      </div>
+      <ConnectionErrorBanner error={error} onRetry={() => fetchClients()} title="No se han podido cargar los clientes" />
     </div>
   );
 

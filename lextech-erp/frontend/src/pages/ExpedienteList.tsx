@@ -2,6 +2,7 @@
   useEffect, useState, useCallback, useMemo, useRef,
 } from "react";
 import { Spinner } from "../components/Spinner";
+import { ConnectionErrorBanner } from "../components/ConnectionErrorBanner";
 import { createPortal } from "react-dom";
 import { useAuth } from "@clerk/clerk-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -6045,16 +6046,7 @@ export default function ExpedienteList() {
       <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
         <FolderOpen size={20} className="text-rose-600" /> Gestión de Expedientes
       </h1>
-      <div className="flex items-center gap-3 p-5 bg-rose-50 border border-rose-200 rounded-xl text-rose-700">
-        <AlertCircle size={20} className="shrink-0" />
-        <div className="flex-1">
-          <p className="font-bold text-sm">Error de conexión con el backend</p>
-          <p className="text-xs mt-0.5 font-mono">{error}</p>
-        </div>
-        <button onClick={() => fetchExpedientes()} className="flex items-center gap-2 text-xs font-bold px-3 py-1.5 bg-rose-600 text-white rounded-lg hover:bg-rose-700">
-          <RefreshCw size={12} /> Reintentar
-        </button>
-      </div>
+      <ConnectionErrorBanner error={error} onRetry={() => fetchExpedientes()} title="No se han podido cargar los expedientes" />
     </div>
   );
 
