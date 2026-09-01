@@ -1687,6 +1687,48 @@ export async function runMigrations(): Promise<void> {
       `);
     } catch (_e: any) {}
 
+    // ── Fase 2 de multi-organización: Agenda, Tareas y Directorio ────
+    // Igual que Clientes/Expedientes en su momento (Fase 1) y el Chat interno
+    // más tarde: columna nullable, backfill a la organización más antigua
+    // (la sembrada), y SET NOT NULL. Antes de esto, agenda_events,
+    // client_tasks y directorio_profesionales eran un único cajón global
+    // compartido por todas las organizaciones a la vez -- cualquiera con
+    // acceso al módulo veía los eventos/tareas/contactos de TODAS.
+    for (const [table, col] of [
+      ['agenda_events', 'organizacion_id'],
+      ['client_tasks', 'organizacion_id'],
+      ['directorio_profesionales', 'organizacion_id'],
+    ] as [string, string][]) {
+      try {
+        await client.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS ${col} UUID REFERENCES organizaciones(id);`);
+        await client.query(`
+          UPDATE ${table} SET ${col} = (SELECT id FROM organizaciones ORDER BY created_at ASC LIMIT 1)
+          WHERE ${col} IS NULL
+        `);
+        await client.query(`ALTER TABLE ${table} ALTER COLUMN ${col} SET NOT NULL;`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_${table}_organizacion_id ON ${table} (${col});`);
+      } catch (_e: any) {}
+    }
+
+    // whatsapp_messages: distinto patrón a propósito -- un mensaje de
+    // WhatsApp no lo crea nadie "dentro" de una organización, llega de un
+    // número de teléfono que puede o no estar ya vinculado a un cliente. Se
+    // backfillea a partir de la organización del cliente vinculado
+    // (client_id -> entities.organizacion_id) cuando existe; los mensajes de
+    // números todavía sin vincular a ningún cliente se quedan con
+    // organizacion_id NULL a propósito (no hay forma de saber de cuál son
+    // hasta que alguien los vincula) y siguen siendo visibles para
+    // cualquier organización hasta entonces -- mejor visibles de más que
+    // perdidos para siempre en un cajón que nadie mira.
+    try {
+      await client.query(`ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS organizacion_id UUID REFERENCES organizaciones(id);`);
+      await client.query(`
+        UPDATE whatsapp_messages m SET organizacion_id = e.organizacion_id
+        FROM entities e WHERE m.client_id = e.id AND m.organizacion_id IS NULL
+      `);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_whatsapp_messages_organizacion_id ON whatsapp_messages (organizacion_id);`);
+    } catch (_e: any) {}
+
     // entities: columna organizacion_id + backfill a la organización sembrada
     try {
       await client.query(`ALTER TABLE entities ADD COLUMN IF NOT EXISTS organizacion_id UUID REFERENCES organizaciones(id);`);

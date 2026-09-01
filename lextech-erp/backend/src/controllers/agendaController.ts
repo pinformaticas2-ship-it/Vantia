@@ -81,9 +81,9 @@ export const getEvents = async (req: any, res: Response) => {
     const status = (req.query.status as string) || '';
     const type = (req.query.type as string) || '';
 
-    const conds: string[] = [`user_id = $1`];
-    const vals: any[] = [userId];
-    let p = 2;
+    const conds: string[] = [`user_id = $1`, `organizacion_id = $2`];
+    const vals: any[] = [userId, req.organizacionId];
+    let p = 3;
 
     if (from) { conds.push(`start_at >= $${p}`); vals.push(from); p += 1; }
     if (to) { conds.push(`start_at <= $${p}`); vals.push(to); p += 1; }
@@ -110,10 +110,10 @@ export const getUpcomingEvents = async (req: any, res: Response) => {
     const limit = Math.min(parseInt((req.query.limit as string) || '10', 10), 50);
     const result = await pool.query(
       `SELECT * FROM agenda_events
-       WHERE user_id = $1 AND start_at >= NOW() AND status != 'cancelado'
+       WHERE user_id = $1 AND organizacion_id = $2 AND start_at >= NOW() AND status != 'cancelado'
        ORDER BY start_at ASC
-       LIMIT $2`,
-      [userId, limit]
+       LIMIT $3`,
+      [userId, req.organizacionId, limit]
     );
     res.json({ success: true, data: result.rows });
   } catch (error: any) {
@@ -122,7 +122,7 @@ export const getUpcomingEvents = async (req: any, res: Response) => {
   }
 };
 
-export const getOrganizationOptions = async (_req: any, res: Response) => {
+export const getOrganizationOptions = async (req: any, res: Response) => {
   try {
     const [expedientesRes, linksRes] = await Promise.all([
       pool.query(
@@ -140,21 +140,25 @@ export const getOrganizationOptions = async (_req: any, res: Response) => {
            ) AS cliente_nombre
          FROM expedientes e
          LEFT JOIN entities ent ON ent.id = e.cliente_id
+         WHERE e.organizacion_id = $1
          ORDER BY e.updated_at DESC NULLS LAST, e.created_at DESC NULLS LAST
-         LIMIT 500`
+         LIMIT 500`,
+        [req.organizacionId]
       ),
       pool.query(
         `SELECT DISTINCT expediente_id, user_id, user_name
          FROM (
            SELECT expediente_id, user_id, user_name
            FROM agenda_events
-           WHERE expediente_id IS NOT NULL
+           WHERE expediente_id IS NOT NULL AND organizacion_id = $1
            UNION
-           SELECT entity_id::uuid AS expediente_id, user_id, user_name
-           FROM activity_log
-           WHERE entity_type = 'EXPEDIENTE' AND entity_id IS NOT NULL
+           SELECT al.entity_id::uuid AS expediente_id, al.user_id, al.user_name
+           FROM activity_log al
+           JOIN expedientes ex ON ex.id = al.entity_id::uuid
+           WHERE al.entity_type = 'EXPEDIENTE' AND al.entity_id IS NOT NULL AND ex.organizacion_id = $1
          ) rel
-         WHERE expediente_id IS NOT NULL AND user_id IS NOT NULL`
+         WHERE expediente_id IS NOT NULL AND user_id IS NOT NULL`,
+        [req.organizacionId]
       ),
     ]);
 
@@ -189,8 +193,8 @@ export const getEventById = async (req: any, res: Response) => {
   const { id } = req.params;
   try {
     const result = await pool.query(
-      `SELECT * FROM agenda_events WHERE id = $1`,
-      [id]
+      `SELECT * FROM agenda_events WHERE id = $1 AND organizacion_id = $2`,
+      [id, req.organizacionId]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Evento no encontrado' });
@@ -224,8 +228,8 @@ export const createEvent = async (req: any, res: Response) => {
       `INSERT INTO agenda_events
          (user_id, user_name, title, description, start_at, end_at, all_day,
           type, status, expediente_id, cliente_id, related_user_id, related_user_name, organization_context, location, color,
-          source, external_provider, external_id, external_url, meet_url, guests, task_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+          source, external_provider, external_id, external_url, meet_url, guests, task_id, organizacion_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
        RETURNING *`,
       [
         userId,
@@ -251,6 +255,7 @@ export const createEvent = async (req: any, res: Response) => {
         sanitizeText(meet_url),
         sanitizeGuests(guests),
         null,
+        req.organizacionId,
       ]
     );
     const createdEvent = result.rows[0];
@@ -265,8 +270,8 @@ export const createEvent = async (req: any, res: Response) => {
       const taskRes = await pool.query(
         `INSERT INTO client_tasks
            (client_id, client_name, titulo, descripcion, plazo, fecha_aviso, estado, prioridad,
-            expediente, expediente_id, tipo, notas, created_by, user_id, agenda_event_id)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+            expediente, expediente_id, tipo, notas, created_by, user_id, agenda_event_id, organizacion_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
          RETURNING *`,
         [
           createdEvent.cliente_id,
@@ -284,6 +289,7 @@ export const createEvent = async (req: any, res: Response) => {
           userName,
           userId,
           createdEvent.id,
+          req.organizacionId,
         ]
       );
       createdEvent.task_id = taskRes.rows[0].id;
@@ -314,7 +320,7 @@ export const updateEvent = async (req: any, res: Response) => {
   }
 
   try {
-    const existingQ = await pool.query(`SELECT * FROM agenda_events WHERE id = $1`, [id]);
+    const existingQ = await pool.query(`SELECT * FROM agenda_events WHERE id = $1 AND organizacion_id = $2`, [id, req.organizacionId]);
     if (existingQ.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Evento no encontrado' });
     }
@@ -343,7 +349,7 @@ export const updateEvent = async (req: any, res: Response) => {
          meet_url = COALESCE($19, meet_url),
          guests = $20,
          updated_at = NOW()
-       WHERE id = $21
+       WHERE id = $21 AND organizacion_id = $22
        RETURNING *`,
       [
         sanitizeTitle(title),
@@ -367,6 +373,7 @@ export const updateEvent = async (req: any, res: Response) => {
         sanitizeText(meet_url),
         sanitizeGuests(guests),
         id,
+        req.organizacionId,
       ]
     );
     const updatedEvent = result.rows[0];
@@ -409,8 +416,8 @@ export const updateEvent = async (req: any, res: Response) => {
       const taskRes = await pool.query(
         `INSERT INTO client_tasks
            (client_id, client_name, titulo, descripcion, plazo, fecha_aviso, estado, prioridad,
-            expediente, expediente_id, tipo, notas, created_by, user_id, agenda_event_id)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+            expediente, expediente_id, tipo, notas, created_by, user_id, agenda_event_id, organizacion_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
          RETURNING *`,
         [
           updatedEvent.cliente_id,
@@ -428,6 +435,7 @@ export const updateEvent = async (req: any, res: Response) => {
           updatedEvent.user_name || 'Sistema',
           updatedEvent.user_id || 'SYSTEM',
           updatedEvent.id,
+          req.organizacionId,
         ]
       );
       updatedEvent.task_id = taskRes.rows[0].id;
@@ -449,15 +457,15 @@ export const updateEvent = async (req: any, res: Response) => {
 export const deleteEvent = async (req: any, res: Response) => {
   const { id } = req.params;
   try {
-    const existing = await pool.query(`SELECT title, task_id FROM agenda_events WHERE id = $1`, [id]);
+    const existing = await pool.query(`SELECT title, task_id FROM agenda_events WHERE id = $1 AND organizacion_id = $2`, [id, req.organizacionId]);
     if (existing.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Evento no encontrado' });
     }
 
     if (existing.rows[0].task_id) {
-      await pool.query(`DELETE FROM client_tasks WHERE id = $1`, [existing.rows[0].task_id]);
+      await pool.query(`DELETE FROM client_tasks WHERE id = $1 AND organizacion_id = $2`, [existing.rows[0].task_id, req.organizacionId]);
     }
-    await pool.query(`DELETE FROM agenda_events WHERE id = $1`, [id]);
+    await pool.query(`DELETE FROM agenda_events WHERE id = $1 AND organizacion_id = $2`, [id, req.organizacionId]);
     await logActivityForReq(req, 'Evento agenda eliminado', 'AGENDA', id, existing.rows[0].title);
     res.json({ success: true });
   } catch (error: any) {
@@ -496,9 +504,9 @@ export const importGoogleEvents = async (req: any, res: Response) => {
     try {
       const existing = await pool.query(
         `SELECT * FROM agenda_events
-         WHERE external_provider = 'google' AND external_id = $1
+         WHERE external_provider = 'google' AND external_id = $1 AND organizacion_id = $2
          LIMIT 1`,
-        [event.externalId]
+        [event.externalId, req.organizacionId]
       );
 
       if (existing.rows.length > 0) {
@@ -510,8 +518,8 @@ export const importGoogleEvents = async (req: any, res: Response) => {
         `INSERT INTO agenda_events
            (user_id, user_name, title, description, start_at, end_at, all_day,
             type, status, expediente_id, cliente_id, location, color,
-            source, external_provider, external_id, external_url, meet_url)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+            source, external_provider, external_id, external_url, meet_url, organizacion_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
          RETURNING *`,
         [
           userId,
@@ -532,6 +540,7 @@ export const importGoogleEvents = async (req: any, res: Response) => {
           event.externalId,
           event.externalUrl,
           event.meetUrl,
+          req.organizacionId,
         ]
       );
 
@@ -598,9 +607,9 @@ export const syncGoogleEvents = async (req: any, res: Response) => {
     try {
       const existing = await pool.query(
         `SELECT * FROM agenda_events
-         WHERE external_provider = 'google' AND external_id = $1
+         WHERE external_provider = 'google' AND external_id = $1 AND organizacion_id = $2
          LIMIT 1`,
-        [event.externalId]
+        [event.externalId, req.organizacionId]
       );
 
       if (existing.rows.length > 0) {
@@ -651,8 +660,8 @@ export const syncGoogleEvents = async (req: any, res: Response) => {
         `INSERT INTO agenda_events
            (user_id, user_name, title, description, start_at, end_at, all_day,
             type, status, expediente_id, cliente_id, location, color,
-            source, external_provider, external_id, external_url, meet_url)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+            source, external_provider, external_id, external_url, meet_url, organizacion_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
          RETURNING *`,
         [
           userId,
@@ -673,6 +682,7 @@ export const syncGoogleEvents = async (req: any, res: Response) => {
           event.externalId,
           event.externalUrl,
           event.meetUrl,
+          req.organizacionId,
         ]
       );
       created.push(result.rows[0]);
@@ -691,9 +701,10 @@ export const syncGoogleEvents = async (req: any, res: Response) => {
        FROM agenda_events
        WHERE external_provider = 'google'
          AND user_id = $3
+         AND organizacion_id = $4
          AND start_at >= $1
          AND start_at <= $2`,
-      [from, to, userId]
+      [from, to, userId, req.organizacionId]
     );
 
     for (const row of existingInRange.rows) {

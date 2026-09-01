@@ -40,8 +40,8 @@ export const getProfesionales = async (req: any, res: Response) => {
   const q = String(req.query.q || '').trim();
 
   try {
-    const conds = ['tipo = $1'];
-    const vals: any[] = [tipo];
+    const conds = ['tipo = $1', 'organizacion_id = $2'];
+    const vals: any[] = [tipo, req.organizacionId];
     if (q) {
       vals.push(`%${q}%`);
       conds.push(`(
@@ -67,7 +67,7 @@ export const getProfesionales = async (req: any, res: Response) => {
 
 export const getProfesionalById = async (req: any, res: Response) => {
   try {
-    const { rows } = await pool.query(`SELECT * FROM directorio_profesionales WHERE id = $1`, [req.params.id]);
+    const { rows } = await pool.query(`SELECT * FROM directorio_profesionales WHERE id = $1 AND organizacion_id = $2`, [req.params.id, req.organizacionId]);
     if (!rows.length) return res.status(404).json({ success: false, error: 'No encontrado' });
     res.json({ success: true, data: rows[0] });
   } catch (e: any) {
@@ -91,8 +91,8 @@ export const createProfesional = async (req: any, res: Response) => {
   const turnoOficio = req.body?.turno_oficio === true || req.body?.turno_oficio === 'true';
   const estado = normalizeEstado(req.body?.estado);
 
-  const cols = ['tipo', 'first_name', 'created_by', 'turno_oficio', 'estado', ...TEXT_FIELDS];
-  const vals: any[] = [tipo, firstName, userId, turnoOficio, estado, ...TEXT_FIELDS.map(f => fields[f])];
+  const cols = ['tipo', 'first_name', 'created_by', 'turno_oficio', 'estado', 'organizacion_id', ...TEXT_FIELDS];
+  const vals: any[] = [tipo, firstName, userId, turnoOficio, estado, req.organizacionId, ...TEXT_FIELDS.map(f => fields[f])];
   const placeholders = cols.map((_, i) => `$${i + 1}`).join(',');
 
   try {
@@ -124,9 +124,9 @@ export const updateProfesional = async (req: any, res: Response) => {
   try {
     const { rows } = await pool.query(
       `UPDATE directorio_profesionales SET ${setClause}, updated_at = NOW()
-       WHERE id = $${setCols.length + 1}
+       WHERE id = $${setCols.length + 1} AND organizacion_id = $${setCols.length + 2}
        RETURNING *`,
-      [...vals, req.params.id]
+      [...vals, req.params.id, req.organizacionId]
     );
     if (!rows.length) return res.status(404).json({ success: false, error: 'No encontrado' });
     const p = rows[0];
@@ -139,7 +139,7 @@ export const updateProfesional = async (req: any, res: Response) => {
 
 export const deleteProfesional = async (req: any, res: Response) => {
   try {
-    const { rows } = await pool.query(`DELETE FROM directorio_profesionales WHERE id = $1 RETURNING *`, [req.params.id]);
+    const { rows } = await pool.query(`DELETE FROM directorio_profesionales WHERE id = $1 AND organizacion_id = $2 RETURNING *`, [req.params.id, req.organizacionId]);
     if (!rows.length) return res.status(404).json({ success: false, error: 'No encontrado' });
     const p = rows[0];
     logActivityForReq(req, `${LABELS[p.tipo] || p.tipo} eliminado: ${p.first_name} ${p.last_name || ''}`.trim(), 'DIRECTORIO', p.id, undefined, 'DELETE');
