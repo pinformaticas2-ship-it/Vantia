@@ -729,7 +729,7 @@ function VantiaWidget({ pathname, getToken }: { pathname: string; getToken: (opt
                   onChange={(e) => { setInput(e.target.value); autoResize(e.target); }}
                   onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
                   placeholder="Escribe tu consulta..."
-                  className="w-full bg-transparent text-[13px] text-slate-800 placeholder-slate-400 px-4 py-3 focus:outline-none resize-none overflow-hidden"
+                  className="w-full bg-transparent text-[13px] text-slate-800 placeholder-slate-400 px-4 py-3 focus:outline-none focus:shadow-none resize-none overflow-hidden"
                   style={{ minHeight: "44px", maxHeight: "100px" }}
                 />
               </div>
