@@ -4005,10 +4005,25 @@ export default function ClientDetail() {
       const res = await fetch(`/api/entities/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify(editForm),
+        body: JSON.stringify({ ...editForm, expectedUpdatedAt: client?.updated_at }),
       });
       const d = await safeJson(res);
-      if (!res.ok) { alert(d.error || "Error al guardar"); return; }
+      if (!res.ok) {
+        // Si alguien más guardó un cambio mientras este cliente estaba abierto en
+        // edición, el backend responde 409 con conflict:true en vez de
+        // sobreescribir en silencio -- se ofrece recargar en vez de un simple
+        // "error al guardar" que no explica qué pasó.
+        if (res.status === 409 && d.conflict) {
+          if (window.confirm(`${d.error}\n\n¿Recargar el cliente ahora? Perderás los cambios que no hayas guardado.`)) {
+            setEditing(false);
+            setEditForm(null);
+            await fetchClient();
+          }
+          return;
+        }
+        alert(d.error || "Error al guardar");
+        return;
+      }
       setEditing(false);
       setEditForm(null);
       await fetchClient();

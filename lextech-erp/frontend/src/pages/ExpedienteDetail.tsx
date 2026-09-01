@@ -5578,6 +5578,18 @@ export default function ExpedienteDetail() {
     setSearchParams(next, { replace: true });
   }, [exp]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Si el guardado choca (alguien más lo cambió mientras esto estaba abierto,
+  // ver expectedUpdatedAt más abajo), el backend responde 409 con
+  // conflict:true en vez de sobreescribir en silencio -- se ofrece recargar
+  // en vez de un simple "error al guardar" que no explica qué pasó.
+  const handleConflict = async (d: any): Promise<boolean> => {
+    if (window.confirm(`${d.error}\n\n¿Recargar el expediente ahora? Perderás los cambios que no hayas guardado.`)) {
+      setEditing(false);
+      await fetchExp();
+    }
+    return false;
+  };
+
   const handleSave = async (form: typeof EXP_EMPTY) => {
     setSaving(true);
     try {
@@ -5585,10 +5597,11 @@ export default function ExpedienteDetail() {
       const res = await fetch(`/api/expedientes/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ ...exp, ...form }),
+        body: JSON.stringify({ ...exp, ...form, expectedUpdatedAt: exp?.updated_at }),
       });
       const d = await safeJson(res);
       if (!res.ok) {
+        if (res.status === 409 && d.conflict) { await handleConflict(d); return; }
         alert(d.error || "Error al guardar");
         return;
       }
@@ -5606,10 +5619,14 @@ export default function ExpedienteDetail() {
     const res = await fetch(`/api/expedientes/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ ...exp, ...fields }),
+      body: JSON.stringify({ ...exp, ...fields, expectedUpdatedAt: exp?.updated_at }),
     });
     const d = await safeJson(res);
-    if (!res.ok) { alert(d.error || "Error al guardar"); return false; }
+    if (!res.ok) {
+      if (res.status === 409 && d.conflict) return await handleConflict(d);
+      alert(d.error || "Error al guardar");
+      return false;
+    }
     await fetchExp();
     return true;
   };

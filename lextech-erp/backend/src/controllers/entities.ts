@@ -426,11 +426,28 @@ export const updateEntity = async (req: any, res: Response) => {
     photo_url,
   } = req.body;
 
+  const { expectedUpdatedAt } = req.body;
   const safeBirthDate = nullIfEmpty(birth_date);
   const safeDateAlta  = nullIfEmpty(date_alta);
   const safeDateBaja  = nullIfEmpty(date_baja);
 
   try {
+    // Aviso de choque: si el frontend manda expectedUpdatedAt (el updated_at
+    // que tenía cargado en pantalla) y ya no coincide con el actual, alguien
+    // más guardó un cambio mientras este usuario editaba -- se rechaza el
+    // guardado en vez de sobreescribirlo en silencio. Opcional: si no se
+    // manda, se comporta como antes.
+    if (expectedUpdatedAt) {
+      const current = await pool.query(`SELECT updated_at FROM entities WHERE id = $1 AND organizacion_id = $2`, [id, req.organizacionId]);
+      if (current.rows.length && new Date(expectedUpdatedAt).getTime() !== new Date(current.rows[0].updated_at).getTime()) {
+        return res.status(409).json({
+          success: false,
+          conflict: true,
+          error: 'Este cliente se modificó mientras lo tenías abierto. Recarga para ver los cambios antes de guardar.',
+        });
+      }
+    }
+
     const result = await pool.query(`
       UPDATE entities SET
         type                     = $1,

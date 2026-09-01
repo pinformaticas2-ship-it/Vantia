@@ -727,6 +727,23 @@ export const updateExpediente = async (req: any, res: Response) => {
   try {
     const beforeR = await pool.query(`SELECT * FROM expedientes WHERE id=$1 AND organizacion_id=$2`, [req.params.id, req.organizacionId]);
     const before = beforeR.rows[0] || null;
+    if (!before) return res.status(404).json({ error: 'Expediente no encontrado' });
+
+    // Aviso de choque: si el frontend manda expectedUpdatedAt (el updated_at
+    // que tenía cargado en pantalla) y ya no coincide con el actual, alguien
+    // más guardó un cambio mientras este usuario editaba -- se rechaza el
+    // guardado en vez de sobreescribirlo en silencio. Es opcional (si no se
+    // manda, se comporta como antes) para no romper otros sitios que llamen
+    // a este endpoint sin pasar por el formulario de edición.
+    const expectedUpdatedAt = body.expectedUpdatedAt;
+    if (expectedUpdatedAt && before.updated_at &&
+        new Date(expectedUpdatedAt).getTime() !== new Date(before.updated_at).getTime()) {
+      return res.status(409).json({
+        error: 'Este expediente se modificó mientras lo tenías abierto. Recarga para ver los cambios antes de guardar.',
+        conflict: true,
+        current: before,
+      });
+    }
 
     // Actualización parcial: cualquier campo que el cliente NO mande en el body
     // (p.ej. un "cambiar estado" en bloque que solo envía {estado}) conserva su
