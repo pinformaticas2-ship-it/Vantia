@@ -7,7 +7,7 @@ import { createPortal } from "react-dom";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Briefcase, Users, Settings,
-  Menu, Search, X, Bell, ShieldCheck, Calendar,
+  Menu, Search, X, Bell, Calendar,
   MessageCircle, Bot, Send, ChevronRight, ChevronLeft, Loader2, History, CheckCircle2,
   MessageSquare, LogOut, Mail, Library, Receipt, Sparkles, ChevronsUpDown,
   MoreVertical, RotateCcw, Copy, Check, Crown,
@@ -721,7 +721,7 @@ function VantiaWidget({ pathname, getToken }: { pathname: string; getToken: (opt
           {/* Footer / Input */}
           <div className="bg-white px-4 py-4 border-t border-slate-200/80 shrink-0 shadow-[0_-4px_10px_rgba(0,0,0,0.02)]">
             <div className="flex items-end gap-3">
-              <div className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl transition-all duration-150 focus-within:border-red-300 focus-within:ring-4 focus-within:ring-red-100 focus-within:bg-white shadow-sm">
+              <div className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl transition-all duration-150 focus-within:border-red-300 focus-within:ring-1 focus-within:ring-red-200 focus-within:bg-white shadow-sm">
                 <textarea
                   ref={textareaRef}
                   rows={1}
@@ -1565,23 +1565,6 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
                 <LogOut size={14} />
               </button>
             )}
-          </div>
-        )}
-      </div>
-
-      {/* Badge seguridad */}
-      <div className={`transition-all duration-300 ${collapsed ? "px-2 pb-4 flex justify-center" : "px-4 pb-4"}`}>
-        {collapsed ? (
-          <ShieldCheck className="h-5 w-5 text-emerald-500" />
-        ) : (
-          <div className="flex items-center gap-2.5 rounded-lg border border-slate-700/50 bg-slate-800/40 px-3 py-2.5">
-            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-emerald-500/10">
-              <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-[10px] font-bold uppercase tracking-tighter text-slate-300">Conexión segura</p>
-              <p className="truncate text-[9px] text-slate-500">VANTIA Legis ERP</p>
-            </div>
           </div>
         )}
       </div>
