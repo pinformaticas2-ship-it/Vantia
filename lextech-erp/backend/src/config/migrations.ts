@@ -758,6 +758,40 @@ export async function runMigrations(): Promise<void> {
       ON CONFLICT (nombre) DO NOTHING;
     `);
 
+    // task_etapas: fase 2 de multi-organización -- las columnas del kanban de
+    // Tareas pasan a ser por organización (antes eran una única lista
+    // global). Se cambia el UNIQUE(nombre) por UNIQUE(organizacion_id,
+    // nombre) para que dos despachos puedan tener una etapa con el mismo
+    // nombre sin chocar.
+    try {
+      await client.query(`ALTER TABLE task_etapas ADD COLUMN IF NOT EXISTS organizacion_id UUID REFERENCES organizaciones(id);`);
+      await client.query(`
+        UPDATE task_etapas SET organizacion_id = (SELECT id FROM organizaciones ORDER BY created_at ASC LIMIT 1)
+        WHERE organizacion_id IS NULL
+      `);
+      await client.query(`ALTER TABLE task_etapas ALTER COLUMN organizacion_id SET NOT NULL;`);
+      await client.query(`ALTER TABLE task_etapas DROP CONSTRAINT IF EXISTS task_etapas_nombre_key;`);
+      await client.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_task_etapas_org_nombre
+          ON task_etapas (organizacion_id, nombre);
+      `);
+      // Las organizaciones que no eran la sembrada se quedan sin ninguna
+      // etapa tras el reparto de arriba -- se les copia el mismo juego de
+      // etapas por defecto para que su kanban no aparezca vacío.
+      const { rows: orgsSinEtapas } = await client.query(`
+        SELECT o.id FROM organizaciones o
+        WHERE NOT EXISTS (SELECT 1 FROM task_etapas t WHERE t.organizacion_id = o.id)
+      `);
+      for (const org of orgsSinEtapas) {
+        await client.query(`
+          INSERT INTO task_etapas (nombre, orden, organizacion_id)
+          SELECT nombre, orden, $1 FROM task_etapas
+          WHERE organizacion_id = (SELECT id FROM organizaciones ORDER BY created_at ASC LIMIT 1)
+          ON CONFLICT (organizacion_id, nombre) DO NOTHING
+        `, [org.id]);
+      }
+    } catch (_e: any) {}
+
     // ── Tabla agenda_events ───────────────────────────────────────────────────
     await client.query(`
       CREATE TABLE IF NOT EXISTS agenda_events (

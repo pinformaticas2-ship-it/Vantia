@@ -138,11 +138,11 @@ export const getTasks = async (req: any, res: Response) => {
   const { clientId } = req.params;
   try {
     const result = await pool.query(
-      `SELECT * FROM client_tasks WHERE client_id = $1 ORDER BY
+      `SELECT * FROM client_tasks WHERE client_id = $1 AND organizacion_id = $2 ORDER BY
         CASE estado WHEN 'urgente' THEN 0 WHEN 'pendiente' THEN 1 ELSE 2 END,
         plazo ASC NULLS LAST,
         created_at DESC`,
-      [clientId]
+      [clientId, req.organizacionId]
     );
     res.json({ data: result.rows });
   } catch (e: any) {
@@ -162,12 +162,12 @@ export const getMyTasks = async (req: any, res: Response) => {
        FROM client_tasks ct
        LEFT JOIN entities e ON e.id = ct.client_id
        LEFT JOIN agenda_events ag ON ag.id = ct.agenda_event_id
-       WHERE ct.user_id = $1
+       WHERE ct.user_id = $1 AND ct.organizacion_id = $2
        ORDER BY
          CASE ct.estado WHEN 'urgente' THEN 0 WHEN 'pendiente' THEN 1 ELSE 2 END,
          ct.plazo ASC NULLS LAST,
          ct.created_at DESC`,
-      [userId]
+      [userId, req.organizacionId]
     );
     res.json({ data: result.rows });
   } catch (e: any) {
@@ -188,16 +188,16 @@ export const createTask = async (req: any, res: Response) => {
   try {
     // Obtener nombre del cliente para guardarlo en la tarea
     const clientRow = await pool.query(
-      `SELECT COALESCE(commercial_name, first_name || ' ' || COALESCE(last_name,'')) AS name FROM entities WHERE id = $1`,
-      [clientId]
+      `SELECT COALESCE(commercial_name, first_name || ' ' || COALESCE(last_name,'')) AS name FROM entities WHERE id = $1 AND organizacion_id = $2`,
+      [clientId, req.organizacionId]
     );
     const clientName = clientRow.rows[0]?.name || null;
 
     const result = await pool.query(
       `INSERT INTO client_tasks
          (client_id, client_name, titulo, descripcion, plazo, fecha_aviso, estado, prioridad,
-          expediente, expediente_id, tipo, juzgado, num_proc, importe, notas, etapa, created_by, user_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+          expediente, expediente_id, tipo, juzgado, num_proc, importe, notas, etapa, created_by, user_id, organizacion_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
        RETURNING *`,
       [
         clientId, clientName,
@@ -217,6 +217,7 @@ export const createTask = async (req: any, res: Response) => {
         etapa?.trim() || null,
         userName,
         userId,
+        req.organizacionId,
       ]
     );
     const createdTask = result.rows[0];
@@ -229,8 +230,8 @@ export const createTask = async (req: any, res: Response) => {
         const agendaRes = await pool.query(
           `INSERT INTO agenda_events
              (user_id, user_name, title, description, start_at, end_at, all_day,
-              type, status, expediente_id, cliente_id, organization_context, source, task_id)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+              type, status, expediente_id, cliente_id, organization_context, source, task_id, organizacion_id)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
            RETURNING *`,
           [
             userId,
@@ -247,6 +248,7 @@ export const createTask = async (req: any, res: Response) => {
             agendaPayload.organization_context,
             agendaPayload.source,
             agendaPayload.task_id,
+            req.organizacionId,
           ]
         );
 
@@ -1011,7 +1013,7 @@ export const updateTask = async (req: any, res: Response) => {
   const { titulo, descripcion, plazo, fecha_aviso, estado, prioridad, expediente, tipo, juzgado, num_proc, importe, notas, etapa } = req.body;
 
   try {
-    const existingQ = await pool.query(`SELECT * FROM client_tasks WHERE id = $1`, [id]);
+    const existingQ = await pool.query(`SELECT * FROM client_tasks WHERE id = $1 AND organizacion_id = $2`, [id, req.organizacionId]);
     if (existingQ.rows.length === 0) return res.status(404).json({ error: 'Tarea no encontrada' });
     const existingTask = existingQ.rows[0];
     const userId = req.auth?.userId || existingTask.user_id || 'SYSTEM';
@@ -1022,7 +1024,7 @@ export const updateTask = async (req: any, res: Response) => {
        SET titulo=$1, descripcion=$2, plazo=$3, fecha_aviso=$4, estado=$5, prioridad=$6,
            expediente=$7, tipo=$8, juzgado=$9, num_proc=$10,
            importe=$11, notas=$12, etapa=$13, updated_at=NOW()
-       WHERE id=$14
+       WHERE id=$14 AND organizacion_id=$15
        RETURNING *`,
       [
         titulo?.trim(),
@@ -1039,6 +1041,7 @@ export const updateTask = async (req: any, res: Response) => {
         notas?.trim() || null,
         etapa?.trim() || null,
         id,
+        req.organizacionId,
       ]
     );
     const updatedTask = result.rows[0];
@@ -1073,8 +1076,8 @@ export const updateTask = async (req: any, res: Response) => {
         const agendaRes = await pool.query(
           `INSERT INTO agenda_events
              (user_id, user_name, title, description, start_at, end_at, all_day,
-              type, status, expediente_id, cliente_id, organization_context, source, task_id)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+              type, status, expediente_id, cliente_id, organization_context, source, task_id, organizacion_id)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
            RETURNING *`,
           [
             userId,
@@ -1091,6 +1094,7 @@ export const updateTask = async (req: any, res: Response) => {
             agendaPayload.organization_context,
             agendaPayload.source,
             agendaPayload.task_id,
+            req.organizacionId,
           ]
         );
         updatedTask.agenda_event_id = agendaRes.rows[0].id;
@@ -1126,8 +1130,8 @@ export const patchTaskEstado = async (req: any, res: Response) => {
   }
   try {
     const result = await pool.query(
-      `UPDATE client_tasks SET estado=$1, updated_at=NOW() WHERE id=$2 RETURNING *`,
-      [estado, id]
+      `UPDATE client_tasks SET estado=$1, updated_at=NOW() WHERE id=$2 AND organizacion_id=$3 RETURNING *`,
+      [estado, id, req.organizacionId]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Tarea no encontrada' });
     const updatedTask = result.rows[0];
@@ -1149,8 +1153,8 @@ export const patchTaskEstado = async (req: any, res: Response) => {
 export const deleteTask = async (req: any, res: Response) => {
   const { id } = req.params;
   try {
-    const beforeDelete = await pool.query(`SELECT agenda_event_id FROM client_tasks WHERE id = $1`, [id]);
-    const { rows } = await pool.query(`DELETE FROM client_tasks WHERE id=$1 RETURNING titulo, client_id`, [id]);
+    const beforeDelete = await pool.query(`SELECT agenda_event_id FROM client_tasks WHERE id = $1 AND organizacion_id = $2`, [id, req.organizacionId]);
+    const { rows } = await pool.query(`DELETE FROM client_tasks WHERE id=$1 AND organizacion_id=$2 RETURNING titulo, client_id`, [id, req.organizacionId]);
     if (rows.length === 0) return res.status(404).json({ error: 'Tarea no encontrada' });
     const agendaEventId = beforeDelete.rows[0]?.agenda_event_id;
     if (agendaEventId) {
@@ -1176,8 +1180,8 @@ export const getIndicators = async (req: any, res: Response) => {
         COUNT(*) FILTER (WHERE estado = 'urgente')                         AS tareas_urgentes,
         COUNT(*) FILTER (WHERE estado != 'completada' AND plazo < CURRENT_DATE) AS tareas_vencidas,
         COUNT(*) FILTER (WHERE estado = 'completada')                      AS tareas_completadas
-       FROM client_tasks WHERE client_id = $1`,
-      [clientId]
+       FROM client_tasks WHERE client_id = $1 AND organizacion_id = $2`,
+      [clientId, req.organizacionId]
     );
 
     // Archivos
@@ -1261,8 +1265,8 @@ export const getExpedienteIndicators = async (req: any, res: Response) => {
           COUNT(*) FILTER (WHERE estado = 'urgente')                         AS tareas_urgentes,
           COUNT(*) FILTER (WHERE estado != 'completada' AND plazo < CURRENT_DATE) AS tareas_vencidas,
           COUNT(*) FILTER (WHERE estado = 'completada')                      AS tareas_completadas
-         FROM client_tasks WHERE expediente_id = $1`,
-        [expedienteId],
+         FROM client_tasks WHERE expediente_id = $1 AND organizacion_id = $2`,
+        [expedienteId, req.organizacionId],
       ),
       pool.query(
         `SELECT COUNT(*) AS total_archivos FROM client_files WHERE client_id = $1`,
@@ -1335,10 +1339,11 @@ export const getExpedienteIndicators = async (req: any, res: Response) => {
 };
 
 // ── GET /api/tasks/etapas ── lista de etapas disponibles ───────
-export const getEtapas = async (_req: any, res: Response) => {
+export const getEtapas = async (req: any, res: Response) => {
   try {
     const result = await pool.query(
-      `SELECT id, nombre, orden FROM task_etapas ORDER BY orden ASC, nombre ASC`
+      `SELECT id, nombre, orden FROM task_etapas WHERE organizacion_id = $1 ORDER BY orden ASC, nombre ASC`,
+      [req.organizacionId]
     );
     res.json({ data: result.rows });
   } catch (e: any) {
@@ -1352,13 +1357,13 @@ export const createEtapa = async (req: any, res: Response) => {
   if (!nombre?.trim()) return res.status(400).json({ error: 'El nombre es obligatorio' });
   try {
     // Obtener el orden máximo actual
-    const maxRes = await pool.query(`SELECT COALESCE(MAX(orden),0) AS max FROM task_etapas`);
+    const maxRes = await pool.query(`SELECT COALESCE(MAX(orden),0) AS max FROM task_etapas WHERE organizacion_id = $1`, [req.organizacionId]);
     const nextOrden = Number(maxRes.rows[0].max) + 1;
     const result = await pool.query(
-      `INSERT INTO task_etapas (nombre, orden) VALUES ($1, $2)
-       ON CONFLICT (nombre) DO UPDATE SET nombre = EXCLUDED.nombre
+      `INSERT INTO task_etapas (nombre, orden, organizacion_id) VALUES ($1, $2, $3)
+       ON CONFLICT (organizacion_id, nombre) DO UPDATE SET nombre = EXCLUDED.nombre
        RETURNING *`,
-      [nombre.trim(), nextOrden]
+      [nombre.trim(), nextOrden, req.organizacionId]
     );
     res.status(201).json({ data: result.rows[0] });
   } catch (e: any) {
@@ -1372,16 +1377,16 @@ export const deleteEtapa = async (req: any, res: Response) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const etapaRes = await client.query(`SELECT nombre FROM task_etapas WHERE id = $1`, [id]);
+    const etapaRes = await client.query(`SELECT nombre FROM task_etapas WHERE id = $1 AND organizacion_id = $2`, [id, req.organizacionId]);
     if (etapaRes.rows.length === 0) {
       await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Etapa no encontrada' });
     }
     await client.query(
-      `UPDATE client_tasks SET etapa = NULL, updated_at = NOW() WHERE etapa = $1`,
-      [etapaRes.rows[0].nombre]
+      `UPDATE client_tasks SET etapa = NULL, updated_at = NOW() WHERE etapa = $1 AND organizacion_id = $2`,
+      [etapaRes.rows[0].nombre, req.organizacionId]
     );
-    await client.query(`DELETE FROM task_etapas WHERE id = $1`, [id]);
+    await client.query(`DELETE FROM task_etapas WHERE id = $1 AND organizacion_id = $2`, [id, req.organizacionId]);
     await client.query('COMMIT');
     res.json({ success: true });
   } catch (e: any) {
@@ -1398,12 +1403,12 @@ export const reorderEtapas = async (req: any, res: Response) => {
   if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'ids es obligatorio' });
   const client = await pool.connect();
   try {
-    await client.query('BEGIN'); 
+    await client.query('BEGIN');
     for (let i = 0; i < ids.length; i++) {
-      await client.query(`UPDATE task_etapas SET orden = $1 WHERE id = $2`, [i, ids[i]]);
+      await client.query(`UPDATE task_etapas SET orden = $1 WHERE id = $2 AND organizacion_id = $3`, [i, ids[i], req.organizacionId]);
     }
     await client.query('COMMIT');
-    const result = await pool.query(`SELECT id, nombre, orden FROM task_etapas ORDER BY orden ASC, nombre ASC`);
+    const result = await pool.query(`SELECT id, nombre, orden FROM task_etapas WHERE organizacion_id = $1 ORDER BY orden ASC, nombre ASC`, [req.organizacionId]);
     res.json({ data: result.rows });
   } catch (e: any) {
     await client.query('ROLLBACK');
