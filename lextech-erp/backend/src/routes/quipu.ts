@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth';
-import { requireAdmin } from '../middleware/requireAdmin';
+import { requireModulePermission } from '../middleware/requireModulePermission';
 import {
   diagnoseQuipu,
   disconnectQuipu,
@@ -38,8 +38,9 @@ import {
 
 const router = Router();
 
-// Quipu es la integración contable de Tesorería -- solo administradores.
-router.use(requireAdmin);
+// Quipu es la integración contable de Tesorería -- misma matriz de permisos
+// que el resto de rutas de facturacion.ts (módulo "facturacion").
+router.use(requireModulePermission('facturacion'));
 
 // ── Configuración ──────────────────────────────────────────────
 router.get('/status',      requireAuth, getQuipuStatus);

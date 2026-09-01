@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth';
-import { requireAdmin } from '../middleware/requireAdmin';
+import { requireModulePermission } from '../middleware/requireModulePermission';
 import {
   createFactura,
   createGasto,
@@ -20,9 +20,11 @@ import {
 
 const router = Router();
 
-// Tesorería es solo para administradores -- se aplica a todas las rutas
-// de este router, además del requireAuth que ya lleva cada una.
-router.use(requireAdmin);
+// Tesorería está sujeta a la matriz de Roles y permisos (por defecto,
+// propietario/admin; miembro y soporte "ninguno", igual que antes) -- se
+// aplica a todas las rutas de este router, además del requireAuth que ya
+// lleva cada una.
+router.use(requireModulePermission('facturacion'));
 
 router.get('/bootstrap', requireAuth, getBillingBootstrap);
 

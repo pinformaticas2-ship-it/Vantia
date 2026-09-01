@@ -8,7 +8,7 @@ export type OrgRol = 'propietario' | 'admin' | 'miembro' | 'soporte';
 // ahí, hay que añadirlo aquí también.
 export type Modulo =
   | 'clientes' | 'expedientes' | 'agenda' | 'tareas' | 'chat'
-  | 'correo' | 'whatsapp' | 'documental' | 'directorio';
+  | 'correo' | 'whatsapp' | 'documental' | 'directorio' | 'facturacion';
 
 export type NivelAcceso = 'ninguno' | 'lectura' | 'edicion';
 

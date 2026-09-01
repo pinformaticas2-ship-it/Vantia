@@ -13,7 +13,7 @@ export type OrgRol = 'propietario' | 'admin' | 'miembro' | 'soporte';
 
 export type Modulo =
   | 'clientes' | 'expedientes' | 'agenda' | 'tareas' | 'chat'
-  | 'correo' | 'whatsapp' | 'documental' | 'directorio';
+  | 'correo' | 'whatsapp' | 'documental' | 'directorio' | 'facturacion';
 
 export type NivelAcceso = 'ninguno' | 'lectura' | 'edicion';
 
@@ -27,6 +27,7 @@ export const MODULOS: { id: Modulo; label: string }[] = [
   { id: 'whatsapp',    label: 'WhatsApp' },
   { id: 'documental',  label: 'Documental' },
   { id: 'directorio',  label: 'Directorio profesional' },
+  { id: 'facturacion', label: 'Tesorería' },
 ];
 
 const ROLES: OrgRol[] = ['propietario', 'admin', 'miembro', 'soporte'];
@@ -37,14 +38,20 @@ export function nivelCubre(nivel: NivelAcceso, requerido: NivelAcceso): boolean 
 }
 
 // Matriz de fábrica. propietario/admin/miembro se quedan exactamente como
-// funcionaba la app hasta ahora (acceso completo a todos estos módulos) --
-// el único comportamiento nuevo por defecto es que "soporte" no ve ninguno
-// de ellos, porque su terreno es Configuración/usuarios/integraciones, no
-// los datos de clientes.
+// funcionaba la app hasta ahora -- salvo Tesorería, que ya era solo para
+// propietario/admin antes de que existiera esta matriz (requireAdmin), así
+// que "miembro" mantiene ese mismo "ninguno" de fábrica; el propietario
+// puede concederle acceso desde Roles y permisos sin tener que ascenderlo a
+// admin de toda la organización. El único comportamiento nuevo por defecto
+// es que "soporte" no ve ninguno de estos módulos, porque su terreno es
+// Configuración/usuarios/integraciones, no los datos de clientes.
 export const DEFAULT_PERMISSIONS: Record<OrgRol, Record<Modulo, NivelAcceso>> = {
   propietario: Object.fromEntries(MODULOS.map((m) => [m.id, 'edicion'])) as Record<Modulo, NivelAcceso>,
   admin:       Object.fromEntries(MODULOS.map((m) => [m.id, 'edicion'])) as Record<Modulo, NivelAcceso>,
-  miembro:     Object.fromEntries(MODULOS.map((m) => [m.id, 'edicion'])) as Record<Modulo, NivelAcceso>,
+  miembro: {
+    ...(Object.fromEntries(MODULOS.map((m) => [m.id, 'edicion'])) as Record<Modulo, NivelAcceso>),
+    facturacion: 'ninguno',
+  },
   // "chat" (el chat interno del equipo, no el de clientes) se deja abierto de
   // fábrica: es la herramienta con la que el soporte técnico habla con el
   // resto del despacho, no tiene el mismo problema de secreto profesional

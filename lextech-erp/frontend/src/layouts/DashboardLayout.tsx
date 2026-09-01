@@ -40,6 +40,17 @@ const NAV_MODULE_MAP: Record<string, Modulo> = {
   WhatsApp: "whatsapp",
   Correo: "correo",
   Documental: "documental",
+  // Todas las pestañas de Tesorería son en realidad la misma página --
+  // comparten el mismo módulo de permisos.
+  "Facturación": "facturacion",
+  "Analítica": "facturacion",
+  "Facturas": "facturacion",
+  "Gastos": "facturacion",
+  "Presupuestos": "facturacion",
+  "Pagos y Cobros": "facturacion",
+  "Contactos": "facturacion",
+  "Cuentas": "facturacion",
+  "Conexión Quipu": "facturacion",
 };
 function moduloForPath(path: string): Modulo | null {
   if (path.startsWith("/dashboard/clientes")) return "clientes";
@@ -52,6 +63,7 @@ function moduloForPath(path: string): Modulo | null {
   if (path.startsWith("/dashboard/whatsapp")) return "whatsapp";
   if (path.startsWith("/dashboard/correo")) return "correo";
   if (path.startsWith("/dashboard/documental")) return "documental";
+  if (path.startsWith("/dashboard/facturacion")) return "facturacion";
   return null;
 }
 
@@ -1072,10 +1084,8 @@ function QuickLinksPanel({ getToken, onClose }: { getToken: () => Promise<string
 // ── Search Dropdown ──────────────────────────────────────────────────────────
 function SearchDropdown({ query, onSelect }: { query: string; onSelect: () => void }) {
   const navigate  = useNavigate();
-  const { rol, puede } = useOrganizacion();
-  const isAdmin   = rol === "propietario" || rol === "admin";
+  const { puede } = useOrganizacion();
   const filtered  = MODULES
-    .filter((m) => isAdmin || !m.path.startsWith("/dashboard/facturacion"))
     .filter((m) => { const mod = moduloForPath(m.path); return !mod || puede(mod); })
     .filter(
       (m) => m.name.toLowerCase().includes(query.toLowerCase()) ||
@@ -1167,9 +1177,6 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
     return () => document.removeEventListener("mousedown", h);
   }, [orgMenuOpen]);
   const currentSearch = search || "";
-  // Tesorería (facturación/Quipu) es solo para propietario/admin -- se oculta
-  // del sidebar para el resto (el backend ya lo bloquea aparte, esto es solo UI).
-  const isAdmin = orgRol === "propietario" || orgRol === "admin";
 
   const isGroupActive = useCallback((item: NavItem) =>
     !!item.children?.some((c) => hrefMatches(pathname, currentSearch, c.href)),
@@ -1353,10 +1360,9 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
           const items = group.items
             .map((name) => NAV_ITEMS.find((item) => item.name === name))
             .filter((item): item is (typeof NAV_ITEMS)[number] => !!item)
-            .filter((item) => item.name !== "Tesorería" || isAdmin)
-            // Poda por la matriz de permisos: un grupo (p.ej. "Directorio")
-            // se queda solo con los hijos a los que el rol tiene acceso, y
-            // desaparece del todo si se queda sin ninguno.
+            // Poda por la matriz de permisos: un grupo (p.ej. "Directorio" o
+            // "Tesorería") se queda solo con los hijos a los que el rol tiene
+            // acceso, y desaparece del todo si se queda sin ninguno.
             .map((item) => item.children
               ? { ...item, children: item.children.filter((c) => { const mod = NAV_MODULE_MAP[c.name]; return !mod || puede(mod); }) }
               : item)

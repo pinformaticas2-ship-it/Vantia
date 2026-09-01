@@ -73,9 +73,9 @@ export default function App() {
             <Route path="whatsapp" element={<RequireModuleAccess modulo="whatsapp"><WhatsApp /></RequireModuleAccess>} />
             <Route path="correo" element={<RequireModuleAccess modulo="correo"><Email /></RequireModuleAccess>} />
             <Route path="documental" element={<RequireModuleAccess modulo="documental"><Documental /></RequireModuleAccess>} />
-            <Route path="facturacion" element={<RequireAdmin><Facturacion /></RequireAdmin>} />
-            <Route path="facturacion/facturas/nueva" element={<RequireAdmin><Facturacion /></RequireAdmin>} />
-            <Route path="facturacion/facturas/:facturaId/editar" element={<RequireAdmin><Facturacion /></RequireAdmin>} />
+            <Route path="facturacion" element={<RequireModuleAccess modulo="facturacion"><Facturacion /></RequireModuleAccess>} />
+            <Route path="facturacion/facturas/nueva" element={<RequireModuleAccess modulo="facturacion"><Facturacion /></RequireModuleAccess>} />
+            <Route path="facturacion/facturas/:facturaId/editar" element={<RequireModuleAccess modulo="facturacion"><Facturacion /></RequireModuleAccess>} />
             <Route path="chat-ia" element={<ChatIA />} />
             <Route path="config" element={<Configuracion />} />
           </Route>
@@ -104,20 +104,6 @@ export default function App() {
       </>
     </ThemeProvider>
   );
-}
-
-// Bloquea el acceso a Tesorería si el usuario no es propietario/admin de la
-// organización activa. Antes miraba publicMetadata.role de Clerk -- una
-// fuente distinta a la que ya comprobaba el backend (organizacionRol,
-// resuelta de organizacion_miembros), así que podían desincronizarse: verlo
-// aquí y que el backend lo rechazase, o al revés. Ahora las dos miran lo
-// mismo. Esto es solo la barrera de UI -- el backend vuelve a comprobarlo en
-// cada endpoint de /api/facturacion y /api/quipu (middleware requireAdmin).
-function RequireAdmin({ children }: { children: React.ReactNode }) {
-  const { rol, isLoaded } = useOrganizacion();
-  if (!isLoaded) return null;
-  if (rol !== 'propietario' && rol !== 'admin') return <Navigate to="/dashboard" replace />;
-  return <>{children}</>;
 }
 
 // Bloquea el acceso a un módulo según la matriz de permisos rol × módulo
