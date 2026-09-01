@@ -1638,6 +1638,40 @@ export async function runMigrations(): Promise<void> {
       `);
     } catch (_e: any) {}
 
+    // ── Rol "soporte" (informático/soporte técnico) ──────────────────
+    // Hasta ahora solo había propietario/admin/miembro -- un despacho con
+    // alguien que administra el sistema pero no es abogado (el propio
+    // informático) no tenía forma de reflejarlo: o le daban acceso total, o
+    // se quedaba como "miembro" con acceso a Clientes/Expedientes que no
+    // necesita. El rol "soporte" está pensado para eso: gestiona
+    // Configuración/usuarios/integraciones, pero por defecto NO ve
+    // Clientes/Expedientes (ver DEFAULT_PERMISSIONS en config/permissions.ts)
+    // -- el secreto profesional no debería depender de confiar en el
+    // informático, solo en los abogados.
+    try {
+      await client.query(`ALTER TABLE organizacion_miembros DROP CONSTRAINT IF EXISTS organizacion_miembros_rol_check;`);
+      await client.query(`
+        ALTER TABLE organizacion_miembros ADD CONSTRAINT organizacion_miembros_rol_check
+          CHECK (rol IN ('propietario','admin','miembro','soporte'));
+      `);
+    } catch (_e: any) {}
+
+    // ── Permisos por módulo (matriz configurable) ────────────────────
+    // Guarda solo las DESVIACIONES respecto a la matriz por defecto
+    // (DEFAULT_PERMISSIONS en config/permissions.ts) -- si un rol/módulo no
+    // tiene fila aquí, se usa el valor por defecto. Así la tabla se queda
+    // vacía mientras nadie toque nada en "Roles y permisos".
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS organizacion_permisos (
+        organizacion_id UUID         NOT NULL REFERENCES organizaciones(id) ON DELETE CASCADE,
+        rol             VARCHAR(20)  NOT NULL,
+        modulo          VARCHAR(40)  NOT NULL,
+        nivel           VARCHAR(20)  NOT NULL CHECK (nivel IN ('ninguno','lectura','edicion')),
+        updated_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (organizacion_id, rol, modulo)
+      );
+    `);
+
     // entities: columna organizacion_id + backfill a la organización sembrada
     try {
       await client.query(`ALTER TABLE entities ADD COLUMN IF NOT EXISTS organizacion_id UUID REFERENCES organizaciones(id);`);

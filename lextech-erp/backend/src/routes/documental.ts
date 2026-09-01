@@ -7,8 +7,10 @@ import {
   searchBoeDocuments,
   getDocumentalProviders,
 } from '../controllers/documentalController';
+import { requireModulePermission } from '../middleware/requireModulePermission';
 
 const router = Router();
+router.use(requireModulePermission('documental'));
 
 router.get('/providers', requireAuth, getDocumentalProviders);
 router.get('/boe/schemas', requireAuth, getBoeSchemas);

@@ -23,6 +23,37 @@ import { useEmailUnread } from "../contexts/EmailUnreadContext";
 import { useWhatsAppUnread, WA_LAST_SEEN_KEY } from "../contexts/WhatsAppUnreadContext";
 import { useDocumentProcessing } from "../contexts/DocumentProcessingContext";
 import { usePushNotifications } from "../lib/usePushNotifications";
+import type { Modulo } from "../lib/useOrganizacion";
+
+// Qué módulo de la matriz de permisos (Configuración → Gestión de usuarios →
+// Roles y permisos) gobierna cada entrada de navegación/búsqueda. Las que no
+// aparecen aquí (Dashboard, Trazabilidad, Chat IA...) no están sujetas a esa
+// matriz, se ven siempre.
+const NAV_MODULE_MAP: Record<string, Modulo> = {
+  Clientes: "clientes",
+  Procuradores: "directorio",
+  Abogados: "directorio",
+  Expedientes: "expedientes",
+  Agenda: "agenda",
+  Tareas: "tareas",
+  Chat: "chat",
+  WhatsApp: "whatsapp",
+  Correo: "correo",
+  Documental: "documental",
+};
+function moduloForPath(path: string): Modulo | null {
+  if (path.startsWith("/dashboard/clientes")) return "clientes";
+  if (path.startsWith("/dashboard/procuradores") || path.startsWith("/dashboard/abogados")) return "directorio";
+  if (path.startsWith("/dashboard/expedientes")) return "expedientes";
+  if (path.startsWith("/dashboard/agenda")) return "agenda";
+  if (path.startsWith("/dashboard/tareas")) return "tareas";
+  if (path.startsWith("/dashboard/chat-ia")) return null;
+  if (path.startsWith("/dashboard/chat")) return "chat";
+  if (path.startsWith("/dashboard/whatsapp")) return "whatsapp";
+  if (path.startsWith("/dashboard/correo")) return "correo";
+  if (path.startsWith("/dashboard/documental")) return "documental";
+  return null;
+}
 
 // ── Módulos buscables ────────────────────────────────────────────────────────
 const MODULES = [
@@ -1041,10 +1072,11 @@ function QuickLinksPanel({ getToken, onClose }: { getToken: () => Promise<string
 // ── Search Dropdown ──────────────────────────────────────────────────────────
 function SearchDropdown({ query, onSelect }: { query: string; onSelect: () => void }) {
   const navigate  = useNavigate();
-  const { user }  = useUser();
-  const isAdmin   = (user?.publicMetadata as any)?.role === "admin";
+  const { rol, puede } = useOrganizacion();
+  const isAdmin   = rol === "propietario" || rol === "admin";
   const filtered  = MODULES
     .filter((m) => isAdmin || !m.path.startsWith("/dashboard/facturacion"))
+    .filter((m) => { const mod = moduloForPath(m.path); return !mod || puede(mod); })
     .filter(
       (m) => m.name.toLowerCase().includes(query.toLowerCase()) ||
              m.desc.toLowerCase().includes(query.toLowerCase())
@@ -1114,7 +1146,7 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
   const { unreadCount: emailUnreadCount } = useEmailUnread();
   const { unreadCount: waUnreadCount } = useWhatsAppUnread();
   const { isProcessing: isDocProcessing } = useDocumentProcessing();
-  const { organizacion, organizaciones, rol: orgRol, switchOrganizacion, isLoaded: orgLoaded } = useOrganizacion();
+  const { organizacion, organizaciones, rol: orgRol, puede, switchOrganizacion, isLoaded: orgLoaded } = useOrganizacion();
   const [orgMenuOpen, setOrgMenuOpen] = useState(false);
   const orgMenuRef = useRef<HTMLDivElement>(null);
   // El desplegable de la vista colapsada se pinta en un portal (ver más abajo,
@@ -1135,9 +1167,9 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
     return () => document.removeEventListener("mousedown", h);
   }, [orgMenuOpen]);
   const currentSearch = search || "";
-  // Tesorería (facturación/Quipu) es solo para administradores -- se oculta
+  // Tesorería (facturación/Quipu) es solo para propietario/admin -- se oculta
   // del sidebar para el resto (el backend ya lo bloquea aparte, esto es solo UI).
-  const isAdmin = (user?.publicMetadata as any)?.role === "admin";
+  const isAdmin = orgRol === "propietario" || orgRol === "admin";
 
   const isGroupActive = useCallback((item: NavItem) =>
     !!item.children?.some((c) => hrefMatches(pathname, currentSearch, c.href)),
@@ -1321,7 +1353,14 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
           const items = group.items
             .map((name) => NAV_ITEMS.find((item) => item.name === name))
             .filter((item): item is (typeof NAV_ITEMS)[number] => !!item)
-            .filter((item) => item.name !== "Tesorería" || isAdmin);
+            .filter((item) => item.name !== "Tesorería" || isAdmin)
+            // Poda por la matriz de permisos: un grupo (p.ej. "Directorio")
+            // se queda solo con los hijos a los que el rol tiene acceso, y
+            // desaparece del todo si se queda sin ninguno.
+            .map((item) => item.children
+              ? { ...item, children: item.children.filter((c) => { const mod = NAV_MODULE_MAP[c.name]; return !mod || puede(mod); }) }
+              : item)
+            .filter((item) => item.children ? item.children.length > 0 : (() => { const mod = NAV_MODULE_MAP[item.name]; return !mod || puede(mod); })());
           if (!items.length) return null;
           return (
             <div key={group.label} className="mb-4">

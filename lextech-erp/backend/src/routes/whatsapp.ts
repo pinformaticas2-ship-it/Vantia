@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/auth';
+import { requireModulePermission } from '../middleware/requireModulePermission';
 import {
   createSchedule,
   getConversationByClient,
@@ -21,6 +22,7 @@ router.get('/webhook', verifyWebhook);
 router.post('/webhook', receiveWebhook);
 
 router.use(requireAuth);
+router.use(requireModulePermission('whatsapp'));
 
 router.get('/status', getWhatsAppStatus);
 router.get('/config', getWhatsAppConfig);

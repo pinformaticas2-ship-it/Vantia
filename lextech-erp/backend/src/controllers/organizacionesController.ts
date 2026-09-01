@@ -4,11 +4,12 @@ import path from 'path';
 import pool from '../config/database';
 import { getClerk, resolveUserRole } from './activityController';
 import { UPLOADS_ORG_LOGOS_ROOT } from '../config/paths';
+import { getRolPermissions, getFullMatrix, setPermissionOverride, MODULOS, Modulo, NivelAcceso, OrgRol } from '../config/permissions';
 
 const pgErr = (e: any) =>
   `${e?.message || String(e)}${e?.detail ? ' | detail: ' + e.detail : ''}${e?.code ? ' | code: ' + e.code : ''}`;
 
-export type OrgRol = 'propietario' | 'admin' | 'miembro';
+export type { OrgRol };
 
 export interface OrgMembership {
   organizacionId: string;
@@ -137,9 +138,12 @@ export async function getMyOrganizacion(req: Request, res: Response) {
       } : { id: activa.organizacionId, nombre: activa.organizacionNombre };
     }
 
+    const permisos = activa ? await getRolPermissions(activa.organizacionId, activa.rol) : null;
+
     return ok(res, {
       organizacion,
       rol: activa?.rol || null,
+      permisos,
       organizaciones: memberships.map((m) => ({ id: m.organizacionId, nombre: m.organizacionNombre, logoUrl: m.organizacionLogoUrl, rol: m.rol })),
     });
   } catch (e: any) {
@@ -309,7 +313,7 @@ export async function addOrganizacionMiembro(req: Request, res: Response) {
       return err(res, 'Solo el propietario o un administrador pueden añadir miembros.', 403);
     }
     const email = String(req.body?.email || '').trim().toLowerCase();
-    const rol: OrgRol = (req.body?.rol === 'admin' || req.body?.rol === 'propietario') ? req.body.rol : 'miembro';
+    const rol: OrgRol = ['admin', 'propietario', 'soporte'].includes(req.body?.rol) ? req.body.rol : 'miembro';
     if (!email) return err(res, 'Indica un email.', 400);
 
     const clerk = getClerk();
@@ -342,7 +346,7 @@ export async function updateOrganizacionMiembroRol(req: Request, res: Response) 
       return err(res, 'Solo el propietario puede cambiar roles.', 403);
     }
     const rol: OrgRol = req.body?.rol;
-    if (!['propietario', 'admin', 'miembro'].includes(rol)) return err(res, 'Rol inválido.', 400);
+    if (!['propietario', 'admin', 'miembro', 'soporte'].includes(rol)) return err(res, 'Rol inválido.', 400);
 
     const { rows } = await pool.query(
       `UPDATE organizacion_miembros SET rol = $1
@@ -488,5 +492,43 @@ export async function deleteOrganizacionActiva(req: Request, res: Response) {
     return err(res, pgErr(e));
   } finally {
     client.release();
+  }
+}
+
+// GET /api/organizacion/permisos — matriz completa rol × módulo (propietario/admin)
+export async function getPermisosMatrix(req: Request, res: Response) {
+  try {
+    const ctx = requireOrgContext(req, res);
+    if (!ctx) return;
+    if (ctx.organizacionRol !== 'propietario' && ctx.organizacionRol !== 'admin') {
+      return err(res, 'Solo el propietario o un administrador pueden ver los permisos.', 403);
+    }
+    const matriz = await getFullMatrix(ctx.organizacionId);
+    return ok(res, { modulos: MODULOS, matriz });
+  } catch (e: any) {
+    return err(res, pgErr(e));
+  }
+}
+
+// PUT /api/organizacion/permisos — cambia una celda (rol, módulo) de la matriz (solo propietario)
+export async function updatePermiso(req: Request, res: Response) {
+  try {
+    const ctx = requireOrgContext(req, res);
+    if (!ctx) return;
+    if (ctx.organizacionRol !== 'propietario') {
+      return err(res, 'Solo el propietario puede cambiar los permisos.', 403);
+    }
+    const rol: OrgRol = req.body?.rol;
+    const modulo: Modulo = req.body?.modulo;
+    const nivel: NivelAcceso = req.body?.nivel;
+    if (rol === 'propietario') return err(res, 'El propietario siempre tiene acceso completo.', 400);
+    if (!['admin', 'miembro', 'soporte'].includes(rol)) return err(res, 'Rol inválido.', 400);
+    if (!MODULOS.some((m) => m.id === modulo)) return err(res, 'Módulo inválido.', 400);
+    if (!['ninguno', 'lectura', 'edicion'].includes(nivel)) return err(res, 'Nivel inválido.', 400);
+
+    await setPermissionOverride(ctx.organizacionId, rol, modulo, nivel);
+    return ok(res, { rol, modulo, nivel });
+  } catch (e: any) {
+    return err(res, pgErr(e));
   }
 }

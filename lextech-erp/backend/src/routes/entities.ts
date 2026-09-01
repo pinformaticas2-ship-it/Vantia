@@ -6,9 +6,11 @@ import {
 } from '../controllers/entities';
 import noteRoutes from './noteRoutes';
 import { requireAuth } from '../middleware/auth';
+import { requireModulePermission } from '../middleware/requireModulePermission';
 import { uploadDNI } from './../middleware/upload';
 
 const router = Router();
+router.use(requireModulePermission('clientes'));
 
 router.get('/', requireAuth, getEntities);
 router.get('/check-nif', requireAuth, checkNifCif);

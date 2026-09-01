@@ -4,7 +4,7 @@ import { useAuth } from '@clerk/clerk-react';
 import { useTheme, AppTheme } from '../lib/ThemeContext';
 import { pickSidebarStyle, autoSidebarBorder, muteSidebarColor } from '../lib/themeCss';
 import { apiFetch, resolveUploadUrl, setActiveOrganizacionId } from '../lib/api';
-import { useOrganizacion, OrgRol } from '../lib/useOrganizacion';
+import { useOrganizacion, OrgRol, Modulo, NivelAcceso } from '../lib/useOrganizacion';
 import ManualPanel from './ManualPanel';
 import { usePushNotifications } from '../lib/usePushNotifications';
 
@@ -837,6 +837,7 @@ function UsuariosPanel() {
               className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-red-300 bg-white"
             >
               <option value="miembro">Miembro</option>
+              <option value="soporte">Soporte técnico</option>
               <option value="admin">Admin</option>
               <option value="propietario">Propietario</option>
             </select>
@@ -898,7 +899,108 @@ function UsuariosPanel() {
           </div>
         )}
       </section>
+
+      {canManage && <RolesPermisosPanel editable={myRol === 'propietario'} />}
     </>
+  );
+}
+
+const NIVEL_LABEL: Record<NivelAcceso, string> = { ninguno: 'Ninguno', lectura: 'Solo ver', edicion: 'Editar' };
+const ROLES_EDITABLES: { rol: OrgRol; label: string }[] = [
+  { rol: 'admin',    label: 'Admin' },
+  { rol: 'miembro',  label: 'Miembro' },
+  { rol: 'soporte',  label: 'Soporte técnico' },
+];
+
+// Matriz módulo × rol, editable solo por el propietario. Solo guarda las
+// celdas que se desvían de lo de fábrica (ver DEFAULT_PERMISSIONS en el
+// backend) -- por eso al abrir esto por primera vez ya sale todo relleno con
+// el comportamiento actual, no vacío.
+function RolesPermisosPanel({ editable }: { editable: boolean }) {
+  const { getToken } = useAuth();
+  const [modulos, setModulos] = useState<{ id: Modulo; label: string }[]>([]);
+  const [matriz, setMatriz] = useState<Record<OrgRol, Record<Modulo, NivelAcceso>> | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [savingCell, setSavingCell] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await apiFetch('/api/organizacion/permisos', { getToken });
+      if (data?.success) { setModulos(data.data.modulos || []); setMatriz(data.data.matriz || null); }
+    } finally {
+      setLoading(false);
+    }
+  }, [getToken]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const changeNivel = async (rol: OrgRol, modulo: Modulo, nivel: NivelAcceso) => {
+    if (!matriz) return;
+    const cellKey = `${rol}:${modulo}`;
+    const prev = matriz[rol][modulo];
+    setMatriz({ ...matriz, [rol]: { ...matriz[rol], [modulo]: nivel } }); // optimista
+    setSavingCell(cellKey);
+    try {
+      const data = await apiFetch('/api/organizacion/permisos', { method: 'PUT', getToken, body: JSON.stringify({ rol, modulo, nivel }) });
+      if (data?.success === false) throw new Error(data.error);
+    } catch {
+      setMatriz((m) => m ? { ...m, [rol]: { ...m[rol], [modulo]: prev } } : m); // revertir si falla
+    } finally {
+      setSavingCell(null);
+    }
+  };
+
+  return (
+    <section className="mt-8">
+      <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-2 border-b border-slate-200 pb-2">Roles y permisos</h3>
+      <p className="text-xs text-slate-500 mb-4 max-w-2xl">
+        Qué puede ver y editar cada rol en cada módulo. El propietario y los administradores siempre tienen acceso completo a todo;
+        aquí se ajusta lo que ven Miembro y Soporte técnico. El rol "Soporte técnico" está pensado para quien administra el sistema
+        sin ser abogado del despacho: por defecto no ve Clientes ni Expedientes, para no depender de su discreción el secreto profesional.
+      </p>
+      {loading || !matriz ? (
+        <div className="flex justify-center py-10"><Loader2 className="animate-spin text-slate-300" size={22} /></div>
+      ) : (
+        <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-100">
+                <th className="text-left font-semibold text-slate-500 text-xs uppercase tracking-wide px-4 py-3">Módulo</th>
+                {ROLES_EDITABLES.map((r) => (
+                  <th key={r.rol} className="text-left font-semibold text-slate-500 text-xs uppercase tracking-wide px-4 py-3">{r.label}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {modulos.map((m) => (
+                <tr key={m.id}>
+                  <td className="px-4 py-2.5 font-medium text-slate-700">{m.label}</td>
+                  {ROLES_EDITABLES.map((r) => {
+                    const cellKey = `${r.rol}:${m.id}`;
+                    return (
+                      <td key={r.rol} className="px-4 py-2">
+                        <select
+                          value={matriz[r.rol][m.id]}
+                          disabled={!editable || savingCell === cellKey}
+                          onChange={(e) => changeNivel(r.rol, m.id, e.target.value as NivelAcceso)}
+                          className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:border-red-300 bg-white disabled:bg-slate-50 disabled:text-slate-400"
+                        >
+                          {(['ninguno', 'lectura', 'edicion'] as NivelAcceso[]).map((n) => (
+                            <option key={n} value={n}>{NIVEL_LABEL[n]}</option>
+                          ))}
+                        </select>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {!editable && <p className="text-xs text-slate-400 mt-2">Solo el propietario puede cambiar estos permisos.</p>}
+    </section>
   );
 }
 

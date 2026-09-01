@@ -4,6 +4,7 @@ import path from 'path';
 import crypto from 'crypto';
 import fs from 'fs';
 import { requireAuth } from '../middleware/auth';
+import { requireModulePermission } from '../middleware/requireModulePermission';
 import {
   getTasks,
   getMyTasks,
@@ -59,6 +60,10 @@ router.get('/files/dl/:token/launch', launchTaskFileWithOffice);
 router.get('/files/dl/:token/bridge', taskOfficeBridgePage);
 router.get('/files/dl/:token', downloadTaskFileByToken);
 router.put('/files/dl/:token/sync', rawBinary, syncTaskFileByToken);
+
+// El resto de rutas exige sesión (arriba están las de enlace con token
+// firmado, para el puente con Office, que no llevan sesión de Clerk).
+router.use(requireModulePermission('tareas'));
 
 // ── Etapas (antes de rutas con :id) ──────────────────────────────
 router.get('/etapas',               requireAuth, getEtapas);

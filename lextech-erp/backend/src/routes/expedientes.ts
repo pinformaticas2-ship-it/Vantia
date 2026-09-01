@@ -37,8 +37,10 @@ import {
 import { getEmailsByExpediente } from '../controllers/emailController';
 import { getConversacionesExpediente } from '../controllers/chatController';
 import noteRoutes from './noteRoutes';
+import { requireModulePermission } from '../middleware/requireModulePermission';
 
 const router = Router();
+router.use(requireModulePermission('expedientes'));
 
 router.get('/stats',  requireAuth, getStats);
 router.get('/contrarios', requireAuth, getContrarioSuggestions);

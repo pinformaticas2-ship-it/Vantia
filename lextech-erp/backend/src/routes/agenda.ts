@@ -11,8 +11,10 @@ import {
   importGoogleEvents,
   syncGoogleEvents,
 } from '../controllers/agendaController';
+import { requireModulePermission } from '../middleware/requireModulePermission';
 
 const router = Router();
+router.use(requireModulePermission('agenda'));
 
 router.get('/',            requireAuth, getEvents);
 router.get('/upcoming',    requireAuth, getUpcomingEvents);

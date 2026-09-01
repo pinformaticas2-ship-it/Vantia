@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import multer from 'multer';
 import { requireAuth } from '../middleware/auth';
+import { requireModulePermission } from '../middleware/requireModulePermission';
 import { UPLOADS_CHAT_ROOT } from '../config/paths';
 import {
   getCanales, createCanal, updateCanal, archivarCanal, marcarLeido, marcarTodoLeido, getCanalMiembros,
@@ -20,6 +21,7 @@ import {
 } from '../controllers/chatController';
 
 const router = Router();
+router.use(requireModulePermission('chat'));
 const uploadDir = UPLOADS_CHAT_ROOT;
 const fileUploadDir = path.join(UPLOADS_CHAT_ROOT, 'files');
 fs.mkdirSync(uploadDir, { recursive: true });

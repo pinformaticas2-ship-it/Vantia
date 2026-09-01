@@ -7,8 +7,10 @@ import {
   updateProfesional,
   deleteProfesional,
 } from '../controllers/directorioController';
+import { requireModulePermission } from '../middleware/requireModulePermission';
 
 const router = Router();
+router.use(requireModulePermission('directorio'));
 
 router.get('/',       requireAuth, getProfesionales);
 router.post('/',      requireAuth, createProfesional);

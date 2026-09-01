@@ -13,6 +13,8 @@ import {
   deleteOrganizacionActiva,
   uploadOrganizacionLogo,
   deleteOrganizacionLogo,
+  getPermisosMatrix,
+  updatePermiso,
 } from '../controllers/organizacionesController';
 
 const router = Router();
@@ -26,6 +28,8 @@ router.get('/miembros', requireAuth, getOrganizacionMiembros);
 router.post('/miembros', requireAuth, addOrganizacionMiembro);
 router.patch('/miembros/:id', requireAuth, updateOrganizacionMiembroRol);
 router.delete('/miembros/:id', requireAuth, removeOrganizacionMiembro);
+router.get('/permisos', requireAuth, getPermisosMatrix);
+router.put('/permisos', requireAuth, updatePermiso);
 router.get('/impacto-borrado', requireAuth, getOrganizacionDeletionImpact);
 router.delete('/', requireAuth, deleteOrganizacionActiva);
 

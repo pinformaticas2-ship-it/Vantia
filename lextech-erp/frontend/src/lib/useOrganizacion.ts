@@ -2,7 +2,15 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { apiFetch, getActiveOrganizacionId, setActiveOrganizacionId } from './api';
 
-export type OrgRol = 'propietario' | 'admin' | 'miembro';
+export type OrgRol = 'propietario' | 'admin' | 'miembro' | 'soporte';
+
+// Mismos módulos que backend/src/config/permissions.ts -- si se añade uno
+// ahí, hay que añadirlo aquí también.
+export type Modulo =
+  | 'clientes' | 'expedientes' | 'agenda' | 'tareas' | 'chat'
+  | 'correo' | 'whatsapp' | 'documental' | 'directorio';
+
+export type NivelAcceso = 'ninguno' | 'lectura' | 'edicion';
 
 export interface OrganizacionInfo {
   id: string;
@@ -25,6 +33,7 @@ export function useOrganizacion() {
   const { getToken } = useAuth();
   const [organizacion, setOrganizacion] = useState<OrganizacionInfo | null>(null);
   const [rol, setRol] = useState<OrgRol | null>(null);
+  const [permisos, setPermisos] = useState<Record<Modulo, NivelAcceso> | null>(null);
   const [organizaciones, setOrganizaciones] = useState<OrganizacionMembership[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -34,6 +43,7 @@ export function useOrganizacion() {
       if (data?.success) {
         setOrganizacion(data.data.organizacion || null);
         setRol(data.data.rol || null);
+        setPermisos(data.data.permisos || null);
         setOrganizaciones(data.data.organizaciones || []);
       }
     } catch {
@@ -53,9 +63,22 @@ export function useOrganizacion() {
     window.location.reload();
   }, []);
 
+  // "propietario"/"admin" son compatibilidad hacia atrás: no dependen de la
+  // matriz de permisos (siempre tienen acceso completo, ver
+  // DEFAULT_PERMISSIONS en el backend), así que se resuelven aparte para que
+  // funcione incluso mientras `permisos` todavía está cargando.
+  const NIVEL_RANK: Record<NivelAcceso, number> = { ninguno: 0, lectura: 1, edicion: 2 };
+  const puede = useCallback((modulo: Modulo, minimo: NivelAcceso = 'lectura'): boolean => {
+    if (rol === 'propietario' || rol === 'admin') return true;
+    if (!permisos) return true; // aún sin cargar: no bloquear de más mientras se resuelve
+    return NIVEL_RANK[permisos[modulo] ?? 'ninguno'] >= NIVEL_RANK[minimo];
+  }, [rol, permisos]);
+
   return {
     organizacion,
     rol,
+    permisos,
+    puede,
     organizaciones,
     isLoaded,
     reload,

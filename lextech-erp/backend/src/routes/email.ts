@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { requireAuth } from '../middleware/auth';
+import { requireModulePermission } from '../middleware/requireModulePermission';
 import { verifyToken } from '@clerk/backend';
 import { addSSEClient } from '../utils/emailSSE';
 import {
@@ -60,6 +61,7 @@ router.get('/events', async (req: Request, res: Response) => {
 });
 
 router.use(requireAuth);
+router.use(requireModulePermission('correo'));
 
 // ── Cuentas ──────────────────────────────────────────────────────────────────
 router.get('/accounts',           getAccounts);
