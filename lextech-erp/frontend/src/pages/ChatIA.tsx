@@ -1013,7 +1013,12 @@ export default function ChatIA() {
                             )}
                           </div>
                         )}
-                        <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.text}</p>
+                        {/* Si no escribió nada, el texto es el mismo "Archivo adjunto: X"
+                            que ya dice la pastilla de arriba -- repetirlo debajo es
+                            redundante, se omite para que solo se vea la pastilla. */}
+                        {!(msg.attachmentName && msg.text === `Archivo adjunto: ${msg.attachmentName}`) && (
+                          <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.text}</p>
+                        )}
                       </div>
                     )}
 
