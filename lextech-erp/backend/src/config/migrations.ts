@@ -1900,6 +1900,29 @@ export async function runMigrations(): Promise<void> {
       await client.query(`ALTER TABLE exp_notificaciones ADD COLUMN IF NOT EXISTS push_sent_at       TIMESTAMPTZ;`);
     } catch (_e: any) {}
 
+    // ── Vistas "legibles" para mirar la BD a mano en Supabase ────────
+    // organizacion_id es un UUID -- perfecto para el código, ilegible para
+    // quien entra al editor de tablas de Supabase a mirar un dato suelto (no
+    // hay forma de saber de un vistazo si "9d76ed9e-..." es el despacho A o
+    // el B). Estas vistas son solo para eso: mismo contenido que la tabla
+    // real + el nombre de la organización al lado, para que quien venga
+    // detrás no tenga que ir a buscarlo a mano en la tabla organizaciones.
+    // La app nunca las consulta -- solo existen para navegar por Supabase.
+    try {
+      await client.query(`
+        CREATE OR REPLACE VIEW v_expedientes AS
+        SELECT e.*, o.nombre AS organizacion_nombre
+        FROM expedientes e
+        JOIN organizaciones o ON o.id = e.organizacion_id;
+      `);
+      await client.query(`
+        CREATE OR REPLACE VIEW v_entities AS
+        SELECT en.*, o.nombre AS organizacion_nombre
+        FROM entities en
+        JOIN organizaciones o ON o.id = en.organizacion_id;
+      `);
+    } catch (_e: any) {}
+
     // VACUUM ANALYZE para mantener las estadísticas de consulta frescas
     try {
       await client.query(`ANALYZE entities;`);
