@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import pool from '../config/database';
 import { resolveUserName } from './activityController';
-import { sendPushToAll } from '../utils/webPush';
+import { sendPushToAll, sendPushToOrg } from '../utils/webPush';
 
 type WhatsAppConfig = {
   accessToken: string;
@@ -122,7 +122,8 @@ async function resolveClientByPhone(phone?: string | null) {
             phone_mobile,
             phone_1,
             email,
-            type
+            type,
+            organizacion_id
      FROM entities
      WHERE regexp_replace(COALESCE(phone_mobile, ''), '\D', '', 'g') = ANY($1)
         OR regexp_replace(COALESCE(phone_1, ''), '\D', '', 'g') = ANY($1)
@@ -239,8 +240,12 @@ export async function testWhatsAppConfig(_req: Request, res: Response) {
   }
 }
 
-export async function getWhatsAppContacts(_req: Request, res: Response) {
+export async function getWhatsAppContacts(req: any, res: Response) {
   try {
+    // WhatsApp comparte un único número de Business API entre organizaciones
+    // (ver migración de whatsapp_messages), así que el aislamiento aquí se
+    // consigue a través del propio contacto (entities SÍ está aislado por
+    // organización desde Fase 1) en vez de por el mensaje.
     const result = await pool.query(
       `WITH latest AS (
          SELECT DISTINCT ON (wm.client_id)
@@ -275,8 +280,10 @@ export async function getWhatsAppContacts(_req: Request, res: Response) {
          ), 0)            AS message_count
        FROM entities e
        LEFT JOIN latest l ON l.client_id = e.id
-       WHERE COALESCE(NULLIF(regexp_replace(COALESCE(e.phone_mobile, e.phone_1, ''), '\D', '', 'g'), ''), '') <> ''
+       WHERE e.organizacion_id = $1
+         AND COALESCE(NULLIF(regexp_replace(COALESCE(e.phone_mobile, e.phone_1, ''), '\D', '', 'g'), ''), '') <> ''
        ORDER BY l.created_at DESC NULLS LAST, e.updated_at DESC NULLS LAST, e.created_at DESC`,
+      [req.organizacionId],
     );
 
     res.json({ success: true, data: result.rows });
@@ -285,13 +292,13 @@ export async function getWhatsAppContacts(_req: Request, res: Response) {
   }
 }
 
-export async function getConversationByClient(req: Request, res: Response) {
+export async function getConversationByClient(req: any, res: Response) {
   const { clientId } = req.params;
   try {
     const clientRes = await pool.query(
       `SELECT id, internal_number, first_name, last_name, commercial_name, phone_mobile, phone_1, email, photo_url, type
-       FROM entities WHERE id = $1 LIMIT 1`,
-      [clientId],
+       FROM entities WHERE id = $1 AND organizacion_id = $2 LIMIT 1`,
+      [clientId, req.organizacionId],
     );
     if (clientRes.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Cliente no encontrado' });
@@ -317,17 +324,20 @@ export async function getConversationByClient(req: Request, res: Response) {
   }
 }
 
-export async function getConversationByPhone(req: Request, res: Response) {
+export async function getConversationByPhone(req: any, res: Response) {
   const phone = normalizePhone(req.params.phone);
   if (!phone) return res.status(400).json({ success: false, error: 'Teléfono inválido' });
 
   try {
+    // organizacion_id puede ser NULL (número todavía no vinculado a ningún
+    // cliente) -- esos mensajes se dejan ver a cualquier organización hasta
+    // que alguien los vincula, en vez de perderlos en un cajón que nadie ve.
     const messagesRes = await pool.query(
       `SELECT *
        FROM whatsapp_messages
-       WHERE from_phone = $1 OR to_phone = $1
+       WHERE (from_phone = $1 OR to_phone = $1) AND (organizacion_id = $2 OR organizacion_id IS NULL)
        ORDER BY created_at ASC`,
-      [phone],
+      [phone, req.organizacionId],
     );
 
     const client = await resolveClientByPhone(phone);
@@ -337,7 +347,7 @@ export async function getConversationByPhone(req: Request, res: Response) {
   }
 }
 
-export async function sendWhatsAppMessage(req: Request, res: Response) {
+export async function sendWhatsAppMessage(req: any, res: Response) {
   const uid = userId(req);
   const userName = uid === 'SYSTEM' ? 'Sistema' : await resolveUserName(uid);
   const { clientId, to, body } = req.body || {};
@@ -352,6 +362,12 @@ export async function sendWhatsAppMessage(req: Request, res: Response) {
       success: false,
       error: 'Falta configurar WhatsApp Business Cloud API en el módulo',
     });
+  }
+  // Si se indica un cliente, tiene que ser de la organización activa -- no
+  // se deja enviar "en nombre de" un cliente de otro despacho.
+  if (clientId) {
+    const ownCheck = await pool.query(`SELECT 1 FROM entities WHERE id = $1 AND organizacion_id = $2`, [clientId, req.organizacionId]);
+    if (!ownCheck.rows.length) return res.status(404).json({ success: false, error: 'Cliente no encontrado' });
   }
 
   try {
@@ -372,8 +388,8 @@ export async function sendWhatsAppMessage(req: Request, res: Response) {
     const waMessageId = provider?.messages?.[0]?.id || null;
     const inserted = await pool.query(
       `INSERT INTO whatsapp_messages
-         (wa_message_id, client_id, direction, message_type, from_phone, to_phone, contact_name, body, status, sent_by_user_id, sent_by_user_name, raw_payload)
-       VALUES ($1,$2,'outbound','text',NULL,$3,$4,$5,'sent',$6,$7,$8)
+         (wa_message_id, client_id, direction, message_type, from_phone, to_phone, contact_name, body, status, sent_by_user_id, sent_by_user_name, raw_payload, organizacion_id)
+       VALUES ($1,$2,'outbound','text',NULL,$3,$4,$5,'sent',$6,$7,$8,$9)
        RETURNING *`,
       [
         waMessageId,
@@ -384,6 +400,7 @@ export async function sendWhatsAppMessage(req: Request, res: Response) {
         uid,
         userName,
         JSON.stringify(provider),
+        req.organizacionId,
       ],
     );
 
@@ -489,8 +506,8 @@ export async function receiveWebhook(req: Request, res: Response) {
 
           await pool.query(
             `INSERT INTO whatsapp_messages
-               (wa_message_id, client_id, direction, message_type, from_phone, to_phone, contact_name, body, status, raw_payload)
-             VALUES ($1,$2,'inbound',$3,$4,$5,$6,$7,'received',$8)
+               (wa_message_id, client_id, direction, message_type, from_phone, to_phone, contact_name, body, status, raw_payload, organizacion_id)
+             VALUES ($1,$2,'inbound',$3,$4,$5,$6,$7,'received',$8,$9)
              ON CONFLICT (wa_message_id)
              DO UPDATE SET
                client_id = EXCLUDED.client_id,
@@ -498,6 +515,7 @@ export async function receiveWebhook(req: Request, res: Response) {
                body = EXCLUDED.body,
                status = EXCLUDED.status,
                raw_payload = EXCLUDED.raw_payload,
+               organizacion_id = COALESCE(whatsapp_messages.organizacion_id, EXCLUDED.organizacion_id),
                updated_at = NOW()`,
             [
               message?.id || null,
@@ -508,19 +526,22 @@ export async function receiveWebhook(req: Request, res: Response) {
               contactName,
               body,
               JSON.stringify({ message, contact, metadata: value?.metadata || null }),
+              client?.organizacion_id || null,
             ],
           );
 
-          // WhatsApp todavía es un módulo compartido (no aislado por organización,
-          // ver Fase 1 de multi-organización), así que el push se manda a todo el
-          // que esté suscrito en cualquier despacho -- igual que ya se comparte la
-          // bandeja de conversaciones.
-          void sendPushToAll({
+          // Si el número ya está vinculado a un cliente, se sabe de qué
+          // organización es el mensaje y el push se manda solo a ese
+          // despacho; si no, se manda a todo el mundo (igual que antes) para
+          // que alguien lo vea y lo vincule.
+          const pushPayload = {
             title: contactName || 'WhatsApp',
             body: body || 'Mensaje recibido',
             url: client?.id ? `/dashboard/whatsapp?clientId=${client.id}&mode=thread` : '/dashboard/whatsapp',
             tag: `whatsapp-${fromPhone}`,
-          });
+          };
+          if (client?.organizacion_id) void sendPushToOrg(client.organizacion_id, pushPayload);
+          else void sendPushToAll(pushPayload);
         }
       }
     }
