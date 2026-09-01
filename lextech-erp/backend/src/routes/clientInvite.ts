@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { requireAuth as auth } from '../middleware/auth';
+import { publicFormLimiter } from '../middleware/rateLimits';
 import {
   createInvite,
   listInvites,
@@ -17,6 +18,6 @@ router.delete('/:id',  auth, deleteInvite);
 
 // Rutas públicas (formulario del cliente)
 router.get('/public/:token',  getPublicForm);
-router.post('/public/:token', submitPublicForm);
+router.post('/public/:token', publicFormLimiter, submitPublicForm);
 
 export default router;
