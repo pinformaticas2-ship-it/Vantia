@@ -738,25 +738,44 @@ export async function runMigrations(): Promise<void> {
         created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
       );
     `);
-    // Insertar etapas por defecto (sólo si la tabla está vacía)
-    await client.query(`
-      INSERT INTO task_etapas (nombre, orden) VALUES
-        ('Sin Iniciar',                                  1),
-        ('Backlog',                                      2),
-        ('Sin Hacer',                                    3),
-        ('En Curso',                                     4),
-        ('Checkear',                                     5),
-        ('CAMPOS RELLENADOS',                            6),
-        ('CONTESTACIÓN A LA DEMANDA',                    7),
-        ('CUESTION CONVENIENTE U OPORTUNA',              8),
-        ('CONCLUSIONES',                                 9),
-        ('SOLUCIONES EN LAS QUE ESTOY TRABAJANDO ACTUALMENTE', 10),
-        ('En Duda',                                      11),
-        ('Realizada',                                    12),
-        ('HECHO',                                        13),
-        ('Cancelada',                                    14)
-      ON CONFLICT (nombre) DO NOTHING;
-    `);
+    // Insertar etapas por defecto (sólo si la tabla está vacía).
+    // OJO: este INSERT es anterior a la Fase 2 de multi-organización (más
+    // abajo) y quedó obsoleto por partida doble en cuanto esa fase se
+    // desplegó: (1) ON CONFLICT (nombre) apunta a una restricción que la
+    // Fase 2 sustituye por UNIQUE(organizacion_id, nombre) -- en el primer
+    // arranque tras ese cambio todavía funcionaba (la restricción vieja no
+    // se había borrado aún en ese punto del script), pero en CUALQUIER
+    // arranque posterior revienta con "no unique or exclusion constraint
+    // matching the ON CONFLICT specification"; (2) no rellena
+    // organizacion_id, que la Fase 2 deja como NOT NULL. Al no estar
+    // envuelto en try/catch (a diferencia de casi todo lo demás en este
+    // fichero), esa excepción abortaba TODA la función de migraciones a
+    // partir de aquí -- silenciada por el catch exterior, así que el
+    // servidor arrancaba igual pero sin aplicar ningún ALTER/CREATE
+    // posterior en este archivo, sin ningún aviso visible. La siembra real
+    // para organizaciones nuevas ya la hace el bucle "orgsSinEtapas" de más
+    // abajo; este bloque solo se conserva (protegido) por si alguna vez
+    // hiciera falta releer el semillero original.
+    try {
+      await client.query(`
+        INSERT INTO task_etapas (nombre, orden) VALUES
+          ('Sin Iniciar',                                  1),
+          ('Backlog',                                      2),
+          ('Sin Hacer',                                    3),
+          ('En Curso',                                     4),
+          ('Checkear',                                     5),
+          ('CAMPOS RELLENADOS',                            6),
+          ('CONTESTACIÓN A LA DEMANDA',                    7),
+          ('CUESTION CONVENIENTE U OPORTUNA',              8),
+          ('CONCLUSIONES',                                 9),
+          ('SOLUCIONES EN LAS QUE ESTOY TRABAJANDO ACTUALMENTE', 10),
+          ('En Duda',                                      11),
+          ('Realizada',                                    12),
+          ('HECHO',                                        13),
+          ('Cancelada',                                    14)
+        ON CONFLICT (nombre) DO NOTHING;
+      `);
+    } catch (_e: any) {}
 
     // task_etapas: fase 2 de multi-organización -- las columnas del kanban de
     // Tareas pasan a ser por organización (antes eran una única lista
