@@ -4636,10 +4636,10 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
           viewerEmail={userEmail}
           viewerAvatar={userAvatar}
           onDownloadAttachment={(index) => downloadAttachment(selectedEmail, index)}
-          expedienteOptions={selectedEmail.source === 'imap' ? organizationExpedientes : undefined}
-          onLinkExpediente={selectedEmail.source === 'imap' ? (expId) => linkExpedienteToEmail(selectedEmail, expId) : undefined}
+          expedienteOptions={organizationExpedientes}
+          onLinkExpediente={(expId) => linkExpedienteToEmail(selectedEmail, expId)}
           linkingExpediente={linkingExpediente}
-          onSaveAttachmentToExpediente={selectedEmail.source === 'imap' ? (index, expId) => saveAttachmentToExpedienteHandler(selectedEmail, index, expId) : undefined}
+          onSaveAttachmentToExpediente={(index, expId) => saveAttachmentToExpedienteHandler(selectedEmail, index, expId)}
           savingAttachmentIndex={savingAttachmentIndex}
         />
         {compose && (
@@ -4947,10 +4947,10 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
               viewerEmail={userEmail}
               viewerAvatar={userAvatar}
               onDownloadAttachment={(index) => downloadAttachment(selectedEmail, index)}
-              expedienteOptions={selectedEmail.source === 'imap' ? organizationExpedientes : undefined}
-              onLinkExpediente={selectedEmail.source === 'imap' ? (expId) => linkExpedienteToEmail(selectedEmail, expId) : undefined}
+              expedienteOptions={organizationExpedientes}
+              onLinkExpediente={(expId) => linkExpedienteToEmail(selectedEmail, expId)}
               linkingExpediente={linkingExpediente}
-              onSaveAttachmentToExpediente={selectedEmail.source === 'imap' ? (index, expId) => saveAttachmentToExpedienteHandler(selectedEmail, index, expId) : undefined}
+              onSaveAttachmentToExpediente={(index, expId) => saveAttachmentToExpedienteHandler(selectedEmail, index, expId)}
               savingAttachmentIndex={savingAttachmentIndex}
             />
           ) : hasActiveMailbox ? (
@@ -5000,10 +5000,10 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
               viewerEmail={userEmail}
               viewerAvatar={userAvatar}
               onDownloadAttachment={(index) => downloadAttachment(fullscreenEmail, index)}
-              expedienteOptions={fullscreenEmail.source === 'imap' ? organizationExpedientes : undefined}
-              onLinkExpediente={fullscreenEmail.source === 'imap' ? (expId) => linkExpedienteToEmail(fullscreenEmail, expId) : undefined}
+              expedienteOptions={organizationExpedientes}
+              onLinkExpediente={(expId) => linkExpedienteToEmail(fullscreenEmail, expId)}
               linkingExpediente={linkingExpediente}
-              onSaveAttachmentToExpediente={fullscreenEmail.source === 'imap' ? (index, expId) => saveAttachmentToExpedienteHandler(fullscreenEmail, index, expId) : undefined}
+              onSaveAttachmentToExpediente={(index, expId) => saveAttachmentToExpedienteHandler(fullscreenEmail, index, expId)}
               savingAttachmentIndex={savingAttachmentIndex}
             />
           </div>
