@@ -1991,6 +1991,31 @@ export async function runMigrations(): Promise<void> {
       await client.query(`ALTER TABLE exp_notificaciones ADD COLUMN IF NOT EXISTS push_sent_at       TIMESTAMPTZ;`);
     } catch (_e: any) {}
 
+    // ── Fase 3 de multi-organización: Correo ──────────────────────
+    // Correo se quedó fuera de las Fases 1 y 2: email_accounts y
+    // email_oauth_profiles solo tenían user_id, así que la bandeja y (más
+    // grave) el selector de "vincular a expediente" mezclaban organizaciones
+    // sin darse cuenta -- un correo podía acabar vinculado a un expediente de
+    // una organización que no era la suya. Igual que las fases anteriores:
+    // columna nullable, backfill a la organización más antigua, SET NOT NULL.
+    // A partir de aquí cada cuenta/perfil pertenece a una única organización
+    // (la que estaba activa cuando se conectó) y todo lo que cuelga de ella
+    // (mensajes, adjuntos) queda acotado a través de esa cuenta.
+    for (const [table, col] of [
+      ['email_accounts', 'organizacion_id'],
+      ['email_oauth_profiles', 'organizacion_id'],
+    ] as [string, string][]) {
+      try {
+        await client.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS ${col} UUID REFERENCES organizaciones(id);`);
+        await client.query(`
+          UPDATE ${table} SET ${col} = (SELECT id FROM organizaciones ORDER BY created_at ASC LIMIT 1)
+          WHERE ${col} IS NULL
+        `);
+        await client.query(`ALTER TABLE ${table} ALTER COLUMN ${col} SET NOT NULL;`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_${table}_organizacion_id ON ${table} (${col});`);
+      } catch (_e: any) {}
+    }
+
     // ── Vistas "legibles" para mirar la BD a mano en Supabase ────────
     // organizacion_id es un UUID -- perfecto para el código, ilegible para
     // quien entra al editor de tablas de Supabase a mirar un dato suelto (no

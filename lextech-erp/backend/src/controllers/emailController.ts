@@ -62,10 +62,12 @@ async function gmailApiPost(path: string, accessToken: string, body: object): Pr
   return res.json();
 }
 
-async function getGmailAccessToken(profileId: string, uid: string): Promise<string> {
+async function getGmailAccessToken(profileId: string, uid: string, organizacionId?: string): Promise<string> {
   const { rows } = await pool.query(
-    `SELECT access_token_enc, token_expiry FROM email_oauth_profiles WHERE id=$1 AND user_id=$2`,
-    [profileId, uid],
+    organizacionId
+      ? `SELECT access_token_enc, token_expiry FROM email_oauth_profiles WHERE id=$1 AND user_id=$2 AND organizacion_id=$3`
+      : `SELECT access_token_enc, token_expiry FROM email_oauth_profiles WHERE id=$1 AND user_id=$2`,
+    organizacionId ? [profileId, uid, organizacionId] : [profileId, uid],
   );
   if (!rows.length) throw new Error('Perfil Gmail no encontrado');
   const row = rows[0];
@@ -184,14 +186,15 @@ async function getAccountForMessage(messageId: string, uid: string) {
 export async function getAccounts(req: Request, res: Response) {
   const uid = userId(req);
   if (!uid) return err(res, 'No autenticado', 401);
+  const organizacionId = (req as any).organizacionId;
   try {
     const { rows } = await pool.query(
       `SELECT id, label, email, imap_host, imap_port, imap_secure,
               smtp_host, smtp_port, smtp_secure, username, active,
               COALESCE(protocol, 'imap') AS protocol,
               last_sync_at, created_at
-       FROM email_accounts WHERE user_id=$1 ORDER BY created_at`,
-      [uid],
+       FROM email_accounts WHERE user_id=$1 AND organizacion_id=$2 ORDER BY created_at`,
+      [uid, organizacionId],
     );
     return ok(res, rows);
   } catch (e: any) { return err(res, e.message); }
@@ -200,15 +203,16 @@ export async function getAccounts(req: Request, res: Response) {
 export async function getOAuthProfiles(req: Request, res: Response) {
   const uid = userId(req);
   if (!uid) return err(res, 'No autenticado', 401);
+  const organizacionId = (req as any).organizacionId;
   const provider = String(req.query.provider || 'google').toLowerCase();
 
   try {
     const { rows } = await pool.query(
       `SELECT id, provider, email, display_name, avatar_url, external_id, last_used_at, created_at
          FROM email_oauth_profiles
-        WHERE user_id=$1 AND provider=$2
+        WHERE user_id=$1 AND provider=$2 AND organizacion_id=$3
         ORDER BY last_used_at DESC, created_at DESC`,
-      [uid, provider],
+      [uid, provider, organizacionId],
     );
     return ok(res, rows);
   } catch (e: any) {
@@ -219,6 +223,8 @@ export async function getOAuthProfiles(req: Request, res: Response) {
 export async function upsertOAuthProfile(req: Request, res: Response) {
   const uid = userId(req);
   if (!uid) return err(res, 'No autenticado', 401);
+  const organizacionId = (req as any).organizacionId;
+  if (!organizacionId) return err(res, 'No se pudo determinar la organización activa', 400);
 
   const provider    = String(req.body?.provider || 'google').toLowerCase();
   const email       = String(req.body?.email || '').trim().toLowerCase();
@@ -234,11 +240,22 @@ export async function upsertOAuthProfile(req: Request, res: Response) {
   const tokenExpiry = accessToken ? new Date(Date.now() + expiresIn * 1000) : null;
 
   try {
+    // Un mismo perfil (user_id+provider+email) pertenece a una única
+    // organización -- si ya existe bajo otra distinta a la activa, no se
+    // mueve solo, para no acabar mezclando el correo de las dos.
+    const { rows: existing } = await pool.query(
+      `SELECT organizacion_id FROM email_oauth_profiles WHERE user_id=$1 AND provider=$2 AND email=$3`,
+      [uid, provider, email],
+    );
+    if (existing.length && existing[0].organizacion_id !== organizacionId) {
+      return err(res, 'Esta cuenta de Gmail ya está conectada en otra organización. Cambia a esa organización para usarla, o desconéctala primero.', 409);
+    }
+
     const { rows } = await pool.query(
       `INSERT INTO email_oauth_profiles
          (user_id, provider, email, display_name, avatar_url, external_id,
-          access_token_enc, token_expiry, last_used_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW())
+          access_token_enc, token_expiry, last_used_at, organizacion_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW(),$9)
        ON CONFLICT (user_id, provider, email)
        DO UPDATE SET
          display_name     = COALESCE(EXCLUDED.display_name,     email_oauth_profiles.display_name),
@@ -249,7 +266,7 @@ export async function upsertOAuthProfile(req: Request, res: Response) {
          last_used_at     = NOW(),
          updated_at       = NOW()
        RETURNING id, provider, email, display_name, avatar_url, external_id, last_used_at, created_at`,
-      [uid, provider, email, displayName, avatarUrl, externalId, tokenEnc, tokenExpiry],
+      [uid, provider, email, displayName, avatarUrl, externalId, tokenEnc, tokenExpiry, organizacionId],
     );
     return ok(res, rows[0]);
   } catch (e: any) {
@@ -260,12 +277,13 @@ export async function upsertOAuthProfile(req: Request, res: Response) {
 export async function deleteOAuthProfile(req: Request, res: Response) {
   const uid = userId(req);
   if (!uid) return err(res, 'No autenticado', 401);
+  const organizacionId = (req as any).organizacionId;
   const { id } = req.params;
 
   try {
     const { rowCount } = await pool.query(
-      `DELETE FROM email_oauth_profiles WHERE id=$1 AND user_id=$2`,
-      [id, uid],
+      `DELETE FROM email_oauth_profiles WHERE id=$1 AND user_id=$2 AND organizacion_id=$3`,
+      [id, uid, organizacionId],
     );
     if (!rowCount) return err(res, 'Perfil no encontrado', 404);
     return ok(res, true);
@@ -277,6 +295,8 @@ export async function deleteOAuthProfile(req: Request, res: Response) {
 export async function createAccount(req: Request, res: Response) {
   const uid = userId(req);
   if (!uid) return err(res, 'No autenticado', 401);
+  const organizacionId = (req as any).organizacionId;
+  if (!organizacionId) return err(res, 'No se pudo determinar la organización activa', 400);
   const {
     label = 'Mi cuenta', email,
     imap_host, imap_port, imap_secure = true,
@@ -303,8 +323,9 @@ export async function createAccount(req: Request, res: Response) {
           AND LOWER(imap_host)=LOWER($4)
           AND COALESCE(protocol, 'imap')=$5
           AND active=true
+          AND organizacion_id=$6
         LIMIT 1`,
-      [uid, email, username, imap_host, proto],
+      [uid, email, username, imap_host, proto, organizacionId],
     );
     if (existingAccounts.length) {
       return err(res, 'Esa cuenta ya existe en el módulo de correo. Usa la cuenta ya creada o bórrala antes de crear otra igual.', 409);
@@ -357,13 +378,13 @@ export async function createAccount(req: Request, res: Response) {
     const { rows } = await pool.query(
       `INSERT INTO email_accounts
          (user_id, label, email, imap_host, imap_port, imap_secure,
-          smtp_host, smtp_port, smtp_secure, username, password_enc, protocol)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+          smtp_host, smtp_port, smtp_secure, username, password_enc, protocol, organizacion_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
        RETURNING id, label, email, imap_host, imap_port, imap_secure,
                  smtp_host, smtp_port, smtp_secure, username, active,
                  protocol, last_sync_at, created_at`,
       [uid, label, email, imap_host, inPort, Boolean(imap_secure),
-       smtp_host, Number(smtp_port), Boolean(smtp_secure), username, enc, proto],
+       smtp_host, Number(smtp_port), Boolean(smtp_secure), username, enc, proto, organizacionId],
     );
     const created = rows[0];
 
@@ -388,6 +409,7 @@ export async function createAccount(req: Request, res: Response) {
 export async function deleteAccount(req: Request, res: Response) {
   const uid = userId(req);
   if (!uid) return err(res, 'No autenticado', 401);
+  const organizacionId = (req as any).organizacionId;
   const { id } = req.params;
   try {
     // Remove from EmailEngine before DB delete (fire-and-forget)
@@ -396,8 +418,8 @@ export async function deleteAccount(req: Request, res: Response) {
     }).catch(() => {});
 
     const { rowCount } = await pool.query(
-      `DELETE FROM email_accounts WHERE id=$1 AND user_id=$2`,
-      [id, uid],
+      `DELETE FROM email_accounts WHERE id=$1 AND user_id=$2 AND organizacion_id=$3`,
+      [id, uid, organizacionId],
     );
     if (!rowCount) return err(res, 'Cuenta no encontrada', 404);
     return ok(res, { id });
@@ -407,6 +429,7 @@ export async function deleteAccount(req: Request, res: Response) {
 export async function updateAccount(req: Request, res: Response) {
   const uid = userId(req);
   if (!uid) return err(res, 'No autenticado', 401);
+  const organizacionId = (req as any).organizacionId;
   const { id } = req.params;
   const {
     label, email,
@@ -417,8 +440,8 @@ export async function updateAccount(req: Request, res: Response) {
 
   try {
     const { rows: existing } = await pool.query(
-      `SELECT * FROM email_accounts WHERE id=$1 AND user_id=$2`,
-      [id, uid],
+      `SELECT * FROM email_accounts WHERE id=$1 AND user_id=$2 AND organizacion_id=$3`,
+      [id, uid, organizacionId],
     );
     if (!existing.length) return err(res, 'Cuenta no encontrada', 404);
     const acc = existing[0];
@@ -462,7 +485,7 @@ export async function updateAccount(req: Request, res: Response) {
               smtp_secure  = COALESCE($10, smtp_secure),
               username     = COALESCE($11, username),
               password_enc = $12
-        WHERE id=$1 AND user_id=$2
+        WHERE id=$1 AND user_id=$2 AND organizacion_id=$13
         RETURNING id, label, email, imap_host, imap_port, imap_secure,
                   smtp_host, smtp_port, smtp_secure, username, active,
                   protocol, last_sync_at, created_at`,
@@ -478,6 +501,7 @@ export async function updateAccount(req: Request, res: Response) {
         smtp_secure !== undefined ? Boolean(smtp_secure): null,
         username    !== undefined ? String(username)    : null,
         encPassword,
+        organizacionId,
       ],
     );
     return ok(res, rows[0]);
@@ -487,12 +511,13 @@ export async function updateAccount(req: Request, res: Response) {
 export async function getAccountFolders(req: Request, res: Response) {
   const uid = userId(req);
   if (!uid) return err(res, 'No autenticado', 401);
+  const organizacionId = (req as any).organizacionId;
   const { id } = req.params;
 
   try {
     const { rows } = await pool.query(
-      `SELECT * FROM email_accounts WHERE id=$1 AND user_id=$2 AND active=true`,
-      [id, uid],
+      `SELECT * FROM email_accounts WHERE id=$1 AND user_id=$2 AND organizacion_id=$3 AND active=true`,
+      [id, uid, organizacionId],
     );
     if (!rows.length) return err(res, 'Cuenta no encontrada', 404);
 
@@ -526,6 +551,7 @@ export async function getAccountFolders(req: Request, res: Response) {
 export async function createAccountFolder(req: Request, res: Response) {
   const uid = userId(req);
   if (!uid) return err(res, 'No autenticado', 401);
+  const organizacionId = (req as any).organizacionId;
   const { id } = req.params;
   const name = String(req.body?.name || '').trim();
 
@@ -533,8 +559,8 @@ export async function createAccountFolder(req: Request, res: Response) {
 
   try {
     const { rows } = await pool.query(
-      `SELECT * FROM email_accounts WHERE id=$1 AND user_id=$2 AND active=true`,
-      [id, uid],
+      `SELECT * FROM email_accounts WHERE id=$1 AND user_id=$2 AND organizacion_id=$3 AND active=true`,
+      [id, uid, organizacionId],
     );
     if (!rows.length) return err(res, 'Cuenta no encontrada', 404);
 
@@ -575,14 +601,15 @@ export async function createAccountFolder(req: Request, res: Response) {
 export async function syncAccount(req: Request, res: Response) {
   const uid = userId(req);
   if (!uid) return err(res, 'No autenticado', 401);
+  const organizacionId = (req as any).organizacionId;
   const { id } = req.params;
   const folder = (req.query.folder as string) || 'INBOX';
   const limit  = Math.min(Number(req.query.limit) || 50, 200);
 
   try {
     const { rows: accs } = await pool.query(
-      `SELECT * FROM email_accounts WHERE id=$1 AND user_id=$2 AND active=true`,
-      [id, uid],
+      `SELECT * FROM email_accounts WHERE id=$1 AND user_id=$2 AND organizacion_id=$3 AND active=true`,
+      [id, uid, organizacionId],
     );
     if (!accs.length) return err(res, 'Cuenta no encontrada', 404);
     const acc      = accs[0];
@@ -680,7 +707,7 @@ export async function syncGmailProfile(req: Request, res: Response) {
   const limit  = Math.min(Number(req.query.limit) || 50, 200);
 
   try {
-    const accessToken = await getGmailAccessToken(profileId, uid);
+    const accessToken = await getGmailAccessToken(profileId, uid, (req as any).organizacionId);
 
     const LABEL_MAP: Record<string, string[]> = {
       INBOX: ['INBOX'], SENT: ['SENT'], DRAFTS: ['DRAFT'], DRAFT: ['DRAFT'],
@@ -763,6 +790,7 @@ export async function syncGmailProfile(req: Request, res: Response) {
 export async function getMessages(req: Request, res: Response) {
   const uid = userId(req);
   if (!uid) return err(res, 'No autenticado', 401);
+  const organizacionId = (req as any).organizacionId;
 
   const accountId      = req.query.account_id       as string | undefined;
   const gmailProfileId = req.query.gmail_profile_id as string | undefined;
@@ -778,8 +806,20 @@ export async function getMessages(req: Request, res: Response) {
     const params: any[] = [uid];
     const conditions: string[] = ['e.user_id=$1'];
 
-    if (accountId)      { params.push(accountId);      conditions.push(`e.account_id=$${params.length}`); }
-    if (gmailProfileId) { params.push(gmailProfileId); conditions.push(`e.gmail_profile_id=$${params.length}`); }
+    // account_id/gmail_profile_id llegan del selector del frontend, que ya
+    // solo lista cuentas de la organización activa -- esta comprobación es
+    // por si el id fuera de otra organización propia del mismo usuario
+    // (varias organizaciones, misma persona) para no mezclar bandejas.
+    if (accountId) {
+      params.push(accountId);
+      params.push(organizacionId);
+      conditions.push(`e.account_id=$${params.length - 1} AND e.account_id IN (SELECT id FROM email_accounts WHERE organizacion_id=$${params.length})`);
+    }
+    if (gmailProfileId) {
+      params.push(gmailProfileId);
+      params.push(organizacionId);
+      conditions.push(`e.gmail_profile_id=$${params.length - 1} AND e.gmail_profile_id IN (SELECT id FROM email_oauth_profiles WHERE organizacion_id=$${params.length})`);
+    }
 
     if (folder === 'STARRED') {
       conditions.push(`e.is_starred=true`);
@@ -858,7 +898,7 @@ export async function getMessage(req: Request, res: Response) {
     // Fetch body from Gmail API if falta el cuerpo o nunca se comprobaron adjuntos
     if (row.gmail_profile_id && row.gmail_message_id && ((!row.body_html && !row.body_text) || attachmentsUnchecked)) {
       try {
-        const accessToken = await getGmailAccessToken(row.gmail_profile_id, uid);
+        const accessToken = await getGmailAccessToken(row.gmail_profile_id, uid, (req as any).organizacionId);
         const full = await gmailApiGet(`/messages/${row.gmail_message_id}?format=full`, accessToken);
         let bodyHtml = ''; let bodyText = '';
         const attachments: { attachmentId: string; filename: string; contentType: string; size: number }[] = [];
@@ -942,7 +982,7 @@ export async function getMessage(req: Request, res: Response) {
       row.is_read = true;
       if (row.gmail_profile_id && row.gmail_message_id) {
         try {
-          const token = await getGmailAccessToken(row.gmail_profile_id, uid);
+          const token = await getGmailAccessToken(row.gmail_profile_id, uid, (req as any).organizacionId);
           await gmailApiPost(`/messages/${row.gmail_message_id}/modify`, token,
             { addLabelIds: [], removeLabelIds: ['UNREAD'] });
         } catch (_e) {}
@@ -970,7 +1010,7 @@ export async function markRead(req: Request, res: Response) {
 
     if (message.gmail_profile_id && message.gmail_message_id) {
       try {
-        const token = await getGmailAccessToken(message.gmail_profile_id, uid);
+        const token = await getGmailAccessToken(message.gmail_profile_id, uid, (req as any).organizacionId);
         await gmailApiPost(`/messages/${message.gmail_message_id}/modify`, token, {
           addLabelIds:    read ? [] : ['UNREAD'],
           removeLabelIds: read ? ['UNREAD'] : [],
@@ -1013,7 +1053,7 @@ export async function toggleStar(req: Request, res: Response) {
 
     if (message.gmail_profile_id && message.gmail_message_id) {
       try {
-        const token = await getGmailAccessToken(message.gmail_profile_id, uid);
+        const token = await getGmailAccessToken(message.gmail_profile_id, uid, (req as any).organizacionId);
         await gmailApiPost(`/messages/${message.gmail_message_id}/modify`, token, {
           addLabelIds:    starred ? ['STARRED'] : [],
           removeLabelIds: starred ? [] : ['STARRED'],
@@ -1427,7 +1467,7 @@ export async function downloadMessageAttachment(req: Request, res: Response) {
 
     if (row.gmail_profile_id && row.gmail_message_id) {
       if (!entry?.attachmentId) return err(res, 'Adjunto no encontrado', 404);
-      const accessToken = await getGmailAccessToken(row.gmail_profile_id, uid);
+      const accessToken = await getGmailAccessToken(row.gmail_profile_id, uid, (req as any).organizacionId);
       const part = await gmailApiGet(`/messages/${row.gmail_message_id}/attachments/${entry.attachmentId}`, accessToken);
       const buffer = Buffer.from(String(part.data || '').replace(/-/g, '+').replace(/_/g, '/'), 'base64');
       res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(entry.filename || 'adjunto')}"`);
@@ -1517,7 +1557,7 @@ export async function saveAttachmentToExpediente(req: any, res: Response) {
 
     if (row.gmail_profile_id && row.gmail_message_id) {
       if (!entry?.attachmentId) return err(res, 'Adjunto no encontrado', 404);
-      const accessToken = await getGmailAccessToken(row.gmail_profile_id, uid);
+      const accessToken = await getGmailAccessToken(row.gmail_profile_id, uid, (req as any).organizacionId);
       const part = await gmailApiGet(`/messages/${row.gmail_message_id}/attachments/${entry.attachmentId}`, accessToken);
       buffer = Buffer.from(String(part.data || '').replace(/-/g, '+').replace(/_/g, '/'), 'base64');
     } else if (row.uid && !Number.isNaN(index)) {
@@ -1571,14 +1611,20 @@ export async function saveAttachmentToExpediente(req: any, res: Response) {
 export async function getStats(req: Request, res: Response) {
   const uid = userId(req);
   if (!uid) return err(res, 'No autenticado', 401);
+  const organizacionId = (req as any).organizacionId;
   const accountId      = req.query.account_id       as string | undefined;
   const gmailProfileId = req.query.gmail_profile_id as string | undefined;
 
   try {
     const params: any[] = [uid];
     let accCond = '';
-    if (accountId)      { params.push(accountId);      accCond = `AND account_id=$2`; }
-    else if (gmailProfileId) { params.push(gmailProfileId); accCond = `AND gmail_profile_id=$2`; }
+    if (accountId) {
+      params.push(accountId, organizacionId);
+      accCond = `AND account_id=$2 AND account_id IN (SELECT id FROM email_accounts WHERE organizacion_id=$3)`;
+    } else if (gmailProfileId) {
+      params.push(gmailProfileId, organizacionId);
+      accCond = `AND gmail_profile_id=$2 AND gmail_profile_id IN (SELECT id FROM email_oauth_profiles WHERE organizacion_id=$3)`;
+    }
 
     const { rows } = await pool.query(
       `SELECT

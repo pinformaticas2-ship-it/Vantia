@@ -3709,6 +3709,11 @@ export default function Email() {
       }),
     }).catch(() => null);
     const payload = await res?.json().catch(() => null);
+    if (res && !res.ok) {
+      // La cuenta puede pertenecer a otra organización (correo aislado por
+      // organización) -- avisar en vez de fallar en silencio.
+      setError(payload?.error || 'No se pudo guardar la cuenta de Gmail');
+    }
     await refreshSavedGmailProfiles().catch(() => undefined);
     return (payload?.success ? payload.data : null) as SavedOAuthProfile | null;
   }, [authFetch, refreshSavedGmailProfiles, userAvatar, userName]);
