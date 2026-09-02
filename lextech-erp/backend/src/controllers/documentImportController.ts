@@ -472,6 +472,7 @@ async function createImportedDeadlineFollowUps(
   draft: Record<string, any>,
   userId_: string,
   userName_: string,
+  organizacionId: string,
 ) {
   const baseDate = String(draft.fecha_inicio || draft.fecha_notificacion || '').slice(0, 10);
   if (!baseDate) return;
@@ -497,8 +498,8 @@ async function createImportedDeadlineFollowUps(
     const taskResult = await pool.query(
       `INSERT INTO client_tasks
          (client_id, client_name, titulo, descripcion, plazo, fecha_aviso, estado, prioridad,
-          expediente, expediente_id, tipo, juzgado, num_proc, notas, etapa, created_by, user_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+          expediente, expediente_id, tipo, juzgado, num_proc, notas, etapa, created_by, user_id, organizacion_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
        RETURNING *`,
       [
         clienteId,
@@ -518,6 +519,7 @@ async function createImportedDeadlineFollowUps(
         'Revisión documental',
         userName_,
         userId_,
+        organizacionId,
       ],
     );
 
@@ -525,8 +527,8 @@ async function createImportedDeadlineFollowUps(
     const reminderAgenda = await pool.query(
       `INSERT INTO agenda_events
          (user_id, user_name, title, description, start_at, end_at, all_day, type, status,
-          expediente_id, cliente_id, organization_context, source, task_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+          expediente_id, cliente_id, organization_context, source, task_id, organizacion_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
        RETURNING id`,
       [
         userId_,
@@ -543,6 +545,7 @@ async function createImportedDeadlineFollowUps(
         expedienteLabel,
         'document-import-review',
         task.id,
+        organizacionId,
       ],
     );
 
@@ -555,8 +558,8 @@ async function createImportedDeadlineFollowUps(
   await pool.query(
     `INSERT INTO agenda_events
        (user_id, user_name, title, description, start_at, end_at, all_day, type, status,
-        expediente_id, cliente_id, organization_context, source)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+        expediente_id, cliente_id, organization_context, source, organizacion_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
       [
         userId_,
         userName_,
@@ -571,6 +574,7 @@ async function createImportedDeadlineFollowUps(
       clienteId,
       expedienteLabel,
       'document-import-deadline',
+      organizacionId,
     ],
   );
 }
@@ -1678,7 +1682,7 @@ export async function acceptDocumentImportItem(req: Request, res: Response) {
 
     const expediente = await createExpediente(finalDraft, unam, organizacionId);
     await attachImportedDocumentToExpediente(expediente.id, payload, uid);
-    await createImportedDeadlineFollowUps(expediente, finalDraft, uid, unam);
+    await createImportedDeadlineFollowUps(expediente, finalDraft, uid, unam, organizacionId);
 
     await pool.query(
       `UPDATE expediente_import_items

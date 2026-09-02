@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { randomBytes } from 'crypto';
 import pool from '../config/database';
+import { resolveUserOrgMemberships } from './organizacionesController';
 
 const pgErr = (e: any) => `${e?.message || String(e)}${e?.code ? ` | code: ${e.code}` : ''}`;
 
@@ -229,11 +230,18 @@ export const createPublicBooking = async (req: any, res: Response) => {
     startAt.setHours(h, m, 0, 0);
     const endAt = new Date(startAt.getTime() + page.duration_minutes * 60000);
 
+    // La reserva es pública (sin sesión, no hay req.organizacionId) -- se
+    // resuelve la organización del dueño de la página de reservas, igual
+    // que hace resolveOrg con una sesión normal (primera organización de la
+    // que sea miembro).
+    const ownerMemberships = await resolveUserOrgMemberships(page.user_id);
+    const organizacionId = ownerMemberships[0]?.organizacionId || null;
+
     const result = await pool.query(
       `INSERT INTO agenda_events
          (user_id, user_name, title, description, start_at, end_at, all_day, type, status,
-          source, guests, booking_page_id)
-       VALUES ($1,$2,$3,$4,$5,$6,false,'cita','pendiente','public_booking',$7,$8)
+          source, guests, booking_page_id, organizacion_id)
+       VALUES ($1,$2,$3,$4,$5,$6,false,'cita','pendiente','public_booking',$7,$8,$9)
        RETURNING id, start_at, end_at`,
       [
         page.user_id,
@@ -244,6 +252,7 @@ export const createPublicBooking = async (req: any, res: Response) => {
         endAt.toISOString(),
         [String(email).trim().toLowerCase()],
         page.id,
+        organizacionId,
       ]
     );
 
