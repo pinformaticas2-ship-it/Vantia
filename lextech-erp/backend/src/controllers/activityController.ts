@@ -308,6 +308,7 @@ export const getActivityByUsers = async (_req: Request, res: Response) => {
         json_agg(DISTINCT event_type) FILTER (WHERE event_type IS NOT NULL) AS event_types,
         json_agg(DISTINCT entity_type) FILTER (WHERE entity_type IS NOT NULL) AS entity_types
       FROM activity_log
+      WHERE user_id != 'SYSTEM'
       GROUP BY user_id
       ORDER BY MAX(created_at) DESC
     `);
