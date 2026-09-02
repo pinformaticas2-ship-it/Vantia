@@ -128,6 +128,8 @@ export const getOrganizationOptions = async (req: any, res: Response) => {
       pool.query(
         `SELECT
            e.id,
+           e.anio,
+           e.num_exp,
            e.ref_expediente,
            e.ref_propia,
            e.descripcion,
@@ -174,6 +176,8 @@ export const getOrganizationOptions = async (req: any, res: Response) => {
 
     const expedientes = expedientesRes.rows.map((row) => ({
       id: row.id,
+      anio: row.anio,
+      num_exp: row.num_exp,
       ref_expediente: row.ref_expediente,
       ref_propia: row.ref_propia,
       descripcion: row.descripcion,

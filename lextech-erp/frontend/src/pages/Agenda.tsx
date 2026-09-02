@@ -86,12 +86,20 @@ interface AgendaOrganizationUser {
 
 interface AgendaOrganizationExpediente {
   id: string;
+  anio?: number | null;
+  num_exp?: number | null;
   ref_expediente?: string | null;
   ref_propia?: string | null;
   descripcion?: string | null;
   cliente_id?: string | null;
   cliente_nombre?: string | null;
   related_users?: AgendaOrganizationUser[];
+}
+
+function expedienteOptionLabel(item: AgendaOrganizationExpediente): string {
+  return item.ref_expediente || item.ref_propia
+    || (item.anio && item.num_exp ? `${item.anio}/${item.num_exp}` : null)
+    || "Expediente sin referencia";
 }
 
 // ── Config de tipos de evento ─────────────────────────────────────────────────
@@ -699,7 +707,7 @@ function EventModal({
                     <option value="">Seleccionar expediente...</option>
                     {expedientesForSelectedUser.map((item) => (
                       <option key={item.id} value={item.id}>
-                        {(item.ref_expediente || item.ref_propia || item.id)} · {item.descripcion || "Sin descripcion"}
+                        {expedienteOptionLabel(item)} · {item.descripcion || "Sin descripcion"}
                       </option>
                     ))}
                   </select>

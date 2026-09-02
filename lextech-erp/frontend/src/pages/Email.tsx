@@ -4283,10 +4283,17 @@ export default function Email() {
         if (!res.ok) return;
         const json = await res.json();
         if (cancelled) return;
-        const list: ExpedienteOption[] = (json?.data?.expedientes || []).map((item: any) => ({
-          id: item.id,
-          label: `${item.ref_expediente || item.ref_propia || item.id}${item.cliente_nombre ? ' · ' + item.cliente_nombre : ''}`,
-        }));
+        const list: ExpedienteOption[] = (json?.data?.expedientes || []).map((item: any) => {
+          // Nunca mostrar el id (UUID) en crudo: si no hay referencia propia,
+          // se cae al mismo "año/número" que usa el resto de la app.
+          const ref = item.ref_expediente || item.ref_propia
+            || (item.anio && item.num_exp ? `${item.anio}/${item.num_exp}` : null)
+            || 'Expediente sin referencia';
+          return {
+            id: item.id,
+            label: `${ref}${item.cliente_nombre ? ' · ' + item.cliente_nombre : ''}`,
+          };
+        });
         setOrganizationExpedientes(list);
       } catch { /* silencioso: la vinculación a expediente es opcional */ }
     })();
