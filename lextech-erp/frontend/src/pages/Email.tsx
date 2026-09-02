@@ -1912,6 +1912,26 @@ function EmailReader({
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [attachmentPickerIdx, setAttachmentPickerIdx] = useState<number | null>(null);
   const [attachmentTargetExp, setAttachmentTargetExp] = useState('');
+  const [expLinkOpen, setExpLinkOpen] = useState(false);
+  const [expLinkFilter, setExpLinkFilter] = useState('');
+
+  // La lista puede traer el mismo expediente repetido (p.ej. si aparece
+  // vinculado a más de un usuario en agenda) — se deduplica por id.
+  const dedupedExpedienteOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const out: ExpedienteOption[] = [];
+    for (const opt of expedienteOptions || []) {
+      if (seen.has(opt.id)) continue;
+      seen.add(opt.id);
+      out.push(opt);
+    }
+    return out;
+  }, [expedienteOptions]);
+
+  const linkedExpedienteLabel = useMemo(
+    () => dedupedExpedienteOptions.find((opt) => opt.id === email.expedienteId)?.label || '',
+    [dedupedExpedienteOptions, email.expedienteId],
+  );
 
   const srcDoc = useMemo(
     () => buildEmailDoc(decodeQP(email.bodyHtml || ''), decodeQP(email.bodyText || '')),
@@ -2099,21 +2119,58 @@ function EmailReader({
                     {email.subject}
                   </h1>
                   {onLinkExpediente && (
-                    <div className="mt-3 flex items-center gap-2">
-                      <Briefcase size={14} className={headerCx('text-slate-400', 'text-slate-400')} />
-                      <select
-                        value={email.expedienteId || ''}
+                    <div className="relative mt-3 inline-block">
+                      <button
+                        type="button"
                         disabled={linkingExpediente}
-                        onChange={(e) => onLinkExpediente(e.target.value || null)}
-                        className={`text-xs rounded-full border px-3 py-1.5 focus:outline-none disabled:opacity-60 ${
-                          headerCx('border-white/15 bg-white/5 text-slate-200', 'border-slate-200 bg-white text-slate-600')
+                        onClick={() => { setExpLinkOpen((o) => !o); setExpLinkFilter(''); }}
+                        className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60 ${
+                          headerCx('border-white/15 bg-white/5 text-slate-200 hover:bg-white/10', 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50')
                         }`}>
-                        <option value="">Sin vincular a expediente</option>
-                        {(expedienteOptions || []).map((opt) => (
-                          <option key={opt.id} value={opt.id}>{opt.label}</option>
-                        ))}
-                      </select>
-                      {linkingExpediente && <span className="text-xs text-slate-400">Guardando…</span>}
+                        <Briefcase size={14} className="shrink-0 text-slate-400" />
+                        <span className="max-w-[240px] truncate">{linkedExpedienteLabel || 'Sin vincular a expediente'}</span>
+                        <ChevronDown size={12} className={`shrink-0 transition-transform ${expLinkOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                      {linkingExpediente && <span className="ml-2 text-xs text-slate-400">Guardando…</span>}
+                      {expLinkOpen && (
+                        <>
+                          <div className="fixed inset-0 z-20" onClick={() => setExpLinkOpen(false)} />
+                          <div className="absolute z-30 top-full left-0 mt-1.5 w-80 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+                            <input
+                              type="text"
+                              value={expLinkFilter}
+                              onChange={(e) => setExpLinkFilter(e.target.value)}
+                              placeholder="Buscar expediente…"
+                              autoFocus
+                              className="w-full text-xs rounded-xl border border-slate-200 px-3 py-2 mb-1.5 text-slate-700 focus:border-red-400 focus:outline-none"
+                            />
+                            <div className="max-h-64 overflow-y-auto">
+                              <button
+                                type="button"
+                                onClick={() => { onLinkExpediente(null); setExpLinkOpen(false); }}
+                                className="w-full text-left px-3 py-2 rounded-lg text-xs text-slate-500 hover:bg-slate-50 transition-colors">
+                                Sin vincular a expediente
+                              </button>
+                              {dedupedExpedienteOptions
+                                .filter((opt) => !expLinkFilter.trim() || opt.label.toLowerCase().includes(expLinkFilter.trim().toLowerCase()))
+                                .map((opt) => (
+                                  <button
+                                    key={opt.id}
+                                    type="button"
+                                    onClick={() => { onLinkExpediente(opt.id); setExpLinkOpen(false); }}
+                                    className={`w-full text-left px-3 py-2 rounded-lg text-xs truncate transition-colors ${
+                                      opt.id === email.expedienteId ? 'bg-red-50 text-[#ab0433] font-semibold' : 'text-slate-700 hover:bg-slate-50'
+                                    }`}>
+                                    {opt.label}
+                                  </button>
+                                ))}
+                              {dedupedExpedienteOptions.filter((opt) => !expLinkFilter.trim() || opt.label.toLowerCase().includes(expLinkFilter.trim().toLowerCase())).length === 0 && (
+                                <p className="px-3 py-2 text-xs text-slate-400">Sin resultados</p>
+                              )}
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
@@ -2213,7 +2270,7 @@ function EmailReader({
                               onChange={(e) => setAttachmentTargetExp(e.target.value)}
                               className="w-full text-xs rounded-xl border border-slate-200 px-2 py-2 mb-2 focus:border-red-400 focus:outline-none">
                               <option value="">Seleccionar expediente…</option>
-                              {(expedienteOptions || []).map((opt) => (
+                              {dedupedExpedienteOptions.map((opt) => (
                                 <option key={opt.id} value={opt.id}>{opt.label}</option>
                               ))}
                             </select>
