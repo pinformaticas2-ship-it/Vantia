@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Spinner } from "../components/Spinner";
+import { ConnectionErrorBanner } from "../components/ConnectionErrorBanner";
 import { useAuth } from "@clerk/clerk-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -374,19 +375,8 @@ export default function WhatsApp() {
 
   if (error && contacts.length === 0 && !status) {
     return (
-      <div className="space-y-4">
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-red-700">
-          <p className="text-sm font-semibold">No se pudo cargar el módulo de WhatsApp</p>
-          <p className="mt-1 text-sm">{error}</p>
-        </div>
-        <button
-          type="button"
-          onClick={fetchShell}
-          className="inline-flex items-center gap-2 rounded-xl bg-[#ab0433] px-4 py-2 text-sm font-semibold text-white hover:bg-[#92042c]"
-        >
-          <RefreshCw size={15} />
-          Reintentar
-        </button>
+      <div className="flex h-[60vh] items-center justify-center">
+        <ConnectionErrorBanner error={error} onRetry={fetchShell} title="No se pudo cargar Comunicación Externa" />
       </div>
     );
   }
