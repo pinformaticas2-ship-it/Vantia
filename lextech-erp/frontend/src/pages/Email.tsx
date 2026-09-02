@@ -8,6 +8,7 @@ import { useSidebar } from "../layouts/DashboardLayout";
 import React, {
   useState, useEffect, useRef, useCallback, useMemo,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth, useUser } from '@clerk/clerk-react';
 import {
@@ -1914,6 +1915,46 @@ function EmailReader({
   const [attachmentTargetExp, setAttachmentTargetExp] = useState('');
   const [expLinkOpen, setExpLinkOpen] = useState(false);
   const [expLinkFilter, setExpLinkFilter] = useState('');
+  const [expLinkMenuPos, setExpLinkMenuPos] = useState({ top: 0, left: 0 });
+  const expLinkBtnRef = useRef<HTMLButtonElement>(null);
+  const expLinkMenuRef = useRef<HTMLDivElement>(null);
+
+  const [attachmentMenuPos, setAttachmentMenuPos] = useState({ top: 0, left: 0 });
+  const attachmentMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (attachmentPickerIdx === null) return;
+    const handler = (e: MouseEvent) => {
+      if (attachmentMenuRef.current && !attachmentMenuRef.current.contains(e.target as Node)) {
+        setAttachmentPickerIdx(null);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [attachmentPickerIdx]);
+
+  const openExpLinkMenu = useCallback(() => {
+    if (!expLinkBtnRef.current) return;
+    const r = expLinkBtnRef.current.getBoundingClientRect();
+    setExpLinkMenuPos({ top: r.bottom + 6, left: r.left });
+    setExpLinkFilter('');
+    setExpLinkOpen((o) => !o);
+  }, []);
+
+  // La lista se porta fuera del panel del correo (que recorta su contenido
+  // con overflow-hidden por las manchas decorativas de fondo), así que hay
+  // que cerrarla a mano al hacer click fuera de ella.
+  useEffect(() => {
+    if (!expLinkOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (
+        expLinkBtnRef.current && !expLinkBtnRef.current.contains(e.target as Node) &&
+        expLinkMenuRef.current && !expLinkMenuRef.current.contains(e.target as Node)
+      ) setExpLinkOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [expLinkOpen]);
 
   // La lista puede traer el mismo expediente repetido (p.ej. si aparece
   // vinculado a más de un usuario en agenda) — se deduplica por id.
@@ -2119,11 +2160,12 @@ function EmailReader({
                     {email.subject}
                   </h1>
                   {onLinkExpediente && (
-                    <div className="relative mt-3 inline-block">
+                    <div className="mt-3 inline-block">
                       <button
+                        ref={expLinkBtnRef}
                         type="button"
                         disabled={linkingExpediente}
-                        onClick={() => { setExpLinkOpen((o) => !o); setExpLinkFilter(''); }}
+                        onClick={openExpLinkMenu}
                         className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60 ${
                           headerCx('border-white/15 bg-white/5 text-slate-200 hover:bg-white/10', 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50')
                         }`}>
@@ -2132,44 +2174,45 @@ function EmailReader({
                         <ChevronDown size={12} className={`shrink-0 transition-transform ${expLinkOpen ? 'rotate-180' : ''}`} />
                       </button>
                       {linkingExpediente && <span className="ml-2 text-xs text-slate-400">Guardando…</span>}
-                      {expLinkOpen && (
-                        <>
-                          <div className="fixed inset-0 z-20" onClick={() => setExpLinkOpen(false)} />
-                          <div className="absolute z-30 top-full left-0 mt-1.5 w-80 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
-                            <input
-                              type="text"
-                              value={expLinkFilter}
-                              onChange={(e) => setExpLinkFilter(e.target.value)}
-                              placeholder="Buscar expediente…"
-                              autoFocus
-                              className="w-full text-xs rounded-xl border border-slate-200 px-3 py-2 mb-1.5 text-slate-700 focus:border-red-400 focus:outline-none"
-                            />
-                            <div className="max-h-64 overflow-y-auto">
-                              <button
-                                type="button"
-                                onClick={() => { onLinkExpediente(null); setExpLinkOpen(false); }}
-                                className="w-full text-left px-3 py-2 rounded-lg text-xs text-slate-500 hover:bg-slate-50 transition-colors">
-                                Sin vincular a expediente
-                              </button>
-                              {dedupedExpedienteOptions
-                                .filter((opt) => !expLinkFilter.trim() || opt.label.toLowerCase().includes(expLinkFilter.trim().toLowerCase()))
-                                .map((opt) => (
-                                  <button
-                                    key={opt.id}
-                                    type="button"
-                                    onClick={() => { onLinkExpediente(opt.id); setExpLinkOpen(false); }}
-                                    className={`w-full text-left px-3 py-2 rounded-lg text-xs truncate transition-colors ${
-                                      opt.id === email.expedienteId ? 'bg-red-50 text-[#ab0433] font-semibold' : 'text-slate-700 hover:bg-slate-50'
-                                    }`}>
-                                    {opt.label}
-                                  </button>
-                                ))}
-                              {dedupedExpedienteOptions.filter((opt) => !expLinkFilter.trim() || opt.label.toLowerCase().includes(expLinkFilter.trim().toLowerCase())).length === 0 && (
-                                <p className="px-3 py-2 text-xs text-slate-400">Sin resultados</p>
-                              )}
-                            </div>
+                      {expLinkOpen && typeof document !== 'undefined' && createPortal(
+                        <div
+                          ref={expLinkMenuRef}
+                          style={{ position: 'fixed', top: expLinkMenuPos.top, left: expLinkMenuPos.left, zIndex: 9999 }}
+                          className="w-80 rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl">
+                          <input
+                            type="text"
+                            value={expLinkFilter}
+                            onChange={(e) => setExpLinkFilter(e.target.value)}
+                            placeholder="Buscar expediente…"
+                            autoFocus
+                            className="w-full text-xs rounded-xl border border-slate-200 px-3 py-2 mb-1.5 text-slate-700 focus:border-red-400 focus:outline-none"
+                          />
+                          <div className="max-h-64 overflow-y-auto">
+                            <button
+                              type="button"
+                              onClick={() => { onLinkExpediente(null); setExpLinkOpen(false); }}
+                              className="w-full text-left px-3 py-2 rounded-lg text-xs text-slate-500 hover:bg-slate-50 transition-colors">
+                              Sin vincular a expediente
+                            </button>
+                            {dedupedExpedienteOptions
+                              .filter((opt) => !expLinkFilter.trim() || opt.label.toLowerCase().includes(expLinkFilter.trim().toLowerCase()))
+                              .map((opt) => (
+                                <button
+                                  key={opt.id}
+                                  type="button"
+                                  onClick={() => { onLinkExpediente(opt.id); setExpLinkOpen(false); }}
+                                  className={`w-full text-left px-3 py-2 rounded-lg text-xs truncate transition-colors ${
+                                    opt.id === email.expedienteId ? 'bg-red-50 text-[#ab0433] font-semibold' : 'text-slate-700 hover:bg-slate-50'
+                                  }`}>
+                                  {opt.label}
+                                </button>
+                              ))}
+                            {dedupedExpedienteOptions.filter((opt) => !expLinkFilter.trim() || opt.label.toLowerCase().includes(expLinkFilter.trim().toLowerCase())).length === 0 && (
+                              <p className="px-3 py-2 text-xs text-slate-400">Sin resultados</p>
+                            )}
                           </div>
-                        </>
+                        </div>,
+                        document.body
                       )}
                     </div>
                   )}
@@ -2252,7 +2295,10 @@ function EmailReader({
                           {onSaveAttachmentToExpediente && (
                             <button
                               type="button"
-                              onClick={() => {
+                              onMouseDown={(e) => e.stopPropagation()}
+                              onClick={(e) => {
+                                const r = e.currentTarget.getBoundingClientRect();
+                                setAttachmentMenuPos({ top: r.bottom + 6, left: r.left });
                                 setAttachmentTargetExp('');
                                 setAttachmentPickerIdx((prev) => (prev === idx ? null : idx));
                               }}
@@ -2262,8 +2308,11 @@ function EmailReader({
                             </button>
                           )}
                         </div>
-                        {attachmentPickerIdx === idx && (
-                          <div className="absolute z-20 top-full left-0 mt-1 w-72 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl">
+                        {attachmentPickerIdx === idx && typeof document !== 'undefined' && createPortal(
+                          <div
+                            ref={attachmentMenuRef}
+                            style={{ position: 'fixed', top: attachmentMenuPos.top, left: attachmentMenuPos.left, zIndex: 9999 }}
+                            className="w-72 rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl">
                             <p className="text-[11px] font-semibold text-slate-500 mb-2">Guardar adjunto en expediente</p>
                             <select
                               value={attachmentTargetExp}
@@ -2292,7 +2341,8 @@ function EmailReader({
                                 {savingAttachmentIndex === idx ? 'Guardando…' : 'Guardar'}
                               </button>
                             </div>
-                          </div>
+                          </div>,
+                          document.body
                         )}
                       </div>
                     ))}
