@@ -8,6 +8,7 @@ import {
   getDocumentImportBatch,
   listDocumentImportBatches,
   acceptDocumentImportItem,
+  confirmDocumentImportDeadline,
   deleteDocumentImportBatch,
 } from '../controllers/documentImportController';
 
@@ -31,5 +32,6 @@ router.get('/batch/:id', requireAuth, getDocumentImportBatch);
 router.get('/batches',   requireAuth, listDocumentImportBatches);
 router.delete('/batch/:id', requireAuth, deleteDocumentImportBatch);
 router.post('/batch/:batchId/items/:itemId/accept', requireAuth, acceptDocumentImportItem);
+router.post('/batch/:batchId/items/:itemId/confirm-deadline', requireAuth, confirmDocumentImportDeadline);
 
 export default router;

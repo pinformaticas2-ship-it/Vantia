@@ -468,28 +468,60 @@ function isoDateToAgendaEnd(value?: string | null) {
   return `${String(value).slice(0, 10)}T18:00:00.000Z`;
 }
 
-async function createImportedDeadlineFollowUps(
-  expediente: any,
-  draft: Record<string, any>,
-  userId_: string,
-  userName_: string,
-  organizacionId: string,
-) {
+// Calcula (sin persistir nada) el plazo procesal detectado a partir del
+// documento importado, para proponerlo al usuario y que confirme —o descarte—
+// la creación de la tarea/agenda correspondientes, en vez de crearlas en
+// silencio como se hacía antes.
+function computeImportedDeadlineProposal(expediente: any, draft: Record<string, any>): Record<string, any> | null {
   const baseDate = String(draft.fecha_inicio || draft.fecha_notificacion || '').slice(0, 10);
-  if (!baseDate) return;
+  if (!baseDate) return null;
 
   const deadlineDate = addWorkingDaysFromIso(baseDate, 20);
-  if (!deadlineDate) return;
+  if (!deadlineDate) return null;
 
   const reminderDate = subtractDaysFromIso(deadlineDate, 3) || deadlineDate;
   const expedienteLabel = draft.ref_expediente || draft.ref_propia || `${expediente.anio}/${expediente.num_exp}`;
   const descripcionBase = draft.descripcion || 'Expediente importado desde documento';
   const clienteId = draft.cliente_id || expediente.cliente_id || null;
   const clienteNombre = draft.cliente_nombre || expediente.cliente_nombre || null;
+
+  return {
+    baseDate,
+    deadlineDate,
+    reminderDate,
+    expedienteLabel,
+    descripcionBase,
+    clienteId,
+    clienteNombre,
+    juzgado: draft.juzgado?.trim() || null,
+    numAutos: draft.num_autos?.trim() || null,
+    observaciones: draft.observaciones?.trim() || null,
+    tipoTareaSugerido: 'plazo_procesal',
+    tipoAgendaSugerido: 'plazo',
+  };
+}
+
+// Crea la tarea (si hay cliente) y los eventos de agenda (aviso previo + fecha
+// límite) a partir de una propuesta ya calculada por computeImportedDeadlineProposal
+// y confirmada por el usuario, con el tipo de actuación que haya elegido.
+async function persistImportedDeadlineFollowUps(
+  expedienteId: string,
+  proposal: Record<string, any>,
+  userId_: string,
+  userName_: string,
+  organizacionId: string,
+  tipoTarea: string,
+  tipoAgenda: string,
+) {
+  const {
+    deadlineDate, reminderDate, expedienteLabel, descripcionBase,
+    clienteId, clienteNombre, juzgado, numAutos, observaciones,
+  } = proposal;
+
   const reminderTitle = `AVISO DE REVISIÓN · FECHA LÍMITE · ${expedienteLabel}`;
   const deadlineTitle = `FECHA LÍMITE · ${expedienteLabel}`;
   const reminderDescription = [
-    'Seguimiento automático creado tras verificar el escaneo del expediente.',
+    'Seguimiento creado a partir del escaneo del expediente, confirmado por el usuario.',
     `Fecha límite del expediente: ${deadlineDate}`,
     `Fecha de revisión / aviso: ${reminderDate}`,
     descripcionBase,
@@ -512,11 +544,11 @@ async function createImportedDeadlineFollowUps(
         'pendiente',
         'alta',
         expedienteLabel,
-        expediente.id,
-        'plazo_procesal',
-        draft.juzgado?.trim() || null,
-        draft.num_autos?.trim() || null,
-        draft.observaciones?.trim() || null,
+        expedienteId,
+        tipoTarea,
+        juzgado,
+        numAutos,
+        observaciones,
         'Revisión documental',
         userName_,
         userId_,
@@ -539,9 +571,9 @@ async function createImportedDeadlineFollowUps(
         isoDateToAgendaStart(reminderDate),
         isoDateToAgendaEnd(reminderDate),
         true,
-        'plazo',
+        tipoAgenda,
         'pendiente',
-        expediente.id,
+        expedienteId,
         clienteId,
         expedienteLabel,
         'document-import-review',
@@ -569,9 +601,9 @@ async function createImportedDeadlineFollowUps(
         isoDateToAgendaStart(deadlineDate),
         isoDateToAgendaEnd(deadlineDate),
       true,
-      'plazo',
+      tipoAgenda,
       'pendiente',
-      expediente.id,
+      expedienteId,
       clienteId,
       expedienteLabel,
       'document-import-deadline',
@@ -1709,7 +1741,11 @@ export async function acceptDocumentImportItem(req: Request, res: Response) {
 
     const expediente = await createExpediente(finalDraft, unam, organizacionId);
     await attachImportedDocumentToExpediente(expediente.id, payload, uid);
-    await createImportedDeadlineFollowUps(expediente, finalDraft, uid, unam, organizacionId);
+    // El plazo procesal detectado ya no se crea en silencio: se calcula y se
+    // devuelve como propuesta para que el usuario la confirme (o la descarte)
+    // desde el frontend, eligiendo el tipo de actuación — ver
+    // confirmDocumentImportDeadline.
+    const deadlineProposal = computeImportedDeadlineProposal(expediente, finalDraft);
 
     await pool.query(
       `UPDATE expediente_import_items
@@ -1726,15 +1762,76 @@ export async function acceptDocumentImportItem(req: Request, res: Response) {
           userError: null,
           developerError: null,
           acceptedAt: new Date().toISOString(),
+          deadlineProposal,
+          deadlineConfirmed: false,
         }),
         itemId,
       ],
     );
 
     const counters = await refreshBatchCounters(batchId);
-    return ok(res, { expediente, counters });
+    return ok(res, { expediente, counters, deadlineProposal });
   } catch (error: any) {
     return err(res, error.message || 'No se pudo aceptar el documento');
+  }
+}
+
+// Confirma o descarta la propuesta de plazo/agenda calculada al aceptar un
+// documento importado. Idempotente: una vez resuelta (confirmada o
+// descartada) no se puede volver a resolver.
+export async function confirmDocumentImportDeadline(req: Request, res: Response) {
+  const uid = userId(req);
+  const unam = userName(req);
+  const organizacionId = (req as any).organizacionId;
+  if (!uid) return err(res, 'No autenticado', 401);
+  if (!organizacionId) return err(res, 'No se pudo determinar la organización activa', 400);
+
+  const { batchId, itemId } = req.params;
+  const action = req.body?.action === 'dismiss' ? 'dismiss' : 'confirm';
+  const tipoTarea = String(req.body?.tipo_tarea || '').trim() || 'plazo_procesal';
+  const tipoAgenda = String(req.body?.tipo_agenda || '').trim() || 'plazo';
+
+  try {
+    const { rows: batchRows } = await pool.query(
+      `SELECT id FROM expediente_import_batches WHERE id=$1 AND organizacion_id=$2`,
+      [batchId, organizacionId],
+    );
+    if (!batchRows.length) return err(res, 'Lote no encontrado', 404);
+
+    const { rows: itemRows } = await pool.query(
+      `SELECT * FROM expediente_import_items WHERE id=$1 AND batch_id=$2`,
+      [itemId, batchId],
+    );
+    if (!itemRows.length) return err(res, 'Documento no encontrado', 404);
+
+    const item = itemRows[0];
+    if (!item.created_expediente_id) {
+      return err(res, 'Este documento todavía no ha creado un expediente', 400);
+    }
+
+    const payload = item.payload || {};
+    if (payload.deadlineConfirmed) {
+      return err(res, 'El plazo propuesto para este documento ya se resolvió', 409);
+    }
+    const proposal = payload.deadlineProposal;
+    if (!proposal) {
+      return err(res, 'No hay ningún plazo propuesto para este documento', 400);
+    }
+
+    if (action === 'confirm') {
+      await persistImportedDeadlineFollowUps(
+        item.created_expediente_id, proposal, uid, unam, organizacionId, tipoTarea, tipoAgenda,
+      );
+    }
+
+    await pool.query(
+      `UPDATE expediente_import_items SET payload=$1 WHERE id=$2`,
+      [JSON.stringify({ ...payload, deadlineConfirmed: true, deadlineAction: action }), itemId],
+    );
+
+    return ok(res, { resolved: true, action });
+  } catch (error: any) {
+    return err(res, error.message || 'No se pudo procesar el plazo propuesto');
   }
 }
 

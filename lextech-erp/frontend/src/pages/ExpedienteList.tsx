@@ -4874,6 +4874,20 @@ export default function ExpedienteList() {
   const [documentImportRepresentaA, setDocumentImportRepresentaA] = useState<"demandantes" | "demandados">("demandantes");
   const [documentImportVerifySaving, setDocumentImportVerifySaving] = useState(false);
   const [documentImportVerifyError, setDocumentImportVerifyError] = useState<string | null>(null);
+  // Propuesta de plazo procesal detectado al aceptar un documento importado —
+  // se muestra para confirmar (o descartar) antes de crear tarea/agenda.
+  const [deadlineProposal, setDeadlineProposal] = useState<{
+    batchId: string;
+    itemId: string;
+    expedienteLabel: string;
+    deadlineDate: string;
+    reminderDate: string;
+    successNotice: string;
+  } | null>(null);
+  const [deadlineProposalTipoTarea, setDeadlineProposalTipoTarea] = useState("plazo_procesal");
+  const [deadlineProposalTipoAgenda, setDeadlineProposalTipoAgenda] = useState("plazo");
+  const [deadlineProposalSaving, setDeadlineProposalSaving] = useState(false);
+  const [deadlineProposalError, setDeadlineProposalError] = useState<string | null>(null);
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [csvPreviewRows, setCsvPreviewRows] = useState<CsvPreviewRow[]>([]);
   const [csvFieldMappings, setCsvFieldMappings] = useState<CsvFieldMapping[]>(() => buildCsvMappings([], []));
@@ -5104,9 +5118,28 @@ export default function ExpedienteList() {
         fetchDocumentImportHistory(true),
       ]);
 
-      setDocumentImportSuccessNotice(`Se creó el expediente correctamente desde "${documentImportVerifyItem.payload?.fileName || documentImportVerifyItem.reference || `Documento ${documentImportVerifyItem.row_number}`}".`);
+      const successNotice = `Se creó el expediente correctamente desde "${documentImportVerifyItem.payload?.fileName || documentImportVerifyItem.reference || `Documento ${documentImportVerifyItem.row_number}`}".`;
+      const proposal = data.data?.deadlineProposal;
       setDocumentImportVerifyItem(null);
       setViewMode("documentImport");
+
+      if (proposal?.deadlineDate) {
+        // Hay un plazo procesal detectado: se pide confirmación antes de crear
+        // la tarea/agenda, en vez de crearlas en silencio.
+        setDeadlineProposalTipoTarea(proposal.tipoTareaSugerido || "plazo_procesal");
+        setDeadlineProposalTipoAgenda(proposal.tipoAgendaSugerido || "plazo");
+        setDeadlineProposalError(null);
+        setDeadlineProposal({
+          batchId: documentImportActiveBatch.id,
+          itemId: documentImportVerifyItem.id,
+          expedienteLabel: proposal.expedienteLabel || "",
+          deadlineDate: proposal.deadlineDate,
+          reminderDate: proposal.reminderDate || proposal.deadlineDate,
+          successNotice,
+        });
+      } else {
+        setDocumentImportSuccessNotice(successNotice);
+      }
     } catch (e: any) {
       setDocumentImportVerifyError(e.message || "No se pudo aceptar el documento");
     } finally {
@@ -5121,6 +5154,40 @@ export default function ExpedienteList() {
     fetchDocumentImportHistory,
     getToken,
   ]);
+
+  const handleResolveDeadlineProposal = useCallback(async (action: "confirm" | "dismiss") => {
+    if (!deadlineProposal) return;
+    setDeadlineProposalSaving(true);
+    setDeadlineProposalError(null);
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(
+        `/api/expedientes/documents/batch/${deadlineProposal.batchId}/items/${deadlineProposal.itemId}/confirm-deadline`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action,
+            tipo_tarea: deadlineProposalTipoTarea,
+            tipo_agenda: deadlineProposalTipoAgenda,
+          }),
+        }
+      );
+      const data = await safeJson(res);
+      if (!res.ok) throw new Error(data.error || "No se pudo procesar el plazo propuesto");
+
+      setDocumentImportSuccessNotice(
+        action === "confirm"
+          ? `${deadlineProposal.successNotice} Se añadió el plazo a Tareas y Agenda.`
+          : deadlineProposal.successNotice
+      );
+      setDeadlineProposal(null);
+    } catch (e: any) {
+      setDeadlineProposalError(e.message || "No se pudo procesar el plazo propuesto");
+    } finally {
+      setDeadlineProposalSaving(false);
+    }
+  }, [deadlineProposal, deadlineProposalTipoTarea, deadlineProposalTipoAgenda, getToken]);
 
   const handleDeleteBatch = useCallback(async (batchId: string) => {
     setDocumentImportHistory(prev => prev.filter(b => b.id !== batchId));
@@ -6144,6 +6211,7 @@ export default function ExpedienteList() {
 
   if (viewMode === "documentImport") {
     return (
+      <>
       <DocumentImportView
         zipFile={documentImportZipFile}
         zipFileName={documentImportZipFileName}
@@ -6184,6 +6252,93 @@ export default function ExpedienteList() {
         onOpenHistory={() => switchView("documentImportHistory")}
         inputRef={documentImportInputRef}
       />
+
+      {deadlineProposal && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-overlay-in">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden animate-modal-in">
+            <div className="flex items-center gap-2.5 px-6 py-4 border-b border-slate-100">
+              <div className="h-8 w-8 rounded-xl bg-amber-50 flex items-center justify-center shrink-0">
+                <AlertTriangle size={15} className="text-amber-600" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-slate-900">Plazo procesal detectado</h2>
+                <p className="text-xs text-slate-400">{deadlineProposal.expedienteLabel}</p>
+              </div>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              <p className="text-sm text-slate-600">
+                Se ha detectado una fecha en el documento. ¿Quieres crear el seguimiento en Tareas y Agenda?
+              </p>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600 space-y-1">
+                <p><span className="font-semibold text-slate-700">Aviso previo:</span> {deadlineProposal.reminderDate}</p>
+                <p><span className="font-semibold text-slate-700">Fecha límite:</span> {deadlineProposal.deadlineDate}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Tipo de tarea</label>
+                  <select
+                    value={deadlineProposalTipoTarea}
+                    onChange={(e) => setDeadlineProposalTipoTarea(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-red-400 focus:outline-none"
+                  >
+                    <option value="plazo_procesal">Plazo procesal</option>
+                    <option value="vista_juicio">Vista / Juicio</option>
+                    <option value="notificacion">Notificación</option>
+                    <option value="reunion">Reunión</option>
+                    <option value="escrito">Escrito</option>
+                    <option value="gestion">Gestión</option>
+                    <option value="pago">Pago</option>
+                    <option value="llamada">Llamada</option>
+                    <option value="diligencia">Diligencia</option>
+                    <option value="otro">Otro</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Tipo de actuación (agenda)</label>
+                  <select
+                    value={deadlineProposalTipoAgenda}
+                    onChange={(e) => setDeadlineProposalTipoAgenda(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-red-400 focus:outline-none"
+                  >
+                    <option value="plazo">Plazo</option>
+                    <option value="vista">Vista oral</option>
+                    <option value="reunion">Reunión</option>
+                    <option value="cita">Cita</option>
+                    <option value="llamada">Llamada</option>
+                    <option value="otro">Otro</option>
+                  </select>
+                </div>
+              </div>
+              {deadlineProposalError && (
+                <p className="text-xs font-medium text-rose-600">{deadlineProposalError}</p>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-slate-100 bg-slate-50">
+              <button
+                type="button"
+                disabled={deadlineProposalSaving}
+                onClick={() => handleResolveDeadlineProposal("dismiss")}
+                className="px-4 py-2 text-sm font-semibold text-slate-500 hover:text-slate-700 disabled:opacity-50"
+              >
+                Descartar
+              </button>
+              <button
+                type="button"
+                disabled={deadlineProposalSaving}
+                onClick={() => handleResolveDeadlineProposal("confirm")}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-[#ab0433] rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                {deadlineProposalSaving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                Confirmar y crear
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+      </>
     );
   }
 
