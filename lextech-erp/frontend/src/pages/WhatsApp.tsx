@@ -6,6 +6,7 @@ import {
   ArrowLeft,
   CheckCircle2,
   ChevronRight,
+  Instagram,
   KeyRound,
   Loader2,
   LockKeyhole,
@@ -17,6 +18,7 @@ import {
   Settings2,
   ShieldCheck,
   Smartphone,
+  Sparkles,
   UserRound,
 } from "lucide-react";
 import { safeJson } from "../lib/api";
@@ -141,6 +143,10 @@ export default function WhatsApp() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => (
     typeof window !== "undefined" && window.sessionStorage.getItem(AUTH_SESSION_KEY) === "1"
   ));
+  // Comunicación externa: de momento solo WhatsApp está realmente conectado.
+  // Instagram queda como pestaña visible pero deshabilitada hasta tener
+  // cuenta de Instagram Business y el permiso de mensajería aprobado por Meta.
+  const [channel, setChannel] = useState<"whatsapp" | "instagram">("whatsapp");
   const [configForm, setConfigForm] = useState<WhatsAppConfigForm>({
     accessToken: "",
     phoneNumberId: "",
@@ -403,7 +409,33 @@ export default function WhatsApp() {
   }
 
   return (
-    <div className="flex h-full overflow-hidden bg-white">
+    <div className="flex h-full flex-col overflow-hidden bg-white">
+      <div className="flex flex-shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-4 py-2">
+        <button
+          type="button"
+          onClick={() => setChannel("whatsapp")}
+          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+            channel === "whatsapp" ? "bg-[#25D366]/15 text-[#1a9e4f]" : "text-slate-400 hover:bg-slate-50 hover:text-slate-600"
+          }`}
+        >
+          <MessageCircle size={13} /> WhatsApp
+        </button>
+        <button
+          type="button"
+          onClick={() => setChannel("instagram")}
+          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+            channel === "instagram" ? "bg-fuchsia-50 text-fuchsia-600" : "text-slate-400 hover:bg-slate-50 hover:text-slate-600"
+          }`}
+        >
+          <Instagram size={13} /> Instagram
+          <span className="ml-0.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-400">Próximamente</span>
+        </button>
+      </div>
+
+      {channel === "instagram" ? (
+        <InstagramComingSoon />
+      ) : (
+      <div className="flex flex-1 min-h-0 overflow-hidden">
       <aside className={`${isMobile && selectedClientId ? "hidden" : "flex w-full"} md:flex md:w-[320px] shrink-0 flex-col bg-[linear-gradient(180deg,#1f2334_0%,#111827_100%)] text-white`}>
         <div className="border-b border-white/10 px-5 py-5">
           <div className="flex items-center justify-between gap-3">
@@ -638,6 +670,31 @@ export default function WhatsApp() {
           </div>
         </div>
       </section>
+      </div>
+      )}
+    </div>
+  );
+}
+
+function InstagramComingSoon() {
+  return (
+    <div className="flex flex-1 min-h-0 flex-col items-center justify-center gap-4 bg-[#fafafa] px-6 text-center">
+      <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-fuchsia-500 via-pink-500 to-amber-400 shadow-lg shadow-fuchsia-200">
+        <Instagram size={28} className="text-white" />
+      </div>
+      <div>
+        <h2 className="text-base font-bold text-slate-800">Instagram — próximamente</h2>
+        <p className="mx-auto mt-2 max-w-sm text-sm text-slate-500">
+          Aquí podrás gestionar los mensajes directos de Instagram junto con WhatsApp, en la misma bandeja.
+        </p>
+      </div>
+      <div className="mt-2 w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-4 text-left text-xs text-slate-500 space-y-2">
+        <p className="flex items-center gap-2 font-semibold text-slate-700"><Sparkles size={13} className="text-fuchsia-500" /> Para activarlo hace falta:</p>
+        <ul className="space-y-1.5 pl-1">
+          <li className="flex gap-2"><span className="text-slate-300">·</span> Una cuenta de Instagram Business o Creator, vinculada a una página de Facebook.</li>
+          <li className="flex gap-2"><span className="text-slate-300">·</span> El permiso de mensajería de Instagram aprobado por Meta para la app del despacho.</li>
+        </ul>
+      </div>
     </div>
   );
 }

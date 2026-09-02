@@ -255,7 +255,7 @@ export async function getWhatsAppContacts(req: any, res: Response) {
            wm.status,
            wm.direction
          FROM whatsapp_messages wm
-         WHERE wm.client_id IS NOT NULL
+         WHERE wm.client_id IS NOT NULL AND wm.channel = 'whatsapp'
          ORDER BY wm.client_id, wm.created_at DESC
        )
        SELECT
@@ -276,7 +276,7 @@ export async function getWhatsAppContacts(req: any, res: Response) {
          COALESCE((
            SELECT COUNT(*)::int
            FROM whatsapp_messages wm2
-           WHERE wm2.client_id = e.id
+           WHERE wm2.client_id = e.id AND wm2.channel = 'whatsapp'
          ), 0)            AS message_count
        FROM entities e
        LEFT JOIN latest l ON l.client_id = e.id
@@ -307,7 +307,7 @@ export async function getConversationByClient(req: any, res: Response) {
     const messagesRes = await pool.query(
       `SELECT *
        FROM whatsapp_messages
-       WHERE client_id = $1
+       WHERE client_id = $1 AND channel = 'whatsapp'
        ORDER BY created_at ASC`,
       [clientId],
     );
@@ -335,7 +335,8 @@ export async function getConversationByPhone(req: any, res: Response) {
     const messagesRes = await pool.query(
       `SELECT *
        FROM whatsapp_messages
-       WHERE (from_phone = $1 OR to_phone = $1) AND (organizacion_id = $2 OR organizacion_id IS NULL)
+       WHERE (from_phone = $1 OR to_phone = $1) AND channel = 'whatsapp'
+         AND (organizacion_id = $2 OR organizacion_id IS NULL)
        ORDER BY created_at ASC`,
       [phone, req.organizacionId],
     );
@@ -388,8 +389,8 @@ export async function sendWhatsAppMessage(req: any, res: Response) {
     const waMessageId = provider?.messages?.[0]?.id || null;
     const inserted = await pool.query(
       `INSERT INTO whatsapp_messages
-         (wa_message_id, client_id, direction, message_type, from_phone, to_phone, contact_name, body, status, sent_by_user_id, sent_by_user_name, raw_payload, organizacion_id)
-       VALUES ($1,$2,'outbound','text',NULL,$3,$4,$5,'sent',$6,$7,$8,$9)
+         (wa_message_id, client_id, direction, message_type, from_phone, to_phone, contact_name, body, status, sent_by_user_id, sent_by_user_name, raw_payload, organizacion_id, channel)
+       VALUES ($1,$2,'outbound','text',NULL,$3,$4,$5,'sent',$6,$7,$8,$9,'whatsapp')
        RETURNING *`,
       [
         waMessageId,
@@ -506,8 +507,8 @@ export async function receiveWebhook(req: Request, res: Response) {
 
           await pool.query(
             `INSERT INTO whatsapp_messages
-               (wa_message_id, client_id, direction, message_type, from_phone, to_phone, contact_name, body, status, raw_payload, organizacion_id)
-             VALUES ($1,$2,'inbound',$3,$4,$5,$6,$7,'received',$8,$9)
+               (wa_message_id, client_id, direction, message_type, from_phone, to_phone, contact_name, body, status, raw_payload, organizacion_id, channel)
+             VALUES ($1,$2,'inbound',$3,$4,$5,$6,$7,'received',$8,$9,'whatsapp')
              ON CONFLICT (wa_message_id)
              DO UPDATE SET
                client_id = EXCLUDED.client_id,

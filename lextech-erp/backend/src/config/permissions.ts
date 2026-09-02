@@ -24,7 +24,7 @@ export const MODULOS: { id: Modulo; label: string }[] = [
   { id: 'tareas',      label: 'Tareas' },
   { id: 'chat',        label: 'Chat interno' },
   { id: 'correo',      label: 'Correo' },
-  { id: 'whatsapp',    label: 'WhatsApp' },
+  { id: 'whatsapp',    label: 'Comunicación externa' },
   { id: 'documental',  label: 'Documental' },
   { id: 'directorio',  label: 'Directorio profesional' },
   { id: 'facturacion', label: 'Tesorería' },

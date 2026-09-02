@@ -2016,6 +2016,21 @@ export async function runMigrations(): Promise<void> {
       } catch (_e: any) {}
     }
 
+    // ── WhatsApp -> Comunicación externa (multicanal) ────────────────
+    // whatsapp_messages pasa a poder guardar mensajes de más de un canal
+    // (de momento solo WhatsApp está realmente conectado; Instagram queda
+    // preparado en el esquema para cuando haya cuenta de Instagram Business
+    // y permiso de mensajería aprobado por Meta). channel por defecto
+    // 'whatsapp' para todo lo existente -- cero impacto en los datos ya
+    // guardados. external_contact_id es la identidad del contacto en
+    // canales que no usan teléfono (usuario/PSID de Instagram, etc.);
+    // en WhatsApp se sigue usando from_phone/to_phone como hasta ahora.
+    try {
+      await client.query(`ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS channel VARCHAR(20) NOT NULL DEFAULT 'whatsapp';`);
+      await client.query(`ALTER TABLE whatsapp_messages ADD COLUMN IF NOT EXISTS external_contact_id VARCHAR(200);`);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_whatsapp_messages_channel ON whatsapp_messages (channel);`);
+    } catch (_e: any) {}
+
     // ── Vistas "legibles" para mirar la BD a mano en Supabase ────────
     // organizacion_id es un UUID -- perfecto para el código, ilegible para
     // quien entra al editor de tablas de Supabase a mirar un dato suelto (no

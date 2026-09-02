@@ -37,7 +37,7 @@ const NAV_MODULE_MAP: Record<string, Modulo> = {
   Agenda: "agenda",
   Tareas: "tareas",
   Chat: "chat",
-  WhatsApp: "whatsapp",
+  "Comunicación Externa": "whatsapp",
   Correo: "correo",
   Documental: "documental",
   // Todas las pestañas de Tesorería son en realidad la misma página --
@@ -79,7 +79,7 @@ const MODULES = [
   { name: "Agenda",         path: "/dashboard/agenda",       icon: Calendar,        desc: "Calendario y citas" },
   { name: "Tareas",         path: "/dashboard/tareas",       icon: CheckCircle2,    desc: "Tareas y plazos del usuario" },
   { name: "Chat",           path: "/dashboard/chat",         icon: MessageSquare,   desc: "Chat de equipo" },
-  { name: "WhatsApp",       path: "/dashboard/whatsapp",     icon: MessageCircle,   desc: "Mensajería y comunicación por WhatsApp" },
+  { name: "Comunicación Externa", path: "/dashboard/whatsapp", icon: MessageCircle, desc: "WhatsApp e Instagram — mensajería con clientes fuera de la app" },
   { name: "Correo",         path: "/dashboard/correo",       icon: Mail,            desc: "Gestor de correo electrónico" },
   { name: "Documental",     path: "/dashboard/documental",   icon: Library,         desc: "Cendoj, BOE y Lexnet" },
   { name: "Facturación",    path: "/dashboard/facturacion",  icon: Receipt,         desc: "Vista general de tesorería" },
@@ -114,7 +114,7 @@ const NAV_ITEMS: NavItem[] = [
   { name: "Agenda",       href: "/dashboard/agenda",      icon: Calendar },
   { name: "Tareas",       href: "/dashboard/tareas",      icon: CheckCircle2 },
   { name: "Chat",         href: "/dashboard/chat",        icon: MessageSquare },
-  { name: "WhatsApp",     href: "/dashboard/whatsapp",    icon: MessageCircle },
+  { name: "Comunicación Externa", href: "/dashboard/whatsapp", icon: MessageCircle },
   { name: "Correo",       href: "/dashboard/correo",      icon: Mail },
   { name: "Documental",   href: "/dashboard/documental",  icon: Library },
   {
@@ -142,7 +142,7 @@ const NAV_GROUPS = [
   },
   {
     label: "Productividad",
-    items: ["Agenda", "Tareas", "Chat", "WhatsApp", "Correo", "Tesorería"],
+    items: ["Agenda", "Tareas", "Chat", "Comunicación Externa", "Correo", "Tesorería"],
   },
   {
     label: "Conocimiento",
