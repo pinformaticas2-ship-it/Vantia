@@ -5,6 +5,7 @@
 import { Request, Response } from 'express';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
 import pool from '../config/database';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import OpenAI from 'openai';
@@ -1444,7 +1445,10 @@ export async function uploadDocumentImport(req: Request, res: Response) {
   if (!organizacionId) return err(res, 'No se pudo determinar la organización activa', 400);
 
   const zipFile = (req as any).file;
-  if (!zipFile) return err(res, 'No se recibió ningún archivo ZIP', 400);
+  if (!zipFile) return err(res, 'No se recibió ningún archivo (ZIP o PDF)', 400);
+
+  const isPdf = path.extname(zipFile.originalname).toLowerCase() === '.pdf' ||
+    zipFile.mimetype === 'application/pdf';
 
   const clienteId = req.body.cliente_id || null;
   const procuradorForzado = req.body.procurador || null;
@@ -1458,11 +1462,34 @@ export async function uploadDocumentImport(req: Request, res: Response) {
          (user_id, user_name, file_name, status, total_count, notes, organizacion_id)
        VALUES ($1,$2,$3,'processing',0,$4,$5)
        RETURNING id`,
-      [uid, unam, fixFileName(zipFile.originalname), 'Importación desde documentos ZIP', organizacionId],
+      [
+        uid, unam, fixFileName(zipFile.originalname),
+        isPdf ? 'Importación desde documento PDF' : 'Importación desde documentos ZIP',
+        organizacionId,
+      ],
     );
     batchId = batchResult.rows[0].id;
 
-    const { dir, files } = await extractZip(zipFile.path);
+    // Un PDF suelto se trata como un ZIP de un único documento: se copia a un
+    // directorio temporal propio (mismo shape { dir, files } que extractZip)
+    // para reutilizar exactamente el mismo pipeline de extracción/limpieza.
+    const { dir, files } = isPdf
+      ? await (async () => {
+          const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lextech-pdf-'));
+          const originalName = fixFileName(zipFile.originalname);
+          const destPath = path.join(tmpDir, sanitizeFileName(originalName) || 'documento.pdf');
+          fs.copyFileSync(zipFile.path, destPath);
+          return {
+            dir: tmpDir,
+            files: [{
+              name: originalName,
+              fullPath: destPath,
+              ext: '.pdf',
+              size: fs.statSync(destPath).size,
+            }],
+          };
+        })()
+      : await extractZip(zipFile.path);
     zipDir = dir;
 
     if (files.length === 0) {

@@ -2794,12 +2794,12 @@ function ZipDropArea({ zipFileName, onSelectFile, onFileChange }: {
       }`}>
         {isDragging ? '¡Suelta el archivo aquí!'
           : isClicked ? 'Abriendo selector...'
-          : zipFileName ?? 'Añade un archivo ZIP con documentos'}
+          : zipFileName ?? 'Añade un ZIP o un PDF suelto'}
       </p>
       <p className="mt-2 max-w-xl text-base leading-7 text-slate-400">
         {zipFileName
           ? 'Haz click para cambiar el archivo'
-          : 'Arrastra un ZIP aquí, o haz click para seleccionarlo'}
+          : 'Arrastra un ZIP o un PDF aquí, o haz click para seleccionarlo'}
       </p>
       {zipFileName && (
         <div className="mt-4 flex items-center gap-2 rounded-full bg-green-50 px-4 py-1.5">
@@ -2906,7 +2906,7 @@ function DocumentImportView({
       <input
         ref={inputRef}
         type="file"
-        accept=".zip,application/zip,application/x-zip-compressed"
+        accept=".zip,application/zip,application/x-zip-compressed,.pdf,application/pdf"
         className="hidden"
         onChange={(e) => onFileChange(e.target.files?.[0] ?? null)}
       />
@@ -2923,7 +2923,7 @@ function DocumentImportView({
           </button>
           <div>
             <h1 className="text-2xl font-extrabold text-slate-800 leading-tight">Importar Expedientes desde Documentos</h1>
-            <p className="text-sm text-slate-500 mt-1">Sube tus archivos ZIP para crear nuevos expedientes automáticamente.</p>
+            <p className="text-sm text-slate-500 mt-1">Sube un ZIP con varios documentos, o un único PDF suelto, para crear nuevos expedientes automáticamente.</p>
           </div>
         </div>
       </div>
@@ -2985,13 +2985,13 @@ function DocumentImportView({
               <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Importar Expedientes</h3>
             </div>
             <div className="p-6 flex flex-col">
-              <p className="text-sm text-slate-500 mb-2">Sube un archivo ZIP que contenga documentos del expediente. Cada documento se procesará como un nuevo expediente.</p>
+              <p className="text-sm text-slate-500 mb-2">Sube un ZIP con documentos del expediente (cada documento se procesará como un nuevo expediente), o un único PDF suelto para dar de alta un expediente a partir de él.</p>
               <ZipDropArea zipFileName={zipFileName} onSelectFile={onSelectFile} onFileChange={onFileChange} />
             </div>
             <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <p className="text-sm font-bold text-slate-800">
-                  {zipFile ? "Archivo listo para importar" : "Selecciona un ZIP para comenzar"}
+                  {zipFile ? "Archivo listo para importar" : "Selecciona un ZIP o un PDF para comenzar"}
                 </p>
                 <p className="text-xs text-slate-500 mt-0.5">
                   {zipFile
@@ -3013,7 +3013,7 @@ function DocumentImportView({
                       <div className="mb-1 flex items-center justify-between text-[11px] font-medium text-slate-500">
                         <span>
                           {uploadStage === "uploading"
-                            ? "Subiendo ZIP..."
+                            ? "Subiendo archivo..."
                             : knowsTotal
                               ? `Procesando documento ${Math.min(processingDone + 1, processingTotal)} de ${processingTotal}...`
                               : "Preparando documentos..."}
@@ -3048,7 +3048,7 @@ function DocumentImportView({
                 }`}
               >
                 {importBusy ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
-                {importBusy ? "Importando documentos..." : "Procesar ZIP e importar"}
+                {importBusy ? "Importando documentos..." : "Procesar e importar"}
               </button>
             </div>
           </div>
@@ -4983,9 +4983,11 @@ export default function ExpedienteList() {
       setDocumentImportZipFileName(null);
       return;
     }
-    const isZip = file.name.toLowerCase().endsWith(".zip");
-    if (!isZip) {
-      setDocumentImportError("Selecciona un archivo ZIP válido.");
+    const lowerName = file.name.toLowerCase();
+    const isZip = lowerName.endsWith(".zip");
+    const isPdf = lowerName.endsWith(".pdf") || file.type === "application/pdf";
+    if (!isZip && !isPdf) {
+      setDocumentImportError("Selecciona un archivo ZIP o un PDF válido.");
       return;
     }
     setDocumentImportError(null);
@@ -5184,7 +5186,7 @@ export default function ExpedienteList() {
 
   async function handleStartDocumentImport() {
     if (!documentImportZipFile) {
-      setDocumentImportError("Selecciona primero un archivo ZIP.");
+      setDocumentImportError("Selecciona primero un archivo ZIP o un PDF.");
       return;
     }
     if (documentImportAutoAssignOrganizations && !documentImportAssignedClientId) {
@@ -5240,7 +5242,7 @@ export default function ExpedienteList() {
           try {
             const parsed = xhr.responseText ? JSON.parse(xhr.responseText) : {};
             if (xhr.status < 200 || xhr.status >= 300) {
-              reject(new Error(parsed.error || "No se pudo importar el ZIP"));
+              reject(new Error(parsed.error || "No se pudo importar el archivo"));
               return;
             }
             resolve(parsed);
@@ -5248,7 +5250,7 @@ export default function ExpedienteList() {
             reject(new Error(parseError?.message || "No se pudo interpretar la respuesta de la importación"));
           }
         };
-        xhr.onerror = () => reject(new Error("No se pudo subir el ZIP al servidor"));
+        xhr.onerror = () => reject(new Error("No se pudo subir el archivo al servidor"));
         xhr.send(formData);
       });
 
@@ -5259,7 +5261,7 @@ export default function ExpedienteList() {
         fetchExpedientes(true),
       ]);
     } catch (e: any) {
-      setDocumentImportError(e.message || "No se pudo importar el ZIP");
+      setDocumentImportError(e.message || "No se pudo importar el archivo");
     } finally {
       stopDocumentImportPolling();
       setDocumentProcessingIndicator(false);

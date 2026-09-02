@@ -17,12 +17,15 @@ const upload = multer({
   dest: os.tmpdir(),
   limits: { fileSize: 200 * 1024 * 1024 }, // 200 MB máximo
   fileFilter: (_req, file, cb) => {
-    const ok = ['.zip', '.ZIP'].includes(path.extname(file.originalname)) ||
-      ['application/zip', 'application/x-zip-compressed', 'application/x-zip'].includes(file.mimetype);
+    const ext = path.extname(file.originalname).toLowerCase();
+    const ok = ['.zip', '.pdf'].includes(ext) ||
+      ['application/zip', 'application/x-zip-compressed', 'application/x-zip', 'application/pdf'].includes(file.mimetype);
     cb(null, ok);
   },
 });
 
+// Acepta tanto un ZIP con varios documentos como un único PDF suelto
+// (mismo campo "zip" del formulario, por compatibilidad con el frontend existente).
 router.post('/upload',   requireAuth, upload.single('zip'), uploadDocumentImport);
 router.get('/batch/:id', requireAuth, getDocumentImportBatch);
 router.get('/batches',   requireAuth, listDocumentImportBatches);
