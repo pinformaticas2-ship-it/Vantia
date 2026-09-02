@@ -449,12 +449,21 @@ function addWorkingDaysFromIso(value?: string | null, days = 0) {
   return current.toISOString().slice(0, 10);
 }
 
-function subtractDaysFromIso(value?: string | null, days = 0) {
+// Cuenta solo días hábiles (de lunes a viernes) hacia atrás -- para que el
+// aviso previo de un plazo nunca caiga en fin de semana (restar días
+// naturales sin más hace que, p.ej., un plazo que vence en martes tenga el
+// aviso en sábado).
+function subtractWorkingDaysFromIso(value?: string | null, days = 0) {
   const base = String(value || '').slice(0, 10);
   if (!base) return null;
   const current = new Date(`${base}T00:00:00Z`);
   if (Number.isNaN(current.getTime())) return null;
-  current.setUTCDate(current.getUTCDate() - Math.max(days, 0));
+
+  let remaining = Math.max(days, 0);
+  while (remaining > 0) {
+    current.setUTCDate(current.getUTCDate() - 1);
+    if (!isWeekend(current)) remaining -= 1;
+  }
   return current.toISOString().slice(0, 10);
 }
 
@@ -479,7 +488,7 @@ function computeImportedDeadlineProposal(expediente: any, draft: Record<string, 
   const deadlineDate = addWorkingDaysFromIso(baseDate, 20);
   if (!deadlineDate) return null;
 
-  const reminderDate = subtractDaysFromIso(deadlineDate, 3) || deadlineDate;
+  const reminderDate = subtractWorkingDaysFromIso(deadlineDate, 3) || deadlineDate;
   const expedienteLabel = draft.ref_expediente || draft.ref_propia || `${expediente.anio}/${expediente.num_exp}`;
   const descripcionBase = draft.descripcion || 'Expediente importado desde documento';
   const clienteId = draft.cliente_id || expediente.cliente_id || null;
