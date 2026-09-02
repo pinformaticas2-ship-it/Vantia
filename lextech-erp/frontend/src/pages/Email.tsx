@@ -22,7 +22,7 @@ import {
   MoreVertical, AlertCircle, Eye, EyeOff,
   ChevronLeft, Edit3, Tag, Wifi, Zap, Pin, FolderPlus, RotateCcw, Folder, Archive,
   AtSign, Shield, Filter, LogIn, Maximize2, Minimize2, Bold, Italic, Underline,
-  AlignLeft, AlignCenter, AlignRight, List, Pencil, Sun, Moon, Download, type LucideIcon,
+  AlignLeft, AlignCenter, AlignRight, List, Pencil, Sun, Moon, Download, Briefcase, type LucideIcon,
 } from 'lucide-react';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -100,6 +100,12 @@ interface ParsedEmail {
   source: 'gmail' | 'imap' | 'draft';
   isPinned?: boolean;
   draftId?: string;
+  expedienteId?: string | null;
+}
+
+interface ExpedienteOption {
+  id: string;
+  label: string;
 }
 
 interface EmailAttachmentMeta {
@@ -219,6 +225,7 @@ interface ImapApiEmail {
   account_id?: string | null;
   account_label?: string | null;
   account_email?: string | null;
+  expediente_id?: string | null;
 }
 
 // ─── Gmail Service ────────────────────────────────────────────────────────────
@@ -475,6 +482,7 @@ function parseImapEmail(row: ImapApiEmail): ParsedEmail {
     attachments,
     source: 'imap',
     isPinned: readPinnedEmailIds().includes(String(row.id)),
+    expedienteId: row.expediente_id || null,
   };
 }
 
@@ -1874,6 +1882,8 @@ function EmailReader({
   email, onReply, onReplyAll, onForward, onDelete, onStar, onBack,
   onPin, onRestore, onAssignLabel, onCreateLabel, userLabels, bodyLoading, theme,
   viewerName, viewerEmail, viewerAvatar, onDownloadAttachment,
+  expedienteOptions, onLinkExpediente, linkingExpediente,
+  onSaveAttachmentToExpediente, savingAttachmentIndex,
 }: {
   email: ParsedEmail;
   onReply: () => void; onReplyAll: () => void; onForward: () => void;
@@ -1889,12 +1899,19 @@ function EmailReader({
   viewerEmail: string;
   viewerAvatar?: string;
   onDownloadAttachment?: (index: number) => void;
+  expedienteOptions?: ExpedienteOption[];
+  onLinkExpediente?: (expedienteId: string | null) => void;
+  linkingExpediente?: boolean;
+  onSaveAttachmentToExpediente?: (index: number, expedienteId: string) => Promise<boolean>;
+  savingAttachmentIndex?: number | null;
 }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [iframeH, setIframeH] = useState(300);
   const [showRaw, setShowRaw] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [attachmentPickerIdx, setAttachmentPickerIdx] = useState<number | null>(null);
+  const [attachmentTargetExp, setAttachmentTargetExp] = useState('');
 
   const srcDoc = useMemo(
     () => buildEmailDoc(decodeQP(email.bodyHtml || ''), decodeQP(email.bodyText || '')),
@@ -2081,6 +2098,24 @@ function EmailReader({
                   <h1 className={`text-[26px] leading-tight font-semibold tracking-[-0.02em] ${headerCx('text-white', 'text-slate-900')}`}>
                     {email.subject}
                   </h1>
+                  {onLinkExpediente && (
+                    <div className="mt-3 flex items-center gap-2">
+                      <Briefcase size={14} className={headerCx('text-slate-400', 'text-slate-400')} />
+                      <select
+                        value={email.expedienteId || ''}
+                        disabled={linkingExpediente}
+                        onChange={(e) => onLinkExpediente(e.target.value || null)}
+                        className={`text-xs rounded-full border px-3 py-1.5 focus:outline-none disabled:opacity-60 ${
+                          headerCx('border-white/15 bg-white/5 text-slate-200', 'border-slate-200 bg-white text-slate-600')
+                        }`}>
+                        <option value="">Sin vincular a expediente</option>
+                        {(expedienteOptions || []).map((opt) => (
+                          <option key={opt.id} value={opt.id}>{opt.label}</option>
+                        ))}
+                      </select>
+                      {linkingExpediente && <span className="text-xs text-slate-400">Guardando…</span>}
+                    </div>
+                  )}
                 </div>
                 <div className="text-right flex-shrink-0">
                   <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500 mb-1">Recibido</p>
@@ -2145,17 +2180,64 @@ function EmailReader({
                 {!!email.attachments?.length && (
                   <div className="flex flex-wrap gap-2 px-6 py-3 border-b border-slate-100 bg-slate-50/50">
                     {email.attachments.map((att, idx) => (
-                      <button
-                        key={`${att.filename}-${idx}`}
-                        type="button"
-                        onClick={() => onDownloadAttachment?.(idx)}
-                        title={`Descargar ${att.filename}`}
-                        className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:border-red-300 hover:bg-red-50 hover:text-red-700 transition-colors">
-                        <Paperclip size={13} className="shrink-0 text-slate-400" />
-                        <span className="max-w-[180px] truncate">{att.filename}</span>
-                        {att.size > 0 && <span className="text-slate-400">{fmtAttachmentSize(att.size)}</span>}
-                        <Download size={12} className="shrink-0 text-slate-400" />
-                      </button>
+                      <div key={`${att.filename}-${idx}`} className="relative">
+                        <div className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white pl-1 pr-1 py-1 text-xs font-medium text-slate-700">
+                          <button
+                            type="button"
+                            onClick={() => onDownloadAttachment?.(idx)}
+                            title={`Descargar ${att.filename}`}
+                            className="inline-flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-red-50 hover:text-red-700 transition-colors">
+                            <Paperclip size={13} className="shrink-0 text-slate-400" />
+                            <span className="max-w-[180px] truncate">{att.filename}</span>
+                            {att.size > 0 && <span className="text-slate-400">{fmtAttachmentSize(att.size)}</span>}
+                            <Download size={12} className="shrink-0 text-slate-400" />
+                          </button>
+                          {onSaveAttachmentToExpediente && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAttachmentTargetExp('');
+                                setAttachmentPickerIdx((prev) => (prev === idx ? null : idx));
+                              }}
+                              title="Guardar en un expediente"
+                              className="p-1.5 rounded-lg text-slate-400 hover:bg-red-50 hover:text-[#ab0433] transition-colors">
+                              <FolderPlus size={13} />
+                            </button>
+                          )}
+                        </div>
+                        {attachmentPickerIdx === idx && (
+                          <div className="absolute z-20 top-full left-0 mt-1 w-72 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl">
+                            <p className="text-[11px] font-semibold text-slate-500 mb-2">Guardar adjunto en expediente</p>
+                            <select
+                              value={attachmentTargetExp}
+                              onChange={(e) => setAttachmentTargetExp(e.target.value)}
+                              className="w-full text-xs rounded-xl border border-slate-200 px-2 py-2 mb-2 focus:border-red-400 focus:outline-none">
+                              <option value="">Seleccionar expediente…</option>
+                              {(expedienteOptions || []).map((opt) => (
+                                <option key={opt.id} value={opt.id}>{opt.label}</option>
+                              ))}
+                            </select>
+                            <div className="flex justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setAttachmentPickerIdx(null)}
+                                className="text-xs text-slate-500 px-2 py-1.5">
+                                Cancelar
+                              </button>
+                              <button
+                                type="button"
+                                disabled={!attachmentTargetExp || savingAttachmentIndex === idx}
+                                onClick={async () => {
+                                  const done = await onSaveAttachmentToExpediente?.(idx, attachmentTargetExp);
+                                  if (done) setAttachmentPickerIdx(null);
+                                }}
+                                className="text-xs font-semibold text-white bg-[#ab0433] rounded-lg px-3 py-1.5 disabled:opacity-50">
+                                {savingAttachmentIndex === idx ? 'Guardando…' : 'Guardar'}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     ))}
                   </div>
                 )}
@@ -3193,6 +3275,10 @@ export default function Email() {
   const [emails, setEmails]             = useState<ParsedEmail[]>([]);
   const [selectedEmail, setSelectedEmail] = useState<ParsedEmail | null>(null);
   const [fullscreenEmail, setFullscreenEmail] = useState<ParsedEmail | null>(null);
+  // ── Vincular correos/adjuntos a un expediente ──────────────────────────────
+  const [organizationExpedientes, setOrganizationExpedientes] = useState<ExpedienteOption[]>([]);
+  const [linkingExpediente, setLinkingExpediente] = useState(false);
+  const [savingAttachmentIndex, setSavingAttachmentIndex] = useState<number | null>(null);
   const [compose, setCompose]           = useState<ComposeData | null>(null);
   const [showImapForm, setShowImapForm] = useState(false);
   const [editImapId, setEditImapId] = useState<string | undefined>(undefined);
@@ -4081,6 +4167,68 @@ export default function Email() {
     }
   }, [authFetch]);
 
+  // ── Expedientes de la organización, para vincular correos/adjuntos ────────
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await authFetch(`${API}/agenda/options`);
+        if (!res.ok) return;
+        const json = await res.json();
+        if (cancelled) return;
+        const list: ExpedienteOption[] = (json?.data?.expedientes || []).map((item: any) => ({
+          id: item.id,
+          label: `${item.ref_expediente || item.ref_propia || item.id}${item.cliente_nombre ? ' · ' + item.cliente_nombre : ''}`,
+        }));
+        setOrganizationExpedientes(list);
+      } catch { /* silencioso: la vinculación a expediente es opcional */ }
+    })();
+    return () => { cancelled = true; };
+  }, [authFetch]);
+
+  const updateEmailLocally = useCallback((id: string, patch: Partial<ParsedEmail>) => {
+    setEmails(prev => prev.map(e => (e.id === id ? { ...e, ...patch } : e)));
+    setSelectedEmail(prev => (prev && prev.id === id ? { ...prev, ...patch } : prev));
+    setFullscreenEmail(prev => (prev && prev.id === id ? { ...prev, ...patch } : prev));
+  }, []);
+
+  // ── Vincular el correo abierto a un expediente (solo correos IMAP, guardados en BD) ──
+  const linkExpedienteToEmail = useCallback(async (email: ParsedEmail, expedienteId: string | null) => {
+    setLinkingExpediente(true);
+    try {
+      const res = await authFetch(`${API}/email/messages/${email.id}/link`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expediente_id: expedienteId }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({} as any))).error || 'No se pudo vincular el expediente');
+      updateEmailLocally(email.id, { expedienteId });
+    } catch (e: any) {
+      setError(e.message || 'Error al vincular el expediente');
+    } finally {
+      setLinkingExpediente(false);
+    }
+  }, [authFetch, updateEmailLocally]);
+
+  // ── Guardar un adjunto del correo abierto directamente en un expediente ───
+  const saveAttachmentToExpedienteHandler = useCallback(async (email: ParsedEmail, index: number, expedienteId: string): Promise<boolean> => {
+    setSavingAttachmentIndex(index);
+    try {
+      const res = await authFetch(`${API}/email/messages/${email.id}/attachments/${index}/save-to-expediente`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expediente_id: expedienteId }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({} as any))).error || 'No se pudo guardar el adjunto en el expediente');
+      return true;
+    } catch (e: any) {
+      setError(e.message || 'Error al guardar el adjunto en el expediente');
+      return false;
+    } finally {
+      setSavingAttachmentIndex(null);
+    }
+  }, [authFetch]);
+
   useEffect(() => {
     if (!pendingOpenEmailId) return;
 
@@ -4488,6 +4636,11 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
           viewerEmail={userEmail}
           viewerAvatar={userAvatar}
           onDownloadAttachment={(index) => downloadAttachment(selectedEmail, index)}
+          expedienteOptions={selectedEmail.source === 'imap' ? organizationExpedientes : undefined}
+          onLinkExpediente={selectedEmail.source === 'imap' ? (expId) => linkExpedienteToEmail(selectedEmail, expId) : undefined}
+          linkingExpediente={linkingExpediente}
+          onSaveAttachmentToExpediente={selectedEmail.source === 'imap' ? (index, expId) => saveAttachmentToExpedienteHandler(selectedEmail, index, expId) : undefined}
+          savingAttachmentIndex={savingAttachmentIndex}
         />
         {compose && (
           <ComposeWindow
@@ -4794,6 +4947,11 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
               viewerEmail={userEmail}
               viewerAvatar={userAvatar}
               onDownloadAttachment={(index) => downloadAttachment(selectedEmail, index)}
+              expedienteOptions={selectedEmail.source === 'imap' ? organizationExpedientes : undefined}
+              onLinkExpediente={selectedEmail.source === 'imap' ? (expId) => linkExpedienteToEmail(selectedEmail, expId) : undefined}
+              linkingExpediente={linkingExpediente}
+              onSaveAttachmentToExpediente={selectedEmail.source === 'imap' ? (index, expId) => saveAttachmentToExpedienteHandler(selectedEmail, index, expId) : undefined}
+              savingAttachmentIndex={savingAttachmentIndex}
             />
           ) : hasActiveMailbox ? (
             <div className="flex flex-col items-center justify-center h-full select-none">
@@ -4842,6 +5000,11 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
               viewerEmail={userEmail}
               viewerAvatar={userAvatar}
               onDownloadAttachment={(index) => downloadAttachment(fullscreenEmail, index)}
+              expedienteOptions={fullscreenEmail.source === 'imap' ? organizationExpedientes : undefined}
+              onLinkExpediente={fullscreenEmail.source === 'imap' ? (expId) => linkExpedienteToEmail(fullscreenEmail, expId) : undefined}
+              linkingExpediente={linkingExpediente}
+              onSaveAttachmentToExpediente={fullscreenEmail.source === 'imap' ? (index, expId) => saveAttachmentToExpedienteHandler(fullscreenEmail, index, expId) : undefined}
+              savingAttachmentIndex={savingAttachmentIndex}
             />
           </div>
         </div>

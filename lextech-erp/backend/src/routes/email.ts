@@ -30,6 +30,7 @@ import {
   emptyTrash,
   getMessageBodyFromEngine,
   downloadMessageAttachment,
+  saveAttachmentToExpediente,
 } from '../controllers/emailController';
 
 const router = Router();
@@ -103,5 +104,7 @@ router.patch('/messages/:id/link', linkEmailToExpediente);
 router.get('/messages/:id/body',                        getMessageBodyFromEngine);
 // ── Adjuntos: descarga real (IMAP/Gmail), con fallback a EmailEngine si aplica ──
 router.get('/messages/:id/attachments/:attachmentId',   downloadMessageAttachment);
+// ── Adjuntos: guardar directamente en los documentos de un expediente ────────
+router.post('/messages/:id/attachments/:attachmentId/save-to-expediente', saveAttachmentToExpediente);
 
 export default router;

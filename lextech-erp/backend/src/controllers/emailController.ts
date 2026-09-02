@@ -1,6 +1,9 @@
 import { Request, Response } from 'express';
 import * as crypto from 'crypto';
+import * as fs from 'fs';
+import * as path from 'path';
 import pool from '../config/database';
+import { UPLOADS_CLIENTS_ROOT } from '../config/paths';
 import { ImapClient, ImapConfig, syncInbox, testImapConnection } from '../utils/imap';
 import { Pop3Config, syncPop3Inbox, testPop3Connection } from '../utils/pop3';
 import { sendEmail, SmtpConfig, MailMessage, testSmtpConnection } from '../utils/smtp';
@@ -1468,6 +1471,98 @@ export async function downloadMessageAttachment(req: Request, res: Response) {
     }
 
     return err(res, 'Adjunto no disponible', 404);
+  } catch (e: any) { return err(res, e.message); }
+}
+
+function sanitizeAttachmentFileName(fileName: string) {
+  return String(fileName || 'adjunto').replace(/[^\w.\-]+/g, '_').slice(0, 180);
+}
+
+// Guarda un adjunto de correo directamente en los documentos de un expediente,
+// reutilizando la misma logica de descarga que downloadMessageAttachment
+// (Gmail API / IMAP / EmailEngine) pero escribiendo el archivo en disco en
+// vez de enviarlo por HTTP.
+export async function saveAttachmentToExpediente(req: any, res: Response) {
+  const uid = userId(req);
+  if (!uid) return err(res, 'No autenticado', 401);
+  const { id, attachmentId } = req.params;
+  const expedienteId = String(req.body?.expediente_id || '').trim();
+  const index = Number(attachmentId);
+  if (!expedienteId) return err(res, 'Falta expediente_id', 400);
+
+  try {
+    const expCheck = await pool.query(
+      `SELECT id FROM expedientes WHERE id = $1 AND organizacion_id = $2`,
+      [expedienteId, req.organizacionId],
+    );
+    if (!expCheck.rows.length) return err(res, 'Expediente no encontrado', 404);
+
+    const { rows } = await pool.query(
+      `SELECT e.*, a.imap_host, a.imap_port, a.imap_secure, a.username, a.password_enc
+         FROM emails e
+         LEFT JOIN email_accounts a ON a.id = e.account_id
+        WHERE e.id=$1 AND e.user_id=$2`,
+      [id, uid],
+    );
+    if (!rows.length) return err(res, 'Mensaje no encontrado', 404);
+    const row = rows[0];
+
+    let meta: any[] = [];
+    try { meta = row.attachments_json ? JSON.parse(row.attachments_json) : []; } catch { /**/ }
+    const entry = Number.isInteger(index) ? meta[index] : null;
+
+    let buffer: Buffer | null = null;
+    let filename = entry?.filename || `adjunto_${attachmentId}`;
+    let contentType = entry?.contentType || 'application/octet-stream';
+
+    if (row.gmail_profile_id && row.gmail_message_id) {
+      if (!entry?.attachmentId) return err(res, 'Adjunto no encontrado', 404);
+      const accessToken = await getGmailAccessToken(row.gmail_profile_id, uid);
+      const part = await gmailApiGet(`/messages/${row.gmail_message_id}/attachments/${entry.attachmentId}`, accessToken);
+      buffer = Buffer.from(String(part.data || '').replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+    } else if (row.uid && !Number.isNaN(index)) {
+      const password = decryptPassword(row.password_enc);
+      const cfg: ImapConfig = {
+        host: row.imap_host, port: row.imap_port, secure: row.imap_secure,
+        user: row.username, password,
+      };
+      const client = new ImapClient(cfg);
+      try {
+        await client.connect();
+        await client.login();
+        await client.selectFolder(row.folder);
+        const att = await client.fetchAttachment(row.uid, index);
+        if (!att) return err(res, 'Adjunto no encontrado', 404);
+        buffer = att.content;
+        filename = att.filename;
+        contentType = att.contentType;
+      } finally {
+        await client.logout().catch(() => undefined);
+      }
+    } else if (row.account_id && row.engine_msg_id) {
+      const { isEmailEngineEnabled, eeGetAttachment } = await import('../utils/emailEngineClient');
+      if (isEmailEngineEnabled()) {
+        buffer = await eeGetAttachment(row.account_id, attachmentId);
+      }
+    }
+
+    if (!buffer) return err(res, 'Adjunto no disponible', 404);
+
+    const expedienteDir = path.join(UPLOADS_CLIENTS_ROOT, expedienteId);
+    fs.mkdirSync(expedienteDir, { recursive: true });
+    const safeName = sanitizeAttachmentFileName(filename);
+    const storedName = `${Date.now()}_${safeName}`;
+    fs.writeFileSync(path.join(expedienteDir, storedName), buffer);
+    const documentName = path.parse(safeName).name;
+
+    await pool.query(
+      `INSERT INTO client_files
+         (client_id, original_name, stored_name, mimetype, size_bytes, document_name, attachment_type, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [expedienteId, filename, storedName, contentType, buffer.length, documentName || null, 'Sin clasificar', uid],
+    );
+
+    return ok(res, { saved: true });
   } catch (e: any) { return err(res, e.message); }
 }
 
