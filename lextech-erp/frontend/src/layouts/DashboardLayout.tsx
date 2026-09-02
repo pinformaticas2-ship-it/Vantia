@@ -767,11 +767,16 @@ function VantiaWidget({ pathname, getToken }: { pathname: string; getToken: (opt
             renderizado se clampa a la mitad de la caja casi al instante,
             así que la transición de forma se veía como un salto en vez de
             un morph gradual. */}
-      <div className="group fixed bottom-2 right-0 z-50 h-24 w-28 flex items-end justify-end pb-4">
+      {/* pointer-events-none en el contenedor: el área de hover es más grande
+          que el botón a propósito (ver comentario arriba), pero al ser un div
+          normal esa zona "vacía" también capturaba los clics -- tapaba la
+          paginación de cualquier tabla que cayera en esa esquina. Se
+          reactivan los clics solo sobre el botón en sí. */}
+      <div className="group pointer-events-none fixed bottom-2 right-0 z-50 h-24 w-28 flex items-end justify-end pb-4">
         <button
           onClick={() => setOpen((v) => !v)}
           title="Vantia — Asistente IA"
-          className={`relative h-14 w-14 shadow-xl flex items-center justify-center transition-all duration-300 ease-out active:scale-90 ${
+          className={`pointer-events-auto relative h-14 w-14 shadow-xl flex items-center justify-center transition-all duration-300 ease-out active:scale-90 ${
             open || loading
               ? "-translate-x-6 rounded-[28px]"
               : "translate-x-[22px] rounded-2xl group-hover:-translate-x-6 group-hover:rounded-[28px]"
