@@ -615,12 +615,12 @@ export default function DashboardHome() {
     switch (id) {
 
       case "agenda": return (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
               {handle}
-              <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0">
-                <Calendar size={15} className="text-indigo-600" />
+              <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
+                <Calendar size={15} className="text-[#ab0433]" />
               </div>
               <h2 className="font-semibold text-slate-800 text-base">Próximas citas</h2>
             </div>
@@ -672,12 +672,12 @@ export default function DashboardHome() {
 
       case "tareas": return (
         <div onClick={() => goTo("/dashboard/tareas")} className="cursor-pointer group">
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all">
-            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden hover:border-slate-300 transition-colors">
+            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 {handle}
                 <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
-                  <CheckCircle2 size={14} className="text-red-500" />
+                  <CheckCircle2 size={14} className="text-[#ab0433]" />
                 </div>
                 <h3 className="font-semibold text-slate-800 text-base">Tareas</h3>
               </div>
@@ -714,12 +714,12 @@ export default function DashboardHome() {
       );
 
       case "actividad": return (
-        <div onClick={() => goTo("/dashboard/trazabilidad")} className="cursor-pointer group bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all">
-          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div onClick={() => goTo("/dashboard/trazabilidad")} className="cursor-pointer group bg-white rounded-xl border border-slate-200 overflow-hidden hover:border-slate-300 transition-colors">
+          <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
               {handle}
-              <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center shrink-0">
-                <RefreshCw size={13} className="text-slate-500" />
+              <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
+                <RefreshCw size={13} className="text-[#ab0433]" />
               </div>
               <h3 className="font-semibold text-slate-800 text-base">Actividad reciente</h3>
             </div>
@@ -770,12 +770,12 @@ export default function DashboardHome() {
       );
 
       case "expedientes": return (
-        <div onClick={() => goTo("/dashboard/expedientes")} className="cursor-pointer group bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all">
-          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div onClick={() => goTo("/dashboard/expedientes")} className="cursor-pointer group bg-white rounded-xl border border-slate-200 overflow-hidden hover:border-slate-300 transition-colors">
+          <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
               {handle}
-              <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center shrink-0">
-                <Briefcase size={14} className="text-amber-600" />
+              <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
+                <Briefcase size={14} className="text-[#ab0433]" />
               </div>
               <h3 className="font-semibold text-slate-800 text-base">Expedientes</h3>
             </div>
@@ -788,12 +788,12 @@ export default function DashboardHome() {
       );
 
       case "clientes": return (
-        <div onClick={() => goTo("/dashboard/clientes")} className="cursor-pointer group bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all">
-          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div onClick={() => goTo("/dashboard/clientes")} className="cursor-pointer group bg-white rounded-xl border border-slate-200 overflow-hidden hover:border-slate-300 transition-colors">
+          <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
               {handle}
-              <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
-                <Users size={14} className="text-emerald-600" />
+              <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
+                <Users size={14} className="text-[#ab0433]" />
               </div>
               <h3 className="font-semibold text-slate-800 text-base">Clientes</h3>
             </div>
@@ -821,12 +821,12 @@ export default function DashboardHome() {
       );
 
       case "chat": return (
-        <div onClick={() => goTo("/dashboard/chat")} className="cursor-pointer group bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all">
-          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div onClick={() => goTo("/dashboard/chat")} className="cursor-pointer group bg-white rounded-xl border border-slate-200 overflow-hidden hover:border-slate-300 transition-colors">
+          <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
               {handle}
-              <div className="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center shrink-0">
-                <MessageSquare size={14} className="text-violet-600" />
+              <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
+                <MessageSquare size={14} className="text-[#ab0433]" />
               </div>
               <h3 className="font-semibold text-slate-800 text-base">Chat interno</h3>
             </div>
@@ -850,12 +850,12 @@ export default function DashboardHome() {
       );
 
       case "whatsapp": return (
-        <div onClick={() => goTo("/dashboard/whatsapp")} className="cursor-pointer group bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all">
-          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div onClick={() => goTo("/dashboard/whatsapp")} className="cursor-pointer group bg-white rounded-xl border border-slate-200 overflow-hidden hover:border-slate-300 transition-colors">
+          <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
               {handle}
-              <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center shrink-0">
-                <MessageCircle size={14} className="text-green-600" />
+              <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
+                <MessageCircle size={14} className="text-[#ab0433]" />
               </div>
               <h3 className="font-semibold text-slate-800 text-base">WhatsApp</h3>
             </div>
@@ -888,12 +888,12 @@ export default function DashboardHome() {
       );
 
       case "correo": return (
-        <div className="group bg-white rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-all overflow-hidden flex flex-col">
-          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-2">
+        <div className="group bg-white rounded-xl border border-slate-200 hover:border-slate-300 transition-colors overflow-hidden flex flex-col">
+          <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
               {handle}
-              <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
-                <Mail size={14} className="text-blue-600" />
+              <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
+                <Mail size={14} className="text-[#ab0433]" />
               </div>
               <h3 className="font-semibold text-slate-800 text-base shrink-0">Correo</h3>
               {emailStats.unread > 0 && (
@@ -1018,12 +1018,12 @@ export default function DashboardHome() {
       );
 
       case "documental": return (
-        <div onClick={() => goTo("/dashboard/documental")} className="cursor-pointer group bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all">
-          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div onClick={() => goTo("/dashboard/documental")} className="cursor-pointer group bg-white rounded-xl border border-slate-200 overflow-hidden hover:border-slate-300 transition-colors">
+          <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
               {handle}
-              <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
-                <Library size={14} className="text-slate-600" />
+              <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
+                <Library size={14} className="text-[#ab0433]" />
               </div>
               <h3 className="font-semibold text-slate-800 text-base">Documental</h3>
             </div>
@@ -1048,13 +1048,13 @@ export default function DashboardHome() {
       );
 
       case "facturacion": return (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
           {/* Header */}
-          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-2">
+          <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 shrink-0">
               {handle}
-              <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
-                <Receipt size={14} className="text-emerald-600" />
+              <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
+                <Receipt size={14} className="text-[#ab0433]" />
               </div>
               <h3 className="font-semibold text-slate-800 text-base">Facturación</h3>
             </div>
@@ -1238,7 +1238,7 @@ export default function DashboardHome() {
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd} autoScroll={false}>
           <SortableContext items={orderedVisible} strategy={rectSortingStrategy}>
-            <div className={`grid gap-6 items-start grid-cols-1 ${isCollapsed ? "lg:grid-cols-3" : "xl:grid-cols-3"} md:grid-cols-2`}>
+            <div className={`grid gap-4 items-start grid-cols-1 ${isCollapsed ? "lg:grid-cols-3" : "xl:grid-cols-3"} md:grid-cols-2`}>
               {orderedVisible.map((id, idx) => (
                 <SortableWidget key={id} id={id} animDelay={Math.min(idx, 8) * 70}>
                   {(handle) => renderWidget(id, handle)}
