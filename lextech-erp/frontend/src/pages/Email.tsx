@@ -731,6 +731,23 @@ function ComposeWindow({
   useEffect(() => {
     if (bodyRef.current && data.body) {
       bodyRef.current.innerHTML = data.body;
+      // En una respuesta/reenvío el cuerpo citado ya viene con un primer
+      // párrafo vacío para que el usuario escriba -- coloca el cursor ahí
+      // en vez de dejarlo al final (después de toda la cita), que es donde
+      // el navegador lo pondría por defecto.
+      if (data.replyToId || /^<p><br\/?><\/p>/.test(data.body)) {
+        const el = bodyRef.current;
+        const range = document.createRange();
+        const sel = window.getSelection();
+        const firstNode = el.firstChild;
+        if (firstNode) {
+          range.setStart(firstNode, 0);
+          range.collapse(true);
+          sel?.removeAllRanges();
+          sel?.addRange(range);
+        }
+        el.focus();
+      }
     }
   }, []); // eslint-disable-line
 
@@ -4658,7 +4675,11 @@ export default function Email() {
   };
 
   const replyTo = (email: ParsedEmail, all = false) => {
-    const quotedBody = `<br/><br/>
+    // El párrafo vacío al principio es donde escribe el usuario -- sin él,
+    // el editor se abre mostrando directamente el correo citado como único
+    // contenido, y parece que estás "editando" el correo original en vez de
+    // redactando una respuesta nueva encima.
+    const quotedBody = `<p><br/></p><br/>
 <blockquote style="border-left:3px solid #d1d5db;padding-left:12px;color:#6b7280;margin:8px 0">
 <p style="margin:0 0 4px 0"><b>El ${fmtFull(email.date)}, ${email.fromName || email.from} escribió:</b></p>
 ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}
@@ -4673,7 +4694,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}
   };
 
   const forwardEmail = (email: ParsedEmail) => {
-    const fwdBody = `<br/><br/>
+    const fwdBody = `<p><br/></p><br/>
 <p style="color:#9ca3af">---------- Mensaje reenviado ----------</p>
 <p style="margin:2px 0"><b>De:</b> ${email.fromName || email.from} &lt;${email.from}&gt;</p>
 <p style="margin:2px 0"><b>Fecha:</b> ${fmtFull(email.date)}</p>
