@@ -1976,6 +1976,13 @@ function EmailReader({
     [email.id, email.bodyHtml, email.bodyText],
   );
 
+  // Tope de altura del iframe: algunos correos (firmas con tablas/imágenes
+  // espaciadoras, reenviados con HTML mal formado...) miden un scrollHeight
+  // absurdamente grande aunque el contenido visible ocupe cuatro líneas --
+  // sin este tope, ese hueco en blanco se traslada tal cual a toda la
+  // página. Por encima del tope, el iframe hace scroll por dentro en vez de
+  // seguir creciendo.
+  const MAX_IFRAME_H = 1400;
   const handleIframeLoad = useCallback(() => {
     const iframe = iframeRef.current;
     if (!iframe) return;
@@ -1987,7 +1994,7 @@ function EmailReader({
         doc.documentElement?.scrollHeight || 0,
         100,
       );
-      setIframeH(h + 12);
+      setIframeH(Math.min(h + 12, MAX_IFRAME_H));
     };
     measure();
     setTimeout(measure, 200);
@@ -2366,7 +2373,10 @@ function EmailReader({
                       srcDoc={srcDoc}
                       onLoad={handleIframeLoad}
                       sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
-                      style={{ width: '100%', height: iframeH, border: 'none', display: 'block', background: 'white' }}
+                      style={{
+                        width: '100%', height: iframeH, border: 'none', display: 'block', background: 'white',
+                        overflow: iframeH >= MAX_IFRAME_H ? 'auto' : 'hidden',
+                      }}
                     />
                   )}
                 </div>
