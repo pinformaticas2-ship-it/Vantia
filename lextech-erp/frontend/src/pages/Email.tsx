@@ -1767,21 +1767,17 @@ function EmailItem({
       onDoubleClick={(e) => { e.preventDefault(); window.open(`/dashboard/correo?openEmail=${encodeURIComponent(email.id)}&solo=1`, '_blank'); }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className={`relative mx-2 my-1.5 flex items-start gap-3 rounded-2xl border px-4 py-3.5 cursor-pointer transition-all duration-150 ${
-        selected
-          ? 'border-red-200 bg-gradient-to-r from-red-50 to-white shadow-sm'
-          : 'border-transparent hover:border-slate-200 hover:bg-slate-50/90'
+      className={`relative flex items-start gap-3 border-b border-slate-100 px-4 py-3.5 cursor-pointer transition-colors duration-150 ${
+        selected ? 'bg-red-50/60' : unread ? 'bg-white hover:bg-slate-50' : 'bg-slate-50/30 hover:bg-white'
       }`}>
 
-      {/* Left selected indicator bar */}
-      {selected && <span className="absolute left-0 top-3 bottom-3 w-1 bg-red-600 rounded-r-full" />}
+      {/* Left indicator bar: rojo si está seleccionado, rojo más fino si solo no leído */}
+      {selected && <span className="absolute left-0 top-0 bottom-0 w-1 bg-red-500" />}
+      {!selected && unread && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 rounded-r-md bg-red-400" />}
 
       {/* Avatar */}
       <div className="relative mt-0.5 flex-shrink-0">
         <Avatar name={email.fromName} email={email.from} size={34} />
-        {unread && !selected && (
-          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-blue-500" />
-        )}
       </div>
 
       {/* Content */}
