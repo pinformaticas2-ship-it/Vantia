@@ -43,3 +43,32 @@ export async function unsubscribePush(req: Request, res: Response) {
     return res.status(500).json({ error: e.message });
   }
 }
+
+// Botón "No volver a avisar" del propio aviso push de un plazo. Sin sesión
+// a propósito -- lo llama el service worker en segundo plano, donde no hay
+// forma sencilla de adjuntar un token de Clerk; el dismiss_token de un solo
+// uso (generado al enviar ese aviso concreto) hace de autorización.
+export async function dismissPlazoPush(req: Request, res: Response) {
+  const kind = String(req.query.kind || '');
+  const id = String(req.query.id || '');
+  const token = String(req.query.token || '');
+  if (!id || !token || (kind !== 'task' && kind !== 'notif')) {
+    return res.status(400).json({ error: 'Parámetros inválidos' });
+  }
+
+  const table = kind === 'task' ? 'client_tasks' : 'exp_notificaciones';
+  const dismissedCol = kind === 'task' ? 'plazo_push_dismissed' : 'push_dismissed';
+  const tokenCol = kind === 'task' ? 'plazo_push_dismiss_token' : 'push_dismiss_token';
+
+  try {
+    const { rowCount } = await pool.query(
+      `UPDATE ${table} SET ${dismissedCol} = true, ${tokenCol} = NULL
+       WHERE id = $1 AND ${tokenCol} = $2`,
+      [id, token],
+    );
+    if (!rowCount) return res.status(404).json({ error: 'Aviso no encontrado o ya resuelto' });
+    return res.json({ data: { dismissed: true } });
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message });
+  }
+}

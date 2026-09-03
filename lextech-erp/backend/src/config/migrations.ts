@@ -2010,6 +2010,19 @@ export async function runMigrations(): Promise<void> {
       await client.query(`ALTER TABLE exp_notificaciones ADD COLUMN IF NOT EXISTS push_sent_at       TIMESTAMPTZ;`);
     } catch (_e: any) {}
 
+    // Botón "No volver a avisar" en el propio aviso push de un plazo: antes
+    // la única forma de callarlo era completar la tarea. dismiss_token es un
+    // valor aleatorio de un solo uso que viaja dentro del payload del push
+    // (como enlace mágico, sin sesión) -- lo genera plazoPushScheduler al
+    // enviar el aviso, y el endpoint público que llama el botón lo valida
+    // antes de marcar dismissed=true.
+    try {
+      await client.query(`ALTER TABLE client_tasks      ADD COLUMN IF NOT EXISTS plazo_push_dismissed BOOLEAN NOT NULL DEFAULT false;`);
+      await client.query(`ALTER TABLE client_tasks      ADD COLUMN IF NOT EXISTS plazo_push_dismiss_token VARCHAR(64);`);
+      await client.query(`ALTER TABLE exp_notificaciones ADD COLUMN IF NOT EXISTS push_dismissed        BOOLEAN NOT NULL DEFAULT false;`);
+      await client.query(`ALTER TABLE exp_notificaciones ADD COLUMN IF NOT EXISTS push_dismiss_token     VARCHAR(64);`);
+    } catch (_e: any) {}
+
     // ── Fase 3 de multi-organización: Correo ──────────────────────
     // Correo se quedó fuera de las Fases 1 y 2: email_accounts y
     // email_oauth_profiles solo tenían user_id, así que la bandeja y (más

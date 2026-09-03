@@ -1,5 +1,12 @@
+import { randomBytes } from 'crypto';
 import pool from '../config/database';
 import { pushEnabled, sendPushToUser, sendPushToOrg } from '../utils/webPush';
+
+const PUBLIC_BACKEND_URL = (process.env.PUBLIC_BACKEND_URL || 'https://vantia.up.railway.app').replace(/\/$/, '');
+
+function buildDismissUrl(kind: 'task' | 'notif', id: string, token: string): string {
+  return `${PUBLIC_BACKEND_URL}/api/push/dismiss-plazo?kind=${kind}&id=${id}&token=${token}`;
+}
 
 // ── Avisos push de plazos ─────────────────────────────────────────────────────
 // Los plazos (tareas con fecha límite, recordatorios de expediente) no son un
@@ -18,6 +25,7 @@ async function checkTaskPlazos(): Promise<void> {
       WHERE plazo IS NOT NULL
         AND estado <> 'completada'
         AND user_id IS NOT NULL
+        AND NOT plazo_push_dismissed
         AND plazo <= (CURRENT_DATE + $1::int)
         AND (plazo_push_sent_at IS NULL OR plazo_push_sent_at < NOW() - $2::interval)`,
     [PLAZO_ALERT_DAYS, `${RENOTIFY_AFTER_MS} milliseconds`],
@@ -29,13 +37,18 @@ async function checkTaskPlazos(): Promise<void> {
       diffDays === 0 ? 'Vence hoy' :
       diffDays === 1 ? 'Vence mañana' :
       `Vence en ${diffDays} días`;
+    const dismissToken = randomBytes(16).toString('hex');
     await sendPushToUser(t.user_id, {
       title: t.titulo || 'Tarea sin título',
       body: `${when}${t.client_name ? ' · ' + t.client_name : ''}`,
       url: t.expediente_id ? `/dashboard/expedientes/${t.expediente_id}?tab=tareas` : '/dashboard/tareas',
       tag: `plazo-task-${t.id}`,
+      dismissUrl: buildDismissUrl('task', t.id, dismissToken),
     });
-    await pool.query(`UPDATE client_tasks SET plazo_push_sent_at = NOW() WHERE id = $1`, [t.id]);
+    await pool.query(
+      `UPDATE client_tasks SET plazo_push_sent_at = NOW(), plazo_push_dismiss_token = $2 WHERE id = $1`,
+      [t.id, dismissToken],
+    );
   }
 }
 
@@ -46,6 +59,7 @@ async function checkExpedienteNotificaciones(): Promise<void> {
        JOIN expedientes e ON e.id = n.expediente_id
       WHERE n.estado = 'pendiente'
         AND n.fecha_limite IS NOT NULL
+        AND NOT n.push_dismissed
         AND n.fecha_limite <= (CURRENT_DATE + $1::int)
         AND (n.push_sent_at IS NULL OR n.push_sent_at < NOW() - $2::interval)`,
     [PLAZO_ALERT_DAYS, `${RENOTIFY_AFTER_MS} milliseconds`],
@@ -57,13 +71,18 @@ async function checkExpedienteNotificaciones(): Promise<void> {
       diffDays === 0 ? 'Vence hoy' :
       diffDays === 1 ? 'Vence mañana' :
       `Vence en ${diffDays} días`;
+    const dismissToken = randomBytes(16).toString('hex');
     await sendPushToOrg(n.organizacion_id, {
       title: n.titulo || 'Recordatorio de expediente',
       body: `${when} · Exp. ${n.anio}/${n.num_exp}`,
       url: `/dashboard/expedientes/${n.expediente_id}?tab=notificaciones`,
       tag: `plazo-notif-${n.id}`,
+      dismissUrl: buildDismissUrl('notif', n.id, dismissToken),
     });
-    await pool.query(`UPDATE exp_notificaciones SET push_sent_at = NOW() WHERE id = $1`, [n.id]);
+    await pool.query(
+      `UPDATE exp_notificaciones SET push_sent_at = NOW(), push_dismiss_token = $2 WHERE id = $1`,
+      [n.id, dismissToken],
+    );
   }
 }
 

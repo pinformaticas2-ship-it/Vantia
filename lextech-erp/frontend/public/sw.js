@@ -22,13 +22,26 @@ self.addEventListener("push", (event) => {
     badge: "/vantia-mark-96.png",
     tag: payload.tag || undefined,
     renotify: Boolean(payload.tag),
-    data: { url: payload.url || "/dashboard" },
+    data: { url: payload.url || "/dashboard", dismissUrl: payload.dismissUrl || null },
+    // Solo los avisos de plazo (los que llevan dismissUrl) ofrecen este
+    // botón -- silencia ESE aviso concreto sin tener que completar la tarea.
+    actions: payload.dismissUrl ? [{ action: "dismiss-plazo", title: "No volver a avisar" }] : undefined,
   };
 
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
 self.addEventListener("notificationclick", (event) => {
+  const dismissUrl = event.notification.data?.dismissUrl;
+
+  if (event.action === "dismiss-plazo" && dismissUrl) {
+    event.notification.close();
+    // fetch en segundo plano -- no hace falta abrir ni enfocar la app para
+    // esta acción, el propio token del enlace autoriza la llamada.
+    event.waitUntil(fetch(dismissUrl, { method: "POST" }).catch(() => {}));
+    return;
+  }
+
   event.notification.close();
   const targetUrl = event.notification.data?.url || "/dashboard";
 

@@ -32,6 +32,12 @@ export interface PushPayload {
   url?: string;
   /** Agrupa avisos relacionados: uno nuevo con el mismo tag sustituye al anterior en la bandeja del SO. */
   tag?: string;
+  /**
+   * URL pública (con token de un solo uso, sin necesitar sesión) que el
+   * service worker llama cuando el usuario pulsa el botón "No volver a
+   * avisar" del propio aviso -- si se indica, el SW añade ese botón.
+   */
+  dismissUrl?: string;
 }
 
 interface SubRow { id: string; endpoint: string; p256dh: string; auth: string; }
