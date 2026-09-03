@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef, ReactNode, useContext } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo, ReactNode, useContext } from "react";
 import { SidebarContext } from "../layouts/DashboardLayout";
 import { Spinner } from "../components/Spinner";
 import { createPortal } from "react-dom";
@@ -16,10 +16,10 @@ import { safeJson } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
 import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors,
-  DragEndEvent, DragStartEvent,
+  DragEndEvent, DragStartEvent, DragOverEvent, DragOverlay, useDroppable,
 } from "@dnd-kit/core";
 import {
-  SortableContext, rectSortingStrategy, useSortable, arrayMove,
+  SortableContext, verticalListSortingStrategy, useSortable, arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
@@ -136,6 +136,66 @@ function loadOrder(): string[]    {
     if (r) return sanitizeWidgetIds(JSON.parse(r), DEFAULT_ORDER);
   } catch {/**/}
   return DEFAULT_ORDER;
+}
+
+// ── Masonry: cada columna apila sus tarjetas por su cuenta, sin esperar a
+// que las otras columnas terminen su fila -- así una tarjeta corta no deja
+// un hueco vacío debajo solo porque su vecina es más alta (lo que pasaba
+// con una rejilla CSS normal, donde toda la fila se estira a la altura de
+// la más alta). El precio es que el reordenar-arrastrando ahora tiene que
+// saber mover tarjetas ENTRE columnas, no solo dentro de una lista plana.
+const COLUMNS_KEY = "dashboard_widget_columns";
+const NUM_COLUMNS = 3;
+
+function reconcileColumns(cols: string[][], visible: string[]): string[][] {
+  const validSet = new Set(visible);
+  const placed = new Set<string>();
+  const next = cols.map((col) => col.filter((id) => {
+    if (!validSet.has(id) || placed.has(id)) return false;
+    placed.add(id);
+    return true;
+  }));
+  for (const id of visible) {
+    if (placed.has(id)) continue;
+    let shortest = 0;
+    for (let i = 1; i < next.length; i++) if (next[i].length < next[shortest].length) shortest = i;
+    next[shortest].push(id);
+    placed.add(id);
+  }
+  return next;
+}
+
+function loadColumns(visible: string[], order: string[]): string[][] {
+  let cols: string[][] | null = null;
+  try {
+    const r = localStorage.getItem(COLUMNS_KEY);
+    if (r) {
+      const parsed = JSON.parse(r);
+      if (Array.isArray(parsed) && parsed.length === NUM_COLUMNS && parsed.every((c) => Array.isArray(c))) {
+        cols = parsed;
+      }
+    }
+  } catch {/**/}
+
+  if (!cols) {
+    // Sin columnas guardadas todavía: migrar el orden plano anterior
+    // (dashboard_widget_order) repartiéndolo por turnos entre columnas.
+    cols = Array.from({ length: NUM_COLUMNS }, () => [] as string[]);
+    order.forEach((id, idx) => { cols![idx % NUM_COLUMNS].push(id); });
+  }
+
+  return reconcileColumns(cols, visible);
+}
+
+function MasonryColumn({ id, items, children }: { id: string; items: string[]; children: ReactNode }) {
+  const { setNodeRef } = useDroppable({ id });
+  return (
+    <SortableContext items={items} strategy={verticalListSortingStrategy}>
+      <div ref={setNodeRef} className="flex flex-col gap-4 min-h-[40px]">
+        {children}
+      </div>
+    </SortableContext>
+  );
 }
 
 function WidgetPickerModal({ visible, isAdmin, onClose, onSave }: { visible: string[]; isAdmin: boolean; onClose: () => void; onSave: (ids: string[]) => void }) {
@@ -318,12 +378,27 @@ export default function DashboardHome() {
   const [showDotsMenu,     setShowDotsMenu]      = useState(false);
   const [showWidgetPicker, setShowWidgetPicker]  = useState(false);
   const [visibleWidgets,   setVisibleWidgets]    = useState<string[]>(loadVisible);
-  const [widgetOrder,      setWidgetOrder]       = useState<string[]>(loadOrder);
+  const [columns,          setColumns]           = useState<string[][]>(() => loadColumns(loadVisible(), loadOrder()));
+  const [activeId,         setActiveId]          = useState<string | null>(null);
+  const [isDesktopMasonry, setIsDesktopMasonry]  = useState(() => (
+    typeof window !== "undefined" ? window.matchMedia("(min-width: 768px)").matches : true
+  ));
 
   const altaMenuRef    = useRef<HTMLDivElement>(null);
   const clienteMenuRef = useRef<HTMLDivElement>(null);
   const dotsMenuRef    = useRef<HTMLDivElement>(null);
   const wasDragging    = useRef(false);
+
+  // Debajo de 768px un solo carril de tarjetas no puede tener huecos por
+  // definición (no hay filas con las que desalinearse), así que ahí no hace
+  // falta lógica de masonry -- solo se aplana el resultado para mostrarlo.
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)");
+    const update = () => setIsDesktopMasonry(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
 
   useEffect(() => {
     const h = (e: MouseEvent) => {
@@ -565,27 +640,95 @@ export default function DashboardHome() {
   useEffect(() => { fetchData(); }, [fetchData]);
   useAutoRefresh(() => fetchData(true), { intervalMs: 20_000 });
 
-  // ── DnD ──────────────────────────────────────────────────────────────────
+  // Tesorería (widget "Facturación") solo cuenta como "visible" para el
+  // reparto en columnas si el usuario es admin -- igual que antes.
+  const effectiveVisible = useMemo(
+    () => visibleWidgets.filter(id => id !== "facturacion" || isAdmin),
+    [visibleWidgets, isAdmin],
+  );
+  const effectiveVisibleKey = effectiveVisible.join(",");
+  useEffect(() => {
+    setColumns(prev => {
+      const next = reconcileColumns(prev, effectiveVisible);
+      localStorage.setItem(COLUMNS_KEY, JSON.stringify(next));
+      return next;
+    });
+    // effectiveVisible se recalcula cada render -- se compara por su
+    // contenido (la key) para no reconciliar en bucle.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveVisibleKey]);
+
+  // ── DnD (masonry: reordenar dentro de una columna y mover entre columnas) ──
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
-  function handleDragStart(_e: DragStartEvent) { wasDragging.current = false; }
+
+  function findColumnIndex(id: string, cols: string[][]): number {
+    return cols.findIndex(col => col.includes(id));
+  }
+
+  function handleDragStart(e: DragStartEvent) {
+    wasDragging.current = false;
+    setActiveId(e.active.id as string);
+  }
+
+  function handleDragOver(e: DragOverEvent) {
+    const { active, over } = e;
+    if (!over) return;
+    const activeId_ = active.id as string;
+    const overId = over.id as string;
+    if (activeId_ === overId) return;
+
+    setColumns(prev => {
+      const fromCol = findColumnIndex(activeId_, prev);
+      let toCol = findColumnIndex(overId, prev);
+      if (toCol === -1) {
+        // El cursor está sobre una columna vacía (o el hueco tras su última
+        // tarjeta), no sobre otra tarjeta -- over.id es entonces el id de la
+        // propia columna (ver MasonryColumn).
+        const idx = prev.findIndex((_, i) => `col-${i}` === overId);
+        toCol = idx;
+      }
+      if (fromCol === -1 || toCol === -1 || fromCol === toCol) return prev;
+
+      const next = prev.map(col => [...col]);
+      next[fromCol].splice(next[fromCol].indexOf(activeId_), 1);
+      const overIndexInCol = next[toCol].indexOf(overId);
+      next[toCol].splice(overIndexInCol >= 0 ? overIndexInCol : next[toCol].length, 0, activeId_);
+      return next;
+    });
+  }
+
   function handleDragEnd(e: DragEndEvent) {
     const { active, over } = e;
-    if (over && active.id !== over.id) {
-      wasDragging.current = true;
-      setWidgetOrder(order => {
-        const next = arrayMove(order, order.indexOf(active.id as string), order.indexOf(over.id as string));
-        localStorage.setItem(ORDER_KEY, JSON.stringify(next));
-        return next;
-      });
-      setTimeout(() => { wasDragging.current = false; }, 200);
-    }
+    setActiveId(null);
+    if (!over) return;
+    const activeId_ = active.id as string;
+    const overId = over.id as string;
+    if (activeId_ === overId) return;
+
+    wasDragging.current = true;
+    setColumns(prev => {
+      const fromCol = findColumnIndex(activeId_, prev);
+      const toCol = findColumnIndex(overId, prev);
+      let next = prev;
+      if (fromCol !== -1 && toCol === fromCol) {
+        const col = prev[fromCol];
+        next = prev.map((c, i) => i === fromCol
+          ? arrayMove(col, col.indexOf(activeId_), col.indexOf(overId))
+          : c);
+      }
+      localStorage.setItem(COLUMNS_KEY, JSON.stringify(next));
+      return next;
+    });
+    setTimeout(() => { wasDragging.current = false; }, 200);
   }
+
   function goTo(path: string) { if (!wasDragging.current) navigate(path); }
 
-  const orderedVisible = [
-    ...widgetOrder.filter(id => visibleWidgets.includes(id)),
-    ...visibleWidgets.filter(id => !widgetOrder.includes(id)),
-  ].filter(id => id !== "facturacion" || isAdmin);
+  const orderedVisible = effectiveVisible;
+  // Para pantallas < 768px, un único carril con todas las tarjetas en el
+  // mismo orden en que aparecen las columnas -- ahí no hace falta (ni se
+  // ofrece) arrastrar para reordenar, ver comentario en isDesktopMasonry.
+  const flatMobileOrder = columns.flat().filter(id => effectiveVisible.includes(id));
 
   // ── Billing calcs ─────────────────────────────────────────────────────────
   const billingCalc = (() => {
@@ -1235,17 +1378,36 @@ export default function DashboardHome() {
           <LayoutGrid size={32} className="opacity-20" />
           <p className="text-sm">Sin elementos visibles. Pulsa <strong>···</strong> para elegir qué mostrar.</p>
         </div>
-      ) : (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd} autoScroll={false}>
-          <SortableContext items={orderedVisible} strategy={rectSortingStrategy}>
-            <div className={`grid gap-4 items-start grid-cols-1 ${isCollapsed ? "lg:grid-cols-3" : "xl:grid-cols-3"} md:grid-cols-2`}>
-              {orderedVisible.map((id, idx) => (
-                <SortableWidget key={id} id={id} animDelay={Math.min(idx, 8) * 70}>
-                  {(handle) => renderWidget(id, handle)}
-                </SortableWidget>
-              ))}
+      ) : !isDesktopMasonry ? (
+        // < 768px: un solo carril, sin drag-and-drop (con una única columna
+        // no hay huecos que evitar ni filas que desalinear).
+        <div className="flex flex-col gap-4">
+          {flatMobileOrder.map((id, idx) => (
+            <div key={id} className="anim-fade-up" style={{ animationDelay: `${Math.min(idx, 8) * 70}ms` }}>
+              {renderWidget(id, null)}
             </div>
-          </SortableContext>
+          ))}
+        </div>
+      ) : (
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd} autoScroll={false}>
+          <div className={`grid gap-4 items-start grid-cols-1 ${isCollapsed ? "lg:grid-cols-3" : "xl:grid-cols-3"} md:grid-cols-2`}>
+            {columns.map((col, colIdx) => (
+              <MasonryColumn key={`col-${colIdx}`} id={`col-${colIdx}`} items={col}>
+                {col.map((id, idx) => (
+                  <SortableWidget key={id} id={id} animDelay={Math.min(colIdx + idx, 8) * 70}>
+                    {(handle) => renderWidget(id, handle)}
+                  </SortableWidget>
+                ))}
+              </MasonryColumn>
+            ))}
+          </div>
+          <DragOverlay>
+            {activeId ? (
+              <div className="rounded-xl shadow-2xl shadow-slate-900/20 rotate-1">
+                {renderWidget(activeId, null)}
+              </div>
+            ) : null}
+          </DragOverlay>
         </DndContext>
       )}
 
