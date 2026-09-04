@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AlertTriangle, Bell, BellOff, BellRing, BookOpen, Building2, Camera, Check, Crown, Loader2, Lock, MessageCircle, Clock3, Mail as MailIcon, Phone, Palette, Plug, Plus, ShieldCheck, Trash2, UsersRound, X } from 'lucide-react';
-import { useAuth } from '@clerk/clerk-react';
+import { AlertTriangle, Bell, BellOff, BellRing, BookOpen, Building2, Camera, Check, Crown, History, Loader2, Lock, MessageCircle, Clock3, Mail as MailIcon, Phone, Palette, Plug, Plus, ShieldCheck, Trash2, UsersRound, X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth, UserProfile } from '@clerk/clerk-react';
 import { useTheme, AppTheme } from '../lib/ThemeContext';
 import { pickSidebarStyle, autoSidebarBorder, muteSidebarColor } from '../lib/themeCss';
 import { apiFetch, resolveUploadUrl, setActiveOrganizacionId } from '../lib/api';
@@ -1170,6 +1171,69 @@ function ColorField({ label, value, onChange, onCommit, valid }: {
   );
 }
 
+function SeguridadPanel() {
+  const navigate = useNavigate();
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-white rounded-2xl border border-slate-200 p-5">
+        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">
+          Cuenta y autenticación
+        </h3>
+        <p className="text-xs text-slate-500 mb-4 max-w-2xl">
+          Contraseña, verificación en dos pasos (2FA) y sesiones activas se gestionan aquí mismo —
+          es la pantalla de seguridad de Clerk, el proveedor de acceso de Vantia, así que los cambios
+          son inmediatos y no hace falta ningún desarrollo aparte para mantenerla al día.
+        </p>
+        <div className="rounded-xl overflow-hidden border border-slate-100">
+          <UserProfile
+            routing="hash"
+            appearance={{
+              elements: {
+                rootBox: 'w-full',
+                card: 'shadow-none border-none w-full',
+                navbar: 'hidden',
+                navbarMobileMenuButton: 'hidden',
+                header: 'hidden',
+                pageScrollBox: 'p-0',
+                profileSection: 'border-slate-100',
+                formButtonPrimary: 'bg-[#ab0433] hover:bg-[#8f0329] text-sm normal-case',
+                badge: 'bg-red-50 text-[#ab0433]',
+              },
+              variables: { colorPrimary: '#ab0433' },
+            }}
+          />
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-slate-200 p-5">
+        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">
+          Actividad de la cuenta
+        </h3>
+        <div className="flex items-start gap-4">
+          <div className="w-11 h-11 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
+            <History size={20} className="text-slate-500" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-slate-800">Historial de accesos y acciones</p>
+            <p className="text-xs text-slate-500 mt-0.5 max-w-md">
+              Inicios de sesión, IP y dispositivo de cada acceso, y el registro de acciones de todo el
+              despacho, están en Trazabilidad.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/dashboard/trazabilidad')}
+            className="shrink-0 px-3.5 py-2 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+          >
+            Ver Trazabilidad
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function NotificacionesPanel() {
   const push = usePushNotifications();
   const [error, setError] = useState<string | null>(null);
@@ -1443,6 +1507,8 @@ export default function Configuracion() {
             <DespachoPanel />
           ) : activeSection === 'notificaciones' ? (
             <NotificacionesPanel />
+          ) : activeSection === 'seguridad' ? (
+            <SeguridadPanel />
           ) : activeSection === 'usuarios' ? (
             <UsuariosPanel />
           ) : (
