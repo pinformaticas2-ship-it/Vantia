@@ -4,7 +4,7 @@ import path from 'path';
 import pool from '../config/database';
 import { getClerk, resolveUserRole } from './activityController';
 import { UPLOADS_ORG_LOGOS_ROOT } from '../config/paths';
-import { getRolPermissions, getFullMatrix, setPermissionOverride, MODULOS, Modulo, NivelAcceso, OrgRol } from '../config/permissions';
+import { getFullMatrix, setPermissionOverride, getMemberMatrix, setMemberPermissionOverride, clearMemberPermissionOverrides, MODULOS, Modulo, NivelAcceso, OrgRol } from '../config/permissions';
 
 const pgErr = (e: any) =>
   `${e?.message || String(e)}${e?.detail ? ' | detail: ' + e.detail : ''}${e?.code ? ' | code: ' + e.code : ''}`;
@@ -138,7 +138,7 @@ export async function getMyOrganizacion(req: Request, res: Response) {
       } : { id: activa.organizacionId, nombre: activa.organizacionNombre };
     }
 
-    const permisos = activa ? await getRolPermissions(activa.organizacionId, activa.rol) : null;
+    const permisos = activa ? (await getMemberMatrix(activa.organizacionId, userId, activa.rol)).matriz : null;
 
     return ok(res, {
       organizacion,
@@ -613,6 +613,88 @@ export async function updatePermiso(req: Request, res: Response) {
 
     await setPermissionOverride(ctx.organizacionId, rol, modulo, nivel);
     return ok(res, { rol, modulo, nivel });
+  } catch (e: any) {
+    return err(res, pgErr(e));
+  }
+}
+
+// Busca el user_id/rol de un miembro por el id de su fila en
+// organizacion_miembros (mismo :id que usa updateOrganizacionMiembroRol),
+// compartido por los tres endpoints de permisos individuales de abajo.
+async function findMiembroById(organizacionId: string, miembroId: string) {
+  const { rows } = await pool.query(
+    `SELECT user_id, rol FROM organizacion_miembros WHERE id = $1 AND organizacion_id = $2`,
+    [miembroId, organizacionId],
+  );
+  return rows[0] as { user_id: string; rol: OrgRol } | undefined;
+}
+
+// GET /api/organizacion/miembros/:id/permisos — matriz efectiva de un
+// miembro (lo que le da su rol + sus excepciones propias ya aplicadas)
+export async function getMemberPermisos(req: Request, res: Response) {
+  try {
+    const ctx = requireOrgContext(req, res);
+    if (!ctx) return;
+    if (ctx.organizacionRol !== 'propietario' && ctx.organizacionRol !== 'admin') {
+      return err(res, 'Solo el propietario o un administrador pueden ver los permisos.', 403);
+    }
+    const miembro = await findMiembroById(ctx.organizacionId, req.params.id);
+    if (!miembro) return err(res, 'Miembro no encontrado.', 404);
+    if (miembro.rol === 'propietario') {
+      return err(res, 'El propietario siempre tiene acceso completo; no admite excepciones.', 400);
+    }
+    const { matriz, personalizados } = await getMemberMatrix(ctx.organizacionId, miembro.user_id, miembro.rol);
+    return ok(res, { modulos: MODULOS, rol: miembro.rol, matriz, personalizados });
+  } catch (e: any) {
+    return err(res, pgErr(e));
+  }
+}
+
+// PUT /api/organizacion/miembros/:id/permisos — cambia una excepción concreta
+// de módulo para ESE miembro (solo propietario, igual que la matriz de roles)
+export async function updateMemberPermiso(req: Request, res: Response) {
+  try {
+    const ctx = requireOrgContext(req, res);
+    if (!ctx) return;
+    if (ctx.organizacionRol !== 'propietario') {
+      return err(res, 'Solo el propietario puede cambiar los permisos.', 403);
+    }
+    const modulo: Modulo = req.body?.modulo;
+    const nivel: NivelAcceso = req.body?.nivel;
+    if (!MODULOS.some((m) => m.id === modulo)) return err(res, 'Módulo inválido.', 400);
+    if (!['ninguno', 'lectura', 'edicion'].includes(nivel)) return err(res, 'Nivel inválido.', 400);
+
+    const miembro = await findMiembroById(ctx.organizacionId, req.params.id);
+    if (!miembro) return err(res, 'Miembro no encontrado.', 404);
+    if (miembro.rol === 'propietario') {
+      return err(res, 'El propietario siempre tiene acceso completo; no admite excepciones.', 400);
+    }
+
+    await setMemberPermissionOverride(ctx.organizacionId, miembro.user_id, miembro.rol, modulo, nivel);
+    invalidateUserCache(miembro.user_id);
+    const { matriz, personalizados } = await getMemberMatrix(ctx.organizacionId, miembro.user_id, miembro.rol);
+    return ok(res, { modulo, nivel, matriz, personalizados });
+  } catch (e: any) {
+    return err(res, pgErr(e));
+  }
+}
+
+// DELETE /api/organizacion/miembros/:id/permisos — quita todas las
+// excepciones de ese miembro, vuelve a heredar exactamente lo de su rol
+export async function resetMemberPermisos(req: Request, res: Response) {
+  try {
+    const ctx = requireOrgContext(req, res);
+    if (!ctx) return;
+    if (ctx.organizacionRol !== 'propietario') {
+      return err(res, 'Solo el propietario puede cambiar los permisos.', 403);
+    }
+    const miembro = await findMiembroById(ctx.organizacionId, req.params.id);
+    if (!miembro) return err(res, 'Miembro no encontrado.', 404);
+
+    await clearMemberPermissionOverrides(ctx.organizacionId, miembro.user_id);
+    invalidateUserCache(miembro.user_id);
+    const { matriz } = await getMemberMatrix(ctx.organizacionId, miembro.user_id, miembro.rol);
+    return ok(res, { matriz, personalizados: [] });
   } catch (e: any) {
     return err(res, pgErr(e));
   }

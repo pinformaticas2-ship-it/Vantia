@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { resolvePermission, nivelCubre, Modulo } from '../config/permissions';
+import { resolveEffectivePermission, nivelCubre, Modulo } from '../config/permissions';
 
 // Gate genérico por módulo, montado una vez por router (p.ej.
 // `router.use(requireModulePermission('clientes'))` al principio de
@@ -10,13 +10,14 @@ export function requireModulePermission(modulo: Modulo) {
   return async (req: Request, res: Response, next: NextFunction) => {
     const organizacionId = (req as any).organizacionId;
     const rol = (req as any).organizacionRol;
+    const userId = (req as any).auth?.userId;
     if (!organizacionId || !rol) {
       res.status(401).json({ success: false, error: 'No autenticado' });
       return;
     }
     const requerido = ['GET', 'HEAD', 'OPTIONS'].includes(req.method) ? 'lectura' : 'edicion';
     try {
-      const nivel = await resolvePermission(organizacionId, rol, modulo);
+      const nivel = await resolveEffectivePermission(organizacionId, userId, rol, modulo);
       if (!nivelCubre(nivel, requerido)) {
         res.status(403).json({
           success: false,

@@ -770,6 +770,7 @@ function UsuariosPanel() {
   const [error, setError] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [transferTarget, setTransferTarget] = useState<Miembro | null>(null);
+  const [permisosTarget, setPermisosTarget] = useState<Miembro | null>(null);
 
   const canManage = myRol === 'propietario' || myRol === 'admin';
 
@@ -915,6 +916,20 @@ function UsuariosPanel() {
                     </button>
                   )}
 
+                  {/* Excepciones de permisos solo para este miembro (p.ej. un
+                      admin que no debe ver Tesorería) -- solo el propietario
+                      puede tocarlas, el propietario mismo no admite excepciones. */}
+                  {myRol === 'propietario' && m.rol !== 'propietario' && (
+                    <button
+                      onClick={() => setPermisosTarget(m)}
+                      disabled={busyId === m.id}
+                      className="p-1.5 rounded-lg text-slate-300 hover:text-[#ab0433] hover:bg-red-50 transition-colors disabled:opacity-40"
+                      title="Permisos individuales de este miembro"
+                    >
+                      <Lock size={14} />
+                    </button>
+                  )}
+
                   {/* Propietario puede quitar a cualquiera (salvo a sí mismo, ver
                       abajo); admin solo a miembro/soporte -- no a otro admin ni al
                       propietario (el backend vuelve a comprobarlo igual, esto es
@@ -946,6 +961,13 @@ function UsuariosPanel() {
           onClose={() => setTransferTarget(null)}
           onDone={() => { window.location.reload(); }}
           transfer={doTransfer}
+        />
+      )}
+
+      {permisosTarget && (
+        <MemberPermisosModal
+          miembro={permisosTarget}
+          onClose={() => setPermisosTarget(null)}
         />
       )}
     </>
@@ -1037,6 +1059,133 @@ function TransferOwnershipModal({ organizacionNombre, targetNombre, onClose, onD
           >
             {busy && <Loader2 size={14} className="animate-spin" />}
             Transferir propiedad
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Excepciones de permisos para UN miembro concreto -- lo que ya le da su rol
+// (Roles y permisos, más arriba), con la posibilidad de hacer una excepción
+// módulo a módulo solo para esta persona (p.ej. un admin sin acceso a
+// Tesorería). Mismo patrón visual que RolesPermisosPanel, en un modal.
+function MemberPermisosModal({ miembro, onClose }: { miembro: Miembro; onClose: () => void }) {
+  const { getToken } = useAuth();
+  const [modulos, setModulos] = useState<{ id: Modulo; label: string }[]>([]);
+  const [matriz, setMatriz] = useState<Record<Modulo, NivelAcceso> | null>(null);
+  const [personalizados, setPersonalizados] = useState<Modulo[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [savingModulo, setSavingModulo] = useState<Modulo | null>(null);
+  const [resetting, setResetting] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await apiFetch(`/api/organizacion/miembros/${miembro.id}/permisos`, { getToken });
+      if (data?.success) {
+        setModulos(data.data.modulos || []);
+        setMatriz(data.data.matriz || null);
+        setPersonalizados(data.data.personalizados || []);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [getToken, miembro.id]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const changeNivel = async (modulo: Modulo, nivel: NivelAcceso) => {
+    if (!matriz) return;
+    const prev = matriz[modulo];
+    setMatriz({ ...matriz, [modulo]: nivel }); // optimista
+    setSavingModulo(modulo);
+    try {
+      const data = await apiFetch(`/api/organizacion/miembros/${miembro.id}/permisos`, {
+        method: 'PUT', getToken, body: JSON.stringify({ modulo, nivel }),
+      });
+      if (data?.success === false) throw new Error(data.error);
+      setMatriz(data.data.matriz);
+      setPersonalizados(data.data.personalizados);
+    } catch {
+      setMatriz((m) => (m ? { ...m, [modulo]: prev } : m)); // revertir si falla
+    } finally {
+      setSavingModulo(null);
+    }
+  };
+
+  const resetAll = async () => {
+    setResetting(true);
+    try {
+      const data = await apiFetch(`/api/organizacion/miembros/${miembro.id}/permisos`, { method: 'DELETE', getToken });
+      if (data?.success) { setMatriz(data.data.matriz); setPersonalizados([]); }
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm flex items-center justify-center px-4">
+      <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl overflow-hidden">
+        <div className="px-6 py-5 border-b border-slate-100 flex items-start gap-3.5">
+          <div className="h-10 w-10 rounded-xl bg-red-50 text-[#ab0433] flex items-center justify-center shrink-0">
+            <Lock size={20} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-base font-extrabold text-slate-900">Permisos individuales</h2>
+            <p className="text-sm text-slate-500 mt-0.5 truncate">{miembro.nombre} · <span className="capitalize">{miembro.rol}</span></p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 shrink-0"><X size={16} /></button>
+        </div>
+
+        <div className="px-6 py-5">
+          <p className="text-xs text-slate-500 mb-4">
+            Por defecto tiene lo que le da su rol ({miembro.rol}). Cambia un módulo aquí para hacer una excepción solo para
+            esta persona — por ejemplo, un admin que no debe ver Tesorería.
+          </p>
+          {loading || !matriz ? (
+            <div className="flex justify-center py-10"><Loader2 className="animate-spin text-slate-300" size={22} /></div>
+          ) : (
+            <div className="space-y-1 max-h-[360px] overflow-y-auto pr-1 -mr-1">
+              {modulos.map((m) => {
+                const isCustom = personalizados.includes(m.id);
+                return (
+                  <div key={m.id} className={`flex items-center justify-between gap-3 px-3 py-2 rounded-lg ${isCustom ? 'bg-red-50/60' : ''}`}>
+                    <span className="text-sm font-medium text-slate-700 flex items-center gap-2 min-w-0">
+                      <span className="truncate">{m.label}</span>
+                      {isCustom && (
+                        <span className="shrink-0 text-[9px] font-bold uppercase tracking-wide text-[#ab0433] bg-red-100 px-1.5 py-0.5 rounded-full">
+                          Personalizado
+                        </span>
+                      )}
+                    </span>
+                    <select
+                      value={matriz[m.id]}
+                      disabled={savingModulo === m.id}
+                      onChange={(e) => changeNivel(m.id, e.target.value as NivelAcceso)}
+                      className="shrink-0 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:border-red-300 bg-white disabled:opacity-50"
+                    >
+                      {(['ninguno', 'lectura', 'edicion'] as NivelAcceso[]).map((n) => (
+                        <option key={n} value={n}>{NIVEL_LABEL[n]}</option>
+                      ))}
+                    </select>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+          <button
+            onClick={resetAll}
+            disabled={resetting || personalizados.length === 0}
+            className="text-xs font-semibold text-slate-500 hover:text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            {resetting ? 'Restableciendo…' : `Quitar excepciones (${personalizados.length})`}
+          </button>
+          <button onClick={onClose} className="px-4 py-2 text-sm font-semibold text-white bg-slate-800 hover:bg-slate-900 rounded-lg transition-colors">
+            Cerrar
           </button>
         </div>
       </div>

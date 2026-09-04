@@ -1725,6 +1725,23 @@ export async function runMigrations(): Promise<void> {
       );
     `);
 
+    // ── Permisos por MIEMBRO concreto (excepciones sobre su rol) ─────
+    // Mismo patrón sparse que organizacion_permisos (solo desviaciones), pero
+    // por user_id en vez de por rol -- para el caso de "es admin, pero este
+    // admin en concreto no debe ver Tesorería" sin tener que crear un rol
+    // nuevo solo para él. Se resuelve DESPUÉS del override de rol: miembro >
+    // rol > valor de fábrica (ver resolveEffectivePermission).
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS organizacion_miembro_permisos (
+        organizacion_id UUID         NOT NULL REFERENCES organizaciones(id) ON DELETE CASCADE,
+        user_id         VARCHAR(150) NOT NULL,
+        modulo          VARCHAR(40)  NOT NULL,
+        nivel           VARCHAR(20)  NOT NULL CHECK (nivel IN ('ninguno','lectura','edicion')),
+        updated_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (organizacion_id, user_id, modulo)
+      );
+    `);
+
     // ── Un único propietario por organización ────────────────────────
     // Antes se podían dar de alta varios "propietario" a la vez en la misma
     // organización (sin límite real, solo una comprobación de "no dejar la

@@ -117,3 +117,72 @@ export async function setPermissionOverride(organizacionId: string, rol: OrgRol,
     [organizacionId, rol, modulo, nivel],
   );
 }
+
+// ── Excepciones por miembro concreto ──────────────────────────────────────────
+// El propietario nunca pasa por aquí -- siempre tiene acceso completo a todo
+// por definición (transferir la propiedad es la única forma de quitárselo),
+// así que ni se consulta ni se deja guardar una excepción para él.
+export async function resolveEffectivePermission(organizacionId: string, userId: string, rol: string, modulo: Modulo): Promise<NivelAcceso> {
+  if (rol === 'propietario' || !userId) return resolvePermission(organizacionId, rol, modulo);
+  try {
+    const { rows } = await pool.query(
+      `SELECT nivel FROM organizacion_miembro_permisos WHERE organizacion_id=$1 AND user_id=$2 AND modulo=$3`,
+      [organizacionId, userId, modulo],
+    );
+    if (rows[0]?.nivel) return rows[0].nivel as NivelAcceso;
+  } catch { /* si falla la consulta, se cae al nivel de su rol */ }
+  return resolvePermission(organizacionId, rol, modulo);
+}
+
+// Matriz completa de UN miembro (lo que ya le da su rol, con las excepciones
+// propias ya aplicadas) + qué módulos tiene personalizados, para pintar y
+// editar la pantalla de permisos individuales.
+export async function getMemberMatrix(
+  organizacionId: string, userId: string, rol: string,
+): Promise<{ matriz: Record<Modulo, NivelAcceso>; personalizados: Modulo[] }> {
+  const rolMatrix = await getRolPermissions(organizacionId, rol);
+  const matriz: Record<Modulo, NivelAcceso> = { ...rolMatrix };
+  const personalizados: Modulo[] = [];
+
+  if (rol !== 'propietario') {
+    const { rows } = await pool.query(
+      `SELECT modulo, nivel FROM organizacion_miembro_permisos WHERE organizacion_id=$1 AND user_id=$2`,
+      [organizacionId, userId],
+    );
+    for (const r of rows) {
+      if (MODULOS.some((m) => m.id === r.modulo)) {
+        matriz[r.modulo as Modulo] = r.nivel as NivelAcceso;
+        personalizados.push(r.modulo as Modulo);
+      }
+    }
+  }
+  return { matriz, personalizados };
+}
+
+export async function setMemberPermissionOverride(
+  organizacionId: string, userId: string, rol: string, modulo: Modulo, nivel: NivelAcceso,
+): Promise<void> {
+  const nivelDeSuRol = await resolvePermission(organizacionId, rol, modulo);
+  if (nivelDeSuRol === nivel) {
+    // Vuelve a coincidir con lo que ya le daba su rol -- se borra la
+    // excepción en vez de guardar una fila redundante.
+    await pool.query(
+      `DELETE FROM organizacion_miembro_permisos WHERE organizacion_id=$1 AND user_id=$2 AND modulo=$3`,
+      [organizacionId, userId, modulo],
+    );
+    return;
+  }
+  await pool.query(
+    `INSERT INTO organizacion_miembro_permisos (organizacion_id, user_id, modulo, nivel)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (organizacion_id, user_id, modulo) DO UPDATE SET nivel = EXCLUDED.nivel, updated_at = NOW()`,
+    [organizacionId, userId, modulo, nivel],
+  );
+}
+
+export async function clearMemberPermissionOverrides(organizacionId: string, userId: string): Promise<void> {
+  await pool.query(
+    `DELETE FROM organizacion_miembro_permisos WHERE organizacion_id=$1 AND user_id=$2`,
+    [organizacionId, userId],
+  );
+}

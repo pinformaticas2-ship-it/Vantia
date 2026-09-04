@@ -15,6 +15,9 @@ import {
   deleteOrganizacionLogo,
   getPermisosMatrix,
   updatePermiso,
+  getMemberPermisos,
+  updateMemberPermiso,
+  resetMemberPermisos,
   transferirPropiedad,
 } from '../controllers/organizacionesController';
 
@@ -32,6 +35,9 @@ router.post('/transferir-propiedad', requireAuth, transferirPropiedad);
 router.delete('/miembros/:id', requireAuth, removeOrganizacionMiembro);
 router.get('/permisos', requireAuth, getPermisosMatrix);
 router.put('/permisos', requireAuth, updatePermiso);
+router.get('/miembros/:id/permisos', requireAuth, getMemberPermisos);
+router.put('/miembros/:id/permisos', requireAuth, updateMemberPermiso);
+router.delete('/miembros/:id/permisos', requireAuth, resetMemberPermisos);
 router.get('/impacto-borrado', requireAuth, getOrganizacionDeletionImpact);
 router.delete('/', requireAuth, deleteOrganizacionActiva);
 
