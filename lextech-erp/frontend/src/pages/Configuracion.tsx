@@ -1461,6 +1461,14 @@ function NotificacionesPanel() {
 }
 
 export default function Configuracion() {
+  const { rol: myRol } = useOrganizacion();
+  // "Gestión de Usuarios" (añadir/quitar miembros, roles, permisos) no
+  // aparece siquiera como pestaña para quien no sea propietario/admin --
+  // antes se mostraba a cualquiera y solo se ocultaban los botones dentro
+  // del panel, dejando la pestaña visible sin motivo para un rol "miembro".
+  const visibleOtherSections = OTHER_SECTIONS.filter(
+    (s) => s.key !== 'usuarios' || myRol === 'propietario' || myRol === 'admin',
+  );
   const { theme, setTheme, customColor, customSecondary, customSidebar, setCustomColors } = useTheme();
   const [draftPrimary, setDraftPrimary] = useState(customColor);
   const [draftSecondary, setDraftSecondary] = useState(customSecondary);
@@ -1479,7 +1487,7 @@ export default function Configuracion() {
     && draftSidebar.toLowerCase() === customSidebar.toLowerCase();
   const currentAccent = PALETTES.find((p) => p.id === theme)?.accent ?? PALETTES[0].accent;
   const [activeSection, setActiveSection] = useState<SectionKey>('apariencia');
-  const activeOther = OTHER_SECTIONS.find((s) => s.key === activeSection);
+  const activeOther = visibleOtherSections.find((s) => s.key === activeSection);
 
   return (
     <div className="flex flex-col md:flex-row h-full overflow-hidden">
@@ -1507,13 +1515,13 @@ export default function Configuracion() {
             >
               <BookOpen size={16} className={activeSection === 'manual' ? 'text-red-500' : 'text-slate-400'} /> Manual de usuario
             </button>
-            {OTHER_SECTIONS.map((s, i) => {
+            {visibleOtherSections.map((s, i) => {
               const Icon = s.icon;
               const active = activeSection === s.key;
               return (
                 <React.Fragment key={s.key}>
-                  {i === OTHER_SECTIONS.length - 1 && <div className="hidden md:block my-4 border-t border-slate-200 mx-2" />}
-                  {i === OTHER_SECTIONS.length - 1 && <div className="shrink-0 w-px self-stretch bg-slate-200 md:hidden" />}
+                  {i === visibleOtherSections.length - 1 && <div className="hidden md:block my-4 border-t border-slate-200 mx-2" />}
+                  {i === visibleOtherSections.length - 1 && <div className="shrink-0 w-px self-stretch bg-slate-200 md:hidden" />}
                   <button
                     onClick={() => setActiveSection(s.key)}
                     className={`shrink-0 whitespace-nowrap md:w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left group ${
