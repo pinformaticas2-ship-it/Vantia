@@ -1176,22 +1176,20 @@ function SeguridadPanel() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-2xl border border-slate-200 p-5">
-        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">
+      <div>
+        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-1">
           Cuenta y autenticación
         </h3>
-        <p className="text-xs text-slate-500 mb-4 max-w-2xl">
+        <p className="text-xs text-slate-500 max-w-2xl mb-5">
           Contraseña, verificación en dos pasos (2FA) y sesiones activas se gestionan aquí mismo —
           es la pantalla de seguridad de Clerk, el proveedor de acceso de Vantia, así que los cambios
           son inmediatos y no hace falta ningún desarrollo aparte para mantenerla al día.
         </p>
-        <div className="mx-auto max-w-3xl rounded-xl border border-slate-100">
+        <div className="mx-auto max-w-3xl flex justify-center">
           <UserProfile
             routing="hash"
             appearance={{
               elements: {
-                rootBox: 'w-full mx-auto',
-                card: 'shadow-none border-none w-full',
                 formButtonPrimary: 'bg-[#ab0433] hover:bg-[#8f0329] text-sm normal-case',
                 badge: 'bg-red-50 text-[#ab0433]',
               },
