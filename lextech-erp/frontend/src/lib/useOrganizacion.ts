@@ -63,13 +63,19 @@ export function useOrganizacion() {
     window.location.reload();
   }, []);
 
-  // "propietario"/"admin" son compatibilidad hacia atrás: no dependen de la
-  // matriz de permisos (siempre tienen acceso completo, ver
-  // DEFAULT_PERMISSIONS en el backend), así que se resuelven aparte para que
-  // funcione incluso mientras `permisos` todavía está cargando.
+  // "propietario" es el único que de verdad no depende nunca de la matriz de
+  // permisos (siempre tiene acceso completo, y no admite excepciones ni de
+  // rol ni de miembro individual -- ver DEFAULT_PERMISSIONS/resolveEffective
+  // Permission en el backend), así que se resuelve aparte para que funcione
+  // incluso mientras `permisos` todavía está cargando. "admin" YA NO tiene
+  // ese atajo: por defecto tiene acceso completo igual, pero el propietario
+  // puede haberle quitado un módulo concreto (excepción por miembro), y esa
+  // excepción vive en `permisos` como a cualquier otro rol -- si se seguía
+  // devolviendo true a ciegas para admin, esa excepción nunca se notaba en
+  // el sidebar/gating del frontend aunque el backend sí la hiciera cumplir.
   const NIVEL_RANK: Record<NivelAcceso, number> = { ninguno: 0, lectura: 1, edicion: 2 };
   const puede = useCallback((modulo: Modulo, minimo: NivelAcceso = 'lectura'): boolean => {
-    if (rol === 'propietario' || rol === 'admin') return true;
+    if (rol === 'propietario') return true;
     if (!permisos) return true; // aún sin cargar: no bloquear de más mientras se resuelve
     return NIVEL_RANK[permisos[modulo] ?? 'ninguno'] >= NIVEL_RANK[minimo];
   }, [rol, permisos]);
