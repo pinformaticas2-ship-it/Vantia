@@ -1382,7 +1382,7 @@ export default function Configuracion() {
 
       {/* ── Contenido del ajuste ── */}
       <div className="flex-1 overflow-y-auto modules-scrollbar p-4 sm:p-8 lg:p-12 bg-[#f4f6f8]">
-        <div className={activeSection === 'apariencia' ? 'max-w-6xl' : 'max-w-4xl'}>
+        <div className={`mx-auto ${activeSection === 'apariencia' ? 'max-w-6xl' : 'max-w-4xl'}`}>
 
           {activeSection === 'apariencia' ? (
             <>
