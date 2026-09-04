@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import './index.css'
 import { ClerkProvider } from '@clerk/clerk-react'
+import { esES } from '@clerk/localizations'
 import { initClientIp, installBackendFetchShim, resolveApiUrl } from './lib/api'
 
 // Obtener IP pública lo antes posible — estará lista antes del primer login
@@ -34,6 +35,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <BrowserRouter> 
       <ClerkProvider
         publishableKey={PUBLISHABLE_KEY}
+        localization={esES}
         appearance={{
           variables: {
             colorPrimary: '#1e2f45',

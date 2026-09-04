@@ -1185,18 +1185,13 @@ function SeguridadPanel() {
           es la pantalla de seguridad de Clerk, el proveedor de acceso de Vantia, así que los cambios
           son inmediatos y no hace falta ningún desarrollo aparte para mantenerla al día.
         </p>
-        <div className="rounded-xl overflow-hidden border border-slate-100">
+        <div className="mx-auto max-w-3xl rounded-xl border border-slate-100">
           <UserProfile
             routing="hash"
             appearance={{
               elements: {
-                rootBox: 'w-full',
+                rootBox: 'w-full mx-auto',
                 card: 'shadow-none border-none w-full',
-                navbar: 'hidden',
-                navbarMobileMenuButton: 'hidden',
-                header: 'hidden',
-                pageScrollBox: 'p-0',
-                profileSection: 'border-slate-100',
                 formButtonPrimary: 'bg-[#ab0433] hover:bg-[#8f0329] text-sm normal-case',
                 badge: 'bg-red-50 text-[#ab0433]',
               },
