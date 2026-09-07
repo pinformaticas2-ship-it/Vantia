@@ -8,17 +8,13 @@ import {
   CheckCircle2,
   ChevronRight,
   Instagram,
-  KeyRound,
   Loader2,
-  LockKeyhole,
   MessageCircle,
   Phone,
   RefreshCw,
   Search,
   Send,
   Settings2,
-  ShieldCheck,
-  Smartphone,
   Sparkles,
   UserRound,
 } from "lucide-react";
@@ -73,16 +69,6 @@ interface WhatsAppStatus {
   mode: string;
 }
 
-interface WhatsAppConfigForm {
-  accessToken: string;
-  phoneNumberId: string;
-  verifyToken: string;
-  graphVersion: string;
-  webhookBaseUrl: string;
-  businessAccountId: string;
-}
-
-const AUTH_SESSION_KEY = "whatsapp-business-authenticated";
 
 function normalizePhone(value?: string | null) {
   const digits = String(value || "").replace(/\D/g, "");
@@ -136,26 +122,12 @@ export default function WhatsApp() {
   const [loading, setLoading] = useState(true);
   const [loadingConversation, setLoadingConversation] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [configMessage, setConfigMessage] = useState<string | null>(null);
   const [composer, setComposer] = useState("");
   const [sending, setSending] = useState(false);
-  const [savingConfig, setSavingConfig] = useState(false);
-  const [testingConfig, setTestingConfig] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(() => (
-    typeof window !== "undefined" && window.sessionStorage.getItem(AUTH_SESSION_KEY) === "1"
-  ));
   // Comunicación externa: de momento solo WhatsApp está realmente conectado.
   // Instagram queda como pestaña visible pero deshabilitada hasta tener
   // cuenta de Instagram Business y el permiso de mensajería aprobado por Meta.
   const [channel, setChannel] = useState<"whatsapp" | "instagram">("whatsapp");
-  const [configForm, setConfigForm] = useState<WhatsAppConfigForm>({
-    accessToken: "",
-    phoneNumberId: "",
-    verifyToken: "",
-    graphVersion: "v23.0",
-    webhookBaseUrl: "",
-    businessAccountId: "",
-  });
 
   const apiGet = useCallback(async (path: string) => {
     const token = await getToken({ skipCache: true });
@@ -182,41 +154,16 @@ export default function WhatsApp() {
     return json;
   }, [getToken]);
 
-  const apiPut = useCallback(async (path: string, body: unknown) => {
-    const token = await getToken({ skipCache: true });
-    const response = await fetch(path, {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
-    const json = await safeJson(response);
-    if (!response.ok) throw new Error(json.error || "No se pudo actualizar la configuración");
-    return json;
-  }, [getToken]);
-
   const fetchShell = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      setConfigMessage(null);
-      const [statusRes, contactsRes, configRes] = await Promise.all([
+      const [statusRes, contactsRes] = await Promise.all([
         apiGet("/api/whatsapp/status"),
         apiGet("/api/whatsapp/contacts"),
-        apiGet("/api/whatsapp/config"),
       ]);
       setStatus(statusRes.data || null);
       setContacts(contactsRes.data || []);
-      setConfigForm((prev) => ({
-        accessToken: prev.accessToken,
-        phoneNumberId: configRes.data?.phoneNumberId || "",
-        verifyToken: configRes.data?.verifyToken || "",
-        graphVersion: configRes.data?.graphVersion || "v23.0",
-        webhookBaseUrl: configRes.data?.webhookBaseUrl || "",
-        businessAccountId: configRes.data?.businessAccountId || "",
-      }));
     } catch (err: any) {
       setError(err.message || "No se pudo cargar el módulo de WhatsApp");
     } finally {
@@ -271,7 +218,6 @@ export default function WhatsApp() {
   }, [selectedClient]);
 
   useEffect(() => {
-    if (!isAuthenticated) return;
     if (selectedClientId) {
       fetchConversation(selectedClientId);
       return;
@@ -279,7 +225,7 @@ export default function WhatsApp() {
     if (!selectedClientId && filteredContacts.length > 0) {
       setSelectedClientId(initialClientId || filteredContacts[0].id);
     }
-  }, [fetchConversation, filteredContacts, initialClientId, isAuthenticated, selectedClientId]);
+  }, [fetchConversation, filteredContacts, initialClientId, selectedClientId]);
 
   const handleSend = async () => {
     if (!selectedClient || !composer.trim()) return;
@@ -311,58 +257,6 @@ export default function WhatsApp() {
     }
   };
 
-  const handleConfigChange = (field: keyof WhatsAppConfigForm, value: string) => {
-    setConfigForm((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const saveConfig = async () => {
-    try {
-      setSavingConfig(true);
-      setError(null);
-      setConfigMessage(null);
-      await apiPut("/api/whatsapp/config", configForm);
-      setConfigMessage("Configuración guardada correctamente.");
-      await fetchShell();
-    } catch (err: any) {
-      setError(err.message || "No se pudo guardar la configuración de WhatsApp");
-    } finally {
-      setSavingConfig(false);
-    }
-  };
-
-  const testConfig = useCallback(async () => {
-    try {
-      setTestingConfig(true);
-      setError(null);
-      setConfigMessage(null);
-      const token = await getToken({ skipCache: true });
-      const response = await fetch("/api/whatsapp/config/test", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const json = await safeJson(response);
-      if (!response.ok) throw new Error(json.error || "No se pudo validar la conexión");
-      const details = [json.data?.displayPhoneNumber, json.data?.verifiedName].filter(Boolean).join(" · ");
-      setConfigMessage(details ? `Conexión correcta: ${details}` : "Conexión correcta con WhatsApp Business.");
-      setIsAuthenticated(true);
-      if (typeof window !== "undefined") {
-        window.sessionStorage.setItem(AUTH_SESSION_KEY, "1");
-      }
-      await fetchShell();
-    } catch (err: any) {
-      setError(err.message || "No se pudo validar la conexión con WhatsApp Business");
-    } finally {
-      setTestingConfig(false);
-    }
-  }, [fetchShell, getToken]);
-
-  const disconnectView = () => {
-    setIsAuthenticated(false);
-    if (typeof window !== "undefined") {
-      window.sessionStorage.removeItem(AUTH_SESSION_KEY);
-    }
-  };
-
   if (loading) {
     return (
       <div className="flex h-[60vh] items-center justify-center text-slate-400">
@@ -378,23 +272,6 @@ export default function WhatsApp() {
       <div className="flex h-[60vh] items-center justify-center">
         <ConnectionErrorBanner error={error} onRetry={fetchShell} title="No se pudo cargar Comunicación Externa" />
       </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <WhatsAppAuthGate
-        status={status}
-        error={error}
-        configMessage={configMessage}
-        configForm={configForm}
-        onBack={() => navigate("/dashboard/clientes")}
-        onChange={handleConfigChange}
-        onSave={saveConfig}
-        onTest={testConfig}
-        savingConfig={savingConfig}
-        testingConfig={testingConfig}
-      />
     );
   }
 
@@ -435,20 +312,35 @@ export default function WhatsApp() {
             </div>
             <button
               type="button"
-              onClick={disconnectView}
+              onClick={() => navigate("/dashboard/config?section=integraciones")}
               className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-400 transition hover:bg-slate-50 hover:text-slate-600"
-              title="Volver a conexión"
+              title="Configurar en Integraciones"
             >
               <Settings2 size={16} />
             </button>
           </div>
-          <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50/60 px-3 py-2.5">
-            <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700">
-              <span className="h-2 w-2 rounded-full bg-emerald-500" />
-              Canal Business autenticado
+          {status?.configured ? (
+            <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50/60 px-3 py-2.5">
+              <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                Canal Business autenticado
+              </div>
+              <p className="mt-1 text-sm text-emerald-600/80">{status?.phoneNumberIdPreview || "WhatsApp Business Cloud API"}</p>
             </div>
-            <p className="mt-1 text-sm text-emerald-600/80">{status?.phoneNumberIdPreview || "WhatsApp Business Cloud API"}</p>
-          </div>
+          ) : (
+            <div className="mt-4 rounded-2xl border border-amber-100 bg-amber-50/60 px-3 py-2.5">
+              <div className="flex items-center gap-2 text-xs font-semibold text-amber-700">
+                <span className="h-2 w-2 rounded-full bg-amber-500" />
+                Canal sin configurar
+              </div>
+              <p className="mt-1 text-xs text-amber-600/80">
+                Conéctalo desde{" "}
+                <button type="button" onClick={() => navigate("/dashboard/config?section=integraciones")} className="font-semibold underline">
+                  Configuración → Integraciones
+                </button>.
+              </p>
+            </div>
+          )}
           <div className="mt-4 flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5">
             <Search size={15} className="text-slate-400" />
             <input
@@ -698,175 +590,6 @@ function InstagramComingSoon() {
   );
 }
 
-function WhatsAppAuthGate({
-  status,
-  error,
-  configMessage,
-  configForm,
-  onBack,
-  onChange,
-  onSave,
-  onTest,
-  savingConfig,
-  testingConfig,
-}: {
-  status: WhatsAppStatus | null;
-  error: string | null;
-  configMessage: string | null;
-  configForm: WhatsAppConfigForm;
-  onBack: () => void;
-  onChange: (field: keyof WhatsAppConfigForm, value: string) => void;
-  onSave: () => Promise<void>;
-  onTest: () => Promise<void>;
-  savingConfig: boolean;
-  testingConfig: boolean;
-}) {
-  return (
-    <div className="flex h-full items-stretch overflow-hidden bg-white">
-      <section className="flex w-[38%] min-w-[360px] flex-col bg-[linear-gradient(180deg,#1f2334_0%,#111827_100%)] px-8 py-8 text-white">
-        <button
-          type="button"
-          onClick={onBack}
-          className="inline-flex items-center gap-2 self-start rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white/80 transition hover:bg-white/10 hover:text-white"
-        >
-          <ArrowLeft size={15} />
-          Volver a Clientes
-        </button>
-
-        <div className="mt-8">
-          <p className="text-[11px] font-bold uppercase tracking-[0.32em] text-white/40">WhatsApp Business</p>
-          <h1 className="mt-3 text-xl font-bold leading-tight">Conecta tu canal y entra al panel de mensajería</h1>
-          <p className="mt-4 max-w-md text-base leading-7 text-white/70">
-            Antes de abrir la bandeja real, autentica el número Business del despacho. Cuando la conexión esté verificada,
-            el módulo mostrará tus conversaciones y te permitirá responder desde el ERP.
-          </p>
-        </div>
-
-        <div className="mt-8 space-y-4">
-          <Feature icon={<ShieldCheck size={18} />} title="Canal protegido">
-            La sesión queda validada dentro del ERP antes de abrir la bandeja.
-          </Feature>
-          <Feature icon={<Smartphone size={18} />} title="Número Business real">
-            Trabaja sobre tu número Cloud API con token, phone number id y webhook.
-          </Feature>
-          <Feature icon={<MessageCircle size={18} />} title="Mensajería integrada">
-            Las conversaciones se consultan desde la misma interfaz, sin abrir WhatsApp Web.
-          </Feature>
-        </div>
-
-        <div className="mt-auto rounded-[28px] border border-white/10 bg-white/5 p-5">
-          <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-white/40">Estado actual</p>
-          <div className="mt-4 space-y-3 text-sm text-white/80">
-            <StatusRow label="Token" ready={!!status?.accessTokenConfigured} />
-            <StatusRow label="Phone number id" ready={!!status?.phoneNumberIdConfigured} />
-            <StatusRow label="Verify token" ready={!!status?.verifyTokenConfigured} />
-            <StatusRow label="Webhook público" ready={!!status?.webhookBaseUrlConfigured} />
-          </div>
-        </div>
-      </section>
-
-      <section className="flex flex-1 flex-col bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-8 py-8">
-        <div className="max-w-3xl">
-          <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-400">Canal</p>
-          <h2 className="mt-2 text-lg font-bold text-slate-900">WhatsApp Business</h2>
-          <p className="mt-3 text-sm leading-6 text-slate-500">
-            El token y el resto de credenciales se configuran en el servidor, no aquí — esta pantalla solo comprueba
-            que la conexión funciona antes de dejarte entrar a la bandeja.
-          </p>
-
-          {error ? (
-            <div className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
-          ) : null}
-          {configMessage ? (
-            <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{configMessage}</div>
-          ) : null}
-        </div>
-
-        <div className="mt-8 max-w-md">
-          <div className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm">
-            <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-400">Resumen</p>
-            <div className="mt-5 space-y-4 text-sm">
-              <SummaryItem label="Origen" value={status?.configSource || "Sin configurar"} />
-              <SummaryItem label="Phone number id" value={status?.phoneNumberIdPreview || "Pendiente"} />
-              <SummaryItem label="Verify token" value={status?.verifyTokenPreview || "Pendiente"} />
-              <SummaryItem label="Webhook" value={status?.webhookUrl || "Pendiente"} multiline />
-            </div>
-
-            <button
-              type="button"
-              onClick={onTest}
-              disabled={testingConfig || !status?.phoneNumberIdConfigured || !status?.accessTokenConfigured}
-              className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#ab0433] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#92042c] disabled:opacity-50"
-            >
-              {testingConfig ? <Loader2 size={15} className="animate-spin" /> : <LockKeyhole size={15} />}
-              Verificar y entrar
-            </button>
-            {!status?.phoneNumberIdConfigured || !status?.accessTokenConfigured ? (
-              <p className="mt-3 text-xs text-slate-400">
-                Todavía no hay token ni número configurados —{' '}
-                <a href="/dashboard/config?section=integraciones" className="font-semibold text-[#ab0433] hover:underline">
-                  conéctalo desde Configuración → Integraciones
-                </a>.
-              </p>
-            ) : null}
-          </div>
-        </div>
-      </section>
-    </div>
-  );
-}
-
-function Feature({
-  icon,
-  title,
-  children,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-white">{icon}</div>
-        <div>
-          <p className="text-sm font-semibold text-white">{title}</p>
-          <p className="mt-1 text-sm leading-6 text-white/60">{children}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function StatusRow({ label, ready }: { label: string; ready: boolean }) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <span>{label}</span>
-      <span className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs font-semibold ${ready ? "bg-emerald-500/15 text-emerald-300" : "bg-white/10 text-white/55"}`}>
-        <span className={`h-2 w-2 rounded-full ${ready ? "bg-emerald-400" : "bg-white/35"}`} />
-        {ready ? "Listo" : "Pendiente"}
-      </span>
-    </div>
-  );
-}
-
-function SummaryItem({
-  label,
-  value,
-  multiline = false,
-}: {
-  label: string;
-  value: string;
-  multiline?: boolean;
-}) {
-  return (
-    <div>
-      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">{label}</p>
-      <p className={`mt-1 text-sm text-slate-700 ${multiline ? "break-all leading-6" : ""}`}>{value}</p>
-    </div>
-  );
-}
-
 function EmptyConversation() {
   return (
     <div className="flex h-full items-center justify-center">
@@ -881,29 +604,3 @@ function EmptyConversation() {
   );
 }
 
-function ConfigField({
-  label,
-  value,
-  onChange,
-  placeholder,
-  help,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  help?: string;
-}) {
-  return (
-    <label className="block">
-      <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">{label}</span>
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="mt-2 h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-700 outline-none transition-colors focus:border-[#ab0433]/35 focus:bg-white"
-      />
-      {help ? <span className="mt-2 block text-xs leading-5 text-slate-400">{help}</span> : null}
-    </label>
-  );
-}
