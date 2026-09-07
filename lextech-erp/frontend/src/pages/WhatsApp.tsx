@@ -803,7 +803,10 @@ function WhatsAppAuthGate({
             </button>
             {!status?.phoneNumberIdConfigured || !status?.accessTokenConfigured ? (
               <p className="mt-3 text-xs text-slate-400">
-                Todavía no hay token ni número configurados en el servidor.
+                Todavía no hay token ni número configurados —{' '}
+                <a href="/dashboard/config?section=integraciones" className="font-semibold text-[#ab0433] hover:underline">
+                  conéctalo desde Configuración → Integraciones
+                </a>.
               </p>
             ) : null}
           </div>

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AlertTriangle, Bell, BellOff, BellRing, BookOpen, Building2, Camera, Check, Crown, History, Loader2, Lock, MessageCircle, Clock3, Mail as MailIcon, Phone, Palette, Plug, Plus, ShieldCheck, Trash2, UsersRound, X } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { AlertTriangle, Bell, BellOff, BellRing, BookOpen, Building2, Camera, Check, Crown, Facebook, History, Instagram, KeyRound, Link2, Loader2, Lock, LockKeyhole, MessageCircle, Clock3, Mail as MailIcon, Phone, Palette, Plug, Plus, ShieldCheck, Trash2, UsersRound, X } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth, UserProfile } from '@clerk/clerk-react';
 import { useTheme, AppTheme } from '../lib/ThemeContext';
 import { pickSidebarStyle, autoSidebarBorder, muteSidebarColor } from '../lib/themeCss';
@@ -1376,6 +1376,234 @@ function SeguridadPanel() {
   );
 }
 
+interface WhatsAppIntegrationStatus {
+  configured: boolean;
+  phoneNumberIdConfigured: boolean;
+  accessTokenConfigured: boolean;
+  verifyTokenConfigured: boolean;
+  webhookBaseUrlConfigured: boolean;
+  webhookUrl: string;
+}
+
+// Todas las conexiones con canales/servicios externos se gestionan desde
+// aquí en vez de repartidas dentro de cada módulo (antes WhatsApp tenía su
+// propio formulario de credenciales escondido en su pantalla de conexión).
+// Instagram y Facebook quedan como fichas informativas -- comparten la
+// misma app de Meta que WhatsApp, pero no hay ninguna cuenta ni permiso de
+// mensajería todavía (ver [[project_vantia_pending_user_actions]]).
+function IntegracionesPanel({ canManage }: { canManage: boolean }) {
+  const { getToken } = useAuth();
+  const [status, setStatus] = useState<WhatsAppIntegrationStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState(false);
+  const [form, setForm] = useState({
+    accessToken: '', phoneNumberId: '', verifyToken: '', webhookBaseUrl: '', graphVersion: 'v23.0', businessAccountId: '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [statusData, configData] = await Promise.all([
+        apiFetch('/api/whatsapp/status', { getToken }),
+        apiFetch('/api/whatsapp/config', { getToken }),
+      ]);
+      if (statusData?.success) setStatus(statusData.data);
+      if (configData?.success) {
+        setForm((f) => ({
+          ...f,
+          phoneNumberId: configData.data?.phoneNumberId || '',
+          verifyToken: configData.data?.verifyToken || '',
+          webhookBaseUrl: configData.data?.webhookBaseUrl || '',
+          graphVersion: configData.data?.graphVersion || 'v23.0',
+          businessAccountId: configData.data?.businessAccountId || '',
+        }));
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [getToken]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const handleSave = async () => {
+    setSaving(true); setError(null); setMessage(null);
+    try {
+      const data = await apiFetch('/api/whatsapp/config', { method: 'PUT', getToken, body: JSON.stringify(form) });
+      if (data?.success === false) throw new Error(data.error);
+      setStatus(data.data);
+      setMessage('Credenciales guardadas.');
+    } catch (e: any) {
+      setError(e.message || 'No se pudo guardar la configuración.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleTest = async () => {
+    setTesting(true); setError(null); setMessage(null);
+    try {
+      const data = await apiFetch('/api/whatsapp/config/test', { method: 'POST', getToken });
+      if (data?.success === false) throw new Error(data.error);
+      setMessage(`Conexión verificada: ${data.data?.verifiedName || data.data?.displayPhoneNumber || 'número validado'}.`);
+    } catch (e: any) {
+      setError(e.message || 'No se pudo verificar la conexión con WhatsApp Business.');
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const waConnected = Boolean(status?.configured);
+
+  return (
+    <div>
+      <div className="mb-8">
+        <h1 className="text-2xl font-extrabold text-slate-800 mb-1">Integraciones</h1>
+        <p className="text-sm text-slate-500">Conecta Vantia con canales de mensajería y servicios externos.</p>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50">
+                <MessageCircle size={20} className="text-emerald-600" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-slate-800">WhatsApp</p>
+                <p className="text-xs text-slate-400 truncate">WhatsApp Business Cloud API</p>
+              </div>
+            </div>
+            <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold uppercase ${waConnected ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
+              {loading ? '…' : waConnected ? 'Conectado' : 'Pendiente'}
+            </span>
+          </div>
+          <p className="mt-3 flex-1 text-xs leading-5 text-slate-500">
+            Habla con tus clientes por WhatsApp desde Comunicación Externa, sin salir del ERP.
+          </p>
+          {canManage ? (
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50"
+            >
+              <Link2 size={13} /> {waConnected ? 'Gestionar' : 'Conectar'}
+            </button>
+          ) : (
+            <p className="mt-4 text-[11px] text-slate-400">Solo el propietario o un administrador pueden configurarlo.</p>
+          )}
+        </div>
+
+        <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-fuchsia-500 via-pink-500 to-amber-400">
+                <Instagram size={20} className="text-white" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-slate-800">Instagram</p>
+                <p className="text-xs text-slate-400 truncate">Mensajes directos</p>
+              </div>
+            </div>
+            <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase text-slate-400">Próximamente</span>
+          </div>
+          <p className="mt-3 flex-1 text-xs leading-5 text-slate-500">
+            Requiere una cuenta de Instagram Business/Creator añadida como probadora en la app de Meta del despacho.
+          </p>
+          <button type="button" disabled className="mt-4 inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-lg border border-slate-100 px-4 py-2 text-xs font-bold text-slate-300">
+            <Link2 size={13} /> Conectar
+          </button>
+        </div>
+
+        <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-600">
+                <Facebook size={20} className="text-white" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-slate-800">Facebook</p>
+                <p className="text-xs text-slate-400 truncate">Página de empresa</p>
+              </div>
+            </div>
+            <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase text-slate-400">Próximamente</span>
+          </div>
+          <p className="mt-3 flex-1 text-xs leading-5 text-slate-500">
+            Vincular la Página de Facebook del despacho es el paso previo para activar Instagram en la misma app de Meta.
+          </p>
+          <button type="button" disabled className="mt-4 inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-lg border border-slate-100 px-4 py-2 text-xs font-bold text-slate-300">
+            <Link2 size={13} /> Conectar
+          </button>
+        </div>
+      </div>
+
+      {canManage && expanded && (
+        <div className="mt-6 max-w-2xl rounded-2xl border border-slate-200 bg-white p-6">
+          <h3 className="mb-1 text-sm font-bold uppercase tracking-wider text-slate-800">Configurar WhatsApp Business</h3>
+          <p className="mb-4 text-xs text-slate-500">
+            El access token, el phone number id y el verify token se obtienen en developers.facebook.com, dentro de la app
+            conectada al número Business del despacho.
+          </p>
+          {error && <p className="mb-3 text-xs font-medium text-rose-600">{error}</p>}
+          {message && <p className="mb-3 text-xs font-medium text-emerald-600">{message}</p>}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <ConfigInput label="Access token" value={form.accessToken} onChange={(v) => setForm((f) => ({ ...f, accessToken: v }))} placeholder="EAAG..." />
+            <ConfigInput label="Phone number id" value={form.phoneNumberId} onChange={(v) => setForm((f) => ({ ...f, phoneNumberId: v }))} placeholder="123456789012345" />
+            <ConfigInput label="Verify token" value={form.verifyToken} onChange={(v) => setForm((f) => ({ ...f, verifyToken: v }))} placeholder="token-seguro" />
+            <ConfigInput label="Webhook base URL" value={form.webhookBaseUrl} onChange={(v) => setForm((f) => ({ ...f, webhookBaseUrl: v }))} placeholder="https://tu-dominio.com" />
+            <ConfigInput label="Graph version" value={form.graphVersion} onChange={(v) => setForm((f) => ({ ...f, graphVersion: v }))} placeholder="v23.0" />
+            <ConfigInput label="Business account id" value={form.businessAccountId} onChange={(v) => setForm((f) => ({ ...f, businessAccountId: v }))} placeholder="opcional" />
+          </div>
+          <div className="mt-5 flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="inline-flex items-center gap-2 rounded-lg bg-[#ab0433] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#92042c] disabled:opacity-50"
+            >
+              {saving ? <Loader2 size={14} className="animate-spin" /> : <KeyRound size={14} />}
+              Guardar credenciales
+            </button>
+            <button
+              type="button"
+              onClick={handleTest}
+              disabled={testing || !status?.phoneNumberIdConfigured || !status?.accessTokenConfigured}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+            >
+              {testing ? <Loader2 size={14} className="animate-spin" /> : <LockKeyhole size={14} />}
+              Probar conexión
+            </button>
+          </div>
+          {status?.webhookUrl && (
+            <p className="mt-4 text-[11px] text-slate-400">
+              URL de webhook para pegar en Meta: <code className="rounded bg-slate-50 px-1.5 py-0.5 text-slate-600">{status.webhookUrl}</code>
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ConfigInput({ label, value, onChange, placeholder }: {
+  label: string; value: string; onChange: (value: string) => void; placeholder?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{label}</span>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-red-300"
+      />
+    </label>
+  );
+}
+
 function NotificacionesPanel() {
   const push = usePushNotifications();
   const [error, setError] = useState<string | null>(null);
@@ -1486,7 +1714,15 @@ export default function Configuracion() {
     && draftSecondary.toLowerCase() === customSecondary.toLowerCase()
     && draftSidebar.toLowerCase() === customSidebar.toLowerCase();
   const currentAccent = PALETTES.find((p) => p.id === theme)?.accent ?? PALETTES[0].accent;
-  const [activeSection, setActiveSection] = useState<SectionKey>('apariencia');
+  // Permite enlazar directamente a una sección concreta (p.ej. desde el aviso
+  // de "conéctalo desde Configuración → Integraciones" en Comunicación Externa)
+  // con ?section=integraciones, en vez de dejar siempre a quien llega en Apariencia.
+  const [searchParams] = useSearchParams();
+  const [activeSection, setActiveSection] = useState<SectionKey>(() => {
+    const requested = searchParams.get('section') as SectionKey | null;
+    const valid: SectionKey[] = ['apariencia', 'manual', 'notificaciones', 'despacho', 'seguridad', 'integraciones', 'usuarios'];
+    return requested && valid.includes(requested) ? requested : 'apariencia';
+  });
   const activeOther = visibleOtherSections.find((s) => s.key === activeSection);
 
   return (
@@ -1659,6 +1895,8 @@ export default function Configuracion() {
             <NotificacionesPanel />
           ) : activeSection === 'seguridad' ? (
             <SeguridadPanel />
+          ) : activeSection === 'integraciones' ? (
+            <IntegracionesPanel canManage={myRol === 'propietario' || myRol === 'admin'} />
           ) : activeSection === 'usuarios' ? (
             <UsuariosPanel />
           ) : (
