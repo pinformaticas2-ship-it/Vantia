@@ -767,10 +767,11 @@ function WhatsAppAuthGate({
 
       <section className="flex flex-1 flex-col bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-8 py-8">
         <div className="max-w-3xl">
-          <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-400">Autenticador</p>
-          <h2 className="mt-2 text-lg font-bold text-slate-900">Acceso a WhatsApp Business Cloud API</h2>
+          <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-400">Canal</p>
+          <h2 className="mt-2 text-lg font-bold text-slate-900">WhatsApp Business</h2>
           <p className="mt-3 text-sm leading-6 text-slate-500">
-            Introduce o revisa la configuración del canal. Después valida la conexión para entrar a la pantalla de mensajería.
+            El token y el resto de credenciales se configuran en el servidor, no aquí — esta pantalla solo comprueba
+            que la conexión funciona antes de dejarte entrar a la bandeja.
           </p>
 
           {error ? (
@@ -781,75 +782,7 @@ function WhatsAppAuthGate({
           ) : null}
         </div>
 
-        <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="grid gap-4 md:grid-cols-2">
-              <ConfigField
-                label="Access token"
-                value={configForm.accessToken}
-                onChange={(value) => onChange("accessToken", value)}
-                placeholder="EAAG..."
-                help="Token de Meta para el número Business."
-              />
-              <ConfigField
-                label="Phone number id"
-                value={configForm.phoneNumberId}
-                onChange={(value) => onChange("phoneNumberId", value)}
-                placeholder="123456789012345"
-                help="Identificador del número dentro de la Cloud API."
-              />
-              <ConfigField
-                label="Verify token"
-                value={configForm.verifyToken}
-                onChange={(value) => onChange("verifyToken", value)}
-                placeholder="token-seguro"
-                help="Se usa para verificar el webhook."
-              />
-              <ConfigField
-                label="Webhook base URL"
-                value={configForm.webhookBaseUrl}
-                onChange={(value) => onChange("webhookBaseUrl", value)}
-                placeholder="https://tu-dominio.com"
-                help="La URL pública base del backend."
-              />
-              <ConfigField
-                label="Graph version"
-                value={configForm.graphVersion}
-                onChange={(value) => onChange("graphVersion", value)}
-                placeholder="v23.0"
-                help="Versión de Meta Graph API."
-              />
-              <ConfigField
-                label="Business account id"
-                value={configForm.businessAccountId}
-                onChange={(value) => onChange("businessAccountId", value)}
-                placeholder="opcional"
-                help="Útil para trazabilidad y soporte."
-              />
-            </div>
-
-            <div className="mt-6 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={onSave}
-                disabled={savingConfig}
-                className="inline-flex items-center gap-2 rounded-2xl bg-[#ab0433] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#92042c] disabled:opacity-60"
-              >
-                {savingConfig ? <Loader2 size={15} className="animate-spin" /> : <KeyRound size={15} />}
-                Guardar credenciales
-              </button>
-              <button
-                type="button"
-                onClick={onTest}
-                disabled={testingConfig || !(status?.phoneNumberIdConfigured || configForm.phoneNumberId) || !(status?.accessTokenConfigured || configForm.accessToken)}
-                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
-              >
-                {testingConfig ? <Loader2 size={15} className="animate-spin" /> : <LockKeyhole size={15} />}
-                Verificar y entrar
-              </button>
-            </div>
-          </div>
-
+        <div className="mt-8 max-w-md">
           <div className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm">
             <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-400">Resumen</p>
             <div className="mt-5 space-y-4 text-sm">
@@ -858,6 +791,21 @@ function WhatsAppAuthGate({
               <SummaryItem label="Verify token" value={status?.verifyTokenPreview || "Pendiente"} />
               <SummaryItem label="Webhook" value={status?.webhookUrl || "Pendiente"} multiline />
             </div>
+
+            <button
+              type="button"
+              onClick={onTest}
+              disabled={testingConfig || !status?.phoneNumberIdConfigured || !status?.accessTokenConfigured}
+              className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#ab0433] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#92042c] disabled:opacity-50"
+            >
+              {testingConfig ? <Loader2 size={15} className="animate-spin" /> : <LockKeyhole size={15} />}
+              Verificar y entrar
+            </button>
+            {!status?.phoneNumberIdConfigured || !status?.accessTokenConfigured ? (
+              <p className="mt-3 text-xs text-slate-400">
+                Todavía no hay token ni número configurados en el servidor.
+              </p>
+            ) : null}
           </div>
         </div>
       </section>
