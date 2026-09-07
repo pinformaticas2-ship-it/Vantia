@@ -1526,13 +1526,14 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-bold text-slate-800">Facebook</p>
-                <p className="text-xs text-slate-400 truncate">Página de empresa</p>
+                <p className="text-xs text-slate-400 truncate">Messenger de la Página</p>
               </div>
             </div>
             <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase text-slate-400">Próximamente</span>
           </div>
           <p className="mt-3 flex-1 text-xs leading-5 text-slate-500">
-            Vincular la Página de Facebook del despacho es el paso previo para activar Instagram en la misma app de Meta.
+            Canal independiente de Instagram: mensajes de Messenger a la Página de Facebook del despacho, dentro de la
+            misma bandeja de Comunicación Externa.
           </p>
           <button type="button" disabled className="mt-4 inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-lg border border-slate-100 px-4 py-2 text-xs font-bold text-slate-300">
             <Link2 size={13} /> Conectar

@@ -690,8 +690,8 @@ function InstagramComingSoon() {
       <div className="mt-2 w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-4 text-left text-xs text-slate-500 space-y-2">
         <p className="flex items-center gap-2 font-semibold text-slate-700"><Sparkles size={13} className="text-fuchsia-500" /> Para activarlo hace falta:</p>
         <ul className="space-y-1.5 pl-1">
-          <li className="flex gap-2"><span className="text-slate-300">·</span> Una cuenta de Instagram Business o Creator, vinculada a una página de Facebook.</li>
-          <li className="flex gap-2"><span className="text-slate-300">·</span> El permiso de mensajería de Instagram aprobado por Meta para la app del despacho.</li>
+          <li className="flex gap-2"><span className="text-slate-300">·</span> Una cuenta de Instagram Business o Creator (no hace falta vincularla a ninguna página de Facebook con la API de Instagram con inicio de sesión de Instagram).</li>
+          <li className="flex gap-2"><span className="text-slate-300">·</span> Añadirla como "Instagram tester" en la app de Meta del despacho, o el permiso de mensajería aprobado por Meta si se necesita para más cuentas.</li>
         </ul>
       </div>
     </div>
