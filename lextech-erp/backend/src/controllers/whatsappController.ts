@@ -246,6 +246,11 @@ export async function getWhatsAppContacts(req: any, res: Response) {
     // (ver migración de whatsapp_messages), así que el aislamiento aquí se
     // consigue a través del propio contacto (entities SÍ está aislado por
     // organización desde Fase 1) en vez de por el mensaje.
+    //
+    // JOIN (no LEFT JOIN) con "latest" a propósito: esta es la bandeja de
+    // Comunicación Externa, no el listado de Clientes -- solo debe aparecer
+    // quien de verdad tiene una conversación de WhatsApp registrada, no
+    // cualquier cliente con teléfono (que es justo lo que hacía antes).
     const result = await pool.query(
       `WITH latest AS (
          SELECT DISTINCT ON (wm.client_id)
@@ -279,10 +284,10 @@ export async function getWhatsAppContacts(req: any, res: Response) {
            WHERE wm2.client_id = e.id AND wm2.channel = 'whatsapp'
          ), 0)            AS message_count
        FROM entities e
-       LEFT JOIN latest l ON l.client_id = e.id
+       JOIN latest l ON l.client_id = e.id
        WHERE e.organizacion_id = $1
          AND COALESCE(NULLIF(regexp_replace(COALESCE(e.phone_mobile, e.phone_1, ''), '\D', '', 'g'), ''), '') <> ''
-       ORDER BY l.created_at DESC NULLS LAST, e.updated_at DESC NULLS LAST, e.created_at DESC`,
+       ORDER BY l.created_at DESC`,
       [req.organizacionId],
     );
 
