@@ -426,44 +426,54 @@ export default function WhatsApp() {
         <InstagramComingSoon />
       ) : (
       <div className="flex flex-1 min-h-0 overflow-hidden">
-      <aside className={`${isMobile && selectedClientId ? "hidden" : "flex w-full"} md:flex md:w-[320px] shrink-0 flex-col bg-[linear-gradient(180deg,#1f2334_0%,#111827_100%)] text-white`}>
-        <div className="border-b border-white/10 px-5 py-5">
+      <aside className={`${isMobile && selectedClientId ? "hidden" : "flex w-full"} md:flex md:w-[320px] shrink-0 flex-col bg-white border-r border-slate-200`}>
+        <div className="border-b border-slate-100 px-5 py-5">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-white/45">LexTech</p>
-              <h1 className="mt-1 text-base font-bold">WhatsApp</h1>
+              <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-slate-400">Bandeja del equipo</p>
+              <h1 className="mt-1 text-base font-bold text-slate-900">WhatsApp</h1>
             </div>
             <button
               type="button"
               onClick={disconnectView}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-white/75 transition hover:bg-white/10 hover:text-white"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-400 transition hover:bg-slate-50 hover:text-slate-600"
               title="Volver a conexión"
             >
               <Settings2 size={16} />
             </button>
           </div>
-          <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5">
-            <div className="flex items-center gap-2 text-xs text-emerald-300">
-              <span className="h-2 w-2 rounded-full bg-emerald-400" />
+          <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50/60 px-3 py-2.5">
+            <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
               Canal Business autenticado
             </div>
-            <p className="mt-1 text-sm text-white/75">{status?.phoneNumberIdPreview || "WhatsApp Business Cloud API"}</p>
+            <p className="mt-1 text-sm text-emerald-600/80">{status?.phoneNumberIdPreview || "WhatsApp Business Cloud API"}</p>
           </div>
-          <div className="mt-4 flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5">
-            <Search size={15} className="text-white/40" />
+          <div className="mt-4 flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+            <Search size={15} className="text-slate-400" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Buscar conversación..."
-              className="w-full bg-transparent text-sm text-white outline-none placeholder:text-white/35"
+              className="w-full bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
             />
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+        <div className="min-h-0 flex-1 overflow-y-auto">
           {filteredContacts.length === 0 ? (
-            <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-6 text-center text-sm text-white/60">
-              No hay contactos con teléfono para WhatsApp.
+            <div className="flex h-full flex-col items-center justify-center gap-3 px-6 py-16 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100">
+                <UserRound size={24} className="text-slate-300" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-600">Sin conversaciones</p>
+                <p className="mt-1 text-xs text-slate-400 max-w-[220px]">
+                  {query.trim()
+                    ? "No hay ningún contacto que coincida con la búsqueda."
+                    : "Los contactos con teléfono que escriban por WhatsApp aparecerán aquí."}
+                </p>
+              </div>
             </div>
           ) : filteredContacts.map((contact) => {
             const isSelected = contact.id === selectedClientId;
@@ -472,34 +482,33 @@ export default function WhatsApp() {
                 key={contact.id}
                 type="button"
                 onClick={() => setSelectedClientId(contact.id)}
-                className={`mb-1.5 flex w-full items-start gap-3 rounded-2xl border px-3 py-3 text-left transition ${
-                  isSelected
-                    ? "border-[#ab0433]/60 bg-white/95 text-slate-900 shadow-lg"
-                    : "border-transparent bg-transparent text-white/85 hover:bg-white/6"
+                className={`relative flex w-full items-start gap-3 border-b border-slate-100 px-4 py-3.5 text-left transition-colors ${
+                  isSelected ? "bg-red-50/60" : "bg-white hover:bg-slate-50"
                 }`}
               >
+                {isSelected && <span className="absolute left-0 top-0 bottom-0 w-1 bg-red-500" />}
                 {contact.photo_url ? (
-                  <img src={contact.photo_url} alt="" className="h-11 w-11 rounded-2xl object-cover" />
+                  <img src={contact.photo_url} alt="" className="h-11 w-11 rounded-full object-cover shrink-0" />
                 ) : (
-                  <div className={`flex h-11 w-11 items-center justify-center rounded-2xl ${isSelected ? "bg-slate-100 text-slate-500" : "bg-white/10 text-white/60"}`}>
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-400">
                     <UserRound size={18} />
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">
-                    <p className={`truncate text-sm font-semibold ${isSelected ? "text-slate-900" : "text-white"}`}>
+                    <p className={`truncate text-sm ${isSelected ? "font-bold text-red-700" : "font-semibold text-slate-800"}`}>
                       {getClientLabel(contact)}
                     </p>
-                    <span className={`text-[11px] ${isSelected ? "text-slate-400" : "text-white/40"}`}>
+                    <span className={`text-[11px] shrink-0 ${isSelected ? "text-red-500" : "text-slate-400"}`}>
                       {shortDateLabel(contact.last_message_at)}
                     </span>
                   </div>
                   {contact.internal_number ? (
-                    <p className={`mt-1 text-[11px] font-semibold ${isSelected ? "text-[#ab0433]" : "text-emerald-300"}`}>
+                    <p className={`mt-0.5 text-[11px] font-semibold ${isSelected ? "text-[#ab0433]" : "text-emerald-600"}`}>
                       EXP-{String(contact.internal_number).padStart(4, "0")}
                     </p>
                   ) : null}
-                  <p className={`mt-1 line-clamp-2 text-xs leading-5 ${isSelected ? "text-slate-500" : "text-white/60"}`}>
+                  <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-slate-500">
                     {contact.last_message_body || "Sin conversación registrada todavía."}
                   </p>
                 </div>
