@@ -3061,8 +3061,8 @@ function DateSep({ date }: { date: string }) {
 // ══════════════════════════════════════════════════════════════════════════════
 // MESSAGE INPUT
 // ══════════════════════════════════════════════════════════════════════════════
-function MessageInput({ canalId, canalNombre, replyTo, editingMsg, miembros, currentUserId, resolveDisplayName, onTypingChange, onSend, onCancelReply, onCancelEdit }: {
-  canalId: string; canalNombre: string; replyTo: Mensaje|null; editingMsg: Mensaje|null; miembros: Miembro[]; currentUserId: string;
+function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, miembros, currentUserId, resolveDisplayName, onTypingChange, onSend, onCancelReply, onCancelEdit }: {
+  canalId: string; canalNombre: string; isDirect?: boolean; replyTo: Mensaje|null; editingMsg: Mensaje|null; miembros: Miembro[]; currentUserId: string;
   resolveDisplayName:(userId?: string | null, name?: string | null, isSelf?: boolean)=>string;
   onTypingChange:(canalId: string, typing: boolean)=>void;
   onSend:(text:string,gifUrl?:string,replyId?:string,editId?:string,imageUrl?:string,fileUrl?:string,fileName?:string,fileMime?:string)=>Promise<void>;
@@ -3444,7 +3444,7 @@ function MessageInput({ canalId, canalNombre, replyTo, editingMsg, miembros, cur
             </div>
           )}
           {selectedFile && (
-            <div className="mx-3 mt-3 flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 shadow-sm animate-in fade-in zoom-in-95 duration-200">
+            <div className="mx-3 mt-3 flex max-w-xs items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 shadow-sm animate-in fade-in zoom-in-95 duration-200">
               <div className="h-9 w-9 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
                 <FileText size={16}/>
               </div>
@@ -3462,7 +3462,7 @@ function MessageInput({ canalId, canalNombre, replyTo, editingMsg, miembros, cur
             onClick={syncSelection}
             onKeyUp={syncSelection}
             onSelect={syncSelection}
-            placeholder={editingMsg ? `Editar mensaje...` : `Escribe en ${canalNombre.startsWith("DM") ? "" : "#"}${canalNombre}...`}
+            placeholder={editingMsg ? `Editar mensaje...` : isDirect ? `Escribe a ${canalNombre}...` : `Escribe en #${canalNombre}...`}
             rows={1}
             className="w-full bg-transparent resize-none px-3.5 py-3 text-slate-700 text-sm outline-none placeholder-slate-400 max-h-40 overflow-y-auto leading-relaxed"
             style={{ minHeight:"42px" }}
@@ -5360,7 +5360,8 @@ export default function Chat() {
                   <MessageInput
                     key={canalActivo.id}
                     canalId={canalActivo.id}
-                    canalNombre={canalActivo.nombre}
+                    canalNombre={activeChatTitle}
+                    isDirect={canalActivo.tipo === "directo"}
                     replyTo={replyTo}
                     editingMsg={editingMsg}
                     miembros={miembros}
