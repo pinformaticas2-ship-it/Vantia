@@ -1612,7 +1612,6 @@ export default function DashboardLayout() {
   const { unreadCount: emailUnreadCount, latestUnread, clearLatestUnread } = useEmailUnread();
   const { totalUnread: chatTotalUnread } = useChatUnread();
   const { latestToast: latestWaToast, clearToast: clearWaToast, markSeen: markWaSeen, markAllSeen: markAllWaSeen } = useWhatsAppUnread();
-  const { organizacion } = useOrganizacion();
 
   const isMobile = useIsMobile();
   const pushNotifications = usePushNotifications();
@@ -2094,22 +2093,6 @@ export default function DashboardLayout() {
               <SearchDropdown query={searchQuery} onSelect={() => { setSearchQuery(""); setSearchFocused(false); }} />
             )}
           </div>
-
-          {/* Logo de la organización activa -- justo tras la búsqueda (que
-              tiene max-w-2xl) para que ocupe el hueco central en pantallas
-              anchas, en vez de quedar pegado del todo a la derecha tras los
-              iconos. Mismo diseño (caja cuadrada, rounded-lg) que ya usa el
-              logo pequeño del sidebar, solo que un poco más grande. */}
-          {organizacion && (
-            <div className="hidden sm:block mx-auto shrink-0">
-              <OrgLogoBadge
-                nombre={organizacion.nombre}
-                logoUrl={organizacion.logoUrl}
-                className="h-11 w-11 rounded-lg text-sm border border-slate-200"
-                imgClassName="object-contain p-1"
-              />
-            </div>
-          )}
 
           {/* Links de interés (por usuario) — se oculta en móviles muy estrechos para dejar sitio al buscador y las notificaciones */}
           <div ref={linksRef} className="relative shrink-0 hidden sm:block">
