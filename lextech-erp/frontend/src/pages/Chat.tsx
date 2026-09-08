@@ -406,6 +406,17 @@ function isWordFile(fileName?: string | null, mime?: string | null): boolean {
   return fileExt(fileName) === "docx" || (mime || "").toLowerCase().includes("wordprocessingml");
 }
 
+// .xlsx (y .xls, que la propia librería también sabe leer). Usa SheetJS
+// (xlsx en npm) -- ese paquete tiene vulnerabilidades conocidas y sin
+// parchear (prototype pollution + ReDoS) en la versión publicada en el
+// registro de npm, decisión consciente y aceptada expresamente para poder
+// previsualizar Excel; el análisis solo procesa archivos que ya han pasado
+// por la subida al chat (miembros de la organización), y corre aislado en
+// la pestaña de quien abre la vista previa, no en el servidor.
+function isExcelFile(fileName?: string | null, mime?: string | null): boolean {
+  return ["xlsx", "xls"].includes(fileExt(fileName)) || (mime || "").toLowerCase().includes("spreadsheetml") || (mime || "").toLowerCase().includes("ms-excel");
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // PREVISUALIZACIÓN DE ARCHIVO ADJUNTO
 // ══════════════════════════════════════════════════════════════════════════════
@@ -442,6 +453,7 @@ function FilePreviewModal({
   const isAudio = isAudioFile(fileName, mime);
   const isText = isTextFile(fileName, mime);
   const isWord = isWordFile(fileName, mime);
+  const isExcel = isExcelFile(fileName, mime);
   const fileTypeIcon = getFileTypeIcon(fileName, mime);
   const displayName = fileName || "Archivo";
   const createdLabel = createdAt
@@ -533,6 +545,8 @@ function FilePreviewModal({
           <TextFilePreview src={src} />
         ) : isWord ? (
           <WordFilePreview src={src} />
+        ) : isExcel ? (
+          <ExcelFilePreview src={src} />
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-4 rounded-xl border border-slate-700 bg-slate-900 text-center px-6">
             <div className={`h-16 w-16 rounded-2xl flex items-center justify-center ${fileTypeIcon.iconBg} ${fileTypeIcon.iconColor}`}>
@@ -664,6 +678,71 @@ function WordFilePreview({ src }: { src: string }) {
         // semántica: p/h1/table/etc.), no contenido de terceros sin filtrar --
         // mismo nivel de confianza que el resto de HTML que ya generamos nosotros.
         dangerouslySetInnerHTML={{ __html: state.html }}
+      />
+    </div>
+  );
+}
+
+// Vista de Excel (.xlsx/.xls): se lee con SheetJS (xlsx) enteramente en el
+// navegador y cada hoja se convierte a una tabla HTML -- si el libro tiene
+// varias hojas, se puede cambiar entre ellas con las pestañas de arriba.
+function ExcelFilePreview({ src }: { src: string }) {
+  const [state, setState] = useState<{ status: "loading" } | { status: "ok"; sheets: { name: string; html: string }[] } | { status: "error" }>({ status: "loading" });
+  const [activeSheet, setActiveSheet] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    setState({ status: "loading" });
+    setActiveSheet(0);
+    (async () => {
+      try {
+        const [res, XLSX] = await Promise.all([fetch(src), import("xlsx")]);
+        if (!res.ok) throw new Error("fetch");
+        const arrayBuffer = await res.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, { type: "array" });
+        const sheets = workbook.SheetNames.map(name => ({
+          name,
+          html: XLSX.utils.sheet_to_html(workbook.Sheets[name], { header: "", footer: "" }),
+        }));
+        if (!cancelled) setState({ status: "ok", sheets });
+      } catch {
+        if (!cancelled) setState({ status: "error" });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [src]);
+
+  if (state.status === "loading") {
+    return (
+      <div className="flex h-full items-center justify-center rounded-xl border border-slate-700 bg-slate-900">
+        <Loader2 size={20} className="animate-spin text-slate-400" />
+      </div>
+    );
+  }
+  if (state.status === "error") {
+    return (
+      <div className="flex h-full items-center justify-center rounded-xl border border-slate-700 bg-slate-900 px-6 text-center">
+        <p className="text-sm text-slate-300">No se pudo generar la vista previa de esta hoja de cálculo.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="flex h-full flex-col overflow-hidden rounded-xl bg-white">
+      {state.sheets.length > 1 && (
+        <div className="flex gap-1 overflow-x-auto border-b border-slate-200 bg-slate-50 px-2 py-1.5 shrink-0">
+          {state.sheets.map((s, i) => (
+            <button key={s.name} type="button" onClick={() => setActiveSheet(i)}
+              className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${i === activeSheet ? "bg-white text-slate-800 shadow-sm border border-slate-200" : "text-slate-500 hover:bg-white/60"}`}>
+              {s.name}
+            </button>
+          ))}
+        </div>
+      )}
+      <div
+        className="flex-1 overflow-auto p-4 text-xs [&_table]:border-collapse [&_td]:border [&_td]:border-slate-200 [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-slate-200 [&_th]:px-2 [&_th]:py-1 [&_th]:bg-slate-50"
+        // Igual que en WordFilePreview: HTML generado por la propia librería a
+        // partir de las celdas del libro, no contenido de terceros sin filtrar.
+        dangerouslySetInnerHTML={{ __html: state.sheets[activeSheet]?.html || "" }}
       />
     </div>
   );
