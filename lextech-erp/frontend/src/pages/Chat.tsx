@@ -3604,6 +3604,7 @@ export default function Chat() {
   const prevUnreadDMsRef = useRef<Record<string, number>>({});
   const mensajesCountRef = useRef(0);
   const mensajesIdsRef = useRef<Set<string>>(new Set());
+  const mensajesRef = useRef<Mensaje[]>([]);
   const fetchMensajesInFlightRef = useRef(false);
   const pollMensajesInFlightRef = useRef(false);
   const loadMoreInFlightRef = useRef(false);
@@ -3693,6 +3694,7 @@ export default function Chat() {
   useEffect(() => {
     mensajesCountRef.current = mensajes.length;
     mensajesIdsRef.current = new Set(mensajes.map(m => m.id));
+    mensajesRef.current = mensajes;
   }, [mensajes]);
 
   useEffect(() => {
@@ -4332,26 +4334,32 @@ export default function Chat() {
   // (envuelto en React.memo), y una función recreada en cada render del
   // componente padre (que repinta cada ~700ms por el polling) invalidaría
   // el memo de cada mensaje de la lista aunque nada suyo hubiera cambiado.
+  // Optimista: aplica el toggle en pantalla al instante (antes de esperar a
+  // hdr()/fetch, que puede tardar si Clerk tiene que renovar el token) y solo
+  // lo deshace si la petición de verdad falla. Sin esto, reaccionar/fijar/
+  // marcar favorito se sentía "no funciona" cuando en realidad solo iba lento.
   const handleReact = useCallback(async (msgId: string, emoji: string) => {
-    const h = await hdr();
-    const res = await fetch(`/api/chat/mensajes/${msgId}/reacciones`, {
-      method:"POST", headers: h, body: JSON.stringify({ emoji }),
-    });
-    const d = await safeJson(res);
-    if (!res.ok) return;
-    setMensajes(prev=>prev.map(m=>{
+    const myName = user?.fullName || user?.username || "Tú";
+    const toggle = (removed: boolean) => setMensajes(prev=>prev.map(m=>{
       if (m.id!==msgId) return m;
       const reac = m.reacciones||[];
-      if (d.data.action==="removed") {
+      if (removed) {
         return {...m, reacciones: reac.filter(r=>!(r.emoji===emoji&&r.user_id===currentUserId))};
       }
-      const alreadyExists = reac.some(r => r.emoji === emoji && r.user_id === currentUserId);
-      if (alreadyExists) return m;
-      return {
-        ...m,
-        reacciones:[...reac,{emoji, user_id:currentUserId, user_name: user?.fullName||user?.username||"Tú"}],
-      };
+      if (reac.some(r => r.emoji === emoji && r.user_id === currentUserId)) return m;
+      return {...m, reacciones:[...reac,{emoji, user_id:currentUserId, user_name: myName}]};
     }));
+    const alreadyMine = mensajesRef.current.find(m=>m.id===msgId)?.reacciones?.some(r => r.emoji === emoji && r.user_id === currentUserId) ?? false;
+    toggle(alreadyMine);
+    try {
+      const h = await hdr();
+      const res = await fetch(`/api/chat/mensajes/${msgId}/reacciones`, {
+        method:"POST", headers: h, body: JSON.stringify({ emoji }),
+      });
+      if (!res.ok) throw new Error("reaccion");
+    } catch {
+      toggle(!alreadyMine); // revertir
+    }
   }, [hdr, currentUserId, user]);
 
   const handleDelete = useCallback(async (msgId: string) => {
@@ -4363,29 +4371,45 @@ export default function Chat() {
   const handlePin = useCallback(async (msgId: string) => {
     const canal = canalActivoRef.current;
     if (!canal) return;
-    const h = await hdr();
-    const res = await fetch(`/api/chat/canales/${canal.id}/fijar/${msgId}`, { method:"POST", headers: h });
-    const d = await safeJson(res);
-    if (!res.ok) return;
+    let wasPinned = false;
     setPinnedIds(prev => {
+      wasPinned = prev.has(msgId);
       const next = new Set(prev);
-      if (d.data?.action === "removed") next.delete(msgId);
-      else next.add(msgId);
+      if (wasPinned) next.delete(msgId); else next.add(msgId);
       return next;
     });
+    try {
+      const h = await hdr();
+      const res = await fetch(`/api/chat/canales/${canal.id}/fijar/${msgId}`, { method:"POST", headers: h });
+      if (!res.ok) throw new Error("fijar");
+    } catch {
+      setPinnedIds(prev => {
+        const next = new Set(prev);
+        if (wasPinned) next.add(msgId); else next.delete(msgId);
+        return next;
+      });
+    }
   }, [hdr]);
 
   const handleFavorite = useCallback(async (msgId: string) => {
-    const h = await hdr();
-    const res = await fetch(`/api/chat/mensajes/${msgId}/favorito`, { method:"POST", headers: h });
-    const d = await safeJson(res);
-    if (!res.ok) return;
+    let wasFavorite = false;
     setFavoriteIds(prev => {
+      wasFavorite = prev.has(msgId);
       const next = new Set(prev);
-      if (d.data?.action === "removed") next.delete(msgId);
-      else next.add(msgId);
+      if (wasFavorite) next.delete(msgId); else next.add(msgId);
       return next;
     });
+    try {
+      const h = await hdr();
+      const res = await fetch(`/api/chat/mensajes/${msgId}/favorito`, { method:"POST", headers: h });
+      if (!res.ok) throw new Error("favorito");
+    } catch {
+      setFavoriteIds(prev => {
+        const next = new Set(prev);
+        if (wasFavorite) next.add(msgId); else next.delete(msgId);
+        return next;
+      });
+    }
   }, [hdr]);
 
   const handleLeave = async () => {
