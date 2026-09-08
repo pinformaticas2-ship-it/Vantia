@@ -3182,7 +3182,9 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
   const [showMediaPicker, setShowMediaPicker] = useState(false);
   const [mentionQ, setMentionQ] = useState<string|null>(null);
   const [selectedImage, setSelectedImage] = useState<{ file: File; previewUrl: string } | null>(null);
-  const [selectedFile, setSelectedFile] = useState<{ file: File; name: string; size: number; mime: string } | null>(null);
+  // Array (antes admitía solo un archivo) -- se manda cada uno como mensaje
+  // aparte al pulsar enviar, ver doSend.
+  const [selectedFiles, setSelectedFiles] = useState<{ file: File; name: string; size: number; mime: string }[]>([]);
   const [isDraggingImage, setIsDraggingImage] = useState(false);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -3283,9 +3285,6 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
         return;
       }
       let imageUrl: string | undefined;
-      let fileUrl: string | undefined;
-      let fileName: string | undefined;
-      let fileMime: string | undefined;
       if (selectedImage) {
         const form = new FormData();
         form.append("image", selectedImage.file);
@@ -3298,26 +3297,41 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
         const data = await safeJson(res);
         if (!res.ok) return;
         imageUrl = data.data?.image_url;
-      } else if (selectedFile) {
-        const form = new FormData();
-        form.append("file", selectedFile.file);
-        const token = await getToken();
-        const res = await fetch("/api/chat/uploads/file", {
-          method: "POST",
-          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-          body: form,
-        });
-        const data = await safeJson(res);
-        if (!res.ok) return;
-        fileUrl = data.data?.file_url;
-        fileName = data.data?.file_name;
-        fileMime = data.data?.file_mime;
       }
-      await onSend(trimmed || "", undefined, replyTo?.id, undefined, imageUrl, fileUrl, fileName, fileMime);
+      if (selectedFiles.length > 0) {
+        // Cada archivo va en su propio mensaje (el modelo de datos es un
+        // adjunto por mensaje) -- el texto escrito, si hay, se manda con el
+        // primero para que no aparezca como un mensaje suelto.
+        for (let i = 0; i < selectedFiles.length; i++) {
+          const sf = selectedFiles[i];
+          const form = new FormData();
+          form.append("file", sf.file);
+          const token = await getToken();
+          const res = await fetch("/api/chat/uploads/file", {
+            method: "POST",
+            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+            body: form,
+          });
+          const data = await safeJson(res);
+          if (!res.ok) continue;
+          await onSend(
+            i === 0 ? (trimmed || "") : "",
+            undefined,
+            i === 0 ? replyTo?.id : undefined,
+            undefined,
+            i === 0 ? imageUrl : undefined,
+            data.data?.file_url,
+            data.data?.file_name,
+            data.data?.file_mime,
+          );
+        }
+      } else {
+        await onSend(trimmed || "", undefined, replyTo?.id, undefined, imageUrl, undefined, undefined, undefined);
+      }
       setText("");
       if (selectedImage?.previewUrl) URL.revokeObjectURL(selectedImage.previewUrl);
       setSelectedImage(null);
-      setSelectedFile(null);
+      setSelectedFiles([]);
       if (fileRef.current) fileRef.current.value = "";
       if (attachFileRef.current) attachFileRef.current.value = "";
       taRef.current && (taRef.current.style.height="auto");
@@ -3462,7 +3476,7 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
     chooseImage(imageFile);
   };
 
-  const canSend = !!text.trim() || !!editingMsg || !!selectedImage || !!selectedFile;
+  const canSend = !!text.trim() || !!editingMsg || !!selectedImage || selectedFiles.length > 0;
 
   return (
     <div className="px-4 pb-4 pt-3 shrink-0">
@@ -3552,19 +3566,26 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
               <p className="mt-2 truncate text-xs font-medium text-slate-500">{selectedImage.file.name}</p>
             </div>
           )}
-          {selectedFile && (
-            <div className="mx-3 mt-3 flex max-w-xs items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 shadow-sm animate-in fade-in zoom-in-95 duration-200">
-              <div className="h-9 w-9 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
-                <FileText size={16}/>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="truncate text-sm font-semibold text-slate-700">{selectedFile.name}</p>
-                <p className="text-[11px] text-slate-400">{(selectedFile.size / 1024).toFixed(0)} KB · {selectedFile.mime}</p>
-              </div>
-              <button onClick={()=>{ setSelectedFile(null); if (attachFileRef.current) attachFileRef.current.value = ""; }}
-                className="shrink-0 rounded-full bg-slate-200 p-1 text-slate-500 hover:bg-slate-300 transition-colors">
-                <X size={12}/>
-              </button>
+          {selectedFiles.length > 0 && (
+            <div className="mx-3 mt-3 flex flex-col gap-2">
+              {selectedFiles.map((sf, i) => (
+                <div key={`${sf.name}-${i}`} className="flex max-w-xs items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 shadow-sm animate-in fade-in zoom-in-95 duration-200">
+                  <div className="h-9 w-9 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                    <FileText size={16}/>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="truncate text-sm font-semibold text-slate-700">{sf.name}</p>
+                    <p className="text-[11px] text-slate-400">{(sf.size / 1024).toFixed(0)} KB · {sf.mime}</p>
+                  </div>
+                  <button onClick={()=>{
+                    setSelectedFiles(prev => prev.filter((_, idx) => idx !== i));
+                    if (attachFileRef.current) attachFileRef.current.value = "";
+                  }}
+                    className="shrink-0 rounded-full bg-slate-200 p-1 text-slate-500 hover:bg-slate-300 transition-colors">
+                    <X size={12}/>
+                  </button>
+                </div>
+              ))}
             </div>
           )}
           <textarea ref={taRef} value={text} onChange={handleChange} onKeyDown={handleKey} onPaste={handlePaste}
@@ -3591,12 +3612,13 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
             <input
               ref={attachFileRef}
               type="file"
+              multiple
               accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv"
               className="hidden"
               onChange={e => {
-                const f = e.target.files?.[0];
-                if (!f) return;
-                setSelectedFile({ file: f, name: f.name, size: f.size, mime: f.type });
+                const picked = Array.from(e.target.files || []);
+                if (!picked.length) return;
+                setSelectedFiles(prev => [...prev, ...picked.map(f => ({ file: f, name: f.name, size: f.size, mime: f.type }))]);
                 setSelectedImage(null);
               }}
             />
@@ -3615,11 +3637,11 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
               className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors">
               <AtSign size={16}/>
             </button>
-            <button title="Adjuntar imagen" onClick={()=>{ setSelectedFile(null); fileRef.current?.click(); }}
+            <button title="Adjuntar imagen" onClick={()=>{ setSelectedFiles([]); fileRef.current?.click(); }}
               className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors">
               <ImageIcon size={16}/>
             </button>
-            <button title="Adjuntar archivo (PDF, Word, Excel...)" onClick={()=>{ setSelectedImage(null); attachFileRef.current?.click(); }}
+            <button title="Adjuntar archivos (PDF, Word, Excel...)" onClick={()=>{ setSelectedImage(null); attachFileRef.current?.click(); }}
               className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors">
               <Paperclip size={16}/>
             </button>
