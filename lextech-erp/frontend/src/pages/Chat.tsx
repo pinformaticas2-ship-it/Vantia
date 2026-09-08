@@ -352,6 +352,140 @@ function getFileTypeIcon(fileName?: string | null, mime?: string | null): { Icon
   return { Icon: FileIcon, iconBg: "bg-slate-200 group-hover/file:bg-slate-300", iconColor: "text-slate-600" };
 }
 
+// Por ahora solo los PDF se pueden incrustar de verdad en un <iframe> y
+// verse bien en cualquier navegador sin depender de un visor externo --
+// Word/Excel/zip, etc. no tienen forma fiable de previsualizarse in-app.
+function isPdfFile(fileName?: string | null, mime?: string | null): boolean {
+  const ext = (fileName?.split(".").pop() || "").toLowerCase();
+  return ext === "pdf" || (mime || "").toLowerCase().includes("pdf");
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PREVISUALIZACIÓN DE ARCHIVO ADJUNTO
+// ══════════════════════════════════════════════════════════════════════════════
+// Antes, pulsar un adjunto (PDF, Word, zip...) lo descargaba directamente sin
+// avisar. Ahora abre esta vista previa -- si es un PDF se incrusta y se puede
+// leer sin salir del chat; para el resto de tipos (sin forma fiable de
+// previsualizarse en el navegador) se muestra un aviso claro con el botón de
+// descarga, en vez de disparar la descarga a ciegas nada más hacer clic.
+function FilePreviewModal({
+  src,
+  fileName,
+  mime,
+  authorName,
+  authorAvatarUrl,
+  createdAt,
+  onDownload,
+  downloading,
+  onClose,
+}: {
+  src: string;
+  fileName?: string | null;
+  mime?: string | null;
+  authorName: string;
+  authorAvatarUrl?: string | null;
+  createdAt?: string;
+  onDownload: () => void;
+  downloading?: boolean;
+  onClose: () => void;
+}) {
+  const [isVisible, setIsVisible] = useState(false);
+  const isPdf = isPdfFile(fileName, mime);
+  const fileTypeIcon = getFileTypeIcon(fileName, mime);
+  const displayName = fileName || "Archivo";
+  const createdLabel = createdAt
+    ? `${new Date(createdAt).toLocaleDateString("es-ES", { day: "numeric", month: "short" })} · ${fmtTime(createdAt)}`
+    : null;
+
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [onClose]);
+
+  useEffect(() => {
+    const raf = window.requestAnimationFrame(() => setIsVisible(true));
+    return () => window.cancelAnimationFrame(raf);
+  }, []);
+
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      className={`fixed inset-0 z-[120] flex flex-col bg-slate-950/88 transition-opacity duration-300 ${isVisible ? "opacity-100" : "opacity-0"}`}
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={displayName}
+    >
+      <div
+        className="flex items-center justify-between gap-3 px-4 py-4 sm:px-6 shrink-0"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-white/10 bg-black/20 px-3 py-2">
+          <Av url={authorAvatarUrl} name={authorName} size={10} />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-white">{authorName}</p>
+            <p className="truncate text-xs text-slate-300">
+              {createdLabel ? `${createdLabel} · ` : ""}{displayName}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-2 py-2 shadow-lg shadow-black/10 shrink-0">
+          <button
+            type="button"
+            onClick={onDownload}
+            disabled={downloading}
+            className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/20 disabled:opacity-60"
+          >
+            {downloading ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+            {downloading ? "Descargando…" : "Descargar"}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white transition hover:bg-white/10"
+            aria-label="Cerrar"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      </div>
+
+      <div className="flex-1 min-h-0 px-4 pb-4 sm:px-6" onClick={(e) => e.stopPropagation()}>
+        {isPdf ? (
+          <iframe src={src} title={displayName} className="h-full w-full rounded-xl border border-white/10 bg-white" />
+        ) : (
+          <div className="flex h-full flex-col items-center justify-center gap-4 rounded-xl border border-white/10 bg-white/5 text-center px-6">
+            <div className={`h-16 w-16 rounded-2xl flex items-center justify-center ${fileTypeIcon.iconBg} ${fileTypeIcon.iconColor}`}>
+              <fileTypeIcon.Icon size={28} />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-white">{displayName}</p>
+              <p className="mt-1 text-xs text-slate-300">Este tipo de archivo no se puede previsualizar aquí</p>
+            </div>
+            <button
+              type="button"
+              onClick={onDownload}
+              disabled={downloading}
+              className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-slate-800 transition hover:bg-slate-100 disabled:opacity-60"
+            >
+              {downloading ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+              {downloading ? "Descargando…" : "Descargar"}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 function fmtDateLabel(iso: string) {
   const d = new Date(iso);
   const now = new Date();
@@ -2656,6 +2790,7 @@ const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserI
     ? `${fileSrc}${fileSrc.includes("?") ? "&" : "?"}download=1${msg.file_name ? `&name=${encodeURIComponent(msg.file_name)}` : ""}`
     : null;
   const [downloadingFile, setDownloadingFile] = useState(false);
+  const [showFilePreview, setShowFilePreview] = useState(false);
   const handleFileDownload = useCallback(async () => {
     if (!fileSrc || downloadingFile) return;
     setDownloadingFile(true);
@@ -2826,19 +2961,38 @@ const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserI
               </>
             )}
             {fileSrc && fileTypeIcon && (
-              <button type="button" onClick={handleFileDownload} disabled={downloadingFile}
-                className="mt-1 flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 px-3 py-2.5 transition-colors group/file max-w-xs text-left disabled:opacity-70">
+              <div role="button" tabIndex={0}
+                onClick={() => setShowFilePreview(true)}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setShowFilePreview(true); } }}
+                className="mt-1 flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 px-3 py-2.5 transition-colors group/file max-w-xs text-left cursor-pointer">
                 <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 transition-colors ${fileTypeIcon.iconBg} ${fileTypeIcon.iconColor}`}>
                   <fileTypeIcon.Icon size={16}/>
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="truncate text-sm font-semibold text-slate-700">{msg.file_name || "Archivo"}</p>
-                  <p className="text-[11px] text-slate-400">{downloadingFile ? "Descargando…" : "Descargar"}</p>
+                  <p className="text-[11px] text-slate-400">Ver archivo</p>
                 </div>
-                {downloadingFile
-                  ? <Loader2 size={14} className="shrink-0 text-slate-400 animate-spin"/>
-                  : <Download size={14} className="shrink-0 text-slate-400 group-hover/file:text-slate-600"/>}
-              </button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); void handleFileDownload(); }}
+                  title="Descargar" disabled={downloadingFile}
+                  className="shrink-0 p-1 -m-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors disabled:opacity-70">
+                  {downloadingFile
+                    ? <Loader2 size={14} className="animate-spin"/>
+                    : <Download size={14}/>}
+                </button>
+              </div>
+            )}
+            {showFilePreview && fileSrc && (
+              <FilePreviewModal
+                src={fileSrc}
+                fileName={msg.file_name}
+                mime={msg.file_mime}
+                authorName={resolveDisplayName(msg.user_id, msg.user_name, isMe)}
+                authorAvatarUrl={resolveAvatarUrl?.(msg.user_id, msg.avatar_url, isMe) ?? msg.avatar_url}
+                createdAt={msg.created_at}
+                onDownload={handleFileDownload}
+                downloading={downloadingFile}
+                onClose={() => setShowFilePreview(false)}
+              />
             )}
             {msg.gif_url
               ? <img src={msg.gif_url} alt="GIF" className="max-w-[240px] rounded-xl mt-1 border border-slate-200 shadow-sm"/>
