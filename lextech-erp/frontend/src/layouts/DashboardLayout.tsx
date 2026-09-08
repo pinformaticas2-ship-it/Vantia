@@ -2130,15 +2130,15 @@ export default function DashboardLayout() {
           {/* Logo de la organización activa -- justo tras la búsqueda (que
               tiene max-w-2xl) para que ocupe el hueco central en pantallas
               anchas, en vez de quedar pegado del todo a la derecha tras los
-              iconos. Mismo patrón de fallback (iniciales) que ya usa el
-              selector del sidebar cuando no hay logo subido todavía. */}
+              iconos. Mismo diseño (caja cuadrada, rounded-lg) que ya usa el
+              logo pequeño del sidebar, solo que un poco más grande. */}
           {organizacion && (
             <div className="hidden sm:block mx-auto shrink-0">
               <OrgLogoBadge
                 nombre={organizacion.nombre}
                 logoUrl={organizacion.logoUrl}
-                className="h-11 w-28 rounded-xl text-sm ring-1 ring-slate-200"
-                imgClassName="object-contain p-0.5"
+                className="h-11 w-11 rounded-lg text-sm border border-slate-200"
+                imgClassName="object-contain p-1"
               />
             </div>
           )}
