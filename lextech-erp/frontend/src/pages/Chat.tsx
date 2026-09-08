@@ -141,9 +141,20 @@ const CHAT_DM_ORDER_CACHE_KEY = "chat-dm-order-cache-v1";
 // los canales/contactos de la organización anterior hasta que la petición
 // de verdad responda y los pisara. Mismo patrón ya usado para no filtrar
 // datos entre usuarios que comparten navegador.
-const orgScopedCacheKey = (base: string) => {
-  const org = getActiveOrganizacionId();
-  return org ? `${base}::${org}` : base;
+//
+// IMPORTANTE: `orgId` se pasa explícito (capturado una sola vez al montar el
+// componente, ver `orgIdRef` en Chat()) en vez de leer getActiveOrganizacionId()
+// aquí dentro. Ese valor vive en localStorage global y cambia en el instante
+// en que se pulsa "cambiar de organización" (switchOrganizacion hace
+// setActiveOrganizacionId(id) y LUEGO location.reload()) -- cualquier fetch/
+// poll de canales que ya estuviera en vuelo en ese momento terminaba
+// resolviendo *después* del cambio de id, y escribía los canales de la
+// organización VIEJA bajo la clave de caché de la organización NUEVA. Ese
+// canal fantasma (ej. un DM) sobrevivía para siempre porque mergeCanales
+// conserva cualquier entrada que no venga en la respuesta más reciente del
+// servidor, dando lugar al bug de "el mismo chat aparece dos veces".
+const orgScopedCacheKey = (base: string, orgId: string | null) => {
+  return orgId ? `${base}::${orgId}` : base;
 };
 const CHAT_EMOJI_RECENTS_KEY = "chat-emoji-recents-v1";
 const CHAT_GIF_CACHE_KEY = "chat-gif-cache-v1";
@@ -3482,6 +3493,12 @@ export default function Chat() {
   const { totalUnread, unreadByCanal, unreadDMs, unreadLoaded, clearUnread, refreshUnread } = useChatUnread();
   const currentUserId = user?.id || "";
   const isMobile = useIsMobile();
+  // Capturado UNA vez al montar: ver la explicación en orgScopedCacheKey más
+  // arriba -- no releer getActiveOrganizacionId() en cada efecto, porque
+  // cambia de valor antes de que la recarga de página por cambio de
+  // organización realmente ocurra.
+  const orgIdRef = useRef(getActiveOrganizacionId());
+  const cacheKey = useCallback((base: string) => orgScopedCacheKey(base, orgIdRef.current), []);
 
   // Estado principal
   const [canales, setCanales]             = useState<Canal[]>([]);
@@ -3555,6 +3572,14 @@ export default function Chat() {
   const typingPollRef    = useRef<ReturnType<typeof setInterval>|null>(null);
   const sidebarPollRef   = useRef<ReturnType<typeof setInterval>|null>(null);
   const fetchCanalesRef  = useRef<()=>Promise<void>>(async ()=>{});
+  // La primera respuesta real del servidor tras montar sustituye la caché local
+  // en vez de fusionarla (ver mergeCanales) -- así se autocura cualquier canal
+  // fantasma que hubiera quedado grabado en localStorage por el bug de carrera
+  // al cambiar de organización (ver orgScopedCacheKey más arriba). A partir de
+  // esa primera sincronización sí interesa fusionar, para no perder un canal
+  // recién creado en esta misma sesión que aún no le haya dado tiempo a
+  // aparecer en la respuesta del servidor.
+  const firstCanalesSyncDoneRef = useRef(false);
   const fetchSysUsersRef = useRef<()=>Promise<void>>(async ()=>{});
   const fetchPresenceRef = useRef<()=>Promise<void>>(async ()=>{});
   const presencePollRef  = useRef<ReturnType<typeof setInterval>|null>(null);
@@ -3587,7 +3612,7 @@ export default function Chat() {
 
   useEffect(() => {
     try {
-      const rawCanales = window.localStorage.getItem(orgScopedCacheKey(CHAT_CANALES_CACHE_KEY));
+      const rawCanales = window.localStorage.getItem(cacheKey(CHAT_CANALES_CACHE_KEY));
       if (rawCanales) {
         const cachedCanales = JSON.parse(rawCanales) as Canal[];
         if (Array.isArray(cachedCanales)) setCanales(cachedCanales);
@@ -3597,7 +3622,7 @@ export default function Chat() {
     }
 
     try {
-      const rawUsers = window.localStorage.getItem(orgScopedCacheKey(CHAT_USERS_CACHE_KEY));
+      const rawUsers = window.localStorage.getItem(cacheKey(CHAT_USERS_CACHE_KEY));
       if (rawUsers) {
         const cachedUsers = JSON.parse(rawUsers) as SysUser[];
         if (Array.isArray(cachedUsers)) setSysUsers(cachedUsers);
@@ -3607,7 +3632,7 @@ export default function Chat() {
     }
 
     try {
-      const rawDmOrder = window.localStorage.getItem(orgScopedCacheKey(CHAT_DM_ORDER_CACHE_KEY));
+      const rawDmOrder = window.localStorage.getItem(cacheKey(CHAT_DM_ORDER_CACHE_KEY));
       if (rawDmOrder) {
         const cachedDmOrder = JSON.parse(rawDmOrder) as string[];
         if (Array.isArray(cachedDmOrder)) setDmOrder(cachedDmOrder.filter(Boolean));
@@ -3629,7 +3654,7 @@ export default function Chat() {
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(orgScopedCacheKey(CHAT_CANALES_CACHE_KEY), JSON.stringify(canales));
+      window.localStorage.setItem(cacheKey(CHAT_CANALES_CACHE_KEY), JSON.stringify(canales));
     } catch {
       // ignorar errores de persistencia
     }
@@ -3637,7 +3662,7 @@ export default function Chat() {
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(orgScopedCacheKey(CHAT_USERS_CACHE_KEY), JSON.stringify(sysUsers));
+      window.localStorage.setItem(cacheKey(CHAT_USERS_CACHE_KEY), JSON.stringify(sysUsers));
     } catch {
       // ignorar errores de persistencia
     }
@@ -3645,7 +3670,7 @@ export default function Chat() {
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(orgScopedCacheKey(CHAT_DM_ORDER_CACHE_KEY), JSON.stringify(dmOrder));
+      window.localStorage.setItem(cacheKey(CHAT_DM_ORDER_CACHE_KEY), JSON.stringify(dmOrder));
     } catch {
       // ignorar errores de persistencia
     }
@@ -3784,9 +3809,13 @@ export default function Chat() {
       if (!res.ok) throw new Error("canales");
       const list: Canal[] = d.data||[];
         setCanales(prev => {
-          const merged = mergeCanales(prev, list);
+          // La primera vez tras montar, el servidor manda: no conservar nada
+          // de lo que hubiera en localStorage que él no confirme (limpia
+          // cualquier canal fantasma de una organización distinta).
+          const merged = firstCanalesSyncDoneRef.current ? mergeCanales(prev, list) : list;
+          firstCanalesSyncDoneRef.current = true;
           try {
-            window.localStorage.setItem(orgScopedCacheKey(CHAT_CANALES_CACHE_KEY), JSON.stringify(merged));
+            window.localStorage.setItem(cacheKey(CHAT_CANALES_CACHE_KEY), JSON.stringify(merged));
           } catch {
             // ignorar errores de persistencia
           }
@@ -3828,7 +3857,7 @@ export default function Chat() {
           return list;
         });
         try {
-          window.localStorage.setItem(orgScopedCacheKey(CHAT_USERS_CACHE_KEY), JSON.stringify(list));
+          window.localStorage.setItem(cacheKey(CHAT_USERS_CACHE_KEY), JSON.stringify(list));
         } catch {
           // ignorar errores de persistencia
         }
