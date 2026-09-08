@@ -2173,7 +2173,7 @@ export default function DashboardLayout() {
               nombre={organizacion.nombre}
               logoUrl={organizacion.logoUrl}
               className="h-11 w-28 rounded-xl text-sm ring-1 ring-slate-200 mr-2 sm:mr-4"
-              imgClassName="object-contain p-1.5"
+              imgClassName="object-contain p-0.5"
             />
           )}
         </header>
