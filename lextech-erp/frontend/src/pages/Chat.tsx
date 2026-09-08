@@ -4458,7 +4458,7 @@ export default function Chat() {
 
   useEffect(() => {
     const dmUserIds = canalDMs
-      .map(c => c.dm_target_user_id || c.id)
+      .map(c => c.dm_target_user_id)
       .filter((id): id is string => !!id);
     setDmOrder(prev => {
       const prevFiltered = prev.filter(id => dmUserIds.includes(id));
@@ -4491,8 +4491,14 @@ export default function Chat() {
   const dmConversationEntries = useMemo(() => {
     const sysUsersById = new Map(sysUsers.map(u => [u.user_id, u]));
     return sortByDmOrder(canalDMs
+      // Un canal "directo" sin la otra persona resuelta (dm_target_user_id vacío)
+      // es un dato corrupto -- usar el id del canal como si fuera un id de usuario
+      // (como se hacía antes) rompía la exclusión de dmProspectUsers de más abajo
+      // y esa persona podía acabar apareciendo dos veces (como conversación real
+      // y también como sugerencia para iniciar chat nuevo).
+      .filter(c => !!c.dm_target_user_id)
       .map(c => {
-        const dmUserId = c.dm_target_user_id || c.id;
+        const dmUserId = c.dm_target_user_id!;
         const knownUser = sysUsersById.get(dmUserId);
         return {
         user: {
