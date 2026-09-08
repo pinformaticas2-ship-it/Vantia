@@ -1147,6 +1147,25 @@ function orgInitials(name: string) {
 }
 const ORG_ROL_LABEL: Record<string, string> = { propietario: "Propietario", admin: "Administrador", miembro: "Miembro" };
 
+// Avatar de organización con fallback a iniciales -- no solo cuando no hay
+// logoUrl, también cuando el archivo apuntado ya no existe (pasa con algún
+// logo subido a Railway, cuyo almacenamiento es efímero y a veces lo pierde).
+// Sin el onError, esos casos mostraban el icono de "imagen rota" en vez de
+// caer a las iniciales como hace el resto de sitios donde se pinta el logo.
+function OrgLogoBadge({ nombre, logoUrl, className }: { nombre: string; logoUrl?: string | null; className: string }) {
+  const [broken, setBroken] = useState(false);
+  const showImg = !!logoUrl && !broken;
+  return (
+    <div className={`${className} overflow-hidden bg-[#ab0433] text-white flex items-center justify-center font-bold shrink-0`} title={nombre}>
+      {showImg ? (
+        <img src={resolveUploadUrl(logoUrl!) || undefined} alt={nombre} className="h-full w-full object-cover" onError={() => setBroken(true)} />
+      ) : (
+        orgInitials(nombre)
+      )}
+    </div>
+  );
+}
+
 // ── Sidebar ──────────────────────────────────────────────────────────────────
 function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onToggleCollapse }: {
   pathname: string;
@@ -1587,6 +1606,7 @@ export default function DashboardLayout() {
   const { unreadCount: emailUnreadCount, latestUnread, clearLatestUnread } = useEmailUnread();
   const { totalUnread: chatTotalUnread } = useChatUnread();
   const { latestToast: latestWaToast, clearToast: clearWaToast, markSeen: markWaSeen, markAllSeen: markAllWaSeen } = useWhatsAppUnread();
+  const { organizacion } = useOrganizacion();
 
   const isMobile = useIsMobile();
   const pushNotifications = usePushNotifications();
@@ -2138,6 +2158,17 @@ export default function DashboardLayout() {
               />
             )}
           </div>
+
+          {/* Logo de la organización activa -- mismo patrón de fallback
+              (iniciales sobre círculo de color) que ya usa el selector del
+              sidebar cuando no hay logo subido todavía. */}
+          {organizacion && (
+            <OrgLogoBadge
+              nombre={organizacion.nombre}
+              logoUrl={organizacion.logoUrl}
+              className="h-9 w-9 rounded-full text-xs ring-1 ring-slate-200"
+            />
+          )}
         </header>
 
         {/* Contenido */}
