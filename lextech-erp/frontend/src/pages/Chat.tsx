@@ -427,7 +427,7 @@ function FilePreviewModal({
         className="flex items-center justify-between gap-3 px-4 py-4 sm:px-6 shrink-0"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-white/10 bg-black/20 px-3 py-2">
+        <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-slate-700 bg-slate-900 px-3 py-2">
           <Av url={authorAvatarUrl} name={authorName} size={10} />
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-white">{authorName}</p>
@@ -436,12 +436,12 @@ function FilePreviewModal({
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-2 py-2 shadow-lg shadow-black/10 shrink-0">
+        <div className="flex items-center gap-2 rounded-full border border-slate-700 bg-slate-900 px-2 py-2 shadow-lg shadow-black/30 shrink-0">
           <button
             type="button"
             onClick={onDownload}
             disabled={downloading}
-            className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/20 disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-full bg-slate-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-600 disabled:opacity-60"
           >
             {downloading ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
             {downloading ? "Descargando…" : "Descargar"}
@@ -449,7 +449,7 @@ function FilePreviewModal({
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white transition hover:bg-white/10"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-white transition hover:bg-slate-700"
             aria-label="Cerrar"
           >
             <X size={16} />
@@ -461,7 +461,7 @@ function FilePreviewModal({
         {isPdf ? (
           <iframe src={src} title={displayName} className="h-full w-full rounded-xl border border-white/10 bg-white" />
         ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-4 rounded-xl border border-white/10 bg-white/5 text-center px-6">
+          <div className="flex h-full flex-col items-center justify-center gap-4 rounded-xl border border-slate-700 bg-slate-900 text-center px-6">
             <div className={`h-16 w-16 rounded-2xl flex items-center justify-center ${fileTypeIcon.iconBg} ${fileTypeIcon.iconColor}`}>
               <fileTypeIcon.Icon size={28} />
             </div>
