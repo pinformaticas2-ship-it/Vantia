@@ -771,8 +771,19 @@ export async function fijarMensaje(req: Request, res: Response) {
   const { id, mensajeId } = req.params;
   try {
     if (!(await assertCanalInOrg(id, (req as any).organizacionId))) return err(res, 'Canal no encontrado', 404);
+    // "Fijar" es compartido por todo el canal (cualquiera lo ve, no es como
+    // los favoritos que son por usuario) -- por eso el toggle mira si YA hay
+    // una fila, sin filtrar por quién lo fijó. El botón de la barra de un
+    // mensaje llama siempre a este mismo endpoint (POST) para fijar/desfijar
+    // indistintamente; el DELETE de abajo sigue existiendo aparte para el
+    // botón "Desfijar" del panel de fijados.
+    const existing = await pool.query(`SELECT 1 FROM chat_fijados WHERE canal_id = $1 AND mensaje_id = $2`, [id, mensajeId]);
+    if (existing.rows.length) {
+      await pool.query(`DELETE FROM chat_fijados WHERE canal_id = $1 AND mensaje_id = $2`, [id, mensajeId]);
+      return ok(res, { action: 'removed', canal_id: id, mensaje_id: mensajeId });
+    }
     await pool.query(`INSERT INTO chat_fijados (canal_id, mensaje_id, fijado_por) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`, [id, mensajeId, userId]);
-    return ok(res, { canal_id: id, mensaje_id: mensajeId });
+    return ok(res, { action: 'added', canal_id: id, mensaje_id: mensajeId });
   } catch (e: any) {
     return err(res, e.message);
   }

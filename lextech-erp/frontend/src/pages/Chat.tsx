@@ -2488,25 +2488,28 @@ function MiembroRow({ m, isMe, canAdmin, acting, onDM, onRemove, presenceByUserI
 // ══════════════════════════════════════════════════════════════════════════════
 // PANEL FIJADOS
 // ══════════════════════════════════════════════════════════════════════════════
-function PanelFijados({ canalId, getToken, onClose, onGoTo, resolveDisplayName }: {
+function PanelFijados({ canalId, getToken, onClose, onGoTo, onTogglePinned, resolveDisplayName }: {
   canalId: string; getToken:()=>Promise<string|null>;
   onClose:()=>void; onGoTo:(id:string)=>void;
+  onTogglePinned:(id:string)=>Promise<void>;
   resolveDisplayName:(userId?: string | null, name?: string | null, isSelf?: boolean)=>string;
 }) {
   const [fijados, setFijados] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
+    let cancelled = false;
     (async()=>{
+      setLoading(true);
       const token = await getToken();
       const res = await fetch(`/api/chat/canales/${canalId}/fijados`, { headers:{Authorization:`Bearer ${token}`} });
       const d = await safeJson(res);
-      if (res.ok) setFijados(d.data||[]);
-      setLoading(false);
+      if (!cancelled && res.ok) setFijados(d.data||[]);
+      if (!cancelled) setLoading(false);
     })();
+    return () => { cancelled = true; };
   }, [canalId, getToken]);
   const unpin = async (msgId: string) => {
-    const token = await getToken();
-    await fetch(`/api/chat/canales/${canalId}/fijar/${msgId}`, { method:"DELETE", headers:{Authorization:`Bearer ${token}`} });
+    await onTogglePinned(msgId);
     setFijados(p=>p.filter(f=>f.mensaje_id!==msgId));
   };
   return (
@@ -2614,12 +2617,12 @@ function PanelFavoritos({ canalId, getToken, onClose, onGoTo, onToggleFavorite, 
 // elementos y el componente padre repinta con cada poll (cada ~700ms
 // mientras la pestaña está visible) -- sin memo, cada mensaje se volvía a
 // renderizar entero en cada ciclo aunque su contenido no hubiera cambiado.
-const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserId, isHighlighted, isFreshIncoming = false, showReadReceipt = false, isReadByRecipient = false, onReply, onReact, onEdit, onDelete, onPin, onFavorite, isFavorite, resolveDisplayName, resolveAvatarUrl }: {
+const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserId, isHighlighted, isFreshIncoming = false, showReadReceipt = false, isReadByRecipient = false, onReply, onReact, onEdit, onDelete, onPin, onFavorite, isFavorite, isPinned, resolveDisplayName, resolveAvatarUrl }: {
   msg: Mensaje; prevMsg: Mensaje|null; currentUserId: string; isHighlighted: boolean; isFreshIncoming?: boolean;
   showReadReceipt?: boolean; isReadByRecipient?: boolean;
   onReply:(m:Mensaje)=>void; onReact:(id:string,e:string)=>void;
   onEdit:(m:Mensaje)=>void; onDelete:(id:string)=>void; onPin:(id:string)=>void; onFavorite:(id:string)=>void;
-  isFavorite?: boolean;
+  isFavorite?: boolean; isPinned?: boolean;
   resolveDisplayName:(userId?: string | null, name?: string | null, isSelf?: boolean)=>string;
   resolveAvatarUrl?:(userId?: string | null, avatarUrl?: string | null, isSelf?: boolean)=>string|null;
 }) {
@@ -2872,8 +2875,8 @@ const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserI
             className="p-1.5 hover:bg-slate-100 rounded-md text-slate-400 hover:text-slate-600 transition-colors"><CornerDownRight size={14}/></button>
           <button onClick={()=>onFavorite(msg.id)} title={isFavorite ? "Quitar de favoritos" : "Guardar en favoritos"}
             className={`p-1.5 rounded-md transition-colors ${isFavorite ? "bg-amber-50 text-amber-500 hover:bg-amber-100" : "text-slate-400 hover:bg-slate-100 hover:text-amber-500"}`}><Star size={14} className={isFavorite ? "fill-amber-300" : ""}/></button>
-          <button onClick={()=>onPin(msg.id)} title="Fijar"
-            className="p-1.5 hover:bg-slate-100 rounded-md text-slate-400 hover:text-slate-600 transition-colors"><Pin size={14}/></button>
+          <button onClick={()=>onPin(msg.id)} title={isPinned ? "Desfijar" : "Fijar"}
+            className={`p-1.5 rounded-md transition-colors ${isPinned ? "bg-red-50 text-red-500 hover:bg-red-100" : "text-slate-400 hover:bg-slate-100 hover:text-slate-600"}`}><Pin size={14} className={isPinned ? "fill-red-200" : ""}/></button>
           {isMe && (
             <>
               <button onClick={()=>onEdit(msg)} title="Editar"
@@ -3511,6 +3514,11 @@ export default function Chat() {
   const [sesionExpediente, setSesionExpediente] = useState<SesionExpediente|null>(null);
   const [showExpSearchModal, setShowExpSearchModal] = useState(false);
   const [favoriteIds, setFavoriteIds]     = useState<Set<string>>(new Set());
+  // A diferencia de favoriteIds (por usuario), los mensajes fijados son
+  // compartidos por todo el canal -- se refresca también en el poll
+  // periódico (ver pollCycleRef más abajo) para que si otra persona fija/
+  // desfija algo, se refleje aquí sin tener que recargar.
+  const [pinnedIds, setPinnedIds]         = useState<Set<string>>(new Set());
   const [replyTo, setReplyTo]             = useState<Mensaje|null>(null);
   const [editingMsg, setEditingMsg]       = useState<Mensaje|null>(null);
   const [highlightId, setHighlightId]     = useState<string|null>(null);
@@ -3585,6 +3593,7 @@ export default function Chat() {
   const presencePollRef  = useRef<ReturnType<typeof setInterval>|null>(null);
   const fetchMensajesRef = useRef<(canal: Canal)=>Promise<void>>(async ()=>{});
   const fetchMiembrosRef = useRef<(canalId: string)=>Promise<void>>(async ()=>{});
+  const fetchPinnedRef   = useRef<(canalId: string)=>Promise<void>>(async ()=>{});
   const fetchTypingUsersRef = useRef<(canalId: string)=>Promise<void>>(async ()=>{});
   const pollMensajesRef = useRef<()=>Promise<void>>(async ()=>{});
   const lastAt           = useRef<string|null>(null);
@@ -3714,6 +3723,14 @@ export default function Chat() {
     const d = await safeJson(res);
     if (!res.ok) return;
     setFavoriteIds(new Set((d.data || []).map((item: { mensaje_id: string }) => item.mensaje_id)));
+  }, [hdr]);
+
+  const fetchPinned = useCallback(async (canalId: string) => {
+    const h = await hdr();
+    const res = await fetch(`/api/chat/canales/${canalId}/fijados`, { headers: h });
+    const d = await safeJson(res);
+    if (!res.ok) return;
+    setPinnedIds(new Set((d.data || []).map((item: { mensaje_id: string }) => item.mensaje_id)));
   }, [hdr]);
 
   const fetchTypingUsers = useCallback(async (canalId: string) => {
@@ -4081,6 +4098,7 @@ export default function Chat() {
   useEffect(() => { fetchPresenceRef.current = fetchPresence; }, [fetchPresence]);
   useEffect(() => { fetchMensajesRef.current = fetchMensajes; }, [fetchMensajes]);
   useEffect(() => { fetchMiembrosRef.current = fetchMiembros; }, [fetchMiembros]);
+  useEffect(() => { fetchPinnedRef.current = fetchPinned; }, [fetchPinned]);
   useEffect(() => { fetchTypingUsersRef.current = fetchTypingUsers; }, [fetchTypingUsers]);
   useEffect(() => { pollMensajesRef.current = pollMensajes; }, [pollMensajes]);
   // Mantener refs del canal activo actualizadas para stale-closure checks en polls async
@@ -4137,6 +4155,10 @@ export default function Chat() {
       void pollMensajesRef.current();
       if (pollCycleRef.current % 4 === 0) {
         void fetchMiembrosRef.current(canalActivoId);
+        // Fijados es un estado compartido por todo el canal (no por usuario,
+        // como favoritos) -- se refresca aquí para que si otra persona fija/
+        // desfija un mensaje se vea reflejado sin recargar la página.
+        void fetchPinnedRef.current(canalActivoId);
       }
     }, activePollMs);
     typingPollRef.current = setInterval(() => { void fetchTypingUsersRef.current(canalActivoId); }, typingPollMs);
@@ -4231,10 +4253,12 @@ export default function Chat() {
   useEffect(() => {
     if (!canalActivo) {
       setFavoriteIds(new Set());
+      setPinnedIds(new Set());
       return;
     }
     void fetchFavorites(canalActivo.id);
-  }, [canalActivoId, fetchFavorites]);
+    void fetchPinned(canalActivo.id);
+  }, [canalActivoId, fetchFavorites, fetchPinned]);
 
   useEffect(() => {
     if (!canalActivoId) { setSesionExpediente(null); return; }
@@ -4340,7 +4364,15 @@ export default function Chat() {
     const canal = canalActivoRef.current;
     if (!canal) return;
     const h = await hdr();
-    await fetch(`/api/chat/canales/${canal.id}/fijar/${msgId}`, { method:"POST", headers: h });
+    const res = await fetch(`/api/chat/canales/${canal.id}/fijar/${msgId}`, { method:"POST", headers: h });
+    const d = await safeJson(res);
+    if (!res.ok) return;
+    setPinnedIds(prev => {
+      const next = new Set(prev);
+      if (d.data?.action === "removed") next.delete(msgId);
+      else next.add(msgId);
+      return next;
+    });
   }, [hdr]);
 
   const handleFavorite = useCallback(async (msgId: string) => {
@@ -5082,6 +5114,7 @@ export default function Chat() {
                             onReply={setReplyTo} onReact={handleReact}
                             onEdit={setEditingMsg} onDelete={handleDelete} onPin={handlePin} onFavorite={handleFavorite}
                             isFavorite={favoriteIds.has(m.id)}
+                            isPinned={pinnedIds.has(m.id)}
                             resolveDisplayName={resolveDisplayName}
                             resolveAvatarUrl={resolveAvatarUrl}
                           />
@@ -5152,6 +5185,7 @@ export default function Chat() {
                   getToken={getToken}
                   onClose={()=>setRightPanel(null)}
                   onGoTo={goToMsg}
+                  onTogglePinned={handlePin}
                   resolveDisplayName={resolveDisplayName}
                 />
               )}
