@@ -356,8 +356,13 @@ function getFileTypeIcon(fileName?: string | null, mime?: string | null): { Icon
 // de un visor externo de terceros (descartado a propósito: mandar la URL de
 // un documento de un cliente a un visor tipo Google Docs/Office Online para
 // renderizar Word/Excel filtraría datos potencialmente confidenciales fuera
-// de Vantia). Con esto: PDF, imágenes, vídeo, audio y texto/código plano.
-// Word/Excel/PowerPoint/zip siguen sin previsualizarse -- se ofrece descargar.
+// de Vantia). Con esto: PDF, imágenes, vídeo, audio, texto/código plano, y
+// .docx (convertido a HTML enteramente en el navegador con mammoth, ver
+// WordFilePreview -- el archivo nunca sale de Vantia).
+// Excel/PowerPoint/.doc antiguo/zip siguen sin previsualizarse -- se ofrece
+// descargar. (Excel se descartó a propósito: la librería cliente disponible,
+// SheetJS/xlsx, tiene vulnerabilidades de seguridad conocidas sin parchear
+// en npm -- ver conversación/memoria del proyecto.)
 function fileExt(fileName?: string | null): string {
   return (fileName?.split(".").pop() || "").toLowerCase();
 }
@@ -395,6 +400,12 @@ function isTextFile(fileName?: string | null, mime?: string | null): boolean {
 // por encima de esto se ofrece descargar en vez de intentar mostrarlo.
 const TEXT_PREVIEW_MAX_BYTES = 2 * 1024 * 1024; // 2 MB
 
+// Solo .docx (Office Open XML) -- mammoth no soporta el binario .doc antiguo
+// (formato pre-2007), asi que ese sigue sin previsualizarse.
+function isWordFile(fileName?: string | null, mime?: string | null): boolean {
+  return fileExt(fileName) === "docx" || (mime || "").toLowerCase().includes("wordprocessingml");
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // PREVISUALIZACIÓN DE ARCHIVO ADJUNTO
 // ══════════════════════════════════════════════════════════════════════════════
@@ -430,6 +441,7 @@ function FilePreviewModal({
   const isVideo = isVideoFile(fileName, mime);
   const isAudio = isAudioFile(fileName, mime);
   const isText = isTextFile(fileName, mime);
+  const isWord = isWordFile(fileName, mime);
   const fileTypeIcon = getFileTypeIcon(fileName, mime);
   const displayName = fileName || "Archivo";
   const createdLabel = createdAt
@@ -519,6 +531,8 @@ function FilePreviewModal({
           </div>
         ) : isText ? (
           <TextFilePreview src={src} />
+        ) : isWord ? (
+          <WordFilePreview src={src} />
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-4 rounded-xl border border-slate-700 bg-slate-900 text-center px-6">
             <div className={`h-16 w-16 rounded-2xl flex items-center justify-center ${fileTypeIcon.iconBg} ${fileTypeIcon.iconColor}`}>
@@ -600,6 +614,57 @@ function TextFilePreview({ src }: { src: string }) {
   return (
     <div className="h-full overflow-auto rounded-xl border border-slate-700 bg-slate-900 p-4">
       <pre className="whitespace-pre-wrap break-words text-xs text-slate-100 font-mono">{state.text}</pre>
+    </div>
+  );
+}
+
+// Vista de Word (.docx): se convierte a HTML enteramente en el navegador con
+// mammoth (import dinámico para no engordar el bundle inicial con algo que
+// solo hace falta al abrir un docx) -- el archivo nunca sale de Vantia hacia
+// un visor externo, a diferencia de Google Docs Viewer/Office Online.
+function WordFilePreview({ src }: { src: string }) {
+  const [state, setState] = useState<{ status: "loading" } | { status: "ok"; html: string } | { status: "error" }>({ status: "loading" });
+
+  useEffect(() => {
+    let cancelled = false;
+    setState({ status: "loading" });
+    (async () => {
+      try {
+        const [res, mammoth] = await Promise.all([fetch(src), import("mammoth")]);
+        if (!res.ok) throw new Error("fetch");
+        const arrayBuffer = await res.arrayBuffer();
+        const result = await mammoth.convertToHtml({ arrayBuffer });
+        if (!cancelled) setState({ status: "ok", html: result.value });
+      } catch {
+        if (!cancelled) setState({ status: "error" });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [src]);
+
+  if (state.status === "loading") {
+    return (
+      <div className="flex h-full items-center justify-center rounded-xl border border-slate-700 bg-slate-900">
+        <Loader2 size={20} className="animate-spin text-slate-400" />
+      </div>
+    );
+  }
+  if (state.status === "error") {
+    return (
+      <div className="flex h-full items-center justify-center rounded-xl border border-slate-700 bg-slate-900 px-6 text-center">
+        <p className="text-sm text-slate-300">No se pudo generar la vista previa de este documento.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="h-full overflow-auto rounded-xl bg-white p-6 sm:p-10">
+      <div
+        className="mx-auto max-w-3xl text-sm leading-relaxed text-slate-800 [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mb-3 [&_h2]:text-xl [&_h2]:font-bold [&_h2]:mb-2 [&_h3]:text-lg [&_h3]:font-bold [&_h3]:mb-2 [&_p]:mb-3 [&_table]:border-collapse [&_table]:w-full [&_td]:border [&_td]:border-slate-300 [&_td]:p-1.5 [&_th]:border [&_th]:border-slate-300 [&_th]:p-1.5 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_img]:max-w-full"
+        // El HTML lo genera mammoth a partir del propio XML del docx (estructura
+        // semántica: p/h1/table/etc.), no contenido de terceros sin filtrar --
+        // mismo nivel de confianza que el resto de HTML que ya generamos nosotros.
+        dangerouslySetInnerHTML={{ __html: state.html }}
+      />
     </div>
   );
 }
