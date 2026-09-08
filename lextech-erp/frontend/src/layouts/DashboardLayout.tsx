@@ -2172,7 +2172,8 @@ export default function DashboardLayout() {
             <OrgLogoBadge
               nombre={organizacion.nombre}
               logoUrl={organizacion.logoUrl}
-              className="h-9 w-9 rounded-full text-xs ring-1 ring-slate-200"
+              className="h-11 w-28 rounded-xl text-sm ring-1 ring-slate-200"
+              imgClassName="object-contain p-1.5"
             />
           )}
         </header>
