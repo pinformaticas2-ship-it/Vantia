@@ -352,13 +352,39 @@ function getFileTypeIcon(fileName?: string | null, mime?: string | null): { Icon
   return { Icon: FileIcon, iconBg: "bg-slate-200 group-hover/file:bg-slate-300", iconColor: "text-slate-600" };
 }
 
-// Por ahora solo los PDF se pueden incrustar de verdad en un <iframe> y
-// verse bien en cualquier navegador sin depender de un visor externo --
-// Word/Excel/zip, etc. no tienen forma fiable de previsualizarse in-app.
-function isPdfFile(fileName?: string | null, mime?: string | null): boolean {
-  const ext = (fileName?.split(".").pop() || "").toLowerCase();
-  return ext === "pdf" || (mime || "").toLowerCase().includes("pdf");
+// Qué tipos se pueden previsualizar de verdad en el navegador sin depender
+// de un visor externo de terceros (descartado a propósito: mandar la URL de
+// un documento de un cliente a un visor tipo Google Docs/Office Online para
+// renderizar Word/Excel filtraría datos potencialmente confidenciales fuera
+// de Vantia). Con esto: PDF, imágenes, vídeo, audio y texto/código plano.
+// Word/Excel/PowerPoint/zip siguen sin previsualizarse -- se ofrece descargar.
+function fileExt(fileName?: string | null): string {
+  return (fileName?.split(".").pop() || "").toLowerCase();
 }
+function isPdfFile(fileName?: string | null, mime?: string | null): boolean {
+  return fileExt(fileName) === "pdf" || (mime || "").toLowerCase().includes("pdf");
+}
+function isImageFile(fileName?: string | null, mime?: string | null): boolean {
+  const ext = fileExt(fileName);
+  return ["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp"].includes(ext) || (mime || "").toLowerCase().startsWith("image/");
+}
+function isVideoFile(fileName?: string | null, mime?: string | null): boolean {
+  const ext = fileExt(fileName);
+  return ["mp4", "mov", "webm", "ogv"].includes(ext) || (mime || "").toLowerCase().startsWith("video/");
+}
+function isAudioFile(fileName?: string | null, mime?: string | null): boolean {
+  const ext = fileExt(fileName);
+  return ["mp3", "wav", "ogg", "m4a", "aac"].includes(ext) || (mime || "").toLowerCase().startsWith("audio/");
+}
+function isTextFile(fileName?: string | null, mime?: string | null): boolean {
+  const ext = fileExt(fileName);
+  const m = (mime || "").toLowerCase();
+  return ["txt", "md", "csv", "log", "json", "xml", "html", "htm", "css", "js", "ts", "tsx", "jsx", "yml", "yaml", "sql", "sh"].includes(ext)
+    || m.startsWith("text/") || m.includes("json") || m.includes("xml");
+}
+// Previsualizar un archivo de texto muy grande sería lento y poco útil --
+// por encima de esto se ofrece descargar en vez de intentar mostrarlo.
+const TEXT_PREVIEW_MAX_BYTES = 2 * 1024 * 1024; // 2 MB
 
 // ══════════════════════════════════════════════════════════════════════════════
 // PREVISUALIZACIÓN DE ARCHIVO ADJUNTO
@@ -391,6 +417,10 @@ function FilePreviewModal({
 }) {
   const [isVisible, setIsVisible] = useState(false);
   const isPdf = isPdfFile(fileName, mime);
+  const isImage = isImageFile(fileName, mime);
+  const isVideo = isVideoFile(fileName, mime);
+  const isAudio = isAudioFile(fileName, mime);
+  const isText = isTextFile(fileName, mime);
   const fileTypeIcon = getFileTypeIcon(fileName, mime);
   const displayName = fileName || "Archivo";
   const createdLabel = createdAt
@@ -460,6 +490,26 @@ function FilePreviewModal({
       <div className="flex-1 min-h-0 px-4 pb-4 sm:px-6" onClick={(e) => e.stopPropagation()}>
         {isPdf ? (
           <iframe src={src} title={displayName} className="h-full w-full rounded-xl border border-white/10 bg-white" />
+        ) : isImage ? (
+          <div className="flex h-full items-center justify-center overflow-auto rounded-xl border border-white/10 bg-slate-900/40">
+            <img src={src} alt={displayName} className="max-h-full max-w-full object-contain" />
+          </div>
+        ) : isVideo ? (
+          <div className="flex h-full items-center justify-center rounded-xl border border-white/10 bg-black">
+            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+            <video src={src} controls autoPlay className="max-h-full max-w-full" />
+          </div>
+        ) : isAudio ? (
+          <div className="flex h-full flex-col items-center justify-center gap-4 rounded-xl border border-slate-700 bg-slate-900 px-6">
+            <div className={`h-16 w-16 rounded-2xl flex items-center justify-center ${fileTypeIcon.iconBg} ${fileTypeIcon.iconColor}`}>
+              <fileTypeIcon.Icon size={28} />
+            </div>
+            <p className="text-sm font-semibold text-white text-center">{displayName}</p>
+            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+            <audio src={src} controls autoPlay className="w-full max-w-md" />
+          </div>
+        ) : isText ? (
+          <TextFilePreview src={src} />
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-4 rounded-xl border border-slate-700 bg-slate-900 text-center px-6">
             <div className={`h-16 w-16 rounded-2xl flex items-center justify-center ${fileTypeIcon.iconBg} ${fileTypeIcon.iconColor}`}>
@@ -483,6 +533,65 @@ function FilePreviewModal({
       </div>
     </div>,
     document.body
+  );
+}
+
+// Vista de texto plano/código: se descarga el contenido como texto (con un
+// tope de tamaño, ver TEXT_PREVIEW_MAX_BYTES) y se muestra en monoespaciada
+// con scroll -- evita intentar "renderizar" el archivo y simplemente lo lee.
+function TextFilePreview({ src }: { src: string }) {
+  const [state, setState] = useState<{ status: "loading" } | { status: "ok"; text: string } | { status: "too-big" } | { status: "error" }>({ status: "loading" });
+
+  useEffect(() => {
+    let cancelled = false;
+    setState({ status: "loading" });
+    (async () => {
+      try {
+        const res = await fetch(src);
+        if (!res.ok) throw new Error("fetch");
+        const len = Number(res.headers.get("content-length") || 0);
+        if (len && len > TEXT_PREVIEW_MAX_BYTES) {
+          if (!cancelled) setState({ status: "too-big" });
+          return;
+        }
+        const text = await res.text();
+        if (text.length > TEXT_PREVIEW_MAX_BYTES) {
+          if (!cancelled) setState({ status: "too-big" });
+          return;
+        }
+        if (!cancelled) setState({ status: "ok", text });
+      } catch {
+        if (!cancelled) setState({ status: "error" });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [src]);
+
+  if (state.status === "loading") {
+    return (
+      <div className="flex h-full items-center justify-center rounded-xl border border-slate-700 bg-slate-900">
+        <Loader2 size={20} className="animate-spin text-slate-400" />
+      </div>
+    );
+  }
+  if (state.status === "too-big") {
+    return (
+      <div className="flex h-full items-center justify-center rounded-xl border border-slate-700 bg-slate-900 px-6 text-center">
+        <p className="text-sm text-slate-300">El archivo es demasiado grande para previsualizarlo aquí -- descárgalo para verlo.</p>
+      </div>
+    );
+  }
+  if (state.status === "error") {
+    return (
+      <div className="flex h-full items-center justify-center rounded-xl border border-slate-700 bg-slate-900 px-6 text-center">
+        <p className="text-sm text-slate-300">No se pudo cargar el contenido del archivo.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="h-full overflow-auto rounded-xl border border-slate-700 bg-slate-900 p-4">
+      <pre className="whitespace-pre-wrap break-words text-xs text-slate-100 font-mono">{state.text}</pre>
+    </div>
   );
 }
 
