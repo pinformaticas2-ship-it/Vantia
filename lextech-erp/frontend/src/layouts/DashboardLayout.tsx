@@ -1152,13 +1152,15 @@ const ORG_ROL_LABEL: Record<string, string> = { propietario: "Propietario", admi
 // logo subido a Railway, cuyo almacenamiento es efímero y a veces lo pierde).
 // Sin el onError, esos casos mostraban el icono de "imagen rota" en vez de
 // caer a las iniciales como hace el resto de sitios donde se pinta el logo.
-function OrgLogoBadge({ nombre, logoUrl, className }: { nombre: string; logoUrl?: string | null; className: string }) {
+function OrgLogoBadge({ nombre, logoUrl, className, fallbackClassName = "bg-[#ab0433]", imgClassName = "object-cover" }: {
+  nombre: string; logoUrl?: string | null; className: string; fallbackClassName?: string; imgClassName?: string;
+}) {
   const [broken, setBroken] = useState(false);
   const showImg = !!logoUrl && !broken;
   return (
-    <div className={`${className} overflow-hidden bg-[#ab0433] text-white flex items-center justify-center font-bold shrink-0`} title={nombre}>
+    <div className={`${className} overflow-hidden flex items-center justify-center font-bold shrink-0 ${showImg ? "" : `${fallbackClassName} text-white`}`} title={nombre}>
       {showImg ? (
-        <img src={resolveUploadUrl(logoUrl!) || undefined} alt={nombre} className="h-full w-full object-cover" onError={() => setBroken(true)} />
+        <img src={resolveUploadUrl(logoUrl!) || undefined} alt={nombre} className={`h-full w-full ${imgClassName}`} onError={() => setBroken(true)} />
       ) : (
         orgInitials(nombre)
       )}
@@ -1242,12 +1244,14 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
               }}
               className="erp-company-icon w-10 h-10 rounded-xl border border-slate-700/60 bg-slate-800/50 flex items-center justify-center cursor-pointer overflow-hidden transition-all duration-200 hover:scale-105 active:scale-95"
             >
-              {organizacion?.logoUrl ? (
-                <img src={resolveUploadUrl(organizacion.logoUrl) || undefined} alt={organizacion.nombre} className="h-full w-full object-contain p-1.5" />
-              ) : organizacion?.nombre ? (
-                <div className={`h-full w-full flex items-center justify-center text-[11px] font-extrabold text-white bg-gradient-to-br ${orgAvatarGradient(organizacion.id)}`}>
-                  {orgInitials(organizacion.nombre)}
-                </div>
+              {organizacion?.nombre ? (
+                <OrgLogoBadge
+                  nombre={organizacion.nombre}
+                  logoUrl={organizacion.logoUrl}
+                  className="h-full w-full text-[11px]"
+                  fallbackClassName={`bg-gradient-to-br ${orgAvatarGradient(organizacion.id)}`}
+                  imgClassName="object-contain p-1.5"
+                />
               ) : (
                 <img src="/vantia-sidebar-slate.png" alt="Vantia Legis" className="h-6 w-6 object-contain" />
               )}
@@ -1278,13 +1282,13 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
                       }`}
                     >
                       <div className="w-7 h-7 rounded-lg bg-slate-900 border border-slate-700/60 flex items-center justify-center shrink-0 overflow-hidden">
-                        {o.logoUrl ? (
-                          <img src={resolveUploadUrl(o.logoUrl) || undefined} alt={o.nombre} className="h-full w-full object-contain" />
-                        ) : (
-                          <div className={`h-full w-full flex items-center justify-center text-[10px] font-extrabold text-white bg-gradient-to-br ${orgAvatarGradient(o.id)}`}>
-                            {orgInitials(o.nombre)}
-                          </div>
-                        )}
+                        <OrgLogoBadge
+                          nombre={o.nombre}
+                          logoUrl={o.logoUrl}
+                          className="h-full w-full text-[10px]"
+                          fallbackClassName={`bg-gradient-to-br ${orgAvatarGradient(o.id)}`}
+                          imgClassName="object-contain"
+                        />
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className={`text-xs font-semibold truncate ${active ? "text-white" : "text-slate-200"}`}>{o.nombre}</p>
@@ -1309,12 +1313,14 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
               }`}
             >
               <div className="erp-company-logo w-9 h-9 rounded-lg bg-slate-800 border border-slate-700/50 flex items-center justify-center shrink-0 overflow-hidden">
-                {organizacion?.logoUrl ? (
-                  <img src={resolveUploadUrl(organizacion.logoUrl) || undefined} alt={organizacion.nombre} className="h-full w-full object-contain p-1" />
-                ) : organizacion?.nombre ? (
-                  <div className={`h-full w-full flex items-center justify-center text-xs font-extrabold text-white bg-gradient-to-br ${orgAvatarGradient(organizacion.id)}`}>
-                    {orgInitials(organizacion.nombre)}
-                  </div>
+                {organizacion?.nombre ? (
+                  <OrgLogoBadge
+                    nombre={organizacion.nombre}
+                    logoUrl={organizacion.logoUrl}
+                    className="h-full w-full text-xs"
+                    fallbackClassName={`bg-gradient-to-br ${orgAvatarGradient(organizacion.id)}`}
+                    imgClassName="object-contain p-1"
+                  />
                 ) : (
                   <img src="/vantia-sidebar-slate.png" alt="Vantia Legis" className="h-7 w-7 object-contain" />
                 )}
@@ -1356,13 +1362,13 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
                       }`}
                     >
                       <div className="w-7 h-7 rounded-lg bg-slate-900 border border-slate-700/60 flex items-center justify-center shrink-0 overflow-hidden">
-                        {o.logoUrl ? (
-                          <img src={resolveUploadUrl(o.logoUrl) || undefined} alt={o.nombre} className="h-full w-full object-contain" />
-                        ) : (
-                          <div className={`h-full w-full flex items-center justify-center text-[10px] font-extrabold text-white bg-gradient-to-br ${orgAvatarGradient(o.id)}`}>
-                            {orgInitials(o.nombre)}
-                          </div>
-                        )}
+                        <OrgLogoBadge
+                          nombre={o.nombre}
+                          logoUrl={o.logoUrl}
+                          className="h-full w-full text-[10px]"
+                          fallbackClassName={`bg-gradient-to-br ${orgAvatarGradient(o.id)}`}
+                          imgClassName="object-contain"
+                        />
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className={`text-xs font-semibold truncate ${active ? "text-white" : "text-slate-200"}`}>{o.nombre}</p>
