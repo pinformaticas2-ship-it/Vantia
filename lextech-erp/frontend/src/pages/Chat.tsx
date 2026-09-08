@@ -379,8 +379,17 @@ function isAudioFile(fileName?: string | null, mime?: string | null): boolean {
 function isTextFile(fileName?: string | null, mime?: string | null): boolean {
   const ext = fileExt(fileName);
   const m = (mime || "").toLowerCase();
+  // OJO: nada de m.includes("xml") ni m.includes("json") -- el mime de un
+  // .docx/.xlsx/.pptx es "application/vnd.openxmlformats-officedocument...",
+  // que contiene literalmente "xml" dentro de "openXMLformats" y colaba como
+  // texto plano, volcando el ZIP binario del documento como si fuera texto.
+  // El formato correcto de un mime XML/JSON de verdad es un tipo exacto o
+  // acabado en +xml/+json (ver RFC 6839), nunca contiene esas letras "de
+  // paso" en medio de otra palabra.
   return ["txt", "md", "csv", "log", "json", "xml", "html", "htm", "css", "js", "ts", "tsx", "jsx", "yml", "yaml", "sql", "sh"].includes(ext)
-    || m.startsWith("text/") || m.includes("json") || m.includes("xml");
+    || m.startsWith("text/")
+    || m === "application/json" || m.endsWith("+json")
+    || m === "application/xml" || m.endsWith("+xml");
 }
 // Previsualizar un archivo de texto muy grande sería lento y poco útil --
 // por encima de esto se ofrece descargar en vez de intentar mostrarlo.
