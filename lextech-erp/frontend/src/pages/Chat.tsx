@@ -3728,6 +3728,7 @@ export default function Chat() {
   const [dmOrder, setDmOrder]             = useState<string[]>([]);
 
   const listRef          = useRef<HTMLDivElement>(null);
+  const listContentRef   = useRef<HTMLDivElement>(null);
   const composerRef      = useRef<HTMLDivElement>(null);
   const statusButtonRef  = useRef<HTMLButtonElement>(null);
   const pollRef          = useRef<ReturnType<typeof setInterval>|null>(null);
@@ -3768,6 +3769,13 @@ export default function Chat() {
   const canalActivoRef   = useRef<Canal | null>(null);
   // Scroll: restaurar posición tras loadMore (guardamos scrollHeight previo)
   const scrollRestoreRef = useRef<number | null>(null);
+  // Scroll al fondo tras la carga inicial de mensajes (o si ya se estaba al
+  // fondo) -- se marca aquí y se ejecuta en un useLayoutEffect keyed en
+  // `mensajes`, para que corra DESPUÉS de que React haya pintado la lista
+  // nueva y no antes (un setTimeout(fn, 0) podía disparar el scroll con el
+  // DOM todavía mostrando la conversación anterior, aterrizando en un punto
+  // que no era el fondo real de la conversación nueva).
+  const pendingScrollToBottomRef = useRef(false);
   const activePollMs = isPageVisible ? 700 : 1800;
   const sidebarPollMs = isPageVisible ? 1400 : 3200;
   const typingPollMs = isPageVisible ? 1200 : 2600;
@@ -4090,7 +4098,7 @@ export default function Chat() {
         if (msgs.length<60) setHasMore(false);
         // Scroll evaluado DESPUÉS del fetch: si el usuario subió mientras cargaba, atBottom es false → no se fuerza
         if (isFirstLoad || atBottom.current) {
-          setTimeout(() => scrollToBottom("instant"), 0);
+          pendingScrollToBottomRef.current = true;
         }
         await fetch(`/api/chat/canales/${canal.id}/leido`, { method:"PUT", headers: h });
         clearUnread(canal.id, canal.dm_target_user_id);
@@ -4213,15 +4221,25 @@ export default function Chat() {
   // lista) ese scrollTop ya no llega al final real. Este observer reengancha
   // el scroll al fondo mientras atBottom siga siendo true, para que abrir
   // una conversación siempre termine mostrando el último mensaje de verdad.
+  //
+  // OJO: hay que observar listContentRef (el div que envuelve los mensajes),
+  // NO listRef (el contenedor con scroll). listRef tiene altura fija por el
+  // layout flex del padre -- su propio tamaño nunca cambia aunque su
+  // contenido crezca, así que un ResizeObserver sobre él no se disparaba
+  // nunca por mensajes/imágenes nuevas (solo por un resize de ventana real).
+  // Esto era la causa real de "el chat se abre en un punto random" / "se
+  // mueve solo": el scroll-to-bottom inicial se calculaba bien, pero nunca
+  // se corregía después según terminaban de cargar avatares/adjuntos.
   useEffect(() => {
     const el = listRef.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
+    const content = listContentRef.current;
+    if (!el || !content || typeof ResizeObserver === "undefined") return;
     const ro = new ResizeObserver(() => {
       if (atBottom.current) el.scrollTop = el.scrollHeight;
     });
-    ro.observe(el);
+    ro.observe(content);
     return () => ro.disconnect();
-  }, []);
+  }, [canalActivoId]);
   const loadMore = useCallback(async () => {
     if (!canalActivo || !mensajes.length || loadingMore || loadMoreInFlightRef.current) return;
     loadMoreInFlightRef.current = true;
@@ -4267,6 +4285,16 @@ export default function Chat() {
     const el = listRef.current;
     if (el) el.scrollTop = el.scrollHeight - scrollRestoreRef.current;
     scrollRestoreRef.current = null;
+  }, [mensajes]);
+
+  // ── Scroll al fondo tras carga inicial (ver pendingScrollToBottomRef) --
+  // useLayoutEffect corre después de que React haya commiteado el DOM con
+  // los mensajes nuevos pero antes de que el navegador pinte, así que
+  // scrollHeight ya refleja la conversación de verdad, no la anterior.
+  useLayoutEffect(() => {
+    if (!pendingScrollToBottomRef.current) return;
+    pendingScrollToBottomRef.current = false;
+    scrollToBottom("instant");
   }, [mensajes]);
 
   // ── Effects: carga inicial — usa los refs para no depender de fetchCanales (estable con hdr)
@@ -5228,6 +5256,7 @@ export default function Chat() {
               {/* Messages list */}
               <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
                 <div ref={listRef} onScroll={onScroll} style={{ scrollbarGutter: "stable" }} className="flex-1 overflow-y-auto pb-1 pr-2 bg-white">
+                <div ref={listContentRef}>
                   {loadingMore&&<div className="flex items-center justify-center py-2"><Spinner size="sm" muted /></div>}
                   {!messageSearchQ.trim() && !hasMore && mensajes.length>0&&(
                     <div className="px-6 pb-2 pt-8 text-center">
@@ -5300,6 +5329,7 @@ export default function Chat() {
                       );
                     })
                   )}
+                </div>
                 </div>
 
                 {newMsgCount>0&&(
