@@ -2605,6 +2605,7 @@ const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserI
   const [hover, setHover] = useState(false);
   const [showEmoji, setShowEmoji] = useState(false);
   const [showImageLightbox, setShowImageLightbox] = useState(false);
+  const [showGifLightbox, setShowGifLightbox] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
   const [dragReplyReady, setDragReplyReady] = useState(false);
   const emojiButtonRef = useRef<HTMLButtonElement>(null);
@@ -2835,7 +2836,23 @@ const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserI
               />
             )}
             {msg.gif_url
-              ? <img src={msg.gif_url} alt="GIF" className="max-w-[240px] rounded-xl mt-1 border border-slate-200 shadow-sm"/>
+              ? (
+                <>
+                  <button type="button" onClick={() => setShowGifLightbox(true)}
+                    className="group/image mt-1 block overflow-hidden rounded-xl border border-slate-200 shadow-sm transition hover:shadow-md"
+                    aria-label="Ampliar GIF">
+                    <img src={msg.gif_url} alt="GIF" className="max-w-[240px] rounded-xl object-cover transition duration-200 group-hover/image:scale-[1.01]" loading="lazy" />
+                  </button>
+                  {showGifLightbox && (
+                    <ImageLightbox src={msg.gif_url} alt="GIF"
+                      authorName={resolveDisplayName(msg.user_id, msg.user_name, isMe)}
+                      authorAvatarUrl={resolveAvatarUrl?.(msg.user_id, msg.avatar_url, isMe) ?? msg.avatar_url}
+                      createdAt={msg.created_at}
+                      fileName={msg.gif_url?.split("/").pop()?.split("?")[0] || undefined}
+                      onClose={() => setShowGifLightbox(false)} />
+                  )}
+                </>
+              )
               : !fileSrc && msg.contenido !== IMAGE_PLACEHOLDER_TEXT && (
                 <p className="whitespace-pre-wrap text-slate-700 text-[15px] leading-relaxed break-words">{renderText(msg.contenido)}</p>
               )
