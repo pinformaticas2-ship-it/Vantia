@@ -10,6 +10,7 @@ import {
 import { safeJson, resolveApiUrl } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
 import { usePasteFiles, setErpClipboard, getErpClipboard, clearErpClipboard } from "../lib/usePasteFiles";
+import { FilePreviewModal, isVideoFile, isAudioFile } from "./FilePreviewModal";
 
 function fileIcon(mime: string, name: string) {
   const n = name.toLowerCase();
@@ -72,6 +73,11 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false, loc
   const [uploading, setUploading]   = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [preview, setPreview]       = useState<{ url: string; name: string; mime: string; fileId?: string; appType?: 'word' | 'excel' } | null>(null);
+  // Vista previa nueva (a pantalla completa, mismo componente que usa el Chat)
+  // -- ver openRichPreview más abajo. Sustituye al botón "Vista previa" de la
+  // tabla, antes casi invisible (solo aparecía al pasar el ratón por encima).
+  const [richPreview, setRichPreview] = useState<{ file: any; url: string } | null>(null);
+  const [richPreviewLoading, setRichPreviewLoading] = useState<string | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
   const [genLoading, setGenLoading] = useState<string | null>(null);
   // DocPlant templates
@@ -273,6 +279,24 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false, loc
     openUrlCache.current.set(fileId, absoluteUrl);
     return absoluteUrl;
   }, [entityId, getToken]);
+
+  // ── Vista previa nueva a pantalla completa (mismo componente que el Chat) ──
+  // Reutiliza getTempOpenUrl (URL temporal con token, sin necesidad de cabecera
+  // de autenticación) para que <img>/<iframe>/<video>/<audio> dentro del modal
+  // puedan cargar el archivo directamente por src, y para que TextFilePreview/
+  // WordFilePreview/ExcelFilePreview (que hacen su propio fetch(src) dentro del
+  // modal) también funcionen sin tener que pasarles cabeceras a mano.
+  const openRichPreview = useCallback(async (file: any) => {
+    setRichPreviewLoading(file.id);
+    try {
+      const url = await getTempOpenUrl(file.id);
+      setRichPreview({ file, url });
+    } catch (e: any) {
+      alert(e?.message || 'No se pudo generar la vista previa.');
+    } finally {
+      setRichPreviewLoading(null);
+    }
+  }, [getTempOpenUrl]);
 
   const openPdfInBrowser = useCallback(async (file: any) => {
     try {
@@ -962,7 +986,7 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false, loc
                 <tbody className="divide-y divide-slate-50">
                   {files.map((f: any) => {
                     const fi = fileIcon(f.mimetype, f.original_name);
-                    const canPreview = isPreviewable(f.mimetype);
+                    const canPreview = isPreviewable(f.mimetype) || isVideoFile(f.original_name, f.mimetype) || isAudioFile(f.original_name, f.mimetype);
                     const canWord    = isWordFile(f.mimetype, f.original_name);
                     const canExcel   = isExcelFile(f.mimetype, f.original_name);
                     const isPdf      = isPdfFile(f.mimetype, f.original_name);
@@ -1033,11 +1057,13 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false, loc
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1 justify-end">
-                            {/* Vista previa */}
+                            {/* Vista previa -- siempre visible (antes solo aparecía al pasar
+                                el ratón por encima de la fila, y era fácil no darse cuenta
+                                de que existía). */}
                             {canOpenPreview && (
-                              <button onClick={() => openPreview(f)} title="Vista previa"
-                                className="p-1.5 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Eye size={14} />
+                              <button onClick={() => openRichPreview(f)} title="Vista previa" disabled={richPreviewLoading === f.id}
+                                className="p-1.5 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-60">
+                                {richPreviewLoading === f.id ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} />}
                               </button>
                             )}
                             {/* Copiar al portapapeles del ERP — siempre visible */}
@@ -1464,6 +1490,17 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false, loc
         <div className="fixed right-5 top-5 z-[10004] rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-2xl">
           {openingMessage}
         </div>
+      )}
+
+      {richPreview && (
+        <FilePreviewModal
+          src={richPreview.url}
+          fileName={richPreview.file.original_name}
+          mime={richPreview.file.mimetype}
+          subtitle={richPreview.file.document_name && richPreview.file.document_name !== richPreview.file.original_name ? richPreview.file.document_name : undefined}
+          onDownload={() => downloadWithAuth(richPreview.file.id, richPreview.file.original_name)}
+          onClose={() => setRichPreview(null)}
+        />
       )}
 
       {pdfOpenMenu && createPortal(
