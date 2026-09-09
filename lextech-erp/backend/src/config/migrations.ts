@@ -2112,6 +2112,24 @@ export async function runMigrations(): Promise<void> {
       await client.query(`ANALYZE vantia_chat_history;`);
     } catch (_e: any) {}
 
+    // ── chat_presence: clave primaria era solo user_id, no (user_id,
+    // organizacion_id) -- un usuario en varias organizaciones solo podía
+    // tener UNA fila de presencia en toda la tabla. Cada latido (ver
+    // updateHeartbeat) hacía ON CONFLICT (user_id) DO UPDATE SET
+    // organizacion_id = <la activa en ese momento>, así que en cuanto esa
+    // persona cambiaba de organización (el selector "Seleccionar empresa"
+    // del sidebar), su fila de presencia se "robaba" para la organización
+    // nueva -- sus compañeros de la organización ORIGINAL dejaban de verla
+    // en chat_presence del todo y la veían como "Desconectado" aunque
+    // siguiera perfectamente conectada, solo que mirando otra organización
+    // un momento. Esto era el bug de "el estado se queda mal" reportado.
+    try {
+      await client.query(`ALTER TABLE chat_presence DROP CONSTRAINT IF EXISTS chat_presence_pkey;`);
+    } catch (_e: any) {}
+    try {
+      await client.query(`ALTER TABLE chat_presence ADD PRIMARY KEY (user_id, organizacion_id);`);
+    } catch (_e: any) {}
+
     // ── Permisos en schema public (requerido en PostgreSQL 15+) ────
     for (const grant of [
       `GRANT USAGE ON SCHEMA public TO admin`,

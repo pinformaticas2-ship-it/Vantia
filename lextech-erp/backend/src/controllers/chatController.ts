@@ -269,10 +269,14 @@ export async function updateHeartbeat(req: Request, res: Response) {
   const organizacionId = (req as any).organizacionId;
   if (!organizacionId) return err(res, 'Organización no resuelta', 400);
   try {
+    // Clave (user_id, organizacion_id) -- no solo user_id -- para que alguien
+    // que pertenece a varias organizaciones tenga una fila de presencia POR
+    // organización, no una sola compartida que la última organización activa
+    // le "robaba" a las demás (ver migración chat_presence en migrations.ts).
     await pool.query(`
       INSERT INTO chat_presence (user_id, organizacion_id, last_active_at)
       VALUES ($1, $2, NOW())
-      ON CONFLICT (user_id) DO UPDATE SET organizacion_id = EXCLUDED.organizacion_id, last_active_at = NOW()
+      ON CONFLICT (user_id, organizacion_id) DO UPDATE SET last_active_at = NOW()
     `, [userId, organizacionId]);
     return ok(res, { ok: true });
   } catch (e: any) {
