@@ -3875,31 +3875,30 @@ export default function Email() {
 
       if (!gmail) return;
 
-      // ── Hybrid path: sync to DB then read (when profile is saved with token) ─
+      // ── Hybrid path (perfil de Gmail guardado con token) ────────────────────
+      // ANTES: se esperaba (await) a un sync completo contra la API de Gmail
+      // ANTES de leer la lista de la BD -- cada cambio de carpeta o refresco
+      // se quedaba varios segundos en blanco esperando a Google. Esta era la
+      // causa principal de "el correo va lento".
+      // AHORA: se lee la BD y se pinta la lista al instante; el sync va por
+      // detrás y, cuando termina, vuelve a leer la BD y actualiza la lista.
       const savedProfile = currentGmailProfileRef.current;
       if (savedProfile && selectedFolder !== 'PINNED') {
-        try {
-          // Sync current folder from Gmail API to DB
-          await authFetch(
-            `${API}/email/gmail/profiles/${savedProfile.id}/sync?folder=${encodeURIComponent(selectedFolder)}&limit=50`,
-            { method: 'POST' },
-          ).catch(() => null); // best effort — don't fail if sync errors
+        const qp = new URLSearchParams({ gmail_profile_id: savedProfile.id, limit: '100' });
+        if (selectedFolder === 'STARRED') qp.set('starred', '1');
+        else qp.set('folder', selectedFolder);
+        if (searchQ.trim()) qp.set('q', searchQ.trim());
 
-          if (isStale()) return;
-
-          // Read from DB (same path as IMAP)
-          const qp = new URLSearchParams({ gmail_profile_id: savedProfile.id, limit: '100' });
-          if (selectedFolder === 'STARRED') qp.set('starred', '1');
-          else qp.set('folder', selectedFolder);
-          if (searchQ.trim()) qp.set('q', searchQ.trim());
-
+        const readDbAndApply = async (isBackground: boolean) => {
           const dbRes = await authFetch(`${API}/email/messages?${qp}`);
-          const dbPayload = await dbRes.json();
-          if (!dbRes.ok || !dbPayload?.success) throw new Error(dbPayload?.error || 'Error al cargar correos');
-
+          const dbPayload = await dbRes.json().catch(() => null);
+          if (!dbRes.ok || !dbPayload?.success) {
+            if (isBackground) return;
+            throw new Error(dbPayload?.error || 'Error al cargar correos');
+          }
           const nextEmails: ParsedEmail[] = (dbPayload.data?.emails || []).map((row: ImapApiEmail) => parseImapEmail(row));
           if (isStale()) return;
-          if (reset) {
+          if (reset || isBackground) {
             setEmails(nextEmails);
             if (previousSelectedId && bodyLoadingRef.current !== previousSelectedId) {
               const nextSel = nextEmails.find(item => item.id === previousSelectedId) || null;
@@ -3912,14 +3911,28 @@ export default function Email() {
           }
           setNextPageToken(undefined);
 
-          // Stats
-          const stRes = await authFetch(`${API}/email/stats?gmail_profile_id=${encodeURIComponent(savedProfile.id)}`);
-          const stPayload = await stRes.json().catch(() => null);
-          if (stRes.ok && stPayload?.success) {
+          const stRes = await authFetch(`${API}/email/stats?gmail_profile_id=${encodeURIComponent(savedProfile.id)}`).catch(() => null);
+          const stPayload = await stRes?.json().catch(() => null);
+          if (stRes?.ok && stPayload?.success) {
             setUnreadCount(Number(stPayload.data?.unread || 0));
-            const draftCount_ = Number(stPayload.data?.drafts || 0) + readLocalDrafts().length;
-            setDraftCount(draftCount_);
+            setDraftCount(Number(stPayload.data?.drafts || 0) + readLocalDrafts().length);
           }
+        };
+
+        try {
+          // 1. Pintar ya lo que hay en la BD
+          await readDbAndApply(false);
+          if (isStale()) return;
+
+          // 2. Sincronizar con Gmail por detrás y refrescar la lista al acabar
+          setBgRefreshing(true);
+          void authFetch(
+            `${API}/email/gmail/profiles/${savedProfile.id}/sync?folder=${encodeURIComponent(selectedFolder)}&limit=50`,
+            { method: 'POST' },
+          )
+            .then(() => { if (!isStale()) return readDbAndApply(true); })
+            .catch(() => { /* best effort */ })
+            .finally(() => setBgRefreshing(false));
           return;
         } catch (e: any) {
           if (!isStale()) handleGmailError(e);

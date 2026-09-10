@@ -934,12 +934,14 @@ export async function getMessage(req: Request, res: Response) {
       } catch (_e) { /* best effort */ }
     }
 
-    // Fetch body from IMAP si falta el cuerpo o nunca se comprobaron adjuntos, y
-    // marcar como leido — en la MISMA conexion IMAP para no pagar dos handshakes
-    // TCP/TLS completos al abrir un correo.
-    const needsImapBody     = !row.gmail_profile_id && row.uid && ((!row.body_html && !row.body_text) || attachmentsUnchecked);
-    const needsImapMarkRead = !row.gmail_profile_id && row.uid && !row.is_read;
-    if (needsImapBody || needsImapMarkRead) {
+    // Fetch body from IMAP SOLO si de verdad falta el cuerpo (o nunca se
+    // comprobaron los adjuntos). Si ya está cacheado, no se abre ninguna
+    // conexión IMAP antes de responder -- marcar como leído en el servidor
+    // se hace luego, en segundo plano, sin que el usuario espere al handshake
+    // TCP/TLS completo (era una de las causas de "abrir un correo va lento").
+    const needsImapBody = !row.gmail_profile_id && row.uid && ((!row.body_html && !row.body_text) || attachmentsUnchecked);
+    let markedReadOnImap = false;
+    if (needsImapBody) {
       try {
         const password = decryptPassword(row.password_enc);
         const cfg: ImapConfig = {
@@ -951,47 +953,58 @@ export async function getMessage(req: Request, res: Response) {
         await client.login();
         await client.selectFolder(row.folder);
 
-        if (needsImapBody) {
-          const full = await client.fetchFullMessage(row.uid);
-          if (full) {
-            // No pisar un cuerpo ya cacheado con uno vacio si el re-parseo
-            // (hecho solo para comprobar adjuntos) no encontrase texto/html.
-            const nextBodyHtml = full.bodyHtml || row.body_html || '';
-            const nextBodyText = full.bodyText || row.body_text || '';
-            const snippet = full.snippet || row.snippet || '';
-            const attachmentsJson = JSON.stringify(full.attachments);
-            await pool.query(
-              `UPDATE emails SET body_text=$1, body_html=$2, snippet=$3, attachments_json=$4, has_attachments=$5 WHERE id=$6`,
-              [nextBodyText, nextBodyHtml, snippet, attachmentsJson, full.hasAttachments, id],
-            );
-            row.body_text = nextBodyText; row.body_html = nextBodyHtml; row.snippet = snippet;
-            row.attachments_json = attachmentsJson; row.has_attachments = full.hasAttachments;
-          }
+        const full = await client.fetchFullMessage(row.uid);
+        if (full) {
+          // No pisar un cuerpo ya cacheado con uno vacio si el re-parseo
+          // (hecho solo para comprobar adjuntos) no encontrase texto/html.
+          const nextBodyHtml = full.bodyHtml || row.body_html || '';
+          const nextBodyText = full.bodyText || row.body_text || '';
+          const snippet = full.snippet || row.snippet || '';
+          const attachmentsJson = JSON.stringify(full.attachments);
+          await pool.query(
+            `UPDATE emails SET body_text=$1, body_html=$2, snippet=$3, attachments_json=$4, has_attachments=$5 WHERE id=$6`,
+            [nextBodyText, nextBodyHtml, snippet, attachmentsJson, full.hasAttachments, id],
+          );
+          row.body_text = nextBodyText; row.body_html = nextBodyHtml; row.snippet = snippet;
+          row.attachments_json = attachmentsJson; row.has_attachments = full.hasAttachments;
         }
-        if (needsImapMarkRead) {
-          await client.markRead(row.uid, true);
-        }
+        // Ya que la conexión está abierta, se aprovecha para marcar leído.
+        if (!row.is_read) { await client.markRead(row.uid, true); markedReadOnImap = true; }
 
         await client.logout();
       } catch (_e) { /* best effort */ }
     }
 
-    // Mark as read (DB + push remoto — el push IMAP ya se hizo en la conexion de arriba)
-    if (!row.is_read) {
+    // Marcar leído en la BD (rápido) y responder YA.
+    const wasUnread = !row.is_read;
+    if (wasUnread) {
       await pool.query(`UPDATE emails SET is_read=true WHERE id=$1`, [id]);
       row.is_read = true;
-      if (row.gmail_profile_id && row.gmail_message_id) {
-        try {
-          const token = await getGmailAccessToken(row.gmail_profile_id, uid, (req as any).organizacionId);
-          await gmailApiPost(`/messages/${row.gmail_message_id}/modify`, token,
-            { addLabelIds: [], removeLabelIds: ['UNREAD'] });
-        } catch (_e) {}
-      }
     }
 
     const { imap_host, imap_port, imap_secure, username, password_enc, ...safe } = row;
-    return ok(res, safe);
-  } catch (e: any) { return err(res, e.message); }
+    ok(res, safe);
+
+    // Propagar el "leído" al servidor remoto DESPUÉS de responder -- no hace
+    // falta que el usuario espere a que Gmail/IMAP confirmen el cambio de flag.
+    if (wasUnread) {
+      if (row.gmail_profile_id && row.gmail_message_id) {
+        getGmailAccessToken(row.gmail_profile_id, uid, (req as any).organizacionId)
+          .then((token) => gmailApiPost(`/messages/${row.gmail_message_id}/modify`, token, { addLabelIds: [], removeLabelIds: ['UNREAD'] }))
+          .catch(() => {});
+      } else if (!markedReadOnImap && row.uid && row.imap_host) {
+        (async () => {
+          try {
+            const password = decryptPassword(row.password_enc);
+            const client = new ImapClient({ host: row.imap_host, port: row.imap_port, secure: row.imap_secure, user: row.username, password });
+            await client.connect(); await client.login(); await client.selectFolder(row.folder);
+            await client.markRead(row.uid, true);
+            await client.logout();
+          } catch (_e) { /* best effort */ }
+        })();
+      }
+    }
+  } catch (e: any) { if (!res.headersSent) return err(res, e.message); }
 }
 
 export async function markRead(req: Request, res: Response) {
