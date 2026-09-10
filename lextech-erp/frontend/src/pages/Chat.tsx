@@ -2,7 +2,7 @@
   useEffect, useLayoutEffect, useState, useRef, useCallback, useMemo,
 } from "react";
 import { Spinner } from "../components/Spinner";
-import { FilePreviewModal, getFileTypeIcon } from "../components/FilePreviewModal";
+import { FilePreviewModal, getFileTypeIcon, isPdfFile, isImageFile } from "../components/FilePreviewModal";
 import { useAuth, useUser } from "@clerk/clerk-react";
 import {
   Hash, Lock, Plus, X, Search, Pin, PinOff, Smile, Send,
@@ -2803,27 +2803,48 @@ const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserI
                 )}
               </>
             )}
-            {fileSrc && fileTypeIcon && (
+            {fileSrc && fileTypeIcon && (() => {
+              const fIsImg = isImageFile(msg.file_name, msg.file_mime);
+              const fIsPdf = isPdfFile(msg.file_name, msg.file_mime);
+              return (
               <div role="button" tabIndex={0}
                 onClick={() => setShowFilePreview(true)}
                 onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setShowFilePreview(true); } }}
-                className="mt-1 flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 px-3 py-2.5 transition-colors group/file max-w-xs text-left cursor-pointer">
-                <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 transition-colors ${fileTypeIcon.iconBg} ${fileTypeIcon.iconColor}`}>
-                  <fileTypeIcon.Icon size={16}/>
+                className="mt-1 w-[190px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md group/file text-left cursor-pointer">
+                {(fIsImg || fIsPdf) ? (
+                  <div className="h-[150px] w-full overflow-hidden bg-slate-50">
+                    {fIsImg ? (
+                      <img src={fileSrc} alt={msg.file_name || "Archivo"} className="h-full w-full object-cover" loading="lazy" />
+                    ) : (
+                      <div className="pointer-events-none h-full w-full overflow-hidden bg-white">
+                        <iframe src={`${fileSrc}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`} title={msg.file_name || "PDF"} tabIndex={-1}
+                          className="h-[460px] w-[190px] origin-top-left border-0" />
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex h-[110px] w-full items-center justify-center bg-slate-50">
+                    <div className={`h-12 w-12 rounded-xl flex items-center justify-center ${fileTypeIcon.iconBg} ${fileTypeIcon.iconColor}`}>
+                      <fileTypeIcon.Icon size={22}/>
+                    </div>
+                  </div>
+                )}
+                <div className="flex items-center gap-1.5 px-2.5 py-2 border-t border-slate-100">
+                  <div className="flex-1 min-w-0">
+                    <p className="truncate text-xs font-semibold text-slate-700">{msg.file_name || "Archivo"}</p>
+                    <p className="text-[10px] text-slate-400">Ver archivo</p>
+                  </div>
+                  <button type="button" onClick={(e) => { e.stopPropagation(); void handleFileDownload(); }}
+                    title="Descargar" disabled={downloadingFile}
+                    className="shrink-0 p-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors disabled:opacity-70">
+                    {downloadingFile
+                      ? <Loader2 size={14} className="animate-spin"/>
+                      : <Download size={14}/>}
+                  </button>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="truncate text-sm font-semibold text-slate-700">{msg.file_name || "Archivo"}</p>
-                  <p className="text-[11px] text-slate-400">Ver archivo</p>
-                </div>
-                <button type="button" onClick={(e) => { e.stopPropagation(); void handleFileDownload(); }}
-                  title="Descargar" disabled={downloadingFile}
-                  className="shrink-0 p-1 -m-1 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors disabled:opacity-70">
-                  {downloadingFile
-                    ? <Loader2 size={14} className="animate-spin"/>
-                    : <Download size={14}/>}
-                </button>
               </div>
-            )}
+              );
+            })()}
             {showFilePreview && fileSrc && (
               <FilePreviewModal
                 src={fileSrc}

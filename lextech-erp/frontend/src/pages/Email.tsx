@@ -1892,10 +1892,105 @@ function buildEmailDoc(bodyHtml?: string | null, bodyText?: string | null): stri
 </style></head><body>${content}</body></html>`;
 }
 
+// ── Tarjeta de adjunto con miniatura de la primera página ─────────────────────
+// Antes los adjuntos eran una "pastilla" plana con el nombre. Ahora cada uno es
+// una tarjeta con vista previa: la imagen para adjuntos de imagen, la primera
+// página incrustada para PDF, y un icono grande para el resto.
+function attachmentKind(name: string, type?: string): 'image' | 'pdf' | 'word' | 'excel' | 'other' {
+  const n = (name || '').toLowerCase();
+  const t = (type || '').toLowerCase();
+  if (t.startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp|svg)$/.test(n)) return 'image';
+  if (t.includes('pdf') || n.endsWith('.pdf')) return 'pdf';
+  if (t.includes('word') || t.includes('wordprocessingml') || /\.(docx?|odt|rtf)$/.test(n)) return 'word';
+  if (t.includes('sheet') || t.includes('excel') || /\.(xlsx?|csv|ods)$/.test(n)) return 'excel';
+  return 'other';
+}
+
+function EmailAttachmentCard({
+  att, index, onDownload, onSaveToExpediente, loadPreviewUrl,
+}: {
+  att: { filename: string; contentType?: string; size: number };
+  index: number;
+  onDownload: () => void;
+  onSaveToExpediente?: (rect: DOMRect) => void;
+  loadPreviewUrl?: (index: number, contentType: string) => Promise<string | null>;
+}) {
+  const kind = attachmentKind(att.filename, att.contentType);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    if ((kind !== 'image' && kind !== 'pdf') || !loadPreviewUrl) return;
+    let cancelled = false;
+    setLoadingPreview(true);
+    loadPreviewUrl(index, att.contentType || (kind === 'pdf' ? 'application/pdf' : 'image/*'))
+      .then((url) => { if (!cancelled) { setPreviewUrl(url); if (!url) setFailed(true); } })
+      .catch(() => { if (!cancelled) setFailed(true); })
+      .finally(() => { if (!cancelled) setLoadingPreview(false); });
+    return () => { cancelled = true; };
+  }, [kind, index, att.contentType, loadPreviewUrl]);
+
+  const icon = kind === 'pdf' ? <FileText size={30} className="text-red-500" />
+    : kind === 'word' ? <FileText size={30} className="text-blue-500" />
+    : kind === 'excel' ? <FileText size={30} className="text-emerald-500" />
+    : <Paperclip size={26} className="text-slate-400" />;
+
+  return (
+    <div className="group/att w-[170px] shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md">
+      <button
+        type="button"
+        onClick={onDownload}
+        title={`Descargar ${att.filename}`}
+        className="block h-[150px] w-full overflow-hidden bg-slate-50">
+        {kind === 'image' && previewUrl ? (
+          <img src={previewUrl} alt={att.filename} className="h-full w-full object-cover" />
+        ) : kind === 'pdf' && previewUrl && !failed ? (
+          <div className="pointer-events-none h-full w-full overflow-hidden bg-white">
+            <iframe
+              src={`${previewUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
+              title={att.filename}
+              className="h-[420px] w-[170px] origin-top-left scale-[1.0] border-0"
+              tabIndex={-1}
+            />
+          </div>
+        ) : (
+          <div className="flex h-full w-full flex-col items-center justify-center gap-2">
+            {loadingPreview ? <RefreshCw size={20} className="animate-spin text-slate-300" /> : icon}
+          </div>
+        )}
+      </button>
+      <div className="flex items-center gap-1 px-2 py-1.5">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[11px] font-semibold text-slate-700" title={att.filename}>{att.filename}</p>
+          <p className="text-[10px] text-slate-400">{att.size > 0 ? fmtAttachmentSize(att.size) : ''}</p>
+        </div>
+        <button
+          type="button"
+          onClick={onDownload}
+          title="Descargar"
+          className="shrink-0 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-700">
+          <Download size={13} />
+        </button>
+        {onSaveToExpediente && (
+          <button
+            type="button"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => onSaveToExpediente(e.currentTarget.getBoundingClientRect())}
+            title="Guardar en un expediente"
+            className="shrink-0 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-[#ab0433]">
+            <FolderPlus size={13} />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function EmailReader({
   email, onReply, onReplyAll, onForward, onDelete, onStar, onBack,
   onPin, onRestore, onAssignLabel, onCreateLabel, userLabels, bodyLoading, theme,
-  viewerName, viewerEmail, viewerAvatar, onDownloadAttachment,
+  viewerName, viewerEmail, viewerAvatar, onDownloadAttachment, onLoadAttachmentPreview,
   expedienteOptions, onLinkExpediente, onCreateExpediente, linkingExpediente,
   onSaveAttachmentToExpediente, savingAttachmentIndex,
 }: {
@@ -1913,6 +2008,7 @@ function EmailReader({
   viewerEmail: string;
   viewerAvatar?: string;
   onDownloadAttachment?: (index: number) => void;
+  onLoadAttachmentPreview?: (index: number, contentType: string) => Promise<string | null>;
   expedienteOptions?: ExpedienteOption[];
   onLinkExpediente?: (expedienteId: string | null) => void;
   onCreateExpediente?: (descripcion: string) => Promise<boolean>;
@@ -2353,36 +2449,20 @@ function EmailReader({
                 </div>
 
                 {!!email.attachments?.length && (
-                  <div className="flex flex-wrap gap-2 px-6 py-3 border-b border-slate-100 bg-slate-50/50">
+                  <div className="flex flex-nowrap gap-3 overflow-x-auto px-6 py-4 border-b border-slate-100 bg-slate-50/50">
                     {email.attachments.map((att, idx) => (
                       <div key={`${att.filename}-${idx}`} className="relative">
-                        <div className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white pl-1 pr-1 py-1 text-xs font-medium text-slate-700">
-                          <button
-                            type="button"
-                            onClick={() => onDownloadAttachment?.(idx)}
-                            title={`Descargar ${att.filename}`}
-                            className="inline-flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-red-50 hover:text-red-700 transition-colors">
-                            <Paperclip size={13} className="shrink-0 text-slate-400" />
-                            <span className="max-w-[180px] truncate">{att.filename}</span>
-                            {att.size > 0 && <span className="text-slate-400">{fmtAttachmentSize(att.size)}</span>}
-                            <Download size={12} className="shrink-0 text-slate-400" />
-                          </button>
-                          {onSaveAttachmentToExpediente && (
-                            <button
-                              type="button"
-                              onMouseDown={(e) => e.stopPropagation()}
-                              onClick={(e) => {
-                                const r = e.currentTarget.getBoundingClientRect();
-                                setAttachmentMenuPos({ top: r.bottom + 6, left: r.left });
-                                setAttachmentTargetExp('');
-                                setAttachmentPickerIdx((prev) => (prev === idx ? null : idx));
-                              }}
-                              title="Guardar en un expediente"
-                              className="p-1.5 rounded-lg text-slate-400 hover:bg-red-50 hover:text-[#ab0433] transition-colors">
-                              <FolderPlus size={13} />
-                            </button>
-                          )}
-                        </div>
+                        <EmailAttachmentCard
+                          att={att}
+                          index={idx}
+                          onDownload={() => onDownloadAttachment?.(idx)}
+                          loadPreviewUrl={onLoadAttachmentPreview}
+                          onSaveToExpediente={onSaveAttachmentToExpediente ? (rect) => {
+                            setAttachmentMenuPos({ top: rect.bottom + 6, left: Math.max(12, rect.left - 200) });
+                            setAttachmentTargetExp('');
+                            setAttachmentPickerIdx((prev) => (prev === idx ? null : idx));
+                          } : undefined}
+                        />
                         {attachmentPickerIdx === idx && typeof document !== 'undefined' && createPortal(
                           <div
                             ref={attachmentMenuRef}
@@ -4370,6 +4450,30 @@ export default function Email() {
     }
   }, [authFetch]);
 
+  // ── Blob URL de un adjunto para la miniatura de la tarjeta (imagen / PDF) ──
+  const attachmentPreviewCacheRef = useRef<Map<string, string>>(new Map());
+  useEffect(() => () => {
+    for (const u of attachmentPreviewCacheRef.current.values()) { try { URL.revokeObjectURL(u); } catch { /**/ } }
+    attachmentPreviewCacheRef.current.clear();
+  }, []);
+  const loadAttachmentPreview = useCallback(async (emailId: string, index: number, contentType: string): Promise<string | null> => {
+    const key = `${emailId}:${index}`;
+    const cached = attachmentPreviewCacheRef.current.get(key);
+    if (cached) return cached;
+    try {
+      const res = await authFetch(`${API}/email/messages/${emailId}/attachments/${index}`);
+      if (!res.ok) return null;
+      const raw = await res.blob();
+      // Forzar el content-type correcto para que <img>/<iframe> lo interpreten bien
+      const blob = contentType && contentType !== '*/*' && raw.type !== contentType
+        ? new Blob([raw], { type: contentType })
+        : raw;
+      const url = URL.createObjectURL(blob);
+      attachmentPreviewCacheRef.current.set(key, url);
+      return url;
+    } catch { return null; }
+  }, [authFetch]);
+
   // ── Expedientes de la organización, para vincular correos/adjuntos ────────
   useEffect(() => {
     let cancelled = false;
@@ -4884,6 +4988,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
           viewerEmail={userEmail}
           viewerAvatar={userAvatar}
           onDownloadAttachment={(index) => downloadAttachment(selectedEmail, index)}
+          onLoadAttachmentPreview={(index, ct) => loadAttachmentPreview(selectedEmail.id, index, ct)}
           expedienteOptions={organizationExpedientes}
           onLinkExpediente={(expId) => linkExpedienteToEmail(selectedEmail, expId)}
           onCreateExpediente={(descripcion) => createExpedienteAndLink(selectedEmail, descripcion)}
@@ -5196,6 +5301,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
               viewerEmail={userEmail}
               viewerAvatar={userAvatar}
               onDownloadAttachment={(index) => downloadAttachment(selectedEmail, index)}
+          onLoadAttachmentPreview={(index, ct) => loadAttachmentPreview(selectedEmail.id, index, ct)}
               expedienteOptions={organizationExpedientes}
               onLinkExpediente={(expId) => linkExpedienteToEmail(selectedEmail, expId)}
               onCreateExpediente={(descripcion) => createExpedienteAndLink(selectedEmail, descripcion)}
@@ -5250,6 +5356,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
               viewerEmail={userEmail}
               viewerAvatar={userAvatar}
               onDownloadAttachment={(index) => downloadAttachment(fullscreenEmail, index)}
+              onLoadAttachmentPreview={(index, ct) => loadAttachmentPreview(fullscreenEmail.id, index, ct)}
               expedienteOptions={organizationExpedientes}
               onLinkExpediente={(expId) => linkExpedienteToEmail(fullscreenEmail, expId)}
               onCreateExpediente={(descripcion) => createExpedienteAndLink(fullscreenEmail, descripcion)}
