@@ -1168,6 +1168,67 @@ function OrgLogoBadge({ nombre, logoUrl, className, fallbackClassName = "bg-[#ab
   );
 }
 
+// Item de grupo (con submenú) cuando el sidebar está colapsado: el icono y,
+// al pasar el ratón, un desplegable lateral con los hijos -- antes al colapsar
+// solo quedaba el icono y no había forma de llegar a las subopciones que no
+// fueran la primera.
+function CollapsedGroupItem({ item, childActive, pathname, currentSearch, onClose }: {
+  item: NavItem; childActive: boolean; pathname: string; currentSearch: string; onClose?: () => void;
+}) {
+  const [flyoutPos, setFlyoutPos] = useState<{ top: number; left: number } | null>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const GroupIcon = item.icon;
+
+  const open = () => {
+    if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null; }
+    const r = wrapRef.current?.getBoundingClientRect();
+    if (r) setFlyoutPos({ top: r.top, left: r.right + 8 });
+  };
+  const scheduleClose = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    closeTimer.current = setTimeout(() => setFlyoutPos(null), 120);
+  };
+
+  return (
+    <div ref={wrapRef} onMouseEnter={open} onMouseLeave={scheduleClose} className="relative">
+      <Link
+        to={item.children![0].href}
+        onClick={onClose}
+        title={item.name}
+        className={`relative flex items-center justify-center h-10 w-10 mx-auto rounded-lg transition-colors border-l-4 ${
+          childActive ? "erp-sidebar-nav-active bg-red-500/10 text-white border-red-500"
+                     : "erp-sidebar-nav-inactive text-slate-400 hover:bg-slate-800/50 hover:text-white border-transparent"
+        }`}>
+        <GroupIcon className={`h-5 w-5 ${childActive ? "text-red-400" : "text-slate-500"}`} />
+      </Link>
+      {flyoutPos && createPortal(
+        <div
+          onMouseEnter={open}
+          onMouseLeave={scheduleClose}
+          style={{ position: "fixed", top: flyoutPos.top, left: flyoutPos.left, zIndex: 999 }}
+          className="animate-fade-in min-w-[190px] rounded-xl border border-slate-700 bg-slate-800 py-1.5 shadow-xl shadow-black/30">
+          <p className="px-3 pb-1 pt-0.5 text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">{item.name}</p>
+          {item.children!.map((child) => {
+            const isChildActive = hrefMatches(pathname, currentSearch, child.href);
+            const ChildIcon = child.icon;
+            return (
+              <Link key={child.name} to={child.href} onClick={() => { setFlyoutPos(null); onClose?.(); }}
+                className={`flex items-center gap-2.5 px-3 py-2 text-[12px] font-medium transition-colors ${
+                  isChildActive ? "bg-red-500/10 text-white" : "text-slate-300 hover:bg-slate-700/60 hover:text-white"
+                }`}>
+                <ChildIcon className={`h-3.5 w-3.5 shrink-0 ${isChildActive ? "text-red-400" : "text-slate-500"}`} />
+                <span className="truncate">{child.name}</span>
+              </Link>
+            );
+          })}
+        </div>,
+        document.body,
+      )}
+    </div>
+  );
+}
+
 // ── Sidebar ──────────────────────────────────────────────────────────────────
 function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onToggleCollapse }: {
   pathname: string;
@@ -1432,13 +1493,14 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
 
                     if (collapsed) {
                       return (
-                        <Link key={item.name} to={item.children[0].href} onClick={onClose} title={item.name}
-                          className={`relative flex items-center justify-center h-10 w-10 mx-auto rounded-lg transition-colors border-l-4 ${
-                            childActive ? "erp-sidebar-nav-active bg-red-500/10 text-white border-red-500"
-                                     : "erp-sidebar-nav-inactive text-slate-400 hover:bg-slate-800/50 hover:text-white border-transparent"
-                          }`}>
-                          <GroupIcon className={`h-5 w-5 ${childActive ? "text-red-400" : "text-slate-500"}`} />
-                        </Link>
+                        <CollapsedGroupItem
+                          key={item.name}
+                          item={item}
+                          childActive={childActive}
+                          pathname={pathname}
+                          currentSearch={currentSearch}
+                          onClose={onClose}
+                        />
                       );
                     }
 
