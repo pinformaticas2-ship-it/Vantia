@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 const uuidv4 = () => crypto.randomUUID();
 import { requireAuth } from '../middleware/auth';
+import { requireFilesPermission } from '../middleware/requireFilesPermission';
 import { listFiles, uploadFiles, downloadFile, deleteFile, UPLOADS_ROOT, listTemplates, downloadTemplate, downloadMergedTemplate, downloadBlank, createBlankDocument, updateFileMetadata, openFileLocally, previewDocxAsHtml, previewExcelAsHtml, previewTemplateAsHtml, testPreviewImages, previewWordAsPdf, previewTemplateAsPdf, createTempToken, downloadByToken, launchWithOffice, officeBridgePage, syncClientFileByToken } from '../controllers/filesController';
 const router = Router();
 const rawBinary = express.raw({ type: 'application/octet-stream', limit: '100mb' });
@@ -43,17 +44,25 @@ router.get('/templates/merge',        requireAuth, downloadMergedTemplate);
 router.get('/templates/blank.docx',   requireAuth, downloadBlank);
 router.get('/test-preview',           requireAuth, testPreviewImages);
 
-// ── Rutas de archivos del cliente ────────────────────────────
-router.post('/:clientId/create-blank',              requireAuth, createBlankDocument);
-router.get('/:clientId',                            requireAuth, listFiles);
-router.post('/:clientId',                           requireAuth, upload.array('files', 50), uploadFiles);
-router.put('/:clientId/:fileId',                    requireAuth, updateFileMetadata);
-router.post('/:clientId/:fileId/open-local',        requireAuth, openFileLocally);
-router.get('/:clientId/:fileId/preview-pdf',        requireAuth, previewWordAsPdf);
-router.get('/:clientId/:fileId/preview-html',       requireAuth, previewDocxAsHtml);
-router.get('/:clientId/:fileId/preview-excel',      requireAuth, previewExcelAsHtml);
-router.get('/:clientId/:fileId/download',           requireAuth, downloadFile);
-router.post('/:clientId/:fileId/temp-token',        requireAuth, createTempToken);
-router.delete('/:clientId/:fileId',                 requireAuth, deleteFile);
+// ── Rutas de archivos del cliente / expediente ───────────────
+// requireFilesPermission: comprueba que la entidad (:clientId puede ser un
+// cliente O un expediente) es de la organización activa y que quien pide
+// tiene permiso en el módulo correspondiente ('clientes' o 'expedientes').
+// Antes, estas rutas solo tenían requireAuth -- cualquiera podía listar/
+// subir/descargar/borrar archivos de cualquier cliente o expediente de
+// cualquier organización con solo saber el id.
+const filesGate = [requireAuth, requireFilesPermission];
+
+router.post('/:clientId/create-blank',              ...filesGate, createBlankDocument);
+router.get('/:clientId',                            ...filesGate, listFiles);
+router.post('/:clientId',                           ...filesGate, upload.array('files', 50), uploadFiles);
+router.put('/:clientId/:fileId',                    ...filesGate, updateFileMetadata);
+router.post('/:clientId/:fileId/open-local',        ...filesGate, openFileLocally);
+router.get('/:clientId/:fileId/preview-pdf',        ...filesGate, previewWordAsPdf);
+router.get('/:clientId/:fileId/preview-html',       ...filesGate, previewDocxAsHtml);
+router.get('/:clientId/:fileId/preview-excel',      ...filesGate, previewExcelAsHtml);
+router.get('/:clientId/:fileId/download',           ...filesGate, downloadFile);
+router.post('/:clientId/:fileId/temp-token',        ...filesGate, createTempToken);
+router.delete('/:clientId/:fileId',                 ...filesGate, deleteFile);
 
 export default router;

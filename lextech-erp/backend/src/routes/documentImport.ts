@@ -3,6 +3,7 @@ import multer      from 'multer';
 import * as path   from 'path';
 import * as os     from 'os';
 import { requireAuth } from '../middleware/auth';
+import { requireModulePermission } from '../middleware/requireModulePermission';
 import {
   uploadDocumentImport,
   getDocumentImportBatch,
@@ -24,6 +25,9 @@ const upload = multer({
     cb(null, ok);
   },
 });
+
+// Importar documentos es parte de la gestión de expedientes -- mismo permiso.
+router.use(requireAuth, requireModulePermission('expedientes'));
 
 // Acepta tanto un ZIP con varios documentos como un único PDF suelto
 // (mismo campo "zip" del formulario, por compatibilidad con el frontend existente).
