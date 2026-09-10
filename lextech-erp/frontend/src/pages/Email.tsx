@@ -1896,7 +1896,7 @@ function EmailReader({
   email, onReply, onReplyAll, onForward, onDelete, onStar, onBack,
   onPin, onRestore, onAssignLabel, onCreateLabel, userLabels, bodyLoading, theme,
   viewerName, viewerEmail, viewerAvatar, onDownloadAttachment,
-  expedienteOptions, onLinkExpediente, linkingExpediente,
+  expedienteOptions, onLinkExpediente, onCreateExpediente, linkingExpediente,
   onSaveAttachmentToExpediente, savingAttachmentIndex,
 }: {
   email: ParsedEmail;
@@ -1915,6 +1915,7 @@ function EmailReader({
   onDownloadAttachment?: (index: number) => void;
   expedienteOptions?: ExpedienteOption[];
   onLinkExpediente?: (expedienteId: string | null) => void;
+  onCreateExpediente?: (descripcion: string) => Promise<boolean>;
   linkingExpediente?: boolean;
   onSaveAttachmentToExpediente?: (index: number, expedienteId: string) => Promise<boolean>;
   savingAttachmentIndex?: number | null;
@@ -1929,6 +1930,8 @@ function EmailReader({
   const [expLinkOpen, setExpLinkOpen] = useState(false);
   const [expLinkFilter, setExpLinkFilter] = useState('');
   const [expLinkMenuPos, setExpLinkMenuPos] = useState({ top: 0, left: 0 });
+  const [creatingExp, setCreatingExp] = useState(false);
+  const [newExpDesc, setNewExpDesc] = useState('');
   const expLinkBtnRef = useRef<HTMLButtonElement>(null);
   const expLinkMenuRef = useRef<HTMLDivElement>(null);
 
@@ -1951,6 +1954,8 @@ function EmailReader({
     const r = expLinkBtnRef.current.getBoundingClientRect();
     setExpLinkMenuPos({ top: r.bottom + 6, left: r.left });
     setExpLinkFilter('');
+    setCreatingExp(false);
+    setNewExpDesc('');
     setExpLinkOpen((o) => !o);
   }, []);
 
@@ -2231,6 +2236,56 @@ function EmailReader({
                               <p className="px-3 py-2 text-xs text-slate-400">Sin resultados</p>
                             )}
                           </div>
+
+                          {onCreateExpediente && (
+                            <div className="mt-1.5 border-t border-slate-100 pt-1.5">
+                              {!creatingExp ? (
+                                <button
+                                  type="button"
+                                  onClick={() => { setNewExpDesc(expLinkFilter.trim() || email.subject || ''); setCreatingExp(true); }}
+                                  className="w-full flex items-center gap-2 text-left px-3 py-2 rounded-lg text-xs font-semibold text-[#ab0433] hover:bg-red-50 transition-colors">
+                                  <Plus size={13} className="shrink-0" /> Crear expediente nuevo
+                                </button>
+                              ) : (
+                                <div className="px-2 py-1.5 space-y-1.5">
+                                  <input
+                                    type="text"
+                                    value={newExpDesc}
+                                    onChange={(e) => setNewExpDesc(e.target.value)}
+                                    onKeyDown={async (e) => {
+                                      if (e.key === 'Enter' && newExpDesc.trim() && !linkingExpediente) {
+                                        const ok = await onCreateExpediente(newExpDesc);
+                                        if (ok) { setCreatingExp(false); setNewExpDesc(''); setExpLinkOpen(false); }
+                                      }
+                                      if (e.key === 'Escape') { setCreatingExp(false); setNewExpDesc(''); }
+                                    }}
+                                    placeholder="Descripción del expediente"
+                                    autoFocus
+                                    className="w-full text-xs rounded-xl border border-slate-200 px-3 py-2 text-slate-700 focus:border-red-400 focus:outline-none"
+                                  />
+                                  <div className="flex items-center gap-1.5">
+                                    <button
+                                      type="button"
+                                      disabled={!newExpDesc.trim() || linkingExpediente}
+                                      onClick={async () => {
+                                        const ok = await onCreateExpediente(newExpDesc);
+                                        if (ok) { setCreatingExp(false); setNewExpDesc(''); setExpLinkOpen(false); }
+                                      }}
+                                      className="flex-1 rounded-lg bg-[#ab0433] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#8a0329] disabled:opacity-50 transition-colors">
+                                      {linkingExpediente ? 'Creando…' : 'Crear y vincular'}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => { setCreatingExp(false); setNewExpDesc(''); }}
+                                      className="rounded-lg px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-100 transition-colors">
+                                      Cancelar
+                                    </button>
+                                  </div>
+                                  <p className="px-1 text-[10px] text-slate-400">Se creará con la numeración automática. Podrás completar los demás datos en Expedientes.</p>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>,
                         document.body
                       )}
@@ -4365,6 +4420,40 @@ export default function Email() {
     }
   }, [authFetch, updateEmailLocally]);
 
+  // ── Crear un expediente nuevo (mínimo) y vincularle este correo ──────────────
+  const createExpedienteAndLink = useCallback(async (email: ParsedEmail, descripcion: string): Promise<boolean> => {
+    if (!descripcion.trim()) return false;
+    setLinkingExpediente(true);
+    try {
+      const res = await authFetch(`${API}/expedientes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ descripcion: descripcion.trim() }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.data?.id) throw new Error(json?.error || 'No se pudo crear el expediente');
+      const exp = json.data;
+      const ref = exp.ref_expediente || exp.ref_propia
+        || (exp.anio && exp.num_exp ? `${exp.anio}/${exp.num_exp}` : null)
+        || 'Expediente sin referencia';
+      const label = `${ref}${exp.cliente_nombre ? ' · ' + exp.cliente_nombre : ''}`;
+      setOrganizationExpedientes(prev => [{ id: exp.id, label }, ...prev]);
+      // Vincular el correo al expediente recién creado
+      await authFetch(`${API}/email/messages/${email.id}/link`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expediente_id: exp.id }),
+      }).catch(() => null);
+      updateEmailLocally(email.id, { expedienteId: exp.id });
+      return true;
+    } catch (e: any) {
+      setError(e.message || 'Error al crear el expediente');
+      return false;
+    } finally {
+      setLinkingExpediente(false);
+    }
+  }, [authFetch, updateEmailLocally]);
+
   // ── Guardar un adjunto del correo abierto directamente en un expediente ───
   const saveAttachmentToExpedienteHandler = useCallback(async (email: ParsedEmail, index: number, expedienteId: string): Promise<boolean> => {
     setSavingAttachmentIndex(index);
@@ -4797,6 +4886,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
           onDownloadAttachment={(index) => downloadAttachment(selectedEmail, index)}
           expedienteOptions={organizationExpedientes}
           onLinkExpediente={(expId) => linkExpedienteToEmail(selectedEmail, expId)}
+          onCreateExpediente={(descripcion) => createExpedienteAndLink(selectedEmail, descripcion)}
           linkingExpediente={linkingExpediente}
           onSaveAttachmentToExpediente={(index, expId) => saveAttachmentToExpedienteHandler(selectedEmail, index, expId)}
           savingAttachmentIndex={savingAttachmentIndex}
@@ -5108,6 +5198,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
               onDownloadAttachment={(index) => downloadAttachment(selectedEmail, index)}
               expedienteOptions={organizationExpedientes}
               onLinkExpediente={(expId) => linkExpedienteToEmail(selectedEmail, expId)}
+              onCreateExpediente={(descripcion) => createExpedienteAndLink(selectedEmail, descripcion)}
               linkingExpediente={linkingExpediente}
               onSaveAttachmentToExpediente={(index, expId) => saveAttachmentToExpedienteHandler(selectedEmail, index, expId)}
               savingAttachmentIndex={savingAttachmentIndex}
@@ -5161,6 +5252,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
               onDownloadAttachment={(index) => downloadAttachment(fullscreenEmail, index)}
               expedienteOptions={organizationExpedientes}
               onLinkExpediente={(expId) => linkExpedienteToEmail(fullscreenEmail, expId)}
+              onCreateExpediente={(descripcion) => createExpedienteAndLink(fullscreenEmail, descripcion)}
               linkingExpediente={linkingExpediente}
               onSaveAttachmentToExpediente={(index, expId) => saveAttachmentToExpedienteHandler(fullscreenEmail, index, expId)}
               savingAttachmentIndex={savingAttachmentIndex}
