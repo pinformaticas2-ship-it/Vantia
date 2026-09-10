@@ -2929,9 +2929,9 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
   const [sending, setSending] = useState(false);
   const [showMediaPicker, setShowMediaPicker] = useState(false);
   const [mentionQ, setMentionQ] = useState<string|null>(null);
-  const [selectedImage, setSelectedImage] = useState<{ file: File; previewUrl: string } | null>(null);
-  // Array (antes admitía solo un archivo) -- se manda cada uno como mensaje
-  // aparte al pulsar enviar, ver doSend.
+  // Arrays (antes admitían solo uno) -- cada imagen / archivo se manda como
+  // su propio mensaje al pulsar enviar, ver doSend.
+  const [selectedImages, setSelectedImages] = useState<{ file: File; previewUrl: string }[]>([]);
   const [selectedFiles, setSelectedFiles] = useState<{ file: File; name: string; size: number; mime: string }[]>([]);
   const [isDraggingImage, setIsDraggingImage] = useState(false);
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -2956,8 +2956,8 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
   }, [editingMsg?.id]);
 
   useEffect(() => () => {
-    if (selectedImage?.previewUrl) URL.revokeObjectURL(selectedImage.previewUrl);
-  }, [selectedImage]);
+    for (const img of selectedImages) URL.revokeObjectURL(img.previewUrl);
+  }, [selectedImages]);
 
   const stopTypingSignal = useCallback(() => {
     if (typingStopTimeoutRef.current) {
@@ -3022,20 +3022,38 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
   const doSend = async () => {
     if (sendLockRef.current) return;
     const trimmed = text.trim();
-    if (!trimmed && !editingMsg && !selectedImage) return;
+    if (!trimmed && !editingMsg && selectedImages.length === 0 && selectedFiles.length === 0) return;
     sendLockRef.current = true;
     stopTypingSignal();
     setSending(true);
     try {
-      if (editingMsg && !selectedImage) {
+      if (editingMsg && selectedImages.length === 0 && selectedFiles.length === 0) {
         await onSend(trimmed||editingMsg.contenido, undefined, undefined, editingMsg.id);
         setText("");
         return;
       }
-      let imageUrl: string | undefined;
-      if (selectedImage) {
+      // Cada imagen y cada archivo van en su propio mensaje (el modelo de
+      // datos es un adjunto por mensaje). El texto escrito y la respuesta,
+      // si los hay, se mandan con el PRIMER mensaje para que no queden
+      // sueltos.
+      let firstDone = false;
+      const sendOne = async (a: { imageUrl?: string; fileUrl?: string; fileName?: string; fileMime?: string }) => {
+        await onSend(
+          firstDone ? "" : (trimmed || ""),
+          undefined,
+          firstDone ? undefined : replyTo?.id,
+          undefined,
+          a.imageUrl,
+          a.fileUrl,
+          a.fileName,
+          a.fileMime,
+        );
+        firstDone = true;
+      };
+
+      for (const img of selectedImages) {
         const form = new FormData();
-        form.append("image", selectedImage.file);
+        form.append("image", img.file);
         const token = await getToken();
         const res = await fetch("/api/chat/uploads/image", {
           method: "POST",
@@ -3043,42 +3061,31 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
           body: form,
         });
         const data = await safeJson(res);
-        if (!res.ok) return;
-        imageUrl = data.data?.image_url;
+        if (!res.ok) continue;
+        await sendOne({ imageUrl: data.data?.image_url });
       }
-      if (selectedFiles.length > 0) {
-        // Cada archivo va en su propio mensaje (el modelo de datos es un
-        // adjunto por mensaje) -- el texto escrito, si hay, se manda con el
-        // primero para que no aparezca como un mensaje suelto.
-        for (let i = 0; i < selectedFiles.length; i++) {
-          const sf = selectedFiles[i];
-          const form = new FormData();
-          form.append("file", sf.file);
-          const token = await getToken();
-          const res = await fetch("/api/chat/uploads/file", {
-            method: "POST",
-            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-            body: form,
-          });
-          const data = await safeJson(res);
-          if (!res.ok) continue;
-          await onSend(
-            i === 0 ? (trimmed || "") : "",
-            undefined,
-            i === 0 ? replyTo?.id : undefined,
-            undefined,
-            i === 0 ? imageUrl : undefined,
-            data.data?.file_url,
-            data.data?.file_name,
-            data.data?.file_mime,
-          );
-        }
-      } else {
-        await onSend(trimmed || "", undefined, replyTo?.id, undefined, imageUrl, undefined, undefined, undefined);
+
+      for (const sf of selectedFiles) {
+        const form = new FormData();
+        form.append("file", sf.file);
+        const token = await getToken();
+        const res = await fetch("/api/chat/uploads/file", {
+          method: "POST",
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+          body: form,
+        });
+        const data = await safeJson(res);
+        if (!res.ok) continue;
+        await sendOne({ fileUrl: data.data?.file_url, fileName: data.data?.file_name, fileMime: data.data?.file_mime });
       }
+
+      if (!firstDone) {
+        await onSend(trimmed || "", undefined, replyTo?.id, undefined, undefined, undefined, undefined, undefined);
+      }
+
       setText("");
-      if (selectedImage?.previewUrl) URL.revokeObjectURL(selectedImage.previewUrl);
-      setSelectedImage(null);
+      for (const img of selectedImages) URL.revokeObjectURL(img.previewUrl);
+      setSelectedImages([]);
       setSelectedFiles([]);
       if (fileRef.current) fileRef.current.value = "";
       if (attachFileRef.current) attachFileRef.current.value = "";
@@ -3131,6 +3138,15 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
   };
 
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    // Imagen pegada (captura de pantalla con Ctrl+V, copiar una imagen del
+    // navegador...) -- va al mismo flujo que "Adjuntar imagen".
+    const pastedImages = Array.from(e.clipboardData.files || []).filter(f => f.type.startsWith("image/"));
+    if (pastedImages.length) {
+      e.preventDefault();
+      chooseImages(pastedImages);
+      return;
+    }
+
     const html = e.clipboardData.getData("text/html");
     if (!html) return;
 
@@ -3182,13 +3198,12 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
     }
   };
 
-  const chooseImage = (file?: File | null) => {
-    if (!file || !file.type.startsWith("image/")) return;
+  const chooseImages = (files: (File | null | undefined)[]) => {
+    const imgs = files.filter((f): f is File => !!f && f.type.startsWith("image/"));
+    if (!imgs.length) return;
     stopTypingSignal();
-    setSelectedImage(prev => {
-      if (prev?.previewUrl) URL.revokeObjectURL(prev.previewUrl);
-      return { file, previewUrl: URL.createObjectURL(file) };
-    });
+    setSelectedFiles([]);
+    setSelectedImages(prev => [...prev, ...imgs.map(file => ({ file, previewUrl: URL.createObjectURL(file) }))]);
     setShowMediaPicker(false);
   };
 
@@ -3216,15 +3231,15 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    const imageFile = [...e.dataTransfer.files].find((file) => file.type.startsWith("image/"));
+    const imageFiles = [...e.dataTransfer.files].filter((file) => file.type.startsWith("image/"));
     dragCounterRef.current = 0;
     setIsDraggingImage(false);
-    if (!imageFile) return;
+    if (!imageFiles.length) return;
     e.preventDefault();
-    chooseImage(imageFile);
+    chooseImages(imageFiles);
   };
 
-  const canSend = !!text.trim() || !!editingMsg || !!selectedImage || selectedFiles.length > 0;
+  const canSend = !!text.trim() || !!editingMsg || selectedImages.length > 0 || selectedFiles.length > 0;
 
   return (
     <div className="px-4 pb-4 pt-3 shrink-0">
@@ -3302,16 +3317,21 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
         {/* Textarea */}
         <div className="relative px-1">
           {mentionQ!==null&&<MentionDropdown miembros={miembros} query={mentionQ} onSelect={insertMention}/>}
-          {selectedImage && (
-            <div className="mx-3 mt-3 rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-2.5 shadow-sm animate-in fade-in zoom-in-95 duration-200">
-              <div className="relative overflow-hidden rounded-xl">
-                <img src={selectedImage.previewUrl} alt="Vista previa" className="max-h-52 w-full object-cover" />
-                <button onClick={()=>{ if (selectedImage.previewUrl) URL.revokeObjectURL(selectedImage.previewUrl); setSelectedImage(null); if (fileRef.current) fileRef.current.value = ""; }}
-                  className="absolute right-2 top-2 rounded-full bg-black/70 p-1 text-white transition-colors hover:bg-black">
-                  <X size={14}/>
-                </button>
-              </div>
-              <p className="mt-2 truncate text-xs font-medium text-slate-500">{selectedImage.file.name}</p>
+          {selectedImages.length > 0 && (
+            <div className="mx-3 mt-3 flex flex-wrap gap-2">
+              {selectedImages.map((img, i) => (
+                <div key={`${img.file.name}-${i}`} className="relative rounded-xl border border-slate-200 bg-white p-1 shadow-sm animate-in fade-in zoom-in-95 duration-200">
+                  <img src={img.previewUrl} alt="Vista previa" className="h-24 w-24 rounded-lg object-cover" />
+                  <button onClick={()=>{
+                    URL.revokeObjectURL(img.previewUrl);
+                    setSelectedImages(prev => prev.filter((_, idx) => idx !== i));
+                    if (fileRef.current) fileRef.current.value = "";
+                  }}
+                    className="absolute -right-1.5 -top-1.5 rounded-full bg-black/70 p-0.5 text-white transition-colors hover:bg-black">
+                    <X size={12}/>
+                  </button>
+                </div>
+              ))}
             </div>
           )}
           {selectedFiles.length > 0 && (
@@ -3354,8 +3374,9 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
               ref={fileRef}
               type="file"
               accept="image/*"
+              multiple
               className="hidden"
-              onChange={e=>chooseImage(e.target.files?.[0] || null)}
+              onChange={e=>chooseImages(Array.from(e.target.files || []))}
             />
             <input
               ref={attachFileRef}
@@ -3367,7 +3388,7 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
                 const picked = Array.from(e.target.files || []);
                 if (!picked.length) return;
                 setSelectedFiles(prev => [...prev, ...picked.map(f => ({ file: f, name: f.name, size: f.size, mime: f.type }))]);
-                setSelectedImage(null);
+                setSelectedImages([]);
               }}
             />
             <button
@@ -3389,7 +3410,7 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
               className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors">
               <ImageIcon size={16}/>
             </button>
-            <button title="Adjuntar archivos (PDF, Word, Excel...)" onClick={()=>{ setSelectedImage(null); attachFileRef.current?.click(); }}
+            <button title="Adjuntar archivos (PDF, Word, Excel...)" onClick={()=>{ setSelectedImages([]); attachFileRef.current?.click(); }}
               className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors">
               <Paperclip size={16}/>
             </button>
