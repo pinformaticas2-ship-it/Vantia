@@ -15,7 +15,7 @@ import {
   FilePlus2, Search, ChevronDown, ChevronRight as ChevronR,
   Banknote, TrendingUp, TrendingDown, BadgeEuro, Link2,
 } from "lucide-react";
-import { safeJson, resolveApiUrl } from "../lib/api";
+import { safeJson, resolveApiUrl, resolveUploadUrl } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
 import { FilesTabPanel } from "../components/FilesTabPanel";
 import { EtapaSelect } from "../components/EtapaSelect";
@@ -116,6 +116,20 @@ function TabPerfil({ client, formatDate, age }: any) {
         <Field label="Edad"                value={age !== null ? `${age} años` : null} />
         <Field label="Nacionalidad"        value={client.nationality} />
         <Field label="País expedición"     value={client.expedition_country} />
+        {client.dni_image_url && (
+          <div className="col-span-2 md:col-span-3">
+            <p className="text-xs font-medium text-slate-500 mb-1.5">Foto del documento</p>
+            <a
+              href={resolveUploadUrl(client.dni_image_url) || undefined}
+              target="_blank"
+              rel="noreferrer"
+              title="Ver a tamaño completo"
+              className="inline-block rounded-xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-md transition-shadow"
+            >
+              <img src={resolveUploadUrl(client.dni_image_url) || undefined} alt="Documento de identidad" className="h-28 w-auto object-cover" />
+            </a>
+          </div>
+        )}
       </Section>
 
       <Section title="Dirección" icon={MapPin}>

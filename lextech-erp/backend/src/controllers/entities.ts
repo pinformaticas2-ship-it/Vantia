@@ -387,6 +387,21 @@ export const createEntity = async (req: any, res: Response) => {
       console.warn('⚠️ No se pudo crear carpeta para cliente:', err);
     }
 
+    // Foto del DNI (subida con uploadDNI.single('dni_image') en la ruta) --
+    // antes multer guardaba el archivo en disco pero nadie enlazaba la ruta
+    // resultante con el cliente: la imagen se quedaba huérfana, sin
+    // aparecer en ningún sitio de la app aunque el alta "funcionara".
+    const dniFile = (req as any).file as { filename: string } | undefined;
+    if (dniFile) {
+      try {
+        const dniImageUrl = `/uploads/dnis/${dniFile.filename}`;
+        await pool.query(`UPDATE entities SET dni_image_url = $1 WHERE id = $2`, [dniImageUrl, result.rows[0].id]);
+        result.rows[0].dni_image_url = dniImageUrl;
+      } catch (err) {
+        console.warn('⚠️ No se pudo enlazar la imagen del DNI al cliente:', err);
+      }
+    }
+
     // Registrar actividad (fire-and-forget, no bloquea la respuesta).
     // Las altas de una importacion CSV masiva no se registran una a una aqui
     // -- el lote ya deja su propia entrada consolidada de "Alta masiva" en

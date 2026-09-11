@@ -156,6 +156,19 @@ export async function submitPublicForm(req: Request, res: Response) {
     );
     const clientId = ent[0].id;
 
+    // Foto del DNI, si el cliente la adjuntó en el formulario (opcional --
+    // ver uploadDNI.single('dni_image') en la ruta). Mismo patrón que el
+    // alta manual desde el panel.
+    const dniFile = (req as any).file as { filename: string } | undefined;
+    if (dniFile) {
+      try {
+        await pool.query(
+          `UPDATE entities SET dni_image_url = $1 WHERE id = $2`,
+          [`/uploads/dnis/${dniFile.filename}`, clientId],
+        );
+      } catch (_e) { /* best effort, no bloquea el alta */ }
+    }
+
     // "observaciones" no es una columna de entities -- se guarda como nota
     // del cliente recién creado, igual que hace el resto de la app.
     const observacionesTrimmed = (observaciones || '').trim();

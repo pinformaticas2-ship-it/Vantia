@@ -1,9 +1,12 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Spinner } from "../components/Spinner";
 import { useParams } from "react-router-dom";
-import { Scale, Loader2, AlertCircle, CheckCircle2, ChevronRight, ChevronLeft } from "lucide-react";
+import { Scale, Loader2, AlertCircle, CheckCircle2, ChevronRight, ChevronLeft, ScanLine, X } from "lucide-react";
 
-interface FormData {
+// Renombrada de "FormData" a "ClientFormFields" -- ese nombre tapaba el
+// FormData global del navegador, que hace falta más abajo para mandar la
+// foto del DNI (multipart/form-data).
+interface ClientFormFields {
   first_name: string;
   last_name: string;
   email: string;
@@ -19,7 +22,7 @@ export default function FormularioCliente() {
   const [pageState, setPageState] = useState<PageState>("loading");
   const [linkInfo, setLinkInfo] = useState<{ label?: string; creator_name?: string } | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [form, setForm] = useState<FormData>({
+  const [form, setForm] = useState<ClientFormFields>({
     first_name: "",
     last_name: "",
     email: "",
@@ -28,6 +31,9 @@ export default function FormularioCliente() {
     observaciones: "",
   });
   const [fieldError, setFieldError] = useState<string | null>(null);
+  const [dniFile, setDniFile] = useState<File | null>(null);
+  const [dniPreview, setDniPreview] = useState<string | null>(null);
+  const dniInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!token) { setPageState("invalid"); return; }
@@ -53,15 +59,28 @@ export default function FormularioCliente() {
     setFieldError(null);
   };
 
+  const handleDniChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    if (dniPreview) URL.revokeObjectURL(dniPreview);
+    setDniFile(file);
+    setDniPreview(file ? URL.createObjectURL(file) : null);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.first_name.trim()) { setFieldError("El nombre es obligatorio."); return; }
     setPageState("submitting");
     try {
+      // multipart/form-data siempre (aunque no se adjunte foto) para no tener
+      // dos caminos distintos en el backend -- multer parsea igual de bien
+      // los campos de texto sueltos.
+      const body = new FormData();
+      Object.entries(form).forEach(([key, value]) => body.append(key, value));
+      if (dniFile) body.append("dni_image", dniFile);
+
       const res = await fetch(`/api/clientes/invites/public/${token}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body,
       });
       const d = await res.json();
       if (res.ok && d.success) {
@@ -240,6 +259,37 @@ export default function FormularioCliente() {
                   rows={3}
                   className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Foto del DNI (opcional)</label>
+                <input
+                  ref={dniInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleDniChange}
+                  className="hidden"
+                />
+                {dniPreview ? (
+                  <div className="relative inline-block">
+                    <img src={dniPreview} alt="Vista previa del DNI" className="h-24 rounded-lg border border-slate-200 object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => { setDniFile(null); if (dniPreview) URL.revokeObjectURL(dniPreview); setDniPreview(null); if (dniInputRef.current) dniInputRef.current.value = ""; }}
+                      className="absolute -right-2 -top-2 rounded-full bg-slate-700 p-1 text-white hover:bg-slate-900 transition-colors"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => dniInputRef.current?.click()}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 py-3 text-sm text-slate-500 hover:border-red-300 hover:text-red-600 transition-colors"
+                  >
+                    <ScanLine className="w-4 h-4" /> Adjuntar foto del DNI
+                  </button>
+                )}
               </div>
             </div>
 
