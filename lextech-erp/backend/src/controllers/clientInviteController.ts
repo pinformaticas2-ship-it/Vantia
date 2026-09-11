@@ -133,37 +133,66 @@ export async function submitPublicForm(req: Request, res: Response) {
 
     const { first_name, last_name, email, telefono, nif_cif, observaciones } = req.body;
     if (!first_name?.trim()) return err(res, 'El nombre es obligatorio', 400);
+    const nifTrimmed = (nif_cif || '').trim() || null;
 
     // Crear la entidad (cliente). Nombres de columna reales de "entities"
     // (antes este INSERT usaba entity_type/telefono/observaciones, que no
     // existen en la tabla -- por eso este formulario público nunca llegaba
     // a crear el cliente).
-    const { rows: ent } = await pool.query(
-      `INSERT INTO entities
-         (first_name, last_name, email, phone_1, nif_cif,
-          type, created_by, organizacion_id)
-       VALUES ($1,$2,$3,$4,$5,'CLIENTE',$6,$7)
-       RETURNING id`,
-      [
-        first_name.trim(),
-        (last_name || '').trim() || null,
-        (email || '').trim() || null,
-        (telefono || '').trim() || null,
-        (nif_cif || '').trim() || null,
-        link.created_by,
-        link.organizacion_id,
-      ],
-    );
-    const clientId = ent[0].id;
+    let clientId: string;
+    try {
+      const { rows: ent } = await pool.query(
+        `INSERT INTO entities
+           (first_name, last_name, email, phone_1, nif_cif,
+            type, created_by, organizacion_id)
+         VALUES ($1,$2,$3,$4,$5,'CLIENTE',$6,$7)
+         RETURNING id`,
+        [
+          first_name.trim(),
+          (last_name || '').trim() || null,
+          (email || '').trim() || null,
+          (telefono || '').trim() || null,
+          nifTrimmed,
+          link.created_by,
+          link.organizacion_id,
+        ],
+      );
+      clientId = ent[0].id;
+    } catch (e: any) {
+      // idx_entities_org_nif_cif: ya existe un cliente con ese NIF/CIF en esta
+      // organización (p.ej. de alguien que ya se dio de alta antes por otra
+      // vía). En vez de reventar con el error técnico de Postgres delante del
+      // cliente que rellena el formulario, reutilizamos esa ficha y
+      // completamos los huecos con lo que acaba de mandar.
+      if (e.code === '23505' && nifTrimmed) {
+        const { rows: existing } = await pool.query(
+          `SELECT id FROM entities WHERE organizacion_id = $1 AND nif_cif = $2 LIMIT 1`,
+          [link.organizacion_id, nifTrimmed],
+        );
+        if (!existing.length) throw e;
+        clientId = existing[0].id;
+        await pool.query(
+          `UPDATE entities SET
+             last_name = COALESCE(NULLIF(last_name, ''), $1),
+             email     = COALESCE(NULLIF(email, ''), $2),
+             phone_1   = COALESCE(NULLIF(phone_1, ''), $3)
+           WHERE id = $4`,
+          [(last_name || '').trim() || null, (email || '').trim() || null, (telefono || '').trim() || null, clientId],
+        );
+      } else {
+        throw e;
+      }
+    }
 
     // Foto del DNI, si el cliente la adjuntó en el formulario (opcional --
     // ver uploadDNI.single('dni_image') en la ruta). Mismo patrón que el
-    // alta manual desde el panel.
+    // alta manual desde el panel. No se pisa una foto que ya hubiera (caso
+    // de ficha reutilizada arriba).
     const dniFile = (req as any).file as { filename: string } | undefined;
     if (dniFile) {
       try {
         await pool.query(
-          `UPDATE entities SET dni_image_url = $1 WHERE id = $2`,
+          `UPDATE entities SET dni_image_url = $1 WHERE id = $2 AND (dni_image_url IS NULL OR dni_image_url = '')`,
           [`/uploads/dnis/${dniFile.filename}`, clientId],
         );
       } catch (_e) { /* best effort, no bloquea el alta */ }
@@ -197,6 +226,11 @@ export async function submitPublicForm(req: Request, res: Response) {
 
     return ok(res, { message: 'Datos recibidos correctamente', client_id: clientId });
   } catch (e: any) {
-    return err(res, e.message);
+    console.error('❌ submitPublicForm:', e);
+    // Nunca mandar el mensaje crudo de Postgres a un formulario público.
+    if (e.code === '23505') {
+      return err(res, 'Ya existe un cliente registrado con estos datos. Ponte en contacto con el despacho.', 409);
+    }
+    return err(res, 'No se pudo enviar el formulario. Inténtalo de nuevo o contacta con el despacho.', 500);
   }
 }
