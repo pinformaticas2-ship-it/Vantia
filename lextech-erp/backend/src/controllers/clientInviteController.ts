@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import pool from '../config/database';
 import { randomBytes } from 'crypto';
+import { sendClientWelcomeEmail } from '../utils/clientWelcomeEmail';
 
 function userId(req: Request) { return (req as any).auth?.userId || 'SYSTEM'; }
 function userName(req: Request) { return (req as any).auth?.firstName || (req as any).auth?.name || 'Usuario'; }
@@ -173,6 +174,13 @@ export async function submitPublicForm(req: Request, res: Response) {
        WHERE id=$2`,
       [clientId, link.id],
     );
+
+    // Correo de confirmación al cliente (fire-and-forget, ver clientWelcomeEmail.ts)
+    void sendClientWelcomeEmail(link.organizacion_id, {
+      email: (email || '').trim() || null,
+      first_name: first_name.trim(),
+      last_name: (last_name || '').trim() || null,
+    });
 
     return ok(res, { message: 'Datos recibidos correctamente', client_id: clientId });
   } catch (e: any) {

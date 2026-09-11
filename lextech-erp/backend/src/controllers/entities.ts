@@ -4,6 +4,7 @@ import fs from 'fs';
 import pool from '../config/database';
 import { logActivity, logActivityForReq } from './activityController';
 import { CLIENT_FILES_ROOT, UPLOADS_CLIENTS_ROOT as UPLOADS_ROOT } from '../config/paths';
+import { sendClientWelcomeEmail } from '../utils/clientWelcomeEmail';
 
 /** Convierte strings vacíos/guiones a null (evita casts fallidos en PostgreSQL) */
 const nullIfEmpty = (v: any) => {
@@ -394,6 +395,12 @@ export const createEntity = async (req: any, res: Response) => {
     if (req.headers['x-bulk-import'] !== '1') {
       const entityName = `${first_name} ${last_name || ''}`.trim() + ` (${nif_cif || 'sin NIF'})`;
       logActivityForReq(req, 'Nuevo cliente creado', 'CLIENT', result.rows[0].id, entityName);
+      // Correo de confirmación al cliente -- solo en altas "de verdad", nunca
+      // en una importación CSV masiva (sería spam a clientes históricos).
+      // Fire-and-forget: si falla o no hay cuenta configurada, no afecta al alta.
+      if ((nullIfEmpty(type) || 'CLIENTE') === 'CLIENTE') {
+        void sendClientWelcomeEmail(req.organizacionId, { email, first_name, last_name });
+      }
     }
 
     res.status(201).json({ success: true, data: result.rows[0] });
