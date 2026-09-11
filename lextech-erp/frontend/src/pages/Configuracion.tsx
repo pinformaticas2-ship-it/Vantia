@@ -349,6 +349,8 @@ function DespachoPanel() {
   const [nifCif, setNifCif] = useState('');
   const [direccionFiscal, setDireccionFiscal] = useState('');
   const [textoLegalFacturas, setTextoLegalFacturas] = useState('');
+  const [welcomeEmailSubject, setWelcomeEmailSubject] = useState('');
+  const [welcomeEmailBody, setWelcomeEmailBody] = useState('');
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [removingLogo, setRemovingLogo] = useState(false);
@@ -371,6 +373,8 @@ function DespachoPanel() {
     setNifCif(organizacion.nifCif || '');
     setDireccionFiscal(organizacion.direccionFiscal || '');
     setTextoLegalFacturas(organizacion.textoLegalFacturas || '');
+    setWelcomeEmailSubject(organizacion.clientWelcomeEmailSubject || '');
+    setWelcomeEmailBody(organizacion.clientWelcomeEmailBody || '');
   }, [organizacion]);
 
   const canEdit = rol === 'propietario' || rol === 'admin';
@@ -386,6 +390,8 @@ function DespachoPanel() {
           nifCif: nifCif.trim(),
           direccionFiscal: direccionFiscal.trim(),
           textoLegalFacturas: textoLegalFacturas.trim(),
+          clientWelcomeEmailSubject: welcomeEmailSubject.trim(),
+          clientWelcomeEmailBody: welcomeEmailBody.trim(),
         }),
       });
       if (data?.success === false) throw new Error(data.error);
@@ -590,6 +596,33 @@ function DespachoPanel() {
                   placeholder="Texto que aparecerá al pie de las facturas (condiciones, aviso legal...)"
                   className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-red-300 resize-none"
                 />
+              </div>
+              <div className="border-t border-slate-100 pt-4">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Correo de bienvenida al cliente</p>
+                <p className="text-xs text-slate-400 mb-3">
+                  Se envía automáticamente al dar de alta un cliente (manual o por formulario con enlace). Deja los campos vacíos para usar el mensaje por defecto. Puedes usar <code className="bg-slate-100 px-1 py-0.5 rounded">{'{nombre}'}</code> para insertar el nombre del cliente.
+                </p>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Asunto</label>
+                    <input
+                      value={welcomeEmailSubject}
+                      onChange={(e) => setWelcomeEmailSubject(e.target.value)}
+                      placeholder="Hemos recibido tus datos"
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-red-300"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Mensaje</label>
+                    <textarea
+                      value={welcomeEmailBody}
+                      onChange={(e) => setWelcomeEmailBody(e.target.value)}
+                      rows={4}
+                      placeholder={`Hola {nombre},\n\nHemos registrado correctamente tus datos en nuestro despacho. En breve nos pondremos en contacto contigo para los siguientes pasos.\n\nUn saludo.`}
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-red-300 resize-none"
+                    />
+                  </div>
+                </div>
               </div>
             </>
           ) : (

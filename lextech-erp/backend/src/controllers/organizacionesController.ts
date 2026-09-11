@@ -124,7 +124,9 @@ export async function getMyOrganizacion(req: Request, res: Response) {
     let organizacion = null;
     if (activa) {
       const { rows } = await pool.query(
-        `SELECT id, nombre, nif_cif, direccion_fiscal, logo_url, texto_legal_facturas FROM organizaciones WHERE id = $1`,
+        `SELECT id, nombre, nif_cif, direccion_fiscal, logo_url, texto_legal_facturas,
+                client_welcome_email_subject, client_welcome_email_body
+         FROM organizaciones WHERE id = $1`,
         [activa.organizacionId]
       );
       const org = rows[0];
@@ -135,6 +137,8 @@ export async function getMyOrganizacion(req: Request, res: Response) {
         nifCif: canSeeCredenciales ? org.nif_cif : null,
         direccionFiscal: canSeeCredenciales ? org.direccion_fiscal : null,
         textoLegalFacturas: canSeeCredenciales ? org.texto_legal_facturas : null,
+        clientWelcomeEmailSubject: canSeeCredenciales ? org.client_welcome_email_subject : null,
+        clientWelcomeEmailBody: canSeeCredenciales ? org.client_welcome_email_body : null,
       } : { id: activa.organizacionId, nombre: activa.organizacionNombre };
     }
 
@@ -164,16 +168,19 @@ export async function updateMyOrganizacion(req: Request, res: Response) {
     const nifCif = nullIfEmpty(req.body?.nifCif);
     const direccionFiscal = nullIfEmpty(req.body?.direccionFiscal);
     const textoLegalFacturas = nullIfEmpty(req.body?.textoLegalFacturas);
+    const clientWelcomeEmailSubject = nullIfEmpty(req.body?.clientWelcomeEmailSubject);
+    const clientWelcomeEmailBody = nullIfEmpty(req.body?.clientWelcomeEmailBody);
 
     await pool.query(
       `UPDATE organizaciones
-         SET nombre = $1, nif_cif = $2, direccion_fiscal = $3, texto_legal_facturas = $4, updated_at = NOW()
-       WHERE id = $5`,
-      [nombre, nifCif, direccionFiscal, textoLegalFacturas, ctx.organizacionId]
+         SET nombre = $1, nif_cif = $2, direccion_fiscal = $3, texto_legal_facturas = $4,
+             client_welcome_email_subject = $5, client_welcome_email_body = $6, updated_at = NOW()
+       WHERE id = $7`,
+      [nombre, nifCif, direccionFiscal, textoLegalFacturas, clientWelcomeEmailSubject, clientWelcomeEmailBody, ctx.organizacionId]
     );
     const userId = (req as any).auth?.userId;
     invalidateUserCache(userId);
-    return ok(res, { id: ctx.organizacionId, nombre, nifCif, direccionFiscal, textoLegalFacturas });
+    return ok(res, { id: ctx.organizacionId, nombre, nifCif, direccionFiscal, textoLegalFacturas, clientWelcomeEmailSubject, clientWelcomeEmailBody });
   } catch (e: any) {
     return err(res, pgErr(e));
   }

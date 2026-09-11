@@ -19,6 +19,8 @@ export interface OrganizacionInfo {
   direccionFiscal?: string | null;
   logoUrl?: string | null;
   textoLegalFacturas?: string | null;
+  clientWelcomeEmailSubject?: string | null;
+  clientWelcomeEmailBody?: string | null;
 }
 
 export interface OrganizacionMembership extends OrganizacionInfo {

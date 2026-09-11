@@ -2130,6 +2130,18 @@ export async function runMigrations(): Promise<void> {
       await client.query(`ALTER TABLE chat_presence ADD PRIMARY KEY (user_id, organizacion_id);`);
     } catch (_e: any) {}
 
+    // ── Correo de bienvenida al cliente: asunto/cuerpo personalizables ──
+    // Antes el texto estaba fijo en el código (sendClientWelcomeEmail). Si
+    // están vacías (NULL), se usa el texto por defecto -- no hace falta que
+    // el propietario configure nada para que siga funcionando como hasta
+    // ahora.
+    try {
+      await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS client_welcome_email_subject TEXT;`);
+    } catch (_e: any) {}
+    try {
+      await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS client_welcome_email_body TEXT;`);
+    } catch (_e: any) {}
+
     // ── Permisos en schema public (requerido en PostgreSQL 15+) ────
     for (const grant of [
       `GRANT USAGE ON SCHEMA public TO admin`,

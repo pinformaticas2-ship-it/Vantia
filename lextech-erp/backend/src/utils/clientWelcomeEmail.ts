@@ -19,28 +19,48 @@ export async function sendClientWelcomeEmail(
 ): Promise<void> {
   if (!client.email?.trim()) return;
   try {
-    const { rows } = await pool.query(
-      `SELECT * FROM email_accounts WHERE organizacion_id = $1 AND active = true ORDER BY created_at ASC LIMIT 1`,
-      [organizacionId],
-    );
-    if (!rows.length) return; // sin cuenta configurada -- no se manda, no rompe nada
-    const acc = rows[0];
+    const [accRes, orgRes] = await Promise.all([
+      pool.query(
+        `SELECT * FROM email_accounts WHERE organizacion_id = $1 AND active = true ORDER BY created_at ASC LIMIT 1`,
+        [organizacionId],
+      ),
+      pool.query(
+        `SELECT client_welcome_email_subject, client_welcome_email_body FROM organizaciones WHERE id = $1`,
+        [organizacionId],
+      ),
+    ]);
+    if (!accRes.rows.length) return; // sin cuenta configurada -- no se manda, no rompe nada
+    const acc = accRes.rows[0];
     const password = decryptPassword(acc.password_enc);
     const smtpCfg: SmtpConfig = {
       host: acc.smtp_host, port: acc.smtp_port, secure: acc.smtp_secure,
       user: acc.username, password,
     };
     const nombre = [client.first_name, client.last_name].filter(Boolean).join(' ').trim() || 'Estimado/a cliente';
-    const html = `
-      <p>Hola ${nombre},</p>
-      <p>Hemos registrado correctamente tus datos en nuestro despacho. En breve nos pondremos en contacto contigo para los siguientes pasos.</p>
-      <p>Un saludo.</p>
-    `.trim();
+
+    // Asunto y cuerpo personalizables desde Configuración → Mi Despacho. Si
+    // la organización no ha configurado nada, se usa el texto de siempre.
+    // Placeholder soportado en ambos: {nombre} -- nombre completo del cliente.
+    const org = orgRes.rows[0] || {};
+    const applyPlaceholders = (text: string) => text.replace(/\{nombre\}/g, nombre);
+
+    const subject = org.client_welcome_email_subject
+      ? applyPlaceholders(org.client_welcome_email_subject)
+      : 'Hemos recibido tus datos';
+
+    const html = org.client_welcome_email_body
+      ? applyPlaceholders(org.client_welcome_email_body).replace(/\n/g, '<br>')
+      : `
+        <p>Hola ${nombre},</p>
+        <p>Hemos registrado correctamente tus datos en nuestro despacho. En breve nos pondremos en contacto contigo para los siguientes pasos.</p>
+        <p>Un saludo.</p>
+      `.trim();
+
     const msg: MailMessage = {
       from: acc.email,
       fromName: acc.label || undefined,
       to: [client.email.trim()],
-      subject: 'Hemos recibido tus datos',
+      subject,
       html,
     };
     await dispatchEmail(smtpCfg, msg);
