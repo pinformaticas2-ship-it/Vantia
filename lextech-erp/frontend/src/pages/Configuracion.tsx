@@ -351,6 +351,7 @@ function DespachoPanel() {
   const [textoLegalFacturas, setTextoLegalFacturas] = useState('');
   const [welcomeEmailSubject, setWelcomeEmailSubject] = useState('');
   const [welcomeEmailBody, setWelcomeEmailBody] = useState('');
+  const [welcomeEmailSignature, setWelcomeEmailSignature] = useState('');
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [removingLogo, setRemovingLogo] = useState(false);
@@ -375,6 +376,7 @@ function DespachoPanel() {
     setTextoLegalFacturas(organizacion.textoLegalFacturas || '');
     setWelcomeEmailSubject(organizacion.clientWelcomeEmailSubject || '');
     setWelcomeEmailBody(organizacion.clientWelcomeEmailBody || '');
+    setWelcomeEmailSignature(organizacion.clientWelcomeEmailSignature || '');
   }, [organizacion]);
 
   const canEdit = rol === 'propietario' || rol === 'admin';
@@ -392,6 +394,7 @@ function DespachoPanel() {
           textoLegalFacturas: textoLegalFacturas.trim(),
           clientWelcomeEmailSubject: welcomeEmailSubject.trim(),
           clientWelcomeEmailBody: welcomeEmailBody.trim(),
+          clientWelcomeEmailSignature: welcomeEmailSignature.trim(),
         }),
       });
       if (data?.success === false) throw new Error(data.error);
@@ -621,6 +624,17 @@ function DespachoPanel() {
                       placeholder={`Hola {nombre},\n\nHemos registrado correctamente tus datos en nuestro despacho. En breve nos pondremos en contacto contigo para los siguientes pasos.\n\nUn saludo.`}
                       className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-red-300 resize-none"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Firma (opcional)</label>
+                    <textarea
+                      value={welcomeEmailSignature}
+                      onChange={(e) => setWelcomeEmailSignature(e.target.value)}
+                      rows={3}
+                      placeholder={`Despacho Vantia Legis\nAv. Ejemplo, 1 — 28001 Madrid\nTel. 900 000 000`}
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-red-300 resize-none"
+                    />
+                    <p className="text-xs text-slate-400 mt-1">Se añade al final del correo, debajo del mensaje.</p>
                   </div>
                 </div>
               </div>

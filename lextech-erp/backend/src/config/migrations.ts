@@ -2141,6 +2141,12 @@ export async function runMigrations(): Promise<void> {
     try {
       await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS client_welcome_email_body TEXT;`);
     } catch (_e: any) {}
+    // Firma opcional que se añade al final del correo de bienvenida (nombre
+    // del despacho, cargo, teléfono...). Independiente del cuerpo para que
+    // no haya que repetirla si se cambia el mensaje.
+    try {
+      await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS client_welcome_email_signature TEXT;`);
+    } catch (_e: any) {}
 
     // ── Permisos en schema public (requerido en PostgreSQL 15+) ────
     for (const grant of [

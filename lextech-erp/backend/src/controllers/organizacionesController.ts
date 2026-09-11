@@ -125,7 +125,7 @@ export async function getMyOrganizacion(req: Request, res: Response) {
     if (activa) {
       const { rows } = await pool.query(
         `SELECT id, nombre, nif_cif, direccion_fiscal, logo_url, texto_legal_facturas,
-                client_welcome_email_subject, client_welcome_email_body
+                client_welcome_email_subject, client_welcome_email_body, client_welcome_email_signature
          FROM organizaciones WHERE id = $1`,
         [activa.organizacionId]
       );
@@ -139,6 +139,7 @@ export async function getMyOrganizacion(req: Request, res: Response) {
         textoLegalFacturas: canSeeCredenciales ? org.texto_legal_facturas : null,
         clientWelcomeEmailSubject: canSeeCredenciales ? org.client_welcome_email_subject : null,
         clientWelcomeEmailBody: canSeeCredenciales ? org.client_welcome_email_body : null,
+        clientWelcomeEmailSignature: canSeeCredenciales ? org.client_welcome_email_signature : null,
       } : { id: activa.organizacionId, nombre: activa.organizacionNombre };
     }
 
@@ -170,17 +171,19 @@ export async function updateMyOrganizacion(req: Request, res: Response) {
     const textoLegalFacturas = nullIfEmpty(req.body?.textoLegalFacturas);
     const clientWelcomeEmailSubject = nullIfEmpty(req.body?.clientWelcomeEmailSubject);
     const clientWelcomeEmailBody = nullIfEmpty(req.body?.clientWelcomeEmailBody);
+    const clientWelcomeEmailSignature = nullIfEmpty(req.body?.clientWelcomeEmailSignature);
 
     await pool.query(
       `UPDATE organizaciones
          SET nombre = $1, nif_cif = $2, direccion_fiscal = $3, texto_legal_facturas = $4,
-             client_welcome_email_subject = $5, client_welcome_email_body = $6, updated_at = NOW()
-       WHERE id = $7`,
-      [nombre, nifCif, direccionFiscal, textoLegalFacturas, clientWelcomeEmailSubject, clientWelcomeEmailBody, ctx.organizacionId]
+             client_welcome_email_subject = $5, client_welcome_email_body = $6,
+             client_welcome_email_signature = $7, updated_at = NOW()
+       WHERE id = $8`,
+      [nombre, nifCif, direccionFiscal, textoLegalFacturas, clientWelcomeEmailSubject, clientWelcomeEmailBody, clientWelcomeEmailSignature, ctx.organizacionId]
     );
     const userId = (req as any).auth?.userId;
     invalidateUserCache(userId);
-    return ok(res, { id: ctx.organizacionId, nombre, nifCif, direccionFiscal, textoLegalFacturas, clientWelcomeEmailSubject, clientWelcomeEmailBody });
+    return ok(res, { id: ctx.organizacionId, nombre, nifCif, direccionFiscal, textoLegalFacturas, clientWelcomeEmailSubject, clientWelcomeEmailBody, clientWelcomeEmailSignature });
   } catch (e: any) {
     return err(res, pgErr(e));
   }

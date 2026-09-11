@@ -25,7 +25,8 @@ export async function sendClientWelcomeEmail(
         [organizacionId],
       ),
       pool.query(
-        `SELECT client_welcome_email_subject, client_welcome_email_body FROM organizaciones WHERE id = $1`,
+        `SELECT client_welcome_email_subject, client_welcome_email_body, client_welcome_email_signature
+         FROM organizaciones WHERE id = $1`,
         [organizacionId],
       ),
     ]);
@@ -48,13 +49,21 @@ export async function sendClientWelcomeEmail(
       ? applyPlaceholders(org.client_welcome_email_subject)
       : 'Hemos recibido tus datos';
 
-    const html = org.client_welcome_email_body
+    const bodyHtml = org.client_welcome_email_body
       ? applyPlaceholders(org.client_welcome_email_body).replace(/\n/g, '<br>')
       : `
         <p>Hola ${nombre},</p>
         <p>Hemos registrado correctamente tus datos en nuestro despacho. En breve nos pondremos en contacto contigo para los siguientes pasos.</p>
         <p>Un saludo.</p>
       `.trim();
+
+    // Firma opcional al final del correo (despacho, cargo, teléfono...),
+    // independiente del cuerpo para no tener que repetirla si se cambia el
+    // mensaje.
+    const signatureHtml = org.client_welcome_email_signature
+      ? applyPlaceholders(org.client_welcome_email_signature).replace(/\n/g, '<br>')
+      : '';
+    const html = signatureHtml ? `${bodyHtml}<br><br>${signatureHtml}` : bodyHtml;
 
     const msg: MailMessage = {
       from: acc.email,

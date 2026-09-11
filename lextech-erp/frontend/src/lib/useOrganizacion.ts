@@ -21,6 +21,7 @@ export interface OrganizacionInfo {
   textoLegalFacturas?: string | null;
   clientWelcomeEmailSubject?: string | null;
   clientWelcomeEmailBody?: string | null;
+  clientWelcomeEmailSignature?: string | null;
 }
 
 export interface OrganizacionMembership extends OrganizacionInfo {
