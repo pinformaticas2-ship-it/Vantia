@@ -4308,15 +4308,29 @@ export default function Email() {
       if (!currentImapAccount || imapSyncInFlightRef.current) return;
       imapSyncInFlightRef.current = true;
       const folderStr = mapFolderToImapApi(selectedFolder, imapSystemFolderMap);
+
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(safetyTimeout);
+        imapSyncInFlightRef.current = false;
+        if (!cancelled) void readAndApply();
+      };
+      // Red de seguridad: si la petición se queda colgada de verdad (no un
+      // error normal, que ya cae en el .catch de abajo -- un problema de red
+      // o un servidor IMAP que ni siquiera responde a nivel de conexión), sin
+      // esto imapSyncInFlightRef se quedaría en true para siempre y el correo
+      // dejaría de refrescarse del todo a partir de ahí ("funcionó un
+      // momento y luego ya nada"). Con esto, como mucho se pierde un ciclo.
+      const safetyTimeout = setTimeout(finish, 40_000);
+
       void authFetch(
         `${API}/email/accounts/${currentImapAccount.id}/sync?folder=${encodeURIComponent(folderStr)}&limit=20`,
         { method: 'POST' },
       )
         .catch(() => null)
-        .then(() => {
-          imapSyncInFlightRef.current = false;
-          if (!cancelled) void readAndApply();
-        });
+        .then(finish);
     };
 
     const doRefresh = async (checkStructure = false, fromFocus = false) => {
