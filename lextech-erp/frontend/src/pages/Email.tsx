@@ -3602,6 +3602,7 @@ export default function Email() {
   const lastRefreshAtRef = useRef<number>(0);
   const emailIdsRef      = useRef<Set<string>>(new Set());
   const imapSyncInFlightRef = useRef(false); // evita solapar sincronizaciones IMAP reales
+  const gmailSyncInFlightRef = useRef(false); // ídem para el perfil de Gmail "guardado" (sync backend)
 
   const currentImapAccount = useMemo(
     () => imapAccounts.find((account) => account.id === selectedImapAccountId) || null,
@@ -4333,6 +4334,37 @@ export default function Email() {
         .then(finish);
     };
 
+    // ── Lo mismo para una cuenta de Gmail conectada "con enlace" (perfil
+    // guardado, sync vía backend) ────────────────────────────────────────
+    // Antes esto SOLO se lanzaba dentro de loadEmails (al cambiar de carpeta
+    // o al cargar la página) -- el refresco periódico de aquí nunca lo
+    // disparaba, solo releía la misma BD una y otra vez. Si el usuario se
+    // quedaba con la pestaña abierta sin tocar nada, jamás llegaba correo
+    // nuevo aunque el token siguiera renovándose solo en segundo plano (por
+    // eso "se quedaba" en una fecha fija). Mismo patrón que triggerImapSync.
+    const triggerGmailProfileSync = () => {
+      const savedProfile = currentGmailProfileRef.current;
+      if (!savedProfile || selectedFolder === 'PINNED' || gmailSyncInFlightRef.current) return;
+      gmailSyncInFlightRef.current = true;
+
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(safetyTimeout);
+        gmailSyncInFlightRef.current = false;
+        if (!cancelled) void readAndApply();
+      };
+      const safetyTimeout = setTimeout(finish, 40_000);
+
+      void authFetch(
+        `${API}/email/gmail/profiles/${savedProfile.id}/sync?folder=${encodeURIComponent(selectedFolder)}&limit=50`,
+        { method: 'POST' },
+      )
+        .catch(() => null)
+        .then(finish);
+    };
+
     const doRefresh = async (checkStructure = false, fromFocus = false) => {
       // Debounce focus-triggered refreshes: ignore if we refreshed < 30s ago
       if (fromFocus && Date.now() - lastRefreshAtRef.current < 30_000) return;
@@ -4346,13 +4378,16 @@ export default function Email() {
         if (currentImapAccount) {
           if (checkStructure) void refreshImapFolders(currentImapAccount.id).catch(() => undefined);
           triggerImapSync();
-        } else if (gmail && checkStructure) {
-          gmail.listLabels().then(({ labels }) => {
-            setGmailLabels((labels || []).map((label: any) => ({
-              ...label,
-              name: normalizeLabelName(label?.name, label?.id || 'Carpeta sin nombre'),
-            })));
-          }).catch(() => undefined);
+        } else {
+          if (checkStructure && gmail) {
+            gmail.listLabels().then(({ labels }) => {
+              setGmailLabels((labels || []).map((label: any) => ({
+                ...label,
+                name: normalizeLabelName(label?.name, label?.id || 'Carpeta sin nombre'),
+              })));
+            }).catch(() => undefined);
+          }
+          triggerGmailProfileSync();
         }
 
         // Lectura inmediata de lo que ya hay en BD (rápida) -- el resultado
