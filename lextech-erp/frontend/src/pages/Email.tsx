@@ -75,6 +75,18 @@ interface GmailGIS {
         login_hint?: string;
         callback: (resp: { access_token?: string; error?: string; expires_in?: number }) => void;
       }) => { requestAccessToken: () => void };
+      // Flujo de código de autorización (access_type=offline) -- a diferencia
+      // de initTokenClient, esto permite obtener un refresh_token para que el
+      // backend pueda renovar el acceso a Gmail sin depender del navegador.
+      initCodeClient: (cfg: {
+        client_id: string;
+        scope: string;
+        login_hint?: string;
+        ux_mode?: 'popup' | 'redirect';
+        access_type?: 'offline' | 'online';
+        prompt?: string;
+        callback: (resp: { code?: string; error?: string }) => void;
+      }) => { requestCode: () => void };
     };
   };
 }
@@ -3531,7 +3543,7 @@ export default function Email() {
   const [savedGmailProfiles, setSavedGmailProfiles] = useState<SavedOAuthProfile[]>([]);
   const [gmailLabels, setGmailLabels]   = useState<GmailLabel[]>([]);
   const [gmailExpired, setGmailExpired] = useState(false);
-  const tokenClientRef = useRef<{ requestAccessToken: () => void } | null>(null);
+  const tokenClientRef = useRef<{ requestCode: () => void } | null>(null);
 
   const gmail = useMemo(() => gmailToken ? new GmailService(gmailToken) : null, [gmailToken]);
 
@@ -3691,55 +3703,6 @@ export default function Email() {
     document.body.appendChild(s);
   }, []);
 
-  // Callback separado para poder reutilizarlo en init y en reintentos
-  const gmailCallback = useCallback((resp: { access_token?: string; error?: string; expires_in?: number }) => {
-    if (resp.access_token) {
-      const expiresAt = Date.now() + (resp.expires_in || 3600) * 1000;
-      setGmailToken(resp.access_token);
-      setGmailExpired(false);
-      localStorage.setItem(GMAIL_TOKEN_KEY, JSON.stringify({
-        access_token: resp.access_token,
-        expires_at: expiresAt,
-      }));
-      return;
-    } else {
-      setError('Error al conectar con Google: ' + (resp.error || 'Desconocido'));
-    }
-  }, []);
-
-  const connectGoogle = useCallback((loginHint?: string) => {
-    const goog = (window as any).google as GmailGIS | undefined;
-    const currentOrigin = window.location.origin;
-    const shouldNormalizeLocalOrigin =
-      /^(http:\/\/127\.0\.0\.1:\d+|http:\/\/localhost:\d+)$/.test(currentOrigin) &&
-      currentOrigin !== 'http://localhost:5173';
-
-    if (shouldNormalizeLocalOrigin) {
-      window.location.replace(
-        `http://localhost:5173${window.location.pathname}${window.location.search}${window.location.hash}`,
-      );
-      return;
-    }
-
-    if (!GMAIL_CLIENT_ID) {
-      setError('VITE_GOOGLE_CLIENT_ID no está configurado en .env');
-      return;
-    }
-    if (!goog?.accounts?.oauth2) {
-      setError('Google Identity Services aún se está cargando. Espera un momento y vuelve a intentarlo.');
-      return;
-    }
-    const clientConfig: any = {
-      client_id: GMAIL_CLIENT_ID,
-      scope: GMAIL_SCOPES,
-      callback: gmailCallback,
-    };
-    if (loginHint) clientConfig.login_hint = loginHint;
-    tokenClientRef.current = goog.accounts.oauth2.initTokenClient(clientConfig);
-    setSelectedImapAccountId(null);
-    tokenClientRef.current.requestAccessToken();
-  }, [gmailCallback]);
-
   const reconnectGoogleProfile = useCallback((profile: SavedOAuthProfile) => {
     setSelectedImapAccountId(null);
     setSelectedFolder('INBOX');
@@ -3833,6 +3796,80 @@ export default function Email() {
     if (!response.ok || !payload?.success) return;
     setSavedGmailProfiles(Array.isArray(payload.data) ? payload.data : []);
   }, [authFetch]);
+
+  // Recibe el "code" de initCodeClient (access_type=offline) y lo canjea en
+  // el backend por access_token + refresh_token -- este último es lo que
+  // permite que el backend renueve el acceso a Gmail él solo, sin depender
+  // de que el navegador tenga un token vivo (antes, pasada ~1h, el perfil
+  // "con enlace" se quedaba muerto en silencio hasta que alguien recargara
+  // la página). El access_token que devuelve se sigue guardando en el
+  // navegador igual que antes, para las llamadas directas que ya existían
+  // (p.ej. la carpeta de fijados).
+  const gmailCodeCallback = useCallback((resp: { code?: string; error?: string }) => {
+    if (!resp.code) {
+      setError('Error al conectar con Google: ' + (resp.error || 'Desconocido'));
+      return;
+    }
+    void (async () => {
+      try {
+        const res = await authFetch(`${API}/email/profiles/google/exchange-code`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: resp.code }),
+        });
+        const payload = await res.json().catch(() => null);
+        if (!res.ok || !payload?.success) throw new Error(payload?.error || 'No se pudo conectar con Google');
+        const { access_token, expires_in } = payload.data as { access_token: string; expires_in: number };
+        const expiresAt = Date.now() + (expires_in || 3600) * 1000;
+        setGmailToken(access_token);
+        setGmailExpired(false);
+        setError('');
+        localStorage.setItem(GMAIL_TOKEN_KEY, JSON.stringify({ access_token, expires_at: expiresAt }));
+        await refreshSavedGmailProfiles().catch(() => undefined);
+      } catch (e: any) {
+        setError(e.message || 'No se pudo conectar con Google');
+      }
+    })();
+  }, [authFetch, refreshSavedGmailProfiles]);
+
+  const connectGoogle = useCallback((loginHint?: string) => {
+    const goog = (window as any).google as GmailGIS | undefined;
+    const currentOrigin = window.location.origin;
+    const shouldNormalizeLocalOrigin =
+      /^(http:\/\/127\.0\.0\.1:\d+|http:\/\/localhost:\d+)$/.test(currentOrigin) &&
+      currentOrigin !== 'http://localhost:5173';
+
+    if (shouldNormalizeLocalOrigin) {
+      window.location.replace(
+        `http://localhost:5173${window.location.pathname}${window.location.search}${window.location.hash}`,
+      );
+      return;
+    }
+
+    if (!GMAIL_CLIENT_ID) {
+      setError('VITE_GOOGLE_CLIENT_ID no está configurado en .env');
+      return;
+    }
+    if (!goog?.accounts?.oauth2) {
+      setError('Google Identity Services aún se está cargando. Espera un momento y vuelve a intentarlo.');
+      return;
+    }
+    const clientConfig: any = {
+      client_id: GMAIL_CLIENT_ID,
+      scope: GMAIL_SCOPES,
+      ux_mode: 'popup',
+      access_type: 'offline',
+      // 'consent' fuerza la pantalla de permisos SIEMPRE -- es lo único que
+      // garantiza que Google mande un refresh_token también en reconexiones
+      // (si no, solo lo manda la primerísima vez que se autoriza la app).
+      prompt: 'consent',
+      callback: gmailCodeCallback,
+    };
+    if (loginHint) clientConfig.login_hint = loginHint;
+    tokenClientRef.current = goog.accounts.oauth2.initCodeClient(clientConfig);
+    setSelectedImapAccountId(null);
+    tokenClientRef.current.requestCode();
+  }, [gmailCodeCallback]);
 
   const deleteSavedGmailProfile = useCallback(async (profileId: string) => {
     const response = await authFetch(`${API}/email/profiles/${profileId}`, { method: 'DELETE' }).catch(() => null);

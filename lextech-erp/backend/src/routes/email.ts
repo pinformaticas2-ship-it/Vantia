@@ -8,6 +8,7 @@ import {
   getOAuthProfiles,
   upsertOAuthProfile,
   deleteOAuthProfile,
+  exchangeGoogleAuthCode,
   createAccount,
   updateAccount,
   deleteAccount,
@@ -69,6 +70,7 @@ router.get('/accounts',           getAccounts);
 router.get('/profiles',           getOAuthProfiles);
 router.post('/profiles',          upsertOAuthProfile);
 router.delete('/profiles/:id',    deleteOAuthProfile);
+router.post('/profiles/google/exchange-code', exchangeGoogleAuthCode);
 router.post('/accounts',          createAccount);
 router.put('/accounts/:id',       updateAccount);
 router.delete('/accounts/:id',    deleteAccount);

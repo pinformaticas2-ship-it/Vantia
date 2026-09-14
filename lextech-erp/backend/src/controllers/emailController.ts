@@ -62,23 +62,165 @@ async function gmailApiPost(path: string, accessToken: string, body: object): Pr
   return res.json();
 }
 
+// ── OAuth de Google: canje de código y renovación de token ──────────────────
+// El token de acceso de Gmail dura ~1h. Antes de esto no había forma de
+// renovarlo sin que el propio navegador volviera a hacer una llamada en vivo
+// a Gmail (lo que solo pasaba justo tras recargar la página) -- pasada esa
+// hora, cualquier sincronización en segundo plano del perfil "con enlace" se
+// quedaba fallando en silencio para siempre. Con un refresh_token de verdad
+// (flujo de código de autorización, access_type=offline) el backend puede
+// renovar el acceso él solo, sin depender de que el usuario tenga la app
+// abierta con un token vivo.
+const GOOGLE_TOKEN_ENDPOINT    = 'https://oauth2.googleapis.com/token';
+const GOOGLE_USERINFO_ENDPOINT = 'https://www.googleapis.com/oauth2/v2/userinfo';
+
+interface GoogleTokenResponse {
+  access_token: string;
+  refresh_token?: string;
+  expires_in: number;
+  scope?: string;
+  token_type?: string;
+}
+
+async function googleTokenRequest(params: Record<string, string>): Promise<GoogleTokenResponse> {
+  const clientId     = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    throw new Error('GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET no están configurados en el backend');
+  }
+  const body = new URLSearchParams({ ...params, client_id: clientId, client_secret: clientSecret });
+  const res = await fetch(GOOGLE_TOKEN_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body,
+  });
+  const data: any = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error_description || data.error || 'No se pudo comunicar con Google');
+  return data as GoogleTokenResponse;
+}
+
+async function exchangeGoogleCode(code: string): Promise<GoogleTokenResponse> {
+  // 'postmessage' es el redirect_uri exacto que exige Google cuando el
+  // código se obtuvo con initCodeClient en modo popup (sin redirección real).
+  return googleTokenRequest({ code, redirect_uri: 'postmessage', grant_type: 'authorization_code' });
+}
+
+async function refreshGoogleAccessToken(refreshToken: string): Promise<GoogleTokenResponse> {
+  return googleTokenRequest({ refresh_token: refreshToken, grant_type: 'refresh_token' });
+}
+
 async function getGmailAccessToken(profileId: string, uid: string, organizacionId?: string): Promise<string> {
   const { rows } = await pool.query(
     organizacionId
-      ? `SELECT access_token_enc, token_expiry FROM email_oauth_profiles WHERE id=$1 AND user_id=$2 AND organizacion_id=$3`
-      : `SELECT access_token_enc, token_expiry FROM email_oauth_profiles WHERE id=$1 AND user_id=$2`,
+      ? `SELECT access_token_enc, token_expiry, refresh_token_enc FROM email_oauth_profiles WHERE id=$1 AND user_id=$2 AND organizacion_id=$3`
+      : `SELECT access_token_enc, token_expiry, refresh_token_enc FROM email_oauth_profiles WHERE id=$1 AND user_id=$2`,
     organizacionId ? [profileId, uid, organizacionId] : [profileId, uid],
   );
   if (!rows.length) throw new Error('Perfil Gmail no encontrado');
   const row = rows[0];
-  if (row.token_expiry && new Date(row.token_expiry) <= new Date()) {
-    throw Object.assign(
-      new Error('El token de Gmail ha expirado. Vuelve a conectar tu cuenta.'),
-      { code: 401 },
-    );
+
+  // Margen de 60s para no usar un token que caduque a mitad de la petición.
+  const isExpired = !row.token_expiry || new Date(row.token_expiry).getTime() <= Date.now() + 60_000;
+  if (isExpired) {
+    if (!row.refresh_token_enc) {
+      // Perfil conectado antes de tener refresh token -- se pide reconectar
+      // una vez para "actualizarlo" y dejar de depender del navegador.
+      throw Object.assign(
+        new Error('El token de Gmail ha expirado. Vuelve a conectar tu cuenta.'),
+        { code: 401 },
+      );
+    }
+    try {
+      const refreshToken = decryptPassword(row.refresh_token_enc);
+      const tokenData = await refreshGoogleAccessToken(refreshToken);
+      const newExpiry = new Date(Date.now() + (tokenData.expires_in || 3600) * 1000);
+      await pool.query(
+        `UPDATE email_oauth_profiles SET access_token_enc=$1, token_expiry=$2, updated_at=NOW() WHERE id=$3`,
+        [encryptPassword(tokenData.access_token), newExpiry, profileId],
+      );
+      return tokenData.access_token;
+    } catch (e: any) {
+      throw Object.assign(
+        new Error('El token de Gmail ha expirado y no se pudo renovar. Vuelve a conectar tu cuenta.'),
+        { code: 401 },
+      );
+    }
   }
+
   if (!row.access_token_enc) throw Object.assign(new Error('No hay token de acceso guardado'), { code: 401 });
   return decryptPassword(row.access_token_enc);
+}
+
+// POST /api/email/profiles/google/exchange-code — canjea el "code" de
+// initCodeClient (access_type=offline) por access+refresh token, guarda el
+// perfil, y devuelve un access_token para que el navegador siga funcionando
+// igual que hasta ahora (llamadas directas a la API de Gmail desde el
+// cliente, p.ej. la carpeta de fijados).
+export async function exchangeGoogleAuthCode(req: Request, res: Response) {
+  const uid = userId(req);
+  if (!uid) return err(res, 'No autenticado', 401);
+  const organizacionId = (req as any).organizacionId;
+  if (!organizacionId) return err(res, 'No se pudo determinar la organización activa', 400);
+  const code = String(req.body?.code || '');
+  if (!code) return err(res, 'Falta el código de autorización de Google', 400);
+
+  try {
+    const tokenData = await exchangeGoogleCode(code);
+
+    const userInfoRes = await fetch(GOOGLE_USERINFO_ENDPOINT, {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+    });
+    const userInfo: any = await userInfoRes.json().catch(() => ({}));
+    if (!userInfoRes.ok || !userInfo?.email) {
+      return err(res, 'No se pudo obtener el email de la cuenta de Google');
+    }
+    const email = String(userInfo.email).trim().toLowerCase();
+
+    // Mismo criterio de aislamiento por organización que upsertOAuthProfile.
+    const { rows: existing } = await pool.query(
+      `SELECT organizacion_id FROM email_oauth_profiles WHERE user_id=$1 AND provider='google' AND email=$2`,
+      [uid, email],
+    );
+    if (existing.length && existing[0].organizacion_id !== organizacionId) {
+      return err(res, 'Esta cuenta de Gmail ya está conectada en otra organización. Cambia a esa organización para usarla, o desconéctala primero.', 409);
+    }
+
+    const tokenExpiry     = new Date(Date.now() + (tokenData.expires_in || 3600) * 1000);
+    const accessTokenEnc  = encryptPassword(tokenData.access_token);
+    // Google solo manda refresh_token la primera vez (o si se fuerza el
+    // consentimiento) -- si esta vez no viene, se conserva el que ya hubiera.
+    const refreshTokenEnc = tokenData.refresh_token ? encryptPassword(tokenData.refresh_token) : null;
+
+    const { rows } = await pool.query(
+      `INSERT INTO email_oauth_profiles
+         (user_id, provider, email, display_name, avatar_url, external_id,
+          access_token_enc, token_expiry, refresh_token_enc, last_used_at, organizacion_id)
+       VALUES ($1,'google',$2,$3,$4,$5,$6,$7,$8,NOW(),$9)
+       ON CONFLICT (user_id, provider, email)
+       DO UPDATE SET
+         display_name      = COALESCE(EXCLUDED.display_name,  email_oauth_profiles.display_name),
+         avatar_url        = COALESCE(EXCLUDED.avatar_url,    email_oauth_profiles.avatar_url),
+         external_id       = COALESCE(EXCLUDED.external_id,   email_oauth_profiles.external_id),
+         access_token_enc  = EXCLUDED.access_token_enc,
+         token_expiry      = EXCLUDED.token_expiry,
+         refresh_token_enc = COALESCE(EXCLUDED.refresh_token_enc, email_oauth_profiles.refresh_token_enc),
+         last_used_at      = NOW(),
+         updated_at        = NOW()
+       RETURNING id, provider, email, display_name, avatar_url, external_id, last_used_at, created_at`,
+      [
+        uid, email, String(userInfo.name || '').trim() || null, userInfo.picture || null, userInfo.id || null,
+        accessTokenEnc, tokenExpiry, refreshTokenEnc, organizacionId,
+      ],
+    );
+
+    return ok(res, {
+      profile: rows[0],
+      access_token: tokenData.access_token,
+      expires_in: tokenData.expires_in,
+    });
+  } catch (e: any) {
+    return err(res, e.message);
+  }
 }
 
 function userId(req: Request): string {

@@ -2148,6 +2148,17 @@ export async function runMigrations(): Promise<void> {
       await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS client_welcome_email_signature TEXT;`);
     } catch (_e: any) {}
 
+    // ── Gmail: refresh token para no depender del token corto del navegador ──
+    // Hasta ahora email_oauth_profiles solo guardaba el access_token (dura
+    // ~1h) sin forma de renovarlo por su cuenta -- el perfil "con enlace" se
+    // quedaba muerto en silencio en cuanto pasaba esa hora sin que el
+    // navegador volviera a hacer una llamada en vivo a Gmail. Con un refresh
+    // token de verdad (flujo de código de autorización, access_type=offline)
+    // el backend puede renovar el acceso solo, indefinidamente.
+    try {
+      await client.query(`ALTER TABLE email_oauth_profiles ADD COLUMN IF NOT EXISTS refresh_token_enc TEXT;`);
+    } catch (_e: any) {}
+
     // ── Permisos en schema public (requerido en PostgreSQL 15+) ────
     for (const grant of [
       `GRANT USAGE ON SCHEMA public TO admin`,
