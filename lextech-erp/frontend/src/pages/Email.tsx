@@ -1638,9 +1638,9 @@ function Sidebar({
         )}
 
         {isGmailActive && extraGmailSystemLabels.length > 0 && (
-          <div className="mt-2 pt-2 border-t border-slate-100">
+          <div className={`mt-2 border-t pt-2 ${sectionBorderCls}`}>
             <div className="px-3 pb-1">
-              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Gmail</p>
+              <p className={`text-[10px] font-semibold uppercase tracking-wider ${sectionLabelCls}`}>Gmail</p>
             </div>
             {extraGmailSystemLabels.map((label) => (
               <button
@@ -1648,14 +1648,13 @@ function Sidebar({
                 type="button"
                 disabled={!canUseMailbox}
                 onClick={() => onSelectFolder(label.id)}
-                className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] transition-colors rounded-lg mx-1 ${
-                  selectedFolder === label.id ? 'bg-red-50 text-red-700 font-medium' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-800'
-                } disabled:cursor-not-allowed disabled:opacity-40`}
-                style={{ width: 'calc(100% - 8px)' }}>
-                <Tag size={12} className={selectedFolder === label.id ? 'text-red-600' : 'text-slate-400'} />
+                className={`mx-2 flex w-[calc(100%-16px)] items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] transition-colors ${
+                  selectedFolder === label.id ? activeItemClsNoBold : inactiveItemCls
+                } disabled:cursor-not-allowed disabled:opacity-40`}>
+                <Folder size={12} className={selectedFolder === label.id ? activeIconCls : inactiveIconCls} />
                 <span className="flex-1 truncate text-left">{normalizeLabelName(label.name, label.id)}</span>
                 {Number(label.messagesUnread ?? label.messagesTotal ?? 0) > 0 && (
-                  <span className="text-[10px] text-slate-400">
+                  <span className={`text-[10px] ${mutedTextCls}`}>
                     {Number(label.messagesUnread ?? label.messagesTotal ?? 0)}
                   </span>
                 )}
@@ -1665,9 +1664,9 @@ function Sidebar({
         )}
 
         {isGmailActive && categoryLabels.length > 0 && (
-          <div className="mt-2 pt-2 border-t border-slate-100">
+          <div className={`mt-2 border-t pt-2 ${sectionBorderCls}`}>
             <div className="px-3 pb-1">
-              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Categorías</p>
+              <p className={`text-[10px] font-semibold uppercase tracking-wider ${sectionLabelCls}`}>Categorías</p>
             </div>
             {categoryLabels.map((label) => (
               <button
@@ -1675,14 +1674,13 @@ function Sidebar({
                 type="button"
                 disabled={!canUseMailbox}
                 onClick={() => onSelectFolder(label.id)}
-                className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] transition-colors rounded-lg mx-1 ${
-                  selectedFolder === label.id ? 'bg-red-50 text-red-700 font-medium' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-800'
-                } disabled:cursor-not-allowed disabled:opacity-40`}
-                style={{ width: 'calc(100% - 8px)' }}>
-                <Tag size={12} className={selectedFolder === label.id ? 'text-red-600' : 'text-slate-400'} />
+                className={`mx-2 flex w-[calc(100%-16px)] items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] transition-colors ${
+                  selectedFolder === label.id ? activeItemClsNoBold : inactiveItemCls
+                } disabled:cursor-not-allowed disabled:opacity-40`}>
+                <Folder size={12} className={selectedFolder === label.id ? activeIconCls : inactiveIconCls} />
                 <span className="flex-1 truncate text-left">{normalizeLabelName(label.name, label.id)}</span>
                 {Number(label.messagesUnread ?? label.messagesTotal ?? 0) > 0 && (
-                  <span className="text-[10px] text-slate-400">
+                  <span className={`text-[10px] ${mutedTextCls}`}>
                     {Number(label.messagesUnread ?? label.messagesTotal ?? 0)}
                   </span>
                 )}
@@ -1692,12 +1690,12 @@ function Sidebar({
         )}
 
         {isGmailActive && (
-          <div className="mt-2 pt-2 border-t border-slate-100 px-2 space-y-0.5">
+          <div className={`mt-2 border-t pt-2 px-2 space-y-0.5 ${sectionBorderCls}`}>
             <button
               type="button"
               disabled={!canUseMailbox}
               onClick={() => onSelectFolder('SCHEDULED')}
-              className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50">
+              className={`w-full flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${iconBtnCls}`}>
               <Send size={12} />
               Gestionar suscripciones
             </button>
@@ -1705,14 +1703,14 @@ function Sidebar({
               type="button"
               disabled={!canUseMailbox}
               onClick={() => onCreateLabel()}
-              className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50">
-              <Tag size={12} />
+              className={`w-full flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${iconBtnCls}`}>
+              <Folder size={12} />
               Gestionar etiquetas
             </button>
             <button
               type="button"
               onClick={() => onCreateLabel()}
-              className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors">
+              className={`w-full flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors ${iconBtnCls}`}>
               <Plus size={12} />
               Nueva etiqueta
             </button>
@@ -1820,6 +1818,22 @@ function EmailItem({
             {displayName}
           </span>
           <div className="flex items-center gap-1 flex-shrink-0">
+            {/* Estrella en el flujo normal de la fila (no "absolute"), para
+                que nunca se solape con la fecha -- antes vivía como botón
+                flotante en la esquina y quedaba encima del texto. Se reserva
+                el hueco siempre (invisible si no aplica) para que la fecha no
+                salte de sitio al pasar el ratón. */}
+            <button
+              onClick={onStar}
+              title={email.isStarred ? 'Quitar estrella' : 'Marcar con estrella'}
+              className={`p-0.5 -m-0.5 rounded transition-colors ${
+                email.isStarred
+                  ? 'text-amber-400'
+                  : hovered ? 'text-slate-400 hover:text-amber-400' : 'text-transparent'
+              }`}
+            >
+              <Star size={11} fill={email.isStarred ? 'currentColor' : 'none'} />
+            </button>
             <span className={`text-[11px] tabular-nums ${
               selected ? 'text-red-500' : unread ? 'font-semibold text-slate-600' : 'text-slate-400'
             }`}>
@@ -1851,23 +1865,10 @@ function EmailItem({
                 <Paperclip size={10} className="text-slate-400" />
               </span>
             )}
-            {email.isStarred && (
-              <Star size={10} fill="currentColor" className="text-amber-400" />
-            )}
           </div>
         </div>
 
       </div>
-
-      {/* Star button on hover */}
-      {hovered && !email.isStarred && (
-        <button
-          onClick={onStar}
-          title="Marcar con estrella"
-          className="absolute right-3 top-3 p-0.5 rounded text-slate-400 hover:text-amber-400 transition-colors">
-          <Star size={12} fill="none" />
-        </button>
-      )}
     </a>
   );
 }
