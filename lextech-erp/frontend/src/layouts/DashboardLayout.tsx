@@ -1147,6 +1147,41 @@ function orgInitials(name: string) {
 }
 const ORG_ROL_LABEL: Record<string, string> = { propietario: "Propietario", admin: "Administrador", miembro: "Miembro" };
 
+// ── Texto que se desplaza al pasar el ratón, si no cabe entero ─────────────
+// Antes se cortaba con "..." (truncate) y no había forma de leer el resto
+// sin ensanchar la barra lateral. Al pasar el ratón, si el contenido no cabe
+// en su hueco, se desliza hasta mostrar el final y vuelve a su sitio al
+// quitar el ratón. Si cabe entero, no hace nada (no hay overflow que medir).
+function HoverScrollText({ children, className }: { children: React.ReactNode; className?: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLSpanElement>(null);
+  const [offset, setOffset] = useState(0);
+  const [duration, setDuration] = useState(0);
+
+  const handleEnter = () => {
+    const container = containerRef.current;
+    const inner = innerRef.current;
+    if (!container || !inner) return;
+    const overflow = inner.scrollWidth - container.clientWidth;
+    if (overflow <= 0) return;
+    setDuration(Math.max(0.6, overflow / 40)); // velocidad constante (~40px/s), con un mínimo para que no sea un salto brusco
+    setOffset(-overflow);
+  };
+  const handleLeave = () => setOffset(0);
+
+  return (
+    <div ref={containerRef} className="min-w-0 overflow-hidden" onMouseEnter={handleEnter} onMouseLeave={handleLeave}>
+      <span
+        ref={innerRef}
+        className={`inline-flex items-center whitespace-nowrap will-change-transform ${className || ""}`}
+        style={{ transform: `translateX(${offset}px)`, transition: `transform ${duration}s linear` }}
+      >
+        {children}
+      </span>
+    </div>
+  );
+}
+
 // Avatar de organización con fallback a iniciales -- no solo cuando no hay
 // logoUrl, también cuando el archivo apuntado ya no existe (pasa con algún
 // logo subido a Railway, cuyo almacenamiento es efímero y a veces lo pierde).
@@ -1396,10 +1431,10 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
                 )}
               </div>
               <div className="flex-1 min-w-0 text-left">
-                <p className="erp-company-name text-[11px] font-bold text-slate-200 truncate leading-tight">
+                <HoverScrollText className="erp-company-name text-[11px] font-bold text-slate-200 leading-tight">
                   {orgLoaded ? (organizacion?.nombre || "Vantia Legis") : "Cargando…"}
-                </p>
-                <p className="erp-company-sub text-[10px] text-slate-500 truncate mt-0.5 flex items-center gap-1">
+                </HoverScrollText>
+                <HoverScrollText className="erp-company-sub text-[10px] text-slate-500 mt-0.5 gap-1">
                   {orgRol && orgRol !== 'miembro' && (
                     <span className="inline-flex items-center gap-0.5 shrink-0">
                       <Crown size={9} className="text-amber-500" />
@@ -1408,7 +1443,7 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
                   )}
                   {orgRol && orgRol !== 'miembro' && organizaciones.length > 1 && <span className="text-slate-700">·</span>}
                   {organizaciones.length > 1 ? `${organizaciones.length} organizaciones` : "Despacho"}
-                </p>
+                </HoverScrollText>
               </div>
               {organizaciones.length > 1 && (
                 <ChevronsUpDown size={13} className={`erp-company-chevron text-slate-600 group-hover:text-slate-400 shrink-0 transition-transform duration-200 ${orgMenuOpen ? "rotate-180" : ""}`} />
