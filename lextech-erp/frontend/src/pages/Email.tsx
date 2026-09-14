@@ -4361,6 +4361,18 @@ export default function Email() {
         `${API}/email/gmail/profiles/${savedProfile.id}/sync?folder=${encodeURIComponent(selectedFolder)}&limit=50`,
         { method: 'POST' },
       )
+        .then((res) => {
+          // El token que el backend tiene guardado para este perfil también
+          // caduca (dura ~1h, igual que el del navegador) y antes esto fallaba
+          // en silencio para siempre sin avisar -- exactamente el mismo tipo
+          // de fallo mudo que "se queda en una fecha fija". Ahora, si el
+          // backend devuelve 401, se muestra el mismo aviso de reconectar que
+          // ya existía para el token del navegador, en vez de quedarse callado.
+          if (res && !cancelled && (res.status === 401 || res.status === 403)) {
+            setGmailExpired(true);
+            setError('Tu sesión de Gmail expiró. Vuelve a conectar.');
+          }
+        })
         .catch(() => null)
         .then(finish);
     };
