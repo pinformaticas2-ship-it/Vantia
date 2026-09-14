@@ -4235,10 +4235,18 @@ export default function Email() {
 
       try {
         // ── 1. Sync data source ─────────────────────────────────────────────
+        // El sync de IMAP abre una conexión real al servidor de correo
+        // (connect+login+select+search) -- antes se esperaba aquí ANTES de
+        // leer nada, así que cada 30s (mientras la pestaña estaba visible)
+        // el refresco entero se quedaba colgado lo que tardara el servidor
+        // de correo en responder. Se lanza en segundo plano sin esperarlo:
+        // el paso 2 ya lee de nuestra propia BD (rápido), y si el sync trae
+        // algo nuevo aparecerá en el siguiente ciclo, unos segundos después,
+        // en vez de congelar este. Mismo criterio que loadEmails/getMessage.
         if (currentImapAccount) {
-          if (checkStructure) await refreshImapFolders(currentImapAccount.id).catch(() => undefined);
+          if (checkStructure) void refreshImapFolders(currentImapAccount.id).catch(() => undefined);
           const folderStr = mapFolderToImapApi(selectedFolder, imapSystemFolderMap);
-          await authFetch(
+          void authFetch(
             `${API}/email/accounts/${currentImapAccount.id}/sync?folder=${encodeURIComponent(folderStr)}&limit=20`,
             { method: 'POST' },
           ).catch(() => null);

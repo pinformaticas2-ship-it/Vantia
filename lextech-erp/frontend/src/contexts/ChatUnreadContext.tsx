@@ -99,7 +99,14 @@ export function ChatUnreadProvider({ children }: { children: React.ReactNode }) 
   const startPolling = () => {
     if (timerRef.current) clearInterval(timerRef.current);
     const isVisible = typeof document === "undefined" || document.visibilityState === "visible";
-    timerRef.current = setInterval(() => doFetchRef.current(), isVisible ? 1200 : 4000);
+    // Este contador va montado en toda la app (no solo en la pantalla de
+    // Chat), así que corría cada 1.2s en TODA página para todo el mundo --
+    // desde el badge del sidebar hasta Correo, sin que nadie estuviera
+    // mirando el chat. Es solo un contador de no-leídos, no hace falta que
+    // sea instantáneo: 8s/20s es el mismo orden que EmailUnreadContext (12s)
+    // y WhatsAppUnreadContext (10s), y quita de encima una carga constante
+    // a la BD que no aportaba nada a cambio.
+    timerRef.current = setInterval(() => doFetchRef.current(), isVisible ? 8_000 : 20_000);
   };
 
   // ── Presencia (conectado/ausente/desconectado) ──────────────────────────────
