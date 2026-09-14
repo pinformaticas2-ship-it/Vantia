@@ -5122,7 +5122,16 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
             selectedImapAccountId={selectedImapAccountId}
             imapFolders={imapCustomFolders}
             imapSystemFolderMap={imapSystemFolderMap}
-            onSelectGmail={() => setSelectedImapAccountId(null)}
+            onSelectGmail={() => {
+              // Al volver a Google desde una cuenta IMAP hay que resetear la
+              // carpeta -- si no, se quedaba con la que tuviera seleccionada
+              // esa cuenta IMAP (una carpeta propia suya, que no existe para
+              // Gmail), y la bandeja de Google se quedaba vacía en silencio.
+              // Mismo criterio que onSelectImapAccount y reconnectGoogleProfile.
+              setSelectedImapAccountId(null);
+              setSelectedFolder('INBOX');
+              setSelectedEmail(null);
+            }}
             onSelectImapAccount={(accountId) => {
               setSelectedImapAccountId(accountId);
               setSelectedFolder('INBOX');
