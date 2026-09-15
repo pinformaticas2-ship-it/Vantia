@@ -72,7 +72,6 @@ async function gmailApiPost(path: string, accessToken: string, body: object): Pr
 // renovar el acceso él solo, sin depender de que el usuario tenga la app
 // abierta con un token vivo.
 const GOOGLE_TOKEN_ENDPOINT    = 'https://oauth2.googleapis.com/token';
-const GOOGLE_USERINFO_ENDPOINT = 'https://www.googleapis.com/oauth2/v2/userinfo';
 
 interface GoogleTokenResponse {
   access_token: string;
@@ -163,18 +162,27 @@ export async function exchangeGoogleAuthCode(req: Request, res: Response) {
   if (!organizacionId) return err(res, 'No se pudo determinar la organización activa', 400);
   const code = String(req.body?.code || '');
   if (!code) return err(res, 'Falta el código de autorización de Google', 400);
+  // El perfil de Gmail (users.getProfile) no devuelve nombre/foto -- si el
+  // frontend los manda (los del usuario de Clerk que conecta la cuenta,
+  // igual que hace upsertOAuthProfile), se guardan como referencia visual.
+  const displayName = String(req.body?.display_name || '').trim() || null;
+  const avatarUrl   = String(req.body?.avatar_url   || '').trim() || null;
 
   try {
     const tokenData = await exchangeGoogleCode(code);
 
-    const userInfoRes = await fetch(GOOGLE_USERINFO_ENDPOINT, {
+    // El endpoint genérico de Google (oauth2/v2/userinfo) exige el scope
+    // "email"/"profile", que no pedimos -- solo scopes de Gmail. El propio
+    // endpoint de perfil de Gmail (users.getProfile) ya devuelve el email y
+    // funciona con los scopes que sí tenemos, sin pedir permiso de más.
+    const profileRes = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/profile', {
       headers: { Authorization: `Bearer ${tokenData.access_token}` },
     });
-    const userInfo: any = await userInfoRes.json().catch(() => ({}));
-    if (!userInfoRes.ok || !userInfo?.email) {
+    const profile: any = await profileRes.json().catch(() => ({}));
+    if (!profileRes.ok || !profile?.emailAddress) {
       return err(res, 'No se pudo obtener el email de la cuenta de Google');
     }
-    const email = String(userInfo.email).trim().toLowerCase();
+    const email = String(profile.emailAddress).trim().toLowerCase();
 
     // Mismo criterio de aislamiento por organización que upsertOAuthProfile.
     const { rows: existing } = await pool.query(
@@ -208,7 +216,7 @@ export async function exchangeGoogleAuthCode(req: Request, res: Response) {
          updated_at        = NOW()
        RETURNING id, provider, email, display_name, avatar_url, external_id, last_used_at, created_at`,
       [
-        uid, email, String(userInfo.name || '').trim() || null, userInfo.picture || null, userInfo.id || null,
+        uid, email, displayName, avatarUrl, null,
         accessTokenEnc, tokenExpiry, refreshTokenEnc, organizacionId,
       ],
     );

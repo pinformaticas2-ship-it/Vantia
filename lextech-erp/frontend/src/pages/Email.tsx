@@ -3816,7 +3816,10 @@ export default function Email() {
         const res = await authFetch(`${API}/email/profiles/google/exchange-code`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code: resp.code }),
+          // El perfil de Gmail (users.getProfile) no trae nombre/foto -- se
+          // manda el del usuario de Clerk que conecta la cuenta, igual que
+          // ya hacía persistGoogleProfile.
+          body: JSON.stringify({ code: resp.code, display_name: userName, avatar_url: userAvatar || null }),
         });
         const payload = await res.json().catch(() => null);
         if (!res.ok || !payload?.success) throw new Error(payload?.error || 'No se pudo conectar con Google');
@@ -3831,7 +3834,7 @@ export default function Email() {
         setError(e.message || 'No se pudo conectar con Google');
       }
     })();
-  }, [authFetch, refreshSavedGmailProfiles]);
+  }, [authFetch, refreshSavedGmailProfiles, userName, userAvatar]);
 
   const connectGoogle = useCallback((loginHint?: string) => {
     const goog = (window as any).google as GmailGIS | undefined;
