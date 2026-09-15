@@ -449,7 +449,7 @@ export default function DashboardHome() {
         actRes, agendaRes, tasksRes, billingRes,
         expRes, clientsRes, chatRes, chatUnreadRes,
         waStatusRes, waSchedulesRes, emailStatsRes, emailAccountsRes,
-        docProvidersRes, emailMsgsRes,
+        docProvidersRes, emailMsgsRes, gmailProfilesRes,
       ] = await Promise.all([
         fetch("/api/activity/me?limit=10",        { headers }),
         fetch("/api/agenda/upcoming?limit=3",     { headers }),
@@ -465,17 +465,18 @@ export default function DashboardHome() {
         fetch("/api/email/accounts",              { headers }),
         fetch("/api/documental/providers",        { headers }),
         fetch("/api/email/messages?folder=INBOX&limit=5", { headers }),
+        fetch("/api/email/profiles?provider=google", { headers }),
       ]);
       const [
         actData, agendaData, tasksData, billingData,
         expData, clientsData, chatData, chatUnreadData,
         waStatusData, waSchedulesData, emailStatsData, emailAccountsData,
-        docProvidersData, emailMsgsData,
+        docProvidersData, emailMsgsData, gmailProfilesData,
       ] = await Promise.all([
         safeJson(actRes), safeJson(agendaRes), safeJson(tasksRes), safeJson(billingRes),
         safeJson(expRes), safeJson(clientsRes), safeJson(chatRes), safeJson(chatUnreadRes),
         safeJson(waStatusRes), safeJson(waSchedulesRes), safeJson(emailStatsRes), safeJson(emailAccountsRes),
-        safeJson(docProvidersRes), safeJson(emailMsgsRes),
+        safeJson(docProvidersRes), safeJson(emailMsgsRes), safeJson(gmailProfilesRes),
       ]);
       if (actRes.ok) {
         setActivity(actData.data || []);
@@ -539,9 +540,25 @@ export default function DashboardHome() {
           origen: status.configSource === "database" ? "Configurado" : status.configSource === "environment" ? "Entorno" : "Sin configurar",
         });
       }
-      if (emailStatsRes.ok || emailAccountsRes.ok) {
+      if (emailStatsRes.ok || emailAccountsRes.ok || gmailProfilesRes.ok) {
         const stats = emailStatsData.data || {};
-        const accounts: any[] = emailAccountsData.data || [];
+        const imapAccounts: any[] = emailAccountsData.data || [];
+        const gmailProfiles: any[] = gmailProfilesData.data || [];
+        // Selector unificado: antes solo listaba cuentas IMAP -- si el
+        // despacho solo tenía Gmail conectado (lo más habitual), el selector
+        // ni siquiera aparecía y no había forma de elegir "de qué cuenta"
+        // ver los correos ni si habían llegado nuevos a esa cuenta en
+        // concreto (los stats/mensajes se mostraban mezclando todo).
+        const accounts = [
+          ...imapAccounts.map((a: any) => ({
+            id: a.id, type: 'imap' as const,
+            label: a.username || a.email || a.label || 'Cuenta',
+          })),
+          ...gmailProfiles.map((p: any) => ({
+            id: p.id, type: 'gmail' as const,
+            label: p.email || p.display_name || 'Gmail',
+          })),
+        ];
         setEmailStats({
           cuentas: accounts.length,
           inbox: Number(stats.inbox || 0),
@@ -598,18 +615,61 @@ export default function DashboardHome() {
     setVisibleWidgets(next);
   };
 
+  // Cada cuenta del selector puede ser una cuenta IMAP o un perfil de Gmail
+  // -- el backend distingue una de otra por un parámetro de query distinto
+  // (account_id vs gmail_profile_id), así que hay que mirar el tipo antes
+  // de pedir nada.
+  const emailAccountQueryParam = useCallback((accountId: string) => {
+    if (!accountId) return '';
+    const acc = emailAccounts.find((a: any) => a.id === accountId);
+    if (!acc) return '';
+    return acc.type === 'gmail' ? `gmail_profile_id=${accountId}` : `account_id=${accountId}`;
+  }, [emailAccounts]);
+
   const fetchEmailMessages = useCallback(async (accountId: string) => {
     setEmailMsgLoading(true);
     try {
       const token = await getToken({ skipCache: true });
-      const url = `/api/email/messages?folder=INBOX&limit=5${accountId ? `&account_id=${accountId}` : ""}`;
+      const param = emailAccountQueryParam(accountId);
+      const url = `/api/email/messages?folder=INBOX&limit=5${param ? `&${param}` : ""}`;
       const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
       const d = await safeJson(res);
       if (res.ok) setEmailMessages(d.data?.emails || d.data || []);
     } catch {/* */} finally {
       setEmailMsgLoading(false);
     }
-  }, [getToken]);
+  }, [getToken, emailAccountQueryParam]);
+
+  // Contador de "no leídos" de la cuenta seleccionada -- antes el badge de
+  // "Correo" siempre mostraba el total mezclando todas las cuentas, así que
+  // elegir una cuenta en el selector no cambiaba si parecía que "había
+  // recibido algo" o no.
+  const fetchEmailStatsForAccount = useCallback(async (accountId: string) => {
+    try {
+      const token = await getToken({ skipCache: true });
+      const param = emailAccountQueryParam(accountId);
+      const url = `/api/email/stats${param ? `?${param}` : ''}`;
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      const d = await safeJson(res);
+      if (res.ok) {
+        const stats = d.data || {};
+        setEmailStats(prev => ({
+          ...prev,
+          inbox: Number(stats.inbox || 0),
+          unread: Number(stats.unread || 0),
+          drafts: Number(stats.drafts || 0),
+        }));
+      }
+    } catch {/* */}
+  }, [getToken, emailAccountQueryParam]);
+
+  // Al elegir una cuenta en el selector (o al resolverse la selección por
+  // defecto tras cargar), refrescar el contador de no-leídos de esa cuenta
+  // en concreto.
+  useEffect(() => {
+    if (!selectedEmailAccountId) return;
+    void fetchEmailStatsForAccount(selectedEmailAccountId);
+  }, [selectedEmailAccountId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -1054,10 +1114,7 @@ export default function DashboardHome() {
                     className="bg-white border border-slate-200 hover:border-slate-300 rounded-full px-3 py-1 flex items-center gap-1.5 transition-colors"
                   >
                     <span className="text-[10px] font-medium text-slate-600 truncate max-w-[130px]">
-                      {emailAccounts.find((a: any) => a.id === selectedEmailAccountId)?.username
-                        || emailAccounts.find((a: any) => a.id === selectedEmailAccountId)?.email
-                        || emailAccounts.find((a: any) => a.id === selectedEmailAccountId)?.name
-                        || "Cuenta"}
+                      {emailAccounts.find((a: any) => a.id === selectedEmailAccountId)?.label || "Cuenta"}
                     </span>
                     <ChevronDown size={9} className={`text-slate-400 transition-transform ${emailAccountMenuOpen ? "rotate-180" : ""}`} />
                   </button>
@@ -1065,7 +1122,7 @@ export default function DashboardHome() {
                   {emailAccountMenuOpen && (
                     <div className="absolute right-0 top-full mt-1.5 w-56 max-h-64 overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl z-30 py-1.5">
                       {emailAccounts.map((acc: any) => {
-                        const label = acc.username || acc.email || acc.name || "Cuenta";
+                        const label = acc.label || "Cuenta";
                         const active = acc.id === selectedEmailAccountId;
                         return (
                           <button
