@@ -461,37 +461,52 @@ export default function DashboardHome() {
     try {
       const token = await getToken({ skipCache: true });
       const headers = { Authorization: `Bearer ${token}` };
+      // Una sola de estas 14 peticiones fallando a nivel de red ("Failed to
+      // fetch": extensión del navegador, hiccup puntual de conexión...)
+      // rechazaba el Promise.all ENTERO, así que ningún widget del Dashboard
+      // se actualizaba ese ciclo -- ni siquiera los que sí habían ido bien.
+      // Cada fetch se blinda por separado con un "Response" sintético (no
+      // ok) en vez de dejar que tumbe a los demás.
+      const safeFetch = (url: string) => fetch(url, { headers }).catch(
+        () => new Response(null, { status: 599, statusText: 'network-error' }),
+      );
       const [
         actRes, agendaRes, tasksRes, billingRes,
         expRes, clientsRes, chatRes, chatUnreadRes,
         waStatusRes, waSchedulesRes, emailStatsRes, emailAccountsRes,
         docProvidersRes, emailMsgsRes,
       ] = await Promise.all([
-        fetch("/api/activity/me?limit=10",        { headers }),
-        fetch("/api/agenda/upcoming?limit=3",     { headers }),
-        fetch("/api/tasks/me",                    { headers }),
-        fetch("/api/facturacion/bootstrap",       { headers }),
-        fetch("/api/expedientes/stats",           { headers }),
-        fetch("/api/entities?limit=500",          { headers }),
-        fetch("/api/chat/canales",                { headers }),
-        fetch("/api/chat/unread",                 { headers }),
-        fetch("/api/whatsapp/status",             { headers }),
-        fetch("/api/whatsapp/schedules",          { headers }),
-        fetch("/api/email/stats",                 { headers }),
-        fetch("/api/email/accounts",              { headers }),
-        fetch("/api/documental/providers",        { headers }),
-        fetch("/api/email/messages?folder=INBOX&limit=5", { headers }),
+        safeFetch("/api/activity/me?limit=10"),
+        safeFetch("/api/agenda/upcoming?limit=3"),
+        safeFetch("/api/tasks/me"),
+        safeFetch("/api/facturacion/bootstrap"),
+        safeFetch("/api/expedientes/stats"),
+        safeFetch("/api/entities?limit=500"),
+        safeFetch("/api/chat/canales"),
+        safeFetch("/api/chat/unread"),
+        safeFetch("/api/whatsapp/status"),
+        safeFetch("/api/whatsapp/schedules"),
+        safeFetch("/api/email/stats"),
+        safeFetch("/api/email/accounts"),
+        safeFetch("/api/documental/providers"),
+        safeFetch("/api/email/messages?folder=INBOX&limit=5"),
       ]);
+      // Mismo criterio para el parseo: si uno solo no es JSON válido (p.ej.
+      // el "Response" sintético de arriba, o un 502/504 en HTML), que no
+      // tumbe la lectura de los otros 13.
       const [
         actData, agendaData, tasksData, billingData,
         expData, clientsData, chatData, chatUnreadData,
         waStatusData, waSchedulesData, emailStatsData, emailAccountsData,
         docProvidersData, emailMsgsData,
       ] = await Promise.all([
-        safeJson(actRes), safeJson(agendaRes), safeJson(tasksRes), safeJson(billingRes),
-        safeJson(expRes), safeJson(clientsRes), safeJson(chatRes), safeJson(chatUnreadRes),
-        safeJson(waStatusRes), safeJson(waSchedulesRes), safeJson(emailStatsRes), safeJson(emailAccountsRes),
-        safeJson(docProvidersRes), safeJson(emailMsgsRes),
+        safeJson(actRes).catch(() => ({})), safeJson(agendaRes).catch(() => ({})),
+        safeJson(tasksRes).catch(() => ({})), safeJson(billingRes).catch(() => ({})),
+        safeJson(expRes).catch(() => ({})), safeJson(clientsRes).catch(() => ({})),
+        safeJson(chatRes).catch(() => ({})), safeJson(chatUnreadRes).catch(() => ({})),
+        safeJson(waStatusRes).catch(() => ({})), safeJson(waSchedulesRes).catch(() => ({})),
+        safeJson(emailStatsRes).catch(() => ({})), safeJson(emailAccountsRes).catch(() => ({})),
+        safeJson(docProvidersRes).catch(() => ({})), safeJson(emailMsgsRes).catch(() => ({})),
       ]);
       if (actRes.ok) {
         setActivity(actData.data || []);
@@ -673,7 +688,8 @@ export default function DashboardHome() {
   const [gmailProfilesDebug, setGmailProfilesDebug] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+
+    const attempt = async (retry: boolean): Promise<void> => {
       try {
         const token = await getToken({ skipCache: true });
         const res = await fetch('/api/email/profiles?provider=google', {
@@ -690,9 +706,15 @@ export default function DashboardHome() {
           setGmailProfilesDebug(`No se pudo cargar Gmail (HTTP ${res.status}): ${d?.error || 'sin detalle'}`);
         }
       } catch (e: any) {
-        if (!cancelled) setGmailProfilesDebug(`No se pudo cargar Gmail: ${e?.message || 'error de red'}`);
+        // "Failed to fetch" suele ser un hiccup puntual de red -- se
+        // reintenta una vez a los 2s antes de darlo por perdido.
+        if (cancelled) return;
+        if (retry) { setTimeout(() => void attempt(false), 2000); return; }
+        setGmailProfilesDebug(`No se pudo cargar Gmail: ${e?.message || 'error de red'}`);
       }
-    })();
+    };
+
+    void attempt(true);
     return () => { cancelled = true; };
   }, [getToken]);
 
