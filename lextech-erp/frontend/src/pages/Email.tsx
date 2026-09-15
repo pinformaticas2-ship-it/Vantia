@@ -243,13 +243,30 @@ interface ImapApiEmail {
 
 // ─── Gmail Service ────────────────────────────────────────────────────────────
 
+// Reparte `items` entre como mucho `limit` llamadas en paralelo -- lanzar
+// decenas de peticiones individuales a la API de Gmail de golpe (p.ej. el
+// detalle de cada correo de un lote de 72 mensajes nuevos) dispara su límite
+// de "demasiadas peticiones" (429) y se pierden sin cargar.
+async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  const workers = Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, async () => {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i]);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
 class GmailService {
   private token: string;
   private base = 'https://gmail.googleapis.com/gmail/v1/users/me';
 
   constructor(token: string) { this.token = token; }
 
-  private async req<T>(path: string, opts?: RequestInit): Promise<T> {
+  private async req<T>(path: string, opts?: RequestInit, attempt = 0): Promise<T> {
     const res = await fetch(`${this.base}${path}`, {
       ...opts,
       headers: {
@@ -258,6 +275,17 @@ class GmailService {
         ...(opts?.headers || {}),
       },
     });
+    // 429 (demasiadas peticiones) -- normalmente puntual, sobre todo cuando
+    // hay un lote grande de correos nuevos que pedir de golpe. Se reintenta
+    // con espera creciente (respetando Retry-After si Google lo manda) antes
+    // de darlo por perdido, en vez de que ese correo concreto quede sin
+    // cargar para siempre.
+    if (res.status === 429 && attempt < 4) {
+      const retryAfter = Number(res.headers.get('Retry-After'));
+      const waitMs = retryAfter > 0 ? retryAfter * 1000 : Math.min(8000, 400 * 2 ** attempt) + Math.random() * 250;
+      await new Promise((r) => setTimeout(r, waitMs));
+      return this.req<T>(path, opts, attempt + 1);
+    }
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       const code = body?.error?.code || res.status;
@@ -4125,9 +4153,7 @@ export default function Email() {
           setNextPageToken(undefined);
           return;
         }
-        const metas = await Promise.all(
-          pinned.map((id) => gmail.getMessage(id, 'metadata').catch(() => null)),
-        );
+        const metas = await mapWithConcurrency(pinned, 6, (id) => gmail.getMessage(id, 'metadata').catch(() => null));
         const parsedPinned = applyPinnedState(
           metas
             .filter(Boolean)
@@ -4205,10 +4231,9 @@ export default function Email() {
         return;
       }
 
-      // Fetch metadata in parallel (fast)
-      const metas = await Promise.all(
-        ids.map(id => gmail.getMessage(id, 'metadata').catch(() => null)),
-      );
+      // Metadatos con un tope de peticiones en paralelo -- lanzarlas todas a
+      // la vez (podían ser 50-100) disparaba el 429 de Gmail.
+      const metas = await mapWithConcurrency(ids, 6, id => gmail.getMessage(id, 'metadata').catch(() => null));
 
       const parsed: ParsedEmail[] = metas
         .filter(Boolean)
