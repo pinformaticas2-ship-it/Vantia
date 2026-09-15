@@ -670,6 +670,7 @@ export default function DashboardHome() {
   // del resto de fetchData() (14 llamadas en paralelo): si esa petición
   // conjunta tarda, falla o se reintenta, esto no depende de ella para
   // aparecer, y si esta en concreto falla no arrastra a nada más.
+  const [gmailProfilesDebug, setGmailProfilesDebug] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -679,8 +680,18 @@ export default function DashboardHome() {
           headers: { Authorization: `Bearer ${token}` },
         });
         const d = await safeJson(res);
-        if (!cancelled && res.ok) setGmailProfilesRaw(Array.isArray(d.data) ? d.data : []);
-      } catch { /* silencioso -- el selector simplemente no mostrará Gmail */ }
+        if (cancelled) return;
+        if (res.ok) {
+          setGmailProfilesRaw(Array.isArray(d.data) ? d.data : []);
+          setGmailProfilesDebug(Array.isArray(d.data) && d.data.length === 0 ? 'La cuenta respondió pero sin ninguna cuenta de Gmail para esta organización.' : null);
+        } else {
+          // Visible directamente en el widget -- así se ve el motivo real sin
+          // tener que abrir herramientas de desarrollador.
+          setGmailProfilesDebug(`No se pudo cargar Gmail (HTTP ${res.status}): ${d?.error || 'sin detalle'}`);
+        }
+      } catch (e: any) {
+        if (!cancelled) setGmailProfilesDebug(`No se pudo cargar Gmail: ${e?.message || 'error de red'}`);
+      }
     })();
     return () => { cancelled = true; };
   }, [getToken]);
@@ -1176,6 +1187,11 @@ export default function DashboardHome() {
               <ChevronRight size={14} onClick={() => goTo("/dashboard/correo")} className="cursor-pointer text-slate-300 group-hover:text-red-500 transition-colors" />
             </div>
           </div>
+          {gmailProfilesDebug && (
+            <p className="px-4 py-1.5 text-[10px] text-amber-600 bg-amber-50 border-b border-amber-100">
+              {gmailProfilesDebug}
+            </p>
+          )}
           {emailMsgLoading ? (
             <div className="flex items-center justify-center py-8"><Spinner size="sm" muted /></div>
           ) : emailMessages.length === 0 ? (
