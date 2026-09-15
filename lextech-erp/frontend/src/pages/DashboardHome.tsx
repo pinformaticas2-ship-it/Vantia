@@ -424,7 +424,23 @@ export default function DashboardHome() {
   const [chatStats,     setChatStats]     = useState({ canales: 0, noLeidos: 0, directos: 0, conActividad: 0 });
   const [waStats,       setWaStats]       = useState({ configurado: false, webhook: false, programados: 0, origen: "Sin configurar" });
   const [emailStats,    setEmailStats]    = useState({ cuentas: 0, inbox: 0, unread: 0, drafts: 0 });
-  const [emailAccounts,    setEmailAccounts]    = useState<any[]>([]);
+  // Cuentas IMAP y perfiles de Gmail se guardan por separado y se combinan
+  // con useMemo -- antes se mezclaban a mano dentro de fetchData(), así que
+  // si esa petición conjunta (14 fetches en paralelo) fallaba o tardaba, el
+  // selector se quedaba vacío sin ninguna pista de por qué. Ahora el Gmail
+  // se pide aparte, de forma aislada, y si falla no arrastra a nada más.
+  const [imapAccountsRaw, setImapAccountsRaw] = useState<any[]>([]);
+  const [gmailProfilesRaw, setGmailProfilesRaw] = useState<any[]>([]);
+  const emailAccounts = useMemo(() => [
+    ...imapAccountsRaw.map((a: any) => ({
+      id: a.id, type: 'imap' as const,
+      label: a.username || a.email || a.label || 'Cuenta',
+    })),
+    ...gmailProfilesRaw.map((p: any) => ({
+      id: p.id, type: 'gmail' as const,
+      label: p.email || p.display_name || 'Gmail',
+    })),
+  ], [imapAccountsRaw, gmailProfilesRaw]);
   const [emailMessages,    setEmailMessages]    = useState<any[]>([]);
   const [emailMsgLoading,  setEmailMsgLoading]  = useState(false);
   const [selectedEmailAccountId, setSelectedEmailAccountId] = useState<string>("");
@@ -449,7 +465,7 @@ export default function DashboardHome() {
         actRes, agendaRes, tasksRes, billingRes,
         expRes, clientsRes, chatRes, chatUnreadRes,
         waStatusRes, waSchedulesRes, emailStatsRes, emailAccountsRes,
-        docProvidersRes, emailMsgsRes, gmailProfilesRes,
+        docProvidersRes, emailMsgsRes,
       ] = await Promise.all([
         fetch("/api/activity/me?limit=10",        { headers }),
         fetch("/api/agenda/upcoming?limit=3",     { headers }),
@@ -465,18 +481,17 @@ export default function DashboardHome() {
         fetch("/api/email/accounts",              { headers }),
         fetch("/api/documental/providers",        { headers }),
         fetch("/api/email/messages?folder=INBOX&limit=5", { headers }),
-        fetch("/api/email/profiles?provider=google", { headers }),
       ]);
       const [
         actData, agendaData, tasksData, billingData,
         expData, clientsData, chatData, chatUnreadData,
         waStatusData, waSchedulesData, emailStatsData, emailAccountsData,
-        docProvidersData, emailMsgsData, gmailProfilesData,
+        docProvidersData, emailMsgsData,
       ] = await Promise.all([
         safeJson(actRes), safeJson(agendaRes), safeJson(tasksRes), safeJson(billingRes),
         safeJson(expRes), safeJson(clientsRes), safeJson(chatRes), safeJson(chatUnreadRes),
         safeJson(waStatusRes), safeJson(waSchedulesRes), safeJson(emailStatsRes), safeJson(emailAccountsRes),
-        safeJson(docProvidersRes), safeJson(emailMsgsRes), safeJson(gmailProfilesRes),
+        safeJson(docProvidersRes), safeJson(emailMsgsRes),
       ]);
       if (actRes.ok) {
         setActivity(actData.data || []);
@@ -540,35 +555,15 @@ export default function DashboardHome() {
           origen: status.configSource === "database" ? "Configurado" : status.configSource === "environment" ? "Entorno" : "Sin configurar",
         });
       }
-      if (emailStatsRes.ok || emailAccountsRes.ok || gmailProfilesRes.ok) {
+      if (emailStatsRes.ok || emailAccountsRes.ok) {
         const stats = emailStatsData.data || {};
-        const imapAccounts: any[] = emailAccountsData.data || [];
-        const gmailProfiles: any[] = gmailProfilesData.data || [];
-        // Selector unificado: antes solo listaba cuentas IMAP -- si el
-        // despacho solo tenía Gmail conectado (lo más habitual), el selector
-        // ni siquiera aparecía y no había forma de elegir "de qué cuenta"
-        // ver los correos ni si habían llegado nuevos a esa cuenta en
-        // concreto (los stats/mensajes se mostraban mezclando todo).
-        const accounts = [
-          ...imapAccounts.map((a: any) => ({
-            id: a.id, type: 'imap' as const,
-            label: a.username || a.email || a.label || 'Cuenta',
-          })),
-          ...gmailProfiles.map((p: any) => ({
-            id: p.id, type: 'gmail' as const,
-            label: p.email || p.display_name || 'Gmail',
-          })),
-        ];
-        setEmailStats({
-          cuentas: accounts.length,
+        setEmailStats(prev => ({
+          ...prev,
           inbox: Number(stats.inbox || 0),
           unread: Number(stats.unread || 0),
           drafts: Number(stats.drafts || 0),
-        });
-        setEmailAccounts(accounts);
-        if (!silent && accounts.length > 0) {
-          setSelectedEmailAccountId(prev => prev || accounts[0].id);
-        }
+        }));
+        setImapAccountsRaw(emailAccountsData.data || []);
       }
       if (emailMsgsRes.ok) {
         setEmailMessages(emailMsgsData.data?.emails || emailMsgsData.data || []);
@@ -670,6 +665,38 @@ export default function DashboardHome() {
     if (!selectedEmailAccountId) return;
     void fetchEmailStatsForAccount(selectedEmailAccountId);
   }, [selectedEmailAccountId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Perfiles de Gmail para el selector -- petición propia e independiente
+  // del resto de fetchData() (14 llamadas en paralelo): si esa petición
+  // conjunta tarda, falla o se reintenta, esto no depende de ella para
+  // aparecer, y si esta en concreto falla no arrastra a nada más.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await getToken({ skipCache: true });
+        const res = await fetch('/api/email/profiles?provider=google', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const d = await safeJson(res);
+        if (!cancelled && res.ok) setGmailProfilesRaw(Array.isArray(d.data) ? d.data : []);
+      } catch { /* silencioso -- el selector simplemente no mostrará Gmail */ }
+    })();
+    return () => { cancelled = true; };
+  }, [getToken]);
+
+  // Selección por defecto (la primera cuenta disponible, sea IMAP o Gmail)
+  // en cuanto se resuelve el listado combinado -- ya no depende de en qué
+  // orden lleguen las dos peticiones (IMAP vs Gmail).
+  useEffect(() => {
+    if (!selectedEmailAccountId && emailAccounts.length > 0) {
+      setSelectedEmailAccountId(emailAccounts[0].id);
+    }
+  }, [emailAccounts, selectedEmailAccountId]);
+
+  useEffect(() => {
+    setEmailStats(prev => ({ ...prev, cuentas: emailAccounts.length }));
+  }, [emailAccounts.length]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
