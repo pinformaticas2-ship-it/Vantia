@@ -3340,6 +3340,11 @@ function BankAccountsTab({
   const [editingAcc, setEditingAcc] = useState<ManualBankAccount | null>(null);
   const [form, setForm] = useState({ name: "", bank_name: "", iban: "", balance: "", currency: "EUR", notes: "" });
   const [saving, setSaving] = useState(false);
+  // Solo Nombre y Saldo se ven de entrada -- Banco/IBAN/Notas quedan detrás
+  // de "+ más datos" para quien los quiera rellenar. Al editar una cuenta que
+  // ya tuviera alguno relleno, se despliega solo desde el principio para no
+  // esconder datos que la persona ya había guardado.
+  const [showMoreFields, setShowMoreFields] = useState(false);
 
   useEffect(() => {
     apiFetch("/api/facturacion/bank-accounts", { getToken })
@@ -3350,6 +3355,7 @@ function BankAccountsTab({
   const openForm = (acc?: ManualBankAccount) => {
     setEditingAcc(acc || null);
     setForm(acc ? { name: acc.name, bank_name: acc.bank_name||"", iban: acc.iban||"", balance: String(acc.balance), currency: acc.currency||"EUR", notes: acc.notes||"" } : { name:"", bank_name:"", iban:"", balance:"", currency:"EUR", notes:"" });
+    setShowMoreFields(Boolean(acc?.bank_name || acc?.iban || acc?.notes));
     setShowForm(true);
   };
 
@@ -3431,16 +3437,25 @@ function BankAccountsTab({
         <div className="space-y-4">
           <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">Nombre *</span>
             <input value={form.name} onChange={e => setForm(f => ({...f, name: e.target.value}))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" placeholder="Ej: Cuenta corriente Sabadell" /></label>
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">Banco</span>
-              <input value={form.bank_name} onChange={e => setForm(f => ({...f, bank_name: e.target.value}))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" placeholder="Sabadell" /></label>
-            <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">IBAN</span>
-              <input value={form.iban} onChange={e => setForm(f => ({...f, iban: e.target.value}))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-mono" placeholder="ES12 1234..." /></label>
-          </div>
           <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">Saldo (€)</span>
             <input type="number" step="0.01" value={form.balance} onChange={e => setForm(f => ({...f, balance: e.target.value}))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" /></label>
-          <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">Notas <span className="normal-case font-normal text-slate-400">(opcional)</span></span>
-            <input value={form.notes} onChange={e => setForm(f => ({...f, notes: e.target.value}))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" /></label>
+
+          {showMoreFields ? (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">Banco</span>
+                  <input value={form.bank_name} onChange={e => setForm(f => ({...f, bank_name: e.target.value}))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" placeholder="Sabadell" /></label>
+                <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">IBAN</span>
+                  <input value={form.iban} onChange={e => setForm(f => ({...f, iban: e.target.value}))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-mono" placeholder="ES12 1234..." /></label>
+              </div>
+              <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">Notas</span>
+                <input value={form.notes} onChange={e => setForm(f => ({...f, notes: e.target.value}))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" /></label>
+            </>
+          ) : (
+            <button type="button" onClick={() => setShowMoreFields(true)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700">
+              <ChevronDown size={13} /> Añadir banco, IBAN o notas (opcional)
+            </button>
+          )}
         </div>
       </Modal>
 
