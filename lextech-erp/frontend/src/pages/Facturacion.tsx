@@ -3437,14 +3437,9 @@ function BankAccountsTab({
             <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">IBAN</span>
               <input value={form.iban} onChange={e => setForm(f => ({...f, iban: e.target.value}))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-mono" placeholder="ES12 1234..." /></label>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">Saldo (€)</span>
-              <input type="number" step="0.01" value={form.balance} onChange={e => setForm(f => ({...f, balance: e.target.value}))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" /></label>
-            <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">Divisa</span>
-              <select value={form.currency} onChange={e => setForm(f => ({...f, currency: e.target.value}))} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm">
-                <option>EUR</option><option>USD</option><option>GBP</option></select></label>
-          </div>
-          <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">Notas</span>
+          <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">Saldo (€)</span>
+            <input type="number" step="0.01" value={form.balance} onChange={e => setForm(f => ({...f, balance: e.target.value}))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" /></label>
+          <label className="block space-y-1.5"><span className="text-xs font-bold uppercase tracking-wider text-slate-500">Notas <span className="normal-case font-normal text-slate-400">(opcional)</span></span>
             <input value={form.notes} onChange={e => setForm(f => ({...f, notes: e.target.value}))} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" /></label>
         </div>
       </Modal>
