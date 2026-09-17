@@ -3375,6 +3375,32 @@ function DocumentImportVerifyView({
   onChangeRepresentaA: (value: "demandantes" | "demandados") => void;
   onAccept: () => void;
 }) {
+  // Abogados y procuradores dados de alta en el Directorio de Profesionales.
+  // Antes "Abogado propio" era una lista fija con 2 nombres escritos a mano
+  // en el código (no eran datos reales del despacho), y "Procurador propio"
+  // no tenía ninguna sugerencia en absoluto.
+  const { getToken: getTokenVerify } = useAuth();
+  const [abogadoOptions, setAbogadoOptions] = useState<string[]>([]);
+  const [procuradorOptionsVerify, setProcuradorOptionsVerify] = useState<string[]>([]);
+  useEffect(() => {
+    (async () => {
+      try {
+        const token = await getTokenVerify({ skipCache: true });
+        const headers = { Authorization: `Bearer ${token}` };
+        const [abogadosRes, procuradoresRes] = await Promise.all([
+          fetch("/api/directorio?tipo=ABOGADO", { headers }),
+          fetch("/api/directorio?tipo=PROCURADOR", { headers }),
+        ]);
+        const [abogadosData, procuradoresData] = await Promise.all([safeJson(abogadosRes), safeJson(procuradoresRes)]);
+        const toNames = (rows: any[]) => (rows || [])
+          .map((p: any) => `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.despacho || "")
+          .filter(Boolean);
+        if (abogadosRes.ok) setAbogadoOptions(toNames(abogadosData.data));
+        if (procuradoresRes.ok) setProcuradorOptionsVerify(toNames(procuradoresData.data));
+      } catch { /* la sugerencia es opcional, no bloquea el resto del formulario */ }
+    })();
+  }, [getTokenVerify]);
+
   const normalizeImportedName = (value: unknown): string => {
     if (typeof value === "string" || typeof value === "number") {
       const normalized = String(value).trim();
@@ -3408,11 +3434,17 @@ function DocumentImportVerifyView({
   const safeAbogadoPropio       = String((form as any).abogado_propio ?? "");
   const safeAbogadoContrario    = String((form as any).abogado_contrario ?? "");
   const safeProcuradorContrario = String((form as any).procurador_contrario ?? "");
+  // Valores SIN recortar para los inputs editables en vivo -- normalizeImportedName
+  // hace .trim() en cada render, así que si se usaba como value= del input,
+  // en cuanto se pulsaba la barra espaciadora (dejando un espacio al final
+  // mientras se sigue escribiendo) ese espacio desaparecía de inmediato al
+  // volver a renderizar, y por tanto era imposible escribir nombres con
+  // espacios a mano. Los "safe*" (recortados) se conservan para el resto de
+  // usos (EyeBtn, validaciones, listas derivadas) donde sí interesa el trim.
+  const rawClienteNombre = String(form.cliente_nombre ?? "");
+  const rawContrario     = String(form.contrario ?? "");
+  const rawProcurador    = String(form.procurador ?? "");
 
-  const ABOGADOS_DESPACHO = [
-    "REBECA RODRIGUEZ PANIAGUA",
-    "FRANCISCO JAVIER FERRÁNDEZ PINA",
-  ];
   const safeJuzgado          = String(form.juzgado ?? "");
   const safeTipoProc         = String(form.tipo_proc ?? "");
   const safeTipoAsunto       = String(form.tipos_asunto ?? "");
@@ -3431,7 +3463,7 @@ function DocumentImportVerifyView({
     label: `${c.first_name || ""} ${c.last_name || ""}`.trim() || c.commercial_name || c.nif_cif || "Cliente sin nombre",
   }));
   const selectedClientLabel = clientOptions.find(o => o.value === safeClienteId)?.label || "";
-  const clientInputValue    = selectedClientLabel || safeClienteNombre || "";
+  const clientInputValue    = selectedClientLabel || rawClienteNombre || "";
 
   const handleClientInputChange = (value: string) => {
     const norm = value.trim().toLowerCase();
@@ -3814,7 +3846,7 @@ function DocumentImportVerifyView({
             {demandadosList.length === 0 ? (
               <PartyRow
                 color="red"
-                value={safeContrario}
+                value={rawContrario}
                 onChange={v => { onChange("contrario", v); onChange("demandados", v ? [v] : []); }}
               />
             ) : (
@@ -3834,22 +3866,22 @@ function DocumentImportVerifyView({
           <PanelSection title="Abogados y Procuradores">
             <div className="grid grid-cols-2 gap-x-3 gap-y-3 mt-2">
 
-              {/* Abogado propio — siempre del despacho */}
+              {/* Abogado propio — sugerencias del Directorio de Profesionales */}
               <div>
                 <p className={`${lbl} flex items-center gap-1`}>
                   <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                   Abogado propio
                 </p>
-                <select
+                <input
                   value={safeAbogadoPropio}
                   onChange={e => onChange("abogado_propio" as any, e.target.value)}
-                  className="mt-1 w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm text-slate-700 bg-white focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100"
-                >
-                  <option value="">— Seleccionar —</option>
-                  {ABOGADOS_DESPACHO.map(a => (
-                    <option key={a} value={a}>{a}</option>
-                  ))}
-                </select>
+                  placeholder="Nombre del abogado…"
+                  list="dl-abogados-verify"
+                  className={`mt-1 ${inp}`}
+                />
+                <datalist id="dl-abogados-verify">
+                  {abogadoOptions.map(a => <option key={a} value={a} />)}
+                </datalist>
               </div>
 
               {/* Abogado contrario */}
@@ -3873,11 +3905,15 @@ function DocumentImportVerifyView({
                   Procurador propio <EyeBtn term={safeProcurador} />
                 </p>
                 <input
-                  value={safeProcurador}
+                  value={rawProcurador}
                   onChange={e => onChange("procurador", e.target.value)}
                   placeholder="Nombre del procurador propio…"
+                  list="dl-procuradores-verify"
                   className={`mt-1 ${inp}`}
                 />
+                <datalist id="dl-procuradores-verify">
+                  {procuradorOptionsVerify.map(p => <option key={p} value={p} />)}
+                </datalist>
               </div>
 
               {/* Procurador contrario */}
