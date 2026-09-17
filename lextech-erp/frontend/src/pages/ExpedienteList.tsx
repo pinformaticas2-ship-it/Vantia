@@ -2873,15 +2873,30 @@ function DocumentImportView({
   inputRef: React.RefObject<HTMLInputElement>;
 }) {
   const navigate = useNavigate();
-  const procuradorOptions = Array.from(
-    new Set(
-      clients
-        .map((client) => [client.procurador, client.procurador_name, client.contacto].find(Boolean))
-        .filter(Boolean)
-        .map((value) => String(value).trim())
-        .filter(Boolean)
-    )
-  ).sort((a, b) => a.localeCompare(b, "es"));
+  const { getToken } = useAuth();
+  // Antes esto se calculaba a partir de campos que no existen en los
+  // clientes (entities no tiene "procurador"/"procurador_name"), así que la
+  // lista siempre salía vacía -- y encima no se llegaba a usar en ningún
+  // input. Se sustituye por los procuradores dados de alta en el Directorio
+  // de Profesionales, la misma fuente que ya usa el modal normal de "Nuevo
+  // expediente" para esta misma sugerencia.
+  const [procuradorOptions, setProcuradorOptions] = useState<string[]>([]);
+  useEffect(() => {
+    (async () => {
+      try {
+        const token = await getToken({ skipCache: true });
+        const res = await fetch("/api/directorio?tipo=PROCURADOR", { headers: { Authorization: `Bearer ${token}` } });
+        const data = await safeJson(res);
+        if (res.ok) {
+          setProcuradorOptions(
+            (data.data || [])
+              .map((p: any) => `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.despacho || "")
+              .filter(Boolean)
+          );
+        }
+      } catch { /* la sugerencia es opcional, no bloquea el resto del formulario */ }
+    })();
+  }, [getToken]);
   const clientOptions = clients.map((client) => ({
     value: client.id,
     label: `${client.first_name || ""} ${client.last_name || ""}`.trim()
@@ -2971,8 +2986,15 @@ function DocumentImportView({
                     value={selectedProcurador}
                     onChange={(e) => onChangeProcurador(e.target.value)}
                     placeholder="Escribir procurador..."
+                    list="dl-procuradores-import"
                     className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-[15px] text-slate-700 shadow-sm outline-none transition-all placeholder:text-slate-400 focus:border-[#ab0433]/35 focus:ring-4 focus:ring-[#ab0433]/10"
                   />
+                  {/* procuradorOptions ya se calculaba a partir de los clientes,
+                      pero no se usaba en ningún sitio -- por eso no salía
+                      ninguna sugerencia al escribir aquí. */}
+                  <datalist id="dl-procuradores-import">
+                    {procuradorOptions.map((v) => <option key={v} value={v} />)}
+                  </datalist>
                 </label>
               </div>
             )}
