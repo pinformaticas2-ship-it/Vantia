@@ -231,6 +231,40 @@ export async function deleteDriveFile(organizacionId: string, fileId: string): P
   await driveFetch(organizacionId, `/files/${fileId}`, { method: 'DELETE' }).catch(() => undefined);
 }
 
+// Sobrescribe el contenido de un archivo ya existente en Drive (misma id,
+// sin crear una copia nueva) -- se usa cuando el documento se edita en el
+// sitio (Word/Excel guardando de vuelta a través de nuestro servidor).
+export async function updateDriveFileContent(organizacionId: string, fileId: string, buffer: Buffer, mimeType?: string): Promise<void> {
+  const token = await getDriveAccessToken(organizacionId);
+  const res = await fetch(
+    `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
+    {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': mimeType || 'application/octet-stream',
+      },
+      body: buffer,
+    },
+  );
+  if (!res.ok) {
+    const data: any = await res.json().catch(() => ({}));
+    throw new Error(data?.error?.message || 'No se pudo actualizar el archivo en Google Drive');
+  }
+}
+
+export async function renameDriveFile(organizacionId: string, fileId: string, newName: string): Promise<void> {
+  const res = await driveFetch(organizacionId, `/files/${fileId}?fields=id`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: newName }),
+  });
+  if (!res.ok) {
+    const data: any = await res.json().catch(() => ({}));
+    throw new Error(data?.error?.message || 'No se pudo renombrar el archivo en Google Drive');
+  }
+}
+
 export async function isDriveConnected(organizacionId: string): Promise<boolean> {
   const { rows } = await pool.query(`SELECT google_drive_refresh_token_enc FROM organizaciones WHERE id=$1`, [organizacionId]);
   return Boolean(rows[0]?.google_drive_refresh_token_enc);

@@ -6,6 +6,15 @@ import AdmZip = require('adm-zip');
 import pool from '../config/database';
 import { logActivity, logActivityForReq } from './activityController';
 import { CLIENT_FILES_ROOT as LOCAL_CLIENT_FILES_ROOT, DATA_ROOT, TEMP_ROOT, UPLOADS_CLIENTS_ROOT as UPLOADS_ROOT } from '../config/paths';
+import {
+  isDriveConnected,
+  ensureExpedienteFolder,
+  uploadFileToDrive,
+  downloadDriveFile,
+  updateDriveFileContent,
+  renameDriveFile,
+  deleteDriveFile,
+} from '../utils/googleDrive';
 
 const LIBREOFFICE_ENABLED =
   String(process.env.ENABLE_LIBREOFFICE_PREVIEW || "true").trim().toLowerCase() !== "false";
@@ -41,6 +50,90 @@ function ensureClientDir(clientId: string) {
   const dir = path.join(UPLOADS_ROOT, clientId);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   return dir;
+}
+
+// ── Google Drive: adjuntos de expedientes ──────────────────────────────────
+// El "clientId" de esta ruta es en realidad el id de la fila que posee el
+// adjunto -- puede ser un cliente (entities) o un expediente. Solo los
+// adjuntos de EXPEDIENTES se guardan en Drive (alcance acordado); los de
+// clientes (DNI, etc.) siguen solo en disco local. Por eso primero hay que
+// comprobar si el id es un expediente antes de intentar nada con Drive.
+async function getExpedienteDriveContext(clientId: string): Promise<{ organizacionId: string; expedienteName: string } | null> {
+  const r = await pool.query(
+    `SELECT organizacion_id, anio, num_exp, descripcion FROM expedientes WHERE id = $1`,
+    [clientId],
+  );
+  if (!r.rows.length) return null;
+  const row = r.rows[0];
+  const expedienteName = [row.anio, row.num_exp].filter(Boolean).join('/')
+    + (row.descripcion ? ` - ${String(row.descripcion).trim()}` : '');
+  return { organizacionId: row.organizacion_id, expedienteName: expedienteName || clientId };
+}
+
+// El disco del contenedor de Railway es efímero y se borra en cada
+// despliegue -- si el archivo ya no está en el caché local pero sabemos que
+// vive en Drive, lo volvemos a bajar antes de servirlo/previsualizarlo.
+async function ensureFileOnDisk(
+  clientId: string,
+  storedName: string,
+  storageProvider: string | null | undefined,
+  driveFileId: string | null | undefined,
+): Promise<string> {
+  const filePath = path.join(UPLOADS_ROOT, clientId, storedName);
+  if (fs.existsSync(filePath) || storageProvider !== 'drive' || !driveFileId) return filePath;
+  const ctx = await getExpedienteDriveContext(clientId);
+  if (!ctx) return filePath;
+  const { buffer } = await downloadDriveFile(ctx.organizacionId, driveFileId);
+  ensureClientDir(clientId);
+  fs.writeFileSync(filePath, buffer);
+  return filePath;
+}
+
+async function recordDriveError(organizacionId: string, err: any): Promise<void> {
+  const message = String(err?.message || err).slice(0, 1000);
+  console.warn('[files] No se pudo sincronizar con Google Drive, se mantiene la copia local:', message);
+  await pool.query(
+    `UPDATE organizaciones SET google_drive_last_error = $1, google_drive_last_error_at = now() WHERE id = $2`,
+    [message, organizacionId],
+  ).catch(() => {});
+}
+
+async function clearDriveError(organizacionId: string): Promise<void> {
+  await pool.query(
+    `UPDATE organizaciones SET google_drive_last_error = NULL, google_drive_last_error_at = NULL WHERE id = $1`,
+    [organizacionId],
+  ).catch(() => {});
+}
+
+// Sube (o vuelve a subir) el contenido en disco de un adjunto ya insertado
+// en client_files a la carpeta de Drive del expediente, y actualiza la fila
+// con storage_provider/drive_file_id. Si algo falla, no lanza -- el archivo
+// simplemente se queda como estaba (normalmente 'local'), igual que ya hace
+// el mismo patrón en documentImportController.ts.
+async function tryUploadFileToDrive(
+  clientId: string,
+  fileRowId: string,
+  originalName: string,
+  mimeType: string,
+  localFilePath: string,
+): Promise<{ id: string } | null> {
+  const ctx = await getExpedienteDriveContext(clientId);
+  if (!ctx) return null;
+  if (!(await isDriveConnected(ctx.organizacionId))) return null;
+  try {
+    const folderId = await ensureExpedienteFolder(ctx.organizacionId, clientId, ctx.expedienteName);
+    const buffer = fs.readFileSync(localFilePath);
+    const uploaded = await uploadFileToDrive(ctx.organizacionId, folderId, originalName, buffer, mimeType);
+    await pool.query(
+      `UPDATE client_files SET storage_provider = 'drive', drive_file_id = $1 WHERE id = $2`,
+      [uploaded.id, fileRowId],
+    );
+    await clearDriveError(ctx.organizacionId);
+    return { id: uploaded.id };
+  } catch (driveErr: any) {
+    await recordDriveError(ctx.organizacionId, driveErr);
+    return null;
+  }
 }
 
 /**
@@ -262,6 +355,15 @@ export const uploadFiles = async (req: any, res: Response) => {
       const sourceFile = path.join(clientDir, file.filename);
       syncFileToLocal(clientId, baseFileName, sourceFile, 'Sin clasificar');
 
+      // Si es un adjunto de expediente y la organización tiene Drive
+      // conectado, se sube también ahí -- el disco local se conserva igual
+      // como caché de trabajo para esta misma sesión del contenedor.
+      const uploaded = await tryUploadFileToDrive(clientId, result.rows[0].id, baseFileName, file.mimetype, sourceFile);
+      if (uploaded) {
+        result.rows[0].storage_provider = 'drive';
+        result.rows[0].drive_file_id = uploaded.id;
+      }
+
       // Registrar en historial
       logActivityForReq(req, `Archivo subido: ${baseFileName}`, 'CLIENT', clientId);
     }
@@ -278,14 +380,14 @@ export const downloadFile = async (req: any, res: Response) => {
   const { clientId, fileId } = req.params;
   try {
     const result = await pool.query(
-      `SELECT stored_name, original_name, mimetype FROM client_files WHERE id = $1 AND client_id = $2`,
+      `SELECT stored_name, original_name, mimetype, storage_provider, drive_file_id FROM client_files WHERE id = $1 AND client_id = $2`,
       [fileId, clientId]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
     }
-    const { stored_name, original_name, mimetype } = result.rows[0];
-    const filePath = path.join(UPLOADS_ROOT, clientId, stored_name);
+    const { stored_name, original_name, mimetype, storage_provider, drive_file_id } = result.rows[0];
+    const filePath = await ensureFileOnDisk(clientId, stored_name, storage_provider, drive_file_id);
 
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ success: false, error: 'Archivo no encontrado en disco.' });
@@ -349,13 +451,13 @@ export const downloadByToken = async (req: any, res: Response) => {
   const isHead = req.method === 'HEAD';
   try {
     const result = await pool.query(
-      `SELECT stored_name, original_name, mimetype, client_id FROM client_files WHERE id = $1 LIMIT 1`,
+      `SELECT stored_name, original_name, mimetype, client_id, storage_provider, drive_file_id FROM client_files WHERE id = $1 LIMIT 1`,
       [data.fileId]
     );
     if (result.rows.length === 0) return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
-    const { stored_name, original_name, mimetype, client_id } = result.rows[0];
+    const { stored_name, original_name, mimetype, client_id, storage_provider, drive_file_id } = result.rows[0];
     const realClientId = client_id || data.clientId;
-    const filePath = path.join(UPLOADS_ROOT, realClientId, stored_name);
+    const filePath = await ensureFileOnDisk(realClientId, stored_name, storage_provider, drive_file_id);
     if (!fs.existsSync(filePath)) return res.status(404).json({ success: false, error: 'Archivo no encontrado en disco.' });
     res.setHeader('Content-Type', mimetype);
     const asciiName = original_name.replace(/[^\x20-\x7E]/g, '_').replace(/"/g, '\\"');
@@ -377,7 +479,7 @@ export const syncClientFileByToken = async (req: any, res: Response) => {
 
   try {
     const result = await pool.query(
-      `SELECT stored_name, original_name, client_id
+      `SELECT stored_name, original_name, client_id, mimetype, storage_provider, drive_file_id
        FROM client_files
        WHERE id = $1
        LIMIT 1`,
@@ -387,9 +489,9 @@ export const syncClientFileByToken = async (req: any, res: Response) => {
       return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
     }
 
-    const { stored_name, original_name, client_id } = result.rows[0];
+    const { stored_name, original_name, client_id, mimetype, storage_provider, drive_file_id } = result.rows[0];
     const realClientId = client_id || data.clientId;
-    const filePath = path.join(UPLOADS_ROOT, realClientId, stored_name);
+    const filePath = await ensureFileOnDisk(realClientId, stored_name, storage_provider, drive_file_id);
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ success: false, error: 'Archivo no encontrado en disco.' });
     }
@@ -409,6 +511,20 @@ export const syncClientFileByToken = async (req: any, res: Response) => {
        WHERE id = $2 AND client_id = $3`,
       [stat.size, data.fileId, realClientId]
     );
+
+    // Si el adjunto vive en Drive, se sobrescribe el mismo archivo con el
+    // contenido recién guardado desde Word/Excel (misma id, sin duplicar).
+    if (storage_provider === 'drive' && drive_file_id) {
+      const ctx = await getExpedienteDriveContext(realClientId);
+      if (ctx) {
+        try {
+          await updateDriveFileContent(ctx.organizacionId, drive_file_id, body, mimetype);
+          await clearDriveError(ctx.organizacionId);
+        } catch (driveErr: any) {
+          await recordDriveError(ctx.organizacionId, driveErr);
+        }
+      }
+    }
 
     await logActivity(
       'SYSTEM',
@@ -544,13 +660,13 @@ export const deleteFile = async (req: any, res: Response) => {
   const userId = req.auth?.userId || 'SYSTEM';
   try {
     const result = await pool.query(
-      `DELETE FROM client_files WHERE id = $1 AND client_id = $2 RETURNING stored_name, original_name, attachment_type`,
+      `DELETE FROM client_files WHERE id = $1 AND client_id = $2 RETURNING stored_name, original_name, attachment_type, storage_provider, drive_file_id`,
       [fileId, clientId]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
     }
-    const { stored_name, original_name, attachment_type } = result.rows[0];
+    const { stored_name, original_name, attachment_type, storage_provider, drive_file_id } = result.rows[0];
     // Borrar del servidor (almacenamiento plano con UUID)
     const filePath = path.join(UPLOADS_ROOT, clientId, stored_name);
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
@@ -558,6 +674,10 @@ export const deleteFile = async (req: any, res: Response) => {
     const localTypeDir = path.join(LOCAL_CLIENT_FILES_ROOT, clientId, typeFolderName(attachment_type));
     const localFilePath = path.join(localTypeDir, original_name);
     if (fs.existsSync(localFilePath)) { try { fs.unlinkSync(localFilePath); } catch (_) {} }
+    if (storage_provider === 'drive' && drive_file_id) {
+      const ctx = await getExpedienteDriveContext(clientId);
+      if (ctx) await deleteDriveFile(ctx.organizacionId, drive_file_id).catch(() => {});
+    }
     logActivityForReq(req, `Archivo eliminado: ${original_name || stored_name}`, 'CLIENT', clientId);
     res.json({ success: true });
   } catch (err: any) {
@@ -575,7 +695,7 @@ export const updateFileMetadata = async (req: any, res: Response) => {
   try {
     // Leer valores actuales ANTES de actualizar (para mover el fichero local)
     const existing = await pool.query(
-      `SELECT original_name, attachment_type FROM client_files WHERE id = $1 AND client_id = $2`,
+      `SELECT original_name, attachment_type, storage_provider, drive_file_id FROM client_files WHERE id = $1 AND client_id = $2`,
       [fileId, clientId]
     );
     if (existing.rows.length === 0) {
@@ -583,6 +703,8 @@ export const updateFileMetadata = async (req: any, res: Response) => {
     }
     const oldOriginalName  = existing.rows[0].original_name as string;
     const oldAttachType    = existing.rows[0].attachment_type as string | null;
+    const storageProvider  = existing.rows[0].storage_provider as string | null;
+    const driveFileId      = existing.rows[0].drive_file_id as string | null;
 
     let originalNameUpdate = '';
     let params: any[];
@@ -615,6 +737,13 @@ export const updateFileMetadata = async (req: any, res: Response) => {
     const nameChanged   = newOriginalName !== oldOriginalName;
     if (typeChanged || nameChanged) {
       moveLocalFile(clientId, oldOriginalName, newOriginalName, oldAttachType, newAttachType);
+    }
+    if (nameChanged && storageProvider === 'drive' && driveFileId) {
+      const ctx = await getExpedienteDriveContext(clientId);
+      if (ctx) {
+        try { await renameDriveFile(ctx.organizacionId, driveFileId, newOriginalName); }
+        catch (driveErr: any) { await recordDriveError(ctx.organizacionId, driveErr); }
+      }
     }
 
     res.json({ success: true, data: result.rows[0] });
@@ -661,6 +790,14 @@ export const createBlankDocument = async (req: any, res: Response) => {
     const fileId = result.rows[0].id;
     // URL de descarga con token incluido (el cliente la usará para Word)
     const downloadUrl = `/api/files/${clientId}/${fileId}/download`;
+
+    await tryUploadFileToDrive(
+      clientId,
+      fileId,
+      originalName,
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      filePath,
+    );
 
     logActivityForReq(req, `Documento creado: ${originalName}`, 'CLIENT', clientId);
 
@@ -738,13 +875,13 @@ export const previewDocxAsHtml = async (req: any, res: Response) => {
   const { clientId, fileId } = req.params;
   try {
     const result = await pool.query(
-      `SELECT stored_name, original_name, mimetype FROM client_files WHERE id = $1 AND client_id = $2`,
+      `SELECT stored_name, original_name, mimetype, storage_provider, drive_file_id FROM client_files WHERE id = $1 AND client_id = $2`,
       [fileId, clientId]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
     }
-    const { stored_name, original_name, mimetype } = result.rows[0];
+    const { stored_name, original_name, mimetype, storage_provider, drive_file_id } = result.rows[0];
     const ext = path.extname(original_name || stored_name || '').toLowerCase();
     const isWord =
       mimetype?.includes('word') ||
@@ -757,7 +894,7 @@ export const previewDocxAsHtml = async (req: any, res: Response) => {
       return res.status(400).json({ success: false, error: 'Este tipo de archivo no es soportado para previsualización.' });
     }
 
-    const filePath = path.join(UPLOADS_ROOT, clientId, stored_name);
+    const filePath = await ensureFileOnDisk(clientId, stored_name, storage_provider, drive_file_id);
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ success: false, error: 'Archivo no encontrado en disco.' });
     }
@@ -1337,15 +1474,15 @@ export const previewExcelAsHtml = async (req: any, res: Response) => {
   const { clientId, fileId } = req.params;
   try {
     const result = await pool.query(
-      `SELECT stored_name, original_name, mimetype FROM client_files WHERE id = $1 AND client_id = $2`,
+      `SELECT stored_name, original_name, mimetype, storage_provider, drive_file_id FROM client_files WHERE id = $1 AND client_id = $2`,
       [fileId, clientId]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
     }
-    const { stored_name } = result.rows[0];
+    const { stored_name, storage_provider, drive_file_id } = result.rows[0];
 
-    const filePath = path.join(UPLOADS_ROOT, clientId, stored_name);
+    const filePath = await ensureFileOnDisk(clientId, stored_name, storage_provider, drive_file_id);
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ success: false, error: 'Archivo no encontrado en disco.' });
     }
@@ -1641,14 +1778,14 @@ export const previewWordAsPdf = async (req: any, res: Response) => {
   const { clientId, fileId } = req.params;
   try {
     const result = await pool.query(
-      `SELECT stored_name, original_name, mimetype FROM client_files WHERE id = $1 AND client_id = $2`,
+      `SELECT stored_name, original_name, mimetype, storage_provider, drive_file_id FROM client_files WHERE id = $1 AND client_id = $2`,
       [fileId, clientId]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
     }
 
-    const { stored_name, original_name, mimetype } = result.rows[0];
+    const { stored_name, original_name, mimetype, storage_provider, drive_file_id } = result.rows[0];
     const ext = path.extname(original_name || stored_name || '').toLowerCase();
 
     // Tipos que LibreOffice puede convertir a PDF
@@ -1672,7 +1809,7 @@ export const previewWordAsPdf = async (req: any, res: Response) => {
       return res.status(400).json({ success: false, error: 'Formato no convertible a PDF.' });
     }
 
-    const sourcePath = path.join(UPLOADS_ROOT, clientId, stored_name);
+    const sourcePath = await ensureFileOnDisk(clientId, stored_name, storage_provider, drive_file_id);
     if (!fs.existsSync(sourcePath)) {
       return res.status(404).json({ success: false, error: 'Archivo no encontrado en disco.' });
     }
