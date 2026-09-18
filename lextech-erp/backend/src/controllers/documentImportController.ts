@@ -19,6 +19,7 @@ import {
   type DocFile,
 } from '../utils/docExtract';
 import { UPLOADS_ROOT, UPLOADS_CLIENTS_ROOT } from '../config/paths';
+import { isDriveConnected, ensureExpedienteFolder, uploadFileToDrive } from '../utils/googleDrive';
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
 const genAI = GEMINI_API_KEY ? new GoogleGenerativeAI(GEMINI_API_KEY) : null;
@@ -1411,6 +1412,8 @@ async function attachImportedDocumentToExpediente(
   expedienteId: string,
   payload: Record<string, any>,
   userId_: string,
+  organizacionId: string,
+  expedienteName: string,
 ) {
   const previewStoredName = String(payload?.storedName || '').trim();
   const originalName = String(payload?.fileName || payload?.reference || '').trim();
@@ -1420,6 +1423,30 @@ async function attachImportedDocumentToExpediente(
 
   const sourcePath = path.join(UPLOADS_ROOT, 'document-imports', String(payload?.batchId || ''), previewStoredName);
   if (!fs.existsSync(sourcePath)) return;
+
+  // Si la organización tiene Google Drive conectado, el documento se sube
+  // ahí (a la carpeta del expediente) en vez de al disco del servidor, que
+  // es efímero y se borra en cada despliegue. Si algo falla al subirlo (o
+  // no hay Drive conectado), se guarda en disco local como hasta ahora --
+  // mejor que el documento se pierda a que la creación del expediente falle.
+  try {
+    if (await isDriveConnected(organizacionId)) {
+      const folderId = await ensureExpedienteFolder(organizacionId, expedienteId, expedienteName);
+      const buffer = fs.readFileSync(sourcePath);
+      const uploaded = await uploadFileToDrive(organizacionId, folderId, originalName, buffer, mimeType);
+      const stat = fs.statSync(sourcePath);
+
+      await pool.query(
+        `INSERT INTO client_files
+           (client_id, original_name, stored_name, mimetype, size_bytes, document_name, attachment_type, created_by, storage_provider, drive_file_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'drive',$9)`,
+        [expedienteId, originalName, uploaded.id, mimeType, stat.size, documentName || null, 'Sin clasificar', userId_, uploaded.id],
+      );
+      return;
+    }
+  } catch (driveErr: any) {
+    console.warn('[documentImport] No se pudo subir el documento a Google Drive, se guarda en disco local:', String(driveErr?.message || driveErr));
+  }
 
   const expedienteDir = ensureDir(path.join(UPLOADS_CLIENTS_ROOT, expedienteId));
   const storedName = `${Date.now()}_${sanitizeFileName(originalName)}`;
@@ -1749,7 +1776,9 @@ export async function acceptDocumentImportItem(req: Request, res: Response) {
     };
 
     const expediente = await createExpediente(finalDraft, unam, organizacionId);
-    await attachImportedDocumentToExpediente(expediente.id, payload, uid);
+    const expedienteName = [expediente.anio, expediente.num_exp].filter(Boolean).join('/')
+      + (finalDraft.descripcion ? ` - ${String(finalDraft.descripcion).trim()}` : '');
+    await attachImportedDocumentToExpediente(expediente.id, payload, uid, organizacionId, expedienteName || expediente.id);
     // El plazo procesal detectado ya no se crea en silencio: se calcula y se
     // devuelve como propuesta para que el usuario la confirme (o la descarte)
     // desde el frontend, eligiendo el tipo de actuación — ver
