@@ -133,16 +133,29 @@ export async function ensureRootFolder(organizacionId: string): Promise<string> 
   return folderId;
 }
 
-// Carpeta del expediente dentro de la carpeta raíz -- se crea la primera vez
+// Carpeta "Expedientes" dentro de la carpeta raíz del despacho -- estructura
+// fija: <Despacho> / Expedientes / <expediente> / adjuntos.
+export async function ensureExpedientesFolder(organizacionId: string): Promise<string> {
+  const { rows } = await pool.query(`SELECT google_drive_expedientes_folder_id FROM organizaciones WHERE id=$1`, [organizacionId]);
+  if (rows.length && rows[0].google_drive_expedientes_folder_id) return rows[0].google_drive_expedientes_folder_id;
+
+  const rootId = await ensureRootFolder(organizacionId);
+  const existing = await findFolder(organizacionId, 'Expedientes', rootId);
+  const folderId = existing || await createFolder(organizacionId, 'Expedientes', rootId);
+  await pool.query(`UPDATE organizaciones SET google_drive_expedientes_folder_id=$1 WHERE id=$2`, [folderId, organizacionId]);
+  return folderId;
+}
+
+// Carpeta del expediente dentro de "Expedientes" -- se crea la primera vez
 // que hace falta (alta del expediente, o primer documento que se le sube) y
 // se recuerda en expedientes.google_drive_folder_id.
 export async function ensureExpedienteFolder(organizacionId: string, expedienteId: string, expedienteName: string): Promise<string> {
   const { rows } = await pool.query(`SELECT google_drive_folder_id FROM expedientes WHERE id=$1`, [expedienteId]);
   if (rows.length && rows[0].google_drive_folder_id) return rows[0].google_drive_folder_id;
 
-  const rootId = await ensureRootFolder(organizacionId);
+  const expedientesFolderId = await ensureExpedientesFolder(organizacionId);
   const safeName = (expedienteName || 'Expediente sin nombre').slice(0, 200);
-  const folderId = await createFolder(organizacionId, safeName, rootId);
+  const folderId = await createFolder(organizacionId, safeName, expedientesFolderId);
   await pool.query(`UPDATE expedientes SET google_drive_folder_id=$1 WHERE id=$2`, [folderId, expedienteId]);
   return folderId;
 }

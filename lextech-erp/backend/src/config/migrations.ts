@@ -2178,6 +2178,10 @@ export async function runMigrations(): Promise<void> {
     try {
       await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS google_drive_root_folder_id TEXT;`);
     } catch (_e: any) {}
+    // Estructura: <Despacho> / Expedientes / <expediente> / adjuntos.
+    try {
+      await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS google_drive_expedientes_folder_id TEXT;`);
+    } catch (_e: any) {}
     try {
       await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS google_drive_email TEXT;`);
     } catch (_e: any) {}
