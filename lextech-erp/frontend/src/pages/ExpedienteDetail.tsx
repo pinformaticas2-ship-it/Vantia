@@ -5801,6 +5801,16 @@ export default function ExpedienteDetail() {
           </div>
         </div>
         <div className="flex items-center gap-2.5 shrink-0">
+          {exp.google_drive_folder_id && (
+            <a
+              href={`https://drive.google.com/drive/folders/${exp.google_drive_folder_id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl shadow-sm active:scale-95 transition-all"
+            >
+              <ExternalLink size={14} className="text-slate-400" /> Ir a carpeta
+            </a>
+          )}
           <BackButton onClick={() => navigate("/dashboard/expedientes")} />
           {editing ? (
             <>
