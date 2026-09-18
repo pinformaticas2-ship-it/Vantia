@@ -14,6 +14,8 @@ import {
   updateDriveFileContent,
   renameDriveFile,
   deleteDriveFile,
+  recordDriveError,
+  clearDriveError,
 } from '../utils/googleDrive';
 
 const LIBREOFFICE_ENABLED =
@@ -87,22 +89,6 @@ async function ensureFileOnDisk(
   ensureClientDir(clientId);
   fs.writeFileSync(filePath, buffer);
   return filePath;
-}
-
-async function recordDriveError(organizacionId: string, err: any): Promise<void> {
-  const message = String(err?.message || err).slice(0, 1000);
-  console.warn('[files] No se pudo sincronizar con Google Drive, se mantiene la copia local:', message);
-  await pool.query(
-    `UPDATE organizaciones SET google_drive_last_error = $1, google_drive_last_error_at = now() WHERE id = $2`,
-    [message, organizacionId],
-  ).catch(() => {});
-}
-
-async function clearDriveError(organizacionId: string): Promise<void> {
-  await pool.query(
-    `UPDATE organizaciones SET google_drive_last_error = NULL, google_drive_last_error_at = NULL WHERE id = $1`,
-    [organizacionId],
-  ).catch(() => {});
 }
 
 // Sube (o vuelve a subir) el contenido en disco de un adjunto ya insertado

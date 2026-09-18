@@ -29,6 +29,7 @@ import organizacionRoutes   from './routes/organizacion';
 import preferencesRoutes    from './routes/preferences';
 import pushRoutes           from './routes/push';
 import { syncAllQuipuUsers } from './controllers/quipuController';
+import { syncAllOrganizacionesDriveChanges } from './utils/googleDriveSync';
 import { clerkMiddleware } from '@clerk/express';
 import { resolveOrg } from './middleware/resolveOrg';
 import { runMigrations } from './config/migrations';
@@ -295,6 +296,13 @@ runMigrations().then(() => {
       syncAllQuipuUsers().catch(() => {});
       setInterval(() => syncAllQuipuUsers().catch(() => {}), 30 * 60 * 1000);
     }, 30_000);
+
+    // Google Drive: refleja en Vantia los cambios hechos directamente en
+    // Drive (renombrar, borrar/mover a papelera) -- sondeo cada 5 min.
+    setTimeout(() => {
+      syncAllOrganizacionesDriveChanges().catch(() => {});
+      setInterval(() => syncAllOrganizacionesDriveChanges().catch(() => {}), 5 * 60 * 1000);
+    }, 45_000);
 
     // EmailEngine startup: configure webhook and register existing IMAP accounts
     const emailEngineUrl = process.env.EMAIL_ENGINE_URL;

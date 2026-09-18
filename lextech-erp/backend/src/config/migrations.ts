@@ -2194,6 +2194,13 @@ export async function runMigrations(): Promise<void> {
     try {
       await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS google_drive_last_error_at TIMESTAMPTZ;`);
     } catch (_e: any) {}
+    // Cursor de la Google Drive Changes API -- permite detectar cambios
+    // hechos DIRECTAMENTE en Drive (renombrar, borrar/mover a papelera) y
+    // reflejarlos en Vantia mediante un sondeo periódico (ver
+    // utils/googleDriveSync.ts), en vez de solo Vantia -> Drive.
+    try {
+      await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS google_drive_changes_page_token TEXT;`);
+    } catch (_e: any) {}
     try {
       await client.query(`ALTER TABLE expedientes ADD COLUMN IF NOT EXISTS google_drive_folder_id TEXT;`);
     } catch (_e: any) {}

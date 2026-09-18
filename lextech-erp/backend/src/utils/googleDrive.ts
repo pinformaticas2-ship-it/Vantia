@@ -269,3 +269,64 @@ export async function isDriveConnected(organizacionId: string): Promise<boolean>
   const { rows } = await pool.query(`SELECT google_drive_refresh_token_enc FROM organizaciones WHERE id=$1`, [organizacionId]);
   return Boolean(rows[0]?.google_drive_refresh_token_enc);
 }
+
+// Registro compartido del último error real al hablar con Drive -- se puede
+// consultar con una query directa a la BD sin depender de los logs de
+// Railway. Nunca lanza: registrar el error no debe romper la operación que
+// falló al hablar con Drive.
+export async function recordDriveError(organizacionId: string, err: any): Promise<void> {
+  const message = String(err?.message || err).slice(0, 1000);
+  console.warn('[googleDrive] Error:', message);
+  await pool.query(
+    `UPDATE organizaciones SET google_drive_last_error = $1, google_drive_last_error_at = now() WHERE id = $2`,
+    [message, organizacionId],
+  ).catch(() => {});
+}
+
+export async function clearDriveError(organizacionId: string): Promise<void> {
+  await pool.query(
+    `UPDATE organizaciones SET google_drive_last_error = NULL, google_drive_last_error_at = NULL WHERE id = $1`,
+    [organizacionId],
+  ).catch(() => {});
+}
+
+// ── Google Drive Changes API: detectar cambios hechos FUERA de Vantia ─────
+// Hasta aquí todo el módulo es Vantia -> Drive (subir, renombrar, borrar
+// desde la app). Esto es lo contrario: si alguien renombra o borra un
+// archivo directamente en la web de Drive, Vantia no se entera solo -- hay
+// que preguntarle a Google qué cambió. La Changes API funciona con un
+// cursor (pageToken): se pide uno inicial, y en cada sondeo se listan solo
+// los cambios ocurridos desde el último cursor guardado.
+export async function getDriveStartPageToken(organizacionId: string): Promise<string> {
+  const res = await driveFetch(organizacionId, '/changes/startPageToken');
+  const data: any = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error?.message || 'No se pudo obtener el cursor de cambios de Google Drive');
+  return data.startPageToken;
+}
+
+export interface DriveChange {
+  fileId: string;
+  removed: boolean;
+  file?: { id: string; name: string; trashed?: boolean; parents?: string[] };
+}
+
+// Devuelve todos los cambios desde `pageToken` (recorriendo la paginación
+// internamente) y el nuevo cursor a guardar para el próximo sondeo.
+export async function listDriveChanges(organizacionId: string, pageToken: string): Promise<{ changes: DriveChange[]; newPageToken: string }> {
+  const changes: DriveChange[] = [];
+  let token = pageToken;
+  for (;;) {
+    const params = new URLSearchParams({
+      pageToken: token,
+      fields: 'nextPageToken,newStartPageToken,changes(fileId,removed,file(id,name,trashed,parents))',
+      spaces: 'drive',
+      pageSize: '1000',
+    });
+    const res = await driveFetch(organizacionId, `/changes?${params}`);
+    const data: any = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.error?.message || 'No se pudo listar los cambios de Google Drive');
+    if (Array.isArray(data.changes)) changes.push(...data.changes);
+    if (data.nextPageToken) { token = data.nextPageToken; continue; }
+    return { changes, newPageToken: data.newStartPageToken || token };
+  }
+}
