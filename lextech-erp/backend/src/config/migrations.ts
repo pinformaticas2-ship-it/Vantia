@@ -2159,6 +2159,42 @@ export async function runMigrations(): Promise<void> {
       await client.query(`ALTER TABLE email_oauth_profiles ADD COLUMN IF NOT EXISTS refresh_token_enc TEXT;`);
     } catch (_e: any) {}
 
+    // ── Google Drive: documentos de expedientes ─────────────────────────
+    // El disco del contenedor de Railway es efímero (se borra en cada
+    // despliegue) -- los documentos de expedientes se movieron a Google
+    // Drive para que sobrevivan a los despliegues. Conexión por
+    // organización (igual que Gmail: refresh token real, access_type=
+    // offline), una carpeta raíz del despacho, y una carpeta por
+    // expediente dentro de ella.
+    try {
+      await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS google_drive_access_token_enc TEXT;`);
+    } catch (_e: any) {}
+    try {
+      await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS google_drive_refresh_token_enc TEXT;`);
+    } catch (_e: any) {}
+    try {
+      await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS google_drive_token_expiry TIMESTAMPTZ;`);
+    } catch (_e: any) {}
+    try {
+      await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS google_drive_root_folder_id TEXT;`);
+    } catch (_e: any) {}
+    try {
+      await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS google_drive_email TEXT;`);
+    } catch (_e: any) {}
+    try {
+      await client.query(`ALTER TABLE expedientes ADD COLUMN IF NOT EXISTS google_drive_folder_id TEXT;`);
+    } catch (_e: any) {}
+    // client_files: de qué proveedor viene cada archivo -- 'local' (disco,
+    // el comportamiento de siempre, para no romper nada de lo ya existente)
+    // o 'drive' (Google Drive, nuevo). drive_file_id solo se rellena para
+    // los que sí están en Drive.
+    try {
+      await client.query(`ALTER TABLE client_files ADD COLUMN IF NOT EXISTS storage_provider TEXT NOT NULL DEFAULT 'local';`);
+    } catch (_e: any) {}
+    try {
+      await client.query(`ALTER TABLE client_files ADD COLUMN IF NOT EXISTS drive_file_id TEXT;`);
+    } catch (_e: any) {}
+
     // ── Permisos en schema public (requerido en PostgreSQL 15+) ────
     for (const grant of [
       `GRANT USAGE ON SCHEMA public TO admin`,

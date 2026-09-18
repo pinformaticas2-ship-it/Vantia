@@ -22,6 +22,8 @@ export interface OrganizacionInfo {
   clientWelcomeEmailSubject?: string | null;
   clientWelcomeEmailBody?: string | null;
   clientWelcomeEmailSignature?: string | null;
+  googleDriveConnected?: boolean;
+  googleDriveEmail?: string | null;
 }
 
 export interface OrganizacionMembership extends OrganizacionInfo {

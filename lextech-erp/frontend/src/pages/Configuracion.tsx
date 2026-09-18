@@ -368,6 +368,11 @@ function DespachoPanel() {
   const [error, setError] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
+  // ── Google Drive (documentos de expedientes) ────────────────────────────
+  const [driveConnecting, setDriveConnecting] = useState(false);
+  const [driveError, setDriveError] = useState('');
+  const [disconnectingDrive, setDisconnectingDrive] = useState(false);
+
   useEffect(() => {
     if (!organizacion) return;
     setNombre(organizacion.nombre);
@@ -380,6 +385,57 @@ function DespachoPanel() {
   }, [organizacion]);
 
   const canEdit = rol === 'propietario' || rol === 'admin';
+
+  // El script de Google Identity Services ya se carga globalmente en
+  // index.html (lo usa también Correo), así que aquí solo hace falta
+  // invocarlo -- sin volver a inyectar el <script>.
+  const connectDrive = () => {
+    setDriveError('');
+    const goog = (window as any).google;
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
+    if (!clientId) { setDriveError('VITE_GOOGLE_CLIENT_ID no está configurado.'); return; }
+    if (!goog?.accounts?.oauth2) { setDriveError('Google Identity Services aún se está cargando. Espera un momento y vuelve a intentarlo.'); return; }
+
+    const codeClient = goog.accounts.oauth2.initCodeClient({
+      client_id: clientId,
+      // drive.file: solo da acceso a los archivos/carpetas que esta app
+      // cree en Drive, nunca al resto del Drive de la cuenta conectada.
+      scope: 'https://www.googleapis.com/auth/drive.file',
+      ux_mode: 'popup',
+      access_type: 'offline',
+      // 'consent' fuerza la pantalla de permisos siempre -- es lo único
+      // que garantiza que Google mande un refresh_token también al
+      // reconectar (si no, solo lo manda la primera vez).
+      prompt: 'consent',
+      callback: async (resp: { code?: string; error?: string }) => {
+        if (!resp.code) { setDriveError('Error al conectar con Google: ' + (resp.error || 'Desconocido')); return; }
+        setDriveConnecting(true);
+        try {
+          const data = await apiFetch('/api/organizacion/drive/exchange-code', {
+            method: 'POST', getToken, body: JSON.stringify({ code: resp.code }),
+          });
+          if (data?.success === false) throw new Error(data.error);
+          window.location.reload();
+        } catch (e: any) {
+          setDriveError(e.message || 'No se pudo conectar Google Drive');
+          setDriveConnecting(false);
+        }
+      },
+    });
+    codeClient.requestCode();
+  };
+
+  const disconnectDrive = async () => {
+    setDisconnectingDrive(true); setDriveError('');
+    try {
+      const data = await apiFetch('/api/organizacion/drive', { method: 'DELETE', getToken });
+      if (data?.success === false) throw new Error(data.error);
+      window.location.reload();
+    } catch (e: any) {
+      setDriveError(e.message || 'No se pudo desconectar Google Drive');
+      setDisconnectingDrive(false);
+    }
+  };
 
   const save = async () => {
     if (!nombre.trim()) return;
@@ -637,6 +693,37 @@ function DespachoPanel() {
                     <p className="text-xs text-slate-400 mt-1">Se añade al final del correo, debajo del mensaje.</p>
                   </div>
                 </div>
+              </div>
+
+              <div className="border-t border-slate-100 pt-4">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Google Drive (documentos de expedientes)</p>
+                <p className="text-xs text-slate-400 mb-3">
+                  El servidor no guarda los archivos de forma permanente. Conecta Google Drive para que los documentos de cada expediente se guarden ahí, en una carpeta por expediente, y no se pierdan.
+                </p>
+                {organizacion?.googleDriveConnected ? (
+                  <div className="flex items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3.5 py-3">
+                    <div className="flex items-center gap-2 text-xs text-emerald-700">
+                      <Check size={14} className="shrink-0" />
+                      <span>Conectado{organizacion.googleDriveEmail ? ` (${organizacion.googleDriveEmail})` : ''}</span>
+                    </div>
+                    <button
+                      onClick={disconnectDrive}
+                      disabled={disconnectingDrive}
+                      className="text-xs font-semibold text-red-600 hover:underline disabled:opacity-50"
+                    >
+                      {disconnectingDrive ? 'Desconectando…' : 'Desconectar'}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={connectDrive}
+                    disabled={driveConnecting}
+                    className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    {driveConnecting ? 'Conectando…' : 'Conectar Google Drive'}
+                  </button>
+                )}
+                {driveError && <p className="text-xs text-rose-600 mt-2">{driveError}</p>}
               </div>
             </>
           ) : (

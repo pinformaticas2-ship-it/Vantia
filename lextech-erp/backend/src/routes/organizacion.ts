@@ -19,6 +19,8 @@ import {
   updateMemberPermiso,
   resetMemberPermisos,
   transferirPropiedad,
+  exchangeGoogleDriveCode,
+  disconnectGoogleDrive,
 } from '../controllers/organizacionesController';
 
 const router = Router();
@@ -28,6 +30,8 @@ router.put('/', requireAuth, updateMyOrganizacion);
 router.post('/', requireAuth, createOrganizacion);
 router.post('/logo', requireAuth, uploadOrgLogo.single('logo'), uploadOrganizacionLogo);
 router.delete('/logo', requireAuth, deleteOrganizacionLogo);
+router.post('/drive/exchange-code', requireAuth, exchangeGoogleDriveCode);
+router.delete('/drive', requireAuth, disconnectGoogleDrive);
 router.get('/miembros', requireAuth, getOrganizacionMiembros);
 router.post('/miembros', requireAuth, addOrganizacionMiembro);
 router.patch('/miembros/:id', requireAuth, updateOrganizacionMiembroRol);

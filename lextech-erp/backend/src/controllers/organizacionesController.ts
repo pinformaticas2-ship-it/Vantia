@@ -5,6 +5,8 @@ import pool from '../config/database';
 import { getClerk, resolveUserRole } from './activityController';
 import { UPLOADS_ORG_LOGOS_ROOT } from '../config/paths';
 import { getFullMatrix, setPermissionOverride, getMemberMatrix, setMemberPermissionOverride, clearMemberPermissionOverrides, MODULOS, Modulo, NivelAcceso, OrgRol } from '../config/permissions';
+import { exchangeGoogleDriveCode as exchangeGoogleDriveCodeToken } from '../utils/googleDrive';
+import { encryptPassword } from '../utils/emailCrypto';
 
 const pgErr = (e: any) =>
   `${e?.message || String(e)}${e?.detail ? ' | detail: ' + e.detail : ''}${e?.code ? ' | code: ' + e.code : ''}`;
@@ -125,7 +127,8 @@ export async function getMyOrganizacion(req: Request, res: Response) {
     if (activa) {
       const { rows } = await pool.query(
         `SELECT id, nombre, nif_cif, direccion_fiscal, logo_url, texto_legal_facturas,
-                client_welcome_email_subject, client_welcome_email_body, client_welcome_email_signature
+                client_welcome_email_subject, client_welcome_email_body, client_welcome_email_signature,
+                google_drive_refresh_token_enc, google_drive_email
          FROM organizaciones WHERE id = $1`,
         [activa.organizacionId]
       );
@@ -140,6 +143,8 @@ export async function getMyOrganizacion(req: Request, res: Response) {
         clientWelcomeEmailSubject: canSeeCredenciales ? org.client_welcome_email_subject : null,
         clientWelcomeEmailBody: canSeeCredenciales ? org.client_welcome_email_body : null,
         clientWelcomeEmailSignature: canSeeCredenciales ? org.client_welcome_email_signature : null,
+        googleDriveConnected: Boolean(org.google_drive_refresh_token_enc),
+        googleDriveEmail: canSeeCredenciales ? org.google_drive_email : null,
       } : { id: activa.organizacionId, nombre: activa.organizacionNombre };
     }
 
@@ -184,6 +189,78 @@ export async function updateMyOrganizacion(req: Request, res: Response) {
     const userId = (req as any).auth?.userId;
     invalidateUserCache(userId);
     return ok(res, { id: ctx.organizacionId, nombre, nifCif, direccionFiscal, textoLegalFacturas, clientWelcomeEmailSubject, clientWelcomeEmailBody, clientWelcomeEmailSignature });
+  } catch (e: any) {
+    return err(res, pgErr(e));
+  }
+}
+
+// POST /api/organizacion/drive/exchange-code — conecta Google Drive para la
+// organización activa (propietario/admin). Canjea el "code" de
+// initCodeClient (scope drive.file, access_type=offline) por access+refresh
+// token, y los guarda en la organización -- el mismo Client ID/Secret que ya
+// se usa para Gmail, solo cambia el scope pedido.
+export async function exchangeGoogleDriveCode(req: Request, res: Response) {
+  try {
+    const ctx = requireOrgContext(req, res);
+    if (!ctx) return;
+    if (ctx.organizacionRol !== 'propietario' && ctx.organizacionRol !== 'admin') {
+      return err(res, 'Solo el propietario o un administrador pueden conectar Google Drive.', 403);
+    }
+    const code = String(req.body?.code || '');
+    if (!code) return err(res, 'Falta el código de autorización de Google', 400);
+
+    const tokenData = await exchangeGoogleDriveCodeToken(code);
+
+    // "about" identifica la cuenta de Google conectada (solo para mostrarla
+    // en Configuración), sin necesitar ningún scope extra de perfil.
+    const aboutRes = await fetch('https://www.googleapis.com/drive/v3/about?fields=user', {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+    });
+    const about: any = await aboutRes.json().catch(() => ({}));
+    const email = about?.user?.emailAddress || null;
+
+    if (!tokenData.refresh_token) {
+      return err(res, 'Google no ha devuelto permiso de renovación. Desconecta el acceso de esta app en tu cuenta de Google (myaccount.google.com/permissions) y vuelve a intentarlo.', 400);
+    }
+
+    const tokenExpiry = new Date(Date.now() + (tokenData.expires_in || 3600) * 1000);
+    await pool.query(
+      `UPDATE organizaciones
+         SET google_drive_access_token_enc = $1,
+             google_drive_refresh_token_enc = $2,
+             google_drive_token_expiry = $3,
+             google_drive_email = $4,
+             updated_at = NOW()
+       WHERE id = $5`,
+      [encryptPassword(tokenData.access_token), encryptPassword(tokenData.refresh_token), tokenExpiry, email, ctx.organizacionId],
+    );
+    return ok(res, { connected: true, email });
+  } catch (e: any) {
+    return err(res, e.message || 'No se pudo conectar Google Drive');
+  }
+}
+
+// DELETE /api/organizacion/drive — desconecta Google Drive (propietario/admin).
+// Los documentos ya subidos a Drive se quedan donde están -- esto solo
+// olvida las credenciales, no borra nada.
+export async function disconnectGoogleDrive(req: Request, res: Response) {
+  try {
+    const ctx = requireOrgContext(req, res);
+    if (!ctx) return;
+    if (ctx.organizacionRol !== 'propietario' && ctx.organizacionRol !== 'admin') {
+      return err(res, 'Solo el propietario o un administrador pueden desconectar Google Drive.', 403);
+    }
+    await pool.query(
+      `UPDATE organizaciones
+         SET google_drive_access_token_enc = NULL,
+             google_drive_refresh_token_enc = NULL,
+             google_drive_token_expiry = NULL,
+             google_drive_email = NULL,
+             updated_at = NOW()
+       WHERE id = $1`,
+      [ctx.organizacionId],
+    );
+    return ok(res, { connected: false });
   } catch (e: any) {
     return err(res, pgErr(e));
   }
