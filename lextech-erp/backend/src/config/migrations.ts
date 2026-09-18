@@ -2185,6 +2185,15 @@ export async function runMigrations(): Promise<void> {
     try {
       await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS google_drive_email TEXT;`);
     } catch (_e: any) {}
+    // Diagnóstico: guarda el último error real al subir/crear carpetas en
+    // Drive, para poder verlo con una consulta directa a la BD sin depender
+    // de los logs de Railway.
+    try {
+      await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS google_drive_last_error TEXT;`);
+    } catch (_e: any) {}
+    try {
+      await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS google_drive_last_error_at TIMESTAMPTZ;`);
+    } catch (_e: any) {}
     try {
       await client.query(`ALTER TABLE expedientes ADD COLUMN IF NOT EXISTS google_drive_folder_id TEXT;`);
     } catch (_e: any) {}
