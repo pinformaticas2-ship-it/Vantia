@@ -298,11 +298,13 @@ runMigrations().then(() => {
     }, 30_000);
 
     // Google Drive: refleja en Vantia los cambios hechos directamente en
-    // Drive (renombrar, borrar/mover a papelera) -- sondeo cada 5 min.
+    // Drive (renombrar, borrar/mover a papelera) -- sondeo cada 20s para que
+    // se note lo antes posible (la Changes API es barata, no hay límite de
+    // cuota real con este volumen de organizaciones).
     setTimeout(() => {
       syncAllOrganizacionesDriveChanges().catch(() => {});
-      setInterval(() => syncAllOrganizacionesDriveChanges().catch(() => {}), 5 * 60 * 1000);
-    }, 45_000);
+      setInterval(() => syncAllOrganizacionesDriveChanges().catch(() => {}), 20_000);
+    }, 15_000);
 
     // EmailEngine startup: configure webhook and register existing IMAP accounts
     const emailEngineUrl = process.env.EMAIL_ENGINE_URL;

@@ -69,16 +69,27 @@ async function syncDriveChangesForOrganizacion(organizacionId: string): Promise<
   );
 }
 
+// El sondeo corre cada 20s -- si una pasada tarda más que eso (organización
+// con muchos cambios pendientes, o Drive lento), esta guarda evita que se
+// solapen dos pasadas a la vez sobre la misma organización.
+let syncInProgress = false;
+
 export async function syncAllOrganizacionesDriveChanges(): Promise<void> {
-  const { rows } = await pool.query(
-    `SELECT id FROM organizaciones WHERE google_drive_refresh_token_enc IS NOT NULL`,
-  );
-  for (const row of rows) {
-    try {
-      await syncDriveChangesForOrganizacion(row.id);
-      await clearDriveError(row.id);
-    } catch (err: any) {
-      await recordDriveError(row.id, err);
+  if (syncInProgress) return;
+  syncInProgress = true;
+  try {
+    const { rows } = await pool.query(
+      `SELECT id FROM organizaciones WHERE google_drive_refresh_token_enc IS NOT NULL`,
+    );
+    for (const row of rows) {
+      try {
+        await syncDriveChangesForOrganizacion(row.id);
+        await clearDriveError(row.id);
+      } catch (err: any) {
+        await recordDriveError(row.id, err);
+      }
     }
+  } finally {
+    syncInProgress = false;
   }
 }
