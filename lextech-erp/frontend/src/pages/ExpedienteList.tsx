@@ -3351,6 +3351,72 @@ function PartyRow({ color, value, onChange, onRemove }: {
   );
 }
 
+// ── Input con sugerencias propio (sustituye al <datalist> nativo) ─────────
+// El popup nativo de <datalist> lo posiciona el navegador, no nuestro CSS, y
+// podía salir superpuesto de forma rara con el resto del formulario. Este
+// desplegable es nuestro, así que se coloca siempre justo debajo del campo.
+// Además, si no hay ninguna sugerencia, ofrece crear el registro sin salir
+// de la pantalla.
+function PersonSuggestInput({ value, onChange, options, placeholder, onCreateNew, createLabel }: {
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
+  placeholder: string;
+  onCreateNew: () => void;
+  createLabel: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const query = value.trim().toLowerCase();
+  const filtered = query ? options.filter(o => o.toLowerCase().includes(query)) : options;
+
+  return (
+    <div className="relative" ref={ref}>
+      <input
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        onFocus={() => setOpen(true)}
+        placeholder={placeholder}
+        className={`mt-1 ${inp}`}
+      />
+      {open && (
+        <div className="absolute z-50 mt-1 w-full max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white py-1.5 shadow-[0_20px_50px_-24px_rgba(15,23,42,0.22)]">
+          {filtered.length > 0 ? (
+            filtered.map(o => (
+              <button
+                key={o}
+                type="button"
+                onMouseDown={() => { onChange(o); setOpen(false); }}
+                className="block w-[calc(100%-12px)] mx-1.5 truncate rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+              >
+                {o}
+              </button>
+            ))
+          ) : (
+            <p className="px-3 py-2 text-xs text-slate-400">Sin coincidencias en el Directorio.</p>
+          )}
+          <button
+            type="button"
+            onMouseDown={() => { onCreateNew(); setOpen(false); }}
+            className="mt-1 flex w-[calc(100%-12px)] mx-1.5 items-center gap-1.5 rounded-lg border-t border-slate-100 px-3 py-2 text-left text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
+          >
+            <Plus size={13} /> {createLabel}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── DocumentImportVerifyView ─────────────────────────────────────────────
 function DocumentImportVerifyView({
   item,
@@ -3400,6 +3466,51 @@ function DocumentImportVerifyView({
       } catch { /* la sugerencia es opcional, no bloquea el resto del formulario */ }
     })();
   }, [getTokenVerify]);
+
+  // ── Alta rápida de abogado/procurador sin salir de esta pantalla ──────────
+  // Mismo patrón que "alta rápida de cliente" en ExpedienteModal: si no hay
+  // ninguno dado de alta en el Directorio, se ofrece crearlo aquí mismo (un
+  // formulario mínimo) en vez de mandar a la persona a otra pantalla y que
+  // pierda la revisión del documento que tenía a medias.
+  const [showNewProfesional, setShowNewProfesional] = useState<"ABOGADO" | "PROCURADOR" | null>(null);
+  const [newProfNombre, setNewProfNombre]       = useState("");
+  const [newProfApellidos, setNewProfApellidos] = useState("");
+  const [creatingProf, setCreatingProf]         = useState(false);
+  const [newProfError, setNewProfError]         = useState("");
+
+  const closeNewProfesional = () => {
+    setShowNewProfesional(null);
+    setNewProfNombre(""); setNewProfApellidos(""); setNewProfError("");
+  };
+
+  const createProfesionalRapido = async () => {
+    const tipo = showNewProfesional;
+    if (!tipo || !newProfNombre.trim()) return;
+    setCreatingProf(true); setNewProfError("");
+    try {
+      const token = await getTokenVerify({ skipCache: true });
+      const res = await fetch("/api/directorio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ tipo, first_name: newProfNombre.trim(), last_name: newProfApellidos.trim() }),
+      });
+      const d = await safeJson(res);
+      if (!res.ok) throw new Error(d.error || "No se pudo crear el registro");
+      const nombreCompleto = `${d.data.first_name || ""} ${d.data.last_name || ""}`.trim();
+      if (tipo === "ABOGADO") {
+        setAbogadoOptions(prev => [...prev, nombreCompleto]);
+        onChange("abogado_propio" as any, nombreCompleto);
+      } else {
+        setProcuradorOptionsVerify(prev => [...prev, nombreCompleto]);
+        onChange("procurador", nombreCompleto);
+      }
+      closeNewProfesional();
+    } catch (e: any) {
+      setNewProfError(e.message || "No se pudo crear el registro");
+    } finally {
+      setCreatingProf(false);
+    }
+  };
 
   const normalizeImportedName = (value: unknown): string => {
     if (typeof value === "string" || typeof value === "number") {
@@ -3872,16 +3983,34 @@ function DocumentImportVerifyView({
                   <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                   Abogado propio
                 </p>
-                <input
-                  value={safeAbogadoPropio}
-                  onChange={e => onChange("abogado_propio" as any, e.target.value)}
-                  placeholder="Nombre del abogado…"
-                  list="dl-abogados-verify"
-                  className={`mt-1 ${inp}`}
-                />
-                <datalist id="dl-abogados-verify">
-                  {abogadoOptions.map(a => <option key={a} value={a} />)}
-                </datalist>
+                {showNewProfesional === "ABOGADO" ? (
+                  <div className="mt-1 space-y-1.5 rounded-lg border border-emerald-200 bg-emerald-50/50 p-2">
+                    <input autoFocus value={newProfNombre} onChange={e => setNewProfNombre(e.target.value)}
+                      placeholder="Nombre" className={inp} />
+                    <input value={newProfApellidos} onChange={e => setNewProfApellidos(e.target.value)}
+                      placeholder="Apellidos" className={inp} />
+                    {newProfError && <p className="text-xs text-red-600">{newProfError}</p>}
+                    <div className="flex gap-1.5">
+                      <button type="button" disabled={creatingProf || !newProfNombre.trim()} onClick={createProfesionalRapido}
+                        className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
+                        {creatingProf ? "Creando…" : "Crear abogado"}
+                      </button>
+                      <button type="button" onClick={closeNewProfesional}
+                        className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-500 hover:bg-white">
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <PersonSuggestInput
+                    value={safeAbogadoPropio}
+                    onChange={v => onChange("abogado_propio" as any, v)}
+                    options={abogadoOptions}
+                    placeholder="Nombre del abogado…"
+                    onCreateNew={() => setShowNewProfesional("ABOGADO")}
+                    createLabel="Crear nuevo abogado"
+                  />
+                )}
               </div>
 
               {/* Abogado contrario */}
@@ -3904,16 +4033,34 @@ function DocumentImportVerifyView({
                   <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                   Procurador propio <EyeBtn term={safeProcurador} />
                 </p>
-                <input
-                  value={rawProcurador}
-                  onChange={e => onChange("procurador", e.target.value)}
-                  placeholder="Nombre del procurador propio…"
-                  list="dl-procuradores-verify"
-                  className={`mt-1 ${inp}`}
-                />
-                <datalist id="dl-procuradores-verify">
-                  {procuradorOptionsVerify.map(p => <option key={p} value={p} />)}
-                </datalist>
+                {showNewProfesional === "PROCURADOR" ? (
+                  <div className="mt-1 space-y-1.5 rounded-lg border border-emerald-200 bg-emerald-50/50 p-2">
+                    <input autoFocus value={newProfNombre} onChange={e => setNewProfNombre(e.target.value)}
+                      placeholder="Nombre" className={inp} />
+                    <input value={newProfApellidos} onChange={e => setNewProfApellidos(e.target.value)}
+                      placeholder="Apellidos" className={inp} />
+                    {newProfError && <p className="text-xs text-red-600">{newProfError}</p>}
+                    <div className="flex gap-1.5">
+                      <button type="button" disabled={creatingProf || !newProfNombre.trim()} onClick={createProfesionalRapido}
+                        className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
+                        {creatingProf ? "Creando…" : "Crear procurador"}
+                      </button>
+                      <button type="button" onClick={closeNewProfesional}
+                        className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-500 hover:bg-white">
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <PersonSuggestInput
+                    value={rawProcurador}
+                    onChange={v => onChange("procurador", v)}
+                    options={procuradorOptionsVerify}
+                    placeholder="Nombre del procurador propio…"
+                    onCreateNew={() => setShowNewProfesional("PROCURADOR")}
+                    createLabel="Crear nuevo procurador"
+                  />
+                )}
               </div>
 
               {/* Procurador contrario */}
