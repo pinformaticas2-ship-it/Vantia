@@ -9,6 +9,7 @@ import {
   getDocumentImportBatch,
   listDocumentImportBatches,
   acceptDocumentImportItem,
+  saveDocumentImportDraft,
   confirmDocumentImportDeadline,
   deleteDocumentImportBatch,
 } from '../controllers/documentImportController';
@@ -35,6 +36,7 @@ router.post('/upload',   requireAuth, upload.single('zip'), uploadDocumentImport
 router.get('/batch/:id', requireAuth, getDocumentImportBatch);
 router.get('/batches',   requireAuth, listDocumentImportBatches);
 router.delete('/batch/:id', requireAuth, deleteDocumentImportBatch);
+router.put('/batch/:batchId/items/:itemId/draft', requireAuth, saveDocumentImportDraft);
 router.post('/batch/:batchId/items/:itemId/accept', requireAuth, acceptDocumentImportItem);
 router.post('/batch/:batchId/items/:itemId/confirm-deadline', requireAuth, confirmDocumentImportDeadline);
 

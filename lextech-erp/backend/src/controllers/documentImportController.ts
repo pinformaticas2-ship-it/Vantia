@@ -1749,6 +1749,45 @@ export async function uploadDocumentImport(req: Request, res: Response) {
   }
 }
 
+// Guarda el borrador tal como lo está revisando el usuario (sin aceptarlo), para
+// que al salir de la revisión y volver a entrar no se pierda lo que ya rellenó.
+export async function saveDocumentImportDraft(req: Request, res: Response) {
+  const organizacionId = (req as any).organizacionId;
+  if (!userId(req)) return err(res, 'No autenticado', 401);
+  if (!organizacionId) return err(res, 'No se pudo determinar la organización activa', 400);
+
+  const { batchId, itemId } = req.params;
+  const draft = req.body?.draft;
+  if (!draft || typeof draft !== 'object' || Array.isArray(draft)) return err(res, 'Falta el borrador', 400);
+
+  try {
+    const { rows: batchRows } = await pool.query(
+      `SELECT id FROM expediente_import_batches WHERE id=$1 AND organizacion_id=$2`,
+      [batchId, organizacionId],
+    );
+    if (!batchRows.length) return err(res, 'Lote no encontrado', 404);
+
+    const { rows: itemRows } = await pool.query(
+      `SELECT payload, created_expediente_id FROM expediente_import_items WHERE id=$1 AND batch_id=$2`,
+      [itemId, batchId],
+    );
+    if (!itemRows.length) return err(res, 'Documento no encontrado', 404);
+    if (itemRows[0].created_expediente_id) return err(res, 'Este documento ya fue aceptado', 409);
+
+    const representaA = req.body?.representa_a === 'demandados' ? 'demandados' : 'demandantes';
+    const payload = itemRows[0].payload || {};
+    const newPayload = {
+      ...payload,
+      draft: { ...draft, representa_a: representaA },
+      draftEditedAt: new Date().toISOString(),
+    };
+    await pool.query(`UPDATE expediente_import_items SET payload=$1 WHERE id=$2`, [JSON.stringify(newPayload), itemId]);
+    return ok(res, { saved: true });
+  } catch (error: any) {
+    return err(res, error.message || 'No se pudo guardar el borrador');
+  }
+}
+
 export async function acceptDocumentImportItem(req: Request, res: Response) {
   const uid = userId(req);
   const unam = userName(req);

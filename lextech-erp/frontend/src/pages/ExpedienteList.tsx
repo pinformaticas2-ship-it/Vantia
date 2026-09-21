@@ -70,6 +70,7 @@ interface DocumentImportItem {
     textPreview?: string;
     userError?: string | null;
     developerError?: string | null;
+    draftEditedAt?: string;
   } | null;
   created_expediente_id?: string | null;
   anio?: number | null;
@@ -3641,8 +3642,12 @@ function DocumentImportVerifyView({
     onChange("contrario", next.filter(Boolean).join(" | "));
   };
 
-  // Auto-rellenar abogado/procurador contrario al cambiar representaA
+  // Auto-rellenar abogado/procurador contrario al cambiar representaA. Si el
+  // borrador ya lo guardó el usuario (draftEditedAt), NO se rellena al abrir:
+  // pisaría lo que ya revisó con lo que extrajo la IA.
+  const skipMountAutofill = useRef(!!item.payload?.draftEditedAt);
   useEffect(() => {
+    if (skipMountAutofill.current) { skipMountAutofill.current = false; return; }
     const ext = (item.payload?.extractedData as any) || {};
     const aboD  = normalizeImportedName(ext.abogado_demandante);
     const aboDem = normalizeImportedName(ext.abogado_demandado);
@@ -5080,6 +5085,43 @@ export default function ExpedienteList() {
   const [documentImportRepresentaA, setDocumentImportRepresentaA] = useState<"demandantes" | "demandados">("demandantes");
   const [documentImportVerifySaving, setDocumentImportVerifySaving] = useState(false);
   const [documentImportVerifyError, setDocumentImportVerifyError] = useState<string | null>(null);
+
+  // Guardado automático del borrador en revisión: si se sale de la pantalla sin
+  // aceptar, al volver a entrar sigue lo que ya se había rellenado.
+  const verifyDirtyRef = useRef(false);
+  const verifyTimerRef = useRef<number | null>(null);
+  const verifyLatestRef = useRef<{ form: typeof EXP_EMPTY; representaA: string; itemId: string | null; batchId: string | null }>({
+    form: EXP_EMPTY, representaA: "demandantes", itemId: null, batchId: null,
+  });
+  verifyLatestRef.current = {
+    form: documentImportVerifyForm,
+    representaA: documentImportRepresentaA,
+    itemId: documentImportVerifyItem?.id ?? null,
+    batchId: documentImportActiveBatch?.id ?? null,
+  };
+  const saveVerifyDraft = useCallback(async () => {
+    if (verifyTimerRef.current) { window.clearTimeout(verifyTimerRef.current); verifyTimerRef.current = null; }
+    const { form, representaA, itemId, batchId } = verifyLatestRef.current;
+    if (!verifyDirtyRef.current || !itemId || !batchId) return;
+    verifyDirtyRef.current = false;
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/expedientes/documents/batch/${batchId}/items/${itemId}/draft`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ draft: form, representa_a: representaA }),
+      });
+      if (!res.ok) verifyDirtyRef.current = true;
+    } catch {
+      verifyDirtyRef.current = true;
+    }
+  }, [getToken]);
+  const markVerifyDirty = useCallback(() => {
+    verifyDirtyRef.current = true;
+    if (verifyTimerRef.current) window.clearTimeout(verifyTimerRef.current);
+    verifyTimerRef.current = window.setTimeout(() => { void saveVerifyDraft(); }, 800);
+  }, [saveVerifyDraft]);
+  useEffect(() => () => { void saveVerifyDraft(); }, [saveVerifyDraft]);
   // Propuesta de plazo procesal detectado al aceptar un documento importado —
   // se muestra para confirmar (o descartar) antes de crear tarea/agenda.
   const [deadlineProposal, setDeadlineProposal] = useState<{
@@ -5281,13 +5323,19 @@ export default function ExpedienteList() {
     setDocumentImportVerifyItem(item);
     setDocumentImportVerifyError(null);
     setDocumentImportRepresentaA(inferredRepresentaA);
+    // Borrador ya guardado por el usuario: se respeta tal cual, sin volver a
+    // derivar procuradores/contrarios de lo que extrajo la IA.
+    const savedByUser = !!item.payload?.draftEditedAt;
+    verifyDirtyRef.current = false;
     setDocumentImportVerifyForm({
       ...EXP_EMPTY,
       ...draft,
       cliente_nombre: normalizeImportedName(draft.cliente_nombre),
       contrario: normalizeImportedName(draft.contrario),
-      procurador: procuradorPropio || normalizeImportedName(draft.procurador),
-      procurador_contrario: procuradorContrario,
+      ...(savedByUser ? {} : {
+        procurador: procuradorPropio || normalizeImportedName(draft.procurador),
+        procurador_contrario: procuradorContrario,
+      }),
       cuantia_principal: draft.cuantia_principal != null ? String(draft.cuantia_principal) : "",
     } as typeof EXP_EMPTY);
     setViewMode("documentImportVerify");
@@ -5306,6 +5354,9 @@ export default function ExpedienteList() {
 
     setDocumentImportVerifySaving(true);
     setDocumentImportVerifyError(null);
+    // Al aceptar ya no hay borrador que guardar (el item pasa a expediente).
+    verifyDirtyRef.current = false;
+    if (verifyTimerRef.current) { window.clearTimeout(verifyTimerRef.current); verifyTimerRef.current = null; }
     try {
       const token = await getToken({ skipCache: true });
       const res = await fetch(`/api/expedientes/documents/batch/${documentImportActiveBatch.id}/items/${documentImportVerifyItem.id}/accept`, {
@@ -6559,11 +6610,18 @@ export default function ExpedienteList() {
         error={documentImportVerifyError}
         onBack={() => {
           setDocumentImportVerifyError(null);
+          // Se guarda lo rellenado y se recarga el lote, para que al reabrir este
+          // documento salga con el borrador guardado y no con el de la IA.
+          void (async () => {
+            await saveVerifyDraft();
+            if (documentImportActiveBatch) { try { await fetchDocumentImportBatch(documentImportActiveBatch.id); } catch { /* se queda lo que hubiera */ } }
+          })();
           setViewMode("documentImport");
         }}
-        onChange={(key, value) => setDocumentImportVerifyForm((prev) => ({ ...prev, [key]: value }))}
+        onChange={(key, value) => { setDocumentImportVerifyForm((prev) => ({ ...prev, [key]: value })); markVerifyDirty(); }}
         onChangeRepresentaA={(value) => {
           setDocumentImportRepresentaA(value);
+          markVerifyDirty();
         }}
         onAccept={handleAcceptDocumentImportItem}
       />
