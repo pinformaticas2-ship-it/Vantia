@@ -18,6 +18,7 @@ import { UserButton, useUser, useAuth, useClerk } from "@clerk/clerk-react";
 import { getDeviceId, safeJson, waitForClientIp, resolveUploadUrl } from "../lib/api";
 import { useOrganizacion } from "../lib/useOrganizacion";
 import DriveConnectPrompt from "../components/DriveConnectPrompt";
+import StorageStatusIcons from "../components/StorageStatusIcons";
 import { useIsMobile } from "../lib/useIsMobile";
 import { useChatUnread } from "../contexts/ChatUnreadContext";
 import { useEmailUnread } from "../contexts/EmailUnreadContext";
@@ -1717,7 +1718,7 @@ export default function DashboardLayout() {
   const { unreadCount: emailUnreadCount, latestUnread, clearLatestUnread } = useEmailUnread();
   const { totalUnread: chatTotalUnread } = useChatUnread();
   const { latestToast: latestWaToast, clearToast: clearWaToast, markSeen: markWaSeen, markAllSeen: markAllWaSeen } = useWhatsAppUnread();
-  const { organizacion } = useOrganizacion();
+  const { organizacion, rol: orgRolMain } = useOrganizacion();
 
   const isMobile = useIsMobile();
   const pushNotifications = usePushNotifications();
@@ -2215,6 +2216,13 @@ export default function DashboardLayout() {
                 imgClassName="object-contain p-0.5"
               />
             </div>
+          )}
+
+          {organizacion && (
+            <StorageStatusIcons
+              driveConnected={!!organizacion.googleDriveConnected}
+              canConnect={orgRolMain === "propietario" || orgRolMain === "admin"}
+            />
           )}
 
           {/* Links de interés (por usuario) — se oculta en móviles muy estrechos para dejar sitio al buscador y las notificaciones */}
