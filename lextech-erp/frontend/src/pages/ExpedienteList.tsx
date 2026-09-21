@@ -21,6 +21,7 @@ import {
 import AdjuntosModal from "../components/AdjuntosModal";
 import ColumnVisibilityModal from "../components/ColumnVisibilityModal";
 import { Modal } from "../components/Modal";
+import { ProfesionalInput } from "../components/ProfesionalInput";
 import { useIsMobile } from "../lib/useIsMobile";
 import BackButton from "../components/BackButton";
 import { UndoToast } from "../components/UndoToast";
@@ -4019,12 +4020,12 @@ function DocumentImportVerifyView({
                   <span className="inline-block w-2 h-2 rounded-full bg-red-400 shrink-0" />
                   Abogado contrario <EyeBtn term={safeAbogadoContrario} />
                 </p>
-                <input
-                  value={safeAbogadoContrario}
-                  onChange={e => onChange("abogado_contrario" as any, e.target.value)}
-                  placeholder="Nombre del abogado contrario…"
-                  className={`mt-1 ${inp}`}
-                />
+                <div className="mt-1">
+                  <ProfesionalInput tipo="ABOGADO" value={safeAbogadoContrario}
+                    onChange={v => onChange("abogado_contrario" as any, v)}
+                    options={abogadoOptions} onCreated={n => setAbogadoOptions(p => [...p, n])}
+                    placeholder="Nombre del abogado contrario…" />
+                </div>
               </div>
 
               {/* Procurador propio */}
@@ -4069,12 +4070,12 @@ function DocumentImportVerifyView({
                   <span className="inline-block w-2 h-2 rounded-full bg-red-400 shrink-0" />
                   Procurador contrario <EyeBtn term={safeProcuradorContrario} />
                 </p>
-                <input
-                  value={safeProcuradorContrario}
-                  onChange={e => onChange("procurador_contrario" as any, e.target.value)}
-                  placeholder="Nombre del procurador contrario…"
-                  className={`mt-1 ${inp}`}
-                />
+                <div className="mt-1">
+                  <ProfesionalInput tipo="PROCURADOR" value={safeProcuradorContrario}
+                    onChange={v => onChange("procurador_contrario" as any, v)}
+                    options={procuradorOptionsVerify} onCreated={n => setProcuradorOptionsVerify(p => [...p, n])}
+                    placeholder="Nombre del procurador contrario…" />
+                </div>
               </div>
 
             </div>
