@@ -1511,6 +1511,29 @@ export async function runMigrations(): Promise<void> {
       `);
     } catch (_e: any) {}
 
+    // WhatsApp por despacho: cada organización con su propia conexión (antes
+    // una única fila global en whatsapp_settings, compartida por todos).
+    try {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS whatsapp_org_settings (
+          organizacion_id      UUID         PRIMARY KEY REFERENCES organizaciones(id) ON DELETE CASCADE,
+          access_token         TEXT,
+          phone_number_id      VARCHAR(255),
+          verify_token         VARCHAR(255),
+          graph_version        VARCHAR(20)  NOT NULL DEFAULT 'v23.0',
+          webhook_base_url     TEXT,
+          business_account_id  VARCHAR(255),
+          updated_by_user_id   VARCHAR(150),
+          updated_by_user_name VARCHAR(200),
+          created_at           TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+          updated_at           TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+        );
+      `);
+    } catch (_e: any) {}
+    try {
+      await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_whatsapp_org_phone_number_id ON whatsapp_org_settings (phone_number_id) WHERE phone_number_id IS NOT NULL`);
+    } catch (_e: any) {}
+
     // ── Tabla exp_notificaciones (cronología de notificaciones judiciales) ───
     await client.query(`
       CREATE TABLE IF NOT EXISTS exp_notificaciones (

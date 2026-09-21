@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import pool from '../config/database';
 import { resolveUserName } from './activityController';
 import { sendPushToAll, sendPushToOrg } from '../utils/webPush';
+import { encryptPassword, decryptPassword } from '../utils/emailCrypto';
 
 type WhatsAppConfig = {
   accessToken: string;
@@ -19,6 +20,11 @@ const ENV_PHONE_NUMBER_ID = (process.env.WHATSAPP_PHONE_NUMBER_ID || '').trim();
 const ENV_VERIFY_TOKEN = (process.env.WHATSAPP_VERIFY_TOKEN || '').trim();
 const ENV_WEBHOOK_BASE_URL = (process.env.WHATSAPP_WEBHOOK_BASE_URL || process.env.PUBLIC_BACKEND_URL || '').trim();
 const ENV_BUSINESS_ACCOUNT_ID = (process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || '').trim();
+// Cada despacho tiene su propia conexión de WhatsApp (tabla whatsapp_org_settings).
+// Las variables WHATSAPP_* de entorno solo sirven de respaldo para UN despacho
+// (el indicado en WHATSAPP_ENV_ORGANIZACION_ID); para el resto no cuentan, si no
+// todos los despachos verían la misma conexión.
+const ENV_ORGANIZACION_ID = (process.env.WHATSAPP_ENV_ORGANIZACION_ID || '').trim();
 
 function userId(req: Request) {
   return (req as any).auth?.userId || 'SYSTEM';
@@ -44,45 +50,61 @@ function maskSecret(value?: string | null) {
   return `${raw.slice(0, 4)}••••${raw.slice(-4)}`;
 }
 
-async function loadWhatsAppConfig(): Promise<WhatsAppConfig> {
+function safeDecrypt(value?: string | null) {
+  if (!value) return '';
+  try { return decryptPassword(value); } catch { return ''; }
+}
+
+async function loadWhatsAppConfig(organizacionId: string | null | undefined): Promise<WhatsAppConfig> {
+  const useEnv = Boolean(organizacionId) && organizacionId === ENV_ORGANIZACION_ID;
+  const baseConfig = (): WhatsAppConfig => ({
+    accessToken: useEnv ? ENV_ACCESS_TOKEN : '',
+    phoneNumberId: useEnv ? ENV_PHONE_NUMBER_ID : '',
+    verifyToken: useEnv ? ENV_VERIFY_TOKEN : '',
+    graphVersion: DEFAULT_GRAPH_VERSION,
+    webhookBaseUrl: ENV_WEBHOOK_BASE_URL,
+    businessAccountId: useEnv ? ENV_BUSINESS_ACCOUNT_ID : '',
+    source: 'environment',
+  });
+  if (!organizacionId) return baseConfig();
   try {
     const result = await pool.query(
       `SELECT access_token, phone_number_id, verify_token, graph_version, webhook_base_url, business_account_id
-       FROM whatsapp_settings
-       WHERE id = 1
+       FROM whatsapp_org_settings
+       WHERE organizacion_id = $1
        LIMIT 1`,
+      [organizacionId],
     );
     const row = result.rows[0];
-    const accessToken = trimOrNull(row?.access_token) || ENV_ACCESS_TOKEN;
-    const phoneNumberId = trimOrNull(row?.phone_number_id) || ENV_PHONE_NUMBER_ID;
-    const verifyToken = trimOrNull(row?.verify_token) || ENV_VERIFY_TOKEN;
-    const graphVersion = trimOrNull(row?.graph_version) || DEFAULT_GRAPH_VERSION;
-    const webhookBaseUrl = trimOrNull(row?.webhook_base_url) || ENV_WEBHOOK_BASE_URL;
-    const businessAccountId = trimOrNull(row?.business_account_id) || ENV_BUSINESS_ACCOUNT_ID;
+    const base = baseConfig();
     const source = row && (trimOrNull(row?.access_token) || trimOrNull(row?.phone_number_id) || trimOrNull(row?.verify_token))
       ? 'database'
       : 'environment';
-
     return {
-      accessToken,
-      phoneNumberId,
-      verifyToken,
-      graphVersion,
-      webhookBaseUrl,
-      businessAccountId,
+      accessToken: safeDecrypt(row?.access_token) || base.accessToken,
+      phoneNumberId: trimOrNull(row?.phone_number_id) || base.phoneNumberId,
+      verifyToken: trimOrNull(row?.verify_token) || base.verifyToken,
+      graphVersion: trimOrNull(row?.graph_version) || base.graphVersion,
+      webhookBaseUrl: trimOrNull(row?.webhook_base_url) || base.webhookBaseUrl,
+      businessAccountId: trimOrNull(row?.business_account_id) || base.businessAccountId,
       source,
     };
   } catch {
-    return {
-      accessToken: ENV_ACCESS_TOKEN,
-      phoneNumberId: ENV_PHONE_NUMBER_ID,
-      verifyToken: ENV_VERIFY_TOKEN,
-      graphVersion: DEFAULT_GRAPH_VERSION,
-      webhookBaseUrl: ENV_WEBHOOK_BASE_URL,
-      businessAccountId: ENV_BUSINESS_ACCOUNT_ID,
-      source: 'environment',
-    };
+    return baseConfig();
   }
+}
+
+// El webhook de Meta es una única URL para todos los despachos: se decide de
+// quién es cada mensaje por el phone_number_id de la cuenta que lo recibe.
+async function resolveOrganizacionByPhoneNumberId(phoneNumberId?: string | null): Promise<string | null> {
+  const id = trimOrNull(phoneNumberId);
+  if (!id) return null;
+  try {
+    const r = await pool.query(`SELECT organizacion_id FROM whatsapp_org_settings WHERE phone_number_id = $1 LIMIT 1`, [id]);
+    if (r.rows[0]?.organizacion_id) return r.rows[0].organizacion_id;
+  } catch { /* cae al respaldo de entorno */ }
+  if (ENV_ORGANIZACION_ID && id === ENV_PHONE_NUMBER_ID) return ENV_ORGANIZACION_ID;
+  return null;
 }
 
 function getConfigStatus(config: WhatsAppConfig) {
@@ -160,13 +182,13 @@ async function graphRequest(config: WhatsAppConfig, path: string, init?: Request
   return json;
 }
 
-export async function getWhatsAppStatus(_req: Request, res: Response) {
-  const config = await loadWhatsAppConfig();
+export async function getWhatsAppStatus(req: Request, res: Response) {
+  const config = await loadWhatsAppConfig((req as any).organizacionId);
   res.json({ success: true, data: getConfigStatus(config) });
 }
 
-export async function getWhatsAppConfig(_req: Request, res: Response) {
-  const config = await loadWhatsAppConfig();
+export async function getWhatsAppConfig(req: Request, res: Response) {
+  const config = await loadWhatsAppConfig((req as any).organizacionId);
   res.json({
     success: true,
     data: {
@@ -193,34 +215,45 @@ export async function saveWhatsAppConfig(req: Request, res: Response) {
   const webhookBaseUrl = trimOrNull(req.body?.webhookBaseUrl);
   const businessAccountId = trimOrNull(req.body?.businessAccountId);
 
+  const organizacionId = (req as any).organizacionId;
+  const orgRol = (req as any).organizacionRol;
+  if (!organizacionId) return res.status(400).json({ success: false, error: 'No se pudo determinar la organización activa' });
+  if (orgRol !== 'propietario' && orgRol !== 'admin') {
+    return res.status(403).json({ success: false, error: 'Solo el propietario o un administrador pueden configurar WhatsApp.' });
+  }
+
   try {
     await pool.query(
-      `INSERT INTO whatsapp_settings
-         (id, access_token, phone_number_id, verify_token, graph_version, webhook_base_url, business_account_id, updated_by_user_id, updated_by_user_name)
+      `INSERT INTO whatsapp_org_settings
+         (organizacion_id, access_token, phone_number_id, verify_token, graph_version, webhook_base_url, business_account_id, updated_by_user_id, updated_by_user_name)
        VALUES
-         (1, $1, $2, $3, $4, $5, $6, $7, $8)
-       ON CONFLICT (id) DO UPDATE SET
-         access_token = COALESCE(EXCLUDED.access_token, whatsapp_settings.access_token),
-         phone_number_id = COALESCE(EXCLUDED.phone_number_id, whatsapp_settings.phone_number_id),
-         verify_token = COALESCE(EXCLUDED.verify_token, whatsapp_settings.verify_token),
-         graph_version = COALESCE(EXCLUDED.graph_version, whatsapp_settings.graph_version),
-         webhook_base_url = COALESCE(EXCLUDED.webhook_base_url, whatsapp_settings.webhook_base_url),
-         business_account_id = COALESCE(EXCLUDED.business_account_id, whatsapp_settings.business_account_id),
+         ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       ON CONFLICT (organizacion_id) DO UPDATE SET
+         access_token = COALESCE(EXCLUDED.access_token, whatsapp_org_settings.access_token),
+         phone_number_id = COALESCE(EXCLUDED.phone_number_id, whatsapp_org_settings.phone_number_id),
+         verify_token = COALESCE(EXCLUDED.verify_token, whatsapp_org_settings.verify_token),
+         graph_version = COALESCE(EXCLUDED.graph_version, whatsapp_org_settings.graph_version),
+         webhook_base_url = COALESCE(EXCLUDED.webhook_base_url, whatsapp_org_settings.webhook_base_url),
+         business_account_id = COALESCE(EXCLUDED.business_account_id, whatsapp_org_settings.business_account_id),
          updated_by_user_id = EXCLUDED.updated_by_user_id,
          updated_by_user_name = EXCLUDED.updated_by_user_name,
          updated_at = NOW()`,
-      [accessToken, phoneNumberId, verifyToken, graphVersion, webhookBaseUrl, businessAccountId, uid, userName],
+      [organizacionId, accessToken ? encryptPassword(accessToken) : null, phoneNumberId, verifyToken, graphVersion, webhookBaseUrl, businessAccountId, uid, userName],
     );
 
-    const config = await loadWhatsAppConfig();
+    const config = await loadWhatsAppConfig(organizacionId);
     res.json({ success: true, data: getConfigStatus(config) });
   } catch (error: any) {
-    res.status(500).json({ success: false, error: error?.message || 'No se pudo guardar la configuración de WhatsApp' });
+    const duplicated = error?.code === '23505';
+    res.status(duplicated ? 409 : 500).json({
+      success: false,
+      error: duplicated ? 'Ese phone number id ya está conectado a otro despacho.' : (error?.message || 'No se pudo guardar la configuración de WhatsApp'),
+    });
   }
 }
 
-export async function testWhatsAppConfig(_req: Request, res: Response) {
-  const config = await loadWhatsAppConfig();
+export async function testWhatsAppConfig(req: Request, res: Response) {
+  const config = await loadWhatsAppConfig((req as any).organizacionId);
   if (!config.accessToken || !config.phoneNumberId) {
     return res.status(400).json({ success: false, error: 'Faltan access token o phone number id para probar la conexión' });
   }
@@ -359,7 +392,7 @@ export async function sendWhatsAppMessage(req: any, res: Response) {
   const { clientId, to, body } = req.body || {};
   const text = String(body || '').trim();
   const normalizedPhone = normalizePhone(to);
-  const config = await loadWhatsAppConfig();
+  const config = await loadWhatsAppConfig(req.organizacionId);
 
   if (!text) return res.status(400).json({ success: false, error: 'El mensaje es obligatorio' });
   if (!normalizedPhone) return res.status(400).json({ success: false, error: 'Falta un teléfono válido' });
@@ -457,14 +490,20 @@ export async function createSchedule(req: Request, res: Response) {
 }
 
 export async function verifyWebhook(req: Request, res: Response) {
-  const config = await loadWhatsAppConfig();
   const mode = String(req.query['hub.mode'] || '');
   const token = String(req.query['hub.verify_token'] || '');
   const challenge = String(req.query['hub.challenge'] || '');
 
-  if (mode === 'subscribe' && config.verifyToken && token === config.verifyToken) {
-    return res.status(200).send(challenge);
+  // Una sola URL de webhook para todos los despachos: vale el verify token de
+  // cualquiera de ellos (o el de respaldo de entorno).
+  let valid = Boolean(token) && Boolean(ENV_VERIFY_TOKEN) && token === ENV_VERIFY_TOKEN;
+  if (!valid && token) {
+    try {
+      const r = await pool.query(`SELECT 1 FROM whatsapp_org_settings WHERE verify_token = $1 LIMIT 1`, [token]);
+      valid = r.rows.length > 0;
+    } catch { /* se rechaza */ }
   }
+  if (mode === 'subscribe' && valid) return res.status(200).send(challenge);
   return res.sendStatus(403);
 }
 
@@ -477,6 +516,7 @@ export async function receiveWebhook(req: Request, res: Response) {
       for (const change of changes) {
         const value = change?.value || {};
         const metadataPhone = normalizePhone(value?.metadata?.display_phone_number || '');
+        const webhookOrgId = await resolveOrganizacionByPhoneNumberId(value?.metadata?.phone_number_id);
         const contacts = Array.isArray(value?.contacts) ? value.contacts : [];
         const messages = Array.isArray(value?.messages) ? value.messages : [];
         const statuses = Array.isArray(value?.statuses) ? value.statuses : [];
@@ -532,7 +572,7 @@ export async function receiveWebhook(req: Request, res: Response) {
               contactName,
               body,
               JSON.stringify({ message, contact, metadata: value?.metadata || null }),
-              client?.organizacion_id || null,
+              webhookOrgId || client?.organizacion_id || null,
             ],
           );
 
@@ -546,7 +586,8 @@ export async function receiveWebhook(req: Request, res: Response) {
             url: client?.id ? `/dashboard/whatsapp?clientId=${client.id}&mode=thread` : '/dashboard/whatsapp',
             tag: `whatsapp-${fromPhone}`,
           };
-          if (client?.organizacion_id) void sendPushToOrg(client.organizacion_id, pushPayload);
+          const messageOrgId = webhookOrgId || client?.organizacion_id;
+          if (messageOrgId) void sendPushToOrg(messageOrgId, pushPayload);
           else void sendPushToAll(pushPayload);
         }
       }
