@@ -12,6 +12,7 @@ import { useAuth } from "@clerk/clerk-react";
 import { safeJson } from "../lib/api";
 import AdjuntosModal from "./AdjuntosModal";
 import BackButton from "./BackButton";
+import { ProfesionalInput } from "./ProfesionalInput";
 import { UndoToast } from "./UndoToast";
 import { Modal } from "./Modal";
 import { useUndoDelete } from "../lib/useUndoDelete";
@@ -981,8 +982,8 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
                     <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
                     <label className={`${lbl} text-slate-700`}>Abogado</label>
                   </div>
-                  <input value={(form as any).abogado_propio || ""} onChange={e => set("abogado_propio", e.target.value)}
-                    placeholder="Nombre del abogado" className={inp} list="dl-abogados" />
+                  <ProfesionalInput tipo="ABOGADO" value={(form as any).abogado_propio || ""} onChange={v => set("abogado_propio", v)}
+                    options={abogadoSuggestions} onCreated={n => setAbogadoSuggestions(p => [...p, n])} placeholder="Nombre del abogado" />
                 </div>
 
                 <div className="w-full h-px bg-slate-100" />
@@ -993,8 +994,8 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
                     <div className="w-2.5 h-2.5 rounded-full bg-purple-500" />
                     <label className={`${lbl} text-slate-700`}>Procurador</label>
                   </div>
-                  <input value={form.procurador} onChange={e => set("procurador", e.target.value)}
-                    placeholder="Nombre del procurador" className={inp} list="dl-procuradores" />
+                  <ProfesionalInput tipo="PROCURADOR" value={form.procurador || ""} onChange={v => set("procurador", v)}
+                    options={procuradorSuggestions} onCreated={n => setProcuradorSuggestions(p => [...p, n])} placeholder="Nombre del procurador" />
                 </div>
 
                 <div className="w-full h-px bg-slate-100" />
@@ -1005,8 +1006,8 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
                     <div className="w-2.5 h-2.5 rounded-full bg-orange-500" />
                     <label className={`${lbl} text-slate-700`}>Abogado Contrario</label>
                   </div>
-                  <input value={(form as any).abogado_contrario || ""} onChange={e => set("abogado_contrario", e.target.value)}
-                    placeholder="Nombre del abogado contrario" className={inp} list="dl-abogados" />
+                  <ProfesionalInput tipo="ABOGADO" value={(form as any).abogado_contrario || ""} onChange={v => set("abogado_contrario", v)}
+                    options={abogadoSuggestions} onCreated={n => setAbogadoSuggestions(p => [...p, n])} placeholder="Nombre del abogado contrario" />
                 </div>
 
                 <div className="w-full h-px bg-slate-100" />
@@ -1017,18 +1018,12 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
                     <div className="w-2.5 h-2.5 rounded-full bg-teal-500" />
                     <label className={`${lbl} text-slate-700`}>Procurador Contrario</label>
                   </div>
-                  <input value={(form as any).procurador_contrario || ""} onChange={e => set("procurador_contrario", e.target.value)}
-                    placeholder="Nombre del procurador contrario" className={inp} list="dl-procuradores" />
+                  <ProfesionalInput tipo="PROCURADOR" value={(form as any).procurador_contrario || ""} onChange={v => set("procurador_contrario", v)}
+                    options={procuradorSuggestions} onCreated={n => setProcuradorSuggestions(p => [...p, n])} placeholder="Nombre del procurador contrario" />
                 </div>
 
                 <datalist id="dl-contrarios">
                   {contrarioSuggestions.map(v => <option key={v} value={v} />)}
-                </datalist>
-                <datalist id="dl-abogados">
-                  {abogadoSuggestions.map(v => <option key={v} value={v} />)}
-                </datalist>
-                <datalist id="dl-procuradores">
-                  {procuradorSuggestions.map(v => <option key={v} value={v} />)}
                 </datalist>
 
               </div>
