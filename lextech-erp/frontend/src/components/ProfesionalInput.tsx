@@ -120,3 +120,33 @@ export function ProfesionalInput({ tipo, value, onChange, options, onCreated, pl
     </div>
   );
 }
+
+// Carga los nombres de abogados y procuradores del Directorio (para el desplegable).
+export function useProfesionalesOptions() {
+  const { getToken } = useAuth();
+  const [abogados, setAbogados] = useState<string[]>([]);
+  const [procuradores, setProcuradores] = useState<string[]>([]);
+  useEffect(() => {
+    (async () => {
+      try {
+        const token = await getToken({ skipCache: true });
+        const headers = { Authorization: `Bearer ${token}` };
+        const [aRes, pRes] = await Promise.all([
+          fetch("/api/directorio?tipo=ABOGADO", { headers }),
+          fetch("/api/directorio?tipo=PROCURADOR", { headers }),
+        ]);
+        const [aData, pData] = await Promise.all([safeJson(aRes), safeJson(pRes)]);
+        const toNames = (rows: any[]) => (rows || [])
+          .map((p: any) => `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.despacho || "")
+          .filter(Boolean);
+        if (aRes.ok) setAbogados(toNames(aData.data));
+        if (pRes.ok) setProcuradores(toNames(pData.data));
+      } catch { /* las sugerencias son opcionales */ }
+    })();
+  }, [getToken]);
+  return {
+    abogados, procuradores,
+    addAbogado: (n: string) => setAbogados(p => [...p, n]),
+    addProcurador: (n: string) => setProcuradores(p => [...p, n]),
+  };
+}

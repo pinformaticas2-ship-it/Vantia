@@ -56,6 +56,7 @@ import {
   Video,
 } from "lucide-react";
 import { safeJson, resolveApiUrl } from "../lib/api";
+import { ProfesionalInput, useProfesionalesOptions } from "../components/ProfesionalInput";
 import { Spinner } from "../components/Spinner";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
 import { usePasteFiles, setErpClipboard } from "../lib/usePasteFiles";
@@ -4027,6 +4028,7 @@ function TabClienteVinculado({ exp, clientes, linkedClient, linkedClientDisplayN
   const [linkSaving, setLinkSaving] = useState(false);
   const [abogadoEdit, setAbogadoEdit] = useState(false);
   const [abogadoVal, setAbogadoVal] = useState(exp.abogado_propio || "");
+  const profOpts = useProfesionalesOptions();
   const [abogadoSaving, setAbogadoSaving] = useState(false);
   const [procuradorEdit, setProcuradorEdit] = useState(false);
   const [procuradorVal, setProcuradorVal] = useState(exp.procurador || "");
@@ -4165,13 +4167,10 @@ function TabClienteVinculado({ exp, clientes, linkedClient, linkedClientDisplayN
         <div className="px-5 py-4">
           {abogadoEdit ? (
             <div className="flex items-center gap-2">
-              <input
-                autoFocus
-                value={abogadoVal}
-                onChange={e => setAbogadoVal(e.target.value)}
-                placeholder="Nombre del abogado propio…"
-                className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-red-400"
-              />
+              <div className="flex-1">
+                <ProfesionalInput tipo="ABOGADO" value={abogadoVal} onChange={setAbogadoVal}
+                  options={profOpts.abogados} onCreated={profOpts.addAbogado} placeholder="Nombre del abogado propio…" />
+              </div>
               <button
                 type="button"
                 disabled={abogadoSaving}
@@ -4211,13 +4210,10 @@ function TabClienteVinculado({ exp, clientes, linkedClient, linkedClientDisplayN
         <div className="px-5 py-4">
           {procuradorEdit ? (
             <div className="flex items-center gap-2">
-              <input
-                autoFocus
-                value={procuradorVal}
-                onChange={e => setProcuradorVal(e.target.value)}
-                placeholder="Nombre del procurador propio…"
-                className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-red-400"
-              />
+              <div className="flex-1">
+                <ProfesionalInput tipo="PROCURADOR" value={procuradorVal} onChange={setProcuradorVal}
+                  options={profOpts.procuradores} onCreated={profOpts.addProcurador} placeholder="Nombre del procurador propio…" />
+              </div>
               <button
                 type="button"
                 disabled={procuradorSaving}
@@ -4251,6 +4247,7 @@ function TabContrarios({ exp, onPatch }: { exp: any; onPatch: (fields: Record<st
   const [editing, setEditing] = useState(false);
   const [cForm, setCForm] = useState({ contrario: exp.contrario || "", procurador_contrario: exp.procurador_contrario || "", abogado_contrario: exp.abogado_contrario || "" });
   const [saving, setSaving] = useState(false);
+  const profOpts = useProfesionalesOptions();
 
   // Sync cForm when exp changes from outside (e.g. saved in Datos tab) but user is not editing
   useEffect(() => {
@@ -4307,15 +4304,13 @@ function TabContrarios({ exp, onPatch }: { exp: any; onPatch: (fields: Record<st
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Abogado contrario</label>
-                <input value={cForm.abogado_contrario} onChange={e => setCForm(f => ({ ...f, abogado_contrario: e.target.value }))}
-                  placeholder="Nombre del abogado..."
-                  className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-1 focus:ring-red-400" />
+                <ProfesionalInput tipo="ABOGADO" value={cForm.abogado_contrario} onChange={v => setCForm(f => ({ ...f, abogado_contrario: v }))}
+                  options={profOpts.abogados} onCreated={profOpts.addAbogado} placeholder="Nombre del abogado..." />
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Procurador contrario</label>
-                <input value={cForm.procurador_contrario} onChange={e => setCForm(f => ({ ...f, procurador_contrario: e.target.value }))}
-                  placeholder="Nombre del procurador..."
-                  className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:ring-1 focus:ring-red-400" />
+                <ProfesionalInput tipo="PROCURADOR" value={cForm.procurador_contrario} onChange={v => setCForm(f => ({ ...f, procurador_contrario: v }))}
+                  options={profOpts.procuradores} onCreated={profOpts.addProcurador} placeholder="Nombre del procurador..." />
               </div>
             </div>
             <div className="flex justify-end gap-2">
