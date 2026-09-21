@@ -223,6 +223,20 @@ export async function exchangeGoogleDriveCode(req: Request, res: Response) {
       return err(res, 'Google no ha devuelto permiso de renovación. Desconecta el acceso de esta app en tu cuenta de Google (myaccount.google.com/permissions) y vuelve a intentarlo.', 400);
     }
 
+    // Si se vincula OTRA cuenta de Google distinta de la anterior, las carpetas
+    // recordadas (despacho / Expedientes / cada expediente) y el cursor de
+    // cambios pertenecen a la cuenta vieja y no existen para la nueva (scope
+    // drive.file): hay que olvidarlos para que se creen de nuevo en la nueva.
+    const prev = await pool.query(`SELECT google_drive_email FROM organizaciones WHERE id = $1`, [ctx.organizacionId]);
+    const prevEmail = prev.rows[0]?.google_drive_email || null;
+    if (prevEmail && email && prevEmail.toLowerCase() !== String(email).toLowerCase()) {
+      await pool.query(
+        `UPDATE organizaciones SET google_drive_root_folder_id = NULL, google_drive_expedientes_folder_id = NULL, google_drive_changes_page_token = NULL WHERE id = $1`,
+        [ctx.organizacionId],
+      );
+      await pool.query(`UPDATE expedientes SET google_drive_folder_id = NULL WHERE organizacion_id = $1`, [ctx.organizacionId]);
+    }
+
     const tokenExpiry = new Date(Date.now() + (tokenData.expires_in || 3600) * 1000);
     await pool.query(
       `UPDATE organizaciones
