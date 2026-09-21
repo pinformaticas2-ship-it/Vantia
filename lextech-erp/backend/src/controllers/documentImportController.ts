@@ -1365,22 +1365,35 @@ async function createExpediente(
 
   const expediente = rows[0];
 
-  // UPDATE opcional para los campos de abogados/procuradores — no bloquea si la migración no se aplicó todavía
+  // Abogados/procuradores en dos UPDATE independientes: si los campos
+  // demandante/demandado no existen en la BD (o fallan), no se pierden los
+  // que el usuario revisó a mano (abogado propio/contrario, procurador contrario).
   try {
     await pool.query(
       `UPDATE expedientes
          SET abogado_propio        = $1,
              abogado_contrario     = $2,
-             procurador_contrario  = $3,
-             abogado_demandante    = $4,
-             abogado_demandado     = $5,
-             procurador_demandante = $6,
-             procurador_demandado  = $7
-       WHERE id = $8`,
+             procurador_contrario  = $3
+       WHERE id = $4`,
       [
         data.abogado_propio?.trim()        || null,
         data.abogado_contrario?.trim()     || null,
         data.procurador_contrario?.trim()  || null,
+        expediente.id,
+      ],
+    );
+  } catch (updateErr: any) {
+    console.warn('[createExpediente] No se pudieron guardar abogado/procurador propio y contrario:', String(updateErr?.message || updateErr));
+  }
+  try {
+    await pool.query(
+      `UPDATE expedientes
+         SET abogado_demandante    = $1,
+             abogado_demandado     = $2,
+             procurador_demandante = $3,
+             procurador_demandado  = $4
+       WHERE id = $5`,
+      [
         data.abogado_demandante?.trim()    || null,
         data.abogado_demandado?.trim()     || null,
         data.procurador_demandante?.trim() || null,
@@ -1389,7 +1402,7 @@ async function createExpediente(
       ],
     );
   } catch (updateErr: any) {
-    console.warn('[createExpediente] No se pudieron guardar campos de abogados/procuradores:', String(updateErr?.message || updateErr));
+    console.warn('[createExpediente] No se pudieron guardar abogado/procurador demandante y demandado:', String(updateErr?.message || updateErr));
   }
 
   return expediente;
