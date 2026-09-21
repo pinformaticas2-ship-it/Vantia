@@ -1456,7 +1456,7 @@ async function attachImportedDocumentToExpediente(
         [expedienteId, originalName, uploaded.id, mimeType, stat.size, documentName || null, 'Sin clasificar', userId_, uploaded.id],
       );
       await pool.query(
-        `UPDATE organizaciones SET google_drive_last_error = NULL, google_drive_last_error_at = NULL WHERE id = $1`,
+        `UPDATE organizaciones SET google_drive_last_error = NULL, google_drive_last_error_at = NULL, google_drive_last_error_source = NULL WHERE id = $1`,
         [organizacionId],
       ).catch(() => {});
       return;
@@ -1465,7 +1465,7 @@ async function attachImportedDocumentToExpediente(
     const driveErrMessage = String(driveErr?.message || driveErr);
     console.warn('[documentImport] No se pudo subir el documento a Google Drive, se guarda en disco local:', driveErrMessage);
     await pool.query(
-      `UPDATE organizaciones SET google_drive_last_error = $1, google_drive_last_error_at = now() WHERE id = $2`,
+      `UPDATE organizaciones SET google_drive_last_error = $1, google_drive_last_error_at = now(), google_drive_last_error_source = 'op' WHERE id = $2`,
       [driveErrMessage.slice(0, 1000), organizacionId],
     ).catch(() => {});
   }

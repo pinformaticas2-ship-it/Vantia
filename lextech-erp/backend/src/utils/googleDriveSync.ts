@@ -84,9 +84,9 @@ export async function syncAllOrganizacionesDriveChanges(): Promise<void> {
     for (const row of rows) {
       try {
         await syncDriveChangesForOrganizacion(row.id);
-        await clearDriveError(row.id);
+        await clearDriveError(row.id, 'sync');
       } catch (err: any) {
-        await recordDriveError(row.id, err);
+        await recordDriveError(row.id, err, 'sync');
       }
     }
   } finally {

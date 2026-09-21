@@ -128,7 +128,8 @@ export async function getMyOrganizacion(req: Request, res: Response) {
       const { rows } = await pool.query(
         `SELECT id, nombre, nif_cif, direccion_fiscal, logo_url, texto_legal_facturas,
                 client_welcome_email_subject, client_welcome_email_body, client_welcome_email_signature,
-                google_drive_refresh_token_enc, google_drive_email
+                google_drive_refresh_token_enc, google_drive_email,
+                google_drive_last_error, google_drive_last_error_at
          FROM organizaciones WHERE id = $1`,
         [activa.organizacionId]
       );
@@ -145,6 +146,10 @@ export async function getMyOrganizacion(req: Request, res: Response) {
         clientWelcomeEmailSignature: canSeeCredenciales ? org.client_welcome_email_signature : null,
         googleDriveConnected: Boolean(org.google_drive_refresh_token_enc),
         googleDriveEmail: canSeeCredenciales ? org.google_drive_email : null,
+        // Error reciente (ultimos 10 min) con Drive vinculado -- la barra superior lo marca con una X.
+        googleDriveHasError: Boolean(org.google_drive_refresh_token_enc && org.google_drive_last_error
+          && org.google_drive_last_error_at && Date.now() - new Date(org.google_drive_last_error_at).getTime() < 10 * 60 * 1000),
+        googleDriveErrorMessage: canSeeCredenciales && org.google_drive_refresh_token_enc && org.google_drive_last_error ? org.google_drive_last_error : null,
       } : { id: activa.organizacionId, nombre: activa.organizacionNombre };
     }
 

@@ -296,19 +296,22 @@ export async function isDriveConnected(organizacionId: string): Promise<boolean>
 // consultar con una query directa a la BD sin depender de los logs de
 // Railway. Nunca lanza: registrar el error no debe romper la operación que
 // falló al hablar con Drive.
-export async function recordDriveError(organizacionId: string, err: any): Promise<void> {
+export async function recordDriveError(organizacionId: string, err: any, source: 'op' | 'sync' = 'op'): Promise<void> {
   const message = String(err?.message || err).slice(0, 1000);
   console.warn('[googleDrive] Error:', message);
   await pool.query(
-    `UPDATE organizaciones SET google_drive_last_error = $1, google_drive_last_error_at = now() WHERE id = $2`,
-    [message, organizacionId],
+    `UPDATE organizaciones SET google_drive_last_error = $1, google_drive_last_error_at = now(), google_drive_last_error_source = $3 WHERE id = $2`,
+    [message, organizacionId, source],
   ).catch(() => {});
 }
 
-export async function clearDriveError(organizacionId: string): Promise<void> {
+// Sin onlySource borra cualquier error (una operacion real de Drive salio bien); con el, solo el que
+// registro esa misma fuente.
+export async function clearDriveError(organizacionId: string, onlySource?: 'op' | 'sync'): Promise<void> {
   await pool.query(
-    `UPDATE organizaciones SET google_drive_last_error = NULL, google_drive_last_error_at = NULL WHERE id = $1`,
-    [organizacionId],
+    `UPDATE organizaciones SET google_drive_last_error = NULL, google_drive_last_error_at = NULL, google_drive_last_error_source = NULL
+      WHERE id = $1 AND ($2::text IS NULL OR google_drive_last_error_source = $2)`,
+    [organizacionId, onlySource ?? null],
   ).catch(() => {});
 }
 

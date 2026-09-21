@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
-import { Cloud, Check, ExternalLink, Settings, Link2, Unlink } from "lucide-react";
+import { Cloud, Check, X, ExternalLink, Settings, Link2, Unlink } from "lucide-react";
 import { startGoogleDriveConnect } from "../lib/googleDriveConnect";
 import { apiFetch } from "../lib/api";
 
@@ -29,8 +29,8 @@ export function DropboxLogo({ size = 20 }: { size?: number }) {
 // Estado de las nubes vinculadas en la barra superior: con tick verde si está
 // vinculada, y en gris con una raya si no. OneDrive y Dropbox aún no son
 // funcionales, así que siempre aparecen como no vinculados.
-function StatusIcon({ children, connected, title, onClick }: {
-  children: React.ReactNode; connected: boolean; title: string; onClick?: () => void;
+function StatusIcon({ children, connected, hasError, title, onClick }: {
+  children: React.ReactNode; connected: boolean; hasError?: boolean; title: string; onClick?: () => void;
 }) {
   return (
     <button
@@ -41,7 +41,11 @@ function StatusIcon({ children, connected, title, onClick }: {
       className={`relative p-2 rounded-full transition-colors ${onClick ? "hover:bg-slate-100 cursor-pointer" : "cursor-default"}`}
     >
       <span className={connected ? "" : "grayscale opacity-40"}>{children}</span>
-      {connected ? (
+      {connected && hasError ? (
+        <span className="absolute bottom-0.5 right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-red-500 ring-2 ring-white">
+          <X size={9} strokeWidth={4} className="text-white" />
+        </span>
+      ) : connected ? (
         <span className="absolute bottom-0.5 right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-emerald-500 ring-2 ring-white">
           <Check size={9} strokeWidth={4} className="text-white" />
         </span>
@@ -71,8 +75,8 @@ function MenuItem({ icon, label, onClick, danger, disabled }: {
   );
 }
 
-export default function StorageStatusIcons({ driveConnected, driveEmail, canConnect }: {
-  driveConnected: boolean; driveEmail?: string | null; canConnect: boolean;
+export default function StorageStatusIcons({ driveConnected, driveEmail, driveHasError, driveErrorMessage, canConnect }: {
+  driveConnected: boolean; driveEmail?: string | null; driveHasError?: boolean; driveErrorMessage?: string | null; canConnect: boolean;
 }) {
   const { getToken } = useAuth();
   const navigate = useNavigate();
@@ -120,7 +124,8 @@ export default function StorageStatusIcons({ driveConnected, driveEmail, canConn
     <div ref={ref} className="relative hidden sm:flex shrink-0 items-center">
       <StatusIcon
         connected={driveConnected}
-        title={driveConnected ? "Google Drive vinculado" : "Google Drive no vinculado"}
+        hasError={driveHasError}
+        title={driveConnected ? (driveHasError ? "Google Drive vinculado, pero con un error reciente" : "Google Drive vinculado") : "Google Drive no vinculado"}
         onClick={() => toggle("drive")}
       >
         <DriveLogo />
@@ -134,7 +139,12 @@ export default function StorageStatusIcons({ driveConnected, driveEmail, canConn
 
       {open === "drive" && (
         <div className={panel}>
-          {header("Google Drive", driveConnected ? `Vinculado${driveEmail ? ` · ${driveEmail}` : ""}` : "No vinculado", driveConnected)}
+          {header("Google Drive", driveConnected ? (driveHasError ? "Vinculado · con error" : `Vinculado${driveEmail ? ` · ${driveEmail}` : ""}`) : "No vinculado", driveConnected && !driveHasError)}
+          {driveConnected && driveHasError && (
+            <p className="border-b border-slate-100 bg-red-50 px-4 py-2 text-xs text-red-700">
+              {driveErrorMessage || "Hubo un error reciente al hablar con Google Drive. Avisa a un administrador."}
+            </p>
+          )}
           {driveConnected ? (
             <>
               <MenuItem icon={<ExternalLink size={14} />} label="Abrir Google Drive" onClick={() => { window.open(`https://drive.google.com/drive/my-drive${driveEmail ? `?authuser=${encodeURIComponent(driveEmail)}` : ""}`, "_blank", "noopener"); setOpen(null); }} />

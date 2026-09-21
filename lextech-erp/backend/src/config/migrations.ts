@@ -2221,6 +2221,11 @@ export async function runMigrations(): Promise<void> {
     try {
       await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS google_drive_last_error_at TIMESTAMPTZ;`);
     } catch (_e: any) {}
+    // Quien registro el ultimo error (sync = sondeo de cambios, op = subida/edicion): el sondeo,
+    // que corre cada pocos segundos, solo puede borrar SUS errores, no los de una subida fallida.
+    try {
+      await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS google_drive_last_error_source TEXT;`);
+    } catch (_e: any) {}
     // Cursor de la Google Drive Changes API -- permite detectar cambios
     // hechos DIRECTAMENTE en Drive (renombrar, borrar/mover a papelera) y
     // reflejarlos en Vantia mediante un sondeo periódico (ver

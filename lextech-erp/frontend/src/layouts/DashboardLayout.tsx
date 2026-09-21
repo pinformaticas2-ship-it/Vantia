@@ -2222,6 +2222,8 @@ export default function DashboardLayout() {
             <StorageStatusIcons
               driveConnected={!!organizacion.googleDriveConnected}
               driveEmail={organizacion.googleDriveEmail}
+              driveHasError={!!organizacion.googleDriveHasError}
+              driveErrorMessage={organizacion.googleDriveErrorMessage}
               canConnect={orgRolMain === "propietario" || orgRolMain === "admin"}
             />
           )}
