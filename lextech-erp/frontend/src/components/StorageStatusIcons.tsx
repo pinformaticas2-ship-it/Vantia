@@ -137,7 +137,7 @@ export default function StorageStatusIcons({ driveConnected, driveEmail, canConn
           {header("Google Drive", driveConnected ? `Vinculado${driveEmail ? ` · ${driveEmail}` : ""}` : "No vinculado", driveConnected)}
           {driveConnected ? (
             <>
-              <MenuItem icon={<ExternalLink size={14} />} label="Abrir Google Drive" onClick={() => { window.open("https://drive.google.com/drive/my-drive", "_blank", "noopener"); setOpen(null); }} />
+              <MenuItem icon={<ExternalLink size={14} />} label="Abrir Google Drive" onClick={() => { window.open(`https://drive.google.com/drive/my-drive${driveEmail ? `?authuser=${encodeURIComponent(driveEmail)}` : ""}`, "_blank", "noopener"); setOpen(null); }} />
               <MenuItem icon={<Settings size={14} />} label="Gestionar en Integraciones" onClick={goIntegraciones} />
               {canConnect && <MenuItem icon={<Unlink size={14} />} label={busy ? "Desconectando…" : "Desconectar"} onClick={disconnect} danger disabled={busy} />}
             </>
