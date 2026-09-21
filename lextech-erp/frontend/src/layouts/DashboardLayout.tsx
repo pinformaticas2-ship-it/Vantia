@@ -17,6 +17,7 @@ import {
 import { UserButton, useUser, useAuth, useClerk } from "@clerk/clerk-react";
 import { getDeviceId, safeJson, waitForClientIp, resolveUploadUrl } from "../lib/api";
 import { useOrganizacion } from "../lib/useOrganizacion";
+import DriveConnectPrompt from "../components/DriveConnectPrompt";
 import { useIsMobile } from "../lib/useIsMobile";
 import { useChatUnread } from "../contexts/ChatUnreadContext";
 import { useEmailUnread } from "../contexts/EmailUnreadContext";
@@ -2119,6 +2120,8 @@ export default function DashboardLayout() {
   return (
     <SidebarContext.Provider value={{ isCollapsed }}>
     <div className="erp-shell flex h-screen overflow-hidden font-sans antialiased text-neutral-900">
+
+      <DriveConnectPrompt />
 
       {latestUnread && !location.pathname.startsWith("/dashboard/correo") && (
         <EmailToast

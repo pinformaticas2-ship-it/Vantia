@@ -42,7 +42,7 @@ async function googleTokenRequest(params: Record<string, string>): Promise<Googl
     body,
   });
   const data: any = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error_description || data.error || 'No se pudo comunicar con Google');
+  if (!res.ok) throw Object.assign(new Error(data.error_description || data.error || 'No se pudo comunicar con Google'), { googleError: data.error });
   return data as GoogleTokenResponse;
 }
 
@@ -74,7 +74,29 @@ export async function getDriveAccessToken(organizacionId: string): Promise<strin
   if (!isExpired) return decryptPassword(row.google_drive_access_token_enc);
 
   const refreshToken = decryptPassword(row.google_drive_refresh_token_enc);
-  const tokenData = await refreshGoogleDriveToken(refreshToken);
+  let tokenData: GoogleTokenResponse;
+  try {
+    tokenData = await refreshGoogleDriveToken(refreshToken);
+  } catch (e: any) {
+    // invalid_grant = Google ya no acepta este refresh_token (revocado desde la
+    // cuenta de Google, caducado -- p. ej. app de Google Cloud en modo "Prueba"
+    // -- o contraseña cambiada). Se marca la conexión como caída para que la app
+    // avise y pida volver a vincular Drive; cualquier otro error (red, Google
+    // caído) es transitorio y NO desvincula nada.
+    if (e?.googleError === 'invalid_grant') {
+      await pool.query(
+        `UPDATE organizaciones
+            SET google_drive_access_token_enc=NULL, google_drive_refresh_token_enc=NULL, google_drive_token_expiry=NULL,
+                google_drive_changes_page_token=NULL,
+                google_drive_last_error='La conexión con Google Drive caducó o fue revocada. Hay que volver a vincularla.',
+                google_drive_last_error_at=now()
+          WHERE id=$1`,
+        [organizacionId],
+      ).catch(() => {});
+      throw Object.assign(new Error('La conexión con Google Drive caducó. Vuelve a vincularla.'), { code: 'DRIVE_NOT_CONNECTED' });
+    }
+    throw e;
+  }
   const newExpiry = new Date(Date.now() + (tokenData.expires_in || 3600) * 1000);
   await pool.query(
     `UPDATE organizaciones SET google_drive_access_token_enc=$1, google_drive_token_expiry=$2, updated_at=NOW() WHERE id=$3`,

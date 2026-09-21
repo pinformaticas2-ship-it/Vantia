@@ -1,3 +1,4 @@
+import { startGoogleDriveConnect } from '../lib/googleDriveConnect';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertTriangle, Bell, BellOff, BellRing, BookOpen, Building2, Camera, Check, Crown, Facebook, History, Instagram, KeyRound, Link2, Loader2, Lock, LockKeyhole, MessageCircle, Clock3, Mail as MailIcon, Phone, Palette, Plug, Plus, ShieldCheck, Trash2, UsersRound, X } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -391,38 +392,12 @@ function DespachoPanel() {
   // invocarlo -- sin volver a inyectar el <script>.
   const connectDrive = () => {
     setDriveError('');
-    const goog = (window as any).google;
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
-    if (!clientId) { setDriveError('VITE_GOOGLE_CLIENT_ID no está configurado.'); return; }
-    if (!goog?.accounts?.oauth2) { setDriveError('Google Identity Services aún se está cargando. Espera un momento y vuelve a intentarlo.'); return; }
-
-    const codeClient = goog.accounts.oauth2.initCodeClient({
-      client_id: clientId,
-      // drive.file: solo da acceso a los archivos/carpetas que esta app
-      // cree en Drive, nunca al resto del Drive de la cuenta conectada.
-      scope: 'https://www.googleapis.com/auth/drive.file',
-      ux_mode: 'popup',
-      access_type: 'offline',
-      // 'consent' fuerza la pantalla de permisos siempre -- es lo único
-      // que garantiza que Google mande un refresh_token también al
-      // reconectar (si no, solo lo manda la primera vez).
-      prompt: 'consent',
-      callback: async (resp: { code?: string; error?: string }) => {
-        if (!resp.code) { setDriveError('Error al conectar con Google: ' + (resp.error || 'Desconocido')); return; }
-        setDriveConnecting(true);
-        try {
-          const data = await apiFetch('/api/organizacion/drive/exchange-code', {
-            method: 'POST', getToken, body: JSON.stringify({ code: resp.code }),
-          });
-          if (data?.success === false) throw new Error(data.error);
-          window.location.reload();
-        } catch (e: any) {
-          setDriveError(e.message || 'No se pudo conectar Google Drive');
-          setDriveConnecting(false);
-        }
-      },
+    startGoogleDriveConnect({
+      getToken,
+      onError: setDriveError,
+      onBusy: setDriveConnecting,
+      onConnected: () => window.location.reload(),
     });
-    codeClient.requestCode();
   };
 
   const disconnectDrive = async () => {
