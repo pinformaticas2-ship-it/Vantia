@@ -1,6 +1,7 @@
 import { startGoogleDriveConnect } from '../lib/googleDriveConnect';
+import { DriveLogo } from '../components/StorageStatusIcons';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AlertTriangle, Bell, BellOff, BellRing, BookOpen, Building2, Camera, Check, Crown, Facebook, History, Instagram, KeyRound, Link2, Loader2, Lock, LockKeyhole, MessageCircle, Clock3, Mail as MailIcon, Phone, Palette, Plug, Plus, ShieldCheck, Trash2, UsersRound, X } from 'lucide-react';
+import { AlertTriangle, Bell, BellOff, BellRing, BookOpen, Building2, Camera, Check, Cloud, Crown, Facebook, History, Instagram, KeyRound, Link2, Loader2, Lock, LockKeyhole, MessageCircle, Clock3, Mail as MailIcon, Phone, Palette, Plug, Plus, ShieldCheck, Trash2, UsersRound, X } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth, UserProfile } from '@clerk/clerk-react';
 import { useTheme, AppTheme } from '../lib/ThemeContext';
@@ -369,11 +370,6 @@ function DespachoPanel() {
   const [error, setError] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-  // ── Google Drive (documentos de expedientes) ────────────────────────────
-  const [driveConnecting, setDriveConnecting] = useState(false);
-  const [driveError, setDriveError] = useState('');
-  const [disconnectingDrive, setDisconnectingDrive] = useState(false);
-
   useEffect(() => {
     if (!organizacion) return;
     setNombre(organizacion.nombre);
@@ -386,31 +382,6 @@ function DespachoPanel() {
   }, [organizacion]);
 
   const canEdit = rol === 'propietario' || rol === 'admin';
-
-  // El script de Google Identity Services ya se carga globalmente en
-  // index.html (lo usa también Correo), así que aquí solo hace falta
-  // invocarlo -- sin volver a inyectar el <script>.
-  const connectDrive = () => {
-    setDriveError('');
-    startGoogleDriveConnect({
-      getToken,
-      onError: setDriveError,
-      onBusy: setDriveConnecting,
-      onConnected: () => window.location.reload(),
-    });
-  };
-
-  const disconnectDrive = async () => {
-    setDisconnectingDrive(true); setDriveError('');
-    try {
-      const data = await apiFetch('/api/organizacion/drive', { method: 'DELETE', getToken });
-      if (data?.success === false) throw new Error(data.error);
-      window.location.reload();
-    } catch (e: any) {
-      setDriveError(e.message || 'No se pudo desconectar Google Drive');
-      setDisconnectingDrive(false);
-    }
-  };
 
   const save = async () => {
     if (!nombre.trim()) return;
@@ -668,37 +639,6 @@ function DespachoPanel() {
                     <p className="text-xs text-slate-400 mt-1">Se añade al final del correo, debajo del mensaje.</p>
                   </div>
                 </div>
-              </div>
-
-              <div className="border-t border-slate-100 pt-4">
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Google Drive (documentos de expedientes)</p>
-                <p className="text-xs text-slate-400 mb-3">
-                  El servidor no guarda los archivos de forma permanente. Conecta Google Drive para que los documentos de cada expediente se guarden ahí, en una carpeta por expediente, y no se pierdan.
-                </p>
-                {organizacion?.googleDriveConnected ? (
-                  <div className="flex items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3.5 py-3">
-                    <div className="flex items-center gap-2 text-xs text-emerald-700">
-                      <Check size={14} className="shrink-0" />
-                      <span>Conectado{organizacion.googleDriveEmail ? ` (${organizacion.googleDriveEmail})` : ''}</span>
-                    </div>
-                    <button
-                      onClick={disconnectDrive}
-                      disabled={disconnectingDrive}
-                      className="text-xs font-semibold text-red-600 hover:underline disabled:opacity-50"
-                    >
-                      {disconnectingDrive ? 'Desconectando…' : 'Desconectar'}
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={connectDrive}
-                    disabled={driveConnecting}
-                    className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                  >
-                    {driveConnecting ? 'Conectando…' : 'Conectar Google Drive'}
-                  </button>
-                )}
-                {driveError && <p className="text-xs text-rose-600 mt-2">{driveError}</p>}
               </div>
             </>
           ) : (
@@ -1502,6 +1442,34 @@ interface WhatsAppIntegrationStatus {
 // mensajería todavía (ver [[project_vantia_pending_user_actions]]).
 function IntegracionesPanel({ canManage }: { canManage: boolean }) {
   const { getToken } = useAuth();
+  const { organizacion } = useOrganizacion();
+  const [driveConnecting, setDriveConnecting] = useState(false);
+  const [driveError, setDriveError] = useState('');
+  const [disconnectingDrive, setDisconnectingDrive] = useState(false);
+  const driveConnected = Boolean(organizacion?.googleDriveConnected);
+
+  const connectDrive = () => {
+    setDriveError('');
+    startGoogleDriveConnect({
+      getToken,
+      onError: setDriveError,
+      onBusy: setDriveConnecting,
+      onConnected: () => window.location.reload(),
+    });
+  };
+
+  const disconnectDrive = async () => {
+    setDisconnectingDrive(true); setDriveError('');
+    try {
+      const data = await apiFetch('/api/organizacion/drive', { method: 'DELETE', getToken });
+      if (data?.success === false) throw new Error(data.error);
+      window.location.reload();
+    } catch (e: any) {
+      setDriveError(e.message || 'No se pudo desconectar Google Drive');
+      setDisconnectingDrive(false);
+    }
+  };
+
   const [status, setStatus] = useState<WhatsAppIntegrationStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(false);
@@ -1643,6 +1611,72 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
           <p className="mt-3 flex-1 text-xs leading-5 text-slate-500">
             Canal independiente de Instagram: mensajes de Messenger a la Página de Facebook del despacho, dentro de la
             misma bandeja de Comunicación Externa.
+          </p>
+          <button type="button" disabled className="mt-4 inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-lg border border-slate-100 px-4 py-2 text-xs font-bold text-slate-300">
+            <Link2 size={13} /> Conectar
+          </button>
+        </div>
+
+        <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-50 ring-1 ring-slate-100">
+                <DriveLogo size={22} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-slate-800">Google Drive</p>
+                <p className="text-xs text-slate-400 truncate">Documentos de expedientes</p>
+              </div>
+            </div>
+            <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold uppercase ${driveConnected ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
+              {driveConnected ? 'Conectado' : 'Pendiente'}
+            </span>
+          </div>
+          <p className="mt-3 flex-1 text-xs leading-5 text-slate-500">
+            El servidor no guarda los archivos de forma permanente. Con Google Drive, los documentos de cada expediente se guardan en una carpeta propia y no se pierden.
+            {driveConnected && organizacion?.googleDriveEmail ? ` Cuenta: ${organizacion.googleDriveEmail}.` : ''}
+          </p>
+          {canManage ? (
+            driveConnected ? (
+              <button
+                type="button"
+                onClick={disconnectDrive}
+                disabled={disconnectingDrive}
+                className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
+              >
+                {disconnectingDrive ? 'Desconectando…' : 'Desconectar'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={connectDrive}
+                disabled={driveConnecting}
+                className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+              >
+                <Link2 size={13} /> {driveConnecting ? 'Conectando…' : 'Conectar'}
+              </button>
+            )
+          ) : (
+            <p className="mt-4 text-[11px] text-slate-400">Solo el propietario o un administrador pueden configurarlo.</p>
+          )}
+          {driveError && <p className="mt-2 text-xs text-rose-600">{driveError}</p>}
+        </div>
+
+        <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-sky-50">
+                <Cloud size={20} className="text-[#0364B8]" fill="currentColor" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-slate-800">OneDrive</p>
+                <p className="text-xs text-slate-400 truncate">Documentos de expedientes</p>
+              </div>
+            </div>
+            <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase text-slate-400">Próximamente</span>
+          </div>
+          <p className="mt-3 flex-1 text-xs leading-5 text-slate-500">
+            Alternativa a Google Drive para guardar los documentos de cada expediente en tu cuenta de Microsoft.
           </p>
           <button type="button" disabled className="mt-4 inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-lg border border-slate-100 px-4 py-2 text-xs font-bold text-slate-300">
             <Link2 size={13} /> Conectar
