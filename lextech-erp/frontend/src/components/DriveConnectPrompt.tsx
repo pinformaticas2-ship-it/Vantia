@@ -54,6 +54,9 @@ export default function DriveConnectPrompt() {
           <button type="button" disabled className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-400 cursor-not-allowed">
             Vincular OneDrive <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-bold uppercase text-slate-500">Próximamente</span>
           </button>
+          <button type="button" disabled className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-400 cursor-not-allowed">
+            Vincular Dropbox <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-bold uppercase text-slate-500">Próximamente</span>
+          </button>
           <button type="button" onClick={dismiss} className="w-full px-4 py-2 text-xs font-semibold text-slate-400 hover:text-slate-600">Ahora no</button>
         </div>
       </div>

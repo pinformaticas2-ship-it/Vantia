@@ -16,9 +16,17 @@ export function DriveLogo({ size = 20 }: { size?: number }) {
   );
 }
 
+export function DropboxLogo({ size = 20 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="#0061FF" aria-hidden="true">
+      <path d="M6 1.807 0 5.629l6 3.822 6.001-3.822L6 1.807zM18 1.807l-6 3.822 6 3.822 6-3.822-6-3.822zM0 13.274l6 3.822 6.001-3.822L6 9.452l-6 3.822zM18 9.452l-6 3.822 6 3.822 6-3.822-6-3.822zM6 18.371l6.001 3.822 6-3.822-6-3.822L6 18.371z" />
+    </svg>
+  );
+}
+
 // Estado de las nubes vinculadas en la barra superior: con tick verde si está
-// vinculada, y en gris con una raya si no. OneDrive aún no es funcional, así
-// que siempre aparece como no vinculado.
+// vinculada, y en gris con una raya si no. OneDrive y Dropbox aún no son
+// funcionales, así que siempre aparecen como no vinculados.
 function StatusIcon({ children, connected, title, onClick }: {
   children: React.ReactNode; connected: boolean; title: string; onClick?: () => void;
 }) {
@@ -66,6 +74,9 @@ export default function StorageStatusIcons({ driveConnected, canConnect }: { dri
       </StatusIcon>
       <StatusIcon connected={false} title="OneDrive no vinculado (próximamente)">
         <Cloud size={20} className="text-[#0364B8]" fill="currentColor" />
+      </StatusIcon>
+      <StatusIcon connected={false} title="Dropbox no vinculado (próximamente)">
+        <DropboxLogo />
       </StatusIcon>
     </div>
   );

@@ -1,5 +1,5 @@
 import { startGoogleDriveConnect } from '../lib/googleDriveConnect';
-import { DriveLogo } from '../components/StorageStatusIcons';
+import { DriveLogo, DropboxLogo } from '../components/StorageStatusIcons';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertTriangle, Bell, BellOff, BellRing, BookOpen, Building2, Camera, Check, Cloud, Crown, Facebook, History, Instagram, KeyRound, Link2, Loader2, Lock, LockKeyhole, MessageCircle, Clock3, Mail as MailIcon, Phone, Palette, Plug, Plus, ShieldCheck, Trash2, UsersRound, X } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -1677,6 +1677,27 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
           </div>
           <p className="mt-3 flex-1 text-xs leading-5 text-slate-500">
             Alternativa a Google Drive para guardar los documentos de cada expediente en tu cuenta de Microsoft.
+          </p>
+          <button type="button" disabled className="mt-4 inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-lg border border-slate-100 px-4 py-2 text-xs font-bold text-slate-300">
+            <Link2 size={13} /> Conectar
+          </button>
+        </div>
+
+        <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50">
+                <DropboxLogo size={22} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-slate-800">Dropbox</p>
+                <p className="text-xs text-slate-400 truncate">Documentos de expedientes</p>
+              </div>
+            </div>
+            <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase text-slate-400">Próximamente</span>
+          </div>
+          <p className="mt-3 flex-1 text-xs leading-5 text-slate-500">
+            Otra alternativa para guardar los documentos de cada expediente, en tu cuenta de Dropbox.
           </p>
           <button type="button" disabled className="mt-4 inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-lg border border-slate-100 px-4 py-2 text-xs font-bold text-slate-300">
             <Link2 size={13} /> Conectar
