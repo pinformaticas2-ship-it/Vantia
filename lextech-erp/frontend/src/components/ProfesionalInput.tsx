@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useAuth } from "@clerk/clerk-react";
 import { Plus } from "lucide-react";
 import { safeJson } from "../lib/api";
@@ -25,10 +26,27 @@ export function ProfesionalInput({ tipo, value, onChange, options, onCreated, pl
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const ref = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [rect, setRect] = useState<{ left: number; top: number; width: number } | null>(null);
+
+  // El desplegable se pinta en un portal (position: fixed) para que no lo
+  // recorte el overflow-hidden de la tarjeta/modal que contiene el campo.
+  useLayoutEffect(() => {
+    if (!open) return;
+    const update = () => {
+      const r = ref.current?.getBoundingClientRect();
+      if (r) setRect({ left: r.left, top: r.bottom + 4, width: r.width });
+    };
+    update();
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => { window.removeEventListener("scroll", update, true); window.removeEventListener("resize", update); };
+  }, [open]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false);
+      const t = event.target as Node;
+      if (ref.current && !ref.current.contains(t) && !menuRef.current?.contains(t)) setOpen(false);
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -92,8 +110,9 @@ export function ProfesionalInput({ tipo, value, onChange, options, onCreated, pl
         placeholder={placeholder}
         className={inputCls}
       />
-      {open && (
-        <div className="absolute z-50 mt-1 w-full max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white py-1.5 shadow-[0_20px_50px_-24px_rgba(15,23,42,0.22)]">
+      {open && rect && createPortal(
+        <div ref={menuRef} style={{ position: "fixed", left: rect.left, top: rect.top, width: rect.width, zIndex: 10000 }}
+          className="max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white py-1.5 shadow-[0_20px_50px_-24px_rgba(15,23,42,0.35)]">
           {filtered.length > 0 ? (
             filtered.map(o => (
               <button
@@ -115,7 +134,8 @@ export function ProfesionalInput({ tipo, value, onChange, options, onCreated, pl
           >
             <Plus size={13} /> Crear nuevo {label}
           </button>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
