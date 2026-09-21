@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
-import { Cloud, Check } from "lucide-react";
+import { Cloud, Check, ExternalLink, Settings, Link2, Unlink } from "lucide-react";
 import { startGoogleDriveConnect } from "../lib/googleDriveConnect";
+import { apiFetch } from "../lib/api";
 
 export function DriveLogo({ size = 20 }: { size?: number }) {
   return (
@@ -52,32 +54,111 @@ function StatusIcon({ children, connected, title, onClick }: {
   );
 }
 
-export default function StorageStatusIcons({ driveConnected, canConnect }: { driveConnected: boolean; canConnect: boolean }) {
+type Provider = "drive" | "onedrive" | "dropbox";
+
+function MenuItem({ icon, label, onClick, danger, disabled }: {
+  icon: React.ReactNode; label: string; onClick: () => void; danger?: boolean; disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className={`flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm transition-colors disabled:opacity-50 ${danger ? "text-red-600 hover:bg-red-50" : "text-slate-700 hover:bg-slate-50"}`}
+    >
+      <span className="shrink-0 text-slate-400">{icon}</span>{label}
+    </button>
+  );
+}
+
+export default function StorageStatusIcons({ driveConnected, driveEmail, canConnect }: {
+  driveConnected: boolean; driveEmail?: string | null; canConnect: boolean;
+}) {
   const { getToken } = useAuth();
+  const navigate = useNavigate();
+  const [open, setOpen] = useState<Provider | null>(null);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(null); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+
+  const toggle = (p: Provider) => { setError(""); setOpen(o => (o === p ? null : p)); };
+  const goIntegraciones = () => { setOpen(null); navigate("/dashboard/config?section=integraciones"); };
 
   const connect = () => {
     if (busy) return;
-    startGoogleDriveConnect({
-      getToken, onError: (m) => window.alert(m), onBusy: setBusy, onConnected: () => window.location.reload(),
-    });
+    setError("");
+    startGoogleDriveConnect({ getToken, onError: setError, onBusy: setBusy, onConnected: () => window.location.reload() });
   };
 
+  const disconnect = async () => {
+    setBusy(true); setError("");
+    try {
+      const data = await apiFetch("/api/organizacion/drive", { method: "DELETE", getToken });
+      if (data?.success === false) throw new Error(data.error);
+      window.location.reload();
+    } catch (e: any) {
+      setError(e.message || "No se pudo desconectar Google Drive");
+      setBusy(false);
+    }
+  };
+
+  const panel = "absolute right-0 top-full z-50 mt-1 w-64 overflow-hidden rounded-xl border border-slate-200 bg-white py-1.5 shadow-2xl";
+  const header = (name: string, status: string, ok: boolean) => (
+    <div className="border-b border-slate-100 px-4 pb-2.5 pt-1.5">
+      <p className="text-sm font-bold text-slate-800">{name}</p>
+      <p className={`text-xs ${ok ? "text-emerald-600" : "text-slate-400"}`}>{status}</p>
+    </div>
+  );
+
   return (
-    <div className="hidden sm:flex shrink-0 items-center">
+    <div ref={ref} className="relative hidden sm:flex shrink-0 items-center">
       <StatusIcon
         connected={driveConnected}
-        title={driveConnected ? "Google Drive vinculado" : canConnect ? "Google Drive no vinculado — pulsa para vincular" : "Google Drive no vinculado"}
-        onClick={!driveConnected && canConnect ? connect : undefined}
+        title={driveConnected ? "Google Drive vinculado" : "Google Drive no vinculado"}
+        onClick={() => toggle("drive")}
       >
         <DriveLogo />
       </StatusIcon>
-      <StatusIcon connected={false} title="OneDrive no vinculado (próximamente)">
+      <StatusIcon connected={false} title="OneDrive no vinculado (próximamente)" onClick={() => toggle("onedrive")}>
         <Cloud size={20} className="text-[#0364B8]" fill="currentColor" />
       </StatusIcon>
-      <StatusIcon connected={false} title="Dropbox no vinculado (próximamente)">
+      <StatusIcon connected={false} title="Dropbox no vinculado (próximamente)" onClick={() => toggle("dropbox")}>
         <DropboxLogo />
       </StatusIcon>
+
+      {open === "drive" && (
+        <div className={panel}>
+          {header("Google Drive", driveConnected ? `Vinculado${driveEmail ? ` · ${driveEmail}` : ""}` : "No vinculado", driveConnected)}
+          {driveConnected ? (
+            <>
+              <MenuItem icon={<ExternalLink size={14} />} label="Abrir Google Drive" onClick={() => { window.open("https://drive.google.com/drive/my-drive", "_blank", "noopener"); setOpen(null); }} />
+              <MenuItem icon={<Settings size={14} />} label="Gestionar en Integraciones" onClick={goIntegraciones} />
+              {canConnect && <MenuItem icon={<Unlink size={14} />} label={busy ? "Desconectando…" : "Desconectar"} onClick={disconnect} danger disabled={busy} />}
+            </>
+          ) : (
+            <>
+              {canConnect
+                ? <MenuItem icon={<Link2 size={14} />} label={busy ? "Vinculando…" : "Vincular Google Drive"} onClick={connect} disabled={busy} />
+                : <p className="px-4 py-2.5 text-xs text-slate-400">Pide al propietario o a un administrador que lo vincule.</p>}
+              <MenuItem icon={<Settings size={14} />} label="Ir a Integraciones" onClick={goIntegraciones} />
+            </>
+          )}
+          {error && <p className="px-4 py-2 text-xs text-red-600">{error}</p>}
+        </div>
+      )}
+      {(open === "onedrive" || open === "dropbox") && (
+        <div className={panel}>
+          {header(open === "onedrive" ? "OneDrive" : "Dropbox", "No vinculado · Próximamente", false)}
+          <p className="px-4 py-2.5 text-xs text-slate-500">Esta conexión aún no está disponible.</p>
+          <MenuItem icon={<Settings size={14} />} label="Ir a Integraciones" onClick={goIntegraciones} />
+        </div>
+      )}
     </div>
   );
 }
