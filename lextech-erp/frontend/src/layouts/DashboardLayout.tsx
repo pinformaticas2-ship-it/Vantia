@@ -1756,6 +1756,27 @@ export default function DashboardLayout() {
   const dismissedNotifIdsRef = useRef<Set<string>>(new Set());
   const activeUserIdRef    = useRef<string | null>(null);
 
+  // Notificaciones marcadas como leídas: se guardan en localStorage (por
+  // usuario, para no mezclarlas si comparten navegador) para que sigan
+  // descartadas tras recargar la página, no solo en memoria de esta sesión.
+  const dismissedNotifStorageKey = user?.id ? `vantia.notifs.dismissed.${user.id}` : null;
+  useEffect(() => {
+    if (!dismissedNotifStorageKey) return;
+    try {
+      const raw = localStorage.getItem(dismissedNotifStorageKey);
+      const ids: string[] = raw ? JSON.parse(raw) : [];
+      dismissedNotifIdsRef.current = new Set(ids);
+    } catch { /* localStorage no disponible o dato corrupto -- se ignora */ }
+  }, [dismissedNotifStorageKey]);
+  const persistDismissedNotifIds = useCallback(() => {
+    if (!dismissedNotifStorageKey) return;
+    try {
+      // Se limita a las últimas 500 para no crecer sin límite con el tiempo.
+      const ids = Array.from(dismissedNotifIdsRef.current).slice(-500);
+      localStorage.setItem(dismissedNotifStorageKey, JSON.stringify(ids));
+    } catch { /* localStorage lleno o no disponible -- se ignora */ }
+  }, [dismissedNotifStorageKey]);
+
   const getModuleBase = (p: string) => {
     const parts = p.split('/').filter(Boolean);
     return parts.length >= 2 ? `/${parts[0]}/${parts[1]}` : p;
@@ -2064,15 +2085,17 @@ export default function DashboardLayout() {
 
   const dismissNotification = useCallback((id: string) => {
     dismissedNotifIdsRef.current.add(id);
+    persistDismissedNotifIds();
     setNotifications((prev) => prev.filter((n) => n.id !== id));
-  }, []);
+  }, [persistDismissedNotifIds]);
 
   const dismissAllNotifications = useCallback(() => {
     setNotifications((prev) => {
       for (const n of prev) dismissedNotifIdsRef.current.add(n.id);
       return [];
     });
-  }, []);
+    persistDismissedNotifIds();
+  }, [persistDismissedNotifIds]);
 
   useEffect(() => {
     let interval: number | null = null;
