@@ -1,4 +1,5 @@
 import { startGoogleDriveConnect } from '../lib/googleDriveConnect';
+import { startDropboxConnect } from '../lib/dropboxConnect';
 import { DriveLogo, DropboxLogo } from '../components/StorageStatusIcons';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertTriangle, Bell, BellOff, BellRing, BookOpen, Building2, Camera, Check, Cloud, Crown, Facebook, History, Instagram, KeyRound, Link2, Loader2, Lock, LockKeyhole, MessageCircle, Clock3, Mail as MailIcon, Phone, Palette, Plug, Plus, ShieldCheck, Trash2, UsersRound, X } from 'lucide-react';
@@ -1470,6 +1471,33 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
     }
   };
 
+  const [dropboxConnecting, setDropboxConnecting] = useState(false);
+  const [dropboxError, setDropboxError] = useState('');
+  const [disconnectingDropbox, setDisconnectingDropbox] = useState(false);
+  const dropboxConnected = Boolean(organizacion?.dropboxConnected);
+
+  const connectDropbox = () => {
+    setDropboxError('');
+    startDropboxConnect({
+      getToken,
+      onError: setDropboxError,
+      onBusy: setDropboxConnecting,
+      onConnected: () => window.location.reload(),
+    });
+  };
+
+  const disconnectDropbox = async () => {
+    setDisconnectingDropbox(true); setDropboxError('');
+    try {
+      const data = await apiFetch('/api/organizacion/dropbox', { method: 'DELETE', getToken });
+      if (data?.success === false) throw new Error(data.error);
+      window.location.reload();
+    } catch (e: any) {
+      setDropboxError(e.message || 'No se pudo desconectar Dropbox');
+      setDisconnectingDropbox(false);
+    }
+  };
+
   const [status, setStatus] = useState<WhatsAppIntegrationStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(false);
@@ -1691,17 +1719,41 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-bold text-slate-800">Dropbox</p>
-                <p className="text-xs text-slate-400 truncate">Documentos de expedientes</p>
+                <p className="text-xs text-slate-400 truncate">Vinculación de cuenta</p>
               </div>
             </div>
-            <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold uppercase text-slate-400">Próximamente</span>
+            <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold uppercase ${dropboxConnected ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
+              {dropboxConnected ? 'Conectado' : 'Pendiente'}
+            </span>
           </div>
           <p className="mt-3 flex-1 text-xs leading-5 text-slate-500">
-            Otra alternativa para guardar los documentos de cada expediente, en tu cuenta de Dropbox.
+            Vincula tu cuenta de Dropbox. Por ahora solo conecta la cuenta -- todavía no guarda documentos de expedientes ahí (esa parte llega después).
+            {dropboxConnected && organizacion?.dropboxEmail ? ` Cuenta: ${organizacion.dropboxEmail}.` : ''}
           </p>
-          <button type="button" disabled className="mt-4 inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-lg border border-slate-100 px-4 py-2 text-xs font-bold text-slate-300">
-            <Link2 size={13} /> Conectar
-          </button>
+          {canManage ? (
+            dropboxConnected ? (
+              <button
+                type="button"
+                onClick={disconnectDropbox}
+                disabled={disconnectingDropbox}
+                className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
+              >
+                {disconnectingDropbox ? 'Desconectando…' : 'Desconectar'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={connectDropbox}
+                disabled={dropboxConnecting}
+                className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+              >
+                <Link2 size={13} /> {dropboxConnecting ? 'Conectando…' : 'Conectar'}
+              </button>
+            )
+          ) : (
+            <p className="mt-4 text-[11px] text-slate-400">Solo el propietario o un administrador pueden configurarlo.</p>
+          )}
+          {dropboxError && <p className="mt-2 text-xs text-rose-600">{dropboxError}</p>}
         </div>
       </div>
 

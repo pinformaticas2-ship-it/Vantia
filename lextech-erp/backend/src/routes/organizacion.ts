@@ -21,6 +21,8 @@ import {
   transferirPropiedad,
   exchangeGoogleDriveCode,
   disconnectGoogleDrive,
+  exchangeDropboxCode,
+  disconnectDropbox,
 } from '../controllers/organizacionesController';
 
 const router = Router();
@@ -32,6 +34,8 @@ router.post('/logo', requireAuth, uploadOrgLogo.single('logo'), uploadOrganizaci
 router.delete('/logo', requireAuth, deleteOrganizacionLogo);
 router.post('/drive/exchange-code', requireAuth, exchangeGoogleDriveCode);
 router.delete('/drive', requireAuth, disconnectGoogleDrive);
+router.post('/dropbox/exchange-code', requireAuth, exchangeDropboxCode);
+router.delete('/dropbox', requireAuth, disconnectDropbox);
 router.get('/miembros', requireAuth, getOrganizacionMiembros);
 router.post('/miembros', requireAuth, addOrganizacionMiembro);
 router.patch('/miembros/:id', requireAuth, updateOrganizacionMiembroRol);

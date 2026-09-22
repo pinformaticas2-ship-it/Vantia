@@ -2289,6 +2289,20 @@ export async function runMigrations(): Promise<void> {
     try {
       await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS google_drive_changes_page_token TEXT;`);
     } catch (_e: any) {}
+    // ── Dropbox: fase 1, solo vinculación (conectar/desconectar) -- todavía
+    // no se usa para guardar documentos de expedientes. Mismo patrón que
+    // Drive: refresh_token cifrado, access_token cacheado con su caducidad.
+    for (const col of [
+      `ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS dropbox_access_token_enc TEXT;`,
+      `ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS dropbox_refresh_token_enc TEXT;`,
+      `ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS dropbox_token_expiry TIMESTAMPTZ;`,
+      `ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS dropbox_email TEXT;`,
+      `ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS dropbox_account_id TEXT;`,
+      `ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS dropbox_last_error TEXT;`,
+      `ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS dropbox_last_error_at TIMESTAMPTZ;`,
+    ]) {
+      try { await client.query(col); } catch (_e: any) {}
+    }
     try {
       await client.query(`ALTER TABLE expedientes ADD COLUMN IF NOT EXISTS google_drive_folder_id TEXT;`);
     } catch (_e: any) {}

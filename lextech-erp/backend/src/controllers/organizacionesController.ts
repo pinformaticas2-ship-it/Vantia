@@ -6,6 +6,7 @@ import { getClerk, resolveUserRole } from './activityController';
 import { UPLOADS_ORG_LOGOS_ROOT } from '../config/paths';
 import { getFullMatrix, setPermissionOverride, getMemberMatrix, setMemberPermissionOverride, clearMemberPermissionOverrides, MODULOS, Modulo, NivelAcceso, OrgRol } from '../config/permissions';
 import { exchangeGoogleDriveCode as exchangeGoogleDriveCodeToken } from '../utils/googleDrive';
+import { exchangeDropboxCode as exchangeDropboxCodeToken } from '../utils/dropboxAuth';
 import { encryptPassword } from '../utils/emailCrypto';
 
 const pgErr = (e: any) =>
@@ -129,7 +130,8 @@ export async function getMyOrganizacion(req: Request, res: Response) {
         `SELECT id, nombre, nif_cif, direccion_fiscal, logo_url, texto_legal_facturas,
                 client_welcome_email_subject, client_welcome_email_body, client_welcome_email_signature,
                 google_drive_refresh_token_enc, google_drive_email,
-                google_drive_last_error, google_drive_last_error_at
+                google_drive_last_error, google_drive_last_error_at,
+                dropbox_refresh_token_enc, dropbox_email
          FROM organizaciones WHERE id = $1`,
         [activa.organizacionId]
       );
@@ -150,6 +152,8 @@ export async function getMyOrganizacion(req: Request, res: Response) {
         googleDriveHasError: Boolean(org.google_drive_refresh_token_enc && org.google_drive_last_error
           && org.google_drive_last_error_at && Date.now() - new Date(org.google_drive_last_error_at).getTime() < 10 * 60 * 1000),
         googleDriveErrorMessage: canSeeCredenciales && org.google_drive_refresh_token_enc && org.google_drive_last_error ? org.google_drive_last_error : null,
+        dropboxConnected: Boolean(org.dropbox_refresh_token_enc),
+        dropboxEmail: canSeeCredenciales ? org.dropbox_email : null,
       } : { id: activa.organizacionId, nombre: activa.organizacionNombre };
     }
 
@@ -275,6 +279,83 @@ export async function disconnectGoogleDrive(req: Request, res: Response) {
              google_drive_refresh_token_enc = NULL,
              google_drive_token_expiry = NULL,
              google_drive_email = NULL,
+             updated_at = NOW()
+       WHERE id = $1`,
+      [ctx.organizacionId],
+    );
+    return ok(res, { connected: false });
+  } catch (e: any) {
+    return err(res, pgErr(e));
+  }
+}
+
+// POST /api/organizacion/dropbox/exchange-code -- vincula Dropbox (fase 1,
+// solo la conexión; todavía no se usa para guardar documentos). A diferencia
+// de Google, aquí no hay SDK de popup: el frontend hace su propio flujo de
+// redirect_uri (ver lib/dropboxConnect.ts) y nos manda el código + el
+// redirect_uri exacto que usó, porque Dropbox exige que coincida al pedir el
+// token.
+export async function exchangeDropboxCode(req: Request, res: Response) {
+  try {
+    const ctx = requireOrgContext(req, res);
+    if (!ctx) return;
+    if (ctx.organizacionRol !== 'propietario' && ctx.organizacionRol !== 'admin') {
+      return err(res, 'Solo el propietario o un administrador pueden conectar Dropbox.', 403);
+    }
+    const code = String(req.body?.code || '');
+    const redirectUri = String(req.body?.redirectUri || '');
+    if (!code || !redirectUri) return err(res, 'Falta el código de autorización o el redirect_uri', 400);
+
+    const tokenData = await exchangeDropboxCodeToken(code, redirectUri);
+
+    if (!tokenData.refresh_token) {
+      return err(res, 'Dropbox no ha devuelto permiso de renovación. Desconecta el acceso de esta app en dropbox.com/account/connected_apps y vuelve a intentarlo.', 400);
+    }
+
+    // Identifica la cuenta conectada (solo para mostrarla en Configuración).
+    let email: string | null = null;
+    try {
+      const accountRes = await fetch('https://api.dropboxapi.com/2/users/get_current_account', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tokenData.access_token}` },
+      });
+      const account: any = await accountRes.json().catch(() => ({}));
+      email = account?.email || null;
+    } catch { /* no bloquea la conexión si falla solo esto */ }
+
+    const tokenExpiry = new Date(Date.now() + (tokenData.expires_in || 14400) * 1000);
+    await pool.query(
+      `UPDATE organizaciones
+         SET dropbox_access_token_enc = $1,
+             dropbox_refresh_token_enc = $2,
+             dropbox_token_expiry = $3,
+             dropbox_email = $4,
+             dropbox_account_id = $5,
+             updated_at = NOW()
+       WHERE id = $6`,
+      [encryptPassword(tokenData.access_token), encryptPassword(tokenData.refresh_token), tokenExpiry, email, tokenData.account_id || null, ctx.organizacionId],
+    );
+    return ok(res, { connected: true, email });
+  } catch (e: any) {
+    return err(res, pgErr(e));
+  }
+}
+
+// DELETE /api/organizacion/dropbox -- desconecta Dropbox (propietario/admin).
+export async function disconnectDropbox(req: Request, res: Response) {
+  try {
+    const ctx = requireOrgContext(req, res);
+    if (!ctx) return;
+    if (ctx.organizacionRol !== 'propietario' && ctx.organizacionRol !== 'admin') {
+      return err(res, 'Solo el propietario o un administrador pueden desconectar Dropbox.', 403);
+    }
+    await pool.query(
+      `UPDATE organizaciones
+         SET dropbox_access_token_enc = NULL,
+             dropbox_refresh_token_enc = NULL,
+             dropbox_token_expiry = NULL,
+             dropbox_email = NULL,
+             dropbox_account_id = NULL,
              updated_at = NOW()
        WHERE id = $1`,
       [ctx.organizacionId],

@@ -26,6 +26,8 @@ export interface OrganizacionInfo {
   googleDriveEmail?: string | null;
   googleDriveHasError?: boolean;
   googleDriveErrorMessage?: string | null;
+  dropboxConnected?: boolean;
+  dropboxEmail?: string | null;
 }
 
 export interface OrganizacionMembership extends OrganizacionInfo {

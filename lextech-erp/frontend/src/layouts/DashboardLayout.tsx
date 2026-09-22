@@ -2399,6 +2399,8 @@ export default function DashboardLayout() {
               driveEmail={organizacion.googleDriveEmail}
               driveHasError={!!organizacion.googleDriveHasError}
               driveErrorMessage={organizacion.googleDriveErrorMessage}
+              dropboxConnected={!!organizacion.dropboxConnected}
+              dropboxEmail={organizacion.dropboxEmail}
               canConnect={orgRolMain === "propietario" || orgRolMain === "admin"}
             />
           )}

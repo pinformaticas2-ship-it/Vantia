@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
 import { Cloud, Check, X, ExternalLink, Settings, Link2, Unlink } from "lucide-react";
 import { startGoogleDriveConnect } from "../lib/googleDriveConnect";
+import { startDropboxConnect } from "../lib/dropboxConnect";
 import { apiFetch } from "../lib/api";
 
 export function DriveLogo({ size = 20 }: { size?: number }) {
@@ -27,8 +28,8 @@ export function DropboxLogo({ size = 20 }: { size?: number }) {
 }
 
 // Estado de las nubes vinculadas en la barra superior: con tick verde si está
-// vinculada, y en gris con una raya si no. OneDrive y Dropbox aún no son
-// funcionales, así que siempre aparecen como no vinculados.
+// vinculada, y en gris con una raya si no. OneDrive aún no es funcional (fijo
+// como no vinculado); Dropbox sí (fase 1: solo vinculación de cuenta).
 function StatusIcon({ children, connected, hasError, title, onClick }: {
   children: React.ReactNode; connected: boolean; hasError?: boolean; title: string; onClick?: () => void;
 }) {
@@ -75,8 +76,10 @@ function MenuItem({ icon, label, onClick, danger, disabled }: {
   );
 }
 
-export default function StorageStatusIcons({ driveConnected, driveEmail, driveHasError, driveErrorMessage, canConnect }: {
-  driveConnected: boolean; driveEmail?: string | null; driveHasError?: boolean; driveErrorMessage?: string | null; canConnect: boolean;
+export default function StorageStatusIcons({ driveConnected, driveEmail, driveHasError, driveErrorMessage, dropboxConnected, dropboxEmail, canConnect }: {
+  driveConnected: boolean; driveEmail?: string | null; driveHasError?: boolean; driveErrorMessage?: string | null;
+  dropboxConnected?: boolean; dropboxEmail?: string | null;
+  canConnect: boolean;
 }) {
   const { getToken } = useAuth();
   const navigate = useNavigate();
@@ -112,6 +115,24 @@ export default function StorageStatusIcons({ driveConnected, driveEmail, driveHa
     }
   };
 
+  const connectDbx = () => {
+    if (busy) return;
+    setError("");
+    startDropboxConnect({ getToken, onError: setError, onBusy: setBusy, onConnected: () => window.location.reload() });
+  };
+
+  const disconnectDbx = async () => {
+    setBusy(true); setError("");
+    try {
+      const data = await apiFetch("/api/organizacion/dropbox", { method: "DELETE", getToken });
+      if (data?.success === false) throw new Error(data.error);
+      window.location.reload();
+    } catch (e: any) {
+      setError(e.message || "No se pudo desconectar Dropbox");
+      setBusy(false);
+    }
+  };
+
   const panel = "absolute right-0 top-full z-50 mt-1 w-64 overflow-hidden rounded-xl border border-slate-200 bg-white py-1.5 shadow-2xl";
   const header = (name: string, status: string, ok: boolean) => (
     <div className="border-b border-slate-100 px-4 pb-2.5 pt-1.5">
@@ -133,7 +154,7 @@ export default function StorageStatusIcons({ driveConnected, driveEmail, driveHa
       <StatusIcon connected={false} title="OneDrive no vinculado (próximamente)" onClick={() => toggle("onedrive")}>
         <Cloud size={20} className="text-[#0364B8]" fill="currentColor" />
       </StatusIcon>
-      <StatusIcon connected={false} title="Dropbox no vinculado (próximamente)" onClick={() => toggle("dropbox")}>
+      <StatusIcon connected={!!dropboxConnected} title={dropboxConnected ? "Dropbox vinculado" : "Dropbox no vinculado"} onClick={() => toggle("dropbox")}>
         <DropboxLogo />
       </StatusIcon>
 
@@ -162,11 +183,31 @@ export default function StorageStatusIcons({ driveConnected, driveEmail, driveHa
           {error && <p className="px-4 py-2 text-xs text-red-600">{error}</p>}
         </div>
       )}
-      {(open === "onedrive" || open === "dropbox") && (
+      {open === "onedrive" && (
         <div className={panel}>
-          {header(open === "onedrive" ? "OneDrive" : "Dropbox", "No vinculado · Próximamente", false)}
+          {header("OneDrive", "No vinculado · Próximamente", false)}
           <p className="px-4 py-2.5 text-xs text-slate-500">Esta conexión aún no está disponible.</p>
           <MenuItem icon={<Settings size={14} />} label="Ir a Integraciones" onClick={goIntegraciones} />
+        </div>
+      )}
+      {open === "dropbox" && (
+        <div className={panel}>
+          {header("Dropbox", dropboxConnected ? `Vinculado${dropboxEmail ? ` · ${dropboxEmail}` : ""}` : "No vinculado", !!dropboxConnected)}
+          {dropboxConnected ? (
+            <>
+              <MenuItem icon={<ExternalLink size={14} />} label="Abrir Dropbox" onClick={() => { window.open("https://www.dropbox.com/home", "_blank", "noopener"); setOpen(null); }} />
+              <MenuItem icon={<Settings size={14} />} label="Gestionar en Integraciones" onClick={goIntegraciones} />
+              {canConnect && <MenuItem icon={<Unlink size={14} />} label={busy ? "Desconectando…" : "Desconectar"} onClick={disconnectDbx} danger disabled={busy} />}
+            </>
+          ) : (
+            <>
+              {canConnect
+                ? <MenuItem icon={<Link2 size={14} />} label={busy ? "Vinculando…" : "Vincular Dropbox"} onClick={connectDbx} disabled={busy} />
+                : <p className="px-4 py-2.5 text-xs text-slate-400">Pide al propietario o a un administrador que lo vincule.</p>}
+              <MenuItem icon={<Settings size={14} />} label="Ir a Integraciones" onClick={goIntegraciones} />
+            </>
+          )}
+          {error && <p className="px-4 py-2 text-xs text-red-600">{error}</p>}
         </div>
       )}
     </div>
