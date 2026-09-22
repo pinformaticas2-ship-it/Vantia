@@ -895,19 +895,27 @@ function notificationIcon(kind: UnifiedNotification["kind"]) {
   return "🟢";
 }
 
-function NotificationsPanel({ notifs, loading, onClose, onDismiss, push }: {
+function NotificationsPanel({ notifs, loading, onClose, onDismiss, onDismissAll, push }: {
   notifs: UnifiedNotification[];
   loading: boolean;
   onClose: () => void;
   onDismiss: (id: string) => void;
+  onDismissAll: () => void;
   push: ReturnType<typeof usePushNotifications>;
 }) {
   const [pushJustEnabled, setPushJustEnabled] = useState(false);
   return (
     <div className="absolute right-0 top-14 w-[calc(100vw-1.5rem)] max-w-sm bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden">
-      <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+      <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-2">
         <h3 className="font-bold text-slate-800 text-sm">Notificaciones</h3>
-        <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={14} /></button>
+        <div className="flex items-center gap-3 shrink-0">
+          {notifs.length > 0 && (
+            <button type="button" onClick={onDismissAll} className="flex items-center gap-1 text-[11px] font-semibold text-slate-400 hover:text-slate-600">
+              <CheckCircle2 size={13} /> Marcar todas como leídas
+            </button>
+          )}
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={14} /></button>
+        </div>
       </div>
       {push.canOffer && (
         <button
@@ -933,27 +941,36 @@ function NotificationsPanel({ notifs, loading, onClose, onDismiss, push }: {
         ) : notifs.length === 0 ? (
           <div className="py-8 text-center text-slate-400 text-xs">Sin mensajes pendientes</div>
         ) : notifs.map((n) => (
-          <button
-            key={n.id}
-            type="button"
-            onClick={() => { n.onClick?.(); onDismiss(n.id); onClose(); }}
-            className="w-full flex items-start gap-3 px-4 py-3 hover:bg-slate-50 text-left">
-            <span className="text-base mt-0.5 shrink-0">{notificationIcon(n.kind)}</span>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-slate-700 truncate">{n.title}</p>
-              {n.subtitle && <p className="text-[11px] text-slate-500 truncate">{n.subtitle}</p>}
-              {n.meta && <p className="text-[11px] text-slate-400 truncate mt-0.5">{n.meta}</p>}
-              {/* Para plazos, el "hace X días" ya está en el subtítulo (Vencida hace/Vence en...);
-                  repetirlo aquí con la hora real de creación de la notificación (que es "ahora")
-                  solo contradice al subtítulo -- se omite para ese tipo. */}
-              {n.kind !== "plazo" && <p className="text-[10px] text-slate-400 mt-0.5">{timeAgo(n.created_at)}</p>}
-            </div>
-            {!!n.count && n.count > 1 && (
-              <span className="ml-2 min-w-[20px] h-5 shrink-0 bg-slate-100 text-slate-600 text-[10px] font-bold rounded-full flex items-center justify-center px-1.5">
-                {n.count > 99 ? "99+" : n.count}
-              </span>
-            )}
-          </button>
+          <div key={n.id} className="group relative flex items-start">
+            <button
+              type="button"
+              onClick={() => { n.onClick?.(); onDismiss(n.id); onClose(); }}
+              className="w-full flex items-start gap-3 px-4 py-3 pr-10 hover:bg-slate-50 text-left">
+              <span className="text-base mt-0.5 shrink-0">{notificationIcon(n.kind)}</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-slate-700 truncate">{n.title}</p>
+                {n.subtitle && <p className="text-[11px] text-slate-500 truncate">{n.subtitle}</p>}
+                {n.meta && <p className="text-[11px] text-slate-400 truncate mt-0.5">{n.meta}</p>}
+                {/* Para plazos, el "hace X días" ya está en el subtítulo (Vencida hace/Vence en...);
+                    repetirlo aquí con la hora real de creación de la notificación (que es "ahora")
+                    solo contradice al subtítulo -- se omite para ese tipo. */}
+                {n.kind !== "plazo" && <p className="text-[10px] text-slate-400 mt-0.5">{timeAgo(n.created_at)}</p>}
+              </div>
+              {!!n.count && n.count > 1 && (
+                <span className="ml-2 min-w-[20px] h-5 shrink-0 bg-slate-100 text-slate-600 text-[10px] font-bold rounded-full flex items-center justify-center px-1.5">
+                  {n.count > 99 ? "99+" : n.count}
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              title="Marcar como leído"
+              onClick={(e) => { e.stopPropagation(); onDismiss(n.id); }}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full p-1.5 text-slate-300 opacity-0 transition-opacity hover:bg-emerald-50 hover:text-emerald-600 group-hover:opacity-100"
+            >
+              <Check size={13} />
+            </button>
+          </div>
         ))}
       </div>
     </div>
@@ -2050,6 +2067,13 @@ export default function DashboardLayout() {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
   }, []);
 
+  const dismissAllNotifications = useCallback(() => {
+    setNotifications((prev) => {
+      for (const n of prev) dismissedNotifIdsRef.current.add(n.id);
+      return [];
+    });
+  }, []);
+
   useEffect(() => {
     let interval: number | null = null;
 
@@ -2261,6 +2285,7 @@ export default function DashboardLayout() {
                 loading={notifLoading}
                 onClose={() => setIsNotifOpen(false)}
                 onDismiss={dismissNotification}
+                onDismissAll={dismissAllNotifications}
                 push={pushNotifications}
               />
             )}
