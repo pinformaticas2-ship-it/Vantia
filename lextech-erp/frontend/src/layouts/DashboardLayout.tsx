@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useCallback, useMemo, createContext, useContext } from "react";
+﻿import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, createContext, useContext } from "react";
 
 export const SidebarContext = createContext({ isCollapsed: false });
 export function useSidebar() { return useContext(SidebarContext); }
@@ -1299,11 +1299,36 @@ const ORG_ROL_LABEL: Record<string, string> = { propietario: "Propietario", admi
 // sin ensanchar la barra lateral. Al pasar el ratón, si el contenido no cabe
 // en su hueco, se desliza hasta mostrar el final y vuelve a su sitio al
 // quitar el ratón. Si cabe entero, no hace nada (no hay overflow que medir).
+// Máscara de difuminado en el borde derecho: sin esto, un texto truncado
+// (p.ej. "2 orga...") se cortaba en seco a media palabra, como si estuviera
+// roto. Se calcula si de verdad hay overflow (no solo al pasar el ratón,
+// también al montar y si cambia de tamaño) para no difuminar innecesariamente
+// un texto que ya cabe entero.
+const FADE_MASK = "linear-gradient(to right, black calc(100% - 14px), transparent)";
+
 function HoverScrollText({ children, className }: { children: React.ReactNode; className?: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLSpanElement>(null);
   const [offset, setOffset] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [hasOverflow, setHasOverflow] = useState(false);
+
+  const checkOverflow = useCallback(() => {
+    const container = containerRef.current;
+    const inner = innerRef.current;
+    if (!container || !inner) return;
+    setHasOverflow(inner.scrollWidth - container.clientWidth > 1);
+  }, []);
+
+  useLayoutEffect(() => {
+    checkOverflow();
+    const container = containerRef.current;
+    if (!container || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(checkOverflow);
+    ro.observe(container);
+    return () => ro.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkOverflow, children]);
 
   const handleEnter = () => {
     const container = containerRef.current;
@@ -1317,7 +1342,13 @@ function HoverScrollText({ children, className }: { children: React.ReactNode; c
   const handleLeave = () => setOffset(0);
 
   return (
-    <div ref={containerRef} className="min-w-0 overflow-hidden" onMouseEnter={handleEnter} onMouseLeave={handleLeave}>
+    <div
+      ref={containerRef}
+      className="min-w-0 overflow-hidden"
+      style={hasOverflow ? { WebkitMaskImage: FADE_MASK, maskImage: FADE_MASK } : undefined}
+      onMouseEnter={handleEnter}
+      onMouseLeave={handleLeave}
+    >
       <span
         ref={innerRef}
         className={`inline-flex items-center whitespace-nowrap will-change-transform ${className || ""}`}
@@ -1589,7 +1620,7 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
                     </span>
                   )}
                   {orgRol && orgRol !== 'miembro' && organizaciones.length > 1 && <span className="text-slate-700">·</span>}
-                  {organizaciones.length > 1 ? `${organizaciones.length} organizaciones` : "Despacho"}
+                  {organizaciones.length > 1 ? `${organizaciones.length} despachos` : "Despacho"}
                 </HoverScrollText>
               </div>
               {organizaciones.length > 1 && (
