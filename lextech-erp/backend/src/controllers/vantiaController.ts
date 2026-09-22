@@ -6,6 +6,13 @@ import { logActivityForReq } from './activityController';
 const GEMINI_MODEL   = 'gemini-2.5-flash';
 const MAX_TOOL_ROUNDS = 5;
 
+// Límites públicos conocidos de la cuenta gratuita de Gemini (Google los
+// puede cambiar sin avisar -- se muestran como referencia, no como dato
+// verificado en vivo, porque la API no expone un endpoint de cuota).
+const GEMINI_FREE_TIER_LIMITS: Record<string, { rpm: number; tpm: number; rpd: number }> = {
+  'gemini-2.5-flash': { rpm: 10, tpm: 250_000, rpd: 250 },
+};
+
 // Modelos que el selector del frontend puede pedir de verdad (el resto de
 // opciones que ofrece el selector -- ChatGPT, Claude, Vincent AI, y también
 // Gemini Pro -- son opciones de cara al usuario sin backend funcional
@@ -29,7 +36,7 @@ CÓMO DEBES COMPORTARTE:
 - Si te preguntan algo de conocimiento general, cultura, ciencia, historia, tecnología, o cualquier tema → responde directamente y en profundidad, sin buscar en la base de datos.
 - Si te preguntan por redacción (contratos, escritos, demandas, emails, cartas, informes) → redacta directamente con calidad profesional.
 - Si te preguntan por datos REALES del despacho (clientes concretos, expedientes activos, facturas, tareas) → usa las herramientas para obtener datos reales. Nunca inventes nombres, cifras ni referencias.
-- Puedes gestionar documentos de expedientes: borrarlos, renombrarlos o moverlos a otro expediente (incluidos los que viven en Google Drive). Para eso usa preparar_borrado_archivo / preparar_renombrado_archivo / preparar_movimiento_archivo. IMPORTANTE: esas herramientas NUNCA ejecutan la acción, solo la dejan preparada — al usuario se le muestra una tarjeta con botones "Confirmar"/"Cancelar" para decidir. Esa tarjeta YA ES la confirmación: en cuanto sepas exactamente qué archivo, qué expediente y (si aplica) qué nombre nuevo o expediente destino, LLAMA A LA HERRAMIENTA EN ESE MISMO TURNO. NUNCA preguntes antes en el chat "¿quieres que lo haga?", "¿te parece bien?" o similar y esperes a que el usuario responda "sí"/"vale" — eso duplica la confirmación (la del chat y la de la tarjeta) y además esta conversación NO conserva qué archivo exacto habíais hablado de un turno a otro, así que un "vale" suelto en el siguiente mensaje no tiene con qué actuar y falla. Si el usuario pide algo (p.ej. "sugiéreme un nombre y cámbialo", "bórralo", "muévelo a...") con intención ya clara, actúa directamente: llama a la herramienta ya. Solo pregunta antes en texto si de verdad falta un dato imprescindible (qué archivo si hay varios, a qué expediente moverlo). Tras usar la herramienta, dile al usuario que confirme en la tarjeta; NUNCA digas que ya está borrado/renombrado/movido, porque todavía no lo está.
+- Puedes gestionar documentos de expedientes (borrarlos, renombrarlos, moverlos a otro expediente, incluidos los que viven en Google Drive), cambiar la descripción de un expediente, y crear notas internas sobre un cliente. Para eso usa preparar_borrado_archivo / preparar_renombrado_archivo / preparar_movimiento_archivo / preparar_actualizar_descripcion_expediente / preparar_crear_nota. También puedes buscar correos del usuario con buscar_correos (esta sí es de solo lectura, no necesita confirmación). IMPORTANTE: las herramientas "preparar_..." NUNCA ejecutan la acción, solo la dejan preparada — al usuario se le muestra una tarjeta con botones "Confirmar"/"Cancelar" para decidir. Esa tarjeta YA ES la confirmación: en cuanto sepas exactamente qué hay que hacer (archivo/expediente/cliente y el dato nuevo que corresponda), LLAMA A LA HERRAMIENTA EN ESE MISMO TURNO. NUNCA preguntes antes en el chat "¿quieres que lo haga?", "¿te parece bien?" o similar y esperes a que el usuario responda "sí"/"vale" — eso duplica la confirmación (la del chat y la de la tarjeta) y además esta conversación NO conserva qué archivo/expediente exacto habíais hablado de un turno a otro, así que un "vale" suelto en el siguiente mensaje no tiene con qué actuar y falla. Si el usuario pide algo con intención ya clara (p.ej. "sugiéreme un nombre y cámbialo", "bórralo", "apunta una nota diciendo...", "cambia la descripción a..."), actúa directamente: llama a la herramienta ya. Solo pregunta antes en texto si de verdad falta un dato imprescindible (qué archivo si hay varios, de qué cliente). Tras usar una herramienta "preparar_...", dile al usuario que confirme en la tarjeta; NUNCA digas que ya está hecho, porque todavía no lo está.
 - Si ya tienes en el contexto datos de la entidad en pantalla → úsalos directamente sin volver a buscarlos.
 - Nunca muestres JSON en bruto. Convierte siempre los resultados en texto natural y bien formateado.
 - Puedes razonar, debatir, opinar (con matices), calcular, traducir, resumir, corregir, mejorar textos, generar ideas, hacer listas, comparar opciones, explicar paso a paso, y mucho más.
@@ -393,6 +400,44 @@ const TOOLS = [{
         required: ['expediente_id', 'archivo', 'expediente_destino'],
       },
     },
+    {
+      name: 'preparar_actualizar_descripcion_expediente',
+      description: 'Prepara cambiar la descripción de un expediente. NO la cambia: deja la acción pendiente de que el usuario la confirme en una tarjeta que se le muestra en el chat.',
+      parameters: {
+        type: 'object',
+        properties: {
+          expediente_id:     { type: 'string', description: 'UUID del expediente' },
+          nueva_descripcion: { type: 'string', description: 'Nueva descripción del expediente' },
+        },
+        required: ['expediente_id', 'nueva_descripcion'],
+      },
+    },
+    {
+      name: 'preparar_crear_nota',
+      description: 'Prepara crear una nota interna sobre un cliente. NO la crea: deja la acción pendiente de que el usuario la confirme en una tarjeta que se le muestra en el chat.',
+      parameters: {
+        type: 'object',
+        properties: {
+          cliente_id: { type: 'string', description: 'UUID del cliente sobre el que va la nota' },
+          contenido:  { type: 'string', description: 'Contenido de la nota' },
+          categoria:  { type: 'string', description: 'general | urgente | seguimiento | recordatorio | comercial | legal | otro (por defecto general)' },
+        },
+        required: ['cliente_id', 'contenido'],
+      },
+    },
+    {
+      name: 'buscar_correos',
+      description: 'Busca correos del usuario (bandeja conectada) por texto libre (asunto, remitente o fragmento) y/o filtrando por cliente o expediente. Solo lectura.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query:         { type: 'string',  description: 'Texto a buscar en asunto, remitente o fragmento del correo' },
+          cliente_id:    { type: 'string',  description: 'UUID del cliente para ver sus correos vinculados' },
+          expediente_id: { type: 'string',  description: 'UUID del expediente para ver sus correos vinculados' },
+          limit:         { type: 'integer', description: 'Máximo resultados (por defecto 8)' },
+        },
+      },
+    },
   ],
 }];
 
@@ -415,6 +460,9 @@ const TOOL_LABELS: Record<string, string> = {
   preparar_borrado_archivo:      'Preparando el borrado del archivo…',
   preparar_renombrado_archivo:   'Preparando el renombrado del archivo…',
   preparar_movimiento_archivo:   'Preparando el movimiento del archivo…',
+  preparar_actualizar_descripcion_expediente: 'Preparando el cambio de descripción…',
+  preparar_crear_nota:           'Preparando la nueva nota…',
+  buscar_correos:                'Buscando correos…',
 };
 
 // ── Gestión de archivos desde el chat: SOLO propone, nunca ejecuta ──────────
@@ -752,7 +800,7 @@ async function callTool(name: string, args: Record<string, any>, userId: string,
         );
         return {
           accion_pendiente: true, token: pending.rows[0].id, tipo: 'delete',
-          archivo: nombre, expediente: resolved.label,
+          titulo: `Borrar "${nombre}"`, detalle: `Expediente ${resolved.label}`,
           mensaje: 'Acción preparada: dile al usuario que confirme el borrado en la tarjeta que se le ha mostrado. Todavía NO está borrado.',
         };
       }
@@ -777,7 +825,7 @@ async function callTool(name: string, args: Record<string, any>, userId: string,
         );
         return {
           accion_pendiente: true, token: pending.rows[0].id, tipo: 'rename',
-          archivo: nombreActual, nuevo_nombre: nuevoNombre, expediente: resolved.label,
+          titulo: `Renombrar "${nombreActual}" → "${nuevoNombre}"`, detalle: `Expediente ${resolved.label}`,
           mensaje: 'Acción preparada: dile al usuario que confirme el renombrado en la tarjeta que se le ha mostrado. Todavía NO está renombrado.',
         };
       }
@@ -812,9 +860,70 @@ async function callTool(name: string, args: Record<string, any>, userId: string,
         );
         return {
           accion_pendiente: true, token: pending.rows[0].id, tipo: 'move',
-          archivo: nombre, expediente_origen: resolved.label, expediente_destino: targetLabel,
+          titulo: `Mover "${nombre}"`, detalle: `De ${resolved.label} a ${targetLabel}`,
           mensaje: 'Acción preparada: dile al usuario que confirme el movimiento en la tarjeta que se le ha mostrado. Todavía NO se ha movido.',
         };
+      }
+
+      case 'preparar_actualizar_descripcion_expediente': {
+        const expedienteId = String(args.expediente_id || '');
+        const nuevaDescripcion = String(args.nueva_descripcion || '').trim();
+        if (!expedienteId || !nuevaDescripcion) return { error: 'Faltan expediente_id o nueva_descripcion.' };
+        const expRes = await pool.query(`SELECT anio, num_exp, descripcion FROM expedientes WHERE id=$1 AND organizacion_id=$2`, [expedienteId, organizacionId]);
+        if (!expRes.rows.length) return { error: 'No encuentro ese expediente en este despacho.' };
+        const label = expedienteLabel(expRes.rows[0]);
+        const pending = await pool.query(
+          `INSERT INTO vantia_pending_actions (organizacion_id, user_id, tipo, expediente_id, expediente_label, payload)
+           VALUES ($1,$2,'update_expediente',$3,$4,$5::jsonb) RETURNING id`,
+          [organizacionId, userId, expedienteId, label, JSON.stringify({ descripcion: nuevaDescripcion })],
+        );
+        return {
+          accion_pendiente: true, token: pending.rows[0].id, tipo: 'update_expediente',
+          titulo: `Cambiar la descripción del expediente ${label}`, detalle: `Nueva descripción: "${nuevaDescripcion}"`,
+          mensaje: 'Acción preparada: dile al usuario que confirme el cambio en la tarjeta que se le ha mostrado. Todavía NO se ha aplicado.',
+        };
+      }
+
+      case 'preparar_crear_nota': {
+        const clienteId = String(args.cliente_id || '');
+        const contenido = String(args.contenido || '').trim();
+        const categoria = String(args.categoria || 'general');
+        if (!clienteId || !contenido) return { error: 'Faltan cliente_id o contenido.' };
+        const validCats = ['general', 'urgente', 'seguimiento', 'recordatorio', 'comercial', 'legal', 'otro'];
+        const cat = validCats.includes(categoria) ? categoria : 'general';
+        const clienteRes = await pool.query(
+          `SELECT commercial_name, first_name, last_name FROM entities WHERE id=$1 AND organizacion_id=$2`,
+          [clienteId, organizacionId],
+        );
+        if (!clienteRes.rows.length) return { error: 'No encuentro ese cliente en este despacho.' };
+        const c = clienteRes.rows[0];
+        const clienteNombre = c.commercial_name || `${c.first_name || ''} ${c.last_name || ''}`.trim() || 'Cliente';
+        const pending = await pool.query(
+          `INSERT INTO vantia_pending_actions (organizacion_id, user_id, tipo, expediente_id, expediente_label, payload)
+           VALUES ($1,$2,'create_note',$3,$4,$5::jsonb) RETURNING id`,
+          [organizacionId, userId, clienteId, clienteNombre, JSON.stringify({ content: contenido, category: cat })],
+        );
+        return {
+          accion_pendiente: true, token: pending.rows[0].id, tipo: 'create_note',
+          titulo: `Crear nota para ${clienteNombre}`, detalle: contenido,
+          mensaje: 'Acción preparada: dile al usuario que confirme la creación de la nota en la tarjeta que se le ha mostrado. Todavía NO se ha creado.',
+        };
+      }
+
+      case 'buscar_correos': {
+        const q = String(args.query || '').trim();
+        const limit = Math.min(Number(args.limit) || 8, 20);
+        const params: any[] = [userId];
+        let where = 'user_id = $1';
+        if (q) { params.push(`%${q}%`); where += ` AND (subject ILIKE $${params.length} OR snippet ILIKE $${params.length} OR from_name ILIKE $${params.length} OR from_email ILIKE $${params.length})`; }
+        if (args.cliente_id) { params.push(args.cliente_id); where += ` AND cliente_id = $${params.length}`; }
+        if (args.expediente_id) { params.push(args.expediente_id); where += ` AND expediente_id = $${params.length}`; }
+        params.push(limit);
+        const r = await pool.query(
+          `SELECT from_name, from_email, subject, snippet, sent_at, is_read FROM emails WHERE ${where} ORDER BY sent_at DESC NULLS LAST LIMIT $${params.length}`,
+          params,
+        );
+        return { total: r.rowCount, correos: r.rows };
       }
 
       default:
@@ -1153,8 +1262,17 @@ export const chatVantiaStream = async (req: any, res: Response) => {
     let fullReply = '';
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:streamGenerateContent?alt=sse&key=${apiKey}`;
 
+    // Google no da un endpoint de "cuota restante" consultable con una API
+    // key normal -- se lleva la cuenta propia de lo que se gasta en esta
+    // conversación (cada ronda es una llamada real a la API, facturable por
+    // separado) para acumularlo en vantia_usage_daily al terminar.
+    let apiCallsMade = 0;
+    let usagePromptTokens = 0, usageCompletionTokens = 0, usageTotalTokens = 0;
+
     for (let round = 0; round < MAX_TOOL_ROUNDS && !closed; round++) {
       const roundParts: any[] = [];
+      let roundUsage: any = null;
+      apiCallsMade++;
 
       for await (const chunk of geminiStreamChunks(url, {
         contents,
@@ -1162,6 +1280,7 @@ export const chatVantiaStream = async (req: any, res: Response) => {
         generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },
       })) {
         if (closed) break;
+        if (chunk?.usageMetadata) roundUsage = chunk.usageMetadata;
         const parts: any[] = chunk?.candidates?.[0]?.content?.parts || [];
         for (const p of parts) {
           roundParts.push(p);
@@ -1170,6 +1289,11 @@ export const chatVantiaStream = async (req: any, res: Response) => {
             emit({ type: 'text', delta: p.text });
           }
         }
+      }
+      if (roundUsage) {
+        usagePromptTokens     += roundUsage.promptTokenCount || 0;
+        usageCompletionTokens += roundUsage.candidatesTokenCount || 0;
+        usageTotalTokens      += roundUsage.totalTokenCount || 0;
       }
       if (closed) break;
 
@@ -1209,6 +1333,21 @@ export const chatVantiaStream = async (req: any, res: Response) => {
     if (!closed) {
       emit({ type: 'done', reply: fullReply });
       res.end();
+    }
+
+    // Uso de hoy, en segundo plano -- si no se hizo ninguna llamada real no
+    // hay nada que sumar (p.ej. si falló antes de arrancar el bucle).
+    if (apiCallsMade > 0) {
+      pool.query(
+        `INSERT INTO vantia_usage_daily (usage_date, requests, prompt_tokens, completion_tokens, total_tokens)
+         VALUES (CURRENT_DATE, $1, $2, $3, $4)
+         ON CONFLICT (usage_date) DO UPDATE SET
+           requests = vantia_usage_daily.requests + EXCLUDED.requests,
+           prompt_tokens = vantia_usage_daily.prompt_tokens + EXCLUDED.prompt_tokens,
+           completion_tokens = vantia_usage_daily.completion_tokens + EXCLUDED.completion_tokens,
+           total_tokens = vantia_usage_daily.total_tokens + EXCLUDED.total_tokens`,
+        [apiCallsMade, usagePromptTokens, usageCompletionTokens, usageTotalTokens],
+      ).catch(() => {});
     }
 
     // Guardar historial en segundo plano, igual que en /chat
@@ -1288,6 +1427,28 @@ export const confirmVantiaAction = async (req: any, res: Response) => {
       result = await performRenameFile(action.expediente_id, action.file_id, action.payload?.newName || '');
     } else if (action.tipo === 'move') {
       result = await performMoveFile(action.expediente_id, action.file_id, action.payload?.targetExpedienteId);
+    } else if (action.tipo === 'update_expediente') {
+      try {
+        const nuevaDescripcion = action.payload?.descripcion;
+        if (!nuevaDescripcion) throw new Error('Nada que actualizar.');
+        const r = await pool.query(
+          `UPDATE expedientes SET descripcion = $1 WHERE id = $2 AND organizacion_id = $3`,
+          [nuevaDescripcion, action.expediente_id, organizacionId],
+        );
+        result = r.rowCount ? { success: true } : { success: false, error: 'No se encontró el expediente.' };
+      } catch (e: any) {
+        result = { success: false, error: e.message };
+      }
+    } else if (action.tipo === 'create_note') {
+      try {
+        await pool.query(
+          `INSERT INTO notes (client_id, content, category, created_by) VALUES ($1,$2,$3,$4)`,
+          [action.expediente_id, action.payload?.content || '', action.payload?.category || 'general', userId],
+        );
+        result = { success: true };
+      } catch (e: any) {
+        result = { success: false, error: e.message };
+      }
     } else {
       result = { success: false, error: 'Tipo de acción desconocido.' };
     }
@@ -1298,8 +1459,12 @@ export const confirmVantiaAction = async (req: any, res: Response) => {
     );
     if (!result.success) return res.status(500).json({ success: false, error: result.error || 'No se pudo completar la acción.' });
 
-    const verbo = action.tipo === 'delete' ? 'eliminó' : action.tipo === 'rename' ? 'renombró' : 'movió';
-    logActivityForReq(req, `Vantia (chat IA) ${verbo} el archivo "${action.file_name}"`, 'EXPEDIENTE', action.expediente_id);
+    const activityMsg = action.tipo === 'delete' ? `Vantia (chat IA) eliminó el archivo "${action.file_name}"`
+      : action.tipo === 'rename' ? `Vantia (chat IA) renombró el archivo "${action.file_name}"`
+      : action.tipo === 'move' ? `Vantia (chat IA) movió el archivo "${action.file_name}"`
+      : action.tipo === 'update_expediente' ? `Vantia (chat IA) actualizó la descripción del expediente ${action.expediente_label}`
+      : `Vantia (chat IA) creó una nota para ${action.expediente_label}`;
+    logActivityForReq(req, activityMsg, 'EXPEDIENTE', action.expediente_id);
     res.json({ success: true });
   } catch (e: any) {
     res.status(500).json({ success: false, error: e.message || 'No se pudo completar la acción.' });
@@ -1320,6 +1485,33 @@ export const cancelVantiaAction = async (req: any, res: Response) => {
     res.json({ success: true });
   } catch (e: any) {
     res.status(500).json({ success: false, error: e.message || 'No se pudo cancelar.' });
+  }
+};
+
+// ── GET /api/vantia/usage ── lo que se lleva gastado HOY con la API key del
+// despacho (propia cuenta de Vantia; Google no expone un endpoint de cuota
+// restante), más los límites públicos conocidos de la cuenta gratuita, para
+// el menú de propiedades del modelo en el selector del chat.
+export const getVantiaUsage = async (_req: Request, res: Response) => {
+  try {
+    const r = await pool.query(
+      `SELECT requests, prompt_tokens, completion_tokens, total_tokens FROM vantia_usage_daily WHERE usage_date = CURRENT_DATE`,
+    );
+    const row = r.rows[0] || { requests: 0, prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
+    res.json({
+      success: true,
+      data: {
+        date: new Date().toISOString().slice(0, 10),
+        requests: Number(row.requests),
+        promptTokens: Number(row.prompt_tokens),
+        completionTokens: Number(row.completion_tokens),
+        totalTokens: Number(row.total_tokens),
+        resetsNote: 'La cuota gratuita de Google se reinicia a medianoche, hora del Pacífico (EE. UU.) -- unas 08:00-09:00 en España según el horario.',
+        limits: GEMINI_FREE_TIER_LIMITS,
+      },
+    });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e.message });
   }
 };
 

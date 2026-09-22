@@ -1963,6 +1963,37 @@ export async function runMigrations(): Promise<void> {
     try {
       await client.query(`CREATE INDEX IF NOT EXISTS idx_vantia_pending_actions_org_status ON vantia_pending_actions (organizacion_id, status)`);
     } catch (_e: any) {}
+    // Amplía vantia_pending_actions a tipos que no son sobre un archivo
+    // (cambiar la descripción de un expediente, crear una nota) -- file_id/
+    // file_name dejan de ser obligatorios, y el CHECK de tipo se reescribe
+    // para incluir los dos nuevos.
+    try {
+      await client.query(`ALTER TABLE vantia_pending_actions ALTER COLUMN file_id DROP NOT NULL`);
+    } catch (_e: any) {}
+    try {
+      await client.query(`ALTER TABLE vantia_pending_actions ALTER COLUMN file_name DROP NOT NULL`);
+    } catch (_e: any) {}
+    try {
+      await client.query(`ALTER TABLE vantia_pending_actions DROP CONSTRAINT IF EXISTS vantia_pending_actions_tipo_check`);
+    } catch (_e: any) {}
+    try {
+      await client.query(`ALTER TABLE vantia_pending_actions ADD CONSTRAINT vantia_pending_actions_tipo_check CHECK (tipo IN ('delete','rename','move','update_expediente','create_note'))`);
+    } catch (_e: any) {}
+
+    // Uso diario de la API de Gemini -- Google no expone un endpoint de
+    // "cuota restante" consultable con una API key normal, así que Vantia
+    // lleva su propia cuenta (peticiones y tokens de hoy) para poder
+    // enseñarla en el menú de propiedades del modelo. Una fila por día;
+    // la API key es única para todo el despacho, no por organización.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS vantia_usage_daily (
+        usage_date        DATE    PRIMARY KEY,
+        requests          INTEGER NOT NULL DEFAULT 0,
+        prompt_tokens     BIGINT  NOT NULL DEFAULT 0,
+        completion_tokens BIGINT  NOT NULL DEFAULT 0,
+        total_tokens      BIGINT  NOT NULL DEFAULT 0
+      );
+    `);
 
     // ── Chat: presencia real (conectado/ausente/desconectado) ──────
     // Antes el puntito verde de "conectado" era decorativo: en la lista de

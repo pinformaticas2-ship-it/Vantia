@@ -19,6 +19,7 @@ import { getDeviceId, safeJson, waitForClientIp, resolveUploadUrl } from "../lib
 import { useOrganizacion } from "../lib/useOrganizacion";
 import DriveConnectPrompt from "../components/DriveConnectPrompt";
 import StorageStatusIcons from "../components/StorageStatusIcons";
+import { AI_MODELS, MODEL_STORAGE_KEY, pickInitialModel, useVantiaUsageOnDemand, VantiaModelPickerPanel } from "../components/VantiaModelPicker";
 import { useIsMobile } from "../lib/useIsMobile";
 import { useChatUnread } from "../contexts/ChatUnreadContext";
 import { useEmailUnread } from "../contexts/EmailUnreadContext";
@@ -215,37 +216,30 @@ interface ToolEvent { name: string; label: string; done: boolean }
 // expediente) que Vantia deja pendiente de confirmación -- nunca se ejecuta
 // sola. Ver preparar_borrado_archivo / preparar_renombrado_archivo /
 // preparar_movimiento_archivo en el backend.
+// El backend ya manda "titulo"/"detalle" en español listos para pintar --
+// así una herramienta "preparar_..." nueva no necesita ningún cambio aquí,
+// solo dar esos dos campos en su respuesta (ver vantiaController.ts).
 interface ActionProposal {
   token: string;
-  tipo: "delete" | "rename" | "move";
-  archivo: string;
-  nuevo_nombre?: string;
-  expediente?: string;
-  expediente_origen?: string;
-  expediente_destino?: string;
+  tipo: string;
+  titulo: string;
+  detalle: string;
   resolving?: boolean;
   resolved?: "confirmed" | "cancelled" | "error";
   errorMsg?: string;
 }
 
-function actionProposalCopy(a: ActionProposal): { title: string; detail: string } {
-  if (a.tipo === "delete") return { title: `Borrar "${a.archivo}"`, detail: `Expediente ${a.expediente || "—"}` };
-  if (a.tipo === "rename") return { title: `Renombrar "${a.archivo}" → "${a.nuevo_nombre}"`, detail: `Expediente ${a.expediente || "—"}` };
-  return { title: `Mover "${a.archivo}"`, detail: `De ${a.expediente_origen || "—"} a ${a.expediente_destino || "—"}` };
-}
-
 function ActionProposalCard({ proposal, onConfirm, onCancel }: {
   proposal: ActionProposal; onConfirm: () => void; onCancel: () => void;
 }) {
-  const { title, detail } = actionProposalCopy(proposal);
   const boxCls = proposal.resolved === "confirmed" ? "border-emerald-200 bg-emerald-50"
     : proposal.resolved === "cancelled" ? "border-slate-200 bg-slate-50"
     : proposal.resolved === "error" ? "border-red-200 bg-red-50"
     : "border-amber-200 bg-amber-50";
   return (
     <div className={`rounded-xl border p-3 text-[12px] ${boxCls}`}>
-      <p className="font-semibold text-slate-700">{title}</p>
-      <p className="mt-0.5 text-slate-500">{detail}</p>
+      <p className="font-semibold text-slate-700">{proposal.titulo}</p>
+      <p className="mt-0.5 text-slate-500">{proposal.detalle}</p>
       {proposal.resolved === "confirmed" && <p className="mt-1.5 flex items-center gap-1 font-semibold text-emerald-700"><Check size={12} /> Hecho</p>}
       {proposal.resolved === "cancelled" && <p className="mt-1.5 text-slate-400">Cancelado.</p>}
       {proposal.resolved === "error" && <p className="mt-1.5 text-red-600">{proposal.errorMsg || "No se pudo completar."}</p>}
@@ -373,6 +367,28 @@ function VantiaWidget({ pathname, getToken }: { pathname: string; getToken: (opt
   const menuRef = useRef<HTMLDivElement>(null);
   const streamAbortRef = useRef<AbortController | null>(null);
 
+  // Selector de modelo/agente de IA -- mismo panel que la página Chat IA.
+  const [selectedModel, setSelectedModel] = useState<string>(pickInitialModel);
+  const [showModelPicker, setShowModelPicker] = useState(false);
+  const modelPickerRef = useRef<HTMLDivElement>(null);
+  const activeModel = AI_MODELS.find((m) => m.id === selectedModel) || AI_MODELS[0];
+  const modelUsage = useVantiaUsageOnDemand(getToken);
+  const chooseModel = (id: string) => {
+    const opt = AI_MODELS.find((m) => m.id === id);
+    if (!opt || !opt.available) return;
+    setSelectedModel(id);
+    localStorage.setItem(MODEL_STORAGE_KEY, id);
+    setShowModelPicker(false);
+  };
+  useEffect(() => {
+    if (!showModelPicker) return;
+    modelUsage.load();
+    const h = (e: MouseEvent) => { if (modelPickerRef.current && !modelPickerRef.current.contains(e.target as Node)) setShowModelPicker(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showModelPicker]);
+
   useEffect(() => {
     if (open) { setEverOpened(true); setHasUnseenResponse(false); }
   }, [open]);
@@ -390,7 +406,7 @@ function VantiaWidget({ pathname, getToken }: { pathname: string; getToken: (opt
     const res = await fetch("/api/vantia/chat/stream", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ message: text, history: historyForApi, moduleId: pathname }),
+      body: JSON.stringify({ message: text, history: historyForApi, moduleId: pathname, model: selectedModel }),
       signal: controller.signal,
     });
     if (!res.ok || !res.body) {
@@ -675,7 +691,26 @@ function VantiaWidget({ pathname, getToken }: { pathname: string; getToken: (opt
               </div>
               <div>
                 <h2 className="text-sm font-bold text-white leading-tight">Vantia</h2>
-                <p className="text-[11px] text-red-100 font-medium tracking-wide">{getVantiaLabel(pathname)}</p>
+                <div className="relative" ref={modelPickerRef}>
+                  <button
+                    type="button"
+                    onClick={() => setShowModelPicker((v) => !v)}
+                    className="flex items-center gap-1 text-[11px] text-red-100 font-medium tracking-wide hover:text-white transition-colors"
+                  >
+                    {getVantiaLabel(pathname)} · {activeModel.label}
+                    <ChevronDown size={10} className={`transition-transform ${showModelPicker ? "rotate-180" : ""}`} />
+                  </button>
+                  {showModelPicker && (
+                    <div className="absolute left-0 top-6 w-72 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-20 animate-fade-in">
+                      <VantiaModelPickerPanel
+                        selectedModel={selectedModel}
+                        onSelect={chooseModel}
+                        usage={modelUsage.usage}
+                        usageLoading={modelUsage.loading}
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-1">

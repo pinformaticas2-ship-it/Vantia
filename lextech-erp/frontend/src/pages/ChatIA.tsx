@@ -6,6 +6,7 @@ import {
   Check, X, Search, StopCircle, Download, FileText, ChevronDown,
 } from 'lucide-react';
 import { resolveApiUrl, safeJson } from '../lib/api';
+import { AI_MODELS, MODEL_STORAGE_KEY, pickInitialModel, useVantiaUsageOnDemand, VantiaModelPickerPanel } from '../components/VantiaModelPicker';
 
 // ─── Keyframe styles ──────────────────────────────────────────────────────────
 
@@ -67,18 +68,16 @@ interface LinkedExpedienteRef {
   descripcion?: string | null;
 }
 
-// Propuesta de gestión de archivo (borrar/renombrar/mover un documento de
-// expediente) que Vantia deja pendiente de confirmación -- nunca se ejecuta
-// sola. Ver preparar_borrado_archivo / preparar_renombrado_archivo /
-// preparar_movimiento_archivo en el backend.
+// Propuesta de gestión (archivo, expediente, nota...) que Vantia deja
+// pendiente de confirmación -- nunca se ejecuta sola. El backend ya manda
+// "titulo"/"detalle" en español listos para pintar, así una herramienta
+// "preparar_..." nueva no necesita ningún cambio aquí. Ver preparar_* en
+// vantiaController.ts.
 interface ActionProposal {
   token: string;
-  tipo: 'delete' | 'rename' | 'move';
-  archivo: string;
-  nuevo_nombre?: string;
-  expediente?: string;
-  expediente_origen?: string;
-  expediente_destino?: string;
+  tipo: string;
+  titulo: string;
+  detalle: string;
   resolving?: boolean;
   resolved?: 'confirmed' | 'cancelled' | 'error';
   errorMsg?: string;
@@ -89,29 +88,22 @@ interface Message {
   text: string;
   ts: Date;
   toolEvents?: ToolEvent[];       // solo mensajes de Vantia en curso/recién generados
-  actionProposals?: ActionProposal[]; // ídem, acciones de archivo pendientes de confirmar
+  actionProposals?: ActionProposal[]; // ídem, acciones pendientes de confirmar
   attachmentName?: string;        // solo mensajes de usuario con archivo adjunto
   linkedExpediente?: LinkedExpedienteRef; // solo mensajes de usuario con expediente vinculado
-}
-
-function actionProposalCopy(a: ActionProposal): { title: string; detail: string } {
-  if (a.tipo === 'delete') return { title: `Borrar "${a.archivo}"`, detail: `Expediente ${a.expediente || '—'}` };
-  if (a.tipo === 'rename') return { title: `Renombrar "${a.archivo}" → "${a.nuevo_nombre}"`, detail: `Expediente ${a.expediente || '—'}` };
-  return { title: `Mover "${a.archivo}"`, detail: `De ${a.expediente_origen || '—'} a ${a.expediente_destino || '—'}` };
 }
 
 function ActionProposalCard({ proposal, onConfirm, onCancel }: {
   proposal: ActionProposal; onConfirm: () => void; onCancel: () => void;
 }) {
-  const { title, detail } = actionProposalCopy(proposal);
   const boxCls = proposal.resolved === 'confirmed' ? 'border-emerald-200 bg-emerald-50'
     : proposal.resolved === 'cancelled' ? 'border-slate-200 bg-slate-50'
     : proposal.resolved === 'error' ? 'border-red-200 bg-red-50'
     : 'border-amber-200 bg-amber-50';
   return (
     <div className={`rounded-xl border p-3 text-[12px] ${boxCls}`}>
-      <p className="font-semibold text-slate-700">{title}</p>
-      <p className="mt-0.5 text-slate-500">{detail}</p>
+      <p className="font-semibold text-slate-700">{proposal.titulo}</p>
+      <p className="mt-0.5 text-slate-500">{proposal.detalle}</p>
       {proposal.resolved === 'confirmed' && <p className="mt-1.5 flex items-center gap-1 font-semibold text-emerald-700">✓ Hecho</p>}
       {proposal.resolved === 'cancelled' && <p className="mt-1.5 text-slate-400">Cancelado.</p>}
       {proposal.resolved === 'error' && <p className="mt-1.5 text-red-600">{proposal.errorMsg || 'No se pudo completar.'}</p>}
@@ -267,33 +259,6 @@ const PROMPTS = [
   { icon: '🔍', label: 'Jurisprudencia',        text: 'Busca jurisprudencia del TS sobre cláusulas abusivas' },
 ];
 
-// ─── Modelos ──────────────────────────────────────────────────────────────────
-// Solo las variantes de Gemini están conectadas de verdad (misma API, mismo
-// backend, solo cambia el id del modelo). ChatGPT, Claude y Vincent AI (el
-// asistente de vLex) se muestran como opciones del selector a petición del
-// usuario, pero sin backend detrás todavía -- hace falta su API key
-// correspondiente antes de poder activarlas.
-const MODEL_STORAGE_KEY = 'vantia_model_v1';
-
-interface AiModelOption {
-  id: string;
-  label: string;
-  provider: string;
-  desc: string;
-  available: boolean;
-}
-
-const AI_MODELS: AiModelOption[] = [
-  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', provider: 'Google',    desc: 'Rápido, el que usa Vantia hoy',                   available: true },
-  // gemini-2.5-pro ya no existe (Google lo retiró) y su sustituto,
-  // gemini-3.1-pro-preview, necesita un plan de pago -- con la cuenta
-  // gratuita actual da error 429 (cuota 0), comprobado a mano contra la API.
-  { id: 'gemini-2.5-pro',   label: 'Gemini Pro',       provider: 'Google',    desc: 'Necesita plan de pago de Google', available: false },
-  { id: 'chatgpt',          label: 'ChatGPT',          provider: 'OpenAI',    desc: 'Próximamente',                   available: false },
-  { id: 'claude',           label: 'Claude',           provider: 'Anthropic', desc: 'Próximamente',                   available: false },
-  { id: 'vincent',          label: 'Vincent AI',       provider: 'vLex',      desc: 'Próximamente',                   available: false },
-];
-
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function ChatIA() {
@@ -330,21 +295,21 @@ export default function ChatIA() {
   const topMenuRef = useRef<HTMLDivElement>(null);
 
   // Selector de modelo/agente de IA
-  const [selectedModel, setSelectedModel] = useState<string>(() => {
-    const saved = localStorage.getItem(MODEL_STORAGE_KEY);
-    return AI_MODELS.some(m => m.id === saved && m.available) ? saved! : AI_MODELS[0].id;
-  });
+  const [selectedModel, setSelectedModel] = useState<string>(pickInitialModel);
   const [showModelPicker, setShowModelPicker] = useState(false);
   const modelPickerRef = useRef<HTMLDivElement>(null);
   const activeModel = AI_MODELS.find(m => m.id === selectedModel) || AI_MODELS[0];
+  const modelUsage = useVantiaUsageOnDemand(getToken);
 
   useEffect(() => {
     if (!showModelPicker) return;
+    modelUsage.load();
     const onClick = (e: MouseEvent) => {
       if (modelPickerRef.current && !modelPickerRef.current.contains(e.target as Node)) setShowModelPicker(false);
     };
     document.addEventListener('mousedown', onClick);
     return () => document.removeEventListener('mousedown', onClick);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showModelPicker]);
 
   const chooseModel = (id: string) => {
@@ -930,28 +895,13 @@ export default function ChatIA() {
                     <ChevronDown className={`h-2.5 w-2.5 transition-transform ${showModelPicker ? 'rotate-180' : ''}`} />
                   </button>
                   {showModelPicker && (
-                    <div className="cia-fade-up absolute left-0 top-6 w-64 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-30">
-                      <p className="px-3.5 pt-1 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-300">Modelo / agente de IA</p>
-                      {AI_MODELS.map(m => (
-                        <button
-                          key={m.id}
-                          onClick={() => chooseModel(m.id)}
-                          disabled={!m.available}
-                          className={`w-full flex items-center justify-between gap-2 px-3.5 py-2 text-left transition-colors ${
-                            m.id === selectedModel ? 'bg-red-50' : m.available ? 'hover:bg-slate-50' : 'cursor-not-allowed'
-                          }`}
-                        >
-                          <div className="min-w-0">
-                            <p className={`text-xs font-semibold truncate ${m.available ? 'text-slate-700' : 'text-slate-400'}`}>{m.label}</p>
-                            <p className="text-[10px] text-slate-400 truncate">{m.provider} · {m.desc}</p>
-                          </div>
-                          {m.id === selectedModel ? (
-                            <Check className="h-3.5 w-3.5 text-red-600 shrink-0" />
-                          ) : !m.available ? (
-                            <span className="shrink-0 text-[9px] font-bold uppercase tracking-wide text-slate-300 bg-slate-100 rounded-full px-1.5 py-0.5">Próx.</span>
-                          ) : null}
-                        </button>
-                      ))}
+                    <div className="cia-fade-up absolute left-0 top-6 w-72 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-30">
+                      <VantiaModelPickerPanel
+                        selectedModel={selectedModel}
+                        onSelect={chooseModel}
+                        usage={modelUsage.usage}
+                        usageLoading={modelUsage.loading}
+                      />
                     </div>
                   )}
                 </div>
