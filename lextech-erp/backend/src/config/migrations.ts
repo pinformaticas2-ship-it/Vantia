@@ -1939,6 +1939,31 @@ export async function runMigrations(): Promise<void> {
       `);
     } catch (_e: any) {}
 
+    // ── Acciones sobre archivos que Vantia (el chat IA) propone pero NO
+    // ejecuta sola -- borrar/renombrar/mover un documento de un expediente.
+    // El tool-calling de Gemini solo puede crear una fila aquí ('pending');
+    // la mutación real (Drive + BD) solo ocurre si el usuario la confirma
+    // desde el botón de la tarjeta en el chat, contra confirmVantiaAction.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS vantia_pending_actions (
+        id                UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        organizacion_id   UUID         NOT NULL REFERENCES organizaciones(id) ON DELETE CASCADE,
+        user_id           VARCHAR(150) NOT NULL,
+        tipo              VARCHAR(20)  NOT NULL CHECK (tipo IN ('delete','rename','move')),
+        file_id           UUID         NOT NULL,
+        file_name         TEXT         NOT NULL,
+        expediente_id     UUID         NOT NULL,
+        expediente_label  TEXT,
+        payload           JSONB        NOT NULL DEFAULT '{}'::jsonb,
+        status            VARCHAR(20)  NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','confirmed','cancelled','expired')),
+        created_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        resolved_at       TIMESTAMPTZ
+      );
+    `);
+    try {
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_vantia_pending_actions_org_status ON vantia_pending_actions (organizacion_id, status)`);
+    } catch (_e: any) {}
+
     // ── Chat: presencia real (conectado/ausente/desconectado) ──────
     // Antes el puntito verde de "conectado" era decorativo: en la lista de
     // DMs estaba cableado a "disponible" siempre (ni se leía el estado real),

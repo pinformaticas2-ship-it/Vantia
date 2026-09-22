@@ -14,6 +14,7 @@ import {
   updateDriveFileContent,
   renameDriveFile,
   deleteDriveFile,
+  moveDriveFile,
   recordDriveError,
   clearDriveError,
 } from '../utils/googleDrive';
@@ -641,22 +642,20 @@ export const officeBridgePage = async (req: any, res: Response) => {
 // ─────────────────────────────────────────────────────────────
 // DELETE /api/files/:clientId/:fileId  — borrar archivo
 // ─────────────────────────────────────────────────────────────
-export const deleteFile = async (req: any, res: Response) => {
-  const { clientId, fileId } = req.params;
-  const userId = req.auth?.userId || 'SYSTEM';
+// Borra un adjunto (fila + disco local + Drive si aplica). Extraída del
+// handler HTTP para poder reutilizarla también desde Vantia (chat IA), que
+// solo la llama tras confirmación explícita del usuario -- ver
+// vantiaController.ts / vantia_pending_actions.
+export async function performDeleteFile(clientId: string, fileId: string): Promise<{ success: boolean; error?: string; originalName?: string }> {
   try {
     const result = await pool.query(
       `DELETE FROM client_files WHERE id = $1 AND client_id = $2 RETURNING stored_name, original_name, attachment_type, storage_provider, drive_file_id`,
       [fileId, clientId]
     );
-    if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
-    }
+    if (result.rows.length === 0) return { success: false, error: 'Archivo no encontrado.' };
     const { stored_name, original_name, attachment_type, storage_provider, drive_file_id } = result.rows[0];
-    // Borrar del servidor (almacenamiento plano con UUID)
     const filePath = path.join(UPLOADS_ROOT, clientId, stored_name);
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-    // Borrar del directorio local (subcarpeta por tipo)
     const localTypeDir = path.join(LOCAL_CLIENT_FILES_ROOT, clientId, typeFolderName(attachment_type));
     const localFilePath = path.join(localTypeDir, original_name);
     if (fs.existsSync(localFilePath)) { try { fs.unlinkSync(localFilePath); } catch (_) {} }
@@ -664,11 +663,108 @@ export const deleteFile = async (req: any, res: Response) => {
       const ctx = await getExpedienteDriveContext(clientId);
       if (ctx) await deleteDriveFile(ctx.organizacionId, drive_file_id).catch(() => {});
     }
-    logActivityForReq(req, `Archivo eliminado: ${original_name || stored_name}`, 'CLIENT', clientId);
-    res.json({ success: true });
+    return { success: true, originalName: original_name };
   } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+    return { success: false, error: err.message };
   }
+}
+
+// Renombra un adjunto (conserva la extensión). Igual que performDeleteFile,
+// pensada para usarse también desde Vantia.
+export async function performRenameFile(clientId: string, fileId: string, newName: string): Promise<{ success: boolean; error?: string; oldName?: string; newName?: string }> {
+  try {
+    const existing = await pool.query(
+      `SELECT original_name, attachment_type, storage_provider, drive_file_id FROM client_files WHERE id = $1 AND client_id = $2`,
+      [fileId, clientId]
+    );
+    if (!existing.rows.length) return { success: false, error: 'Archivo no encontrado.' };
+    const oldOriginalName = existing.rows[0].original_name as string;
+    const attachType      = existing.rows[0].attachment_type as string | null;
+    const storageProvider = existing.rows[0].storage_provider as string | null;
+    const driveFileId     = existing.rows[0].drive_file_id as string | null;
+
+    const ext = path.extname(oldOriginalName || '');
+    const cleanNew = String(newName || '').trim().replace(/\.[a-zA-Z0-9]{1,6}$/, '') || 'Documento';
+    const newOriginalName = `${cleanNew}${ext}`;
+
+    await pool.query(
+      `UPDATE client_files SET document_name = $1, original_name = $2, updated_at = NOW() WHERE id = $3 AND client_id = $4`,
+      [cleanNew, newOriginalName, fileId, clientId],
+    );
+
+    if (newOriginalName !== oldOriginalName) {
+      moveLocalFile(clientId, oldOriginalName, newOriginalName, attachType, attachType);
+      if (storageProvider === 'drive' && driveFileId) {
+        const ctx = await getExpedienteDriveContext(clientId);
+        if (ctx) {
+          try { await renameDriveFile(ctx.organizacionId, driveFileId, newOriginalName); }
+          catch (driveErr: any) { await recordDriveError(ctx.organizacionId, driveErr); }
+        }
+      }
+    }
+    return { success: true, oldName: oldOriginalName, newName: newOriginalName };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+// Mueve un adjunto de un expediente a otro (cambia su dueño, y su carpeta en
+// Drive si el archivo vive ahí). Los dos expedientes deben ser de la misma
+// organización -- lo comprueba el llamante (Vantia) antes de invocarla.
+export async function performMoveFile(clientId: string, fileId: string, targetExpedienteId: string): Promise<{ success: boolean; error?: string; originalName?: string }> {
+  try {
+    const existing = await pool.query(
+      `SELECT stored_name, original_name, attachment_type, storage_provider, drive_file_id FROM client_files WHERE id = $1 AND client_id = $2`,
+      [fileId, clientId],
+    );
+    if (!existing.rows.length) return { success: false, error: 'Archivo no encontrado.' };
+    const { stored_name, original_name, attachment_type, storage_provider, drive_file_id } = existing.rows[0];
+
+    await pool.query(`UPDATE client_files SET client_id = $1, updated_at = NOW() WHERE id = $2`, [targetExpedienteId, fileId]);
+
+    try {
+      const fromPath = path.join(UPLOADS_ROOT, clientId, stored_name);
+      if (fs.existsSync(fromPath)) {
+        ensureClientDir(targetExpedienteId);
+        fs.renameSync(fromPath, path.join(UPLOADS_ROOT, targetExpedienteId, stored_name));
+      }
+    } catch (_) { /* se recupera de Drive en el próximo acceso si aplica */ }
+
+    try {
+      const fromMirror = path.join(LOCAL_CLIENT_FILES_ROOT, clientId, typeFolderName(attachment_type), original_name);
+      if (fs.existsSync(fromMirror)) {
+        const toDir = ensureLocalClientDir(targetExpedienteId, attachment_type);
+        fs.renameSync(fromMirror, path.join(toDir, original_name));
+      }
+    } catch (_) { /* copia local secundaria -- no crítica */ }
+
+    if (storage_provider === 'drive' && drive_file_id) {
+      const toCtx = await getExpedienteDriveContext(targetExpedienteId);
+      if (toCtx && await isDriveConnected(toCtx.organizacionId)) {
+        try {
+          const oldFolder = (await pool.query(`SELECT google_drive_folder_id FROM expedientes WHERE id = $1`, [clientId])).rows[0];
+          const newFolderId = await ensureExpedienteFolder(toCtx.organizacionId, targetExpedienteId, toCtx.expedienteName);
+          await moveDriveFile(toCtx.organizacionId, drive_file_id, newFolderId, oldFolder?.google_drive_folder_id || undefined);
+        } catch (driveErr: any) {
+          await recordDriveError(toCtx.organizacionId, driveErr);
+        }
+      }
+    }
+
+    return { success: true, originalName: original_name };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export const deleteFile = async (req: any, res: Response) => {
+  const { clientId, fileId } = req.params;
+  const r = await performDeleteFile(clientId, fileId);
+  if (!r.success) {
+    return res.status(r.error === 'Archivo no encontrado.' ? 404 : 500).json({ success: false, error: r.error });
+  }
+  logActivityForReq(req, `Archivo eliminado: ${r.originalName}`, 'CLIENT', clientId);
+  res.json({ success: true });
 };
 
 // ─────────────────────────────────────────────────────────────

@@ -1,5 +1,7 @@
 import { Response, Request } from 'express';
 import pool from '../config/database';
+import { performDeleteFile, performRenameFile, performMoveFile } from './filesController';
+import { logActivityForReq } from './activityController';
 
 const GEMINI_MODEL   = 'gemini-2.5-flash';
 const MAX_TOOL_ROUNDS = 5;
@@ -27,6 +29,7 @@ CÓMO DEBES COMPORTARTE:
 - Si te preguntan algo de conocimiento general, cultura, ciencia, historia, tecnología, o cualquier tema → responde directamente y en profundidad, sin buscar en la base de datos.
 - Si te preguntan por redacción (contratos, escritos, demandas, emails, cartas, informes) → redacta directamente con calidad profesional.
 - Si te preguntan por datos REALES del despacho (clientes concretos, expedientes activos, facturas, tareas) → usa las herramientas para obtener datos reales. Nunca inventes nombres, cifras ni referencias.
+- Puedes gestionar documentos de expedientes: borrarlos, renombrarlos o moverlos a otro expediente (incluidos los que viven en Google Drive). Para eso usa preparar_borrado_archivo / preparar_renombrado_archivo / preparar_movimiento_archivo. IMPORTANTE: esas herramientas NUNCA ejecutan la acción, solo la dejan preparada — al usuario se le muestra una tarjeta para confirmarla o cancelarla. Tras usarlas, dile al usuario que confirme en esa tarjeta; NUNCA digas que ya está borrado/renombrado/movido, porque todavía no lo está. Si hay varias coincidencias, pide que precise cuál antes de volver a intentarlo.
 - Si ya tienes en el contexto datos de la entidad en pantalla → úsalos directamente sin volver a buscarlos.
 - Nunca muestres JSON en bruto. Convierte siempre los resultados en texto natural y bien formateado.
 - Puedes razonar, debatir, opinar (con matices), calcular, traducir, resumir, corregir, mejorar textos, generar ideas, hacer listas, comparar opciones, explicar paso a paso, y mucho más.
@@ -352,6 +355,44 @@ const TOOLS = [{
         required: ['expediente_id'],
       },
     },
+    {
+      name: 'preparar_borrado_archivo',
+      description: 'Prepara el borrado de un documento de un expediente. NO lo borra: deja la acción pendiente de que el usuario la confirme en una tarjeta que se le muestra en el chat. Úsala solo cuando el usuario pida explícitamente borrar/eliminar un archivo concreto.',
+      parameters: {
+        type: 'object',
+        properties: {
+          expediente_id: { type: 'string', description: 'UUID del expediente que contiene el archivo' },
+          archivo:       { type: 'string', description: 'Nombre (o parte del nombre) del archivo a borrar' },
+        },
+        required: ['expediente_id', 'archivo'],
+      },
+    },
+    {
+      name: 'preparar_renombrado_archivo',
+      description: 'Prepara el renombrado de un documento de un expediente. NO lo renombra: deja la acción pendiente de que el usuario la confirme en una tarjeta que se le muestra en el chat.',
+      parameters: {
+        type: 'object',
+        properties: {
+          expediente_id: { type: 'string', description: 'UUID del expediente que contiene el archivo' },
+          archivo:       { type: 'string', description: 'Nombre (o parte del nombre) del archivo a renombrar' },
+          nuevo_nombre:  { type: 'string', description: 'Nuevo nombre para el archivo (sin extensión, se conserva la original)' },
+        },
+        required: ['expediente_id', 'archivo', 'nuevo_nombre'],
+      },
+    },
+    {
+      name: 'preparar_movimiento_archivo',
+      description: 'Prepara mover un documento desde un expediente a otro (deben ser expedientes distintos, del mismo despacho). NO lo mueve: deja la acción pendiente de que el usuario la confirme en una tarjeta que se le muestra en el chat.',
+      parameters: {
+        type: 'object',
+        properties: {
+          expediente_id:      { type: 'string', description: 'UUID del expediente de origen (donde está ahora el archivo)' },
+          archivo:            { type: 'string', description: 'Nombre (o parte del nombre) del archivo a mover' },
+          expediente_destino: { type: 'string', description: 'Expediente al que moverlo: su UUID si se conoce, o texto para buscarlo (p.ej. "2026/14" o parte de la descripción)' },
+        },
+        required: ['expediente_id', 'archivo', 'expediente_destino'],
+      },
+    },
   ],
 }];
 
@@ -371,7 +412,59 @@ const TOOL_LABELS: Record<string, string> = {
   buscar_notas:           'Buscando notas…',
   tareas_expediente:      'Consultando tareas del expediente…',
   archivos_expediente:    'Consultando archivos del expediente…',
+  preparar_borrado_archivo:      'Preparando el borrado del archivo…',
+  preparar_renombrado_archivo:   'Preparando el renombrado del archivo…',
+  preparar_movimiento_archivo:   'Preparando el movimiento del archivo…',
 };
+
+// ── Gestión de archivos desde el chat: SOLO propone, nunca ejecuta ──────────
+// Estas tres herramientas nunca tocan un archivo real. Buscan el expediente y
+// el archivo (siempre acotado a la organización activa), y si hay una única
+// coincidencia crean una fila 'pending' en vantia_pending_actions con lo que
+// se HARÍA. La mutación real solo ocurre en confirmVantiaAction, cuando el
+// usuario pulsa "Confirmar" en la tarjeta que le muestra el chat.
+async function resolveExpedienteAndFile(organizacionId: string, expedienteId: string, query: string) {
+  const expRes = await pool.query(
+    `SELECT anio, num_exp, descripcion FROM expedientes WHERE id = $1 AND organizacion_id = $2`,
+    [expedienteId, organizacionId],
+  );
+  if (!expRes.rows.length) return { error: 'No encuentro ese expediente en este despacho.' };
+  const exp = expRes.rows[0];
+  const label = `${exp.anio}/${exp.num_exp}${exp.descripcion ? ' - ' + exp.descripcion : ''}`;
+
+  const filesRes = await pool.query(
+    `SELECT id, original_name, document_name FROM client_files
+     WHERE client_id = $1 AND (original_name ILIKE $2 OR document_name ILIKE $2)
+     ORDER BY created_at DESC LIMIT 10`,
+    [expedienteId, `%${query}%`],
+  );
+  return { label, files: filesRes.rows as { id: string; original_name: string; document_name: string | null }[] };
+}
+
+async function resolveExpedienteByText(organizacionId: string, text: string) {
+  const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (uuidRe.test(text.trim())) {
+    const r = await pool.query(
+      `SELECT id, anio, num_exp, descripcion FROM expedientes WHERE id = $1 AND organizacion_id = $2`,
+      [text.trim(), organizacionId],
+    );
+    return r.rows;
+  }
+  const r = await pool.query(
+    `SELECT id, anio, num_exp, descripcion FROM expedientes
+     WHERE organizacion_id = $1 AND (descripcion ILIKE $2 OR (anio::text || '/' || num_exp::text) ILIKE $2)
+     ORDER BY created_at DESC LIMIT 10`,
+    [organizacionId, `%${text}%`],
+  );
+  return r.rows;
+}
+
+function expedienteLabel(e: { anio: number; num_exp: number; descripcion?: string | null }) {
+  return `${e.anio}/${e.num_exp}${e.descripcion ? ' - ' + e.descripcion : ''}`;
+}
+
+const AMBIGUOUS_FILE_MSG = 'Hay varios archivos que coinciden con ese nombre en el expediente. Pide al usuario que precise cuál (nombre más completo, o cuál de la lista) y vuelve a intentarlo.';
+const AMBIGUOUS_EXP_MSG  = 'Hay varios expedientes que coinciden con ese destino. Pide al usuario que precise cuál (número de expediente o más detalle) y vuelve a intentarlo.';
 
 // ── Dispatcher de herramientas ────────────────────────────────────────────────
 async function callTool(name: string, args: Record<string, any>, userId: string, organizacionId: string): Promise<object> {
@@ -628,11 +721,100 @@ async function callTool(name: string, args: Record<string, any>, userId: string,
       }
 
       case 'archivos_expediente': {
+        // El expediente tiene que ser de esta organización -- sin este filtro,
+        // pedir el UUID de un expediente de OTRO despacho devolvía igualmente
+        // sus nombres de archivo.
+        const expCheck = await pool.query(`SELECT 1 FROM expedientes WHERE id=$1 AND organizacion_id=$2`, [args.expediente_id, organizacionId]);
+        if (!expCheck.rows.length) return { error: 'No encuentro ese expediente en este despacho.' };
         const r = await pool.query(`
-          SELECT original_name, document_name, category, size_bytes, created_at
+          SELECT id, original_name, document_name, category, size_bytes, storage_provider, created_at
           FROM client_files WHERE client_id=$1 ORDER BY created_at DESC LIMIT 30
         `, [args.expediente_id]);
-        return { total: r.rowCount, archivos: r.rows.map(f => ({ nombre: f.document_name || f.original_name, categoria: f.category, tamano_kb: f.size_bytes ? Math.round(f.size_bytes / 1024) : null, fecha: f.created_at })) };
+        return { total: r.rowCount, archivos: r.rows.map(f => ({ id: f.id, nombre: f.document_name || f.original_name, categoria: f.category, tamano_kb: f.size_bytes ? Math.round(f.size_bytes / 1024) : null, en_drive: f.storage_provider === 'drive', fecha: f.created_at })) };
+      }
+
+      case 'preparar_borrado_archivo': {
+        const expedienteId = String(args.expediente_id || '');
+        const query = String(args.archivo || '');
+        if (!expedienteId || !query) return { error: 'Faltan expediente_id o archivo.' };
+        const resolved = await resolveExpedienteAndFile(organizacionId, expedienteId, query);
+        if ('error' in resolved) return resolved;
+        if (resolved.files.length === 0) return { error: `No encuentro ningún archivo que coincida con "${query}" en ese expediente.` };
+        if (resolved.files.length > 1) {
+          return { ambiguo: true, coincidencias: resolved.files.map(f => ({ id: f.id, nombre: f.document_name || f.original_name })), mensaje: AMBIGUOUS_FILE_MSG };
+        }
+        const file = resolved.files[0];
+        const nombre = file.document_name || file.original_name;
+        const pending = await pool.query(
+          `INSERT INTO vantia_pending_actions (organizacion_id, user_id, tipo, file_id, file_name, expediente_id, expediente_label)
+           VALUES ($1,$2,'delete',$3,$4,$5,$6) RETURNING id`,
+          [organizacionId, userId, file.id, nombre, expedienteId, resolved.label],
+        );
+        return {
+          accion_pendiente: true, token: pending.rows[0].id, tipo: 'delete',
+          archivo: nombre, expediente: resolved.label,
+          mensaje: 'Acción preparada: dile al usuario que confirme el borrado en la tarjeta que se le ha mostrado. Todavía NO está borrado.',
+        };
+      }
+
+      case 'preparar_renombrado_archivo': {
+        const expedienteId = String(args.expediente_id || '');
+        const query = String(args.archivo || '');
+        const nuevoNombre = String(args.nuevo_nombre || '').trim();
+        if (!expedienteId || !query || !nuevoNombre) return { error: 'Faltan expediente_id, archivo o nuevo_nombre.' };
+        const resolved = await resolveExpedienteAndFile(organizacionId, expedienteId, query);
+        if ('error' in resolved) return resolved;
+        if (resolved.files.length === 0) return { error: `No encuentro ningún archivo que coincida con "${query}" en ese expediente.` };
+        if (resolved.files.length > 1) {
+          return { ambiguo: true, coincidencias: resolved.files.map(f => ({ id: f.id, nombre: f.document_name || f.original_name })), mensaje: AMBIGUOUS_FILE_MSG };
+        }
+        const file = resolved.files[0];
+        const nombreActual = file.document_name || file.original_name;
+        const pending = await pool.query(
+          `INSERT INTO vantia_pending_actions (organizacion_id, user_id, tipo, file_id, file_name, expediente_id, expediente_label, payload)
+           VALUES ($1,$2,'rename',$3,$4,$5,$6,$7::jsonb) RETURNING id`,
+          [organizacionId, userId, file.id, nombreActual, expedienteId, resolved.label, JSON.stringify({ newName: nuevoNombre })],
+        );
+        return {
+          accion_pendiente: true, token: pending.rows[0].id, tipo: 'rename',
+          archivo: nombreActual, nuevo_nombre: nuevoNombre, expediente: resolved.label,
+          mensaje: 'Acción preparada: dile al usuario que confirme el renombrado en la tarjeta que se le ha mostrado. Todavía NO está renombrado.',
+        };
+      }
+
+      case 'preparar_movimiento_archivo': {
+        const expedienteId = String(args.expediente_id || '');
+        const query = String(args.archivo || '');
+        const destinoTexto = String(args.expediente_destino || '');
+        if (!expedienteId || !query || !destinoTexto) return { error: 'Faltan expediente_id, archivo o expediente_destino.' };
+        const resolved = await resolveExpedienteAndFile(organizacionId, expedienteId, query);
+        if ('error' in resolved) return resolved;
+        if (resolved.files.length === 0) return { error: `No encuentro ningún archivo que coincida con "${query}" en ese expediente.` };
+        if (resolved.files.length > 1) {
+          return { ambiguo: true, coincidencias: resolved.files.map(f => ({ id: f.id, nombre: f.document_name || f.original_name })), mensaje: AMBIGUOUS_FILE_MSG };
+        }
+        const file = resolved.files[0];
+        const nombre = file.document_name || file.original_name;
+
+        const targets = await resolveExpedienteByText(organizacionId, destinoTexto);
+        if (targets.length === 0) return { error: `No encuentro ningún expediente destino que coincida con "${destinoTexto}".` };
+        if (targets.length > 1) {
+          return { ambiguo: true, coincidencias: targets.map(t => ({ id: t.id, nombre: expedienteLabel(t) })), mensaje: AMBIGUOUS_EXP_MSG };
+        }
+        const target = targets[0];
+        if (target.id === expedienteId) return { error: 'El expediente de destino es el mismo que el de origen.' };
+        const targetLabel = expedienteLabel(target);
+
+        const pending = await pool.query(
+          `INSERT INTO vantia_pending_actions (organizacion_id, user_id, tipo, file_id, file_name, expediente_id, expediente_label, payload)
+           VALUES ($1,$2,'move',$3,$4,$5,$6,$7::jsonb) RETURNING id`,
+          [organizacionId, userId, file.id, nombre, expedienteId, resolved.label, JSON.stringify({ targetExpedienteId: target.id, targetExpedienteLabel: targetLabel })],
+        );
+        return {
+          accion_pendiente: true, token: pending.rows[0].id, tipo: 'move',
+          archivo: nombre, expediente_origen: resolved.label, expediente_destino: targetLabel,
+          mensaje: 'Acción preparada: dile al usuario que confirme el movimiento en la tarjeta que se le ha mostrado. Todavía NO se ha movido.',
+        };
       }
 
       default:
@@ -1004,6 +1186,14 @@ export const chatVantiaStream = async (req: any, res: Response) => {
         const result = await callTool(name, args ?? {}, userId, req.organizacionId);
         toolResults.push({ name, result });
         emit({ type: 'tool_end', name });
+        // Propuesta de gestión de archivo (borrar/renombrar/mover): se manda
+        // como evento propio, independiente de lo que Gemini narre en texto,
+        // para que el frontend pinte la tarjeta de confirmación siempre que
+        // de verdad se haya creado una fila 'pending' -- no solo cuando el
+        // modelo la menciona (o se le olvida mencionarla) en su respuesta.
+        if ((result as any)?.accion_pendiente && (result as any)?.token) {
+          emit({ type: 'action_proposal', ...(result as any) });
+        }
       }
 
       contents.push({ role: 'model', parts: roundParts.length ? roundParts : [{ text: '' }] });
@@ -1059,6 +1249,80 @@ export const chatVantiaStream = async (req: any, res: Response) => {
 // ── POST /api/vantia/feedback ── 👍/👎 sobre una respuesta concreta de Vantia.
 // Guarda un único voto por (usuario, conversación, índice de mensaje); mandar
 // rating:null borra el voto (el frontend lo usa para "deshacer" un clic).
+// ── POST /api/vantia/actions/:token/confirm ── ejecuta de verdad una acción
+// de archivo que el chat dejó propuesta (borrar/renombrar/mover) -- este es
+// el ÚNICO sitio de todo el flujo de Vantia que llega a tocar un archivo
+// real. Solo se llega aquí con un clic explícito del usuario en la tarjeta.
+export const confirmVantiaAction = async (req: any, res: Response) => {
+  const userId = req.auth?.userId;
+  const organizacionId = req.organizacionId;
+  const { token } = req.params;
+  if (!userId) return res.status(401).json({ success: false, error: 'No autenticado.' });
+  if (!organizacionId) return res.status(400).json({ success: false, error: 'No se pudo determinar la organización activa.' });
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT * FROM vantia_pending_actions WHERE id = $1 AND organizacion_id = $2`,
+      [token, organizacionId],
+    );
+    if (!rows.length) return res.status(404).json({ success: false, error: 'Acción no encontrada.' });
+    const action = rows[0];
+
+    if (action.status !== 'pending') {
+      return res.status(409).json({
+        success: false,
+        error: action.status === 'confirmed' ? 'Esta acción ya se ejecutó antes.' : 'Esta acción ya no está disponible.',
+      });
+    }
+    // Caduca a los 30 min -- evita ejecutar sobre un archivo que puede haber
+    // cambiado (o desaparecido) desde que se propuso la acción.
+    if (Date.now() - new Date(action.created_at).getTime() > 30 * 60 * 1000) {
+      await pool.query(`UPDATE vantia_pending_actions SET status='expired', resolved_at=NOW() WHERE id=$1`, [token]);
+      return res.status(410).json({ success: false, error: 'Esta propuesta caducó. Pídeselo de nuevo a Vantia.' });
+    }
+
+    let result: { success: boolean; error?: string };
+    if (action.tipo === 'delete') {
+      result = await performDeleteFile(action.expediente_id, action.file_id);
+    } else if (action.tipo === 'rename') {
+      result = await performRenameFile(action.expediente_id, action.file_id, action.payload?.newName || '');
+    } else if (action.tipo === 'move') {
+      result = await performMoveFile(action.expediente_id, action.file_id, action.payload?.targetExpedienteId);
+    } else {
+      result = { success: false, error: 'Tipo de acción desconocido.' };
+    }
+
+    await pool.query(
+      `UPDATE vantia_pending_actions SET status = $1, resolved_at = NOW() WHERE id = $2`,
+      [result.success ? 'confirmed' : 'cancelled', token],
+    );
+    if (!result.success) return res.status(500).json({ success: false, error: result.error || 'No se pudo completar la acción.' });
+
+    const verbo = action.tipo === 'delete' ? 'eliminó' : action.tipo === 'rename' ? 'renombró' : 'movió';
+    logActivityForReq(req, `Vantia (chat IA) ${verbo} el archivo "${action.file_name}"`, 'EXPEDIENTE', action.expediente_id);
+    res.json({ success: true });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e.message || 'No se pudo completar la acción.' });
+  }
+};
+
+// ── POST /api/vantia/actions/:token/cancel ── descarta una propuesta sin
+// tocar nada. Se llama al pulsar "Cancelar" en la tarjeta.
+export const cancelVantiaAction = async (req: any, res: Response) => {
+  const organizacionId = req.organizacionId;
+  const { token } = req.params;
+  if (!organizacionId) return res.status(400).json({ success: false, error: 'No se pudo determinar la organización activa.' });
+  try {
+    await pool.query(
+      `UPDATE vantia_pending_actions SET status='cancelled', resolved_at=NOW() WHERE id=$1 AND organizacion_id=$2 AND status='pending'`,
+      [token, organizacionId],
+    );
+    res.json({ success: true });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e.message || 'No se pudo cancelar.' });
+  }
+};
+
 export const submitFeedback = async (req: any, res: Response) => {
   const { moduleId, messageIndex, rating, messageExcerpt } = req.body as {
     moduleId?: string; messageIndex?: number; rating?: 'up' | 'down'; messageExcerpt?: string;

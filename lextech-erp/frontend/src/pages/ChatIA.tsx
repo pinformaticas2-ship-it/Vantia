@@ -5,7 +5,7 @@ import {
   Paperclip, Link2, Send, MessageSquare, Sparkles, MoreHorizontal, Loader2,
   Check, X, Search, StopCircle, Download, FileText, ChevronDown,
 } from 'lucide-react';
-import { resolveApiUrl } from '../lib/api';
+import { resolveApiUrl, safeJson } from '../lib/api';
 
 // ─── Keyframe styles ──────────────────────────────────────────────────────────
 
@@ -67,13 +67,68 @@ interface LinkedExpedienteRef {
   descripcion?: string | null;
 }
 
+// Propuesta de gestión de archivo (borrar/renombrar/mover un documento de
+// expediente) que Vantia deja pendiente de confirmación -- nunca se ejecuta
+// sola. Ver preparar_borrado_archivo / preparar_renombrado_archivo /
+// preparar_movimiento_archivo en el backend.
+interface ActionProposal {
+  token: string;
+  tipo: 'delete' | 'rename' | 'move';
+  archivo: string;
+  nuevo_nombre?: string;
+  expediente?: string;
+  expediente_origen?: string;
+  expediente_destino?: string;
+  resolving?: boolean;
+  resolved?: 'confirmed' | 'cancelled' | 'error';
+  errorMsg?: string;
+}
+
 interface Message {
   role: 'user' | 'model';
   text: string;
   ts: Date;
   toolEvents?: ToolEvent[];       // solo mensajes de Vantia en curso/recién generados
+  actionProposals?: ActionProposal[]; // ídem, acciones de archivo pendientes de confirmar
   attachmentName?: string;        // solo mensajes de usuario con archivo adjunto
   linkedExpediente?: LinkedExpedienteRef; // solo mensajes de usuario con expediente vinculado
+}
+
+function actionProposalCopy(a: ActionProposal): { title: string; detail: string } {
+  if (a.tipo === 'delete') return { title: `Borrar "${a.archivo}"`, detail: `Expediente ${a.expediente || '—'}` };
+  if (a.tipo === 'rename') return { title: `Renombrar "${a.archivo}" → "${a.nuevo_nombre}"`, detail: `Expediente ${a.expediente || '—'}` };
+  return { title: `Mover "${a.archivo}"`, detail: `De ${a.expediente_origen || '—'} a ${a.expediente_destino || '—'}` };
+}
+
+function ActionProposalCard({ proposal, onConfirm, onCancel }: {
+  proposal: ActionProposal; onConfirm: () => void; onCancel: () => void;
+}) {
+  const { title, detail } = actionProposalCopy(proposal);
+  const boxCls = proposal.resolved === 'confirmed' ? 'border-emerald-200 bg-emerald-50'
+    : proposal.resolved === 'cancelled' ? 'border-slate-200 bg-slate-50'
+    : proposal.resolved === 'error' ? 'border-red-200 bg-red-50'
+    : 'border-amber-200 bg-amber-50';
+  return (
+    <div className={`rounded-xl border p-3 text-[12px] ${boxCls}`}>
+      <p className="font-semibold text-slate-700">{title}</p>
+      <p className="mt-0.5 text-slate-500">{detail}</p>
+      {proposal.resolved === 'confirmed' && <p className="mt-1.5 flex items-center gap-1 font-semibold text-emerald-700">✓ Hecho</p>}
+      {proposal.resolved === 'cancelled' && <p className="mt-1.5 text-slate-400">Cancelado.</p>}
+      {proposal.resolved === 'error' && <p className="mt-1.5 text-red-600">{proposal.errorMsg || 'No se pudo completar.'}</p>}
+      {!proposal.resolved && (
+        <div className="mt-2 flex gap-2">
+          <button type="button" disabled={proposal.resolving} onClick={onConfirm}
+            className="rounded-lg bg-red-600 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-red-700 disabled:opacity-50">
+            {proposal.resolving ? 'Aplicando…' : 'Confirmar'}
+          </button>
+          <button type="button" disabled={proposal.resolving} onClick={onCancel}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-500 hover:bg-slate-50 disabled:opacity-50">
+            Cancelar
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ─── Markdown renderer ────────────────────────────────────────────────────────
@@ -382,6 +437,11 @@ export default function ChatIA() {
             setMessages(prev => prev.map((m, i) => (i === targetIdx
               ? { ...m, toolEvents: (m.toolEvents || []).map(te => (te.name === evt.name && !te.done ? { ...te, done: true } : te)) }
               : m)));
+          } else if (evt.type === 'action_proposal') {
+            const { type: _t, ...proposal } = evt;
+            setMessages(prev => prev.map((m, i) => (i === targetIdx
+              ? { ...m, actionProposals: [...(m.actionProposals || []), proposal as ActionProposal] }
+              : m)));
           } else if (evt.type === 'done') {
             finalReply = evt.reply;
           } else if (evt.type === 'error') {
@@ -394,6 +454,31 @@ export default function ChatIA() {
       return finalReply;
     } finally {
       if (revealTimer) clearInterval(revealTimer);
+    }
+  };
+
+  // Confirma o cancela una propuesta de gestión de archivo -- este fetch es
+  // el único sitio donde una acción del chat llega a ejecutarse de verdad.
+  const resolveAction = async (msgIdx: number, actionToken: string, decision: 'confirm' | 'cancel') => {
+    setMessages(prev => prev.map((m, i) => (i !== msgIdx ? m : {
+      ...m, actionProposals: m.actionProposals?.map(a => (a.token === actionToken ? { ...a, resolving: true } : a)),
+    })));
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(resolveApiUrl(`/api/vantia/actions/${actionToken}/${decision}`), {
+        method: 'POST', headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await safeJson(res);
+      if (!res.ok || data?.success === false) throw new Error(data?.error || 'No se pudo completar la acción.');
+      setMessages(prev => prev.map((m, i) => (i !== msgIdx ? m : {
+        ...m, actionProposals: m.actionProposals?.map(a => (a.token === actionToken
+          ? { ...a, resolving: false, resolved: decision === 'confirm' ? 'confirmed' : 'cancelled' } : a)),
+      })));
+    } catch (e: any) {
+      setMessages(prev => prev.map((m, i) => (i !== msgIdx ? m : {
+        ...m, actionProposals: m.actionProposals?.map(a => (a.token === actionToken
+          ? { ...a, resolving: false, resolved: 'error', errorMsg: e.message } : a)),
+      })));
     }
   };
 
@@ -999,6 +1084,15 @@ export default function ChatIA() {
                         {msg.text
                           ? renderMd(msg.text)
                           : (sending && idx === messages.length - 1 ? <TypingDots /> : null)}
+                        {msg.actionProposals && msg.actionProposals.length > 0 && (
+                          <div className="mt-2 flex flex-col gap-2 max-w-sm">
+                            {msg.actionProposals.map(a => (
+                              <ActionProposalCard key={a.token} proposal={a}
+                                onConfirm={() => resolveAction(idx, a.token, 'confirm')}
+                                onCancel={() => resolveAction(idx, a.token, 'cancel')} />
+                            ))}
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="bg-gradient-to-br from-red-600 to-red-700 text-white rounded-2xl rounded-tr-sm px-5 py-3.5 shadow-sm max-w-full">
