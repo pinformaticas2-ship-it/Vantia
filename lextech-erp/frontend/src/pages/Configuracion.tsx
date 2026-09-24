@@ -1514,11 +1514,28 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
     return () => document.removeEventListener('mousedown', h);
   }, [showProviderPicker]);
   const providerLabel = (p: 'drive' | 'dropbox') => (p === 'drive' ? 'Google Drive' : 'Dropbox');
+  const connectedStorageProviders = (['drive', 'dropbox'] as const).filter(p =>
+    p === 'drive' ? !!organizacion?.googleDriveConnected : !!organizacion?.dropboxConnected
+  );
 
   useEffect(() => {
     if (organizacion?.documentStorageMode) setStorageMode(organizacion.documentStorageMode);
     if (organizacion?.documentStorageDefaultProvider) setStorageDefault(organizacion.documentStorageDefaultProvider);
   }, [organizacion?.documentStorageMode, organizacion?.documentStorageDefaultProvider]);
+
+  // Si la nube marcada como "por defecto" deja de estar conectada (o nunca
+  // lo estuvo), no tiene sentido seguir ofreciéndola/mostrándola -- se
+  // corrige sola a la primera que sí esté conectada.
+  useEffect(() => {
+    if (!organizacion || connectedStorageProviders.length === 0) return;
+    const stored = organizacion.documentStorageDefaultProvider || 'drive';
+    if (!connectedStorageProviders.includes(stored)) {
+      const corrected = connectedStorageProviders[0];
+      setStorageDefault(corrected);
+      saveStorageSettings(organizacion.documentStorageMode || 'auto', corrected);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [organizacion?.googleDriveConnected, organizacion?.dropboxConnected]);
 
   const saveStorageSettings = async (mode: 'auto' | 'ask', defaultProvider: 'drive' | 'dropbox') => {
     setSavingStorageSettings(true); setStorageSettingsError(''); setStorageSettingsSaved(false);
@@ -1844,7 +1861,7 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
                       <p className="mt-0.5 text-xs text-slate-500">Al subir un documento, elige Drive, Dropbox u OneDrive.</p>
                     </button>
                   </div>
-                  {storageMode === 'auto' && (
+                  {storageMode === 'auto' && connectedStorageProviders.length > 1 && (
                     <div>
                       <label className="mb-1.5 block text-xs font-bold text-slate-600">Nube por defecto</label>
                       <div className="relative w-full max-w-xs" ref={providerPickerRef}>
@@ -1862,7 +1879,7 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
                         </button>
                         {showProviderPicker && (
                           <div className="absolute left-0 top-full z-10 mt-1 w-full overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg animate-fade-in">
-                            {(['drive', 'dropbox'] as const).map(p => (
+                            {connectedStorageProviders.map(p => (
                               <button
                                 key={p}
                                 type="button"
@@ -1882,9 +1899,15 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
                         )}
                       </div>
                       <p className="mt-1.5 text-[11px] text-slate-400">
-                        Si la elegida no está conectada, se usa la que sí lo esté; si ninguna lo está, se guarda solo en el servidor.
+                        Si la elegida deja de estar conectada, se usa la que sí lo esté; si ninguna lo está, se guarda solo en el servidor.
                       </p>
                     </div>
+                  )}
+                  {storageMode === 'auto' && connectedStorageProviders.length === 1 && (
+                    <p className="flex items-center gap-2 text-xs text-slate-500">
+                      {connectedStorageProviders[0] === 'drive' ? <DriveLogo size={16} /> : <DropboxLogo size={16} />}
+                      Se guardará en <span className="font-semibold text-slate-700">{providerLabel(connectedStorageProviders[0])}</span>, tu única nube conectada.
+                    </p>
                   )}
                   {storageSettingsError && <p className="text-xs text-rose-600">{storageSettingsError}</p>}
                   {storageSettingsSaved && <p className="text-xs text-emerald-600">Guardado.</p>}
