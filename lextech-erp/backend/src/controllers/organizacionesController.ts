@@ -131,7 +131,8 @@ export async function getMyOrganizacion(req: Request, res: Response) {
                 client_welcome_email_subject, client_welcome_email_body, client_welcome_email_signature,
                 google_drive_refresh_token_enc, google_drive_email,
                 google_drive_last_error, google_drive_last_error_at,
-                dropbox_refresh_token_enc, dropbox_email
+                dropbox_refresh_token_enc, dropbox_email,
+                document_storage_mode, document_storage_default_provider
          FROM organizaciones WHERE id = $1`,
         [activa.organizacionId]
       );
@@ -154,6 +155,8 @@ export async function getMyOrganizacion(req: Request, res: Response) {
         googleDriveErrorMessage: canSeeCredenciales && org.google_drive_refresh_token_enc && org.google_drive_last_error ? org.google_drive_last_error : null,
         dropboxConnected: Boolean(org.dropbox_refresh_token_enc),
         dropboxEmail: canSeeCredenciales ? org.dropbox_email : null,
+        documentStorageMode: org.document_storage_mode || 'auto',
+        documentStorageDefaultProvider: org.document_storage_default_provider || 'drive',
       } : { id: activa.organizacionId, nombre: activa.organizacionNombre };
     }
 
@@ -198,6 +201,33 @@ export async function updateMyOrganizacion(req: Request, res: Response) {
     const userId = (req as any).auth?.userId;
     invalidateUserCache(userId);
     return ok(res, { id: ctx.organizacionId, nombre, nifCif, direccionFiscal, textoLegalFacturas, clientWelcomeEmailSubject, clientWelcomeEmailBody, clientWelcomeEmailSignature });
+  } catch (e: any) {
+    return err(res, pgErr(e));
+  }
+}
+
+// PUT /api/organizacion/document-storage-settings -- a qué nube van los
+// documentos nuevos de expedientes: 'auto' usa siempre document_storage_
+// default_provider (si está conectada, si no la que sí lo esté); 'ask' hace
+// que el frontend le pregunte al usuario en cada subida (Drive/Dropbox/
+// OneDrive -- ver uploadFiles en filesController.ts).
+export async function updateDocumentStorageSettings(req: Request, res: Response) {
+  try {
+    const ctx = requireOrgContext(req, res);
+    if (!ctx) return;
+    if (ctx.organizacionRol !== 'propietario' && ctx.organizacionRol !== 'admin') {
+      return err(res, 'Solo el propietario o un administrador pueden cambiar este ajuste.', 403);
+    }
+    const mode = String(req.body?.mode || '');
+    const defaultProvider = String(req.body?.defaultProvider || '');
+    if (mode !== 'auto' && mode !== 'ask') return err(res, 'Modo no válido.', 400);
+    if (defaultProvider !== 'drive' && defaultProvider !== 'dropbox') return err(res, 'Nube por defecto no válida.', 400);
+
+    await pool.query(
+      `UPDATE organizaciones SET document_storage_mode = $1, document_storage_default_provider = $2, updated_at = NOW() WHERE id = $3`,
+      [mode, defaultProvider, ctx.organizacionId],
+    );
+    return ok(res, { mode, defaultProvider });
   } catch (e: any) {
     return err(res, pgErr(e));
   }

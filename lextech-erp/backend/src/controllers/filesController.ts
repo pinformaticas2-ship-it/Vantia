@@ -18,6 +18,17 @@ import {
   recordDriveError,
   clearDriveError,
 } from '../utils/googleDrive';
+import {
+  isDropboxConnected,
+  ensureExpedienteFolder as ensureDropboxExpedienteFolder,
+  uploadFileToDropbox,
+  downloadDropboxFile,
+  updateDropboxFileContent,
+  moveOrRenameDropboxFile,
+  deleteDropboxFile,
+  recordDropboxError,
+  clearDropboxError,
+} from '../utils/dropboxStorage';
 
 const LIBREOFFICE_ENABLED =
   String(process.env.ENABLE_LIBREOFFICE_PREVIEW || "true").trim().toLowerCase() !== "false";
@@ -75,50 +86,96 @@ async function getExpedienteDriveContext(clientId: string): Promise<{ organizaci
 
 // El disco del contenedor de Railway es efímero y se borra en cada
 // despliegue -- si el archivo ya no está en el caché local pero sabemos que
-// vive en Drive, lo volvemos a bajar antes de servirlo/previsualizarlo.
+// vive en Drive o Dropbox, lo volvemos a bajar antes de servirlo/previsualizarlo.
 async function ensureFileOnDisk(
   clientId: string,
   storedName: string,
   storageProvider: string | null | undefined,
   driveFileId: string | null | undefined,
+  dropboxFileId?: string | null | undefined,
 ): Promise<string> {
   const filePath = path.join(UPLOADS_ROOT, clientId, storedName);
-  if (fs.existsSync(filePath) || storageProvider !== 'drive' || !driveFileId) return filePath;
+  if (fs.existsSync(filePath)) return filePath;
+  if (storageProvider !== 'drive' && storageProvider !== 'dropbox') return filePath;
   const ctx = await getExpedienteDriveContext(clientId);
   if (!ctx) return filePath;
-  const { buffer } = await downloadDriveFile(ctx.organizacionId, driveFileId);
-  ensureClientDir(clientId);
-  fs.writeFileSync(filePath, buffer);
+  if (storageProvider === 'drive' && driveFileId) {
+    const { buffer } = await downloadDriveFile(ctx.organizacionId, driveFileId);
+    ensureClientDir(clientId);
+    fs.writeFileSync(filePath, buffer);
+  } else if (storageProvider === 'dropbox' && dropboxFileId) {
+    const { buffer } = await downloadDropboxFile(ctx.organizacionId, dropboxFileId);
+    ensureClientDir(clientId);
+    fs.writeFileSync(filePath, buffer);
+  }
   return filePath;
 }
 
-// Sube (o vuelve a subir) el contenido en disco de un adjunto ya insertado
-// en client_files a la carpeta de Drive del expediente, y actualiza la fila
-// con storage_provider/drive_file_id. Si algo falla, no lanza -- el archivo
-// simplemente se queda como estaba (normalmente 'local'), igual que ya hace
-// el mismo patrón en documentImportController.ts.
-async function tryUploadFileToDrive(
+export type CloudProvider = 'drive' | 'dropbox';
+
+// Decide a qué nube va un documento nuevo cuando no se ha pedido una en
+// concreto (subida "normal", sin picker): 'auto' usa siempre la misma nube
+// (document_storage_default_provider) si está conectada, y si no cae a la
+// que sí lo esté. Con document_storage_mode='ask' el frontend siempre debería
+// mandar un provider explícito (ver uploadFiles) -- esto es solo el respaldo
+// por si no lo manda.
+export async function resolveUploadProvider(organizacionId: string, requestedProvider?: string | null): Promise<CloudProvider | 'local'> {
+  if (requestedProvider === 'local') return 'local';
+  if (requestedProvider === 'drive' || requestedProvider === 'dropbox') {
+    const connected = requestedProvider === 'drive' ? await isDriveConnected(organizacionId) : await isDropboxConnected(organizacionId);
+    if (connected) return requestedProvider;
+    // Se pidió una nube que ya no está conectada -- se cae al automático.
+  }
+  const { rows } = await pool.query(
+    `SELECT document_storage_default_provider FROM organizaciones WHERE id = $1`,
+    [organizacionId],
+  );
+  const preferred = rows[0]?.document_storage_default_provider || 'drive';
+  const [driveOk, dropboxOk] = await Promise.all([isDriveConnected(organizacionId), isDropboxConnected(organizacionId)]);
+  if (preferred === 'drive' && driveOk) return 'drive';
+  if (preferred === 'dropbox' && dropboxOk) return 'dropbox';
+  if (driveOk) return 'drive';
+  if (dropboxOk) return 'dropbox';
+  return 'local';
+}
+
+// Sube (o vuelve a subir) el contenido en disco de un adjunto ya insertado en
+// client_files a la nube que corresponda (o ninguna, si se queda en local), y
+// actualiza la fila con storage_provider/drive_file_id o dropbox_file_id. Si
+// algo falla, no lanza -- el archivo simplemente se queda como estaba
+// (normalmente 'local'), igual que ya hacía este mismo patrón cuando solo
+// existía Drive.
+async function tryUploadFileToCloud(
   clientId: string,
   fileRowId: string,
   originalName: string,
   mimeType: string,
   localFilePath: string,
-): Promise<{ id: string } | null> {
+  requestedProvider?: string | null,
+): Promise<{ provider: CloudProvider; id: string } | null> {
   const ctx = await getExpedienteDriveContext(clientId);
   if (!ctx) return null;
-  if (!(await isDriveConnected(ctx.organizacionId))) return null;
+  const provider = await resolveUploadProvider(ctx.organizacionId, requestedProvider);
+  if (provider === 'local') return null;
+
   try {
-    const folderId = await ensureExpedienteFolder(ctx.organizacionId, clientId, ctx.expedienteName);
     const buffer = fs.readFileSync(localFilePath);
-    const uploaded = await uploadFileToDrive(ctx.organizacionId, folderId, originalName, buffer, mimeType);
-    await pool.query(
-      `UPDATE client_files SET storage_provider = 'drive', drive_file_id = $1 WHERE id = $2`,
-      [uploaded.id, fileRowId],
-    );
-    await clearDriveError(ctx.organizacionId);
-    return { id: uploaded.id };
-  } catch (driveErr: any) {
-    await recordDriveError(ctx.organizacionId, driveErr);
+    if (provider === 'drive') {
+      const folderId = await ensureExpedienteFolder(ctx.organizacionId, clientId, ctx.expedienteName);
+      const uploaded = await uploadFileToDrive(ctx.organizacionId, folderId, originalName, buffer, mimeType);
+      await pool.query(`UPDATE client_files SET storage_provider = 'drive', drive_file_id = $1 WHERE id = $2`, [uploaded.id, fileRowId]);
+      await clearDriveError(ctx.organizacionId);
+      return { provider: 'drive', id: uploaded.id };
+    } else {
+      const folderPath = await ensureDropboxExpedienteFolder(ctx.organizacionId, clientId, ctx.expedienteName);
+      const uploaded = await uploadFileToDropbox(ctx.organizacionId, folderPath, originalName, buffer, mimeType);
+      await pool.query(`UPDATE client_files SET storage_provider = 'dropbox', dropbox_file_id = $1 WHERE id = $2`, [uploaded.id, fileRowId]);
+      await clearDropboxError(ctx.organizacionId);
+      return { provider: 'dropbox', id: uploaded.id };
+    }
+  } catch (cloudErr: any) {
+    if (provider === 'drive') await recordDriveError(ctx.organizacionId, cloudErr);
+    else await recordDropboxError(ctx.organizacionId, cloudErr);
     return null;
   }
 }
@@ -318,6 +375,9 @@ export const uploadFiles = async (req: any, res: Response) => {
   const { clientId } = req.params;
   const userId = req.auth?.userId || 'SYSTEM';
   const files: Express.Multer.File[] = req.files as Express.Multer.File[];
+  // Campo opcional del formulario -- solo lo manda el frontend cuando el
+  // despacho tiene "preguntar cada vez" activado (ver document_storage_mode).
+  const requestedProvider = typeof req.body?.provider === 'string' ? req.body.provider : undefined;
 
   if (!files || files.length === 0) {
     return res.status(400).json({ success: false, error: 'No se recibieron archivos.' });
@@ -342,13 +402,14 @@ export const uploadFiles = async (req: any, res: Response) => {
       const sourceFile = path.join(clientDir, file.filename);
       syncFileToLocal(clientId, baseFileName, sourceFile, 'Sin clasificar');
 
-      // Si es un adjunto de expediente y la organización tiene Drive
-      // conectado, se sube también ahí -- el disco local se conserva igual
+      // Si es un adjunto de expediente y el despacho tiene alguna nube
+      // conectada, se sube también ahí -- el disco local se conserva igual
       // como caché de trabajo para esta misma sesión del contenedor.
-      const uploaded = await tryUploadFileToDrive(clientId, result.rows[0].id, baseFileName, file.mimetype, sourceFile);
+      const uploaded = await tryUploadFileToCloud(clientId, result.rows[0].id, baseFileName, file.mimetype, sourceFile, requestedProvider);
       if (uploaded) {
-        result.rows[0].storage_provider = 'drive';
-        result.rows[0].drive_file_id = uploaded.id;
+        result.rows[0].storage_provider = uploaded.provider;
+        if (uploaded.provider === 'drive') result.rows[0].drive_file_id = uploaded.id;
+        else result.rows[0].dropbox_file_id = uploaded.id;
       }
 
       // Registrar en historial
@@ -367,14 +428,14 @@ export const downloadFile = async (req: any, res: Response) => {
   const { clientId, fileId } = req.params;
   try {
     const result = await pool.query(
-      `SELECT stored_name, original_name, mimetype, storage_provider, drive_file_id FROM client_files WHERE id = $1 AND client_id = $2`,
+      `SELECT stored_name, original_name, mimetype, storage_provider, drive_file_id, dropbox_file_id FROM client_files WHERE id = $1 AND client_id = $2`,
       [fileId, clientId]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
     }
-    const { stored_name, original_name, mimetype, storage_provider, drive_file_id } = result.rows[0];
-    const filePath = await ensureFileOnDisk(clientId, stored_name, storage_provider, drive_file_id);
+    const { stored_name, original_name, mimetype, storage_provider, drive_file_id, dropbox_file_id } = result.rows[0];
+    const filePath = await ensureFileOnDisk(clientId, stored_name, storage_provider, drive_file_id, dropbox_file_id);
 
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ success: false, error: 'Archivo no encontrado en disco.' });
@@ -438,13 +499,13 @@ export const downloadByToken = async (req: any, res: Response) => {
   const isHead = req.method === 'HEAD';
   try {
     const result = await pool.query(
-      `SELECT stored_name, original_name, mimetype, client_id, storage_provider, drive_file_id FROM client_files WHERE id = $1 LIMIT 1`,
+      `SELECT stored_name, original_name, mimetype, client_id, storage_provider, drive_file_id, dropbox_file_id FROM client_files WHERE id = $1 LIMIT 1`,
       [data.fileId]
     );
     if (result.rows.length === 0) return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
-    const { stored_name, original_name, mimetype, client_id, storage_provider, drive_file_id } = result.rows[0];
+    const { stored_name, original_name, mimetype, client_id, storage_provider, drive_file_id, dropbox_file_id } = result.rows[0];
     const realClientId = client_id || data.clientId;
-    const filePath = await ensureFileOnDisk(realClientId, stored_name, storage_provider, drive_file_id);
+    const filePath = await ensureFileOnDisk(realClientId, stored_name, storage_provider, drive_file_id, dropbox_file_id);
     if (!fs.existsSync(filePath)) return res.status(404).json({ success: false, error: 'Archivo no encontrado en disco.' });
     res.setHeader('Content-Type', mimetype);
     const asciiName = original_name.replace(/[^\x20-\x7E]/g, '_').replace(/"/g, '\\"');
@@ -466,7 +527,7 @@ export const syncClientFileByToken = async (req: any, res: Response) => {
 
   try {
     const result = await pool.query(
-      `SELECT stored_name, original_name, client_id, mimetype, storage_provider, drive_file_id
+      `SELECT stored_name, original_name, client_id, mimetype, storage_provider, drive_file_id, dropbox_file_id
        FROM client_files
        WHERE id = $1
        LIMIT 1`,
@@ -476,9 +537,9 @@ export const syncClientFileByToken = async (req: any, res: Response) => {
       return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
     }
 
-    const { stored_name, original_name, client_id, mimetype, storage_provider, drive_file_id } = result.rows[0];
+    const { stored_name, original_name, client_id, mimetype, storage_provider, drive_file_id, dropbox_file_id } = result.rows[0];
     const realClientId = client_id || data.clientId;
-    const filePath = await ensureFileOnDisk(realClientId, stored_name, storage_provider, drive_file_id);
+    const filePath = await ensureFileOnDisk(realClientId, stored_name, storage_provider, drive_file_id, dropbox_file_id);
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ success: false, error: 'Archivo no encontrado en disco.' });
     }
@@ -499,8 +560,8 @@ export const syncClientFileByToken = async (req: any, res: Response) => {
       [stat.size, data.fileId, realClientId]
     );
 
-    // Si el adjunto vive en Drive, se sobrescribe el mismo archivo con el
-    // contenido recién guardado desde Word/Excel (misma id, sin duplicar).
+    // Si el adjunto vive en Drive/Dropbox, se sobrescribe el mismo archivo
+    // con el contenido recién guardado desde Word/Excel (mismo id, sin duplicar).
     if (storage_provider === 'drive' && drive_file_id) {
       const ctx = await getExpedienteDriveContext(realClientId);
       if (ctx) {
@@ -509,6 +570,16 @@ export const syncClientFileByToken = async (req: any, res: Response) => {
           await clearDriveError(ctx.organizacionId);
         } catch (driveErr: any) {
           await recordDriveError(ctx.organizacionId, driveErr);
+        }
+      }
+    } else if (storage_provider === 'dropbox' && dropbox_file_id) {
+      const ctx = await getExpedienteDriveContext(realClientId);
+      if (ctx) {
+        try {
+          await updateDropboxFileContent(ctx.organizacionId, dropbox_file_id, body);
+          await clearDropboxError(ctx.organizacionId);
+        } catch (dbxErr: any) {
+          await recordDropboxError(ctx.organizacionId, dbxErr);
         }
       }
     }
@@ -649,11 +720,11 @@ export const officeBridgePage = async (req: any, res: Response) => {
 export async function performDeleteFile(clientId: string, fileId: string): Promise<{ success: boolean; error?: string; originalName?: string }> {
   try {
     const result = await pool.query(
-      `DELETE FROM client_files WHERE id = $1 AND client_id = $2 RETURNING stored_name, original_name, attachment_type, storage_provider, drive_file_id`,
+      `DELETE FROM client_files WHERE id = $1 AND client_id = $2 RETURNING stored_name, original_name, attachment_type, storage_provider, drive_file_id, dropbox_file_id`,
       [fileId, clientId]
     );
     if (result.rows.length === 0) return { success: false, error: 'Archivo no encontrado.' };
-    const { stored_name, original_name, attachment_type, storage_provider, drive_file_id } = result.rows[0];
+    const { stored_name, original_name, attachment_type, storage_provider, drive_file_id, dropbox_file_id } = result.rows[0];
     const filePath = path.join(UPLOADS_ROOT, clientId, stored_name);
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
     const localTypeDir = path.join(LOCAL_CLIENT_FILES_ROOT, clientId, typeFolderName(attachment_type));
@@ -662,6 +733,9 @@ export async function performDeleteFile(clientId: string, fileId: string): Promi
     if (storage_provider === 'drive' && drive_file_id) {
       const ctx = await getExpedienteDriveContext(clientId);
       if (ctx) await deleteDriveFile(ctx.organizacionId, drive_file_id).catch(() => {});
+    } else if (storage_provider === 'dropbox' && dropbox_file_id) {
+      const ctx = await getExpedienteDriveContext(clientId);
+      if (ctx) await deleteDropboxFile(ctx.organizacionId, dropbox_file_id).catch(() => {});
     }
     return { success: true, originalName: original_name };
   } catch (err: any) {
@@ -674,7 +748,7 @@ export async function performDeleteFile(clientId: string, fileId: string): Promi
 export async function performRenameFile(clientId: string, fileId: string, newName: string): Promise<{ success: boolean; error?: string; oldName?: string; newName?: string }> {
   try {
     const existing = await pool.query(
-      `SELECT original_name, attachment_type, storage_provider, drive_file_id FROM client_files WHERE id = $1 AND client_id = $2`,
+      `SELECT original_name, attachment_type, storage_provider, drive_file_id, dropbox_file_id FROM client_files WHERE id = $1 AND client_id = $2`,
       [fileId, clientId]
     );
     if (!existing.rows.length) return { success: false, error: 'Archivo no encontrado.' };
@@ -682,6 +756,7 @@ export async function performRenameFile(clientId: string, fileId: string, newNam
     const attachType      = existing.rows[0].attachment_type as string | null;
     const storageProvider = existing.rows[0].storage_provider as string | null;
     const driveFileId     = existing.rows[0].drive_file_id as string | null;
+    const dropboxFileId   = existing.rows[0].dropbox_file_id as string | null;
 
     const ext = path.extname(oldOriginalName || '');
     const cleanNew = String(newName || '').trim().replace(/\.[a-zA-Z0-9]{1,6}$/, '') || 'Documento';
@@ -700,6 +775,14 @@ export async function performRenameFile(clientId: string, fileId: string, newNam
           try { await renameDriveFile(ctx.organizacionId, driveFileId, newOriginalName); }
           catch (driveErr: any) { await recordDriveError(ctx.organizacionId, driveErr); }
         }
+      } else if (storageProvider === 'dropbox' && dropboxFileId) {
+        const ctx = await getExpedienteDriveContext(clientId);
+        if (ctx) {
+          try {
+            const folderPath = await ensureDropboxExpedienteFolder(ctx.organizacionId, clientId, ctx.expedienteName);
+            await moveOrRenameDropboxFile(ctx.organizacionId, dropboxFileId, folderPath, newOriginalName);
+          } catch (dbxErr: any) { await recordDropboxError(ctx.organizacionId, dbxErr); }
+        }
       }
     }
     return { success: true, oldName: oldOriginalName, newName: newOriginalName };
@@ -714,11 +797,11 @@ export async function performRenameFile(clientId: string, fileId: string, newNam
 export async function performMoveFile(clientId: string, fileId: string, targetExpedienteId: string): Promise<{ success: boolean; error?: string; originalName?: string }> {
   try {
     const existing = await pool.query(
-      `SELECT stored_name, original_name, attachment_type, storage_provider, drive_file_id FROM client_files WHERE id = $1 AND client_id = $2`,
+      `SELECT stored_name, original_name, attachment_type, storage_provider, drive_file_id, dropbox_file_id FROM client_files WHERE id = $1 AND client_id = $2`,
       [fileId, clientId],
     );
     if (!existing.rows.length) return { success: false, error: 'Archivo no encontrado.' };
-    const { stored_name, original_name, attachment_type, storage_provider, drive_file_id } = existing.rows[0];
+    const { stored_name, original_name, attachment_type, storage_provider, drive_file_id, dropbox_file_id } = existing.rows[0];
 
     await pool.query(`UPDATE client_files SET client_id = $1, updated_at = NOW() WHERE id = $2`, [targetExpedienteId, fileId]);
 
@@ -728,7 +811,7 @@ export async function performMoveFile(clientId: string, fileId: string, targetEx
         ensureClientDir(targetExpedienteId);
         fs.renameSync(fromPath, path.join(UPLOADS_ROOT, targetExpedienteId, stored_name));
       }
-    } catch (_) { /* se recupera de Drive en el próximo acceso si aplica */ }
+    } catch (_) { /* se recupera de la nube en el próximo acceso si aplica */ }
 
     try {
       const fromMirror = path.join(LOCAL_CLIENT_FILES_ROOT, clientId, typeFolderName(attachment_type), original_name);
@@ -747,6 +830,16 @@ export async function performMoveFile(clientId: string, fileId: string, targetEx
           await moveDriveFile(toCtx.organizacionId, drive_file_id, newFolderId, oldFolder?.google_drive_folder_id || undefined);
         } catch (driveErr: any) {
           await recordDriveError(toCtx.organizacionId, driveErr);
+        }
+      }
+    } else if (storage_provider === 'dropbox' && dropbox_file_id) {
+      const toCtx = await getExpedienteDriveContext(targetExpedienteId);
+      if (toCtx && await isDropboxConnected(toCtx.organizacionId)) {
+        try {
+          const newFolderPath = await ensureDropboxExpedienteFolder(toCtx.organizacionId, targetExpedienteId, toCtx.expedienteName);
+          await moveOrRenameDropboxFile(toCtx.organizacionId, dropbox_file_id, newFolderPath, original_name);
+        } catch (dbxErr: any) {
+          await recordDropboxError(toCtx.organizacionId, dbxErr);
         }
       }
     }
@@ -777,7 +870,7 @@ export const updateFileMetadata = async (req: any, res: Response) => {
   try {
     // Leer valores actuales ANTES de actualizar (para mover el fichero local)
     const existing = await pool.query(
-      `SELECT original_name, attachment_type, storage_provider, drive_file_id FROM client_files WHERE id = $1 AND client_id = $2`,
+      `SELECT original_name, attachment_type, storage_provider, drive_file_id, dropbox_file_id FROM client_files WHERE id = $1 AND client_id = $2`,
       [fileId, clientId]
     );
     if (existing.rows.length === 0) {
@@ -787,6 +880,7 @@ export const updateFileMetadata = async (req: any, res: Response) => {
     const oldAttachType    = existing.rows[0].attachment_type as string | null;
     const storageProvider  = existing.rows[0].storage_provider as string | null;
     const driveFileId      = existing.rows[0].drive_file_id as string | null;
+    const dropboxFileId    = existing.rows[0].dropbox_file_id as string | null;
 
     let originalNameUpdate = '';
     let params: any[];
@@ -826,6 +920,14 @@ export const updateFileMetadata = async (req: any, res: Response) => {
         try { await renameDriveFile(ctx.organizacionId, driveFileId, newOriginalName); }
         catch (driveErr: any) { await recordDriveError(ctx.organizacionId, driveErr); }
       }
+    } else if (nameChanged && storageProvider === 'dropbox' && dropboxFileId) {
+      const ctx = await getExpedienteDriveContext(clientId);
+      if (ctx) {
+        try {
+          const folderPath = await ensureDropboxExpedienteFolder(ctx.organizacionId, clientId, ctx.expedienteName);
+          await moveOrRenameDropboxFile(ctx.organizacionId, dropboxFileId, folderPath, newOriginalName);
+        } catch (dbxErr: any) { await recordDropboxError(ctx.organizacionId, dbxErr); }
+      }
     }
 
     res.json({ success: true, data: result.rows[0] });
@@ -839,7 +941,7 @@ export const updateFileMetadata = async (req: any, res: Response) => {
 // ─────────────────────────────────────────────────────────────
 export const createBlankDocument = async (req: any, res: Response) => {
   const { clientId } = req.params;
-  const { document_name, attachment_type } = req.body;
+  const { document_name, attachment_type, provider: requestedProvider } = req.body;
   const userId = req.auth?.userId || 'SYSTEM';
 
   try {
@@ -873,12 +975,13 @@ export const createBlankDocument = async (req: any, res: Response) => {
     // URL de descarga con token incluido (el cliente la usará para Word)
     const downloadUrl = `/api/files/${clientId}/${fileId}/download`;
 
-    await tryUploadFileToDrive(
+    await tryUploadFileToCloud(
       clientId,
       fileId,
       originalName,
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       filePath,
+      requestedProvider,
     );
 
     logActivityForReq(req, `Documento creado: ${originalName}`, 'CLIENT', clientId);
@@ -957,13 +1060,13 @@ export const previewDocxAsHtml = async (req: any, res: Response) => {
   const { clientId, fileId } = req.params;
   try {
     const result = await pool.query(
-      `SELECT stored_name, original_name, mimetype, storage_provider, drive_file_id FROM client_files WHERE id = $1 AND client_id = $2`,
+      `SELECT stored_name, original_name, mimetype, storage_provider, drive_file_id, dropbox_file_id FROM client_files WHERE id = $1 AND client_id = $2`,
       [fileId, clientId]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
     }
-    const { stored_name, original_name, mimetype, storage_provider, drive_file_id } = result.rows[0];
+    const { stored_name, original_name, mimetype, storage_provider, drive_file_id, dropbox_file_id } = result.rows[0];
     const ext = path.extname(original_name || stored_name || '').toLowerCase();
     const isWord =
       mimetype?.includes('word') ||
@@ -976,7 +1079,7 @@ export const previewDocxAsHtml = async (req: any, res: Response) => {
       return res.status(400).json({ success: false, error: 'Este tipo de archivo no es soportado para previsualización.' });
     }
 
-    const filePath = await ensureFileOnDisk(clientId, stored_name, storage_provider, drive_file_id);
+    const filePath = await ensureFileOnDisk(clientId, stored_name, storage_provider, drive_file_id, dropbox_file_id);
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ success: false, error: 'Archivo no encontrado en disco.' });
     }
@@ -1556,15 +1659,15 @@ export const previewExcelAsHtml = async (req: any, res: Response) => {
   const { clientId, fileId } = req.params;
   try {
     const result = await pool.query(
-      `SELECT stored_name, original_name, mimetype, storage_provider, drive_file_id FROM client_files WHERE id = $1 AND client_id = $2`,
+      `SELECT stored_name, original_name, mimetype, storage_provider, drive_file_id, dropbox_file_id FROM client_files WHERE id = $1 AND client_id = $2`,
       [fileId, clientId]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
     }
-    const { stored_name, storage_provider, drive_file_id } = result.rows[0];
+    const { stored_name, storage_provider, drive_file_id, dropbox_file_id } = result.rows[0];
 
-    const filePath = await ensureFileOnDisk(clientId, stored_name, storage_provider, drive_file_id);
+    const filePath = await ensureFileOnDisk(clientId, stored_name, storage_provider, drive_file_id, dropbox_file_id);
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ success: false, error: 'Archivo no encontrado en disco.' });
     }
@@ -1860,14 +1963,14 @@ export const previewWordAsPdf = async (req: any, res: Response) => {
   const { clientId, fileId } = req.params;
   try {
     const result = await pool.query(
-      `SELECT stored_name, original_name, mimetype, storage_provider, drive_file_id FROM client_files WHERE id = $1 AND client_id = $2`,
+      `SELECT stored_name, original_name, mimetype, storage_provider, drive_file_id, dropbox_file_id FROM client_files WHERE id = $1 AND client_id = $2`,
       [fileId, clientId]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
     }
 
-    const { stored_name, original_name, mimetype, storage_provider, drive_file_id } = result.rows[0];
+    const { stored_name, original_name, mimetype, storage_provider, drive_file_id, dropbox_file_id } = result.rows[0];
     const ext = path.extname(original_name || stored_name || '').toLowerCase();
 
     // Tipos que LibreOffice puede convertir a PDF
@@ -1891,7 +1994,7 @@ export const previewWordAsPdf = async (req: any, res: Response) => {
       return res.status(400).json({ success: false, error: 'Formato no convertible a PDF.' });
     }
 
-    const sourcePath = await ensureFileOnDisk(clientId, stored_name, storage_provider, drive_file_id);
+    const sourcePath = await ensureFileOnDisk(clientId, stored_name, storage_provider, drive_file_id, dropbox_file_id);
     if (!fs.existsSync(sourcePath)) {
       return res.status(404).json({ success: false, error: 'Archivo no encontrado en disco.' });
     }

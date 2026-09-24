@@ -5,12 +5,14 @@ import { Spinner } from "./Spinner";
 import {
   Upload, FolderOpen, FilePlus2, Sparkles, Loader2,
   Eye, Download, Trash2, Edit3, ExternalLink, FileText,
-  ChevronDown, ChevronRight, X, Search, Copy, Clipboard,
+  ChevronDown, ChevronRight, X, Search, Copy, Clipboard, Cloud, Check,
 } from "lucide-react";
 import { safeJson, resolveApiUrl } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
 import { usePasteFiles, setErpClipboard, getErpClipboard, clearErpClipboard } from "../lib/usePasteFiles";
 import { FilePreviewModal, isVideoFile, isAudioFile } from "./FilePreviewModal";
+import { useOrganizacion } from "../lib/useOrganizacion";
+import { DriveLogo, DropboxLogo } from "./StorageStatusIcons";
 
 function fileIcon(mime: string, name: string) {
   const n = name.toLowerCase();
@@ -65,8 +67,16 @@ function encodeVantiaPayload(payload: unknown) {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
-export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false, locked = false }: { entityId: string; entity?: any; alwaysShowPreview?: boolean; locked?: boolean }) {
+export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview = false, locked = false }: {
+  entityId: string; entity?: any; entityType?: "cliente" | "expediente"; alwaysShowPreview?: boolean; locked?: boolean;
+}) {
   const { getToken } = useAuth();
+  const { organizacion } = useOrganizacion();
+  // Solo los adjuntos de EXPEDIENTES pueden ir a la nube (alcance acordado);
+  // para clientes esto no aplica nunca, así que ni se muestra el selector.
+  const askWhereToUpload = entityType === "expediente" && organizacion?.documentStorageMode === "ask";
+  const defaultUploadProvider = (organizacion?.documentStorageDefaultProvider === "dropbox" ? "dropbox" : "drive") as "drive" | "dropbox" | "local";
+  const [uploadProvider, setUploadProvider] = useState<"drive" | "dropbox" | "local">(defaultUploadProvider);
 
   const [files, setFiles]           = useState<any[]>([]);
   const [loadingFiles, setLoadingFiles] = useState(true);
@@ -381,8 +391,10 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false, loc
     const baseName = file.name.replace(/\.[^/.]+$/, '');
     setEditDocName(baseName);
     if (!keepType) setEditAttachmentType('Sin clasificar');
+    if (askWhereToUpload) setUploadProvider(defaultUploadProvider);
     setEditingFile({ id: 'PENDING_UPLOAD', document_name: baseName, attachment_type: 'Sin clasificar' });
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [askWhereToUpload, defaultUploadProvider]);
 
   // ── Interceptar selección: mostrar modal en lugar de subir directo ──
   const enqueueFiles = useCallback((fileList: FileList | File[]) => {
@@ -409,6 +421,7 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false, loc
       const token = await getToken({ skipCache: true });
       const fd = new FormData();
       fd.append('files', file);
+      if (askWhereToUpload) fd.append('provider', uploadProvider);
       const res = await fetch(`/api/files/${entityId}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
@@ -461,6 +474,7 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false, loc
         const file = allFiles[i];
         const fd = new FormData();
         fd.append('files', file);
+        if (askWhereToUpload) fd.append('provider', uploadProvider);
         const res = await fetch(`/api/files/${entityId}`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` },
@@ -614,6 +628,7 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false, loc
     setEditingFile({ id: 'NEW_BLANK', document_name: '', attachment_type: 'Sin clasificar' });
     setEditDocName('');
     setEditAttachmentType('Sin clasificar');
+    if (askWhereToUpload) setUploadProvider(defaultUploadProvider);
   };
 
   // ── Documento en blanco (después de ingresar nombre y tipo) ────
@@ -632,6 +647,7 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false, loc
         body: JSON.stringify({
           document_name: editDocName,
           attachment_type: editAttachmentType,
+          ...(askWhereToUpload ? { provider: uploadProvider } : {}),
         }),
       });
       if (!res.ok) throw new Error(`Error: ${res.status}`);
@@ -1647,6 +1663,39 @@ export function FilesTabPanel({ entityId, entity, alwaysShowPreview = false, loc
                   <option value="EVIDENCIA">EVIDENCIA</option>
                 </select>
               </div>
+
+              {/* Dónde guardarlo -- solo si el despacho tiene "preguntar cada vez" activado (Integraciones) */}
+              {askWhereToUpload && (editingFile.id === 'NEW_BLANK' || editingFile.id === 'PENDING_UPLOAD') && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1.5">¿Dónde lo guardamos?</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button type="button" onClick={() => setUploadProvider('drive')}
+                      className={`flex flex-col items-center gap-1 rounded-lg border px-2 py-2.5 text-[11px] font-semibold transition-colors ${
+                        uploadProvider === 'drive' ? 'border-red-400 bg-red-50 text-red-700' : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                      }`}>
+                      <DriveLogo size={18} /> Drive
+                      {uploadProvider === 'drive' && <Check size={11} className="text-red-600" />}
+                    </button>
+                    <button type="button" onClick={() => setUploadProvider('dropbox')}
+                      className={`flex flex-col items-center gap-1 rounded-lg border px-2 py-2.5 text-[11px] font-semibold transition-colors ${
+                        uploadProvider === 'dropbox' ? 'border-red-400 bg-red-50 text-red-700' : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                      }`}>
+                      <DropboxLogo size={18} /> Dropbox
+                      {uploadProvider === 'dropbox' && <Check size={11} className="text-red-600" />}
+                    </button>
+                    <button type="button" disabled title="Próximamente"
+                      className="flex cursor-not-allowed flex-col items-center gap-1 rounded-lg border border-slate-100 px-2 py-2.5 text-[11px] font-semibold text-slate-300">
+                      <Cloud size={18} className="text-[#0364B8] opacity-40" fill="currentColor" /> OneDrive
+                    </button>
+                  </div>
+                  {uploadProvider === 'drive' && !organizacion?.googleDriveConnected && (
+                    <p className="mt-1.5 text-[11px] text-amber-600">Google Drive no está vinculado -- se guardará solo en el servidor.</p>
+                  )}
+                  {uploadProvider === 'dropbox' && !organizacion?.dropboxConnected && (
+                    <p className="mt-1.5 text-[11px] text-amber-600">Dropbox no está vinculado -- se guardará solo en el servidor.</p>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Footer */}

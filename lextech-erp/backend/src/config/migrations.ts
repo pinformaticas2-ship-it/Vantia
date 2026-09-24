@@ -2303,6 +2303,28 @@ export async function runMigrations(): Promise<void> {
     ]) {
       try { await client.query(col); } catch (_e: any) {}
     }
+    // ── Dropbox: fase 2, guardar documentos de expedientes ahí ──────────────
+    // El scope de la app en Dropbox es "App folder": todos los paths que se
+    // usan aquí son relativos a esa carpeta propia dentro del Dropbox del
+    // usuario (no hace falta una carpeta raíz "Vantia - <org>" como en Drive,
+    // Dropbox ya aísla la app en su propia carpeta).
+    try {
+      await client.query(`ALTER TABLE expedientes ADD COLUMN IF NOT EXISTS dropbox_folder_path TEXT;`);
+    } catch (_e: any) {}
+    try {
+      await client.query(`ALTER TABLE client_files ADD COLUMN IF NOT EXISTS dropbox_file_id TEXT;`);
+    } catch (_e: any) {}
+    // Elegir dónde se guarda cada documento nuevo de expediente: 'auto' usa
+    // siempre la misma nube (document_storage_default_provider) sin
+    // preguntar; 'ask' le pide al usuario que elija en cada subida entre
+    // Drive/Dropbox/OneDrive (OneDrive solo estará disponible cuando esté
+    // conectada de verdad).
+    try {
+      await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS document_storage_mode TEXT NOT NULL DEFAULT 'auto';`);
+    } catch (_e: any) {}
+    try {
+      await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS document_storage_default_provider TEXT NOT NULL DEFAULT 'drive';`);
+    } catch (_e: any) {}
     try {
       await client.query(`ALTER TABLE expedientes ADD COLUMN IF NOT EXISTS google_drive_folder_id TEXT;`);
     } catch (_e: any) {}

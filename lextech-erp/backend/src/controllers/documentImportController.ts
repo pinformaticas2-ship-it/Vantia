@@ -19,7 +19,9 @@ import {
   type DocFile,
 } from '../utils/docExtract';
 import { UPLOADS_ROOT, UPLOADS_CLIENTS_ROOT } from '../config/paths';
-import { isDriveConnected, ensureExpedienteFolder, uploadFileToDrive } from '../utils/googleDrive';
+import { ensureExpedienteFolder, uploadFileToDrive } from '../utils/googleDrive';
+import { ensureExpedienteFolder as ensureDropboxExpedienteFolder, uploadFileToDropbox } from '../utils/dropboxStorage';
+import { resolveUploadProvider } from './filesController';
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
 const genAI = GEMINI_API_KEY ? new GoogleGenerativeAI(GEMINI_API_KEY) : null;
@@ -1437,37 +1439,59 @@ async function attachImportedDocumentToExpediente(
   const sourcePath = path.join(UPLOADS_ROOT, 'document-imports', String(payload?.batchId || ''), previewStoredName);
   if (!fs.existsSync(sourcePath)) return;
 
-  // Si la organización tiene Google Drive conectado, el documento se sube
-  // ahí (a la carpeta del expediente) en vez de al disco del servidor, que
-  // es efímero y se borra en cada despliegue. Si algo falla al subirlo (o
-  // no hay Drive conectado), se guarda en disco local como hasta ahora --
+  // Si el despacho tiene alguna nube conectada, el documento se sube ahí (a
+  // la carpeta del expediente) en vez de al disco del servidor, que es
+  // efímero y se borra en cada despliegue. Si algo falla al subirlo (o no
+  // hay ninguna nube conectada), se guarda en disco local como hasta ahora --
   // mejor que el documento se pierda a que la creación del expediente falle.
-  try {
-    if (await isDriveConnected(organizacionId)) {
-      const folderId = await ensureExpedienteFolder(organizacionId, expedienteId, expedienteName);
+  const cloudProvider = await resolveUploadProvider(organizacionId).catch(() => 'local' as const);
+  if (cloudProvider !== 'local') {
+    try {
       const buffer = fs.readFileSync(sourcePath);
-      const uploaded = await uploadFileToDrive(organizacionId, folderId, originalName, buffer, mimeType);
       const stat = fs.statSync(sourcePath);
-
-      await pool.query(
-        `INSERT INTO client_files
-           (client_id, original_name, stored_name, mimetype, size_bytes, document_name, attachment_type, created_by, storage_provider, drive_file_id)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'drive',$9)`,
-        [expedienteId, originalName, uploaded.id, mimeType, stat.size, documentName || null, 'Sin clasificar', userId_, uploaded.id],
-      );
-      await pool.query(
-        `UPDATE organizaciones SET google_drive_last_error = NULL, google_drive_last_error_at = NULL, google_drive_last_error_source = NULL WHERE id = $1`,
-        [organizacionId],
-      ).catch(() => {});
+      if (cloudProvider === 'drive') {
+        const folderId = await ensureExpedienteFolder(organizacionId, expedienteId, expedienteName);
+        const uploaded = await uploadFileToDrive(organizacionId, folderId, originalName, buffer, mimeType);
+        await pool.query(
+          `INSERT INTO client_files
+             (client_id, original_name, stored_name, mimetype, size_bytes, document_name, attachment_type, created_by, storage_provider, drive_file_id)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'drive',$9)`,
+          [expedienteId, originalName, uploaded.id, mimeType, stat.size, documentName || null, 'Sin clasificar', userId_, uploaded.id],
+        );
+        await pool.query(
+          `UPDATE organizaciones SET google_drive_last_error = NULL, google_drive_last_error_at = NULL, google_drive_last_error_source = NULL WHERE id = $1`,
+          [organizacionId],
+        ).catch(() => {});
+      } else {
+        const folderPath = await ensureDropboxExpedienteFolder(organizacionId, expedienteId, expedienteName);
+        const uploaded = await uploadFileToDropbox(organizacionId, folderPath, originalName, buffer, mimeType);
+        await pool.query(
+          `INSERT INTO client_files
+             (client_id, original_name, stored_name, mimetype, size_bytes, document_name, attachment_type, created_by, storage_provider, dropbox_file_id)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'dropbox',$9)`,
+          [expedienteId, originalName, uploaded.id, mimeType, stat.size, documentName || null, 'Sin clasificar', userId_, uploaded.id],
+        );
+        await pool.query(
+          `UPDATE organizaciones SET dropbox_last_error = NULL, dropbox_last_error_at = NULL WHERE id = $1`,
+          [organizacionId],
+        ).catch(() => {});
+      }
       return;
+    } catch (cloudErr: any) {
+      const cloudErrMessage = String(cloudErr?.message || cloudErr);
+      console.warn(`[documentImport] No se pudo subir el documento a ${cloudProvider}, se guarda en disco local:`, cloudErrMessage);
+      if (cloudProvider === 'drive') {
+        await pool.query(
+          `UPDATE organizaciones SET google_drive_last_error = $1, google_drive_last_error_at = now(), google_drive_last_error_source = 'op' WHERE id = $2`,
+          [cloudErrMessage.slice(0, 1000), organizacionId],
+        ).catch(() => {});
+      } else {
+        await pool.query(
+          `UPDATE organizaciones SET dropbox_last_error = $1, dropbox_last_error_at = now() WHERE id = $2`,
+          [cloudErrMessage.slice(0, 1000), organizacionId],
+        ).catch(() => {});
+      }
     }
-  } catch (driveErr: any) {
-    const driveErrMessage = String(driveErr?.message || driveErr);
-    console.warn('[documentImport] No se pudo subir el documento a Google Drive, se guarda en disco local:', driveErrMessage);
-    await pool.query(
-      `UPDATE organizaciones SET google_drive_last_error = $1, google_drive_last_error_at = now(), google_drive_last_error_source = 'op' WHERE id = $2`,
-      [driveErrMessage.slice(0, 1000), organizacionId],
-    ).catch(() => {});
   }
 
   const expedienteDir = ensureDir(path.join(UPLOADS_CLIENTS_ROOT, expedienteId));

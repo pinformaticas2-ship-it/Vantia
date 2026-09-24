@@ -1443,7 +1443,7 @@ interface WhatsAppIntegrationStatus {
 // mensajería todavía (ver [[project_vantia_pending_user_actions]]).
 function IntegracionesPanel({ canManage }: { canManage: boolean }) {
   const { getToken } = useAuth();
-  const { organizacion } = useOrganizacion();
+  const { organizacion, reload: reloadOrganizacion } = useOrganizacion();
   const [driveConnecting, setDriveConnecting] = useState(false);
   const [driveError, setDriveError] = useState('');
   const [disconnectingDrive, setDisconnectingDrive] = useState(false);
@@ -1495,6 +1495,35 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
     } catch (e: any) {
       setDropboxError(e.message || 'No se pudo desconectar Dropbox');
       setDisconnectingDropbox(false);
+    }
+  };
+
+  // ── Almacenamiento de documentos: automático vs preguntar cada vez ───────
+  const [storageMode, setStorageMode] = useState<'auto' | 'ask'>(organizacion?.documentStorageMode || 'auto');
+  const [storageDefault, setStorageDefault] = useState<'drive' | 'dropbox'>(organizacion?.documentStorageDefaultProvider || 'drive');
+  const [savingStorageSettings, setSavingStorageSettings] = useState(false);
+  const [storageSettingsError, setStorageSettingsError] = useState('');
+  const [storageSettingsSaved, setStorageSettingsSaved] = useState(false);
+
+  useEffect(() => {
+    if (organizacion?.documentStorageMode) setStorageMode(organizacion.documentStorageMode);
+    if (organizacion?.documentStorageDefaultProvider) setStorageDefault(organizacion.documentStorageDefaultProvider);
+  }, [organizacion?.documentStorageMode, organizacion?.documentStorageDefaultProvider]);
+
+  const saveStorageSettings = async (mode: 'auto' | 'ask', defaultProvider: 'drive' | 'dropbox') => {
+    setSavingStorageSettings(true); setStorageSettingsError(''); setStorageSettingsSaved(false);
+    try {
+      const data = await apiFetch('/api/organizacion/document-storage-settings', {
+        method: 'PUT', getToken, body: JSON.stringify({ mode, defaultProvider }),
+      });
+      if (data?.success === false) throw new Error(data.error);
+      await reloadOrganizacion();
+      setStorageSettingsSaved(true);
+      setTimeout(() => setStorageSettingsSaved(false), 2000);
+    } catch (e: any) {
+      setStorageSettingsError(e.message || 'No se pudo guardar.');
+    } finally {
+      setSavingStorageSettings(false);
     }
   };
 
@@ -1755,6 +1784,62 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
           )}
           {dropboxError && <p className="mt-2 text-xs text-rose-600">{dropboxError}</p>}
         </div>
+      </div>
+
+      <div className="mt-6 max-w-2xl rounded-2xl border border-slate-200 bg-white p-6">
+        <h3 className="mb-1 text-sm font-bold uppercase tracking-wider text-slate-800">Almacenamiento de documentos</h3>
+        <p className="mb-4 text-xs text-slate-500">
+          A qué nube van los documentos nuevos de un expediente, cuando hay más de una conectada.
+        </p>
+        {!canManage ? (
+          <p className="text-xs text-slate-400">Solo el propietario o un administrador pueden cambiar esto.</p>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
+              <button
+                type="button"
+                disabled={savingStorageSettings}
+                onClick={() => { setStorageMode('auto'); saveStorageSettings('auto', storageDefault); }}
+                className={`flex-1 rounded-xl border px-4 py-3 text-left transition-colors disabled:opacity-60 ${
+                  storageMode === 'auto' ? 'border-red-400 bg-red-50' : 'border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <p className="text-sm font-bold text-slate-800">Automático</p>
+                <p className="mt-0.5 text-xs text-slate-500">Siempre la misma nube, sin preguntar.</p>
+              </button>
+              <button
+                type="button"
+                disabled={savingStorageSettings}
+                onClick={() => { setStorageMode('ask'); saveStorageSettings('ask', storageDefault); }}
+                className={`flex-1 rounded-xl border px-4 py-3 text-left transition-colors disabled:opacity-60 ${
+                  storageMode === 'ask' ? 'border-red-400 bg-red-50' : 'border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <p className="text-sm font-bold text-slate-800">Preguntar cada vez</p>
+                <p className="mt-0.5 text-xs text-slate-500">Al subir un documento, elige Drive, Dropbox u OneDrive.</p>
+              </button>
+            </div>
+            {storageMode === 'auto' && (
+              <div>
+                <label className="mb-1.5 block text-xs font-bold text-slate-600">Nube por defecto</label>
+                <select
+                  value={storageDefault}
+                  disabled={savingStorageSettings}
+                  onChange={(e) => { const v = e.target.value as 'drive' | 'dropbox'; setStorageDefault(v); saveStorageSettings('auto', v); }}
+                  className="w-full max-w-xs rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:border-red-300"
+                >
+                  <option value="drive">Google Drive</option>
+                  <option value="dropbox">Dropbox</option>
+                </select>
+                <p className="mt-1.5 text-[11px] text-slate-400">
+                  Si la elegida no está conectada, se usa la que sí lo esté; si ninguna lo está, se guarda solo en el servidor.
+                </p>
+              </div>
+            )}
+            {storageSettingsError && <p className="text-xs text-rose-600">{storageSettingsError}</p>}
+            {storageSettingsSaved && <p className="text-xs text-emerald-600">Guardado.</p>}
+          </div>
+        )}
       </div>
 
       {canManage && expanded && (

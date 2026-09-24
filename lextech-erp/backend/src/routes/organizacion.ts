@@ -23,6 +23,7 @@ import {
   disconnectGoogleDrive,
   exchangeDropboxCode,
   disconnectDropbox,
+  updateDocumentStorageSettings,
 } from '../controllers/organizacionesController';
 
 const router = Router();
@@ -36,6 +37,7 @@ router.post('/drive/exchange-code', requireAuth, exchangeGoogleDriveCode);
 router.delete('/drive', requireAuth, disconnectGoogleDrive);
 router.post('/dropbox/exchange-code', requireAuth, exchangeDropboxCode);
 router.delete('/dropbox', requireAuth, disconnectDropbox);
+router.put('/document-storage-settings', requireAuth, updateDocumentStorageSettings);
 router.get('/miembros', requireAuth, getOrganizacionMiembros);
 router.post('/miembros', requireAuth, addOrganizacionMiembro);
 router.patch('/miembros/:id', requireAuth, updateOrganizacionMiembroRol);

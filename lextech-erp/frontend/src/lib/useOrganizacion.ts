@@ -28,6 +28,8 @@ export interface OrganizacionInfo {
   googleDriveErrorMessage?: string | null;
   dropboxConnected?: boolean;
   dropboxEmail?: string | null;
+  documentStorageMode?: 'auto' | 'ask';
+  documentStorageDefaultProvider?: 'drive' | 'dropbox';
 }
 
 export interface OrganizacionMembership extends OrganizacionInfo {
