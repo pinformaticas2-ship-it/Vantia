@@ -1645,17 +1645,9 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
           <p className="mt-3 flex-1 text-xs leading-5 text-slate-500">
             Habla con tus clientes por WhatsApp desde Comunicación Externa, sin salir del ERP.
           </p>
-          {canManage ? (
-            <button
-              type="button"
-              onClick={() => setExpanded((v) => !v)}
-              className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50"
-            >
-              <Link2 size={13} /> {waConnected ? 'Gestionar' : 'Conectar'}
-            </button>
-          ) : (
-            <p className="mt-4 text-[11px] text-slate-400">Solo el propietario o un administrador pueden configurarlo.</p>
-          )}
+          <p className="mt-4 text-[11px] text-slate-400">
+            {canManage ? 'Configúralo en "WhatsApp Business" más abajo.' : 'Solo el propietario o un administrador pueden configurarlo.'}
+          </p>
         </div>
 
         <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5">
@@ -1918,50 +1910,72 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
         </div>
       )}
 
-      {canManage && expanded && (
-        <div className="mt-6 max-w-2xl rounded-2xl border border-slate-200 bg-white p-6">
-          <h3 className="mb-1 text-sm font-bold uppercase tracking-wider text-slate-800">Configurar WhatsApp Business</h3>
-          <p className="mb-4 text-xs text-slate-500">
-            El access token, el phone number id y el verify token se obtienen en developers.facebook.com, dentro de la app
-            conectada al número Business del despacho.
-          </p>
-          {error && <p className="mb-3 text-xs font-medium text-rose-600">{error}</p>}
-          {message && <p className="mb-3 text-xs font-medium text-emerald-600">{message}</p>}
-          <div className="grid gap-4 sm:grid-cols-2">
-            <ConfigInput label="Access token" value={form.accessToken} onChange={(v) => setForm((f) => ({ ...f, accessToken: v }))} placeholder="EAAG..." />
-            <ConfigInput label="Phone number id" value={form.phoneNumberId} onChange={(v) => setForm((f) => ({ ...f, phoneNumberId: v }))} placeholder="123456789012345" />
-            <ConfigInput label="Verify token" value={form.verifyToken} onChange={(v) => setForm((f) => ({ ...f, verifyToken: v }))} placeholder="token-seguro" />
-            <ConfigInput label="Webhook base URL" value={form.webhookBaseUrl} onChange={(v) => setForm((f) => ({ ...f, webhookBaseUrl: v }))} placeholder="https://tu-dominio.com" />
-            <ConfigInput label="Graph version" value={form.graphVersion} onChange={(v) => setForm((f) => ({ ...f, graphVersion: v }))} placeholder="v23.0" />
-            <ConfigInput label="Business account id" value={form.businessAccountId} onChange={(v) => setForm((f) => ({ ...f, businessAccountId: v }))} placeholder="opcional" />
+      <div className="mt-4 max-w-2xl">
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-2.5 text-left transition-colors hover:bg-slate-100/70"
+        >
+          <span className="flex items-center gap-2 text-xs text-slate-500">
+            <MessageCircle size={13} className="shrink-0 text-slate-400" />
+            WhatsApp Business:{' '}
+            <span className="font-semibold text-slate-700">
+              {loading ? '…' : waConnected ? 'conectado' : 'sin configurar'}
+            </span>
+          </span>
+          <ChevronDown size={14} className={`shrink-0 text-slate-400 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+        </button>
+
+        {expanded && (
+          <div className="mt-2 rounded-xl border border-slate-200 bg-white p-5 animate-fade-in">
+            {!canManage ? (
+              <p className="text-xs text-slate-400">Solo el propietario o un administrador pueden cambiar esto.</p>
+            ) : (
+              <>
+                <p className="mb-4 text-xs text-slate-500">
+                  El access token, el phone number id y el verify token se obtienen en developers.facebook.com, dentro de la app
+                  conectada al número Business del despacho.
+                </p>
+                {error && <p className="mb-3 text-xs font-medium text-rose-600">{error}</p>}
+                {message && <p className="mb-3 text-xs font-medium text-emerald-600">{message}</p>}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <ConfigInput label="Access token" value={form.accessToken} onChange={(v) => setForm((f) => ({ ...f, accessToken: v }))} placeholder="EAAG..." />
+                  <ConfigInput label="Phone number id" value={form.phoneNumberId} onChange={(v) => setForm((f) => ({ ...f, phoneNumberId: v }))} placeholder="123456789012345" />
+                  <ConfigInput label="Verify token" value={form.verifyToken} onChange={(v) => setForm((f) => ({ ...f, verifyToken: v }))} placeholder="token-seguro" />
+                  <ConfigInput label="Webhook base URL" value={form.webhookBaseUrl} onChange={(v) => setForm((f) => ({ ...f, webhookBaseUrl: v }))} placeholder="https://tu-dominio.com" />
+                  <ConfigInput label="Graph version" value={form.graphVersion} onChange={(v) => setForm((f) => ({ ...f, graphVersion: v }))} placeholder="v23.0" />
+                  <ConfigInput label="Business account id" value={form.businessAccountId} onChange={(v) => setForm((f) => ({ ...f, businessAccountId: v }))} placeholder="opcional" />
+                </div>
+                <div className="mt-5 flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="inline-flex items-center gap-2 rounded-lg bg-[#ab0433] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#92042c] disabled:opacity-50"
+                  >
+                    {saving ? <Loader2 size={14} className="animate-spin" /> : <KeyRound size={14} />}
+                    Guardar credenciales
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleTest}
+                    disabled={testing || !status?.phoneNumberIdConfigured || !status?.accessTokenConfigured}
+                    className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    {testing ? <Loader2 size={14} className="animate-spin" /> : <LockKeyhole size={14} />}
+                    Probar conexión
+                  </button>
+                </div>
+                {status?.webhookUrl && (
+                  <p className="mt-4 text-[11px] text-slate-400">
+                    URL de webhook para pegar en Meta: <code className="rounded bg-slate-50 px-1.5 py-0.5 text-slate-600">{status.webhookUrl}</code>
+                  </p>
+                )}
+              </>
+            )}
           </div>
-          <div className="mt-5 flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving}
-              className="inline-flex items-center gap-2 rounded-lg bg-[#ab0433] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#92042c] disabled:opacity-50"
-            >
-              {saving ? <Loader2 size={14} className="animate-spin" /> : <KeyRound size={14} />}
-              Guardar credenciales
-            </button>
-            <button
-              type="button"
-              onClick={handleTest}
-              disabled={testing || !status?.phoneNumberIdConfigured || !status?.accessTokenConfigured}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
-            >
-              {testing ? <Loader2 size={14} className="animate-spin" /> : <LockKeyhole size={14} />}
-              Probar conexión
-            </button>
-          </div>
-          {status?.webhookUrl && (
-            <p className="mt-4 text-[11px] text-slate-400">
-              URL de webhook para pegar en Meta: <code className="rounded bg-slate-50 px-1.5 py-0.5 text-slate-600">{status.webhookUrl}</code>
-            </p>
-          )}
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
