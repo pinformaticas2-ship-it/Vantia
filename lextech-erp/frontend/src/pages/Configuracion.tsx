@@ -1505,6 +1505,15 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
   const [storageSettingsError, setStorageSettingsError] = useState('');
   const [storageSettingsSaved, setStorageSettingsSaved] = useState(false);
   const [showStorageSettings, setShowStorageSettings] = useState(false);
+  const [showProviderPicker, setShowProviderPicker] = useState(false);
+  const providerPickerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!showProviderPicker) return;
+    const h = (e: MouseEvent) => { if (providerPickerRef.current && !providerPickerRef.current.contains(e.target as Node)) setShowProviderPicker(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [showProviderPicker]);
+  const providerLabel = (p: 'drive' | 'dropbox') => (p === 'drive' ? 'Google Drive' : 'Dropbox');
 
   useEffect(() => {
     if (organizacion?.documentStorageMode) setStorageMode(organizacion.documentStorageMode);
@@ -1838,15 +1847,40 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
                   {storageMode === 'auto' && (
                     <div>
                       <label className="mb-1.5 block text-xs font-bold text-slate-600">Nube por defecto</label>
-                      <select
-                        value={storageDefault}
-                        disabled={savingStorageSettings}
-                        onChange={(e) => { const v = e.target.value as 'drive' | 'dropbox'; setStorageDefault(v); saveStorageSettings('auto', v); }}
-                        className="w-full max-w-xs rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:border-red-300"
-                      >
-                        <option value="drive">Google Drive</option>
-                        <option value="dropbox">Dropbox</option>
-                      </select>
+                      <div className="relative w-full max-w-xs" ref={providerPickerRef}>
+                        <button
+                          type="button"
+                          disabled={savingStorageSettings}
+                          onClick={() => setShowProviderPicker(v => !v)}
+                          className="flex w-full items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 transition-colors hover:border-slate-300 focus:outline-none focus:border-red-300 disabled:opacity-60"
+                        >
+                          <span className="flex items-center gap-2">
+                            {storageDefault === 'drive' ? <DriveLogo size={16} /> : <DropboxLogo size={16} />}
+                            {providerLabel(storageDefault)}
+                          </span>
+                          <ChevronDown size={14} className={`shrink-0 text-slate-400 transition-transform ${showProviderPicker ? 'rotate-180' : ''}`} />
+                        </button>
+                        {showProviderPicker && (
+                          <div className="absolute left-0 top-full z-10 mt-1 w-full overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg animate-fade-in">
+                            {(['drive', 'dropbox'] as const).map(p => (
+                              <button
+                                key={p}
+                                type="button"
+                                onClick={() => { setStorageDefault(p); saveStorageSettings('auto', p); setShowProviderPicker(false); }}
+                                className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm transition-colors ${
+                                  storageDefault === p ? 'bg-red-50 font-semibold text-red-700' : 'text-slate-700 hover:bg-slate-50'
+                                }`}
+                              >
+                                <span className="flex items-center gap-2">
+                                  {p === 'drive' ? <DriveLogo size={16} /> : <DropboxLogo size={16} />}
+                                  {providerLabel(p)}
+                                </span>
+                                {storageDefault === p && <Check size={14} />}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                       <p className="mt-1.5 text-[11px] text-slate-400">
                         Si la elegida no está conectada, se usa la que sí lo esté; si ninguna lo está, se guarda solo en el servidor.
                       </p>
