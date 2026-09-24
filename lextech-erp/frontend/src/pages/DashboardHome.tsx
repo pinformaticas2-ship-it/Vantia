@@ -9,7 +9,7 @@ import {
   ChevronDown, FileSpreadsheet, ClipboardList,
   ScanLine, ExternalLink, MoreHorizontal, LayoutGrid, X, GripVertical,
   Briefcase, Users, History, MessageSquare, MessageCircle, Mail, Library,
-  Receipt, Reply, MailOpen, ArrowRight, Check,
+  Receipt, Reply, MailOpen, ArrowRight, Check, Trash2, Eye,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { safeJson } from "../lib/api";
@@ -246,6 +246,117 @@ function WidgetPickerModal({ visible, isAdmin, onClose, onSave }: { visible: str
   );
 }
 
+// ── Vista previa de correo (widget "Correo" del dashboard) ────────────────────
+// Cuerpo renderizado en un iframe con sandbox, igual que el lector completo de
+// Email.tsx -- así un HTML de correo con <script>/estilos raros no puede tocar
+// el resto de la página, sin necesidad de sanitizar el HTML a mano.
+function linkifyPlainTextDash(escapedText: string): string {
+  return escapedText
+    .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>')
+    .replace(/([\w.+-]+@[\w-]+\.[\w.-]+)(?![^<]*>)/g, '<a href="mailto:$1">$1</a>');
+}
+function buildEmailPreviewDoc(bodyHtml?: string | null, bodyText?: string | null): string {
+  const looksLikeHtml = bodyText && /<[a-z][\s\S]*>/i.test(bodyText);
+  const html = bodyHtml || (looksLikeHtml ? bodyText : null);
+  const content = html
+    || (bodyText
+      ? `<pre style="font-family:inherit;white-space:pre-wrap;word-break:break-word;margin:0;padding:0">${linkifyPlainTextDash(bodyText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'))}</pre>`
+      : '<p style="color:#9ca3af;font-style:italic;margin:0">Sin contenido</p>');
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><base target="_blank">
+<style>
+  html,body{margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:14px;color:#1f2937;line-height:1.7;background:#fff;word-break:break-word;overflow-wrap:break-word;padding:16px}
+  a{color:#2563eb}a:hover{text-decoration:underline}
+  img{max-width:100%!important;height:auto}
+  *{box-sizing:border-box}
+  blockquote{border-left:3px solid #e2e8f0;margin:8px 0;padding:4px 14px;color:#64748b}
+  table{max-width:100%!important;border-collapse:collapse}
+  pre{white-space:pre-wrap;word-break:break-word;font-family:inherit}
+  p{margin:0 0 6px}
+</style></head><body>${content}</body></html>`;
+}
+
+function EmailPreviewModal({
+  data, loading, deleting, onClose, onReply, onOpenFull, onDelete,
+}: {
+  data: any | null;
+  loading: boolean;
+  deleting: boolean;
+  onClose: () => void;
+  onReply: () => void;
+  onOpenFull: () => void;
+  onDelete: () => void;
+}) {
+  useEffect(() => {
+    const scrollEl = document.getElementById("dashboard-content") as HTMLElement | null;
+    const prevScroll = scrollEl?.style.overflow ?? "";
+    if (scrollEl) scrollEl.style.overflow = "hidden";
+    return () => { if (scrollEl) scrollEl.style.overflow = prevScroll; };
+  }, []);
+
+  return createPortal(
+    <div className="fixed inset-0 z-[70] flex items-start justify-center bg-slate-900/40 px-4 pb-8 pt-[8vh]" onClick={onClose}>
+      <div
+        className="flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="shrink-0 flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-4">
+          {loading || !data ? (
+            <div className="flex items-center gap-2 text-sm text-slate-400"><Spinner size="sm" muted /> Cargando…</div>
+          ) : (
+            <div className="min-w-0">
+              <h3 className="text-base font-bold text-slate-900 truncate">{data.subject || "(Sin asunto)"}</h3>
+              <p className="mt-1 text-xs text-slate-500 truncate">
+                <span className="font-semibold text-slate-700">{data.from_name || data.from_email || "Desconocido"}</span>
+                {data.from_name && data.from_email ? ` · ${data.from_email}` : ""}
+                {data.sent_at ? ` · ${new Date(data.sent_at).toLocaleString("es-ES")}` : ""}
+              </p>
+            </div>
+          )}
+          <button onClick={onClose} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-50"><X size={16} /></button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          {loading || !data ? (
+            <div className="flex items-center justify-center py-16"><Spinner muted /></div>
+          ) : (
+            <iframe
+              srcDoc={buildEmailPreviewDoc(data.body_html, data.body_text)}
+              title="Vista previa del correo"
+              sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+              className="block w-full border-0"
+              style={{ height: "50vh" }}
+            />
+          )}
+        </div>
+        <div className="shrink-0 flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 px-5 py-3">
+          <button
+            onClick={onDelete}
+            disabled={deleting || loading}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3.5 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 disabled:opacity-50"
+          >
+            {deleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />} Eliminar
+          </button>
+          <button
+            onClick={onReply}
+            disabled={loading}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          >
+            <Reply size={13} /> Responder
+          </button>
+          <button
+            onClick={onOpenFull}
+            disabled={loading}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-slate-800 px-3.5 py-2 text-xs font-semibold text-white hover:bg-slate-900 disabled:opacity-50"
+          >
+            <ExternalLink size={13} /> Abrir completo
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 // ── Sortable wrapper ──────────────────────────────────────────────────────────
 function SortableWidget({ id, children, className, animDelay = 0 }: { id: string; children: (handle: ReactNode) => ReactNode; className?: string; animDelay?: number }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
@@ -448,6 +559,10 @@ export default function DashboardHome() {
   const emailAccountMenuRef = useRef<HTMLDivElement | null>(null);
   const [openMenuEmailId,      setOpenMenuEmailId]      = useState<string | null>(null);
   const emailMenuRef = useRef<HTMLDivElement | null>(null);
+  const [previewEmailId,   setPreviewEmailId]   = useState<string | null>(null);
+  const [previewEmailData, setPreviewEmailData] = useState<any | null>(null);
+  const [previewLoading,   setPreviewLoading]   = useState(false);
+  const [deletingEmailId,  setDeletingEmailId]  = useState<string | null>(null);
   const [docStats,      setDocStats]      = useState({ providers: 0, activos: 0, lexnet: false });
 
   // Billing period state
@@ -755,6 +870,59 @@ export default function DashboardHome() {
       setEmailMessages(prev => prev.map(m => m.id === msgId ? { ...m, is_read: true } : m));
       setEmailStats(prev => ({ ...prev, unread: Math.max(0, prev.unread - 1) }));
     } catch {/* */}
+  }, [getToken]);
+
+  // Vista previa sin salir del dashboard -- GET /messages/:id ya marca el
+  // correo como leído en servidor (igual que abrirlo en la bandeja normal),
+  // así que se replica ese efecto en el estado local de la tarjeta.
+  const openEmailPreview = useCallback(async (msg: any) => {
+    setOpenMenuEmailId(null);
+    setPreviewEmailId(msg.id);
+    setPreviewEmailData(null);
+    setPreviewLoading(true);
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/email/messages/${msg.id}`, { headers: { Authorization: `Bearer ${token}` } });
+      const d = await safeJson(res);
+      if (res.ok) {
+        setPreviewEmailData(d.data);
+        if (!msg.is_read) {
+          setEmailMessages(prev => prev.map(m => m.id === msg.id ? { ...m, is_read: true } : m));
+          setEmailStats(prev => ({ ...prev, unread: Math.max(0, prev.unread - 1) }));
+        }
+      }
+    } catch {/* */} finally {
+      setPreviewLoading(false);
+    }
+  }, [getToken]);
+
+  const closeEmailPreview = useCallback(() => {
+    setPreviewEmailId(null);
+    setPreviewEmailData(null);
+  }, []);
+
+  const deleteEmailMsg = useCallback(async (msg: any) => {
+    setOpenMenuEmailId(null);
+    setDeletingEmailId(msg.id);
+    try {
+      const token = await getToken({ skipCache: true });
+      const res = await fetch(`/api/email/messages/${msg.id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setEmailMessages(prev => prev.filter(m => m.id !== msg.id));
+        setEmailStats(prev => ({
+          ...prev,
+          inbox: Math.max(0, prev.inbox - 1),
+          unread: msg.is_read ? prev.unread : Math.max(0, prev.unread - 1),
+        }));
+        setPreviewEmailId(cur => cur === msg.id ? null : cur);
+        setPreviewEmailData((cur: any) => cur?.id === msg.id ? null : cur);
+      }
+    } catch {/* */} finally {
+      setDeletingEmailId(null);
+    }
   }, [getToken]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
@@ -1223,8 +1391,8 @@ export default function DashboardHome() {
               {emailMessages.slice(0, 5).map((msg: any, i: number) => (
                 <div
                   key={i}
-                  className={`relative flex cursor-pointer items-start gap-3.5 p-4 hover:bg-slate-50 transition-colors ${!msg.is_read ? "bg-blue-50/20" : ""}`}
-                  onClick={() => setOpenMenuEmailId(openMenuEmailId === msg.id ? null : msg.id)}
+                  className={`group relative flex cursor-pointer items-start gap-3.5 p-4 pr-9 hover:bg-slate-50 transition-colors ${!msg.is_read ? "bg-blue-50/20" : ""} ${deletingEmailId === msg.id ? "opacity-40 pointer-events-none" : ""}`}
+                  onClick={() => openEmailPreview(msg)}
                 >
                   {!msg.is_read && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-blue-500" />}
                   <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${!msg.is_read ? "bg-blue-500 shadow-sm shadow-blue-500/30" : "bg-slate-200 border border-slate-300"}`} />
@@ -1242,11 +1410,25 @@ export default function DashboardHome() {
                     </p>
                   </div>
 
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setOpenMenuEmailId(openMenuEmailId === msg.id ? null : msg.id); }}
+                    className="absolute right-2 top-3 rounded-lg p-1 text-slate-300 opacity-0 transition-opacity hover:bg-slate-100 hover:text-slate-500 group-hover:opacity-100"
+                  >
+                    <MoreHorizontal size={15} />
+                  </button>
+
                   {openMenuEmailId === msg.id && (
                     <div
                       className="absolute right-3 top-8 z-30 w-48 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
                       onClick={(e) => e.stopPropagation()}
                     >
+                      <button
+                        className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                        onClick={() => openEmailPreview(msg)}
+                      >
+                        <Eye size={13} className="text-slate-400" /> Vista previa
+                      </button>
                       <button
                         className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                         onClick={() => { setOpenMenuEmailId(null); navigate(`/dashboard/correo?openEmail=${msg.id}`); }}
@@ -1267,6 +1449,12 @@ export default function DashboardHome() {
                           <MailOpen size={13} className="text-slate-400" /> Marcar como leído
                         </button>
                       )}
+                      <button
+                        className="flex w-full items-center gap-2.5 border-t border-slate-100 px-4 py-2.5 text-left text-xs font-medium text-rose-600 hover:bg-rose-50 transition-colors"
+                        onClick={() => deleteEmailMsg(msg)}
+                      >
+                        <Trash2 size={13} /> Eliminar
+                      </button>
                     </div>
                   )}
                 </div>
@@ -1569,6 +1757,18 @@ export default function DashboardHome() {
 
       {showWidgetPicker && (
         <WidgetPickerModal visible={visibleWidgets} isAdmin={isAdmin} onClose={() => setShowWidgetPicker(false)} onSave={saveVisible} />
+      )}
+
+      {previewEmailId && (
+        <EmailPreviewModal
+          data={previewEmailData}
+          loading={previewLoading}
+          deleting={deletingEmailId === previewEmailId}
+          onClose={closeEmailPreview}
+          onReply={() => { const id = previewEmailId; closeEmailPreview(); navigate(`/dashboard/correo?openEmail=${id}&reply=1`); }}
+          onOpenFull={() => { const id = previewEmailId; closeEmailPreview(); navigate(`/dashboard/correo?openEmail=${id}`); }}
+          onDelete={() => deleteEmailMsg({ id: previewEmailId, is_read: true })}
+        />
       )}
     </div>
   );

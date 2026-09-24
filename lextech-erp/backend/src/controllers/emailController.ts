@@ -62,6 +62,19 @@ async function gmailApiPost(path: string, accessToken: string, body: object): Pr
   return res.json();
 }
 
+// Borrado permanente: la API de Gmail no tiene un endpoint POST .../delete
+// como trash/untrash -- es el único que usa el verbo HTTP DELETE.
+async function gmailApiDelete(path: string, accessToken: string): Promise<void> {
+  const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me${path}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) {
+    const b = await res.json().catch(() => ({} as any)) as any;
+    throw Object.assign(new Error(b?.error?.message || `Gmail API ${res.status}`), { code: res.status });
+  }
+}
+
 // ── OAuth de Google: canje de código y renovación de token ──────────────────
 // El token de acceso de Gmail dura ~1h. Antes de esto no había forma de
 // renovarlo sin que el propio navegador volviera a hacer una llamada en vivo
@@ -1248,13 +1261,18 @@ export async function deleteMessage(req: Request, res: Response) {
   const permanent = req.query.permanent === '1';
 
   try {
+    // LEFT JOIN (no JOIN): un correo de Gmail no tiene account_id -- con JOIN
+    // esta consulta no encontraba nunca esos mensajes y el borrado devolvía
+    // 404 en silencio para cualquier cuenta de Gmail (la mayoría de cuentas).
     const { rows } = await pool.query(
-      `SELECT e.uid, e.folder, a.imap_host, a.imap_port, a.imap_secure, a.username, a.password_enc
-       FROM emails e JOIN email_accounts a ON a.id=e.account_id
+      `SELECT e.uid, e.folder, e.gmail_profile_id, e.gmail_message_id,
+              a.imap_host, a.imap_port, a.imap_secure, a.username, a.password_enc
+       FROM emails e LEFT JOIN email_accounts a ON a.id=e.account_id
        WHERE e.id=$1 AND e.user_id=$2`,
       [id, uid],
     );
     if (!rows.length) return err(res, 'Email no encontrado', 404);
+    const row = rows[0];
 
     if (permanent) {
       await pool.query(`DELETE FROM emails WHERE id=$1 AND user_id=$2`, [id, uid]);
@@ -1265,9 +1283,16 @@ export async function deleteMessage(req: Request, res: Response) {
       );
     }
 
-    // Best-effort IMAP delete
-    const row = rows[0];
-    if (row.uid) {
+    if (row.gmail_profile_id && row.gmail_message_id) {
+      // Best-effort Gmail trash/delete -- si el token falla, el mensaje ya
+      // ha desaparecido de la bandeja local igualmente.
+      try {
+        const accessToken = await getGmailAccessToken(row.gmail_profile_id, uid, (req as any).organizacionId);
+        if (permanent) await gmailApiDelete(`/messages/${row.gmail_message_id}`, accessToken);
+        else await gmailApiPost(`/messages/${row.gmail_message_id}/trash`, accessToken, {});
+      } catch (_e) {}
+    } else if (row.uid) {
+      // Best-effort IMAP delete
       try {
         const password = decryptPassword(row.password_enc);
         const cfg: ImapConfig = {
