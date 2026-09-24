@@ -9,7 +9,7 @@ import {
   ChevronDown, FileSpreadsheet, ClipboardList,
   ScanLine, ExternalLink, MoreHorizontal, LayoutGrid, X, GripVertical,
   Briefcase, Users, History, MessageSquare, MessageCircle, Mail, Library,
-  Receipt, Reply, MailOpen, ArrowRight, Check, Trash2, Eye,
+  Receipt, Reply, MailOpen, ArrowRight, Check, Trash2,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { safeJson } from "../lib/api";
@@ -562,8 +562,6 @@ export default function DashboardHome() {
   const [selectedEmailAccountId, setSelectedEmailAccountId] = useState<string>("");
   const [emailAccountMenuOpen, setEmailAccountMenuOpen] = useState(false);
   const emailAccountMenuRef = useRef<HTMLDivElement | null>(null);
-  const [openMenuEmailId,      setOpenMenuEmailId]      = useState<string | null>(null);
-  const emailMenuRef = useRef<HTMLDivElement | null>(null);
   const [previewEmailId,   setPreviewEmailId]   = useState<string | null>(null);
   const [previewEmailData, setPreviewEmailData] = useState<any | null>(null);
   const [previewLoading,   setPreviewLoading]   = useState(false);
@@ -859,9 +857,6 @@ export default function DashboardHome() {
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (emailMenuRef.current && !emailMenuRef.current.contains(e.target as Node)) {
-        setOpenMenuEmailId(null);
-      }
       if (emailAccountMenuRef.current && !emailAccountMenuRef.current.contains(e.target as Node)) {
         setEmailAccountMenuOpen(false);
       }
@@ -887,7 +882,6 @@ export default function DashboardHome() {
   // correo como leído en servidor (igual que abrirlo en la bandeja normal),
   // así que se replica ese efecto en el estado local de la tarjeta.
   const openEmailPreview = useCallback(async (msg: any) => {
-    setOpenMenuEmailId(null);
     setPreviewEmailId(msg.id);
     setPreviewEmailData(null);
     setPreviewLoading(true);
@@ -913,7 +907,6 @@ export default function DashboardHome() {
   }, []);
 
   const deleteEmailMsg = useCallback(async (msg: any) => {
-    setOpenMenuEmailId(null);
     setDeletingEmailId(msg.id);
     try {
       const token = await getToken({ skipCache: true });
@@ -1409,11 +1402,11 @@ export default function DashboardHome() {
           ) : emailMessages.length === 0 ? (
             <p className="py-8 text-center text-xs text-slate-400">Sin mensajes recientes</p>
           ) : (
-            <div className="flex flex-col divide-y divide-slate-100/80" ref={emailMenuRef}>
+            <div className="flex flex-col divide-y divide-slate-100/80">
               {emailMessages.slice(0, 5).map((msg: any, i: number) => (
                 <div
                   key={i}
-                  className={`group relative flex cursor-pointer items-start gap-3.5 p-4 pr-9 hover:bg-slate-50 transition-colors ${!msg.is_read ? "bg-blue-50/20" : ""} ${deletingEmailId === msg.id ? "opacity-40 pointer-events-none" : ""}`}
+                  className={`group relative flex cursor-pointer items-start gap-3.5 p-4 hover:bg-slate-50 transition-colors ${!msg.is_read ? "bg-blue-50/20" : ""} ${deletingEmailId === msg.id ? "opacity-40 pointer-events-none" : ""}`}
                   onClick={() => openEmailPreview(msg)}
                 >
                   {!msg.is_read && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-blue-500" />}
@@ -1423,62 +1416,38 @@ export default function DashboardHome() {
                       <h4 className={`truncate text-[13px] pr-2 ${!msg.is_read ? "font-bold text-slate-900" : "font-semibold text-slate-700"}`}>
                         {msg.from_name || msg.from_email || "Desconocido"}
                       </h4>
-                      <span className={`shrink-0 whitespace-nowrap text-[10px] ${!msg.is_read ? "font-bold text-blue-600" : "font-medium text-slate-400"}`}>
-                        {msg.sent_at ? timeAgo(msg.sent_at) : ""}
+                      {/* Iconos de acción directos al pasar el ratón -- antes había
+                          que abrir un menú de "···" para marcar leído o eliminar. */}
+                      <span className="flex shrink-0 items-center gap-0.5">
+                        <span className={`whitespace-nowrap text-[10px] transition-opacity group-hover:opacity-0 ${!msg.is_read ? "font-bold text-blue-600" : "font-medium text-slate-400"}`}>
+                          {msg.sent_at ? timeAgo(msg.sent_at) : ""}
+                        </span>
+                        <span className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                          {!msg.is_read && (
+                            <button
+                              type="button"
+                              title="Marcar como leído"
+                              onClick={(e) => { e.stopPropagation(); markEmailRead(msg.id); }}
+                              className="rounded-lg p-1.5 text-slate-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                            >
+                              <MailOpen size={14} />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            title="Eliminar"
+                            onClick={(e) => { e.stopPropagation(); deleteEmailMsg(msg); }}
+                            className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </span>
                       </span>
                     </div>
                     <p className={`truncate text-xs ${!msg.is_read ? "font-medium text-slate-800" : "text-slate-500"}`}>
                       {msg.subject || "(Sin asunto)"}
                     </p>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setOpenMenuEmailId(openMenuEmailId === msg.id ? null : msg.id); }}
-                    className="absolute right-2 top-3 rounded-lg p-1 text-slate-300 opacity-0 transition-opacity hover:bg-slate-100 hover:text-slate-500 group-hover:opacity-100"
-                  >
-                    <MoreHorizontal size={15} />
-                  </button>
-
-                  {openMenuEmailId === msg.id && (
-                    <div
-                      className="absolute right-3 top-8 z-30 w-48 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <button
-                        className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-                        onClick={() => openEmailPreview(msg)}
-                      >
-                        <Eye size={13} className="text-slate-400" /> Vista previa
-                      </button>
-                      <button
-                        className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-                        onClick={() => { setOpenMenuEmailId(null); navigate(`/dashboard/correo?openEmail=${msg.id}`); }}
-                      >
-                        <ExternalLink size={13} className="text-slate-400" /> Ver correo
-                      </button>
-                      <button
-                        className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-                        onClick={() => { setOpenMenuEmailId(null); navigate(`/dashboard/correo?openEmail=${msg.id}&reply=1`); }}
-                      >
-                        <Reply size={13} className="text-slate-400" /> Responder
-                      </button>
-                      {!msg.is_read && (
-                        <button
-                          className="flex w-full items-center gap-2.5 border-t border-slate-100 px-4 py-2.5 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-                          onClick={() => { setOpenMenuEmailId(null); markEmailRead(msg.id); }}
-                        >
-                          <MailOpen size={13} className="text-slate-400" /> Marcar como leído
-                        </button>
-                      )}
-                      <button
-                        className="flex w-full items-center gap-2.5 border-t border-slate-100 px-4 py-2.5 text-left text-xs font-medium text-rose-600 hover:bg-rose-50 transition-colors"
-                        onClick={() => deleteEmailMsg(msg)}
-                      >
-                        <Trash2 size={13} /> Eliminar
-                      </button>
-                    </div>
-                  )}
                 </div>
               ))}
             </div>
