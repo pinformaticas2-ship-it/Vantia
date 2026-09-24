@@ -2,7 +2,7 @@ import { startGoogleDriveConnect } from '../lib/googleDriveConnect';
 import { startDropboxConnect } from '../lib/dropboxConnect';
 import { DriveLogo, DropboxLogo } from '../components/StorageStatusIcons';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AlertTriangle, Bell, BellOff, BellRing, BookOpen, Building2, Camera, Check, Cloud, Crown, Facebook, History, Instagram, KeyRound, Link2, Loader2, Lock, LockKeyhole, MessageCircle, Clock3, Mail as MailIcon, Phone, Palette, Plug, Plus, ShieldCheck, Trash2, UsersRound, X } from 'lucide-react';
+import { AlertTriangle, Bell, BellOff, BellRing, BookOpen, Building2, Camera, Check, ChevronDown, Cloud, Crown, Facebook, History, Instagram, KeyRound, Link2, Loader2, Lock, LockKeyhole, MessageCircle, Clock3, Mail as MailIcon, Phone, Palette, Plug, Plus, Settings, ShieldCheck, Trash2, UsersRound, X } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth, UserProfile } from '@clerk/clerk-react';
 import { useTheme, AppTheme } from '../lib/ThemeContext';
@@ -1504,6 +1504,7 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
   const [savingStorageSettings, setSavingStorageSettings] = useState(false);
   const [storageSettingsError, setStorageSettingsError] = useState('');
   const [storageSettingsSaved, setStorageSettingsSaved] = useState(false);
+  const [showStorageSettings, setShowStorageSettings] = useState(false);
 
   useEffect(() => {
     if (organizacion?.documentStorageMode) setStorageMode(organizacion.documentStorageMode);
@@ -1786,61 +1787,79 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
         </div>
       </div>
 
-      <div className="mt-6 max-w-2xl rounded-2xl border border-slate-200 bg-white p-6">
-        <h3 className="mb-1 text-sm font-bold uppercase tracking-wider text-slate-800">Almacenamiento de documentos</h3>
-        <p className="mb-4 text-xs text-slate-500">
-          A qué nube van los documentos nuevos de un expediente, cuando hay más de una conectada.
-        </p>
-        {!canManage ? (
-          <p className="text-xs text-slate-400">Solo el propietario o un administrador pueden cambiar esto.</p>
-        ) : (
-          <div className="space-y-4">
-            <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
-              <button
-                type="button"
-                disabled={savingStorageSettings}
-                onClick={() => { setStorageMode('auto'); saveStorageSettings('auto', storageDefault); }}
-                className={`flex-1 rounded-xl border px-4 py-3 text-left transition-colors disabled:opacity-60 ${
-                  storageMode === 'auto' ? 'border-red-400 bg-red-50' : 'border-slate-200 hover:bg-slate-50'
-                }`}
-              >
-                <p className="text-sm font-bold text-slate-800">Automático</p>
-                <p className="mt-0.5 text-xs text-slate-500">Siempre la misma nube, sin preguntar.</p>
-              </button>
-              <button
-                type="button"
-                disabled={savingStorageSettings}
-                onClick={() => { setStorageMode('ask'); saveStorageSettings('ask', storageDefault); }}
-                className={`flex-1 rounded-xl border px-4 py-3 text-left transition-colors disabled:opacity-60 ${
-                  storageMode === 'ask' ? 'border-red-400 bg-red-50' : 'border-slate-200 hover:bg-slate-50'
-                }`}
-              >
-                <p className="text-sm font-bold text-slate-800">Preguntar cada vez</p>
-                <p className="mt-0.5 text-xs text-slate-500">Al subir un documento, elige Drive, Dropbox u OneDrive.</p>
-              </button>
+      {(organizacion?.googleDriveConnected || organizacion?.dropboxConnected) && (
+        <div className="mt-4 max-w-2xl">
+          <button
+            type="button"
+            onClick={() => setShowStorageSettings(v => !v)}
+            className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-2.5 text-left transition-colors hover:bg-slate-100/70"
+          >
+            <span className="flex items-center gap-2 text-xs text-slate-500">
+              <Settings size={13} className="shrink-0 text-slate-400" />
+              Guardado de documentos:{' '}
+              <span className="font-semibold text-slate-700">
+                {storageMode === 'auto' ? `automático · ${storageDefault === 'drive' ? 'Google Drive' : 'Dropbox'}` : 'pregunta cada vez'}
+              </span>
+            </span>
+            <ChevronDown size={14} className={`shrink-0 text-slate-400 transition-transform ${showStorageSettings ? 'rotate-180' : ''}`} />
+          </button>
+
+          {showStorageSettings && (
+            <div className="mt-2 rounded-xl border border-slate-200 bg-white p-5 animate-fade-in">
+              {!canManage ? (
+                <p className="text-xs text-slate-400">Solo el propietario o un administrador pueden cambiar esto.</p>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-xs text-slate-500">A qué nube van los documentos nuevos de un expediente, cuando hay más de una conectada.</p>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
+                    <button
+                      type="button"
+                      disabled={savingStorageSettings}
+                      onClick={() => { setStorageMode('auto'); saveStorageSettings('auto', storageDefault); }}
+                      className={`flex-1 rounded-xl border px-4 py-3 text-left transition-colors disabled:opacity-60 ${
+                        storageMode === 'auto' ? 'border-red-400 bg-red-50' : 'border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      <p className="text-sm font-bold text-slate-800">Automático</p>
+                      <p className="mt-0.5 text-xs text-slate-500">Siempre la misma nube, sin preguntar.</p>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={savingStorageSettings}
+                      onClick={() => { setStorageMode('ask'); saveStorageSettings('ask', storageDefault); }}
+                      className={`flex-1 rounded-xl border px-4 py-3 text-left transition-colors disabled:opacity-60 ${
+                        storageMode === 'ask' ? 'border-red-400 bg-red-50' : 'border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      <p className="text-sm font-bold text-slate-800">Preguntar cada vez</p>
+                      <p className="mt-0.5 text-xs text-slate-500">Al subir un documento, elige Drive, Dropbox u OneDrive.</p>
+                    </button>
+                  </div>
+                  {storageMode === 'auto' && (
+                    <div>
+                      <label className="mb-1.5 block text-xs font-bold text-slate-600">Nube por defecto</label>
+                      <select
+                        value={storageDefault}
+                        disabled={savingStorageSettings}
+                        onChange={(e) => { const v = e.target.value as 'drive' | 'dropbox'; setStorageDefault(v); saveStorageSettings('auto', v); }}
+                        className="w-full max-w-xs rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:border-red-300"
+                      >
+                        <option value="drive">Google Drive</option>
+                        <option value="dropbox">Dropbox</option>
+                      </select>
+                      <p className="mt-1.5 text-[11px] text-slate-400">
+                        Si la elegida no está conectada, se usa la que sí lo esté; si ninguna lo está, se guarda solo en el servidor.
+                      </p>
+                    </div>
+                  )}
+                  {storageSettingsError && <p className="text-xs text-rose-600">{storageSettingsError}</p>}
+                  {storageSettingsSaved && <p className="text-xs text-emerald-600">Guardado.</p>}
+                </div>
+              )}
             </div>
-            {storageMode === 'auto' && (
-              <div>
-                <label className="mb-1.5 block text-xs font-bold text-slate-600">Nube por defecto</label>
-                <select
-                  value={storageDefault}
-                  disabled={savingStorageSettings}
-                  onChange={(e) => { const v = e.target.value as 'drive' | 'dropbox'; setStorageDefault(v); saveStorageSettings('auto', v); }}
-                  className="w-full max-w-xs rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:border-red-300"
-                >
-                  <option value="drive">Google Drive</option>
-                  <option value="dropbox">Dropbox</option>
-                </select>
-                <p className="mt-1.5 text-[11px] text-slate-400">
-                  Si la elegida no está conectada, se usa la que sí lo esté; si ninguna lo está, se guarda solo en el servidor.
-                </p>
-              </div>
-            )}
-            {storageSettingsError && <p className="text-xs text-rose-600">{storageSettingsError}</p>}
-            {storageSettingsSaved && <p className="text-xs text-emerald-600">Guardado.</p>}
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
       {canManage && expanded && (
         <div className="mt-6 max-w-2xl rounded-2xl border border-slate-200 bg-white p-6">
