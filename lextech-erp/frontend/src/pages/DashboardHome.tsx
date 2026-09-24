@@ -542,16 +542,21 @@ export default function DashboardHome() {
   // se pide aparte, de forma aislada, y si falla no arrastra a nada más.
   const [imapAccountsRaw, setImapAccountsRaw] = useState<any[]>([]);
   const [gmailProfilesRaw, setGmailProfilesRaw] = useState<any[]>([]);
+  // Si la última comprobación de los perfiles de Gmail falló de verdad (no
+  // "no hay ninguno", sino que no se pudo ni preguntar), no tiene sentido
+  // seguir listando esa cuenta como si funcionara -- mejor no mostrarla y
+  // pedir reconectar que dar una falsa sensación de que todo está bien.
+  const [gmailProfilesFetchFailed, setGmailProfilesFetchFailed] = useState(false);
   const emailAccounts = useMemo(() => [
     ...imapAccountsRaw.map((a: any) => ({
       id: a.id, type: 'imap' as const,
       label: a.username || a.email || a.label || 'Cuenta',
     })),
-    ...gmailProfilesRaw.map((p: any) => ({
+    ...(gmailProfilesFetchFailed ? [] : gmailProfilesRaw.map((p: any) => ({
       id: p.id, type: 'gmail' as const,
       label: p.email || p.display_name || 'Gmail',
-    })),
-  ], [imapAccountsRaw, gmailProfilesRaw]);
+    }))),
+  ], [imapAccountsRaw, gmailProfilesRaw, gmailProfilesFetchFailed]);
   const [emailMessages,    setEmailMessages]    = useState<any[]>([]);
   const [emailMsgLoading,  setEmailMsgLoading]  = useState(false);
   const [selectedEmailAccountId, setSelectedEmailAccountId] = useState<string>("");
@@ -814,10 +819,12 @@ export default function DashboardHome() {
         if (cancelled) return;
         if (res.ok) {
           setGmailProfilesRaw(Array.isArray(d.data) ? d.data : []);
+          setGmailProfilesFetchFailed(false);
           setGmailProfilesDebug(Array.isArray(d.data) && d.data.length === 0 ? 'La cuenta respondió pero sin ninguna cuenta de Gmail para esta organización.' : null);
         } else {
           // Visible directamente en el widget -- así se ve el motivo real sin
           // tener que abrir herramientas de desarrollador.
+          setGmailProfilesFetchFailed(true);
           setGmailProfilesDebug(`No se pudo cargar Gmail (HTTP ${res.status}): ${d?.error || 'sin detalle'}`);
         }
       } catch (e: any) {
@@ -825,6 +832,7 @@ export default function DashboardHome() {
         // reintenta una vez a los 2s antes de darlo por perdido.
         if (cancelled) return;
         if (retry) { setTimeout(() => void attempt(false), 2000); return; }
+        setGmailProfilesFetchFailed(true);
         setGmailProfilesDebug(`No se pudo cargar Gmail: ${e?.message || 'error de red'}`);
       }
     };
@@ -837,8 +845,11 @@ export default function DashboardHome() {
   // en cuanto se resuelve el listado combinado -- ya no depende de en qué
   // orden lleguen las dos peticiones (IMAP vs Gmail).
   useEffect(() => {
-    if (!selectedEmailAccountId && emailAccounts.length > 0) {
+    const stillExists = emailAccounts.some(a => a.id === selectedEmailAccountId);
+    if ((!selectedEmailAccountId || !stillExists) && emailAccounts.length > 0) {
       setSelectedEmailAccountId(emailAccounts[0].id);
+    } else if (selectedEmailAccountId && !stillExists && emailAccounts.length === 0) {
+      setSelectedEmailAccountId("");
     }
   }, [emailAccounts, selectedEmailAccountId]);
 
@@ -1334,7 +1345,7 @@ export default function DashboardHome() {
               )}
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              {emailAccounts.length > 0 && (
+              {emailAccounts.length > 0 ? (
                 <div className="relative" ref={emailAccountMenuRef} onClick={(e) => e.stopPropagation()}>
                   <button
                     type="button"
@@ -1373,11 +1384,22 @@ export default function DashboardHome() {
                     </div>
                   )}
                 </div>
-              )}
+              ) : gmailProfilesFetchFailed ? (
+                // No hay ninguna cuenta que listar (la de Gmail no se pudo ni
+                // comprobar) -- en vez de un selector con una cuenta que quizá
+                // ya no esté vinculada, se pide reconectar directamente.
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); goTo("/dashboard/correo"); }}
+                  className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[10px] font-bold text-amber-700 transition-colors hover:bg-amber-100"
+                >
+                  Conectar cuenta
+                </button>
+              ) : null}
               <ChevronRight size={14} onClick={() => goTo("/dashboard/correo")} className="cursor-pointer text-slate-300 group-hover:text-red-500 transition-colors" />
             </div>
           </div>
-          {gmailProfilesDebug && (
+          {gmailProfilesDebug && !gmailProfilesFetchFailed && (
             <p className="px-4 py-1.5 text-[10px] text-amber-600 bg-amber-50 border-b border-amber-100">
               {gmailProfilesDebug}
             </p>
