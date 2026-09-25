@@ -236,10 +236,11 @@ function TypingDots() {
 // ─── Aviso en vivo de que Vantia está usando una herramienta (consultando
 // datos reales del despacho) — pasa de "en curso" a "hecho" según llegan los
 // eventos tool_start/tool_end del streaming ─────────────────────────────────
-function ToolPill({ label, done }: { label: string; done: boolean }) {
+function ToolPill({ label, name, done }: { label: string; name: string; done: boolean }) {
   return (
     <div
-      className={`cia-fade-up inline-flex items-center gap-1.5 text-[11px] font-medium rounded-full px-2.5 py-1 w-fit transition-colors duration-300 ${
+      title={name}
+      className={`cia-fade-up inline-flex items-center gap-1.5 text-[11px] font-medium rounded-full px-2.5 py-1 w-fit cursor-help transition-colors duration-300 ${
         done ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'
       }`}
     >
@@ -1037,7 +1038,7 @@ export default function ChatIA() {
                       <div className="text-sm px-1 pt-1">
                         {msg.toolEvents && msg.toolEvents.length > 0 && (
                           <div className="flex flex-col gap-1.5 mb-2.5">
-                            {msg.toolEvents.map((te, ti) => <ToolPill key={ti} label={te.label} done={te.done} />)}
+                            {msg.toolEvents.map((te, ti) => <ToolPill key={ti} label={te.label} name={te.name} done={te.done} />)}
                           </div>
                         )}
                         {msg.text

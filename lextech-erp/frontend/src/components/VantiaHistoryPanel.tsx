@@ -99,7 +99,7 @@ export function VantiaHistoryModal({ getToken, onClose }: {
                       {e.kind === 'write' ? <PencilLine size={13} /> : <Search size={13} />}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className={`text-xs leading-5 ${e.ok ? 'text-slate-700' : 'text-rose-600'}`}>{e.summary}</p>
+                      <p title={e.toolName} className={`w-fit cursor-help text-xs leading-5 ${e.ok ? 'text-slate-700' : 'text-rose-600'}`}>{e.summary}</p>
                       <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] text-slate-400">
                         <span>{e.userName}</span><span>·</span><span>{timeAgo(e.createdAt)}</span>
                         {status && <span className={`rounded-full px-1.5 py-0.5 font-bold uppercase ${status.cls}`}>{status.label}</span>}

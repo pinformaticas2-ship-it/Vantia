@@ -785,7 +785,7 @@ function VantiaWidget({ pathname, getToken }: { pathname: string; getToken: (opt
                         {msg.toolEvents && msg.toolEvents.length > 0 && (
                           <div className="flex flex-col gap-1.5 mb-2">
                             {msg.toolEvents.map((te, ti) => (
-                              <div key={ti} className={`inline-flex items-center gap-1.5 text-[10.5px] font-medium rounded-full px-2.5 py-1 w-fit transition-colors duration-300 ${
+                              <div key={ti} title={te.name} className={`inline-flex items-center gap-1.5 text-[10.5px] font-medium rounded-full px-2.5 py-1 w-fit cursor-help transition-colors duration-300 ${
                                 te.done ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-500"
                               }`}>
                                 {te.done ? <Check size={11} /> : <Loader2 size={11} className="animate-spin" />}
