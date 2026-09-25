@@ -4,7 +4,7 @@ import { vantiaLimiter } from '../middleware/rateLimits';
 import {
   chatVantia, chatVantiaStream, getChatHistory, clearChatHistory,
   listConversations, deleteConversation, submitFeedback,
-  confirmVantiaAction, cancelVantiaAction, getVantiaUsage,
+  confirmVantiaAction, cancelVantiaAction, getVantiaUsage, getVantiaHistory,
 } from '../controllers/vantiaController';
 
 const router = Router();
@@ -17,6 +17,7 @@ router.post('/chat',                  requireAuth, vantiaLimiter, chatVantia);
 router.post('/chat/stream',           requireAuth, vantiaLimiter, chatVantiaStream);
 router.post('/feedback',              requireAuth, submitFeedback);
 router.get('/usage',                  requireAuth, getVantiaUsage);
+router.get('/history',                requireAuth, getVantiaHistory);
 router.post('/actions/:token/confirm', requireAuth, vantiaLimiter, confirmVantiaAction);
 router.post('/actions/:token/cancel',  requireAuth, cancelVantiaAction);
 

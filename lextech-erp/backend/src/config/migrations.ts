@@ -2339,6 +2339,54 @@ export async function runMigrations(): Promise<void> {
       await client.query(`ALTER TABLE client_files ADD COLUMN IF NOT EXISTS drive_file_id TEXT;`);
     } catch (_e: any) {}
 
+    // ── Historial de Vantia (chat IA): registra CADA herramienta que la IA
+    // ejecuta -- tanto las de solo lectura (buscar_clientes, listar_...) como
+    // las que solo proponen una acción (preparar_...). Antes solo quedaba
+    // rastro en activity_log, y solo para las acciones YA confirmadas por el
+    // usuario -- no había forma de ver qué había consultado o propuesto la IA.
+    // pending_action_id enlaza con vantia_pending_actions para las que son
+    // una propuesta, así el historial puede mostrar si acabó confirmándose.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS vantia_tool_log (
+        id                 UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        organizacion_id    UUID         NOT NULL REFERENCES organizaciones(id) ON DELETE CASCADE,
+        user_id            VARCHAR(150) NOT NULL,
+        tool_name          VARCHAR(80)  NOT NULL,
+        kind               VARCHAR(10)  NOT NULL DEFAULT 'read' CHECK (kind IN ('read','write')),
+        args               JSONB,
+        summary            TEXT,
+        ok                 BOOLEAN      NOT NULL DEFAULT true,
+        pending_action_id  UUID         REFERENCES vantia_pending_actions(id) ON DELETE SET NULL,
+        created_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      );
+    `);
+    for (const idx of [
+      `CREATE INDEX IF NOT EXISTS idx_vantia_tool_log_org_created  ON vantia_tool_log (organizacion_id, created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_vantia_tool_log_user_created ON vantia_tool_log (user_id, created_at DESC)`,
+    ]) {
+      try { await client.query(idx); } catch (_e: any) {}
+    }
+
+    // Amplía los tipos de acción que Vantia puede proponer: crear/completar/
+    // borrar una tarea, crear una cita de agenda. create_note ya admitía
+    // cliente_id; ahora su payload puede llevar target_type:'expediente' para
+    // crear la nota sobre un expediente en vez de un cliente (la tabla notes
+    // ya admite ambos desde antes).
+    try {
+      await client.query(`ALTER TABLE vantia_pending_actions DROP CONSTRAINT IF EXISTS vantia_pending_actions_tipo_check`);
+    } catch (_e: any) {}
+    try {
+      await client.query(`ALTER TABLE vantia_pending_actions ADD CONSTRAINT vantia_pending_actions_tipo_check CHECK (tipo IN ('delete','rename','move','update_expediente','create_note','create_task','update_task','delete_task','create_event'))`);
+    } catch (_e: any) {}
+    // update_task/delete_task/create_event no siempre tienen un expediente de
+    // verdad detrás (una tarea o cita puede ir suelta, solo del usuario) --
+    // antes esta columna era NOT NULL porque todo lo que existía hasta ahora
+    // (archivos, descripción de expediente, nota de cliente) siempre tenía
+    // algún id que guardar aquí.
+    try {
+      await client.query(`ALTER TABLE vantia_pending_actions ALTER COLUMN expediente_id DROP NOT NULL`);
+    } catch (_e: any) {}
+
     // ── Permisos en schema public (requerido en PostgreSQL 15+) ────
     for (const grant of [
       `GRANT USAGE ON SCHEMA public TO admin`,

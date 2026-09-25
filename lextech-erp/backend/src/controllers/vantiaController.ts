@@ -1,7 +1,7 @@
 import { Response, Request } from 'express';
 import pool from '../config/database';
 import { performDeleteFile, performRenameFile, performMoveFile } from './filesController';
-import { logActivityForReq } from './activityController';
+import { logActivityForReq, resolveUserName } from './activityController';
 
 const GEMINI_MODEL   = 'gemini-2.5-flash';
 const MAX_TOOL_ROUNDS = 5;
@@ -36,7 +36,7 @@ CÓMO DEBES COMPORTARTE:
 - Si te preguntan algo de conocimiento general, cultura, ciencia, historia, tecnología, o cualquier tema → responde directamente y en profundidad, sin buscar en la base de datos.
 - Si te preguntan por redacción (contratos, escritos, demandas, emails, cartas, informes) → redacta directamente con calidad profesional.
 - Si te preguntan por datos REALES del despacho (clientes concretos, expedientes activos, facturas, tareas) → usa las herramientas para obtener datos reales. Nunca inventes nombres, cifras ni referencias.
-- Puedes gestionar documentos de expedientes (borrarlos, renombrarlos, moverlos a otro expediente, incluidos los que viven en Google Drive), cambiar la descripción de un expediente, y crear notas internas sobre un cliente. Para eso usa preparar_borrado_archivo / preparar_renombrado_archivo / preparar_movimiento_archivo / preparar_actualizar_descripcion_expediente / preparar_crear_nota. También puedes buscar correos del usuario con buscar_correos (esta sí es de solo lectura, no necesita confirmación). IMPORTANTE: las herramientas "preparar_..." NUNCA ejecutan la acción, solo la dejan preparada — al usuario se le muestra una tarjeta con botones "Confirmar"/"Cancelar" para decidir. Esa tarjeta YA ES la confirmación: en cuanto sepas exactamente qué hay que hacer (archivo/expediente/cliente y el dato nuevo que corresponda), LLAMA A LA HERRAMIENTA EN ESE MISMO TURNO. NUNCA preguntes antes en el chat "¿quieres que lo haga?", "¿te parece bien?" o similar y esperes a que el usuario responda "sí"/"vale" — eso duplica la confirmación (la del chat y la de la tarjeta) y además esta conversación NO conserva qué archivo/expediente exacto habíais hablado de un turno a otro, así que un "vale" suelto en el siguiente mensaje no tiene con qué actuar y falla. Si el usuario pide algo con intención ya clara (p.ej. "sugiéreme un nombre y cámbialo", "bórralo", "apunta una nota diciendo...", "cambia la descripción a..."), actúa directamente: llama a la herramienta ya. Solo pregunta antes en texto si de verdad falta un dato imprescindible (qué archivo si hay varios, de qué cliente). Tras usar una herramienta "preparar_...", dile al usuario que confirme en la tarjeta; NUNCA digas que ya está hecho, porque todavía no lo está.
+- Puedes gestionar documentos de expedientes (borrarlos, renombrarlos, moverlos a otro expediente, incluidos los que viven en Google Drive), cambiar la descripción de un expediente, crear notas internas sobre un cliente o un expediente, crear y actualizar tareas/actuaciones (incluido marcarlas completadas o borrarlas), y crear citas en la agenda. Para eso usa preparar_borrado_archivo / preparar_renombrado_archivo / preparar_movimiento_archivo / preparar_actualizar_descripcion_expediente / preparar_crear_nota / preparar_crear_tarea / preparar_actualizar_estado_tarea / preparar_eliminar_tarea / preparar_crear_cita. También tienes herramientas de solo lectura para el detalle completo de un cliente o expediente (detalle_cliente, detalle_expediente), el directorio de profesionales externos (listar_profesionales) y correos (buscar_correos) — estas no necesitan confirmación. Cada herramienta que usas, sea de lectura o de propuesta, queda registrada en un historial de Vantia que el despacho puede consultar; si te preguntan "qué has hecho" o "qué has consultado", diles que pueden verlo ahí. IMPORTANTE: las herramientas "preparar_..." NUNCA ejecutan la acción, solo la dejan preparada — al usuario se le muestra una tarjeta con botones "Confirmar"/"Cancelar" para decidir. Esa tarjeta YA ES la confirmación: en cuanto sepas exactamente qué hay que hacer (archivo/expediente/cliente y el dato nuevo que corresponda), LLAMA A LA HERRAMIENTA EN ESE MISMO TURNO. NUNCA preguntes antes en el chat "¿quieres que lo haga?", "¿te parece bien?" o similar y esperes a que el usuario responda "sí"/"vale" — eso duplica la confirmación (la del chat y la de la tarjeta) y además esta conversación NO conserva qué archivo/expediente exacto habíais hablado de un turno a otro, así que un "vale" suelto en el siguiente mensaje no tiene con qué actuar y falla. Si el usuario pide algo con intención ya clara (p.ej. "sugiéreme un nombre y cámbialo", "bórralo", "apunta una nota diciendo...", "cambia la descripción a..."), actúa directamente: llama a la herramienta ya. Solo pregunta antes en texto si de verdad falta un dato imprescindible (qué archivo si hay varios, de qué cliente). Tras usar una herramienta "preparar_...", dile al usuario que confirme en la tarjeta; NUNCA digas que ya está hecho, porque todavía no lo está.
 - Si ya tienes en el contexto datos de la entidad en pantalla → úsalos directamente sin volver a buscarlos.
 - Nunca muestres JSON en bruto. Convierte siempre los resultados en texto natural y bien formateado.
 - Puedes razonar, debatir, opinar (con matices), calcular, traducir, resumir, corregir, mejorar textos, generar ideas, hacer listas, comparar opciones, explicar paso a paso, y mucho más.
@@ -414,15 +414,16 @@ const TOOLS = [{
     },
     {
       name: 'preparar_crear_nota',
-      description: 'Prepara crear una nota interna sobre un cliente. NO la crea: deja la acción pendiente de que el usuario la confirme en una tarjeta que se le muestra en el chat.',
+      description: 'Prepara crear una nota interna sobre un cliente o sobre un expediente concreto. NO la crea: deja la acción pendiente de que el usuario la confirme en una tarjeta que se le muestra en el chat. Da cliente_id o expediente_id (uno de los dos).',
       parameters: {
         type: 'object',
         properties: {
-          cliente_id: { type: 'string', description: 'UUID del cliente sobre el que va la nota' },
-          contenido:  { type: 'string', description: 'Contenido de la nota' },
-          categoria:  { type: 'string', description: 'general | urgente | seguimiento | recordatorio | comercial | legal | otro (por defecto general)' },
+          cliente_id:    { type: 'string', description: 'UUID del cliente sobre el que va la nota' },
+          expediente_id: { type: 'string', description: 'UUID del expediente sobre el que va la nota (alternativa a cliente_id)' },
+          contenido:     { type: 'string', description: 'Contenido de la nota' },
+          categoria:     { type: 'string', description: 'general | urgente | seguimiento | recordatorio | comercial | legal | otro (por defecto general)' },
         },
-        required: ['cliente_id', 'contenido'],
+        required: ['contenido'],
       },
     },
     {
@@ -436,6 +437,100 @@ const TOOLS = [{
           expediente_id: { type: 'string',  description: 'UUID del expediente para ver sus correos vinculados' },
           limit:         { type: 'integer', description: 'Máximo resultados (por defecto 8)' },
         },
+      },
+    },
+    {
+      name: 'detalle_cliente',
+      description: 'Ficha completa de un cliente concreto: contacto (email, teléfonos, dirección), estado LOPD, fecha de alta y número de expedientes. Úsala cuando el usuario pida "la ficha de", "los datos de" o "el contacto de" un cliente ya identificado.',
+      parameters: {
+        type: 'object',
+        properties: {
+          cliente_id:     { type: 'string', description: 'UUID del cliente (usar si se conoce)' },
+          cliente_nombre: { type: 'string', description: 'Nombre del cliente para buscarlo primero si no se tiene el UUID' },
+        },
+      },
+    },
+    {
+      name: 'detalle_expediente',
+      description: 'Ficha completa de un expediente concreto: descripción, tipo de procedimiento, juzgado, autos, NIG, contrario, procurador/abogado propio y contrario, fechas y observaciones.',
+      parameters: {
+        type: 'object',
+        properties: {
+          expediente_id: { type: 'string', description: 'UUID del expediente' },
+        },
+        required: ['expediente_id'],
+      },
+    },
+    {
+      name: 'listar_profesionales',
+      description: 'Lista el directorio de abogados y procuradores externos del despacho (contrarios o de referencia), con colegio, número de colegiado y contacto.',
+      parameters: {
+        type: 'object',
+        properties: {
+          tipo:     { type: 'string',  description: 'ABOGADO | PROCURADOR. Si se omite, se listan ambos tipos.' },
+          busqueda: { type: 'string',  description: 'Nombre, despacho, colegio o número de colegiado' },
+          limit:    { type: 'integer', description: 'Máximo resultados (por defecto 15)' },
+        },
+      },
+    },
+    {
+      name: 'preparar_crear_tarea',
+      description: 'Prepara crear una tarea/actuación nueva. NO la crea: deja la acción pendiente de que el usuario la confirme en una tarjeta que se le muestra en el chat. Necesita saber para qué cliente o expediente es.',
+      parameters: {
+        type: 'object',
+        properties: {
+          titulo:        { type: 'string', description: 'Título de la tarea' },
+          descripcion:   { type: 'string', description: 'Descripción opcional' },
+          cliente_id:    { type: 'string', description: 'UUID del cliente (si no se da expediente_id, es obligatorio)' },
+          expediente_id: { type: 'string', description: 'UUID del expediente al que pertenece la tarea (opcional; si se da, el cliente se deduce de él)' },
+          plazo:         { type: 'string', description: 'Fecha límite en formato YYYY-MM-DD (opcional)' },
+          prioridad:     { type: 'string', description: 'alta | media | baja (por defecto media)' },
+          tipo:          { type: 'string', description: 'Tipo de actuación libre (por defecto "otro")' },
+        },
+        required: ['titulo'],
+      },
+    },
+    {
+      name: 'preparar_actualizar_estado_tarea',
+      description: 'Prepara cambiar el estado de una tarea existente (marcarla completada, urgente o reabrirla a pendiente). NO la cambia: deja la acción pendiente de confirmación en una tarjeta.',
+      parameters: {
+        type: 'object',
+        properties: {
+          tarea:         { type: 'string', description: 'Texto (parte del título) de la tarea a localizar' },
+          expediente_id: { type: 'string', description: 'UUID del expediente para acotar la búsqueda si hay varias tareas con nombre parecido' },
+          nuevo_estado:  { type: 'string', description: 'pendiente | urgente | completada' },
+        },
+        required: ['tarea', 'nuevo_estado'],
+      },
+    },
+    {
+      name: 'preparar_eliminar_tarea',
+      description: 'Prepara eliminar una tarea existente. NO la elimina: deja la acción pendiente de confirmación en una tarjeta.',
+      parameters: {
+        type: 'object',
+        properties: {
+          tarea:         { type: 'string', description: 'Texto (parte del título) de la tarea a localizar' },
+          expediente_id: { type: 'string', description: 'UUID del expediente para acotar la búsqueda si hay varias tareas con nombre parecido' },
+        },
+        required: ['tarea'],
+      },
+    },
+    {
+      name: 'preparar_crear_cita',
+      description: 'Prepara crear un evento/cita en la agenda. NO lo crea: deja la acción pendiente de confirmación en una tarjeta.',
+      parameters: {
+        type: 'object',
+        properties: {
+          titulo:        { type: 'string', description: 'Título de la cita' },
+          fecha_inicio:  { type: 'string', description: 'Fecha y hora de inicio en formato ISO (p.ej. 2026-10-01T10:00:00) o "YYYY-MM-DD HH:mm"' },
+          fecha_fin:     { type: 'string', description: 'Fecha y hora de fin (opcional)' },
+          descripcion:   { type: 'string', description: 'Descripción opcional' },
+          ubicacion:     { type: 'string', description: 'Lugar opcional' },
+          tipo:          { type: 'string', description: 'cita | vista | reunion | plazo | otro (por defecto cita)' },
+          expediente_id: { type: 'string', description: 'UUID del expediente relacionado (opcional)' },
+          cliente_id:    { type: 'string', description: 'UUID del cliente relacionado (opcional)' },
+        },
+        required: ['titulo', 'fecha_inicio'],
       },
     },
   ],
@@ -463,6 +558,13 @@ const TOOL_LABELS: Record<string, string> = {
   preparar_actualizar_descripcion_expediente: 'Preparando el cambio de descripción…',
   preparar_crear_nota:           'Preparando la nueva nota…',
   buscar_correos:                'Buscando correos…',
+  detalle_cliente:               'Consultando ficha del cliente…',
+  detalle_expediente:            'Consultando ficha del expediente…',
+  listar_profesionales:          'Consultando el directorio…',
+  preparar_crear_tarea:          'Preparando la nueva tarea…',
+  preparar_actualizar_estado_tarea: 'Preparando el cambio de estado de la tarea…',
+  preparar_eliminar_tarea:       'Preparando el borrado de la tarea…',
+  preparar_crear_cita:           'Preparando la nueva cita…',
 };
 
 // ── Gestión de archivos desde el chat: SOLO propone, nunca ejecuta ──────────
@@ -511,11 +613,68 @@ function expedienteLabel(e: { anio: number; num_exp: number; descripcion?: strin
   return `${e.anio}/${e.num_exp}${e.descripcion ? ' - ' + e.descripcion : ''}`;
 }
 
+async function resolveTaskByText(organizacionId: string, text: string, expedienteId?: string) {
+  const conds = ['organizacion_id = $1', 'titulo ILIKE $2'];
+  const params: any[] = [organizacionId, `%${text}%`];
+  if (expedienteId) { conds.push(`expediente_id = $3`); params.push(expedienteId); }
+  const r = await pool.query(
+    `SELECT id, titulo, estado FROM client_tasks WHERE ${conds.join(' AND ')} ORDER BY created_at DESC LIMIT 10`,
+    params,
+  );
+  return r.rows as { id: string; titulo: string; estado: string }[];
+}
+
 const AMBIGUOUS_FILE_MSG = 'Hay varios archivos que coinciden con ese nombre en el expediente. Pide al usuario que precise cuál (nombre más completo, o cuál de la lista) y vuelve a intentarlo.';
 const AMBIGUOUS_EXP_MSG  = 'Hay varios expedientes que coinciden con ese destino. Pide al usuario que precise cuál (número de expediente o más detalle) y vuelve a intentarlo.';
+const AMBIGUOUS_TASK_MSG = 'Hay varias tareas que coinciden con ese texto. Pide al usuario que precise cuál (título más completo, o cuál de la lista) y vuelve a intentarlo.';
+
+// ── Historial de Vantia: registra cada herramienta ejecutada (lectura o
+// propuesta) para que el despacho pueda ver qué ha consultado o hecho la IA.
+// Se llama una sola vez, en el wrapper callTool() -- así cualquier
+// herramienta nueva queda registrada automáticamente sin tocar este código.
+function summarizeToolCall(name: string, args: Record<string, any>, result: any): string {
+  const base = (TOOL_LABELS[name] || name).replace(/…$/, '').trim();
+  const bits: string[] = [];
+  for (const k of ['query', 'busqueda', 'archivo', 'tarea', 'cliente_nombre', 'nuevo_nombre', 'nueva_descripcion', 'contenido', 'estado', 'nuevo_estado', 'expediente_destino', 'titulo']) {
+    if (args?.[k]) bits.push(`${k}="${String(args[k]).slice(0, 60)}"`);
+  }
+  const argsStr = bits.length ? ` (${bits.join(', ')})` : '';
+  if (result?.error) return `${base}${argsStr} → error: ${String(result.error).slice(0, 160)}`;
+  if (result?.ambiguo) return `${base}${argsStr} → varias coincidencias, pidió aclarar`;
+  if (result?.accion_pendiente) return `${base}${argsStr} → propuesta: ${result.titulo || result.tipo}`;
+  if (typeof result?.total === 'number') return `${base}${argsStr} → ${result.total} resultado(s)`;
+  return `${base}${argsStr}`;
+}
+
+async function logVantiaToolCall(organizacionId: string, userId: string, name: string, args: Record<string, any>, result: any): Promise<void> {
+  if (!organizacionId) return;
+  try {
+    const kind = name.startsWith('preparar_') ? 'write' : 'read';
+    const ok = !(result && (result as any).error);
+    const pendingActionId = (result && (result as any).accion_pendiente) ? (result as any).token : null;
+    await pool.query(
+      `INSERT INTO vantia_tool_log (organizacion_id, user_id, tool_name, kind, args, summary, ok, pending_action_id)
+       VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8)`,
+      [organizacionId, userId, name, kind, JSON.stringify(args || {}), summarizeToolCall(name, args, result), ok, pendingActionId],
+    );
+  } catch (e: any) {
+    console.error('❌ Vantia tool log:', e?.message);
+  }
+}
 
 // ── Dispatcher de herramientas ────────────────────────────────────────────────
+// callTool() es un envoltorio fino sobre callToolInner(): ejecuta la
+// herramienta y, pase lo que pase, deja constancia en vantia_tool_log. Al
+// registrar aquí (un único punto de paso para las dos formas de chatear,
+// chatVantia y chatVantiaStream) cualquier herramienta nueva queda trazada
+// sin tener que tocar este código de nuevo.
 async function callTool(name: string, args: Record<string, any>, userId: string, organizacionId: string): Promise<object> {
+  const result = await callToolInner(name, args, userId, organizacionId);
+  void logVantiaToolCall(organizacionId, userId, name, args, result);
+  return result;
+}
+
+async function callToolInner(name: string, args: Record<string, any>, userId: string, organizacionId: string): Promise<object> {
   try {
     switch (name) {
 
@@ -886,27 +1045,201 @@ async function callTool(name: string, args: Record<string, any>, userId: string,
 
       case 'preparar_crear_nota': {
         const clienteId = String(args.cliente_id || '');
+        const expedienteIdArg = String(args.expediente_id || '');
         const contenido = String(args.contenido || '').trim();
         const categoria = String(args.categoria || 'general');
-        if (!clienteId || !contenido) return { error: 'Faltan cliente_id o contenido.' };
+        if (!clienteId && !expedienteIdArg) return { error: 'Falta cliente_id o expediente_id.' };
+        if (!contenido) return { error: 'Falta contenido.' };
         const validCats = ['general', 'urgente', 'seguimiento', 'recordatorio', 'comercial', 'legal', 'otro'];
         const cat = validCats.includes(categoria) ? categoria : 'general';
-        const clienteRes = await pool.query(
-          `SELECT commercial_name, first_name, last_name FROM entities WHERE id=$1 AND organizacion_id=$2`,
-          [clienteId, organizacionId],
-        );
-        if (!clienteRes.rows.length) return { error: 'No encuentro ese cliente en este despacho.' };
-        const c = clienteRes.rows[0];
-        const clienteNombre = c.commercial_name || `${c.first_name || ''} ${c.last_name || ''}`.trim() || 'Cliente';
+
+        let targetId: string; let targetLabel: string; let targetType: 'cliente' | 'expediente';
+        if (expedienteIdArg) {
+          const expRes = await pool.query(`SELECT anio, num_exp, descripcion FROM expedientes WHERE id=$1 AND organizacion_id=$2`, [expedienteIdArg, organizacionId]);
+          if (!expRes.rows.length) return { error: 'No encuentro ese expediente en este despacho.' };
+          targetId = expedienteIdArg; targetLabel = expedienteLabel(expRes.rows[0]); targetType = 'expediente';
+        } else {
+          const clienteRes = await pool.query(
+            `SELECT commercial_name, first_name, last_name FROM entities WHERE id=$1 AND organizacion_id=$2`,
+            [clienteId, organizacionId],
+          );
+          if (!clienteRes.rows.length) return { error: 'No encuentro ese cliente en este despacho.' };
+          const c = clienteRes.rows[0];
+          targetId = clienteId; targetLabel = c.commercial_name || `${c.first_name || ''} ${c.last_name || ''}`.trim() || 'Cliente'; targetType = 'cliente';
+        }
         const pending = await pool.query(
           `INSERT INTO vantia_pending_actions (organizacion_id, user_id, tipo, expediente_id, expediente_label, payload)
            VALUES ($1,$2,'create_note',$3,$4,$5::jsonb) RETURNING id`,
-          [organizacionId, userId, clienteId, clienteNombre, JSON.stringify({ content: contenido, category: cat })],
+          [organizacionId, userId, targetId, targetLabel, JSON.stringify({ content: contenido, category: cat, target_type: targetType })],
         );
         return {
           accion_pendiente: true, token: pending.rows[0].id, tipo: 'create_note',
-          titulo: `Crear nota para ${clienteNombre}`, detalle: contenido,
+          titulo: `Crear nota para ${targetLabel}`, detalle: contenido,
           mensaje: 'Acción preparada: dile al usuario que confirme la creación de la nota en la tarjeta que se le ha mostrado. Todavía NO se ha creado.',
+        };
+      }
+
+      case 'detalle_cliente': {
+        let clienteId = String(args.cliente_id || '');
+        if (!clienteId && args.cliente_nombre) {
+          const q = `%${args.cliente_nombre}%`;
+          const found = await pool.query(
+            `SELECT id FROM entities WHERE (commercial_name ILIKE $1 OR CONCAT(first_name,' ',last_name) ILIKE $1) AND organizacion_id=$2 LIMIT 1`,
+            [q, organizacionId],
+          );
+          if (!found.rows.length) return { error: `No se encontró cliente con nombre "${args.cliente_nombre}"` };
+          clienteId = found.rows[0].id;
+        }
+        if (!clienteId) return { error: 'Se requiere cliente_id o cliente_nombre' };
+        const r = await pool.query(`
+          SELECT e.*, COUNT(exp.id)::int AS num_expedientes, COUNT(n.id)::int AS num_notas
+          FROM entities e
+          LEFT JOIN expedientes exp ON exp.cliente_id = e.id
+          LEFT JOIN notes n ON n.client_id = e.id
+          WHERE e.id=$1 AND e.organizacion_id=$2
+          GROUP BY e.id
+        `, [clienteId, organizacionId]);
+        if (!r.rows.length) return { error: 'No encuentro ese cliente en este despacho.' };
+        const c = r.rows[0];
+        return {
+          cliente: {
+            id: c.id, nombre: c.commercial_name || `${c.first_name || ''} ${c.last_name || ''}`.trim(),
+            tipo: c.type, estado: c.client_status, nif: c.nif_cif,
+            email: c.email, telefonos: [c.phone_1, c.phone_2, c.phone_3, c.phone_mobile].filter(Boolean),
+            direccion: [c.address_street, c.address_town, c.address_province, c.address_cp].filter(Boolean).join(', '),
+            web: c.website, lopd: c.lopd, alta: c.date_alta,
+            num_expedientes: c.num_expedientes, num_notas: c.num_notas,
+          },
+        };
+      }
+
+      case 'detalle_expediente': {
+        const r = await pool.query(`
+          SELECT e.*, COALESCE(ent.commercial_name, CONCAT(ent.first_name,' ',ent.last_name)) AS cliente_nombre
+          FROM expedientes e LEFT JOIN entities ent ON ent.id = e.cliente_id
+          WHERE e.id=$1 AND e.organizacion_id=$2
+        `, [args.expediente_id, organizacionId]);
+        if (!r.rows.length) return { error: 'No encuentro ese expediente en este despacho.' };
+        const e = r.rows[0];
+        return {
+          expediente: {
+            id: e.id, ref: `${e.anio}/${e.num_exp}`, ref_propia: e.ref_propia, descripcion: e.descripcion,
+            tipo: e.tipo, estado: e.estado, cliente: e.cliente_nombre, contrario: e.contrario,
+            procurador: e.procurador, procurador_contrario: e.procurador_contrario,
+            abogado_propio: e.abogado_propio, abogado_contrario: e.abogado_contrario,
+            juzgado: e.juzgado, tipo_proc: e.tipo_proc, num_autos: e.num_autos, nig: e.nig,
+            fecha_inicio: e.fecha_inicio, fecha_cierre: e.fecha_cierre,
+            importe_eur: e.importe != null ? Number(e.importe).toFixed(2) : null,
+            observaciones: e.observaciones,
+          },
+        };
+      }
+
+      case 'listar_profesionales': {
+        const limit = Math.min(Number(args.limit) || 15, 40);
+        const conds = ['organizacion_id=$1'], params: any[] = [organizacionId];
+        let pi = 2;
+        if (args.tipo) { conds.push(`tipo=$${pi++}`); params.push(String(args.tipo).toUpperCase()); }
+        if (args.busqueda) {
+          conds.push(`(first_name ILIKE $${pi} OR last_name ILIKE $${pi} OR despacho ILIKE $${pi} OR colegio ILIKE $${pi} OR num_colegiado ILIKE $${pi})`);
+          params.push(`%${args.busqueda}%`); pi++;
+        }
+        params.push(limit);
+        const r = await pool.query(`
+          SELECT tipo, first_name, last_name, despacho, colegio, num_colegiado, email, phone
+          FROM directorio_profesionales WHERE ${conds.join(' AND ')}
+          ORDER BY first_name ASC LIMIT $${pi}
+        `, params);
+        return { total: r.rowCount, profesionales: r.rows.map(p => ({ tipo: p.tipo, nombre: `${p.first_name} ${p.last_name || ''}`.trim(), despacho: p.despacho, colegio: p.colegio, num_colegiado: p.num_colegiado, email: p.email, telefono: p.phone })) };
+      }
+
+      case 'preparar_crear_tarea': {
+        const titulo = String(args.titulo || '').trim();
+        if (!titulo) return { error: 'Falta titulo.' };
+        let clienteId = String(args.cliente_id || '');
+        let expedienteIdArg = String(args.expediente_id || '');
+        let clienteNombre = '';
+        let expLabel = '';
+        if (expedienteIdArg) {
+          const expRes = await pool.query(`SELECT anio, num_exp, descripcion, cliente_id FROM expedientes WHERE id=$1 AND organizacion_id=$2`, [expedienteIdArg, organizacionId]);
+          if (!expRes.rows.length) return { error: 'No encuentro ese expediente en este despacho.' };
+          expLabel = expedienteLabel(expRes.rows[0]);
+          if (!clienteId) clienteId = expRes.rows[0].cliente_id;
+        }
+        if (!clienteId) return { error: 'Necesito cliente_id, o un expediente_id cuyo expediente tenga cliente asignado.' };
+        const clienteRes = await pool.query(`SELECT commercial_name, first_name, last_name FROM entities WHERE id=$1 AND organizacion_id=$2`, [clienteId, organizacionId]);
+        if (!clienteRes.rows.length) return { error: 'No encuentro ese cliente en este despacho.' };
+        const c = clienteRes.rows[0];
+        clienteNombre = c.commercial_name || `${c.first_name || ''} ${c.last_name || ''}`.trim() || 'Cliente';
+        const label = expLabel ? `${clienteNombre} (expediente ${expLabel})` : clienteNombre;
+        const pending = await pool.query(
+          `INSERT INTO vantia_pending_actions (organizacion_id, user_id, tipo, expediente_id, expediente_label, payload)
+           VALUES ($1,$2,'create_task',$3,$4,$5::jsonb) RETURNING id`,
+          [organizacionId, userId, clienteId, label, JSON.stringify({
+            titulo, descripcion: args.descripcion || null, plazo: args.plazo || null,
+            prioridad: args.prioridad || 'media', tipo: args.tipo || 'otro', expedienteId: expedienteIdArg || null,
+          })],
+        );
+        return {
+          accion_pendiente: true, token: pending.rows[0].id, tipo: 'create_task',
+          titulo: `Crear tarea "${titulo}"`, detalle: `Para ${label}`,
+          mensaje: 'Acción preparada: dile al usuario que confirme la creación de la tarea en la tarjeta que se le ha mostrado. Todavía NO se ha creado.',
+        };
+      }
+
+      case 'preparar_actualizar_estado_tarea':
+      case 'preparar_eliminar_tarea': {
+        const isDelete = name === 'preparar_eliminar_tarea';
+        const texto = String(args.tarea || '').trim();
+        if (!texto) return { error: 'Falta tarea (texto para localizarla).' };
+        const nuevoEstado = String(args.nuevo_estado || '');
+        if (!isDelete && !['pendiente', 'urgente', 'completada'].includes(nuevoEstado)) {
+          return { error: 'nuevo_estado debe ser pendiente, urgente o completada.' };
+        }
+        const matches = await resolveTaskByText(organizacionId, texto, args.expediente_id ? String(args.expediente_id) : undefined);
+        if (matches.length === 0) return { error: `No encuentro ninguna tarea que coincida con "${texto}".` };
+        if (matches.length > 1) {
+          return { ambiguo: true, coincidencias: matches.map(t => ({ id: t.id, nombre: t.titulo })), mensaje: AMBIGUOUS_TASK_MSG };
+        }
+        const task = matches[0];
+        const tipo = isDelete ? 'delete_task' : 'update_task';
+        const pending = await pool.query(
+          `INSERT INTO vantia_pending_actions (organizacion_id, user_id, tipo, expediente_label, payload)
+           VALUES ($1,$2,$3,$4,$5::jsonb) RETURNING id`,
+          [organizacionId, userId, tipo, task.titulo, JSON.stringify({ taskId: task.id, nuevoEstado })],
+        );
+        return {
+          accion_pendiente: true, token: pending.rows[0].id, tipo,
+          titulo: isDelete ? `Eliminar la tarea "${task.titulo}"` : `Cambiar la tarea "${task.titulo}" a ${nuevoEstado}`,
+          detalle: isDelete ? undefined : `Estado actual: ${task.estado}`,
+          mensaje: `Acción preparada: dile al usuario que confirme en la tarjeta que se le ha mostrado. Todavía NO se ha ${isDelete ? 'eliminado' : 'cambiado'}.`,
+        };
+      }
+
+      case 'preparar_crear_cita': {
+        const titulo = String(args.titulo || '').trim();
+        const fechaInicio = String(args.fecha_inicio || '').trim();
+        if (!titulo || !fechaInicio) return { error: 'Faltan titulo o fecha_inicio.' };
+        const startDate = new Date(fechaInicio);
+        if (isNaN(startDate.getTime())) return { error: 'fecha_inicio no es una fecha válida.' };
+        let contextLabel = titulo;
+        if (args.expediente_id) {
+          const expRes = await pool.query(`SELECT anio, num_exp, descripcion FROM expedientes WHERE id=$1 AND organizacion_id=$2`, [args.expediente_id, organizacionId]);
+          if (!expRes.rows.length) return { error: 'No encuentro ese expediente en este despacho.' };
+          contextLabel = `${titulo} (expediente ${expedienteLabel(expRes.rows[0])})`;
+        }
+        const pending = await pool.query(
+          `INSERT INTO vantia_pending_actions (organizacion_id, user_id, tipo, expediente_id, expediente_label, payload)
+           VALUES ($1,$2,'create_event',$3,$4,$5::jsonb) RETURNING id`,
+          [organizacionId, userId, args.expediente_id || null, contextLabel, JSON.stringify({
+            titulo, fechaInicio, fechaFin: args.fecha_fin || null, descripcion: args.descripcion || null,
+            ubicacion: args.ubicacion || null, tipo: args.tipo || 'cita', expedienteId: args.expediente_id || null, clienteId: args.cliente_id || null,
+          })],
+        );
+        return {
+          accion_pendiente: true, token: pending.rows[0].id, tipo: 'create_event',
+          titulo: `Crear cita "${titulo}"`, detalle: `${startDate.toLocaleString('es-ES')}`,
+          mensaje: 'Acción preparada: dile al usuario que confirme la creación de la cita en la tarjeta que se le ha mostrado. Todavía NO se ha creado.',
         };
       }
 
@@ -1441,9 +1774,69 @@ export const confirmVantiaAction = async (req: any, res: Response) => {
       }
     } else if (action.tipo === 'create_note') {
       try {
+        const targetType = action.payload?.target_type === 'expediente' ? 'expediente' : 'cliente';
+        const column = targetType === 'expediente' ? 'expediente_id' : 'client_id';
         await pool.query(
-          `INSERT INTO notes (client_id, content, category, created_by) VALUES ($1,$2,$3,$4)`,
+          `INSERT INTO notes (${column}, content, category, created_by) VALUES ($1,$2,$3,$4)`,
           [action.expediente_id, action.payload?.content || '', action.payload?.category || 'general', userId],
+        );
+        result = { success: true };
+      } catch (e: any) {
+        result = { success: false, error: e.message };
+      }
+    } else if (action.tipo === 'create_task') {
+      try {
+        const p = action.payload || {};
+        if (!p.titulo) throw new Error('Falta el título de la tarea.');
+        const userName = await resolveUserName(userId);
+        const clienteRes = await pool.query(`SELECT COALESCE(commercial_name, CONCAT(first_name,' ',last_name)) AS nombre FROM entities WHERE id=$1`, [action.expediente_id]);
+        await pool.query(
+          `INSERT INTO client_tasks (client_id, client_name, titulo, descripcion, plazo, estado, prioridad, tipo, expediente_id, created_by, user_id, organizacion_id)
+           VALUES ($1,$2,$3,$4,$5,'pendiente',$6,$7,$8,$9,$10,$11)`,
+          [action.expediente_id, clienteRes.rows[0]?.nombre || null, p.titulo, p.descripcion || null, p.plazo || null, p.prioridad || 'media', p.tipo || 'otro', p.expedienteId || null, userName, userId, organizacionId],
+        );
+        result = { success: true };
+      } catch (e: any) {
+        result = { success: false, error: e.message };
+      }
+    } else if (action.tipo === 'update_task') {
+      try {
+        const p = action.payload || {};
+        if (!p.taskId || !p.nuevoEstado) throw new Error('Faltan datos de la tarea.');
+        const r = await pool.query(
+          `UPDATE client_tasks SET estado=$1, updated_at=NOW() WHERE id=$2 AND organizacion_id=$3 RETURNING agenda_event_id`,
+          [p.nuevoEstado, p.taskId, organizacionId],
+        );
+        if (!r.rowCount) throw new Error('No se encontró la tarea.');
+        const agendaEventId = r.rows[0].agenda_event_id;
+        if (agendaEventId) {
+          await pool.query(`UPDATE agenda_events SET status=$1, updated_at=NOW() WHERE id=$2`, [p.nuevoEstado === 'completada' ? 'completado' : 'pendiente', agendaEventId]);
+        }
+        result = { success: true };
+      } catch (e: any) {
+        result = { success: false, error: e.message };
+      }
+    } else if (action.tipo === 'delete_task') {
+      try {
+        const p = action.payload || {};
+        if (!p.taskId) throw new Error('Falta el id de la tarea.');
+        const before = await pool.query(`SELECT agenda_event_id FROM client_tasks WHERE id=$1 AND organizacion_id=$2`, [p.taskId, organizacionId]);
+        const r = await pool.query(`DELETE FROM client_tasks WHERE id=$1 AND organizacion_id=$2`, [p.taskId, organizacionId]);
+        if (!r.rowCount) throw new Error('No se encontró la tarea.');
+        if (before.rows[0]?.agenda_event_id) await pool.query(`DELETE FROM agenda_events WHERE id=$1`, [before.rows[0].agenda_event_id]);
+        result = { success: true };
+      } catch (e: any) {
+        result = { success: false, error: e.message };
+      }
+    } else if (action.tipo === 'create_event') {
+      try {
+        const p = action.payload || {};
+        if (!p.titulo || !p.fechaInicio) throw new Error('Faltan datos de la cita.');
+        const userName = await resolveUserName(userId);
+        await pool.query(
+          `INSERT INTO agenda_events (user_id, user_name, title, description, start_at, end_at, all_day, type, status, expediente_id, cliente_id, location, source, organizacion_id)
+           VALUES ($1,$2,$3,$4,$5,$6,false,$7,'pendiente',$8,$9,$10,'vantia',$11)`,
+          [userId, userName, p.titulo, p.descripcion || null, p.fechaInicio, p.fechaFin || null, p.tipo || 'cita', p.expedienteId || null, p.clienteId || null, p.ubicacion || null, organizacionId],
         );
         result = { success: true };
       } catch (e: any) {
@@ -1463,8 +1856,18 @@ export const confirmVantiaAction = async (req: any, res: Response) => {
       : action.tipo === 'rename' ? `Vantia (chat IA) renombró el archivo "${action.file_name}"`
       : action.tipo === 'move' ? `Vantia (chat IA) movió el archivo "${action.file_name}"`
       : action.tipo === 'update_expediente' ? `Vantia (chat IA) actualizó la descripción del expediente ${action.expediente_label}`
-      : `Vantia (chat IA) creó una nota para ${action.expediente_label}`;
-    logActivityForReq(req, activityMsg, 'EXPEDIENTE', action.expediente_id);
+      : action.tipo === 'create_note' ? `Vantia (chat IA) creó una nota para ${action.expediente_label}`
+      : action.tipo === 'create_task' ? `Vantia (chat IA) creó la tarea "${action.payload?.titulo}" para ${action.expediente_label}`
+      : action.tipo === 'update_task' ? `Vantia (chat IA) cambió el estado de la tarea "${action.expediente_label}" a ${action.payload?.nuevoEstado}`
+      : action.tipo === 'delete_task' ? `Vantia (chat IA) eliminó la tarea "${action.expediente_label}"`
+      : `Vantia (chat IA) creó la cita "${action.payload?.titulo}"`;
+    const entityType = ['delete', 'rename', 'move', 'update_expediente'].includes(action.tipo) ? 'EXPEDIENTE'
+      : ['update_task', 'delete_task'].includes(action.tipo) ? 'TASK'
+      : action.tipo === 'create_note' ? (action.payload?.target_type === 'expediente' ? 'EXPEDIENTE' : 'CLIENT')
+      : action.tipo === 'create_task' ? 'CLIENT'
+      : 'AGENDA';
+    const entityId = ['update_task', 'delete_task'].includes(action.tipo) ? action.payload?.taskId : action.expediente_id;
+    logActivityForReq(req, activityMsg, entityType, entityId);
     res.json({ success: true });
   } catch (e: any) {
     res.status(500).json({ success: false, error: e.message || 'No se pudo completar la acción.' });
@@ -1509,6 +1912,46 @@ export const getVantiaUsage = async (_req: Request, res: Response) => {
         resetsNote: 'La cuota gratuita de Google se reinicia a medianoche, hora del Pacífico (EE. UU.) -- unas 08:00-09:00 en España según el horario.',
         limits: GEMINI_FREE_TIER_LIMITS,
       },
+    });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+};
+
+// ── GET /api/vantia/history ── historial de lo que Vantia ha consultado y
+// propuesto en este despacho (trazabilidad de la IA) -- toda la organización,
+// no solo el usuario que pregunta, igual que el resto de Trazabilidad.
+export const getVantiaHistory = async (req: any, res: Response) => {
+  const organizacionId = req.organizacionId;
+  if (!organizacionId) return res.status(400).json({ success: false, error: 'No se pudo determinar la organización activa.' });
+  const limit = Math.min(Number(req.query.limit) || 50, 200);
+  const offset = Math.max(Number(req.query.offset) || 0, 0);
+  try {
+    const r = await pool.query(
+      `SELECT l.id, l.user_id, l.tool_name, l.kind, l.summary, l.ok, l.created_at,
+              p.status AS pending_status
+       FROM vantia_tool_log l
+       LEFT JOIN vantia_pending_actions p ON p.id = l.pending_action_id
+       WHERE l.organizacion_id = $1
+       ORDER BY l.created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [organizacionId, limit, offset],
+    );
+    const uniqueUserIds = [...new Set(r.rows.map(row => row.user_id))];
+    const names = await Promise.all(uniqueUserIds.map(id => resolveUserName(id)));
+    const nameByUser = Object.fromEntries(uniqueUserIds.map((id, i) => [id, names[i]]));
+    res.json({
+      success: true,
+      data: r.rows.map(row => ({
+        id: row.id,
+        userName: nameByUser[row.user_id] || row.user_id,
+        toolName: row.tool_name,
+        kind: row.kind,
+        summary: row.summary,
+        ok: row.ok,
+        pendingStatus: row.pending_status,
+        createdAt: row.created_at,
+      })),
     });
   } catch (e: any) {
     res.status(500).json({ success: false, error: e.message });

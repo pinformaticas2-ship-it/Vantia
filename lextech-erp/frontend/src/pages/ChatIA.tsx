@@ -3,10 +3,11 @@ import { useAuth, useUser } from '@clerk/clerk-react';
 import {
   Plus, Trash2, Copy, RotateCcw, ThumbsUp, ThumbsDown,
   Paperclip, Link2, Send, MessageSquare, Sparkles, MoreHorizontal, Loader2,
-  Check, X, Search, StopCircle, Download, FileText, ChevronDown,
+  Check, X, Search, StopCircle, Download, FileText, ChevronDown, History,
 } from 'lucide-react';
 import { resolveApiUrl, safeJson } from '../lib/api';
 import { AI_MODELS, MODEL_STORAGE_KEY, pickInitialModel, useVantiaUsageOnDemand, VantiaModelPickerPanel } from '../components/VantiaModelPicker';
+import { VantiaHistoryModal } from '../components/VantiaHistoryPanel';
 
 // ─── Keyframe styles ──────────────────────────────────────────────────────────
 
@@ -297,6 +298,7 @@ export default function ChatIA() {
   // Selector de modelo/agente de IA
   const [selectedModel, setSelectedModel] = useState<string>(pickInitialModel);
   const [showModelPicker, setShowModelPicker] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const modelPickerRef = useRef<HTMLDivElement>(null);
   const activeModel = AI_MODELS.find(m => m.id === selectedModel) || AI_MODELS[0];
   const modelUsage = useVantiaUsageOnDemand(getToken);
@@ -920,6 +922,13 @@ export default function ChatIA() {
                   Copiar chat
                 </button>
               )}
+              <button
+                onClick={() => setShowHistory(true)}
+                className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 border border-slate-200 hover:border-slate-300 px-3 py-1.5 rounded-lg transition-all hover:bg-slate-50 active:scale-95"
+              >
+                <History className="h-3.5 w-3.5" />
+                Historial
+              </button>
               <div className="relative" ref={topMenuRef}>
                 <button
                   onClick={() => setShowTopMenu(v => !v)}
@@ -1246,6 +1255,8 @@ export default function ChatIA() {
 
         </div>
       </div>
+
+      {showHistory && <VantiaHistoryModal getToken={getToken} onClose={() => setShowHistory(false)} />}
     </>
   );
 }
