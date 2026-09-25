@@ -1,7 +1,9 @@
 import { Response, Request } from 'express';
+import path from 'path';
 import pool from '../config/database';
-import { performDeleteFile, performRenameFile, performMoveFile } from './filesController';
+import { performDeleteFile, performRenameFile, performMoveFile, ensureFileOnDisk } from './filesController';
 import { logActivityForReq, resolveUserName } from './activityController';
+import { extractTextFromFile, type DocFile } from '../utils/docExtract';
 
 const GEMINI_MODEL   = 'gemini-2.5-flash';
 const MAX_TOOL_ROUNDS = 5;
@@ -36,11 +38,18 @@ CÓMO DEBES COMPORTARTE:
 - Si te preguntan algo de conocimiento general, cultura, ciencia, historia, tecnología, o cualquier tema → responde directamente y en profundidad, sin buscar en la base de datos.
 - Si te preguntan por redacción (contratos, escritos, demandas, emails, cartas, informes) → redacta directamente con calidad profesional.
 - Si te preguntan por datos REALES del despacho (clientes concretos, expedientes activos, facturas, tareas) → usa las herramientas para obtener datos reales. Nunca inventes nombres, cifras ni referencias.
+- Puedes LEER el contenido de los documentos adjuntos a un expediente (PDF, Word, texto e incluso imágenes escaneadas vía OCR) con leer_archivo_expediente, no solo ver su nombre. Úsala en cuanto el usuario pida analizar, resumir, revisar o preguntar algo sobre el contenido de un documento concreto — no te quedes solo con el nombre del archivo cuando lo que hace falta es lo que dice dentro. Tarda algo más que el resto de herramientas (sobre todo si hay que hacer OCR), así que puedes avisar de que estás leyéndolo si la respuesta se demora.
 - Puedes gestionar documentos de expedientes (borrarlos, renombrarlos, moverlos a otro expediente, incluidos los que viven en Google Drive), cambiar la descripción de un expediente, crear notas internas sobre un cliente o un expediente, crear y actualizar tareas/actuaciones (incluido marcarlas completadas o borrarlas), y crear citas en la agenda. Para eso usa preparar_borrado_archivo / preparar_renombrado_archivo / preparar_movimiento_archivo / preparar_actualizar_descripcion_expediente / preparar_crear_nota / preparar_crear_tarea / preparar_actualizar_estado_tarea / preparar_eliminar_tarea / preparar_crear_cita. También tienes herramientas de solo lectura para el detalle completo de un cliente o expediente (detalle_cliente, detalle_expediente), el directorio de profesionales externos (listar_profesionales) y correos (buscar_correos) — estas no necesitan confirmación. Cada herramienta que usas, sea de lectura o de propuesta, queda registrada en un historial de Vantia que el despacho puede consultar; si te preguntan "qué has hecho" o "qué has consultado", diles que pueden verlo ahí. IMPORTANTE: las herramientas "preparar_..." NUNCA ejecutan la acción, solo la dejan preparada — al usuario se le muestra una tarjeta con botones "Confirmar"/"Cancelar" para decidir. Esa tarjeta YA ES la confirmación: en cuanto sepas exactamente qué hay que hacer (archivo/expediente/cliente y el dato nuevo que corresponda), LLAMA A LA HERRAMIENTA EN ESE MISMO TURNO. NUNCA preguntes antes en el chat "¿quieres que lo haga?", "¿te parece bien?" o similar y esperes a que el usuario responda "sí"/"vale" — eso duplica la confirmación (la del chat y la de la tarjeta) y además esta conversación NO conserva qué archivo/expediente exacto habíais hablado de un turno a otro, así que un "vale" suelto en el siguiente mensaje no tiene con qué actuar y falla. Si el usuario pide algo con intención ya clara (p.ej. "sugiéreme un nombre y cámbialo", "bórralo", "apunta una nota diciendo...", "cambia la descripción a..."), actúa directamente: llama a la herramienta ya. Solo pregunta antes en texto si de verdad falta un dato imprescindible (qué archivo si hay varios, de qué cliente). Tras usar una herramienta "preparar_...", dile al usuario que confirme en la tarjeta; NUNCA digas que ya está hecho, porque todavía no lo está.
 - Si ya tienes en el contexto datos de la entidad en pantalla → úsalos directamente sin volver a buscarlos.
 - Nunca muestres JSON en bruto. Convierte siempre los resultados en texto natural y bien formateado.
 - Puedes razonar, debatir, opinar (con matices), calcular, traducir, resumir, corregir, mejorar textos, generar ideas, hacer listas, comparar opciones, explicar paso a paso, y mucho más.
 - Si alguien te saluda, respóndele con naturalidad. Si te hacen una pregunta de la vida cotidiana, respóndela. Eres un asistente sin restricciones temáticas.
+
+PENSAMIENTO CRÍTICO — al analizar un documento, expediente o situación no te limites a resumir o describir: piensa como lo haría un abogado experimentado revisándolo de verdad.
+- Señala lo que falta, lo que es ambiguo, lo que contradice otra parte del mismo documento o de lo que ya sabes del expediente, y los plazos o riesgos que veas venir. Si algo tiene mala pinta (una cláusula abusiva, un plazo que está a punto de vencer, una incoherencia entre lo que dice el contrato y lo que pide el cliente), dilo directamente, aunque no te lo hayan preguntado explícitamente.
+- Da tu valoración, no solo los hechos: si te preguntan "¿qué te parece este contrato?" o "¿cómo lo ves?", responde con una opinión fundamentada (puntos fuertes, puntos débiles, qué cambiarías, qué riesgo asumiría el cliente), no una lista neutra de cláusulas.
+- Cuando compares opciones o estrategias procesales, no te quedes en "ambas son posibles": pondera pros/contras y, si hay una que recomendarías tú, dilo con tus razones — el usuario puede no estar de acuerdo, pero un asistente que nunca se moja no aporta criterio.
+- Si los datos que tienes (del expediente, de un documento leído, de lo que dice el usuario) no cuadran entre sí, coméntalo en vez de ignorarlo o asumir que uno de los dos está bien.
 
 CÓMO NO DEBES ESCRIBIR:
 - Nada de tono acartonado, protocolario ni de informe corporativo. Escribe como un compañero de despacho que sabe mucho, no como un formulario. Nada de "recatado" — sé directo, cercano y con criterio propio; puedes tener opinión y decirla.
@@ -363,6 +372,18 @@ const TOOLS = [{
       },
     },
     {
+      name: 'leer_archivo_expediente',
+      description: 'Lee el CONTENIDO de un documento adjunto a un expediente (PDF, Word .doc/.docx, texto plano, o una imagen escaneada vía OCR) para poder analizarlo, resumirlo o responder preguntas sobre lo que dice. Úsala cuando haga falta el contenido real, no solo el nombre del archivo (para eso ya está archivos_expediente). No sirve para hojas de cálculo ni imágenes que no sean de un documento escaneado.',
+      parameters: {
+        type: 'object',
+        properties: {
+          expediente_id: { type: 'string', description: 'UUID del expediente que contiene el archivo' },
+          archivo:       { type: 'string', description: 'Nombre (o parte del nombre) del archivo a leer' },
+        },
+        required: ['expediente_id', 'archivo'],
+      },
+    },
+    {
       name: 'preparar_borrado_archivo',
       description: 'Prepara el borrado de un documento de un expediente. NO lo borra: deja la acción pendiente de que el usuario la confirme en una tarjeta que se le muestra en el chat. Úsala solo cuando el usuario pida explícitamente borrar/eliminar un archivo concreto.',
       parameters: {
@@ -552,6 +573,7 @@ const TOOL_LABELS: Record<string, string> = {
   buscar_notas:           'Buscando notas…',
   tareas_expediente:      'Consultando tareas del expediente…',
   archivos_expediente:    'Consultando archivos del expediente…',
+  leer_archivo_expediente: 'Leyendo el documento…',
   preparar_borrado_archivo:      'Preparando el borrado del archivo…',
   preparar_renombrado_archivo:   'Preparando el renombrado del archivo…',
   preparar_movimiento_archivo:   'Preparando el movimiento del archivo…',
@@ -642,6 +664,7 @@ function summarizeToolCall(name: string, args: Record<string, any>, result: any)
   if (result?.error) return `${base}${argsStr} → error: ${String(result.error).slice(0, 160)}`;
   if (result?.ambiguo) return `${base}${argsStr} → varias coincidencias, pidió aclarar`;
   if (result?.accion_pendiente) return `${base}${argsStr} → propuesta: ${result.titulo || result.tipo}`;
+  if (typeof result?.texto === 'string') return `${base}${argsStr} → leyó ${result.texto.length.toLocaleString('es-ES')} caracteres`;
   if (typeof result?.total === 'number') return `${base}${argsStr} → ${result.total} resultado(s)`;
   return `${base}${argsStr}`;
 }
@@ -938,6 +961,41 @@ async function callToolInner(name: string, args: Record<string, any>, userId: st
           FROM client_files WHERE client_id=$1 ORDER BY created_at DESC LIMIT 30
         `, [args.expediente_id]);
         return { total: r.rowCount, archivos: r.rows.map(f => ({ id: f.id, nombre: f.document_name || f.original_name, categoria: f.category, tamano_kb: f.size_bytes ? Math.round(f.size_bytes / 1024) : null, en_drive: f.storage_provider === 'drive', fecha: f.created_at })) };
+      }
+
+      case 'leer_archivo_expediente': {
+        const expedienteId = String(args.expediente_id || '');
+        const query = String(args.archivo || '');
+        if (!expedienteId || !query) return { error: 'Faltan expediente_id o archivo.' };
+        const resolved = await resolveExpedienteAndFile(organizacionId, expedienteId, query);
+        if ('error' in resolved) return resolved;
+        if (resolved.files.length === 0) return { error: `No encuentro ningún archivo que coincida con "${query}" en ese expediente.` };
+        if (resolved.files.length > 1) {
+          return { ambiguo: true, coincidencias: resolved.files.map(f => ({ id: f.id, nombre: f.document_name || f.original_name })), mensaje: AMBIGUOUS_FILE_MSG };
+        }
+        const file = resolved.files[0];
+        const nombre = file.document_name || file.original_name;
+        const fileRow = await pool.query(
+          `SELECT stored_name, original_name, storage_provider, drive_file_id, dropbox_file_id, size_bytes
+           FROM client_files WHERE id=$1`,
+          [file.id],
+        );
+        if (!fileRow.rows.length) return { error: 'No encuentro ese archivo.' };
+        const f = fileRow.rows[0];
+        const ext = path.extname(f.original_name || f.stored_name || '').toLowerCase();
+        const READABLE_EXTS = ['.pdf', '.docx', '.doc', '.txt', '.text', '.rtf', '.jpg', '.jpeg', '.png', '.tiff', '.tif', '.bmp', '.webp'];
+        if (!READABLE_EXTS.includes(ext)) {
+          return { error: `No puedo leer archivos ${ext || 'de este tipo'} todavía. Solo puedo leer PDF, Word, texto plano e imágenes escaneadas (con OCR).` };
+        }
+        try {
+          const filePath = await ensureFileOnDisk(expedienteId, f.stored_name, f.storage_provider, f.drive_file_id, f.dropbox_file_id);
+          const docFile: DocFile = { name: nombre, fullPath: filePath, ext, size: f.size_bytes || 0 };
+          const texto = await extractTextFromFile(docFile);
+          if (!texto.trim()) return { error: 'No se ha podido extraer texto legible de ese documento (puede estar vacío, o ser una imagen ilegible).' };
+          return { archivo: nombre, expediente: resolved.label, texto };
+        } catch (e: any) {
+          return { error: `No se pudo leer el archivo: ${e.message}` };
+        }
       }
 
       case 'preparar_borrado_archivo': {

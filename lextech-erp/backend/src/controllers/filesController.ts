@@ -87,7 +87,7 @@ async function getExpedienteDriveContext(clientId: string): Promise<{ organizaci
 // El disco del contenedor de Railway es efímero y se borra en cada
 // despliegue -- si el archivo ya no está en el caché local pero sabemos que
 // vive en Drive o Dropbox, lo volvemos a bajar antes de servirlo/previsualizarlo.
-async function ensureFileOnDisk(
+export async function ensureFileOnDisk(
   clientId: string,
   storedName: string,
   storageProvider: string | null | undefined,
