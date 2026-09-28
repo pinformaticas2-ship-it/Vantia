@@ -39,7 +39,7 @@ CÓMO DEBES COMPORTARTE:
 - Si te preguntan por redacción (contratos, escritos, demandas, emails, cartas, informes) → redacta directamente con calidad profesional.
 - Si te preguntan por datos REALES del despacho (clientes concretos, expedientes activos, facturas, tareas) → usa las herramientas para obtener datos reales. Nunca inventes nombres, cifras ni referencias.
 - Puedes LEER el contenido de los documentos adjuntos a un expediente (PDF, Word, texto e incluso imágenes escaneadas vía OCR) con leer_archivo_expediente, no solo ver su nombre. Úsala en cuanto el usuario pida analizar, resumir, revisar o preguntar algo sobre el contenido de un documento concreto — no te quedes solo con el nombre del archivo cuando lo que hace falta es lo que dice dentro. Tarda algo más que el resto de herramientas (sobre todo si hay que hacer OCR), así que puedes avisar de que estás leyéndolo si la respuesta se demora.
-- Puedes gestionar documentos de expedientes (borrarlos, renombrarlos, moverlos a otro expediente, incluidos los que viven en Google Drive), cambiar la descripción de un expediente, crear notas internas sobre un cliente o un expediente, crear y actualizar tareas/actuaciones (incluido marcarlas completadas o borrarlas), y crear citas en la agenda. Para eso usa preparar_borrado_archivo / preparar_renombrado_archivo / preparar_movimiento_archivo / preparar_actualizar_descripcion_expediente / preparar_crear_nota / preparar_crear_tarea / preparar_actualizar_estado_tarea / preparar_eliminar_tarea / preparar_crear_cita. También tienes herramientas de solo lectura para el detalle completo de un cliente o expediente (detalle_cliente, detalle_expediente), el directorio de profesionales externos (listar_profesionales) y correos (buscar_correos) — estas no necesitan confirmación. Cada herramienta que usas, sea de lectura o de propuesta, queda registrada en un historial de Vantia que el despacho puede consultar; si te preguntan "qué has hecho" o "qué has consultado", diles que pueden verlo ahí. IMPORTANTE: las herramientas "preparar_..." NUNCA ejecutan la acción, solo la dejan preparada — al usuario se le muestra una tarjeta con botones "Confirmar"/"Cancelar" para decidir. Esa tarjeta YA ES la confirmación: en cuanto sepas exactamente qué hay que hacer (archivo/expediente/cliente y el dato nuevo que corresponda), LLAMA A LA HERRAMIENTA EN ESE MISMO TURNO. NUNCA preguntes antes en el chat "¿quieres que lo haga?", "¿te parece bien?" o similar y esperes a que el usuario responda "sí"/"vale" — eso duplica la confirmación (la del chat y la de la tarjeta) y además esta conversación NO conserva qué archivo/expediente exacto habíais hablado de un turno a otro, así que un "vale" suelto en el siguiente mensaje no tiene con qué actuar y falla. Si el usuario pide algo con intención ya clara (p.ej. "sugiéreme un nombre y cámbialo", "bórralo", "apunta una nota diciendo...", "cambia la descripción a..."), actúa directamente: llama a la herramienta ya. Solo pregunta antes en texto si de verdad falta un dato imprescindible (qué archivo si hay varios, de qué cliente). Tras usar una herramienta "preparar_...", dile al usuario que confirme en la tarjeta; NUNCA digas que ya está hecho, porque todavía no lo está.
+- Puedes gestionar documentos de expedientes (borrarlos, renombrarlos, moverlos a otro expediente, incluidos los que viven en Google Drive), cambiar la descripción de un expediente, crear notas internas sobre un cliente o un expediente, crear y actualizar tareas/actuaciones (incluido marcarlas completadas o borrarlas), y crear citas en la agenda. Para eso usa preparar_borrado_archivo / preparar_renombrado_archivo / preparar_movimiento_archivo / preparar_actualizar_descripcion_expediente / preparar_crear_nota / preparar_crear_tarea / preparar_actualizar_estado_tarea / preparar_eliminar_tarea / preparar_crear_cita. También tienes herramientas de solo lectura para el detalle completo de un cliente o expediente (detalle_cliente, detalle_expediente), el directorio de profesionales externos (listar_profesionales) y correos (buscar_correos) — estas no necesitan confirmación. Cada herramienta que usas, sea de lectura o de propuesta, queda registrada en un historial de Vantia que el despacho puede consultar; si te preguntan "qué has hecho" o "qué has consultado", diles que pueden verlo ahí. IMPORTANTE: las herramientas "preparar_..." NUNCA ejecutan la acción, solo la dejan preparada — al usuario se le muestra una tarjeta con botones "Confirmar"/"Cancelar" para decidir. Esa tarjeta YA ES la confirmación: en cuanto sepas exactamente qué hay que hacer (archivo/expediente/cliente y el dato nuevo que corresponda), LLAMA A LA HERRAMIENTA EN ESE MISMO TURNO. NUNCA preguntes antes en el chat "¿quieres que lo haga?", "¿te parece bien?" o similar y esperes a que el usuario responda "sí"/"vale" — eso duplica la confirmación (la del chat y la de la tarjeta) y además esta conversación NO conserva qué archivo/expediente exacto habíais hablado de un turno a otro, así que un "vale" suelto en el siguiente mensaje no tiene con qué actuar y falla. Si el usuario pide algo con intención ya clara (p.ej. "sugiéreme un nombre y cámbialo", "bórralo", "apunta una nota diciendo...", "cambia la descripción a..."), actúa directamente: llama a la herramienta ya. Ejemplo concreto de lo que NO hay que hacer: si te piden "sugiéreme un nombre para este archivo y cámbialo", NO respondas "te sugiero llamarlo X, ¿te parece bien?" y esperes -- decide el nombre y llama a preparar_renombrado_archivo en ese mismo turno; la tarjeta de confirmación ya cumple el papel de "¿te parece bien?". Solo pregunta antes en texto si de verdad falta un dato imprescindible (qué archivo si hay varios, de qué cliente). Tras usar una herramienta "preparar_...", dile al usuario que confirme en la tarjeta; NUNCA digas que ya está hecho, porque todavía no lo está.
 - Si ya tienes en el contexto datos de la entidad en pantalla → úsalos directamente sin volver a buscarlos.
 - Nunca muestres JSON en bruto. Convierte siempre los resultados en texto natural y bien formateado.
 - Puedes razonar, debatir, opinar (con matices), calcular, traducir, resumir, corregir, mejorar textos, generar ideas, hacer listas, comparar opciones, explicar paso a paso, y mucho más.
@@ -283,7 +283,7 @@ const TOOLS = [{
         properties: {
           estado:         { type: 'string',  description: 'pendiente | urgente | completada' },
           solo_vencidas:  { type: 'boolean', description: 'true para ver solo tareas con plazo vencido' },
-          expediente_id:  { type: 'string',  description: 'UUID del expediente para filtrar sus tareas' },
+          expediente_id:  { type: 'string',  description: 'UUID del expediente (o su referencia, ej. 2026/16, si no tienes el UUID) para filtrar sus tareas' },
           limit:          { type: 'integer', description: 'Máximo resultados (por defecto 10)' },
         },
       },
@@ -343,7 +343,7 @@ const TOOLS = [{
         properties: {
           query:         { type: 'string',  description: 'Texto a buscar en el contenido de la nota' },
           cliente_id:    { type: 'string',  description: 'UUID del cliente para ver sus notas' },
-          expediente_id: { type: 'string',  description: 'UUID del expediente para ver sus notas' },
+          expediente_id: { type: 'string',  description: 'UUID del expediente (o su referencia, ej. 2026/16, si no tienes el UUID) para ver sus notas' },
           limit:         { type: 'integer', description: 'Máximo resultados (por defecto 8)' },
         },
       },
@@ -354,7 +354,7 @@ const TOOLS = [{
       parameters: {
         type: 'object',
         properties: {
-          expediente_id: { type: 'string', description: 'UUID del expediente' },
+          expediente_id: { type: 'string', description: 'UUID del expediente (o su referencia, ej. 2026/16, si no tienes el UUID)' },
           estado:        { type: 'string', description: 'Filtrar por estado (opcional)' },
         },
         required: ['expediente_id'],
@@ -366,7 +366,7 @@ const TOOLS = [{
       parameters: {
         type: 'object',
         properties: {
-          expediente_id: { type: 'string', description: 'UUID del expediente' },
+          expediente_id: { type: 'string', description: 'UUID del expediente (o su referencia, ej. 2026/16, si no tienes el UUID)' },
         },
         required: ['expediente_id'],
       },
@@ -377,7 +377,7 @@ const TOOLS = [{
       parameters: {
         type: 'object',
         properties: {
-          expediente_id: { type: 'string', description: 'UUID del expediente que contiene el archivo' },
+          expediente_id: { type: 'string', description: 'UUID del expediente (o su referencia, ej. 2026/16, si no tienes el UUID) que contiene el archivo' },
           archivo:       { type: 'string', description: 'Nombre (o parte del nombre) del archivo a leer' },
         },
         required: ['expediente_id', 'archivo'],
@@ -389,7 +389,7 @@ const TOOLS = [{
       parameters: {
         type: 'object',
         properties: {
-          expediente_id: { type: 'string', description: 'UUID del expediente que contiene el archivo' },
+          expediente_id: { type: 'string', description: 'UUID del expediente (o su referencia, ej. 2026/16, si no tienes el UUID) que contiene el archivo' },
           archivo:       { type: 'string', description: 'Nombre (o parte del nombre) del archivo a borrar' },
         },
         required: ['expediente_id', 'archivo'],
@@ -401,7 +401,7 @@ const TOOLS = [{
       parameters: {
         type: 'object',
         properties: {
-          expediente_id: { type: 'string', description: 'UUID del expediente que contiene el archivo' },
+          expediente_id: { type: 'string', description: 'UUID del expediente (o su referencia, ej. 2026/16, si no tienes el UUID) que contiene el archivo' },
           archivo:       { type: 'string', description: 'Nombre (o parte del nombre) del archivo a renombrar' },
           nuevo_nombre:  { type: 'string', description: 'Nuevo nombre para el archivo (sin extensión, se conserva la original)' },
         },
@@ -414,7 +414,7 @@ const TOOLS = [{
       parameters: {
         type: 'object',
         properties: {
-          expediente_id:      { type: 'string', description: 'UUID del expediente de origen (donde está ahora el archivo)' },
+          expediente_id:      { type: 'string', description: 'UUID del expediente (o su referencia, ej. 2026/16, si no tienes el UUID) de origen (donde está ahora el archivo)' },
           archivo:            { type: 'string', description: 'Nombre (o parte del nombre) del archivo a mover' },
           expediente_destino: { type: 'string', description: 'Expediente al que moverlo: su UUID si se conoce, o texto para buscarlo (p.ej. "2026/14" o parte de la descripción)' },
         },
@@ -427,7 +427,7 @@ const TOOLS = [{
       parameters: {
         type: 'object',
         properties: {
-          expediente_id:     { type: 'string', description: 'UUID del expediente' },
+          expediente_id:     { type: 'string', description: 'UUID del expediente (o su referencia, ej. 2026/16, si no tienes el UUID)' },
           nueva_descripcion: { type: 'string', description: 'Nueva descripción del expediente' },
         },
         required: ['expediente_id', 'nueva_descripcion'],
@@ -440,7 +440,7 @@ const TOOLS = [{
         type: 'object',
         properties: {
           cliente_id:    { type: 'string', description: 'UUID del cliente sobre el que va la nota' },
-          expediente_id: { type: 'string', description: 'UUID del expediente sobre el que va la nota (alternativa a cliente_id)' },
+          expediente_id: { type: 'string', description: 'UUID del expediente (o su referencia, ej. 2026/16, si no tienes el UUID) sobre el que va la nota (alternativa a cliente_id)' },
           contenido:     { type: 'string', description: 'Contenido de la nota' },
           categoria:     { type: 'string', description: 'general | urgente | seguimiento | recordatorio | comercial | legal | otro (por defecto general)' },
         },
@@ -455,7 +455,7 @@ const TOOLS = [{
         properties: {
           query:         { type: 'string',  description: 'Texto a buscar en asunto, remitente o fragmento del correo' },
           cliente_id:    { type: 'string',  description: 'UUID del cliente para ver sus correos vinculados' },
-          expediente_id: { type: 'string',  description: 'UUID del expediente para ver sus correos vinculados' },
+          expediente_id: { type: 'string',  description: 'UUID del expediente (o su referencia, ej. 2026/16, si no tienes el UUID) para ver sus correos vinculados' },
           limit:         { type: 'integer', description: 'Máximo resultados (por defecto 8)' },
         },
       },
@@ -477,7 +477,7 @@ const TOOLS = [{
       parameters: {
         type: 'object',
         properties: {
-          expediente_id: { type: 'string', description: 'UUID del expediente' },
+          expediente_id: { type: 'string', description: 'UUID del expediente (o su referencia, ej. 2026/16, si no tienes el UUID)' },
         },
         required: ['expediente_id'],
       },
@@ -503,7 +503,7 @@ const TOOLS = [{
           titulo:        { type: 'string', description: 'Título de la tarea' },
           descripcion:   { type: 'string', description: 'Descripción opcional' },
           cliente_id:    { type: 'string', description: 'UUID del cliente (si no se da expediente_id, es obligatorio)' },
-          expediente_id: { type: 'string', description: 'UUID del expediente al que pertenece la tarea (opcional; si se da, el cliente se deduce de él)' },
+          expediente_id: { type: 'string', description: 'UUID del expediente (o su referencia, ej. 2026/16, si no tienes el UUID) al que pertenece la tarea (opcional; si se da, el cliente se deduce de él)' },
           plazo:         { type: 'string', description: 'Fecha límite en formato YYYY-MM-DD (opcional)' },
           prioridad:     { type: 'string', description: 'alta | media | baja (por defecto media)' },
           tipo:          { type: 'string', description: 'Tipo de actuación libre (por defecto "otro")' },
@@ -518,7 +518,7 @@ const TOOLS = [{
         type: 'object',
         properties: {
           tarea:         { type: 'string', description: 'Texto (parte del título) de la tarea a localizar' },
-          expediente_id: { type: 'string', description: 'UUID del expediente para acotar la búsqueda si hay varias tareas con nombre parecido' },
+          expediente_id: { type: 'string', description: 'UUID del expediente (o su referencia, ej. 2026/16, si no tienes el UUID) para acotar la búsqueda si hay varias tareas con nombre parecido' },
           nuevo_estado:  { type: 'string', description: 'pendiente | urgente | completada' },
         },
         required: ['tarea', 'nuevo_estado'],
@@ -531,7 +531,7 @@ const TOOLS = [{
         type: 'object',
         properties: {
           tarea:         { type: 'string', description: 'Texto (parte del título) de la tarea a localizar' },
-          expediente_id: { type: 'string', description: 'UUID del expediente para acotar la búsqueda si hay varias tareas con nombre parecido' },
+          expediente_id: { type: 'string', description: 'UUID del expediente (o su referencia, ej. 2026/16, si no tienes el UUID) para acotar la búsqueda si hay varias tareas con nombre parecido' },
         },
         required: ['tarea'],
       },
@@ -548,7 +548,7 @@ const TOOLS = [{
           descripcion:   { type: 'string', description: 'Descripción opcional' },
           ubicacion:     { type: 'string', description: 'Lugar opcional' },
           tipo:          { type: 'string', description: 'cita | vista | reunion | plazo | otro (por defecto cita)' },
-          expediente_id: { type: 'string', description: 'UUID del expediente relacionado (opcional)' },
+          expediente_id: { type: 'string', description: 'UUID del expediente (o su referencia, ej. 2026/16, si no tienes el UUID) relacionado (opcional)' },
           cliente_id:    { type: 'string', description: 'UUID del cliente relacionado (opcional)' },
         },
         required: ['titulo', 'fecha_inicio'],
@@ -633,6 +633,39 @@ async function resolveExpedienteByText(organizacionId: string, text: string) {
 
 function expedienteLabel(e: { anio: number; num_exp: number; descripcion?: string | null }) {
   return `${e.anio}/${e.num_exp}${e.descripcion ? ' - ' + e.descripcion : ''}`;
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Casi todas las herramientas piden expediente_id, y el modelo casi siempre
+// lo tiene -- lo acaba de sacar de listar_expedientes/archivos_expediente en
+// el mismo turno. El problema es el turno SIGUIENTE: el historial de chat
+// solo conserva el texto final de cada respuesta, no los resultados de
+// herramientas de turnos anteriores, así que si el usuario contesta "vale"
+// más tarde, al modelo solo le queda en el historial la referencia humana
+// ("2026/16") que sí mencionó en su respuesta, no el UUID real. Pedirle el
+// UUID en ese momento no tiene sentido: nunca lo tuvo visible. Esta función
+// acepta cualquiera de los dos -- si lo que llega no es un UUID, lo resuelve
+// como texto libre (número de expediente o parte de la descripción), igual
+// que ya hacía preparar_movimiento_archivo para su expediente_destino.
+async function resolveExpedienteIdFlexible(organizacionId: string, value: string): Promise<
+  | { id: string }
+  | { error: string }
+  | { ambiguo: true; coincidencias: { id: string; nombre: string }[]; mensaje: string }
+> {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) return { error: 'Falta expediente_id.' };
+  if (UUID_RE.test(trimmed)) {
+    const r = await pool.query(`SELECT id FROM expedientes WHERE id=$1 AND organizacion_id=$2`, [trimmed, organizacionId]);
+    if (!r.rows.length) return { error: 'No encuentro ese expediente en este despacho.' };
+    return { id: r.rows[0].id };
+  }
+  const matches = await resolveExpedienteByText(organizacionId, trimmed);
+  if (matches.length === 0) return { error: `No encuentro ningún expediente que coincida con "${trimmed}".` };
+  if (matches.length > 1) {
+    return { ambiguo: true, coincidencias: matches.map(t => ({ id: t.id, nombre: expedienteLabel(t) })), mensaje: AMBIGUOUS_EXP_MSG };
+  }
+  return { id: matches[0].id };
 }
 
 async function resolveTaskByText(organizacionId: string, text: string, expedienteId?: string) {
@@ -859,8 +892,13 @@ async function callToolInner(name: string, args: Record<string, any>, userId: st
         const limit = Math.min(Number(args.limit) || 10, 30);
         const conds = ['created_by=$1'], params: any[] = [userId];
         let pi = 2;
-        if (args.estado)        { conds.push(`estado=$${pi++}`); params.push(args.estado); }
-        if (args.expediente_id) { conds.push(`expediente_id=$${pi++}`); params.push(args.expediente_id); }
+        if (args.estado) { conds.push(`estado=$${pi++}`); params.push(args.estado); }
+        if (args.expediente_id) {
+          const resolvedExp = await resolveExpedienteIdFlexible(organizacionId, String(args.expediente_id));
+          if ('error' in resolvedExp) return resolvedExp;
+          if ('ambiguo' in resolvedExp) return resolvedExp;
+          conds.push(`expediente_id=$${pi++}`); params.push(resolvedExp.id);
+        }
         if (args.solo_vencidas) conds.push(`(plazo<NOW() AND estado!='completada')`);
         params.push(limit);
         const r = await pool.query(`
@@ -921,9 +959,14 @@ async function callToolInner(name: string, args: Record<string, any>, userId: st
         const limit = Math.min(Number(args.limit) || 8, 20);
         const conds: string[] = [], params: any[] = [];
         let pi = 1;
-        if (args.query)         { conds.push(`n.content ILIKE $${pi++}`); params.push(`%${args.query}%`); }
-        if (args.cliente_id)    { conds.push(`n.client_id=$${pi++}`); params.push(args.cliente_id); }
-        if (args.expediente_id) { conds.push(`n.expediente_id=$${pi++}`); params.push(args.expediente_id); }
+        if (args.query)      { conds.push(`n.content ILIKE $${pi++}`); params.push(`%${args.query}%`); }
+        if (args.cliente_id) { conds.push(`n.client_id=$${pi++}`); params.push(args.cliente_id); }
+        if (args.expediente_id) {
+          const resolvedExp = await resolveExpedienteIdFlexible(organizacionId, String(args.expediente_id));
+          if ('error' in resolvedExp) return resolvedExp;
+          if ('ambiguo' in resolvedExp) return resolvedExp;
+          conds.push(`n.expediente_id=$${pi++}`); params.push(resolvedExp.id);
+        }
         params.push(limit);
         const r = await pool.query(`
           SELECT n.content, n.category, n.priority, n.created_at,
@@ -936,8 +979,14 @@ async function callToolInner(name: string, args: Record<string, any>, userId: st
       }
 
       case 'tareas_expediente': {
+        // expediente_id acotado a esta organización -- antes no se comprobaba
+        // en absoluto, así que pedir el UUID de un expediente de OTRO
+        // despacho devolvía igualmente sus tareas.
+        const resolvedExp = await resolveExpedienteIdFlexible(organizacionId, String(args.expediente_id || ''));
+        if ('error' in resolvedExp) return resolvedExp;
+        if ('ambiguo' in resolvedExp) return resolvedExp;
         const limit = Math.min(Number(args.limit) || 20, 50);
-        const conds = ['expediente_id=$1'], params: any[] = [args.expediente_id];
+        const conds = ['expediente_id=$1'], params: any[] = [resolvedExp.id];
         let pi = 2;
         if (args.estado) { conds.push(`estado=$${pi++}`); params.push(args.estado); }
         params.push(limit);
@@ -951,22 +1000,24 @@ async function callToolInner(name: string, args: Record<string, any>, userId: st
       }
 
       case 'archivos_expediente': {
-        // El expediente tiene que ser de esta organización -- sin este filtro,
-        // pedir el UUID de un expediente de OTRO despacho devolvía igualmente
-        // sus nombres de archivo.
-        const expCheck = await pool.query(`SELECT 1 FROM expedientes WHERE id=$1 AND organizacion_id=$2`, [args.expediente_id, organizacionId]);
-        if (!expCheck.rows.length) return { error: 'No encuentro ese expediente en este despacho.' };
+        const resolvedExp = await resolveExpedienteIdFlexible(organizacionId, String(args.expediente_id || ''));
+        if ('error' in resolvedExp) return resolvedExp;
+        if ('ambiguo' in resolvedExp) return resolvedExp;
         const r = await pool.query(`
           SELECT id, original_name, document_name, category, size_bytes, storage_provider, created_at
           FROM client_files WHERE client_id=$1 ORDER BY created_at DESC LIMIT 30
-        `, [args.expediente_id]);
+        `, [resolvedExp.id]);
         return { total: r.rowCount, archivos: r.rows.map(f => ({ id: f.id, nombre: f.document_name || f.original_name, categoria: f.category, tamano_kb: f.size_bytes ? Math.round(f.size_bytes / 1024) : null, en_drive: f.storage_provider === 'drive', fecha: f.created_at })) };
       }
 
       case 'leer_archivo_expediente': {
-        const expedienteId = String(args.expediente_id || '');
+        const expIdArg = String(args.expediente_id || '');
         const query = String(args.archivo || '');
-        if (!expedienteId || !query) return { error: 'Faltan expediente_id o archivo.' };
+        if (!expIdArg || !query) return { error: 'Faltan expediente_id o archivo.' };
+        const resolvedExp = await resolveExpedienteIdFlexible(organizacionId, expIdArg);
+        if ('error' in resolvedExp) return resolvedExp;
+        if ('ambiguo' in resolvedExp) return resolvedExp;
+        const expedienteId = resolvedExp.id;
         const resolved = await resolveExpedienteAndFile(organizacionId, expedienteId, query);
         if ('error' in resolved) return resolved;
         if (resolved.files.length === 0) return { error: `No encuentro ningún archivo que coincida con "${query}" en ese expediente.` };
@@ -999,9 +1050,13 @@ async function callToolInner(name: string, args: Record<string, any>, userId: st
       }
 
       case 'preparar_borrado_archivo': {
-        const expedienteId = String(args.expediente_id || '');
+        const expIdArg = String(args.expediente_id || '');
         const query = String(args.archivo || '');
-        if (!expedienteId || !query) return { error: 'Faltan expediente_id o archivo.' };
+        if (!expIdArg || !query) return { error: 'Faltan expediente_id o archivo.' };
+        const resolvedExp = await resolveExpedienteIdFlexible(organizacionId, expIdArg);
+        if ('error' in resolvedExp) return resolvedExp;
+        if ('ambiguo' in resolvedExp) return resolvedExp;
+        const expedienteId = resolvedExp.id;
         const resolved = await resolveExpedienteAndFile(organizacionId, expedienteId, query);
         if ('error' in resolved) return resolved;
         if (resolved.files.length === 0) return { error: `No encuentro ningún archivo que coincida con "${query}" en ese expediente.` };
@@ -1023,10 +1078,14 @@ async function callToolInner(name: string, args: Record<string, any>, userId: st
       }
 
       case 'preparar_renombrado_archivo': {
-        const expedienteId = String(args.expediente_id || '');
+        const expIdArg = String(args.expediente_id || '');
         const query = String(args.archivo || '');
         const nuevoNombre = String(args.nuevo_nombre || '').trim();
-        if (!expedienteId || !query || !nuevoNombre) return { error: 'Faltan expediente_id, archivo o nuevo_nombre.' };
+        if (!expIdArg || !query || !nuevoNombre) return { error: 'Faltan expediente_id, archivo o nuevo_nombre.' };
+        const resolvedExp = await resolveExpedienteIdFlexible(organizacionId, expIdArg);
+        if ('error' in resolvedExp) return resolvedExp;
+        if ('ambiguo' in resolvedExp) return resolvedExp;
+        const expedienteId = resolvedExp.id;
         const resolved = await resolveExpedienteAndFile(organizacionId, expedienteId, query);
         if ('error' in resolved) return resolved;
         if (resolved.files.length === 0) return { error: `No encuentro ningún archivo que coincida con "${query}" en ese expediente.` };
@@ -1048,10 +1107,14 @@ async function callToolInner(name: string, args: Record<string, any>, userId: st
       }
 
       case 'preparar_movimiento_archivo': {
-        const expedienteId = String(args.expediente_id || '');
+        const expIdArg = String(args.expediente_id || '');
         const query = String(args.archivo || '');
         const destinoTexto = String(args.expediente_destino || '');
-        if (!expedienteId || !query || !destinoTexto) return { error: 'Faltan expediente_id, archivo o expediente_destino.' };
+        if (!expIdArg || !query || !destinoTexto) return { error: 'Faltan expediente_id, archivo o expediente_destino.' };
+        const resolvedExp = await resolveExpedienteIdFlexible(organizacionId, expIdArg);
+        if ('error' in resolvedExp) return resolvedExp;
+        if ('ambiguo' in resolvedExp) return resolvedExp;
+        const expedienteId = resolvedExp.id;
         const resolved = await resolveExpedienteAndFile(organizacionId, expedienteId, query);
         if ('error' in resolved) return resolved;
         if (resolved.files.length === 0) return { error: `No encuentro ningún archivo que coincida con "${query}" en ese expediente.` };
@@ -1083,9 +1146,13 @@ async function callToolInner(name: string, args: Record<string, any>, userId: st
       }
 
       case 'preparar_actualizar_descripcion_expediente': {
-        const expedienteId = String(args.expediente_id || '');
+        const expIdArg = String(args.expediente_id || '');
         const nuevaDescripcion = String(args.nueva_descripcion || '').trim();
-        if (!expedienteId || !nuevaDescripcion) return { error: 'Faltan expediente_id o nueva_descripcion.' };
+        if (!expIdArg || !nuevaDescripcion) return { error: 'Faltan expediente_id o nueva_descripcion.' };
+        const resolvedExp = await resolveExpedienteIdFlexible(organizacionId, expIdArg);
+        if ('error' in resolvedExp) return resolvedExp;
+        if ('ambiguo' in resolvedExp) return resolvedExp;
+        const expedienteId = resolvedExp.id;
         const expRes = await pool.query(`SELECT anio, num_exp, descripcion FROM expedientes WHERE id=$1 AND organizacion_id=$2`, [expedienteId, organizacionId]);
         if (!expRes.rows.length) return { error: 'No encuentro ese expediente en este despacho.' };
         const label = expedienteLabel(expRes.rows[0]);
@@ -1113,9 +1180,12 @@ async function callToolInner(name: string, args: Record<string, any>, userId: st
 
         let targetId: string; let targetLabel: string; let targetType: 'cliente' | 'expediente';
         if (expedienteIdArg) {
-          const expRes = await pool.query(`SELECT anio, num_exp, descripcion FROM expedientes WHERE id=$1 AND organizacion_id=$2`, [expedienteIdArg, organizacionId]);
+          const resolvedExp = await resolveExpedienteIdFlexible(organizacionId, expedienteIdArg);
+          if ('error' in resolvedExp) return resolvedExp;
+          if ('ambiguo' in resolvedExp) return resolvedExp;
+          const expRes = await pool.query(`SELECT anio, num_exp, descripcion FROM expedientes WHERE id=$1 AND organizacion_id=$2`, [resolvedExp.id, organizacionId]);
           if (!expRes.rows.length) return { error: 'No encuentro ese expediente en este despacho.' };
-          targetId = expedienteIdArg; targetLabel = expedienteLabel(expRes.rows[0]); targetType = 'expediente';
+          targetId = resolvedExp.id; targetLabel = expedienteLabel(expRes.rows[0]); targetType = 'expediente';
         } else {
           const clienteRes = await pool.query(
             `SELECT commercial_name, first_name, last_name FROM entities WHERE id=$1 AND organizacion_id=$2`,
@@ -1172,11 +1242,14 @@ async function callToolInner(name: string, args: Record<string, any>, userId: st
       }
 
       case 'detalle_expediente': {
+        const resolvedExp = await resolveExpedienteIdFlexible(organizacionId, String(args.expediente_id || ''));
+        if ('error' in resolvedExp) return resolvedExp;
+        if ('ambiguo' in resolvedExp) return resolvedExp;
         const r = await pool.query(`
           SELECT e.*, COALESCE(ent.commercial_name, CONCAT(ent.first_name,' ',ent.last_name)) AS cliente_nombre
           FROM expedientes e LEFT JOIN entities ent ON ent.id = e.cliente_id
           WHERE e.id=$1 AND e.organizacion_id=$2
-        `, [args.expediente_id, organizacionId]);
+        `, [resolvedExp.id, organizacionId]);
         if (!r.rows.length) return { error: 'No encuentro ese expediente en este despacho.' };
         const e = r.rows[0];
         return {
@@ -1219,6 +1292,10 @@ async function callToolInner(name: string, args: Record<string, any>, userId: st
         let clienteNombre = '';
         let expLabel = '';
         if (expedienteIdArg) {
+          const resolvedExp = await resolveExpedienteIdFlexible(organizacionId, expedienteIdArg);
+          if ('error' in resolvedExp) return resolvedExp;
+          if ('ambiguo' in resolvedExp) return resolvedExp;
+          expedienteIdArg = resolvedExp.id;
           const expRes = await pool.query(`SELECT anio, num_exp, descripcion, cliente_id FROM expedientes WHERE id=$1 AND organizacion_id=$2`, [expedienteIdArg, organizacionId]);
           if (!expRes.rows.length) return { error: 'No encuentro ese expediente en este despacho.' };
           expLabel = expedienteLabel(expRes.rows[0]);
@@ -1254,7 +1331,14 @@ async function callToolInner(name: string, args: Record<string, any>, userId: st
         if (!isDelete && !['pendiente', 'urgente', 'completada'].includes(nuevoEstado)) {
           return { error: 'nuevo_estado debe ser pendiente, urgente o completada.' };
         }
-        const matches = await resolveTaskByText(organizacionId, texto, args.expediente_id ? String(args.expediente_id) : undefined);
+        let taskExpedienteId: string | undefined;
+        if (args.expediente_id) {
+          const resolvedExp = await resolveExpedienteIdFlexible(organizacionId, String(args.expediente_id));
+          if ('error' in resolvedExp) return resolvedExp;
+          if ('ambiguo' in resolvedExp) return resolvedExp;
+          taskExpedienteId = resolvedExp.id;
+        }
+        const matches = await resolveTaskByText(organizacionId, texto, taskExpedienteId);
         if (matches.length === 0) return { error: `No encuentro ninguna tarea que coincida con "${texto}".` };
         if (matches.length > 1) {
           return { ambiguo: true, coincidencias: matches.map(t => ({ id: t.id, nombre: t.titulo })), mensaje: AMBIGUOUS_TASK_MSG };
@@ -1281,17 +1365,22 @@ async function callToolInner(name: string, args: Record<string, any>, userId: st
         const startDate = new Date(fechaInicio);
         if (isNaN(startDate.getTime())) return { error: 'fecha_inicio no es una fecha válida.' };
         let contextLabel = titulo;
+        let resolvedExpedienteId: string | null = null;
         if (args.expediente_id) {
-          const expRes = await pool.query(`SELECT anio, num_exp, descripcion FROM expedientes WHERE id=$1 AND organizacion_id=$2`, [args.expediente_id, organizacionId]);
+          const resolvedExp = await resolveExpedienteIdFlexible(organizacionId, String(args.expediente_id));
+          if ('error' in resolvedExp) return resolvedExp;
+          if ('ambiguo' in resolvedExp) return resolvedExp;
+          resolvedExpedienteId = resolvedExp.id;
+          const expRes = await pool.query(`SELECT anio, num_exp, descripcion FROM expedientes WHERE id=$1 AND organizacion_id=$2`, [resolvedExpedienteId, organizacionId]);
           if (!expRes.rows.length) return { error: 'No encuentro ese expediente en este despacho.' };
           contextLabel = `${titulo} (expediente ${expedienteLabel(expRes.rows[0])})`;
         }
         const pending = await pool.query(
           `INSERT INTO vantia_pending_actions (organizacion_id, user_id, tipo, expediente_id, expediente_label, payload)
            VALUES ($1,$2,'create_event',$3,$4,$5::jsonb) RETURNING id`,
-          [organizacionId, userId, args.expediente_id || null, contextLabel, JSON.stringify({
+          [organizacionId, userId, resolvedExpedienteId, contextLabel, JSON.stringify({
             titulo, fechaInicio, fechaFin: args.fecha_fin || null, descripcion: args.descripcion || null,
-            ubicacion: args.ubicacion || null, tipo: args.tipo || 'cita', expedienteId: args.expediente_id || null, clienteId: args.cliente_id || null,
+            ubicacion: args.ubicacion || null, tipo: args.tipo || 'cita', expedienteId: resolvedExpedienteId, clienteId: args.cliente_id || null,
           })],
         );
         return {
@@ -1308,7 +1397,12 @@ async function callToolInner(name: string, args: Record<string, any>, userId: st
         let where = 'user_id = $1';
         if (q) { params.push(`%${q}%`); where += ` AND (subject ILIKE $${params.length} OR snippet ILIKE $${params.length} OR from_name ILIKE $${params.length} OR from_email ILIKE $${params.length})`; }
         if (args.cliente_id) { params.push(args.cliente_id); where += ` AND cliente_id = $${params.length}`; }
-        if (args.expediente_id) { params.push(args.expediente_id); where += ` AND expediente_id = $${params.length}`; }
+        if (args.expediente_id) {
+          const resolvedExp = await resolveExpedienteIdFlexible(organizacionId, String(args.expediente_id));
+          if ('error' in resolvedExp) return resolvedExp;
+          if ('ambiguo' in resolvedExp) return resolvedExp;
+          params.push(resolvedExp.id); where += ` AND expediente_id = $${params.length}`;
+        }
         params.push(limit);
         const r = await pool.query(
           `SELECT from_name, from_email, subject, snippet, sent_at, is_read FROM emails WHERE ${where} ORDER BY sent_at DESC NULLS LAST LIMIT $${params.length}`,
