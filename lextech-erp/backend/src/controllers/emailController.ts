@@ -1006,26 +1006,30 @@ export async function getMessages(req: Request, res: Response) {
     const limitP  = params.length - 1;
     const offsetP = params.length;
 
-    const { rows } = await pool.query(
-      `SELECT e.id, e.uid, e.folder, e.from_email, e.from_name, e.to_emails,
-              e.subject, e.snippet, e.is_read, e.is_starred, e.has_attachments,
-              e.size_bytes, e.sent_at, e.account_id, e.gmail_profile_id, e.gmail_message_id,
-              e.expediente_id, e.cliente_id,
-              COALESCE(a.label, op.display_name, op.email) AS account_label,
-              COALESCE(a.email, op.email)                  AS account_email
-       FROM emails e
-       LEFT JOIN email_accounts       a  ON a.id  = e.account_id
-       LEFT JOIN email_oauth_profiles op ON op.id = e.gmail_profile_id
-       WHERE ${where}
-       ORDER BY e.sent_at DESC NULLS LAST
-       LIMIT $${limitP} OFFSET $${offsetP}`,
-      params,
-    );
-
-    const { rows: cnt } = await pool.query(
-      `SELECT COUNT(*) FROM emails e WHERE ${where}`,
-      params.slice(0, -2),
-    );
+    // Las dos consultas son independientes (mismo WHERE, proyección distinta)
+    // -- antes se esperaba una y luego la otra, pagando dos viajes de ida y
+    // vuelta a la BD en serie para cada carga de la bandeja.
+    const [{ rows }, { rows: cnt }] = await Promise.all([
+      pool.query(
+        `SELECT e.id, e.uid, e.folder, e.from_email, e.from_name, e.to_emails,
+                e.subject, e.snippet, e.is_read, e.is_starred, e.has_attachments,
+                e.size_bytes, e.sent_at, e.account_id, e.gmail_profile_id, e.gmail_message_id,
+                e.expediente_id, e.cliente_id,
+                COALESCE(a.label, op.display_name, op.email) AS account_label,
+                COALESCE(a.email, op.email)                  AS account_email
+         FROM emails e
+         LEFT JOIN email_accounts       a  ON a.id  = e.account_id
+         LEFT JOIN email_oauth_profiles op ON op.id = e.gmail_profile_id
+         WHERE ${where}
+         ORDER BY e.sent_at DESC NULLS LAST
+         LIMIT $${limitP} OFFSET $${offsetP}`,
+        params,
+      ),
+      pool.query(
+        `SELECT COUNT(*) FROM emails e WHERE ${where}`,
+        params.slice(0, -2),
+      ),
+    ]);
 
     return ok(res, { emails: rows, total: parseInt(cnt[0].count), page, pageSize });
   } catch (e: any) { return err(res, e.message); }

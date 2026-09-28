@@ -2407,6 +2407,34 @@ export async function runMigrations(): Promise<void> {
       );
     `);
 
+    // ── Correo: acelerar bandejas UNREAD/STARRED y la búsqueda ──────
+    // Las carpetas especiales (no leídos, destacados) y la búsqueda por texto
+    // libre filtran siempre por cuenta/perfil + is_read/is_starred, pero solo
+    // había índices sueltos de una columna (idx_emails_is_read/is_starred) --
+    // valen poco cuando además hay que ordenar por sent_at, y ninguno cubre
+    // la combinación real de la consulta (cuenta + estado + orden). La
+    // búsqueda (ILIKE '%texto%') tampoco podía usar los índices normales, así
+    // que con muchos correos degenera en un escaneo completo.
+    for (const idx of [
+      `CREATE INDEX IF NOT EXISTS idx_emails_account_starred ON emails (account_id, is_starred, sent_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_emails_account_unread  ON emails (account_id, is_read, sent_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_emails_gmail_starred   ON emails (gmail_profile_id, is_starred, sent_at DESC) WHERE gmail_profile_id IS NOT NULL`,
+      `CREATE INDEX IF NOT EXISTS idx_emails_gmail_unread    ON emails (gmail_profile_id, is_read, sent_at DESC) WHERE gmail_profile_id IS NOT NULL`,
+    ]) {
+      try { await client.query(idx); } catch (_e: any) {}
+    }
+    try {
+      await client.query(`CREATE EXTENSION IF NOT EXISTS pg_trgm;`);
+      for (const idx of [
+        `CREATE INDEX IF NOT EXISTS idx_emails_subject_trgm    ON emails USING gin (subject gin_trgm_ops)`,
+        `CREATE INDEX IF NOT EXISTS idx_emails_from_email_trgm ON emails USING gin (from_email gin_trgm_ops)`,
+        `CREATE INDEX IF NOT EXISTS idx_emails_from_name_trgm  ON emails USING gin (from_name gin_trgm_ops)`,
+        `CREATE INDEX IF NOT EXISTS idx_emails_snippet_trgm    ON emails USING gin (snippet gin_trgm_ops)`,
+      ]) {
+        try { await client.query(idx); } catch (_e: any) {}
+      }
+    } catch (_e: any) {}
+
     // ── Permisos en schema public (requerido en PostgreSQL 15+) ────
     for (const grant of [
       `GRANT USAGE ON SCHEMA public TO admin`,

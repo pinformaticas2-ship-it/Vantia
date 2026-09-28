@@ -4096,7 +4096,14 @@ export default function Email() {
         if (searchQ.trim()) qp.set('q', searchQ.trim());
 
         const readDbAndApply = async (isBackground: boolean) => {
-          const dbRes = await authFetch(`${API}/email/messages?${qp}`);
+          // Mensajes y estadísticas son independientes (mismo perfil, datos
+          // distintos) -- antes se esperaba uno y luego el otro, pagando dos
+          // viajes en serie en cada carga. La rama IMAP de aquí abajo ya iba
+          // en paralelo; esta rama de Gmail se había quedado sin el mismo arreglo.
+          const [dbRes, stRes] = await Promise.all([
+            authFetch(`${API}/email/messages?${qp}`),
+            authFetch(`${API}/email/stats?gmail_profile_id=${encodeURIComponent(savedProfile.id)}`).catch(() => null),
+          ]);
           const dbPayload = await dbRes.json().catch(() => null);
           if (!dbRes.ok || !dbPayload?.success) {
             if (isBackground) return;
@@ -4117,7 +4124,6 @@ export default function Email() {
           }
           setNextPageToken(undefined);
 
-          const stRes = await authFetch(`${API}/email/stats?gmail_profile_id=${encodeURIComponent(savedProfile.id)}`).catch(() => null);
           const stPayload = await stRes?.json().catch(() => null);
           if (stRes?.ok && stPayload?.success) {
             setUnreadCount(Number(stPayload.data?.unread || 0));
