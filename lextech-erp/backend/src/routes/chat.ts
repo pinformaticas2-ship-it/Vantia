@@ -17,7 +17,7 @@ import {
   getSystemUsers, buscarCanalesDisponibles, getUnreadCounts, uploadChatImage, uploadChatFile,
   getTypingStatus, updateTypingStatus,
   getSesionExpediente, iniciarSesionExpediente, cerrarSesionExpediente,
-  getMyStatus, updateHeartbeat, getPresence,
+  getMyStatus, updateHeartbeat, getPresence, getLinkPreview,
 } from '../controllers/chatController';
 
 const router = Router();
@@ -112,6 +112,9 @@ router.delete('/canales/:id/fijar/:mensajeId',   requireAuth, desfijarMensaje);
 router.get   ('/favoritos',                      requireAuth, getFavoritos);
 router.post  ('/mensajes/:id/favorito',          requireAuth, toggleFavorito);
 router.get   ('/buscar',                         requireAuth, buscarMensajes);
+
+// Vista previa de enlaces (tarjeta bajo el mensaje al pegar un link)
+router.get   ('/link-preview',                   requireAuth, getLinkPreview);
 
 // Usuarios del sistema (Clerk)
 router.get   ('/usuarios',                       requireAuth, getSystemUsers);

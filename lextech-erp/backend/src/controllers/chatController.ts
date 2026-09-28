@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
 import path from 'path';
+import dns from 'dns/promises';
+import net from 'net';
 import pool from '../config/database';
 import { sendPushToUsers } from '../utils/webPush';
 import { resolveUserName } from './activityController';
@@ -1225,5 +1227,154 @@ export async function getUnreadCounts(req: Request, res: Response) {
     return ok(res, rows);
   } catch (e: any) {
     return err(res, e.message);
+  }
+}
+
+// ── Vista previa de enlaces (estilo Slack) ──────────────────────────────────
+// Cuando alguien pega un link en el chat, se pide aquí su og:title/og:image/
+// og:description para pintar una tarjeta bajo el mensaje, en vez de dejar el
+// link como texto plano. Cache en memoria (no hace falta persistirlo: si el
+// backend se reinicia, se vuelve a pedir la próxima vez que alguien la vea).
+const linkPreviewCache = new Map<string, { data: LinkPreviewData; expires: number }>();
+const LINK_PREVIEW_TTL_MS = 60 * 60 * 1000; // 1h
+const LINK_PREVIEW_MAX_BYTES = 300 * 1024; // el <head> con los meta tags va sobrado con esto
+
+interface LinkPreviewData {
+  url: string;
+  title: string;
+  description: string | null;
+  image: string | null;
+  siteName: string;
+  favicon: string | null;
+}
+
+// Evita que el chat se use para sondear la red interna del propio servidor
+// (localhost, IPs privadas, metadata de la nube, etc.) a través de un enlace
+// pegado en un mensaje -- comprobación básica sobre la IP ya resuelta, no
+// protege de un ataque de DNS rebinding sofisticado, pero cubre el caso real.
+function isPrivateOrLocalIp(ip: string): boolean {
+  if (net.isIPv4(ip)) {
+    const [a, b] = ip.split('.').map(Number);
+    if (a === 10 || a === 127 || a === 0) return true;
+    if (a === 169 && b === 254) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    return false;
+  }
+  const lower = ip.toLowerCase();
+  return lower === '::1' || lower.startsWith('fe80:') || lower.startsWith('fc') || lower.startsWith('fd');
+}
+
+function decodeHtmlEntities(s: string): string {
+  return s
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#0?39;/g, "'").replace(/&apos;/g, "'")
+    .replace(/&#x([0-9a-f]+);/gi, (_m, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_m, d) => String.fromCodePoint(parseInt(d, 10)));
+}
+
+function extractMetaTag(html: string, prop: string): string | null {
+  const patterns = [
+    new RegExp(`<meta[^>]+(?:property|name)=["']${prop}["'][^>]*content=["']([^"']*)["']`, 'i'),
+    new RegExp(`<meta[^>]+content=["']([^"']*)["'][^>]*(?:property|name)=["']${prop}["']`, 'i'),
+  ];
+  for (const re of patterns) {
+    const m = html.match(re);
+    if (m) return decodeHtmlEntities(m[1]).trim();
+  }
+  return null;
+}
+
+/** GET /api/chat/link-preview?url=... — metadatos (Open Graph) de un enlace para la tarjeta de vista previa */
+export async function getLinkPreview(req: Request, res: Response) {
+  const raw = String(req.query.url || '').trim();
+  if (!raw) return err(res, 'Falta url.', 400);
+
+  let target: URL;
+  try {
+    target = new URL(raw);
+  } catch {
+    return err(res, 'URL no válida.', 400);
+  }
+  if (target.protocol !== 'http:' && target.protocol !== 'https:') {
+    return err(res, 'Solo se admiten enlaces http/https.', 400);
+  }
+
+  const cacheKey = target.toString();
+  const cached = linkPreviewCache.get(cacheKey);
+  if (cached && cached.expires > Date.now()) return ok(res, cached.data);
+
+  try {
+    const { address } = await dns.lookup(target.hostname);
+    if (isPrivateOrLocalIp(address)) return err(res, 'Ese dominio no está permitido.', 400);
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 6000);
+    let html: string;
+    try {
+      const resp = await fetch(target.toString(), {
+        signal: controller.signal,
+        redirect: 'follow',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; VantiaLinkPreview/1.0)',
+          'Accept': 'text/html,application/xhtml+xml',
+        },
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const contentType = resp.headers.get('content-type') || '';
+      if (!contentType.includes('text/html')) throw new Error('No es una página HTML.');
+
+      const reader = resp.body?.getReader();
+      const chunks: Uint8Array[] = [];
+      let total = 0;
+      if (reader) {
+        while (total < LINK_PREVIEW_MAX_BYTES) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (value) { chunks.push(value); total += value.length; }
+        }
+        try { await reader.cancel(); } catch { /* */ }
+      }
+      html = Buffer.concat(chunks.map(c => Buffer.from(c))).toString('utf-8');
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    const titleTagMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i);
+    const title = extractMetaTag(html, 'og:title') || (titleTagMatch ? decodeHtmlEntities(titleTagMatch[1]).trim() : null);
+    const description = extractMetaTag(html, 'og:description') || extractMetaTag(html, 'description');
+    let image = extractMetaTag(html, 'og:image');
+    if (image) {
+      try { image = new URL(image, target).toString(); } catch { image = null; }
+    }
+    const siteName = extractMetaTag(html, 'og:site_name') || target.hostname.replace(/^www\./, '');
+    const iconMatch = html.match(/<link[^>]+rel=["'](?:shortcut icon|icon)["'][^>]*href=["']([^"']+)["']/i)
+      || html.match(/<link[^>]+href=["']([^"']+)["'][^>]*rel=["'](?:shortcut icon|icon)["']/i);
+    let favicon: string | null = null;
+    if (iconMatch) {
+      try { favicon = new URL(iconMatch[1], target).toString(); } catch { favicon = null; }
+    }
+    if (!favicon) favicon = `${target.protocol}//${target.host}/favicon.ico`;
+
+    if (!title && !description && !image) {
+      return err(res, 'No se encontró información para previsualizar ese enlace.', 404);
+    }
+
+    const data: LinkPreviewData = {
+      url: target.toString(),
+      title: title || target.hostname,
+      description: description ? description.slice(0, 300) : null,
+      image,
+      siteName,
+      favicon,
+    };
+    linkPreviewCache.set(cacheKey, { data, expires: Date.now() + LINK_PREVIEW_TTL_MS });
+    if (linkPreviewCache.size > 500) {
+      const oldestKey = linkPreviewCache.keys().next().value;
+      if (oldestKey) linkPreviewCache.delete(oldestKey);
+    }
+    return ok(res, data);
+  } catch (e: any) {
+    return err(res, 'No se pudo obtener la vista previa de ese enlace.', 502);
   }
 }

@@ -21,6 +21,7 @@ import { createPortal } from "react-dom";
 import { useChatUnread } from "../contexts/ChatUnreadContext";
 import BackButton from "../components/BackButton";
 import { useIsMobile } from "../lib/useIsMobile";
+import { LinkPreviewCard, firstUrlIn } from "../components/LinkPreviewCard";
 
 // ══════════════════════════════════════════════════════════════════════════════
 // TIPOS
@@ -2593,7 +2594,7 @@ function PanelFavoritos({ canalId, getToken, onClose, onGoTo, onToggleFavorite, 
 // elementos y el componente padre repinta con cada poll (cada ~700ms
 // mientras la pestaña está visible) -- sin memo, cada mensaje se volvía a
 // renderizar entero en cada ciclo aunque su contenido no hubiera cambiado.
-const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserId, isHighlighted, isFreshIncoming = false, showReadReceipt = false, isReadByRecipient = false, onReply, onReact, onEdit, onDelete, onPin, onFavorite, isFavorite, isPinned, resolveDisplayName, resolveAvatarUrl }: {
+const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserId, isHighlighted, isFreshIncoming = false, showReadReceipt = false, isReadByRecipient = false, onReply, onReact, onEdit, onDelete, onPin, onFavorite, isFavorite, isPinned, resolveDisplayName, resolveAvatarUrl, getToken }: {
   msg: Mensaje; prevMsg: Mensaje|null; currentUserId: string; isHighlighted: boolean; isFreshIncoming?: boolean;
   showReadReceipt?: boolean; isReadByRecipient?: boolean;
   onReply:(m:Mensaje)=>void; onReact:(id:string,e:string)=>void;
@@ -2601,6 +2602,7 @@ const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserI
   isFavorite?: boolean; isPinned?: boolean;
   resolveDisplayName:(userId?: string | null, name?: string | null, isSelf?: boolean)=>string;
   resolveAvatarUrl?:(userId?: string | null, avatarUrl?: string | null, isSelf?: boolean)=>string|null;
+  getToken:()=>Promise<string|null>;
 }) {
   const [hover, setHover] = useState(false);
   const [showEmoji, setShowEmoji] = useState(false);
@@ -2627,6 +2629,9 @@ const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserI
   }, [msg.reacciones, currentUserId]);
   const imageSrc = msg.tipo !== 'archivo' ? mediaUrl(msg.image_url) : null;
   const fileSrc  = msg.tipo === 'archivo' ? mediaUrl(msg.file_url ?? msg.image_url) : null;
+  const previewUrl = !msg.gif_url && !fileSrc && msg.contenido !== IMAGE_PLACEHOLDER_TEXT
+    ? firstUrlIn(msg.contenido || '')
+    : null;
   // ?download=1 hace que el backend anada Content-Disposition: attachment
   // (server.ts) — se usa como fallback si el fetch de abajo falla.
   const fileDownloadHref = fileSrc
@@ -2878,6 +2883,7 @@ const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserI
                 <p className="whitespace-pre-wrap text-slate-700 text-[15px] leading-relaxed break-words">{renderText(msg.contenido)}</p>
               )
             }
+            {previewUrl && <LinkPreviewCard url={previewUrl} getToken={getToken} />}
           </div>
 
           {/* Reacciones */}
@@ -5245,6 +5251,7 @@ export default function Chat() {
                             isPinned={pinnedIds.has(m.id)}
                             resolveDisplayName={resolveDisplayName}
                             resolveAvatarUrl={resolveAvatarUrl}
+                            getToken={getToken}
                           />
                         </React.Fragment>
                       );
