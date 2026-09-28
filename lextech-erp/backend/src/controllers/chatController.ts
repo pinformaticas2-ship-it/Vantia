@@ -436,18 +436,37 @@ export async function sendMensaje(req: Request, res: Response) {
   }
 }
 
+// Nombre aleatorio con la misma pinta que generaba antes multer.diskStorage
+// -- así la URL pública (/uploads/chat/<archivo>) no cambia de forma.
+function randomUploadFilename(originalName: string, fallbackExt: string): string {
+  const ext = (path.extname(originalName || '').toLowerCase() || fallbackExt);
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${ext}`;
+}
+
 export async function uploadChatImage(req: Request, res: Response) {
   const userId = (req as any).auth?.userId;
   if (!userId) return err(res, 'No autenticado', 401);
   const file = (req as any).file as Express.Multer.File | undefined;
   if (!file) return err(res, 'Imagen requerida', 400);
-  const imageUrl = path.posix.join('/uploads', 'chat', file.filename);
-  return ok(res, {
-    image_url: imageUrl,
-    original_name: file.originalname,
-    mimetype: file.mimetype,
-    size: file.size,
-  }, 201);
+  try {
+    const rawExt = path.extname(file.originalname || '').toLowerCase();
+    const safeExt = ['.png', '.jpg', '.jpeg', '.gif', '.webp'].includes(rawExt) ? rawExt : '.png';
+    const filename = randomUploadFilename(file.originalname, safeExt);
+    await pool.query(
+      `INSERT INTO chat_uploads (filename, kind, original_name, mimetype, size_bytes, data)
+       VALUES ($1,'image',$2,$3,$4,$5)`,
+      [filename, file.originalname || null, file.mimetype, file.size, file.buffer],
+    );
+    const imageUrl = path.posix.join('/uploads', 'chat', filename);
+    return ok(res, {
+      image_url: imageUrl,
+      original_name: file.originalname,
+      mimetype: file.mimetype,
+      size: file.size,
+    }, 201);
+  } catch (e: any) {
+    return err(res, e.message);
+  }
 }
 
 export async function uploadChatFile(req: Request, res: Response) {
@@ -455,13 +474,23 @@ export async function uploadChatFile(req: Request, res: Response) {
   if (!userId) return err(res, 'No autenticado', 401);
   const file = (req as any).file as Express.Multer.File | undefined;
   if (!file) return err(res, 'Archivo requerido', 400);
-  const fileUrl = path.posix.join('/uploads', 'chat', 'files', file.filename);
-  return ok(res, {
-    file_url: fileUrl,
-    file_name: file.originalname,
-    file_mime: file.mimetype,
-    file_size: file.size,
-  }, 201);
+  try {
+    const filename = randomUploadFilename(file.originalname, '.bin');
+    await pool.query(
+      `INSERT INTO chat_uploads (filename, kind, original_name, mimetype, size_bytes, data)
+       VALUES ($1,'file',$2,$3,$4,$5)`,
+      [filename, file.originalname || null, file.mimetype, file.size, file.buffer],
+    );
+    const fileUrl = path.posix.join('/uploads', 'chat', 'files', filename);
+    return ok(res, {
+      file_url: fileUrl,
+      file_name: file.originalname,
+      file_mime: file.mimetype,
+      file_size: file.size,
+    }, 201);
+  } catch (e: any) {
+    return err(res, e.message);
+  }
 }
 
 // ── Sesiones de expediente ────────────────────────────────────────────────────

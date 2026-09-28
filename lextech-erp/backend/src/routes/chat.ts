@@ -1,10 +1,7 @@
 import { Router } from 'express';
-import fs from 'fs';
-import path from 'path';
 import multer from 'multer';
 import { requireAuth } from '../middleware/auth';
 import { requireModulePermission } from '../middleware/requireModulePermission';
-import { UPLOADS_CHAT_ROOT } from '../config/paths';
 import {
   getCanales, createCanal, updateCanal, archivarCanal, marcarLeido, marcarTodoLeido, getCanalMiembros,
   getMensajes, sendMensaje, editMensaje, deleteMensaje,
@@ -22,20 +19,15 @@ import {
 
 const router = Router();
 router.use(requireModulePermission('chat'));
-const uploadDir = UPLOADS_CHAT_ROOT;
-const fileUploadDir = path.join(UPLOADS_CHAT_ROOT, 'files');
-fs.mkdirSync(uploadDir, { recursive: true });
-fs.mkdirSync(fileUploadDir, { recursive: true });
 
+// memoryStorage (no diskStorage): el disco de Railway es efímero y se borra
+// en cada redeploy/reinicio -- las imágenes y archivos del chat se guardan
+// en la base de datos (tabla chat_uploads, ver chatController.ts), que sí
+// sobrevive. El buffer llega en req.file.buffer y el nombre de archivo se
+// genera a mano en el controlador (memoryStorage no ofrece un callback
+// "filename" como diskStorage).
 const chatUpload = multer({
-  storage: multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, uploadDir),
-    filename: (_req, file, cb) => {
-      const ext = path.extname(file.originalname || '').toLowerCase() || '.png';
-      const safeExt = ['.png', '.jpg', '.jpeg', '.gif', '.webp'].includes(ext) ? ext : '.png';
-      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${safeExt}`);
-    },
-  }),
+  storage: multer.memoryStorage(),
   fileFilter: (_req, file, cb) => {
     if (!file.mimetype.startsWith('image/')) return cb(new Error('Solo se permiten imágenes'));
     cb(null, true);
@@ -51,13 +43,7 @@ const ALLOWED_FILE_TYPES = [
 ];
 
 const chatFileUpload = multer({
-  storage: multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, fileUploadDir),
-    filename: (_req, file, cb) => {
-      const ext = path.extname(file.originalname || '').toLowerCase() || '.bin';
-      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${ext}`);
-    },
-  }),
+  storage: multer.memoryStorage(),
   fileFilter: (_req, file, cb) => {
     const allowed = ALLOWED_FILE_TYPES.some(t => file.mimetype.startsWith(t));
     if (!allowed) return cb(new Error('Tipo de archivo no permitido'));

@@ -149,6 +149,43 @@ app.use('/uploads', (req, res, next) => {
   }
   next();
 });
+// Imágenes y archivos del chat: se guardan en la BD (chat_uploads), no en
+// disco -- ver server.ts import de pool y chatController.ts. Si no se
+// encuentra en la BD, cae al static de abajo (por si el archivo aún vive en
+// disco de antes de este cambio).
+app.get('/uploads/chat/files/:filename', async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT mimetype, original_name, data FROM chat_uploads WHERE filename = $1 AND kind = 'file'`,
+      [req.params.filename],
+    );
+    if (!rows.length) return next();
+    const row = rows[0];
+    res.setHeader('Content-Type', row.mimetype || 'application/octet-stream');
+    if (!res.getHeader('Content-Disposition')) {
+      const name = typeof req.query.name === 'string' && req.query.name.trim()
+        ? req.query.name.trim()
+        : (row.original_name || req.params.filename);
+      res.setHeader('Content-Disposition', `${req.query.download ? 'attachment' : 'inline'}; filename="${String(name).replace(/"/g, '')}"`);
+    }
+    res.send(row.data);
+  } catch (_e) {
+    next();
+  }
+});
+app.get('/uploads/chat/:filename', async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT mimetype, data FROM chat_uploads WHERE filename = $1 AND kind = 'image'`,
+      [req.params.filename],
+    );
+    if (!rows.length) return next();
+    res.setHeader('Content-Type', rows[0].mimetype || 'image/png');
+    res.send(rows[0].data);
+  } catch (_e) {
+    next();
+  }
+});
 app.use('/uploads', express.static(UPLOADS_ROOT));
 
 // --- RUTAS ---

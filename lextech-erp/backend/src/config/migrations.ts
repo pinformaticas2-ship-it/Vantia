@@ -2387,6 +2387,26 @@ export async function runMigrations(): Promise<void> {
       await client.query(`ALTER TABLE vantia_pending_actions ALTER COLUMN expediente_id DROP NOT NULL`);
     } catch (_e: any) {}
 
+    // ── Archivos del chat interno guardados en la base de datos, no en disco ──
+    // El disco de Railway es efímero: cada redeploy/reinicio lo borra, y las
+    // imágenes/archivos que la gente sube al chat vivían solo ahí (a
+    // diferencia de los documentos de expediente, que ya pueden ir a Google
+    // Drive/Dropbox). Resultado real: documentos adjuntos en el chat que
+    // dejaban de abrir de un día para otro ("Cannot GET /uploads/chat/...").
+    // Al guardar el propio contenido en Postgres (que si es persistente),
+    // sobrevive a cualquier reinicio del backend.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS chat_uploads (
+        filename       TEXT        PRIMARY KEY,
+        kind           VARCHAR(10) NOT NULL CHECK (kind IN ('image','file')),
+        original_name  TEXT,
+        mimetype       TEXT,
+        size_bytes     INTEGER,
+        data           BYTEA       NOT NULL,
+        created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+
     // ── Permisos en schema public (requerido en PostgreSQL 15+) ────
     for (const grant of [
       `GRANT USAGE ON SCHEMA public TO admin`,
