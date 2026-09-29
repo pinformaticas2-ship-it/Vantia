@@ -9,7 +9,7 @@ import {
   ChevronDown, FileSpreadsheet, ClipboardList,
   ScanLine, ExternalLink, MoreHorizontal, LayoutGrid, X, GripVertical,
   Briefcase, Users, History, MessageSquare, MessageCircle, Mail, Library,
-  Receipt, Reply, MailOpen, ArrowRight, Check, Trash2,
+  Receipt, Reply, MailOpen, ArrowRight, Check, Trash2, AlertTriangle,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { safeJson } from "../lib/api";
@@ -1042,7 +1042,12 @@ export default function DashboardHome() {
     const ivaIng      = ingresos * 0.21;
     const ivaGas      = gastosTot * 0.21;
     const ivaLiq      = ivaIng - ivaGas;
-    return { ingresos, gastosTot, total, ivaIng, ivaGas, ivaLiq };
+    const cobrado         = facturas.filter((f:any) => f.estado === "cobrada").reduce((s:number, f:any) => s + Number(f.total||0), 0);
+    const pendienteCobro  = ingresos - cobrado;
+    const facturasVencidas = facturas.filter((f:any) => f.estado === "vencida").length;
+    const numFacturas    = facturas.length;
+    const numGastos      = gastos.length;
+    return { ingresos, gastosTot, total, ivaIng, ivaGas, ivaLiq, cobrado, pendienteCobro, facturasVencidas, numFacturas, numGastos };
   })();
 
   // ── Widget renderers ──────────────────────────────────────────────────────
@@ -1540,25 +1545,39 @@ export default function DashboardHome() {
             <div className="flex items-center justify-center py-8"><Spinner size="sm" muted /></div>
           ) : (
             <div className="p-4">
-              <div className="grid grid-cols-3 gap-2 mb-3">
+              {/* Total destacado */}
+              <div className={`flex items-center justify-between rounded-2xl px-4 py-3 mb-3 ${billingCalc.total>=0 ? "bg-emerald-50" : "bg-red-50"}`}>
                 <div>
-                  <p className="text-[10px] font-semibold text-slate-500 mb-1">Ingresos</p>
+                  <p className={`text-[10px] font-bold uppercase tracking-wider ${billingCalc.total>=0 ? "text-emerald-600" : "text-red-500"}`}>Total del periodo</p>
+                  <p className={`text-2xl font-extrabold leading-tight ${billingCalc.total>=0 ? "text-emerald-700" : "text-red-600"}`}>{fmtEur(billingCalc.total)}</p>
+                </div>
+                {billingCalc.facturasVencidas > 0 && (
+                  <div className="flex items-center gap-1 rounded-lg bg-white px-2 py-1 text-[10px] font-bold text-red-600 shadow-sm">
+                    <AlertTriangle size={11} />
+                    {billingCalc.facturasVencidas} vencida{billingCalc.facturasVencidas === 1 ? "" : "s"}
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <div className="rounded-xl bg-slate-50 px-3 py-2">
+                  <p className="text-[10px] font-semibold text-slate-500 mb-0.5">Ingresos <span className="text-slate-400 font-normal">({billingCalc.numFacturas})</span></p>
                   <p className="text-sm font-bold text-emerald-600 leading-tight">{fmtEur(billingCalc.ingresos)}</p>
-                  <p className="text-[10px] text-slate-400 mt-1.5">IVA {fmtEur(billingCalc.ivaIng)}</p>
-                  <p className="text-[10px] text-slate-400">IRPF 0,00 €</p>
                 </div>
-                <div>
-                  <p className="text-[10px] font-semibold text-slate-500 mb-1">Gastos</p>
+                <div className="rounded-xl bg-slate-50 px-3 py-2">
+                  <p className="text-[10px] font-semibold text-slate-500 mb-0.5">Gastos <span className="text-slate-400 font-normal">({billingCalc.numGastos})</span></p>
                   <p className="text-sm font-bold text-red-500 leading-tight">{fmtEur(billingCalc.gastosTot)}</p>
-                  <p className="text-[10px] text-slate-400 mt-1.5">IVA {fmtEur(billingCalc.ivaGas)}</p>
-                  <p className="text-[10px] text-slate-400">IRPF 0,00 €</p>
                 </div>
-                <div>
-                  <p className="text-[10px] font-semibold text-slate-500 mb-1">Total</p>
-                  <p className={`text-sm font-bold leading-tight ${billingCalc.total>=0?"text-slate-800":"text-red-600"}`}>{fmtEur(billingCalc.total)}</p>
-                  <p className="text-[10px] text-slate-400 mt-1.5">IVA {fmtEur(billingCalc.ivaLiq)}</p>
+                <div className="rounded-xl bg-slate-50 px-3 py-2">
+                  <p className="text-[10px] font-semibold text-slate-500 mb-0.5">Cobrado</p>
+                  <p className="text-sm font-bold text-emerald-600 leading-tight">{fmtEur(billingCalc.cobrado)}</p>
+                </div>
+                <div className="rounded-xl bg-slate-50 px-3 py-2">
+                  <p className="text-[10px] font-semibold text-slate-500 mb-0.5">Pendiente de cobro</p>
+                  <p className="text-sm font-bold text-amber-600 leading-tight">{fmtEur(billingCalc.pendienteCobro)}</p>
                 </div>
               </div>
+
               <div className="grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 -mx-4 -mb-4 px-4 pb-4 bg-slate-50 rounded-b-2xl">
                 <div>
                   <p className="text-[10px] text-slate-400">IVA a liquidar</p>
