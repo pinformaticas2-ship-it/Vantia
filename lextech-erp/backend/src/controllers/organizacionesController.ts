@@ -1,13 +1,11 @@
 import { Request, Response } from 'express';
-import fs from 'fs';
-import path from 'path';
 import pool from '../config/database';
 import { getClerk, resolveUserRole } from './activityController';
-import { UPLOADS_ORG_LOGOS_ROOT } from '../config/paths';
 import { getFullMatrix, setPermissionOverride, getMemberMatrix, setMemberPermissionOverride, clearMemberPermissionOverrides, MODULOS, Modulo, NivelAcceso, OrgRol } from '../config/permissions';
 import { exchangeGoogleDriveCode as exchangeGoogleDriveCodeToken } from '../utils/googleDrive';
 import { exchangeDropboxCode as exchangeDropboxCodeToken } from '../utils/dropboxAuth';
 import { encryptPassword } from '../utils/emailCrypto';
+import { saveMiscUpload, deleteMiscUpload } from '../utils/miscUploads';
 
 const pgErr = (e: any) =>
   `${e?.message || String(e)}${e?.detail ? ' | detail: ' + e.detail : ''}${e?.code ? ' | code: ' + e.code : ''}`;
@@ -445,16 +443,16 @@ export async function uploadOrganizacionLogo(req: Request, res: Response) {
     const { rows } = await pool.query(`SELECT logo_url FROM organizaciones WHERE id = $1`, [ctx.organizacionId]);
     const previousUrl = rows[0]?.logo_url as string | undefined;
 
-    const logoUrl = `/uploads/org-logos/${file.filename}`;
+    const filename = await saveMiscUpload(file, 'org_logo');
+    const logoUrl = `/uploads/org-logos/${filename}`;
     await pool.query(
       `UPDATE organizaciones SET logo_url = $1, updated_at = NOW() WHERE id = $2`,
       [logoUrl, ctx.organizacionId]
     );
 
-    // Borrar el fichero anterior para no acumular logos huérfanos
+    // Borrar el logo anterior para no acumular blobs huérfanos
     if (previousUrl && previousUrl.startsWith('/uploads/org-logos/')) {
-      const previousPath = path.join(UPLOADS_ORG_LOGOS_ROOT, path.basename(previousUrl));
-      fs.unlink(previousPath, () => {});
+      await deleteMiscUpload(previousUrl.split('/').pop()!);
     }
 
     return ok(res, { logoUrl });
@@ -482,8 +480,7 @@ export async function deleteOrganizacionLogo(req: Request, res: Response) {
     );
 
     if (previousUrl && previousUrl.startsWith('/uploads/org-logos/')) {
-      const previousPath = path.join(UPLOADS_ORG_LOGOS_ROOT, path.basename(previousUrl));
-      fs.unlink(previousPath, () => {});
+      await deleteMiscUpload(previousUrl.split('/').pop()!);
     }
 
     return ok(res, { logoUrl: null });

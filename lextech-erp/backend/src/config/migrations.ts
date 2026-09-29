@@ -2435,6 +2435,23 @@ export async function runMigrations(): Promise<void> {
       }
     } catch (_e: any) {}
 
+    // ── Fotos de DNI y logos de organización guardados en la base de datos ──
+    // Mismo motivo que chat_uploads: el disco de Railway es efímero. Estos
+    // dos eran los dos casos que quedaban sin ninguna copia -- un logo
+    // perdido es solo feo, pero un DNI perdido es un documento de identidad
+    // de un cliente real que desaparece sin avisar en el próximo redeploy.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS misc_uploads (
+        filename       TEXT        PRIMARY KEY,
+        kind           VARCHAR(20) NOT NULL CHECK (kind IN ('dni','org_logo')),
+        original_name  TEXT,
+        mimetype       TEXT,
+        size_bytes     INTEGER,
+        data           BYTEA       NOT NULL,
+        created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+
     // ── Permisos en schema public (requerido en PostgreSQL 15+) ────
     for (const grant of [
       `GRANT USAGE ON SCHEMA public TO admin`,

@@ -193,6 +193,35 @@ app.get('/uploads/chat/:filename', async (req, res, next) => {
     next();
   }
 });
+// Fotos de DNI y logos de organización: mismo patrón que el chat -- se
+// guardan en la BD (tabla misc_uploads), con el disco como fallback para lo
+// que aún viviera ahí de antes de este cambio.
+app.get('/uploads/dnis/:filename', async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT mimetype, data FROM misc_uploads WHERE filename = $1 AND kind = 'dni'`,
+      [req.params.filename],
+    );
+    if (!rows.length) return next();
+    res.setHeader('Content-Type', rows[0].mimetype || 'image/jpeg');
+    res.send(rows[0].data);
+  } catch (_e) {
+    next();
+  }
+});
+app.get('/uploads/org-logos/:filename', async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT mimetype, data FROM misc_uploads WHERE filename = $1 AND kind = 'org_logo'`,
+      [req.params.filename],
+    );
+    if (!rows.length) return next();
+    res.setHeader('Content-Type', rows[0].mimetype || 'image/png');
+    res.send(rows[0].data);
+  } catch (_e) {
+    next();
+  }
+});
 app.use('/uploads', express.static(UPLOADS_ROOT));
 
 // --- RUTAS ---

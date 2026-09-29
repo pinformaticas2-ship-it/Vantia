@@ -5,6 +5,7 @@ import pool from '../config/database';
 import { logActivity, logActivityForReq } from './activityController';
 import { CLIENT_FILES_ROOT, UPLOADS_CLIENTS_ROOT as UPLOADS_ROOT } from '../config/paths';
 import { sendClientWelcomeEmail } from '../utils/clientWelcomeEmail';
+import { saveMiscUpload } from '../utils/miscUploads';
 
 /** Convierte strings vacíos/guiones a null (evita casts fallidos en PostgreSQL) */
 const nullIfEmpty = (v: any) => {
@@ -391,10 +392,11 @@ export const createEntity = async (req: any, res: Response) => {
     // antes multer guardaba el archivo en disco pero nadie enlazaba la ruta
     // resultante con el cliente: la imagen se quedaba huérfana, sin
     // aparecer en ningún sitio de la app aunque el alta "funcionara".
-    const dniFile = (req as any).file as { filename: string } | undefined;
+    const dniFile = (req as any).file as { originalname: string; mimetype: string; size: number; buffer: Buffer } | undefined;
     if (dniFile) {
       try {
-        const dniImageUrl = `/uploads/dnis/${dniFile.filename}`;
+        const filename = await saveMiscUpload(dniFile, 'dni');
+        const dniImageUrl = `/uploads/dnis/${filename}`;
         await pool.query(`UPDATE entities SET dni_image_url = $1 WHERE id = $2`, [dniImageUrl, result.rows[0].id]);
         result.rows[0].dni_image_url = dniImageUrl;
       } catch (err) {

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import pool from '../config/database';
 import { randomBytes } from 'crypto';
 import { sendClientWelcomeEmail } from '../utils/clientWelcomeEmail';
+import { saveMiscUpload } from '../utils/miscUploads';
 
 function userId(req: Request) { return (req as any).auth?.userId || 'SYSTEM'; }
 function userName(req: Request) { return (req as any).auth?.firstName || (req as any).auth?.name || 'Usuario'; }
@@ -188,12 +189,13 @@ export async function submitPublicForm(req: Request, res: Response) {
     // ver uploadDNI.single('dni_image') en la ruta). Mismo patrón que el
     // alta manual desde el panel. No se pisa una foto que ya hubiera (caso
     // de ficha reutilizada arriba).
-    const dniFile = (req as any).file as { filename: string } | undefined;
+    const dniFile = (req as any).file as { originalname: string; mimetype: string; size: number; buffer: Buffer } | undefined;
     if (dniFile) {
       try {
+        const filename = await saveMiscUpload(dniFile, 'dni');
         await pool.query(
           `UPDATE entities SET dni_image_url = $1 WHERE id = $2 AND (dni_image_url IS NULL OR dni_image_url = '')`,
-          [`/uploads/dnis/${dniFile.filename}`, clientId],
+          [`/uploads/dnis/${filename}`, clientId],
         );
       } catch (_e) { /* best effort, no bloquea el alta */ }
     }
