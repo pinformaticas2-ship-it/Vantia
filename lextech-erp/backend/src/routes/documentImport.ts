@@ -4,6 +4,7 @@ import * as path   from 'path';
 import * as os     from 'os';
 import { requireAuth } from '../middleware/auth';
 import { requireModulePermission } from '../middleware/requireModulePermission';
+import { costlyActionLimiter } from '../middleware/rateLimits';
 import {
   uploadDocumentImport,
   getDocumentImportBatch,
@@ -32,7 +33,7 @@ router.use(requireAuth, requireModulePermission('expedientes'));
 
 // Acepta tanto un ZIP con varios documentos como un único PDF suelto
 // (mismo campo "zip" del formulario, por compatibilidad con el frontend existente).
-router.post('/upload',   requireAuth, upload.single('zip'), uploadDocumentImport);
+router.post('/upload',   requireAuth, costlyActionLimiter, upload.single('zip'), uploadDocumentImport);
 router.get('/batch/:id', requireAuth, getDocumentImportBatch);
 router.get('/batches',   requireAuth, listDocumentImportBatches);
 router.delete('/batch/:id', requireAuth, deleteDocumentImportBatch);

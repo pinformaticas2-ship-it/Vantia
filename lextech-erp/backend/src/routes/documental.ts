@@ -8,13 +8,14 @@ import {
   getDocumentalProviders,
 } from '../controllers/documentalController';
 import { requireModulePermission } from '../middleware/requireModulePermission';
+import { costlyActionLimiter } from '../middleware/rateLimits';
 
 const router = Router();
 router.use(requireModulePermission('documental'));
 
 router.get('/providers', requireAuth, getDocumentalProviders);
 router.get('/boe/schemas', requireAuth, getBoeSchemas);
-router.get('/boe/search', requireAuth, searchBoeDocuments);
+router.get('/boe/search', requireAuth, costlyActionLimiter, searchBoeDocuments);
 router.get('/boe/document/:id/block/:blockId', requireAuth, getBoeBlockById);
 router.get('/boe/document/:id', requireAuth, getBoeDocumentById);
 

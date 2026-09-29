@@ -2,6 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import { requireAuth } from '../middleware/auth';
 import { requireModulePermission } from '../middleware/requireModulePermission';
+import { costlyActionLimiter } from '../middleware/rateLimits';
 import {
   getCanales, createCanal, updateCanal, archivarCanal, marcarLeido, marcarTodoLeido, getCanalMiembros,
   getMensajes, sendMensaje, editMensaje, deleteMensaje,
@@ -100,7 +101,7 @@ router.post  ('/mensajes/:id/favorito',          requireAuth, toggleFavorito);
 router.get   ('/buscar',                         requireAuth, buscarMensajes);
 
 // Vista previa de enlaces (tarjeta bajo el mensaje al pegar un link)
-router.get   ('/link-preview',                   requireAuth, getLinkPreview);
+router.get   ('/link-preview',                   requireAuth, costlyActionLimiter, getLinkPreview);
 
 // Usuarios del sistema (Clerk)
 router.get   ('/usuarios',                       requireAuth, getSystemUsers);

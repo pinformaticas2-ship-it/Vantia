@@ -2,6 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import os from 'os';
 import { requireAuth } from '../middleware/auth';
+import { costlyActionLimiter } from '../middleware/rateLimits';
 import { scanDNI } from '../controllers/ocrController';
 
 const router = Router();
@@ -23,6 +24,7 @@ const upload = multer({
 router.post(
   '/dni',
   requireAuth,
+  costlyActionLimiter,
   upload.fields([
     { name: 'dni_front_image', maxCount: 1 },
     { name: 'dni_back_image', maxCount: 1 },

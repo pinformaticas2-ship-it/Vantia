@@ -56,8 +56,13 @@ const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
   .map((o) => o.trim())
   .filter(Boolean);
 
-// Patrones siempre activos (independiente de env vars)
-const HARDCODED_PATTERNS = ['.vercel.app', 'localhost', '127.0.0.1'];
+// Patrones siempre activos (independiente de env vars). Antes era ".vercel.app"
+// a secas, que cualquiera puede conseguir creando su propio proyecto de
+// Vercel (name-lo-que-sea.vercel.app) -- con eso, un sitio ajeno podría hacer
+// peticiones autenticadas (credentials incluidas) contra esta API desde el
+// navegador de un usuario logueado. Restringido al propio team/slug de
+// Vercel del despacho, que nadie más puede registrar.
+const HARDCODED_PATTERNS = ['-pinformaticas2-ship-its-projects.vercel.app', 'localhost', '127.0.0.1'];
 const allowedPatterns = [
   ...HARDCODED_PATTERNS,
   ...(process.env.CORS_ALLOWED_PATTERNS || '')
@@ -68,8 +73,10 @@ const allowedPatterns = [
 
 function isCorsAllowed(origin: string | undefined): boolean {
   if (!origin) return true;                          // mismo origen / curl
-  if (allowedOrigins.length === 0) return true;      // modo permisivo total
   if (allowedOrigins.includes(origin)) return true;  // coincidencia exacta
+  // Si CORS_ALLOWED_ORIGINS no está configurada, antes esto abría el CORS a
+  // CUALQUIER origen (con credenciales incluidas) -- ahora, esté configurada
+  // o no, solo se admiten los patrones conocidos de abajo.
   return allowedPatterns.some((pattern) => origin.includes(pattern));
 }
 

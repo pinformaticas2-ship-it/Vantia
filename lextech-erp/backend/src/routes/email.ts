@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { requireAuth } from '../middleware/auth';
 import { requireModulePermission } from '../middleware/requireModulePermission';
+import { costlyActionLimiter } from '../middleware/rateLimits';
 import { verifyToken } from '@clerk/backend';
 import { addSSEClient } from '../utils/emailSSE';
 import {
@@ -88,7 +89,7 @@ router.delete('/messages/:id',    deleteMessage);
 router.get('/contacts/suggestions', getRecipientSuggestions);
 
 // ── Envío y borradores ───────────────────────────────────────────────────────
-router.post('/send',              sendMail);
+router.post('/send',              costlyActionLimiter, sendMail);
 router.post('/gmail/log-sent',    logGmailSent);
 router.post('/drafts',            saveDraft);
 router.get('/drafts',             getDrafts);

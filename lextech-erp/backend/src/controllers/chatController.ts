@@ -1334,21 +1334,46 @@ export async function getLinkPreview(req: Request, res: Response) {
   if (cached && cached.expires > Date.now()) return ok(res, cached.data);
 
   try {
-    const { address } = await dns.lookup(target.hostname);
-    if (isPrivateOrLocalIp(address)) return err(res, 'Ese dominio no está permitido.', 400);
+    // Sigue las redirecciones a mano (máx. 3 saltos) en vez de dejar que
+    // fetch las siga solo -- si no, la comprobación de IP privada de arriba
+    // solo vale para la URL original: una página podría devolver un 302 a
+    // http://169.254.169.254/... (metadatos de la nube) o a una IP interna
+    // y fetch la seguiría sin volver a pasar por isPrivateOrLocalIp.
+    let currentUrl = target;
+    let resp: Awaited<ReturnType<typeof fetch>> | null = null;
+    for (let hop = 0; hop < 4; hop++) {
+      const { address } = await dns.lookup(currentUrl.hostname);
+      if (isPrivateOrLocalIp(address)) return err(res, 'Ese dominio no está permitido.', 400);
+
+      const hopController = new AbortController();
+      const hopTimeout = setTimeout(() => hopController.abort(), 6000);
+      try {
+        resp = await fetch(currentUrl.toString(), {
+          signal: hopController.signal,
+          redirect: 'manual',
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; VantiaLinkPreview/1.0)',
+            'Accept': 'text/html,application/xhtml+xml',
+          },
+        });
+      } finally {
+        clearTimeout(hopTimeout);
+      }
+      if (resp.status >= 300 && resp.status < 400 && resp.headers.get('location')) {
+        currentUrl = new URL(resp.headers.get('location')!, currentUrl);
+        if (currentUrl.protocol !== 'http:' && currentUrl.protocol !== 'https:') {
+          return err(res, 'Ese dominio no está permitido.', 400);
+        }
+        continue;
+      }
+      break;
+    }
+    if (!resp) return err(res, 'No se pudo obtener la vista previa de ese enlace.', 502);
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 6000);
     let html: string;
     try {
-      const resp = await fetch(target.toString(), {
-        signal: controller.signal,
-        redirect: 'follow',
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; VantiaLinkPreview/1.0)',
-          'Accept': 'text/html,application/xhtml+xml',
-        },
-      });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const contentType = resp.headers.get('content-type') || '';
       if (!contentType.includes('text/html')) throw new Error('No es una página HTML.');

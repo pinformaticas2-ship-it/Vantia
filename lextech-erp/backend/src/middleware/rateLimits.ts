@@ -33,3 +33,16 @@ export const publicFormLimiter = rateLimit({
   legacyHeaders: false,
   message: { success: false, error: 'Demasiados intentos. Espera unos minutos y vuelve a intentarlo.' },
 });
+
+// Acciones que cuestan dinero por petición (OCR/IA, envío de correo, análisis
+// de documentos) o que reenvían la petición a un servicio de terceros (BOE,
+// vista previa de enlaces) -- sin límite, cualquier cuenta podía convertir
+// nuestro backend en un generador de tráfico/coste contra esas APIs.
+export const costlyActionLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  limit: 40,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req: any) => req.auth?.userId || req.ip,
+  message: { success: false, error: 'Demasiadas peticiones seguidas. Espera un momento y vuelve a intentarlo.' },
+});
