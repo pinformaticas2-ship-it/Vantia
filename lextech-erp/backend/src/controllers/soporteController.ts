@@ -8,8 +8,10 @@ import { SmtpConfig } from '../utils/smtp';
 
 // ── Centro de soporte ────────────────────────────────────────────────────────
 // Sistema de tickets por organización: cualquier miembro abre tickets y ve
-// los suyos; propietario/admin/soporte ("gestores") ven todos los de la
-// organización, los responden y cambian su estado. Cada ticket nuevo (y cada
+// solo los suyos (y puede responder en ellos); únicamente los informáticos
+// del despacho (rol "soporte") ven todos los de la organización, cambian su
+// estado/prioridad y configuran el correo de soporte -- ni siquiera el
+// propietario o un admin gestionan tickets ajenos. Cada ticket nuevo (y cada
 // respuesta de quien lo abrió) se manda por correo al soporte_email de SU
 // organización -- así cada despacho tiene su propio informático.
 
@@ -31,7 +33,7 @@ function err(res: Response, message: string, status = 500) {
 }
 
 function isGestor(rol: string | undefined): boolean {
-  return rol === 'propietario' || rol === 'admin' || rol === 'soporte';
+  return rol === 'soporte';
 }
 
 function requireCtx(req: Request, res: Response): { organizacionId: string; rol: string; userId: string } | null {
@@ -310,24 +312,18 @@ export async function addMensaje(req: Request, res: Response) {
   }
 }
 
-// PATCH /api/soporte/tickets/:id — estado/prioridad (gestores). Quien abrió
-// el ticket solo puede cerrarlo o reabrirlo.
+// PATCH /api/soporte/tickets/:id — estado/prioridad (solo rol soporte).
 export async function updateTicket(req: Request, res: Response) {
   try {
     const loaded = await loadTicketForUser(req, res);
     if (!loaded) return;
     const { ticket, ctx } = loaded;
-    const gestor = isGestor(ctx.rol);
+    if (!isGestor(ctx.rol)) return err(res, 'Solo los informáticos del despacho pueden gestionar los tickets.', 403);
     const estado = req.body?.estado;
     const prioridad = req.body?.prioridad;
 
     if (estado !== undefined && !ESTADOS.includes(estado)) return err(res, 'Estado no válido.', 400);
     if (prioridad !== undefined && !PRIORIDADES.includes(prioridad)) return err(res, 'Prioridad no válida.', 400);
-    if (!gestor) {
-      if (prioridad !== undefined || (estado !== undefined && estado !== 'cerrado' && estado !== 'abierto')) {
-        return err(res, 'Solo el equipo de soporte puede cambiar esto.', 403);
-      }
-    }
 
     const { rows } = await pool.query(
       `UPDATE soporte_tickets
@@ -336,7 +332,7 @@ export async function updateTicket(req: Request, res: Response) {
       [estado ?? null, prioridad ?? null, ticket.id],
     );
     const updated = rows[0];
-    if (gestor && estado && estado !== ticket.estado && ticket.created_by !== ctx.userId) {
+    if (estado && estado !== ticket.estado && ticket.created_by !== ctx.userId) {
       await notifyCreador(updated, `El estado de tu ticket ha cambiado a: ${ESTADO_LABEL[estado]}.`);
     }
     return ok(res, serializeTicket(updated));
@@ -351,6 +347,7 @@ export async function reenviarTicket(req: Request, res: Response) {
   try {
     const loaded = await loadTicketForUser(req, res);
     if (!loaded) return;
+    if (!isGestor(loaded.ctx.rol)) return err(res, 'Solo los informáticos del despacho pueden reenviar tickets.', 403);
     await notifySoporte(loaded.ticket);
     const { rows } = await pool.query(`SELECT * FROM soporte_tickets WHERE id = $1`, [loaded.ticket.id]);
     return ok(res, serializeTicket(rows[0]));
@@ -360,7 +357,7 @@ export async function reenviarTicket(req: Request, res: Response) {
 }
 
 // GET /api/soporte/config — correo de soporte de cada organización que el
-// usuario puede gestionar (propietario/admin/soporte en ella).
+// usuario puede gestionar (en las que tiene rol soporte).
 export async function getSoporteConfig(req: Request, res: Response) {
   try {
     const userId = (req as any).auth?.userId;
@@ -387,7 +384,7 @@ export async function updateSoporteConfig(req: Request, res: Response) {
     const organizacionId = req.params.organizacionId;
     const membership = (await resolveUserOrgMemberships(userId)).find((m) => m.organizacionId === organizacionId);
     if (!membership || !isGestor(membership.rol)) {
-      return err(res, 'Solo el propietario, un administrador o soporte pueden cambiar este correo.', 403);
+      return err(res, 'Solo los informáticos del despacho pueden cambiar este correo.', 403);
     }
     const email = String(req.body?.soporteEmail || '').trim();
     if (email && !EMAIL_RE.test(email)) return err(res, 'El correo no es válido.', 400);

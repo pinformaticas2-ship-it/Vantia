@@ -223,7 +223,7 @@ export default function Soporte() {
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[11px] font-mono font-bold text-slate-400">{ref(t.numero)}</span>
                     <div className="flex items-center gap-1">
-                      {t.emailError && <span title={`Correo no enviado: ${t.emailError}`}><AlertTriangle size={12} className="text-amber-500" /></span>}
+                      {esGestor && t.emailError && <span title={`Correo no enviado: ${t.emailError}`}><AlertTriangle size={12} className="text-amber-500" /></span>}
                       <Badge list={PRIORIDADES} id={t.prioridad} />
                       <Badge list={ESTADOS} id={t.estado} />
                     </div>
@@ -430,14 +430,10 @@ function TicketDetail({ id, esGestor, onBack, onChanged }: {
             <>
               <Badge list={ESTADOS} id={ticket.estado} />
               <Badge list={PRIORIDADES} id={ticket.prioridad} />
-              <button onClick={() => patch({ estado: cerrado ? "abierto" : "cerrado" })}
-                className="ml-auto text-xs font-bold text-slate-500 hover:text-red-600">
-                {cerrado ? "Reabrir ticket" : "Cerrar ticket"}
-              </button>
             </>
           )}
         </div>
-        {ticket.emailError ? (
+        {!esGestor ? null : ticket.emailError ? (
           <div className="mt-3 flex items-start gap-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-800">
             <AlertTriangle size={13} className="shrink-0 mt-0.5" />
             <span className="flex-1">No se pudo enviar por correo al soporte: {ticket.emailError}</span>
@@ -445,7 +441,7 @@ function TicketDetail({ id, esGestor, onBack, onChanged }: {
               {resending ? "Enviando…" : "Reintentar"}
             </button>
           </div>
-        ) : ticket.enviadoA && esGestor ? (
+        ) : ticket.enviadoA ? (
           <p className="mt-2 flex items-center gap-1 text-[11px] text-slate-400"><Mail size={11} /> Enviado a {ticket.enviadoA}</p>
         ) : null}
       </div>
