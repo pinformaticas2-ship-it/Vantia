@@ -2,6 +2,7 @@ import { Response } from 'express';
 import pool from '../config/database';
 import { logActivityForReq, resolveUserName } from './activityController';
 import { syncQuipuForUserInternal, pushFacturaToQuipuInternal } from './quipuController';
+import { resolveUserOrgMemberships } from './organizacionesController';
 
 const QUIPU_STALE_MS = 15 * 60 * 1000; // 15 minutes
 
@@ -89,29 +90,39 @@ export const getBillingBootstrap = async (req: any, res: Response) => {
   const organizacionId = req.organizacionId;
 
   try {
-    const [facturas, gastos, presupuestos, clientes, expedientes] = await Promise.all([
+    const [facturas, gastos, presupuestos, clientes, expedientes, misOrganizaciones] = await Promise.all([
       pool.query(`
         SELECT ff.*,
                e.anio,
                e.num_exp,
                e.ref_expediente,
                e.ref_propia,
-               e.descripcion AS expediente_descripcion
+               e.descripcion AS expediente_descripcion,
+               o.nombre AS organizacion_nombre
         FROM facturacion_facturas ff
         LEFT JOIN expedientes e ON e.id = ff.expediente_id
+        LEFT JOIN organizaciones o ON o.id = ff.organizacion_id
         WHERE ff.user_id = $1
         ORDER BY ff.fecha DESC, ff.created_at DESC
       `, [userId]),
-      pool.query(`SELECT * FROM facturacion_gastos WHERE user_id = $1 ORDER BY fecha DESC, created_at DESC`, [userId]),
+      pool.query(`
+        SELECT fg.*, o.nombre AS organizacion_nombre
+        FROM facturacion_gastos fg
+        LEFT JOIN organizaciones o ON o.id = fg.organizacion_id
+        WHERE fg.user_id = $1
+        ORDER BY fg.fecha DESC, fg.created_at DESC
+      `, [userId]),
       pool.query(`
         SELECT fp.*,
                e.anio,
                e.num_exp,
                e.ref_expediente,
                e.ref_propia,
-               e.descripcion AS expediente_descripcion
+               e.descripcion AS expediente_descripcion,
+               o.nombre AS organizacion_nombre
         FROM facturacion_presupuestos fp
         LEFT JOIN expedientes e ON e.id = fp.expediente_id
+        LEFT JOIN organizaciones o ON o.id = fp.organizacion_id
         WHERE fp.user_id = $1
         ORDER BY fp.fecha DESC, fp.created_at DESC
       `, [userId]),
@@ -144,6 +155,7 @@ export const getBillingBootstrap = async (req: any, res: Response) => {
         WHERE ex.organizacion_id = $1
         ORDER BY ex.updated_at DESC NULLS LAST, ex.created_at DESC NULLS LAST
       `, [organizacionId]),
+      resolveUserOrgMemberships(userId),
     ]);
 
     // Obtener facturas de Quipu que aún no están importadas en facturacion_facturas
@@ -162,6 +174,7 @@ export const getBillingBootstrap = async (req: any, res: Response) => {
           )
         ORDER BY qi.issue_date DESC NULLS LAST
       `, [userId]);
+      const orgActiva = misOrganizaciones.find((o) => o.organizacionId === organizacionId);
       quipuRows = quipuFacturas.rows.map((qi: any) => ({
         id: qi.id, user_id: userId,
         num: qi.num || qi.external_id || '—',
@@ -174,6 +187,9 @@ export const getBillingBootstrap = async (req: any, res: Response) => {
         client_id: null, expediente_id: null, quipu_id: qi.external_id,
         anio: null, num_exp: null, ref_expediente: null, ref_propia: null,
         expediente_descripcion: null,
+        // Quipu no está vinculado a una organización concreta -- se etiqueta con
+        // la organización activa de quien está mirando el bootstrap ahora mismo.
+        organizacion_id: organizacionId, organizacion_nombre: orgActiva?.organizacionNombre || null,
       }));
     } catch { /* quipu_invoices may not exist */ }
 
@@ -209,6 +225,7 @@ export const getBillingBootstrap = async (req: any, res: Response) => {
         expedientes:       expedientes.rows,
         quipuContacts:     quipuContactsRows,
         quipuBankAccounts: quipuBankAccountsRows,
+        organizaciones:    misOrganizaciones.map((o) => ({ id: o.organizacionId, nombre: o.organizacionNombre })),
       },
     });
   } catch (error: any) {
@@ -219,6 +236,8 @@ export const getBillingBootstrap = async (req: any, res: Response) => {
 export const createFactura = async (req: any, res: Response) => {
   const userId = req.auth?.userId;
   if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  const organizacionId = req.organizacionId;
+  if (!organizacionId) return res.status(400).json({ success: false, error: 'No se pudo determinar la organización activa.' });
   const userName = await resolveUserName(userId);
   const {
     num, contacto, fecha, vencimiento, total, estado, area, responsable,
@@ -237,8 +256,8 @@ export const createFactura = async (req: any, res: Response) => {
     await ensureFacturaNumberAvailable(userId, num, serie);
     const result = await pool.query(
       `INSERT INTO facturacion_facturas
-         (user_id, created_by, num, contacto, fecha, vencimiento, total, estado, area, responsable, forma_pago, serie, tipo_cliente, client_id, expediente_id, concepto, notas, base_unitaria, cantidad, descuento_pct, iva_pct, irpf_pct)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+         (user_id, created_by, num, contacto, fecha, vencimiento, total, estado, area, responsable, forma_pago, serie, tipo_cliente, client_id, expediente_id, concepto, notas, base_unitaria, cantidad, descuento_pct, iva_pct, irpf_pct, organizacion_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
        RETURNING *`,
       [
         userId,
@@ -263,6 +282,7 @@ export const createFactura = async (req: any, res: Response) => {
         sanitizeOptionalAmount(descuentoPct, 0),
         sanitizeOptionalAmount(ivaPct, 21),
         sanitizeOptionalAmount(irpfPct, 0),
+        organizacionId,
       ],
     );
     await logActivityForReq(req, `Factura creada: ${sanitizeText(num)}`, 'FACTURACION_FACTURA', result.rows[0].id, sanitizeText(contacto) || undefined, 'CREATE');
@@ -371,6 +391,8 @@ export const deleteFactura = async (req: any, res: Response) => {
 export const createGasto = async (req: any, res: Response) => {
   const userId = req.auth?.userId;
   if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  const organizacionId = req.organizacionId;
+  if (!organizacionId) return res.status(400).json({ success: false, error: 'No se pudo determinar la organización activa.' });
   const userName = await resolveUserName(userId);
   const { num, proveedor, fecha, total, cat, estado, area, responsable, deducible } = req.body;
 
@@ -381,8 +403,8 @@ export const createGasto = async (req: any, res: Response) => {
   try {
     const result = await pool.query(
       `INSERT INTO facturacion_gastos
-         (user_id, created_by, num, proveedor, fecha, total, categoria, estado, area, responsable, deducible)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+         (user_id, created_by, num, proveedor, fecha, total, categoria, estado, area, responsable, deducible, organizacion_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
        RETURNING *`,
       [
         userId,
@@ -396,6 +418,7 @@ export const createGasto = async (req: any, res: Response) => {
         sanitizeText(area) || 'procesal',
         sanitizeText(responsable) || userName,
         Boolean(deducible),
+        organizacionId,
       ],
     );
     await logActivityForReq(req, `Gasto creado: ${sanitizeText(num)}`, 'FACTURACION_GASTO', result.rows[0].id, sanitizeText(proveedor) || undefined, 'CREATE');
@@ -454,6 +477,8 @@ export const deleteGasto = async (req: any, res: Response) => {
 export const createPresupuesto = async (req: any, res: Response) => {
   const userId = req.auth?.userId;
   if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  const organizacionId = req.organizacionId;
+  if (!organizacionId) return res.status(400).json({ success: false, error: 'No se pudo determinar la organización activa.' });
   const userName = await resolveUserName(userId);
   const { num, contacto, fecha, total, estado, area, responsable, iguala, clientId, expedienteId } = req.body;
 
@@ -467,10 +492,10 @@ export const createPresupuesto = async (req: any, res: Response) => {
   try {
     const result = await pool.query(
       `INSERT INTO facturacion_presupuestos
-         (user_id, created_by, num, contacto, fecha, total, estado, area, responsable, iguala, client_id, expediente_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+         (user_id, created_by, num, contacto, fecha, total, estado, area, responsable, iguala, client_id, expediente_id, organizacion_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
        RETURNING *`,
-      [userId, userName, sanitizeText(num), sanitizeText(contacto), fecha || null, sanitizeAmount(total), sanitizeText(estado) || 'pendiente', sanitizeText(area) || 'procesal', sanitizeText(responsable) || userName, Boolean(iguala), sanitizeText(clientId), sanitizeText(expedienteId)],
+      [userId, userName, sanitizeText(num), sanitizeText(contacto), fecha || null, sanitizeAmount(total), sanitizeText(estado) || 'pendiente', sanitizeText(area) || 'procesal', sanitizeText(responsable) || userName, Boolean(iguala), sanitizeText(clientId), sanitizeText(expedienteId), organizacionId],
     );
     await logActivityForReq(req, `Presupuesto creado: ${sanitizeText(num)}`, 'FACTURACION_PRESUPUESTO', result.rows[0].id, sanitizeText(contacto) || undefined, 'CREATE');
     res.status(201).json({ success: true, data: result.rows[0] });

@@ -1904,6 +1904,59 @@ export async function runMigrations(): Promise<void> {
       } catch (_e: any) {}
     }
 
+    // facturacion_facturas / facturacion_presupuestos / facturacion_gastos:
+    // hasta ahora solo se filtraban por user_id, así que un usuario con varias
+    // organizaciones veía la facturación de todas mezclada en un único total,
+    // sin forma de saber qué pertenecía a cuál. Se backfillea a partir del
+    // cliente o expediente vinculado (más preciso, cubre facturas y
+    // presupuestos porque llevan client_id obligatorio) y, si no hay ninguno
+    // de los dos -- caso de los gastos, que no llevan cliente ni expediente --
+    // a la organización sembrada, igual que el resto de tablas de esta
+    // migración.
+    try {
+      await client.query(`ALTER TABLE facturacion_facturas ADD COLUMN IF NOT EXISTS organizacion_id UUID REFERENCES organizaciones(id);`);
+      await client.query(`
+        UPDATE facturacion_facturas ff SET organizacion_id = e.organizacion_id
+        FROM entities e WHERE ff.client_id = e.id AND ff.organizacion_id IS NULL
+      `);
+      await client.query(`
+        UPDATE facturacion_facturas ff SET organizacion_id = ex.organizacion_id
+        FROM expedientes ex WHERE ff.expediente_id = ex.id AND ff.organizacion_id IS NULL
+      `);
+      await client.query(`
+        UPDATE facturacion_facturas SET organizacion_id = (SELECT id FROM organizaciones ORDER BY created_at ASC LIMIT 1)
+        WHERE organizacion_id IS NULL
+      `);
+      await client.query(`ALTER TABLE facturacion_facturas ALTER COLUMN organizacion_id SET NOT NULL;`);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_facturacion_facturas_organizacion_id ON facturacion_facturas (organizacion_id);`);
+    } catch (_e: any) {}
+    try {
+      await client.query(`ALTER TABLE facturacion_presupuestos ADD COLUMN IF NOT EXISTS organizacion_id UUID REFERENCES organizaciones(id);`);
+      await client.query(`
+        UPDATE facturacion_presupuestos fp SET organizacion_id = e.organizacion_id
+        FROM entities e WHERE fp.client_id = e.id AND fp.organizacion_id IS NULL
+      `);
+      await client.query(`
+        UPDATE facturacion_presupuestos fp SET organizacion_id = ex.organizacion_id
+        FROM expedientes ex WHERE fp.expediente_id = ex.id AND fp.organizacion_id IS NULL
+      `);
+      await client.query(`
+        UPDATE facturacion_presupuestos SET organizacion_id = (SELECT id FROM organizaciones ORDER BY created_at ASC LIMIT 1)
+        WHERE organizacion_id IS NULL
+      `);
+      await client.query(`ALTER TABLE facturacion_presupuestos ALTER COLUMN organizacion_id SET NOT NULL;`);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_facturacion_presupuestos_organizacion_id ON facturacion_presupuestos (organizacion_id);`);
+    } catch (_e: any) {}
+    try {
+      await client.query(`ALTER TABLE facturacion_gastos ADD COLUMN IF NOT EXISTS organizacion_id UUID REFERENCES organizaciones(id);`);
+      await client.query(`
+        UPDATE facturacion_gastos SET organizacion_id = (SELECT id FROM organizaciones ORDER BY created_at ASC LIMIT 1)
+        WHERE organizacion_id IS NULL
+      `);
+      await client.query(`ALTER TABLE facturacion_gastos ALTER COLUMN organizacion_id SET NOT NULL;`);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_facturacion_gastos_organizacion_id ON facturacion_gastos (organizacion_id);`);
+    } catch (_e: any) {}
+
     // ── Preferencias de usuario (tema de la interfaz, entre otras futuras) ──
     await client.query(`
       CREATE TABLE IF NOT EXISTS user_preferences (
