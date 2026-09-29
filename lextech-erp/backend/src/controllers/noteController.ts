@@ -24,9 +24,18 @@ function getNotesScope(req: Request) {
 export const getNotes = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const scope = getNotesScope(req);
+    const organizacionId = (req as any).organizacionId;
 
     if (!scope.ownerId || !UUID_REGEX.test(scope.ownerId)) {
       return res.status(400).json({ success: false, error: `ID de ${scope.ownerLabel} inválido.` });
+    }
+
+    // El cliente/expediente tiene que ser de esta organización -- sin este
+    // filtro, pedir notas por el UUID de un cliente/expediente de OTRO
+    // despacho las devolvía igualmente.
+    const ownerCheck = await pool.query(`SELECT id FROM ${scope.ownerTable} WHERE id = $1 AND organizacion_id = $2`, [scope.ownerId, organizacionId]);
+    if (ownerCheck.rows.length === 0) {
+      return res.status(404).json({ success: false, error: `${scope.ownerLabel.charAt(0).toUpperCase() + scope.ownerLabel.slice(1)} no encontrado.` });
     }
 
     const result = await pool.query(
@@ -47,6 +56,7 @@ export const getNotes = async (req: AuthenticatedRequest, res: Response) => {
 export const createNote = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const scope = getNotesScope(req);
+    const organizacionId = (req as any).organizacionId;
     const { content, category = 'general', priority = 'normal', color = '#FCD34D' } = req.body;
 
     if (!scope.ownerId || !UUID_REGEX.test(scope.ownerId)) {
@@ -65,7 +75,7 @@ export const createNote = async (req: AuthenticatedRequest, res: Response) => {
       return res.status(400).json({ success: false, error: 'Prioridad inválida.' });
     }
 
-    const ownerCheck = await pool.query(`SELECT id FROM ${scope.ownerTable} WHERE id = $1`, [scope.ownerId]);
+    const ownerCheck = await pool.query(`SELECT id FROM ${scope.ownerTable} WHERE id = $1 AND organizacion_id = $2`, [scope.ownerId, organizacionId]);
     if (ownerCheck.rows.length === 0) {
       return res.status(404).json({
         success: false,
@@ -103,6 +113,7 @@ export const createNote = async (req: AuthenticatedRequest, res: Response) => {
 export const updateNote = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const scope = getNotesScope(req);
+    const organizacionId = (req as any).organizacionId;
     const { noteId } = req.params;
     const { content, category, priority, color } = req.body;
 
@@ -123,8 +134,10 @@ export const updateNote = async (req: AuthenticatedRequest, res: Response) => {
     }
 
     const noteCheck = await pool.query(
-      `SELECT id FROM notes WHERE id = $1 AND ${scope.ownerColumn} = $2`,
-      [noteId, scope.ownerId]
+      `SELECT n.id FROM notes n
+       JOIN ${scope.ownerTable} o ON o.id = n.${scope.ownerColumn}
+       WHERE n.id = $1 AND n.${scope.ownerColumn} = $2 AND o.organizacion_id = $3`,
+      [noteId, scope.ownerId, organizacionId]
     );
 
     if (noteCheck.rows.length === 0) {
@@ -163,6 +176,7 @@ export const updateNote = async (req: AuthenticatedRequest, res: Response) => {
 export const deleteNote = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const scope = getNotesScope(req);
+    const organizacionId = (req as any).organizacionId;
     const { noteId } = req.params;
 
     if (!scope.ownerId || !UUID_REGEX.test(scope.ownerId)) {
@@ -174,8 +188,10 @@ export const deleteNote = async (req: AuthenticatedRequest, res: Response) => {
     }
 
     const noteCheck = await pool.query(
-      `SELECT id, content FROM notes WHERE id = $1 AND ${scope.ownerColumn} = $2`,
-      [noteId, scope.ownerId]
+      `SELECT n.id, n.content FROM notes n
+       JOIN ${scope.ownerTable} o ON o.id = n.${scope.ownerColumn}
+       WHERE n.id = $1 AND n.${scope.ownerColumn} = $2 AND o.organizacion_id = $3`,
+      [noteId, scope.ownerId, organizacionId]
     );
 
     if (noteCheck.rows.length === 0) {

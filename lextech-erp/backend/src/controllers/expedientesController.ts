@@ -482,6 +482,16 @@ export const removeRelatedExpediente = async (req: any, res: Response) => {
     if (!expedienteId || !relatedId) {
       return res.status(400).json({ error: 'Falta el expediente relacionado' });
     }
+    // Igual que addRelatedExpediente: ambos expedientes tienen que ser de
+    // esta organización -- si no, cualquiera podría borrar una relación de
+    // otro despacho conociendo los dos UUID.
+    const bothOwned = await pool.query(
+      `SELECT COUNT(*)::int AS n FROM expedientes WHERE id = ANY($1::uuid[]) AND organizacion_id = $2`,
+      [[expedienteId, relatedId], req.organizacionId]
+    );
+    if (bothOwned.rows[0]?.n !== 2) {
+      return res.status(404).json({ error: 'Expediente no encontrado' });
+    }
     const [leftId, rightId] = normalizeExpedienteRelationPair(expedienteId, relatedId);
     await pool.query(
       `DELETE FROM expediente_relations

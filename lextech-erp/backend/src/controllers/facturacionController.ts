@@ -86,6 +86,7 @@ const mapQuipuStatusToErp = (status: string): string => {
 export const getBillingBootstrap = async (req: any, res: Response) => {
   const userId = req.auth?.userId;
   if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  const organizacionId = req.organizacionId;
 
   try {
     const [facturas, gastos, presupuestos, clientes, expedientes] = await Promise.all([
@@ -126,9 +127,9 @@ export const getBillingBootstrap = async (req: any, res: Response) => {
                  WHERE exp.cliente_id = e.id
                ) AS total_expedientes
         FROM entities e
-        WHERE e.type = 'CLIENTE'
+        WHERE e.type = 'CLIENTE' AND e.organizacion_id = $1
         ORDER BY e.first_name ASC, e.last_name ASC
-      `),
+      `, [organizacionId]),
       pool.query(`
         SELECT ex.id,
                ex.cliente_id,
@@ -140,8 +141,9 @@ export const getBillingBootstrap = async (req: any, res: Response) => {
                COALESCE(ent.first_name || COALESCE(' ' || ent.last_name, ''), ex.cliente_nombre, 'Sin cliente') AS cliente_nombre
         FROM expedientes ex
         LEFT JOIN entities ent ON ent.id = ex.cliente_id
+        WHERE ex.organizacion_id = $1
         ORDER BY ex.updated_at DESC NULLS LAST, ex.created_at DESC NULLS LAST
-      `),
+      `, [organizacionId]),
     ]);
 
     // Obtener facturas de Quipu que aún no están importadas en facturacion_facturas

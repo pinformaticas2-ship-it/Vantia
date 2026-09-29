@@ -43,7 +43,28 @@ const isOfficeOpenable = (fileName?: string | null, mimeType?: string | null) =>
     || mime.includes('presentation');
 };
 
-const getTaskFileRecord = async (taskId: string, fileId: string) => {
+async function assertTaskInOrg(taskId: string, organizacionId: string): Promise<boolean> {
+  const r = await pool.query(`SELECT 1 FROM client_tasks WHERE id = $1 AND organizacion_id = $2`, [taskId, organizacionId]);
+  return r.rows.length > 0;
+}
+
+// organizacionId es opcional a propósito: las rutas autenticadas (/:id/files/...)
+// siempre lo pasan y así no pueden tocar el archivo de otro despacho aunque
+// adivinen el UUID de la tarea; las rutas por token de un solo uso
+// (/files/dl/:token, sin sesión) no tienen organización que comprobar --
+// su seguridad viene de que el token ya se emitió tras una comprobación de
+// organización en createTaskFileTempToken.
+const getTaskFileRecord = async (taskId: string, fileId: string, organizacionId?: string) => {
+  if (organizacionId) {
+    const result = await pool.query(
+      `SELECT tf.stored_name, tf.original_name, tf.mimetype
+       FROM task_files tf
+       JOIN client_tasks ct ON ct.id = tf.task_id
+       WHERE tf.id = $1 AND tf.task_id = $2 AND ct.organizacion_id = $3`,
+      [fileId, taskId, organizacionId]
+    );
+    return result.rows[0] || null;
+  }
   const result = await pool.query(
     `SELECT stored_name, original_name, mimetype
      FROM task_files
@@ -274,6 +295,9 @@ export const createTask = async (req: any, res: Response) => {
 export const listTaskFiles = async (req: any, res: Response) => {
   const { id } = req.params;
   try {
+    if (!(await assertTaskInOrg(id, req.organizacionId))) {
+      return res.status(404).json({ success: false, error: 'Tarea no encontrada' });
+    }
     const result = await pool.query(
       `SELECT id, task_id, original_name, stored_name, mimetype, size_bytes,
               document_name, attachment_type, created_by, created_at, updated_at
@@ -305,6 +329,9 @@ export const uploadTaskFiles = async (req: any, res: Response) => {
   }
 
   try {
+    if (!(await assertTaskInOrg(id, req.organizacionId))) {
+      return res.status(404).json({ success: false, error: 'Tarea no encontrada' });
+    }
     const inserted: any[] = [];
     for (const file of files) {
       const baseFileName = path.basename(file.originalname);
@@ -329,6 +356,9 @@ export const updateTaskFileMetadata = async (req: any, res: Response) => {
   const { id, fileId } = req.params;
   const { document_name, attachment_type } = req.body || {};
   try {
+    if (!(await assertTaskInOrg(id, req.organizacionId))) {
+      return res.status(404).json({ success: false, error: 'Tarea no encontrada' });
+    }
     const result = await pool.query(
       `UPDATE task_files
        SET document_name = $1,
@@ -355,7 +385,7 @@ export const updateTaskFileMetadata = async (req: any, res: Response) => {
 export const downloadTaskFile = async (req: any, res: Response) => {
   const { id, fileId } = req.params;
   try {
-    const fileRow = await getTaskFileRecord(id, fileId);
+    const fileRow = await getTaskFileRecord(id, fileId, req.organizacionId);
     if (!fileRow) {
       return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
     }
@@ -381,7 +411,7 @@ export const downloadTaskFile = async (req: any, res: Response) => {
 export const createTaskFileTempToken = async (req: any, res: Response) => {
   const { id, fileId } = req.params;
   try {
-    const fileRow = await getTaskFileRecord(id, fileId);
+    const fileRow = await getTaskFileRecord(id, fileId, req.organizacionId);
     if (!fileRow) {
       return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
     }
@@ -610,7 +640,7 @@ export const previewTaskWordAsPdf = async (req: any, res: Response) => {
   if (!LIBREOFFICE_ENABLED) return res.status(503).json({ success: false, error: 'Vista previa PDF temporalmente no disponible.' });
   const { id, fileId } = req.params;
   try {
-    const fileRow = await getTaskFileRecord(id, fileId);
+    const fileRow = await getTaskFileRecord(id, fileId, req.organizacionId);
     if (!fileRow) {
       return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
     }
@@ -767,7 +797,7 @@ sys.exit(1)
 export const previewTaskWordAsHtml = async (req: any, res: Response) => {
   const { id, fileId } = req.params;
   try {
-    const fileRow = await getTaskFileRecord(id, fileId);
+    const fileRow = await getTaskFileRecord(id, fileId, req.organizacionId);
     if (!fileRow) {
       return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
     }
@@ -959,7 +989,7 @@ except Exception as e:
 export const previewTaskExcelAsHtml = async (req: any, res: Response) => {
   const { id, fileId } = req.params;
   try {
-    const fileRow = await getTaskFileRecord(id, fileId);
+    const fileRow = await getTaskFileRecord(id, fileId, req.organizacionId);
     if (!fileRow) {
       return res.status(404).json({ success: false, error: 'Archivo no encontrado.' });
     }
@@ -987,6 +1017,9 @@ export const previewTaskExcelAsHtml = async (req: any, res: Response) => {
 export const deleteTaskFile = async (req: any, res: Response) => {
   const { id, fileId } = req.params;
   try {
+    if (!(await assertTaskInOrg(id, req.organizacionId))) {
+      return res.status(404).json({ success: false, error: 'Tarea no encontrada' });
+    }
     const result = await pool.query(
       `DELETE FROM task_files
        WHERE id = $1 AND task_id = $2
@@ -1172,6 +1205,13 @@ export const deleteTask = async (req: any, res: Response) => {
 export const getIndicators = async (req: any, res: Response) => {
   const { clientId } = req.params;
   try {
+    // El cliente tiene que ser de esta organización -- sin esto, las
+    // sub-consultas de abajo (archivos, notas, actuaciones, expedientes) no
+    // comprobaban organización y devolvían igualmente sus datos agregados
+    // para el UUID de un cliente de OTRO despacho.
+    const ownerCheck = await pool.query(`SELECT 1 FROM entities WHERE id = $1 AND organizacion_id = $2`, [clientId, req.organizacionId]);
+    if (!ownerCheck.rows.length) return res.status(404).json({ error: 'Cliente no encontrado' });
+
     // Tareas
     const tasksQ = await pool.query(
       `SELECT
@@ -1257,6 +1297,11 @@ export const getIndicators = async (req: any, res: Response) => {
 export const getExpedienteIndicators = async (req: any, res: Response) => {
   const { expedienteId } = req.params;
   try {
+    // Mismo motivo que getIndicators: las sub-consultas no comprobaban
+    // organización por su cuenta.
+    const ownerCheck = await pool.query(`SELECT 1 FROM expedientes WHERE id = $1 AND organizacion_id = $2`, [expedienteId, req.organizacionId]);
+    if (!ownerCheck.rows.length) return res.status(404).json({ error: 'Expediente no encontrado' });
+
     const [tasksQ, filesQ, notesQ, actQ, expQ, facturasQ] = await Promise.all([
       pool.query(
         `SELECT
