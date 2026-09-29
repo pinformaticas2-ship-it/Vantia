@@ -115,7 +115,7 @@ function parseOS(ua: string | null): string | null {
 interface EventConfig {
   nodeBg: string;
   nodeText: string;
-  Icon: React.ComponentType<{ size?: number; className?: string }>;
+  Icon: React.ComponentType<{ size?: number | string; className?: string }>;
   title: string;
   isError?: boolean;
 }

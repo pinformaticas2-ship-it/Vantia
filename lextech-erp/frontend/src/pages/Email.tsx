@@ -1486,7 +1486,9 @@ function Sidebar({
                       </div>
                       {isActive && <div className="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" />}
                       {needsReauth && (
-                        <AlertCircle size={11} className="text-orange-400 flex-shrink-0" title="Sesión expirada" />
+                        <span title="Sesión expirada" className="flex-shrink-0">
+                          <AlertCircle size={11} className="text-orange-400" />
+                        </span>
                       )}
                     </button>
                     {isActive ? (
@@ -4841,7 +4843,7 @@ export default function Email() {
     if (activeProvider === 'imap' && currentImapAccount) {
       await authFetch(`${API}/email/trash?account_id=${currentImapAccount.id}`, { method: 'DELETE' }).catch(() => {});
     } else if (activeProvider === 'gmail' && gmail) {
-      const trashEmails = emails.filter(e => e.folder === 'TRASH' || e.source === 'gmail');
+      const trashEmails = emails.filter(e => e.source === 'gmail' && e.labelIds?.includes('TRASH'));
       await Promise.all(trashEmails.map(e => gmail.trash(e.id).catch(() => {}))).catch(() => {});
     }
     if (selectedFolder === 'TRASH') {
@@ -5376,7 +5378,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
                 <p className="text-sm text-rose-600 mb-4">{error}</p>
                 {!gmail && (
                   <button
-                    onClick={connectGoogle}
+                    onClick={() => connectGoogle()}
                     className="flex items-center gap-2 text-sm text-red-600 hover:text-red-700 font-medium bg-red-50 border border-red-200 px-4 py-2 rounded-full">
                     <LogIn size={15} /> Reconectar Gmail
                   </button>

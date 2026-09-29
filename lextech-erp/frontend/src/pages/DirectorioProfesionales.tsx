@@ -101,7 +101,7 @@ function cellValue(p: Profesional, key: ColumnKey): React.ReactNode {
 
 // ── Botón de barra de herramientas (calcado de ToolBtn en ClientList) ──────
 function ToolBtn({ icon: Icon, label, onClick, disabled, danger, primary }: {
-  icon: React.ComponentType<{ size?: number }>;
+  icon: React.ComponentType<{ size?: number | string }>;
   label: string;
   onClick: () => void;
   disabled?: boolean;

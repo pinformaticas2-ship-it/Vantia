@@ -5229,9 +5229,9 @@ function ConversacionesTab({ expedienteId }: { expedienteId: string }) {
     setLoading(true);
     setActionError("");
     getToken({ skipCache: true })
-      .then((t: string) =>
+      .then((t: string | null) =>
         fetch(`/api/expedientes/${expedienteId}/conversaciones`, {
-          headers: { Authorization: `Bearer ${t}` },
+          headers: { Authorization: `Bearer ${t || ''}` },
         })
       )
       .then((r: Response) => r.json())

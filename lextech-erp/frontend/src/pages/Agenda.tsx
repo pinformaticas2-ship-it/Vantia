@@ -1997,7 +1997,7 @@ function DayEventsPopover({
     top:  Math.min(position.y + 8, window.innerHeight - 320),
   };
 
-  return ReactDOM.createPortal(
+  return createPortal(
     <div ref={ref} style={style} className="w-64 bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden">
       <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between">
         <span className="text-xs font-semibold text-slate-700 capitalize">{dateLabel}</span>
@@ -3268,11 +3268,14 @@ export default function Agenda() {
         type: "cita",
         status: "pendiente",
         location: "",
+        color: "",
         expediente_id: "",
         cliente_id: "",
         related_user_id: "",
         related_user_name: "",
         organization_context: "",
+        with_meet: false,
+        guests: [] as string[],
       },
     });
   }, []);

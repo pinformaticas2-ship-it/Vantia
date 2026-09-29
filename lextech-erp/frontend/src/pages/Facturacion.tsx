@@ -1405,7 +1405,7 @@ function FacturaWorkspacePage({
                 </div>
                 <div className="min-w-0 rounded-2xl border border-slate-200 px-4 py-3">
                   <p className="text-xs font-semibold text-slate-400">Cobro</p>
-                  <p className="mt-1 truncate font-bold text-slate-900">{PAYMENT_LABELS[form.formaPago]}</p>
+                  <p className="mt-1 truncate font-bold text-slate-900">{PAYMENT_LABELS[form.formaPago as PaymentMethod]}</p>
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-3 text-sm">
@@ -1760,6 +1760,7 @@ function FacturacionContent() {
           id: factura.id,
           num: factura.num,
           contacto: factura.contacto,
+          clientId: factura.clientId,
           vencimiento: factura.vencimiento,
           pendiente: factura.total,
           estado: factura.estado === "enviada" ? "pendiente" : factura.estado,

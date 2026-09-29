@@ -370,6 +370,7 @@ export default function ClientForm() {
           commercial_communications: d.commercial_communications || "No",
           center:                  d.center                   || "",
           photo_url:               d.photo_url                || "",
+          observaciones:           d.observaciones            || "",
         });
         if (d.photo_url) setPhotoPreview(d.photo_url);
       } catch (err: any) {
