@@ -1346,27 +1346,41 @@ function RolesPermisosPanel({ editable }: { editable: boolean }) {
 function ColorField({ label, value, onChange, onCommit, valid }: {
   label: string; value: string; onChange: (v: string) => void; onCommit: (v: string) => void; valid: boolean;
 }) {
+  // El <input type="color"> nativo se deja tal cual por debajo (mismo
+  // selector del sistema, con cuentagotas incluido en navegadores que lo
+  // soportan) pero se le quita el aspecto por defecto -- el "chip" redondeado
+  // de encima es el que se ve, el input real vive invisible justo encima
+  // capturando el clic.
   return (
-    <div className="flex items-center gap-3">
-      <input
-        type="color"
-        value={valid ? value : '#000000'}
-        onChange={(e) => { onChange(e.target.value); onCommit(e.target.value); }}
-        className="h-11 w-11 shrink-0 cursor-pointer rounded-xl border border-slate-200 bg-transparent p-0"
-        title={label}
-      />
-      <div className="min-w-0 flex-1">
-        <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{label}</p>
-        <input
-          type="text"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onBlur={() => { if (valid) onCommit(value); }}
-          onKeyDown={(e) => { if (e.key === 'Enter' && valid) onCommit(value); }}
-          maxLength={7}
-          className="mt-0.5 w-full rounded-lg border border-slate-200 px-2 py-1 text-sm font-mono uppercase text-slate-700"
-        />
+    <div className={`rounded-xl border bg-white p-3 transition-colors ${valid ? 'border-slate-200 hover:border-slate-300' : 'border-rose-200'}`}>
+      <p className="mb-2 text-[10.5px] font-bold uppercase tracking-wider text-slate-400">{label}</p>
+      <div className="flex items-center gap-2.5">
+        <div
+          className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl shadow-inner ring-1 ring-inset ring-black/10 transition-transform hover:scale-105"
+          style={{ backgroundColor: valid ? value : '#e2e8f0' }}
+        >
+          <input
+            type="color"
+            value={valid ? value : '#000000'}
+            onChange={(e) => { onChange(e.target.value); onCommit(e.target.value); }}
+            title={`Elegir ${label.toLowerCase()}`}
+            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+          />
+        </div>
+        <div className={`flex min-w-0 flex-1 items-center gap-0.5 rounded-lg border bg-white px-2.5 transition-colors ${valid ? 'border-slate-200 focus-within:border-slate-400' : 'border-rose-300'}`}>
+          <span className="text-sm font-mono text-slate-300">#</span>
+          <input
+            type="text"
+            value={value.replace(/^#/, '')}
+            onChange={(e) => onChange('#' + e.target.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 6))}
+            onBlur={() => { if (valid) onCommit(value); }}
+            onKeyDown={(e) => { if (e.key === 'Enter' && valid) onCommit(value); }}
+            maxLength={6}
+            className="w-full min-w-0 border-0 bg-transparent py-2 text-sm font-mono uppercase text-slate-700 outline-none"
+          />
+        </div>
       </div>
+      {!valid && <p className="mt-1.5 text-[10px] font-semibold text-rose-500">Formato no válido (ej. 0F766E)</p>}
     </div>
   );
 }
@@ -2232,11 +2246,16 @@ export default function Configuracion() {
                   return (
                     <div className="mt-6 flex flex-col gap-6 lg:flex-row lg:items-start">
                       <div className="flex flex-1 flex-col gap-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <div>
-                          <p className="text-sm font-bold text-slate-800">Elige tus propios colores</p>
-                          <p className="mt-0.5 text-xs text-slate-500">Primario, secundario y barra lateral — se aplican al instante en toda la aplicación. El color de la barra lateral se suaviza para que quede elegante, no invasivo.</p>
+                        <div className="flex items-start gap-3">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-50 ring-1 ring-slate-100">
+                            <Palette size={16} className="text-slate-400" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-slate-800">Elige tus propios colores</p>
+                            <p className="mt-0.5 text-xs leading-5 text-slate-500">Primario, secundario y barra lateral — se aplican al instante en toda la aplicación. El color de la barra lateral se suaviza para que quede elegante, no invasivo.</p>
+                          </div>
                         </div>
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                           <ColorField
                             label="Primario (acentos)"
                             value={draftPrimary}
@@ -2259,9 +2278,19 @@ export default function Configuracion() {
                             valid={draftSidebarValid}
                           />
                         </div>
-                        <span className="text-xs font-bold text-slate-400">
-                          {isCustomInUse ? 'En uso' : allDraftsValid ? 'Pulsa Intro en cada campo, o haz clic en la vista previa para aplicar los tres' : 'Formato: #RRGGBB'}
-                        </span>
+                        <div className="flex items-center gap-2 border-t border-slate-100 pt-4">
+                          {isCustomInUse ? (
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-600">
+                              <Check size={11} /> En uso
+                            </span>
+                          ) : (
+                            <p className="text-xs leading-5 text-slate-400">
+                              {allDraftsValid
+                                ? 'Pulsa Intro en cada campo, o haz clic en la vista previa para aplicar los tres a la vez.'
+                                : 'Corrige el formato marcado en rojo para poder aplicar los colores.'}
+                            </p>
+                          )}
+                        </div>
                       </div>
                       <div className="w-full lg:w-72 lg:shrink-0">
                         <PaletteCard
