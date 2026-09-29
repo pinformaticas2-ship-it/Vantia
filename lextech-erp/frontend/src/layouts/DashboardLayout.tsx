@@ -12,7 +12,7 @@ import {
   MessageSquare, LogOut, Mail, Library, Receipt, Sparkles, ChevronsUpDown,
   MoreVertical, RotateCcw, Copy, Check, Crown,
   Pen, AlertTriangle, RefreshCw, Link2, Plus, Trash2, Scale, Gavel, ChevronDown,
-  Wallet, CreditCard, Building2, BarChart3, FileText, Calculator, Square, BellRing,
+  Wallet, CreditCard, Building2, BarChart3, FileText, Calculator, Square, BellRing, LifeBuoy,
 } from "lucide-react";
 import { UserButton, useUser, useAuth, useClerk } from "@clerk/clerk-react";
 import { getDeviceId, safeJson, waitForClientIp, resolveUploadUrl } from "../lib/api";
@@ -95,6 +95,7 @@ const MODULES = [
   { name: "Cuentas",        path: "/dashboard/facturacion?tab=bank_accounts", icon: Building2,  desc: "Cuentas bancarias" },
   { name: "Conexión Quipu", path: "/dashboard/facturacion?tab=config",        icon: Settings,   desc: "Configuración de la conexión con Quipu" },
   { name: "Chat IA",        path: "/dashboard/chat-ia",      icon: Sparkles,        desc: "Asistente IA con herramientas e historial" },
+  { name: "Centro de soporte", path: "/dashboard/soporte",   icon: LifeBuoy,        desc: "Tickets de soporte técnico" },
   { name: "Configuración",  path: "/dashboard/config",       icon: Settings,        desc: "Ajustes del sistema" },
 ];
 
@@ -1839,8 +1840,23 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
 
       <div className="mx-3 border-t border-slate-800/70" />
 
-      {/* Configuración */}
-      <div className={`transition-all duration-300 pt-2 ${collapsed ? "px-2 pb-2" : "px-3 pb-2"}`}>
+      {/* Centro de soporte + Configuración */}
+      <div className={`transition-all duration-300 pt-2 space-y-0.5 ${collapsed ? "px-2 pb-2" : "px-3 pb-2"}`}>
+        {collapsed ? (
+          <Link to="/dashboard/soporte" onClick={onClose} title="Centro de soporte"
+            className={`flex items-center justify-center h-10 w-10 mx-auto rounded-lg transition-colors border-l-4 ${
+              pathname === "/dashboard/soporte" ? "erp-sidebar-nav-active bg-red-500/10 text-white border-red-500" : "erp-sidebar-nav-inactive text-slate-400 hover:bg-slate-800/50 hover:text-white border-transparent"
+            }`}>
+            <LifeBuoy className="erp-sidebar-icon-inactive h-5 w-5 text-slate-500" />
+          </Link>
+        ) : (
+          <Link to="/dashboard/soporte" onClick={onClose}
+            className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-colors border-l-4 ${
+              pathname === "/dashboard/soporte" ? "erp-sidebar-nav-active bg-red-500/10 text-white border-red-500" : "erp-sidebar-nav-inactive text-slate-400 hover:bg-slate-800/50 hover:text-white border-transparent"
+            }`}>
+            <LifeBuoy className="erp-sidebar-icon-inactive h-4 w-4 shrink-0 text-slate-500" /> Centro de soporte
+          </Link>
+        )}
         {collapsed ? (
           <Link to="/dashboard/config" onClick={onClose} title="Configuración"
             className={`flex items-center justify-center h-10 w-10 mx-auto rounded-lg transition-colors border-l-4 ${
