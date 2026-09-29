@@ -2549,6 +2549,19 @@ export async function runMigrations(): Promise<void> {
       await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_soporte_tickets_org_numero ON soporte_tickets (organizacion_id, numero);`);
       await client.query(`CREATE INDEX IF NOT EXISTS idx_soporte_tickets_org_estado ON soporte_tickets (organizacion_id, estado, updated_at DESC);`);
     } catch (_e: any) {}
+    // Datos extra para que el informático tenga el contexto completo en el
+    // correo: cuándo ocurrió de verdad la incidencia (no siempre coincide con
+    // cuándo se abre el ticket), en qué módulo, y desde qué navegador/equipo.
+    for (const [col, def] of [
+      ['fecha_incidencia', `TIMESTAMPTZ`],
+      ['modulo',           `VARCHAR(40)`],
+      ['created_by_rol',   `VARCHAR(20)`],
+      ['user_agent',       `TEXT`],
+    ] as [string, string][]) {
+      try {
+        await client.query(`ALTER TABLE soporte_tickets ADD COLUMN IF NOT EXISTS ${col} ${def};`);
+      } catch (_e: any) {}
+    }
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS soporte_ticket_mensajes (

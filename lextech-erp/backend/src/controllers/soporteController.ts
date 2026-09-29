@@ -22,6 +22,15 @@ const ESTADOS = ['abierto', 'en_progreso', 'esperando', 'resuelto', 'cerrado'] a
 const CATEGORIA_LABEL: Record<string, string> = { incidencia: 'Incidencia', consulta: 'Consulta', peticion: 'Petición', otro: 'Otro' };
 const PRIORIDAD_LABEL: Record<string, string> = { baja: 'Baja', media: 'Media', alta: 'Alta', urgente: 'Urgente' };
 const ESTADO_LABEL: Record<string, string> = { abierto: 'Abierto', en_progreso: 'En progreso', esperando: 'Esperando respuesta', resuelto: 'Resuelto', cerrado: 'Cerrado' };
+const ROL_LABEL: Record<string, string> = { propietario: 'Propietario', admin: 'Administrador', miembro: 'Miembro', soporte: 'Soporte' };
+// Mismos ids que MODULOS en frontend/src/pages/Soporte.tsx.
+const MODULO_LABEL: Record<string, string> = {
+  clientes: 'Clientes', expedientes: 'Expedientes', agenda: 'Agenda', tareas: 'Tareas', correo: 'Correo',
+  chat: 'Chat interno', whatsapp: 'Comunicación externa', documental: 'Documental', directorio: 'Directorio profesional',
+  facturacion: 'Tesorería / Facturación', vantia: 'Vantia IA', documentos: 'Documentos / Drive / Dropbox',
+  configuracion: 'Configuración / usuarios', acceso: 'Acceso / inicio de sesión', otro: 'Otro',
+};
+const PRIORIDAD_COLOR: Record<string, string> = { baja: '#64748b', media: '#0284c7', alta: '#d97706', urgente: '#dc2626' };
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -62,15 +71,21 @@ async function getUserInfo(userId: string): Promise<{ nombre: string; email: str
   }
 }
 
-// Envía un correo desde la primera cuenta de correo activa de la
-// organización (mismo criterio que el correo de bienvenida a clientes).
+// Envía un correo desde la cuenta de correo de `preferUserId` en la
+// organización (quien abre/responde el ticket), y si no tiene ninguna, desde
+// la primera cuenta activa de la organización. Antes iba siempre a la
+// primera, y el ticket salía desde el buzón personal de un compañero
+// cualquiera en vez de desde quien lo había abierto.
 // Devuelve el error como texto en vez de lanzarlo: el ticket se guarda igual
 // aunque el correo no salga, y el error queda visible en el propio ticket.
-async function sendOrgEmail(organizacionId: string, to: string, subject: string, html: string, replyTo?: string | null): Promise<string | null> {
+async function sendOrgEmail(
+  organizacionId: string, preferUserId: string, to: string, subject: string, html: string, replyTo?: string | null,
+): Promise<string | null> {
   try {
     const { rows } = await pool.query(
-      `SELECT * FROM email_accounts WHERE organizacion_id = $1 AND active = true ORDER BY created_at ASC LIMIT 1`,
-      [organizacionId],
+      `SELECT * FROM email_accounts WHERE organizacion_id = $1 AND active = true
+        ORDER BY (user_id = $2) DESC, created_at ASC LIMIT 1`,
+      [organizacionId, preferUserId],
     );
     if (!rows.length) return 'La organización no tiene ninguna cuenta de correo configurada para enviar.';
     const acc = rows[0];
@@ -101,30 +116,114 @@ function ticketRef(numero: number) {
   return `#${String(numero).padStart(4, '0')}`;
 }
 
+// Fecha y hora completas en hora de España ("lunes, 29 de septiembre de
+// 2026, 10:32 h") -- el servidor corre en UTC, así que sin timeZone la hora
+// del correo saldría desplazada.
+function fmtFecha(d: string | Date | null | undefined): string {
+  if (!d) return '—';
+  const s = new Date(d).toLocaleString('es-ES', {
+    timeZone: 'Europe/Madrid', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  });
+  return `${s.charAt(0).toUpperCase()}${s.slice(1)} h`;
+}
+
+function describeUserAgent(ua: string | null | undefined): string | null {
+  if (!ua) return null;
+  const browser = /Edg\//.test(ua) ? 'Edge' : /OPR\//.test(ua) ? 'Opera' : /Chrome\//.test(ua) ? 'Chrome'
+    : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : null;
+  const os = /Windows/.test(ua) ? 'Windows' : /iPhone|iPad/.test(ua) ? 'iOS' : /Android/.test(ua) ? 'Android'
+    : /Mac OS/.test(ua) ? 'macOS' : /Linux/.test(ua) ? 'Linux' : null;
+  return [browser, os].filter(Boolean).join(' · ') || null;
+}
+
+const box = 'padding:14px 16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;font-size:14px;line-height:1.55;color:#0f172a';
+
+function row(label: string, value: string): string {
+  return `<tr>
+    <td style="padding:7px 12px 7px 0;color:#64748b;font-size:13px;white-space:nowrap;vertical-align:top;width:190px">${label}</td>
+    <td style="padding:7px 0;color:#0f172a;font-size:13px;vertical-align:top">${value}</td>
+  </tr>`;
+}
+
+function pill(text: string, color: string): string {
+  return `<span style="display:inline-block;padding:2px 10px;border-radius:999px;background:${color};color:#fff;font-size:12px;font-weight:bold">${escapeHtml(text)}</span>`;
+}
+
+// Ficha completa del ticket: todo lo que el informático necesita sin tener
+// que entrar en Vantia.
+function ticketDetailsHtml(ticket: any, orgNombre: string): string {
+  const abiertoPor = `<b>${escapeHtml(ticket.created_by_name || '—')}</b>`
+    + (ticket.created_by_rol ? ` <span style="color:#64748b">(${escapeHtml(ROL_LABEL[ticket.created_by_rol] || ticket.created_by_rol)})</span>` : '')
+    + (ticket.created_by_email ? `<br><a href="mailto:${escapeHtml(ticket.created_by_email)}" style="color:#0284c7">${escapeHtml(ticket.created_by_email)}</a>` : '');
+  const equipo = describeUserAgent(ticket.user_agent);
+  return `<table role="presentation" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;margin:4px 0 18px">
+    ${row('Nº de ticket', `<b>${escapeHtml(ticketRef(ticket.numero))}</b>`)}
+    ${row('Organización', escapeHtml(orgNombre))}
+    ${row('Abierto por', abiertoPor)}
+    ${row('Fecha y hora de la incidencia', `<b>${escapeHtml(fmtFecha(ticket.fecha_incidencia || ticket.created_at))}</b>`)}
+    ${row('Ticket abierto el', escapeHtml(fmtFecha(ticket.created_at)))}
+    ${row('Módulo afectado', escapeHtml(MODULO_LABEL[ticket.modulo] || 'No indicado'))}
+    ${row('Categoría', escapeHtml(CATEGORIA_LABEL[ticket.categoria] || ticket.categoria))}
+    ${row('Prioridad', pill(PRIORIDAD_LABEL[ticket.prioridad] || ticket.prioridad, PRIORIDAD_COLOR[ticket.prioridad] || '#64748b'))}
+    ${row('Estado', escapeHtml(ESTADO_LABEL[ticket.estado] || ticket.estado))}
+    ${equipo ? row('Navegador / equipo', escapeHtml(equipo)) : ''}
+  </table>`;
+}
+
+function emailLayout(titulo: string, subtitulo: string, color: string, cuerpo: string, pie: string): string {
+  return `<div style="font-family:Segoe UI,Arial,sans-serif;max-width:680px;margin:0 auto;color:#0f172a">
+    <div style="border-left:5px solid ${color};padding:4px 0 4px 14px;margin-bottom:18px">
+      <div style="font-size:12px;font-weight:bold;letter-spacing:.06em;text-transform:uppercase;color:${color}">${escapeHtml(subtitulo)}</div>
+      <div style="font-size:21px;font-weight:bold;margin-top:2px">${titulo}</div>
+    </div>
+    ${cuerpo}
+    <p style="color:#94a3b8;font-size:12px;margin-top:22px;border-top:1px solid #e2e8f0;padding-top:12px">${pie}</p>
+  </div>`;
+}
+
+async function conversacionHtml(ticketId: string): Promise<string> {
+  const { rows } = await pool.query(
+    `SELECT user_name, es_soporte, mensaje, created_at FROM soporte_ticket_mensajes WHERE ticket_id = $1 ORDER BY created_at ASC`,
+    [ticketId],
+  );
+  if (!rows.length) return '';
+  return `<h3 style="font-size:14px;margin:22px 0 8px">Conversación completa</h3>`
+    + rows.map((m) => `<div style="margin-bottom:10px;padding:10px 14px;border-radius:10px;border:1px solid ${m.es_soporte ? '#bae6fd' : '#e2e8f0'};background:${m.es_soporte ? '#f0f9ff' : '#ffffff'}">
+      <div style="font-size:12px;color:#64748b;margin-bottom:4px"><b style="color:#0f172a">${escapeHtml(m.user_name || 'Usuario')}</b>${m.es_soporte ? ' · Soporte' : ''} · ${escapeHtml(fmtFecha(m.created_at))}</div>
+      <div style="font-size:13px;line-height:1.5">${nl2br(m.mensaje)}</div>
+    </div>`).join('');
+}
+
 // Correo al soporte de la organización con el ticket (nuevo o con respuesta
 // nueva del usuario). Guarda en el ticket a quién se mandó y el error, si lo hubo.
-async function notifySoporte(ticket: any, mensaje?: { autor: string; texto: string }): Promise<void> {
+async function notifySoporte(ticket: any, mensaje?: { autorId: string; autor: string; texto: string }): Promise<void> {
   const { email, orgNombre } = await getSoporteEmail(ticket.organizacion_id);
   let error: string | null;
   if (!email) {
     error = 'La organización no tiene correo de soporte configurado.';
   } else {
+    const color = PRIORIDAD_COLOR[ticket.prioridad] || '#dc2626';
     const subject = mensaje
-      ? `[Soporte ${ticketRef(ticket.numero)}] Nueva respuesta: ${ticket.asunto}`
-      : `[Soporte ${ticketRef(ticket.numero)}] ${PRIORIDAD_LABEL[ticket.prioridad]} · ${ticket.asunto}`;
-    const html = `
-      <h2 style="margin:0 0 8px">${escapeHtml(ticketRef(ticket.numero))} · ${escapeHtml(ticket.asunto)}</h2>
-      <p style="margin:0 0 12px;color:#555">
-        <b>Organización:</b> ${escapeHtml(orgNombre)}<br>
-        <b>Abierto por:</b> ${escapeHtml(ticket.created_by_name || '')}${ticket.created_by_email ? ` &lt;${escapeHtml(ticket.created_by_email)}&gt;` : ''}<br>
-        <b>Categoría:</b> ${CATEGORIA_LABEL[ticket.categoria]} · <b>Prioridad:</b> ${PRIORIDAD_LABEL[ticket.prioridad]} · <b>Estado:</b> ${ESTADO_LABEL[ticket.estado]}
-      </p>
-      ${mensaje
-        ? `<p><b>${escapeHtml(mensaje.autor)} ha respondido:</b></p><div style="padding:12px;background:#f5f5f5;border-radius:8px">${nl2br(mensaje.texto)}</div>`
-        : `<div style="padding:12px;background:#f5f5f5;border-radius:8px">${nl2br(ticket.descripcion)}</div>`}
-      <p style="color:#888;font-size:12px;margin-top:16px">Gestiona este ticket desde Vantia → Centro de soporte.</p>
-    `.trim();
-    error = await sendOrgEmail(ticket.organizacion_id, email, subject, html, ticket.created_by_email);
+      ? `[Soporte ${ticketRef(ticket.numero)}] Nueva respuesta · ${ticket.asunto}`
+      : `[Soporte ${ticketRef(ticket.numero)}] ${PRIORIDAD_LABEL[ticket.prioridad]} · ${ticket.asunto} · ${fmtFecha(ticket.fecha_incidencia || ticket.created_at)}`;
+    const cuerpo = mensaje
+      ? `<p style="margin:0 0 6px;font-size:14px"><b>${escapeHtml(mensaje.autor)}</b> ha respondido el ${escapeHtml(fmtFecha(new Date()))}:</p>
+         <div style="${box};margin-bottom:20px">${nl2br(mensaje.texto)}</div>
+         ${ticketDetailsHtml(ticket, orgNombre)}
+         <h3 style="font-size:14px;margin:0 0 8px">Descripción original</h3>
+         <div style="${box}">${nl2br(ticket.descripcion)}</div>
+         ${await conversacionHtml(ticket.id)}`
+      : `${ticketDetailsHtml(ticket, orgNombre)}
+         <h3 style="font-size:14px;margin:0 0 8px">Descripción de la incidencia</h3>
+         <div style="${box}">${nl2br(ticket.descripcion)}</div>`;
+    const html = emailLayout(
+      `${escapeHtml(ticketRef(ticket.numero))} · ${escapeHtml(ticket.asunto)}`,
+      mensaje ? 'Nueva respuesta en ticket de soporte' : `Nuevo ticket de soporte · Prioridad ${PRIORIDAD_LABEL[ticket.prioridad]}`,
+      color,
+      cuerpo,
+      `Responde a este correo para contestar directamente a ${escapeHtml(ticket.created_by_name || 'quien abrió el ticket')}, o gestiona el ticket desde Vantia → Centro de soporte.`,
+    );
+    error = await sendOrgEmail(ticket.organizacion_id, mensaje?.autorId || ticket.created_by, email, subject, html, ticket.created_by_email);
   }
   await pool.query(
     `UPDATE soporte_tickets SET enviado_a = $1, email_error = $2 WHERE id = $3`,
@@ -134,15 +233,21 @@ async function notifySoporte(ticket: any, mensaje?: { autor: string; texto: stri
 }
 
 // Aviso por correo a quien abrió el ticket cuando soporte responde o cambia
-// el estado. Best effort: si falla no se registra nada en el ticket.
-async function notifyCreador(ticket: any, texto: string): Promise<void> {
+// el estado (se envía desde la cuenta del informático que actúa). Best
+// effort: si falla no se registra nada en el ticket.
+async function notifyCreador(ticket: any, senderUserId: string, texto: string): Promise<void> {
   if (!ticket.created_by_email) return;
-  const html = `
-    <h2 style="margin:0 0 8px">${escapeHtml(ticketRef(ticket.numero))} · ${escapeHtml(ticket.asunto)}</h2>
-    <div style="padding:12px;background:#f5f5f5;border-radius:8px">${nl2br(texto)}</div>
-    <p style="color:#888;font-size:12px;margin-top:16px">Estado actual: ${ESTADO_LABEL[ticket.estado]}. Puedes responder desde Vantia → Centro de soporte.</p>
-  `.trim();
-  const error = await sendOrgEmail(ticket.organizacion_id, ticket.created_by_email, `[Soporte ${ticketRef(ticket.numero)}] ${ticket.asunto}`, html);
+  const { orgNombre } = await getSoporteEmail(ticket.organizacion_id);
+  const html = emailLayout(
+    `${escapeHtml(ticketRef(ticket.numero))} · ${escapeHtml(ticket.asunto)}`,
+    'Actualización de tu ticket de soporte',
+    '#0284c7',
+    `<div style="${box};margin-bottom:20px">${nl2br(texto)}</div>
+     ${ticketDetailsHtml(ticket, orgNombre)}
+     ${await conversacionHtml(ticket.id)}`,
+    'Puedes responder desde Vantia → Centro de soporte.',
+  );
+  const error = await sendOrgEmail(ticket.organizacion_id, senderUserId, ticket.created_by_email, `[Soporte ${ticketRef(ticket.numero)}] ${ticket.asunto}`, html);
   if (error) console.warn(`Soporte: no se pudo avisar al creador del ticket ${ticket.id}:`, error);
 }
 
@@ -173,6 +278,9 @@ function serializeTicket(t: any) {
     createdBy: t.created_by,
     createdByName: t.created_by_name,
     createdByEmail: t.created_by_email,
+    createdByRol: t.created_by_rol,
+    fechaIncidencia: t.fecha_incidencia || t.created_at,
+    modulo: t.modulo,
     enviadoA: t.enviado_a,
     emailError: t.email_error,
     mensajesCount: t.mensajes_count != null ? Number(t.mensajes_count) : undefined,
@@ -217,6 +325,14 @@ export async function createTicket(req: Request, res: Response) {
   const prioridad = PRIORIDADES.includes(req.body?.prioridad) ? req.body.prioridad : 'media';
   if (!asunto) return err(res, 'El asunto es obligatorio.', 400);
   if (!descripcion) return err(res, 'La descripción es obligatoria.', 400);
+  const modulo = req.body?.modulo && MODULO_LABEL[req.body.modulo] ? req.body.modulo : null;
+  // Fecha/hora en que ocurrió la incidencia (la elige el usuario, por defecto
+  // "ahora"). Se descarta si no es válida o está en el futuro -- en ese caso
+  // se usa la de apertura del ticket.
+  const fechaRaw = req.body?.fechaIncidencia ? new Date(req.body.fechaIncidencia) : null;
+  const fechaIncidencia = fechaRaw && !isNaN(fechaRaw.getTime()) && fechaRaw.getTime() <= Date.now() + 5 * 60 * 1000
+    ? fechaRaw : new Date();
+  const userAgent = String(req.headers['user-agent'] || '').slice(0, 500) || null;
 
   const autor = await getUserInfo(ctx.userId);
   const client = await pool.connect();
@@ -232,10 +348,12 @@ export async function createTicket(req: Request, res: Response) {
     );
     const { rows } = await client.query(
       `INSERT INTO soporte_tickets
-         (organizacion_id, numero, asunto, descripcion, categoria, prioridad, created_by, created_by_name, created_by_email)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         (organizacion_id, numero, asunto, descripcion, categoria, prioridad, created_by, created_by_name, created_by_email,
+          created_by_rol, fecha_incidencia, modulo, user_agent)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        RETURNING *`,
-      [ctx.organizacionId, n[0].next, asunto, descripcion, categoria, prioridad, ctx.userId, autor.nombre, autor.email],
+      [ctx.organizacionId, n[0].next, asunto, descripcion, categoria, prioridad, ctx.userId, autor.nombre, autor.email,
+        ctx.rol || null, fechaIncidencia, modulo, userAgent],
     );
     await client.query('COMMIT');
     ticket = rows[0];
@@ -299,8 +417,8 @@ export async function addMensaje(req: Request, res: Response) {
       [nuevoEstado, ticket.id],
     );
 
-    if (esSoporte) await notifyCreador(upd[0], `${autor.nombre} ha respondido:\n\n${texto}`);
-    else await notifySoporte(upd[0], { autor: autor.nombre, texto });
+    if (esSoporte) await notifyCreador(upd[0], ctx.userId, `${autor.nombre} ha respondido:\n\n${texto}`);
+    else await notifySoporte(upd[0], { autorId: ctx.userId, autor: autor.nombre, texto });
 
     const m = rows[0];
     return ok(res, {
@@ -333,7 +451,7 @@ export async function updateTicket(req: Request, res: Response) {
     );
     const updated = rows[0];
     if (estado && estado !== ticket.estado && ticket.created_by !== ctx.userId) {
-      await notifyCreador(updated, `El estado de tu ticket ha cambiado a: ${ESTADO_LABEL[estado]}.`);
+      await notifyCreador(updated, ctx.userId, `El estado de tu ticket ha cambiado a: ${ESTADO_LABEL[estado]}.`);
     }
     return ok(res, serializeTicket(updated));
   } catch (e: any) {

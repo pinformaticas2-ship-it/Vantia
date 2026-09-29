@@ -25,6 +25,9 @@ interface Ticket {
   createdBy: string;
   createdByName: string | null;
   createdByEmail: string | null;
+  createdByRol: string | null;
+  fechaIncidencia: string;
+  modulo: string | null;
   enviadoA: string | null;
   emailError: string | null;
   mensajesCount?: number;
@@ -68,6 +71,30 @@ const ESTADOS: { id: Estado; label: string; cls: string }[] = [
   { id: "cerrado", label: "Cerrado", cls: "bg-slate-100 text-slate-500 border-slate-200" },
 ];
 const ACTIVOS: Estado[] = ["abierto", "en_progreso", "esperando"];
+// Mismos ids que MODULO_LABEL en backend/src/controllers/soporteController.ts.
+const MODULOS: { id: string; label: string }[] = [
+  { id: "clientes", label: "Clientes" },
+  { id: "expedientes", label: "Expedientes" },
+  { id: "agenda", label: "Agenda" },
+  { id: "tareas", label: "Tareas" },
+  { id: "correo", label: "Correo" },
+  { id: "chat", label: "Chat interno" },
+  { id: "whatsapp", label: "Comunicación externa" },
+  { id: "documental", label: "Documental" },
+  { id: "directorio", label: "Directorio profesional" },
+  { id: "facturacion", label: "Tesorería / Facturación" },
+  { id: "vantia", label: "Vantia IA" },
+  { id: "documentos", label: "Documentos / Drive / Dropbox" },
+  { id: "configuracion", label: "Configuración / usuarios" },
+  { id: "acceso", label: "Acceso / inicio de sesión" },
+  { id: "otro", label: "Otro" },
+];
+
+// Valor para <input type="datetime-local"> con la hora local actual.
+function nowLocalInput(): string {
+  const d = new Date();
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+}
 
 const ref = (n: number) => `#${String(n).padStart(4, "0")}`;
 const fmt = (d: string) => new Date(d).toLocaleString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -268,20 +295,31 @@ function NuevoTicketModal({ open, onClose, onCreated }: { open: boolean; onClose
   const [descripcion, setDescripcion] = useState("");
   const [categoria, setCategoria] = useState<Categoria>("incidencia");
   const [prioridad, setPrioridad] = useState<Prioridad>("media");
+  const [modulo, setModulo] = useState("");
+  const [fechaIncidencia, setFechaIncidencia] = useState(nowLocalInput);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (open) { setAsunto(""); setDescripcion(""); setCategoria("incidencia"); setPrioridad("media"); setError(""); }
+    if (open) {
+      setAsunto(""); setDescripcion(""); setCategoria("incidencia"); setPrioridad("media");
+      setModulo(""); setFechaIncidencia(nowLocalInput()); setError("");
+    }
   }, [open]);
 
   const submit = async () => {
     if (!asunto.trim() || !descripcion.trim()) { setError("El asunto y la descripción son obligatorios."); return; }
+    const fecha = fechaIncidencia ? new Date(fechaIncidencia) : new Date();
+    if (isNaN(fecha.getTime()) || fecha.getTime() > Date.now() + 5 * 60 * 1000) {
+      setError("La fecha y hora de la incidencia no puede estar en el futuro.");
+      return;
+    }
     setSaving(true);
     setError("");
     try {
       const d = await apiFetch("/api/soporte/tickets", {
-        getToken, method: "POST", body: JSON.stringify({ asunto, descripcion, categoria, prioridad }),
+        getToken, method: "POST",
+        body: JSON.stringify({ asunto, descripcion, categoria, prioridad, modulo: modulo || null, fechaIncidencia: fecha.toISOString() }),
       });
       if (!d?.success) throw new Error(d?.error || "No se pudo crear el ticket");
       onCreated(d.data);
@@ -307,6 +345,20 @@ function NuevoTicketModal({ open, onClose, onCreated }: { open: boolean; onClose
           <label className="block text-xs font-bold text-slate-600 mb-1">Asunto</label>
           <input value={asunto} onChange={(e) => setAsunto(e.target.value)} maxLength={200} autoFocus
             placeholder="Ej.: No puedo abrir los documentos de un expediente" className={inputCls} />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-bold text-slate-600 mb-1">Fecha y hora de la incidencia</label>
+            <input type="datetime-local" value={fechaIncidencia} max={nowLocalInput()}
+              onChange={(e) => setFechaIncidencia(e.target.value)} className={inputCls} />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-600 mb-1">Módulo afectado</label>
+            <select value={modulo} onChange={(e) => setModulo(e.target.value)} className={inputCls}>
+              <option value="">— Selecciona —</option>
+              {MODULOS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+            </select>
+          </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -411,6 +463,10 @@ function TicketDetail({ id, esGestor, onBack, onChanged }: {
             <h2 className="text-base font-extrabold text-slate-900 break-words">{ticket.asunto}</h2>
             <p className="text-[11px] text-slate-500 mt-0.5">
               Abierto por <span className="font-semibold">{ticket.createdByName}</span> el {fmt(ticket.createdAt)}
+            </p>
+            <p className="text-[11px] text-slate-500">
+              Incidencia: <span className="font-semibold">{fmt(ticket.fechaIncidencia)}</span>
+              {ticket.modulo && <> · Módulo: <span className="font-semibold">{MODULOS.find((m) => m.id === ticket.modulo)?.label || ticket.modulo}</span></>}
             </p>
           </div>
         </div>
