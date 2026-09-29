@@ -21,9 +21,12 @@ const storage = multer.diskStorage({
     }
 });
 
-// Filtro de seguridad: Solo aceptar imágenes
+// Filtro de seguridad: Solo aceptar imágenes -- excepto SVG. Un SVG es XML,
+// no una imagen rasterizada: puede llevar <script> dentro, y como luego se
+// sirve de vuelta con el mismo Content-Type que se declaró al subirlo, un
+// navegador lo ejecutaría. Nadie sube un DNI o un logo en SVG de verdad.
 const fileFilter = (req: any, file: Express.Multer.File, cb: any) => {
-    if (file.mimetype.startsWith('image/')) {
+    if (file.mimetype.startsWith('image/') && file.mimetype !== 'image/svg+xml') {
         cb(null, true);
     } else {
         cb(new Error('Formato no soportado. Sube solo imágenes (JPG, PNG).') as any, false);

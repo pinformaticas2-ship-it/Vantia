@@ -30,7 +30,9 @@ router.use(requireModulePermission('chat'));
 const chatUpload = multer({
   storage: multer.memoryStorage(),
   fileFilter: (_req, file, cb) => {
-    if (!file.mimetype.startsWith('image/')) return cb(new Error('Solo se permiten imágenes'));
+    // Sin SVG: es XML y puede llevar <script>, y se sirve de vuelta con el
+    // mismo Content-Type que se declaró al subirlo.
+    if (!file.mimetype.startsWith('image/') || file.mimetype === 'image/svg+xml') return cb(new Error('Solo se permiten imágenes'));
     cb(null, true);
   },
   limits: { fileSize: 10 * 1024 * 1024 },
@@ -46,6 +48,7 @@ const ALLOWED_FILE_TYPES = [
 const chatFileUpload = multer({
   storage: multer.memoryStorage(),
   fileFilter: (_req, file, cb) => {
+    if (file.mimetype === 'image/svg+xml') return cb(new Error('Tipo de archivo no permitido'));
     const allowed = ALLOWED_FILE_TYPES.some(t => file.mimetype.startsWith(t));
     if (!allowed) return cb(new Error('Tipo de archivo no permitido'));
     cb(null, true);

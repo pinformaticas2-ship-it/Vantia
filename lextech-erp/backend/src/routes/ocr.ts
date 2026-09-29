@@ -12,7 +12,7 @@ const upload = multer({
   dest: os.tmpdir(),
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB máximo
   fileFilter: (_req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
+    if (file.mimetype.startsWith('image/') && file.mimetype !== 'image/svg+xml') {
       cb(null, true);
     } else {
       cb(new Error('Solo se aceptan imágenes (JPG, PNG, WEBP)'));
