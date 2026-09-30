@@ -279,13 +279,21 @@ async function notifyCreador(ticket: any, senderUserId: string, texto: string): 
   if (error) console.warn(`Soporte: no se pudo avisar al creador del ticket ${ticket.id}:`, error);
 }
 
-// Notificación push a quien abrió el ticket cuando soporte le responde o
-// cambia el estado. El título deja claro que viene del Centro de soporte
-// (no se confunde con un chat o un correo normal) y al pulsarla abre el
-// ticket. sendPushToUser no lanza nunca y no hace nada si el push no está
-// configurado o el usuario no tiene ningún dispositivo suscrito.
+// Aviso a quien abrió el ticket cuando soporte le responde o cambia el
+// estado, por los dos canales del ERP (el correo va aparte, notifyCreador):
+//   1. Campana de notificaciones de la app: se marca soporte_actualizado_at
+//      y el resumen; GET /api/soporte/notificaciones lo devuelve hasta que
+//      el creador abre el ticket (creador_visto_at).
+//   2. Notificación push del navegador (la de Chrome en el escritorio). El
+//      título deja claro que viene del Centro de soporte y al pulsarla abre
+//      el ticket. sendPushToUser no lanza nunca y no hace nada si el push no
+//      está configurado o el usuario no tiene ningún navegador suscrito.
 async function pushCreador(ticket: any, body: string): Promise<void> {
   const texto = body.replace(/\s+/g, ' ').trim();
+  await pool.query(
+    `UPDATE soporte_tickets SET soporte_actualizado_at = NOW(), soporte_resumen = $1 WHERE id = $2`,
+    [texto.slice(0, 300), ticket.id],
+  );
   await sendPushToUser(ticket.created_by, {
     title: `Centro de soporte · Ticket ${ticketRef(ticket.numero)}`,
     body: texto.length > 160 ? `${texto.slice(0, 157)}…` : texto,
@@ -435,6 +443,10 @@ export async function getTicket(req: Request, res: Response) {
   try {
     const loaded = await loadTicketForUser(req, res);
     if (!loaded) return;
+    // Quien abrió el ticket lo está viendo: desaparece su aviso de la campana.
+    if (loaded.ticket.created_by === loaded.ctx.userId) {
+      await pool.query(`UPDATE soporte_tickets SET creador_visto_at = NOW() WHERE id = $1`, [loaded.ticket.id]);
+    }
     const { rows } = await pool.query(
       `SELECT id, user_id, user_name, es_soporte, mensaje, created_at
          FROM soporte_ticket_mensajes WHERE ticket_id = $1 ORDER BY created_at ASC`,
@@ -446,6 +458,39 @@ export async function getTicket(req: Request, res: Response) {
         id: m.id, userId: m.user_id, userName: m.user_name, esSoporte: m.es_soporte, mensaje: m.mensaje, createdAt: m.created_at,
       })),
     });
+  } catch (e: any) {
+    return err(res, e?.message || String(e));
+  }
+}
+
+// GET /api/soporte/notificaciones — para la campana del ERP: tickets del
+// usuario con novedades de soporte que aún no ha visto. Se consulta cada
+// pocos segundos, así que es una sola consulta ligera por índice.
+export async function listNotificaciones(req: Request, res: Response) {
+  try {
+    const ctx = requireCtx(req, res);
+    if (!ctx) return;
+    if (isGestor(ctx.rol)) return ok(res, []);
+    const { rows } = await pool.query(
+      `SELECT id, numero, asunto, estado, soporte_resumen, soporte_actualizado_at
+         FROM soporte_tickets
+        WHERE organizacion_id = $1 AND created_by = $2
+          AND soporte_actualizado_at IS NOT NULL
+          AND (creador_visto_at IS NULL OR soporte_actualizado_at > creador_visto_at)
+        ORDER BY soporte_actualizado_at DESC
+        LIMIT 20`,
+      [ctx.organizacionId, ctx.userId],
+    );
+    return ok(res, rows.map((r) => ({
+      ticketId: r.id,
+      numero: r.numero,
+      referencia: ticketRef(r.numero),
+      asunto: r.asunto,
+      estado: r.estado,
+      estadoLabel: ESTADO_LABEL[r.estado] || r.estado,
+      resumen: r.soporte_resumen,
+      actualizadoAt: r.soporte_actualizado_at,
+    })));
   } catch (e: any) {
     return err(res, e?.message || String(e));
   }

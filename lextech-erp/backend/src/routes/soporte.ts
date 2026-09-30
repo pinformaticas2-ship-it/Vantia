@@ -11,10 +11,12 @@ import {
   updateSoporteConfig,
   getEstadisticas,
   exportCsv,
+  listNotificaciones,
 } from '../controllers/soporteController';
 
 const router = Router();
 
+router.get('/notificaciones', requireAuth, listNotificaciones);
 router.get('/tickets', requireAuth, listTickets);
 router.post('/tickets', requireAuth, createTicket);
 router.get('/tickets/:id', requireAuth, getTicket);

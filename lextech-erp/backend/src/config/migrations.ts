@@ -2562,6 +2562,12 @@ export async function runMigrations(): Promise<void> {
       // ver services/soporteRetencion.ts.
       ['cerrado_at',       `TIMESTAMPTZ`],
       ['aviso_borrado_at', `TIMESTAMPTZ`],
+      // Campana de notificaciones del ERP: hay aviso para quien abrió el
+      // ticket si soporte lo ha actualizado (respuesta o cambio de estado)
+      // después de la última vez que él lo abrió.
+      ['soporte_actualizado_at', `TIMESTAMPTZ`],
+      ['soporte_resumen',        `TEXT`],
+      ['creador_visto_at',       `TIMESTAMPTZ`],
     ] as [string, string][]) {
       try {
         await client.query(`ALTER TABLE soporte_tickets ADD COLUMN IF NOT EXISTS ${col} ${def};`);
@@ -2573,6 +2579,7 @@ export async function runMigrations(): Promise<void> {
         WHERE estado = 'cerrado' AND cerrado_at IS NULL
       `);
       await client.query(`CREATE INDEX IF NOT EXISTS idx_soporte_tickets_cerrado_at ON soporte_tickets (cerrado_at) WHERE estado = 'cerrado';`);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_soporte_tickets_creador_novedades ON soporte_tickets (created_by, soporte_actualizado_at DESC) WHERE soporte_actualizado_at IS NOT NULL;`);
     } catch (_e: any) {}
 
     // Recuento mensual de tickets cerrados que ya se han borrado -- al borrar

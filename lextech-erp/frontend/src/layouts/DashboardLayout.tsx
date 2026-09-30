@@ -1008,7 +1008,7 @@ function WhatsAppWidget() {
 // ── Notifications Panel ──────────────────────────────────────────────────────
 type UnifiedNotification = {
   id: string;
-  kind: "chat" | "email" | "whatsapp" | "plazo";
+  kind: "chat" | "email" | "whatsapp" | "plazo" | "soporte";
   title: string;
   subtitle?: string;
   meta?: string;
@@ -1021,6 +1021,7 @@ function notificationIcon(kind: UnifiedNotification["kind"]) {
   if (kind === "chat") return "💬";
   if (kind === "email") return "✉️";
   if (kind === "plazo") return "⏰";
+  if (kind === "soporte") return "🛟";
   return "🟢";
 }
 
@@ -2061,20 +2062,22 @@ export default function DashboardLayout() {
       const token = await getToken({ skipCache: true });
       if (!token) return;
       const headers = { Authorization: `Bearer ${token}` };
-      const [chatRes, emailRes, waRes, tasksRes, expNotifRes] = await Promise.all([
+      const [chatRes, emailRes, waRes, tasksRes, expNotifRes, soporteRes] = await Promise.all([
         fetch("/api/chat/canales", { headers }),
         fetch("/api/email/messages?folder=INBOX&unread=1&page=1&pageSize=50", { headers }),
         fetch("/api/whatsapp/contacts", { headers }),
         fetch("/api/tasks/me", { headers }),
         fetch("/api/expedientes/notificaciones/pendientes", { headers }),
+        fetch("/api/soporte/notificaciones", { headers }),
       ]);
 
-      const [chatData, emailData, waData, tasksData, expNotifData] = await Promise.all([
+      const [chatData, emailData, waData, tasksData, expNotifData, soporteData] = await Promise.all([
         safeJson(chatRes),
         safeJson(emailRes),
         safeJson(waRes),
         safeJson(tasksRes),
         safeJson(expNotifRes),
+        safeJson(soporteRes),
       ]);
 
       const next: UnifiedNotification[] = [];
@@ -2229,6 +2232,26 @@ export default function DashboardLayout() {
             meta: `Exp. ${n.anio}/${n.num_exp}${n.cliente_nombre ? " · " + n.cliente_nombre : ""}`,
             created_at: nowIso,
             onClick: () => navigate(`/dashboard/expedientes/${n.expediente_id}?tab=cronologia`),
+          });
+        }
+      }
+
+      // Centro de soporte: respuestas o cambios de estado de soporte en los
+      // tickets que ha abierto el usuario y que aún no ha visto. El id lleva
+      // la fecha de la actualización para que, si se descarta y luego llega
+      // otra respuesta, vuelva a aparecer.
+      if (soporteRes.ok) {
+        const soporteItems = Array.isArray(soporteData?.data) ? soporteData.data : [];
+        for (const s of soporteItems) {
+          if (!s?.ticketId) continue;
+          next.push({
+            id: `soporte-${s.ticketId}-${s.actualizadoAt}`,
+            kind: "soporte",
+            title: `Centro de soporte · Ticket ${s.referencia}`,
+            subtitle: s.asunto || undefined,
+            meta: s.resumen || `Estado: ${s.estadoLabel}`,
+            created_at: s.actualizadoAt || new Date().toISOString(),
+            onClick: () => navigate(`/dashboard/soporte?ticket=${encodeURIComponent(s.ticketId)}`),
           });
         }
       }
