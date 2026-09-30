@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
+import { useSearchParams } from "react-router-dom";
 import {
   LifeBuoy, Plus, RefreshCw, Search, X, Send, Mail, AlertTriangle, ChevronLeft,
   MessageSquare, Settings, Check, Loader2, Building2, BarChart3, Download, Clock, Trash2,
@@ -172,7 +173,19 @@ export default function Soporte() {
   const [error, setError] = useState("");
   const [filtro, setFiltro] = useState<"activos" | "todos" | Estado>("activos");
   const [search, setSearch] = useState("");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  const [selectedId, setSelectedId] = useState<string | null>(() => searchParams.get("ticket"));
+
+  // ?ticket=<id>: viene de pulsar una notificación push del Centro de
+  // soporte -- abre directamente ese ticket (con el filtro en "Todos" por si
+  // ya está resuelto/cerrado y no saldría entre los activos).
+  useEffect(() => {
+    const id = searchParams.get("ticket");
+    if (!id) return;
+    setSelectedId(id);
+    setTab("tickets");
+    setFiltro("todos");
+  }, [searchParams]);
   const [showNew, setShowNew] = useState(false);
 
   const load = useCallback(async (spin = false) => {

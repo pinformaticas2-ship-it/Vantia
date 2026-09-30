@@ -5,6 +5,7 @@ import { resolveUserOrgMemberships } from './organizacionesController';
 import { decryptPassword } from '../utils/emailCrypto';
 import { dispatchEmail } from '../utils/mailer';
 import { SmtpConfig, MailAttachment } from '../utils/smtp';
+import { sendPushToUser } from '../utils/webPush';
 
 // ── Centro de soporte ────────────────────────────────────────────────────────
 // Sistema de tickets por organización: cualquier miembro abre tickets y ve
@@ -278,6 +279,21 @@ async function notifyCreador(ticket: any, senderUserId: string, texto: string): 
   if (error) console.warn(`Soporte: no se pudo avisar al creador del ticket ${ticket.id}:`, error);
 }
 
+// Notificación push a quien abrió el ticket cuando soporte le responde o
+// cambia el estado. El título deja claro que viene del Centro de soporte
+// (no se confunde con un chat o un correo normal) y al pulsarla abre el
+// ticket. sendPushToUser no lanza nunca y no hace nada si el push no está
+// configurado o el usuario no tiene ningún dispositivo suscrito.
+async function pushCreador(ticket: any, body: string): Promise<void> {
+  const texto = body.replace(/\s+/g, ' ').trim();
+  await sendPushToUser(ticket.created_by, {
+    title: `Centro de soporte · Ticket ${ticketRef(ticket.numero)}`,
+    body: texto.length > 160 ? `${texto.slice(0, 157)}…` : texto,
+    url: `/dashboard/soporte?ticket=${ticket.id}`,
+    tag: `soporte-ticket-${ticket.id}`,
+  });
+}
+
 async function loadTicketForUser(req: Request, res: Response): Promise<{ ticket: any; ctx: { organizacionId: string; rol: string; userId: string } } | null> {
   const ctx = requireCtx(req, res);
   if (!ctx) return null;
@@ -462,8 +478,12 @@ export async function addMensaje(req: Request, res: Response) {
       [nuevoEstado, ticket.id],
     );
 
-    if (esSoporte) await notifyCreador(upd[0], ctx.userId, `${autor.nombre} ha respondido:\n\n${texto}`);
-    else await notifySoporte(upd[0], { autorId: ctx.userId, autor: autor.nombre, texto });
+    if (esSoporte) {
+      await notifyCreador(upd[0], ctx.userId, `${autor.nombre} ha respondido:\n\n${texto}`);
+      await pushCreador(upd[0], `Soporte ha respondido a «${upd[0].asunto}»: ${texto}`);
+    } else {
+      await notifySoporte(upd[0], { autorId: ctx.userId, autor: autor.nombre, texto });
+    }
 
     const m = rows[0];
     return ok(res, {
@@ -498,6 +518,7 @@ export async function updateTicket(req: Request, res: Response) {
     const updated = rows[0];
     if (estado && estado !== ticket.estado && ticket.created_by !== ctx.userId) {
       await notifyCreador(updated, ctx.userId, `El estado de tu ticket ha cambiado a: ${ESTADO_LABEL[estado]}.`);
+      await pushCreador(updated, `«${updated.asunto}» ha pasado a: ${ESTADO_LABEL[estado]}.`);
     }
     return ok(res, serializeTicket(updated));
   } catch (e: any) {
