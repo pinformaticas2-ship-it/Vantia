@@ -37,8 +37,8 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // Retención de tickets cerrados: se borran a los RETENCION_DIAS de cerrarse,
 // y nunca antes de AVISO_DIAS_ANTES días desde que se mandó el aviso por
 // correo con el CSV (ver services/soporteRetencion.ts).
-export const RETENCION_DIAS = 30;
-export const AVISO_DIAS_ANTES = 7;
+export const RETENCION_DIAS = 15;
+export const AVISO_DIAS_ANTES = 1;
 const DIA_MS = 86_400_000;
 
 // Fecha prevista de borrado de un ticket cerrado (null si no está cerrado).
@@ -47,7 +47,7 @@ function fechaBorrado(t: any): Date | null {
   const base = new Date(t.cerrado_at).getTime() + RETENCION_DIAS * DIA_MS;
   const trasAviso = t.aviso_borrado_at
     ? new Date(t.aviso_borrado_at).getTime() + AVISO_DIAS_ANTES * DIA_MS
-    // Aún sin avisar: como pronto, 7 días después de que salga el aviso.
+    // Aún sin avisar: como pronto, AVISO_DIAS_ANTES días después de que salga el aviso.
     : Math.max(Date.now(), new Date(t.cerrado_at).getTime() + (RETENCION_DIAS - AVISO_DIAS_ANTES) * DIA_MS) + AVISO_DIAS_ANTES * DIA_MS;
   return new Date(Math.max(base, trasAviso));
 }

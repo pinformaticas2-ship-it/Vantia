@@ -62,7 +62,7 @@ async function avisarPendientes(): Promise<void> {
     </tr>`).join('');
     const th = 'padding:6px 10px;text-align:left;font-size:12px;color:#64748b;border-bottom:2px solid #e2e8f0';
     const html = emailLayout(
-      `${tickets.length} ${tickets.length === 1 ? 'ticket cerrado se borrará' : 'tickets cerrados se borrarán'} en ${AVISO_DIAS_ANTES} días`,
+      `${tickets.length} ${tickets.length === 1 ? 'ticket cerrado se borrará' : 'tickets cerrados se borrarán'} ${AVISO_DIAS_ANTES === 1 ? 'mañana' : `en ${AVISO_DIAS_ANTES} días`}`,
       `Aviso de borrado · ${orgNombre}`,
       '#d97706',
       `<p style="font-size:14px;line-height:1.55;margin:0 0 14px">

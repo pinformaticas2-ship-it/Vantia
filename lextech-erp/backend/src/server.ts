@@ -367,7 +367,7 @@ runMigrations().then(() => {
     // Notificaciones push: aviso de plazos próximos a vencer
     startPlazoPushScheduler();
 
-    // Centro de soporte: aviso (con CSV) y borrado de tickets cerrados hace 30 días
+    // Centro de soporte: aviso (con CSV) y borrado de tickets cerrados hace 15 días
     startSoporteRetencionScheduler();
 
     // Quipu auto-sync: run once after 30s (let DB settle), then every 30 min

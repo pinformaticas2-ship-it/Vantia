@@ -2557,7 +2557,7 @@ export async function runMigrations(): Promise<void> {
       ['modulo',           `VARCHAR(40)`],
       ['created_by_rol',   `VARCHAR(20)`],
       ['user_agent',       `TEXT`],
-      // Retención: los tickets cerrados se borran a los 30 días de cerrarse,
+      // Retención: los tickets cerrados se borran a los 15 días de cerrarse,
       // siempre después de haber avisado por correo (con el CSV adjunto) --
       // ver services/soporteRetencion.ts.
       ['cerrado_at',       `TIMESTAMPTZ`],

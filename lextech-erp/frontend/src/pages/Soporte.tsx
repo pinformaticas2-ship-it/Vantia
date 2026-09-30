@@ -772,7 +772,7 @@ function SoporteEstadisticas() {
           <div>
             <h2 className="text-sm font-extrabold text-slate-800">Tickets cerrados por mes</h2>
             <p className="text-xs text-slate-500 mt-1">
-              Cuenta cada ticket en el mes en que se cerró. Incluye los tickets ya borrados automáticamente a los 30 días.
+              Cuenta cada ticket en el mes en que se cerró. Incluye los tickets ya borrados automáticamente a los 15 días.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
