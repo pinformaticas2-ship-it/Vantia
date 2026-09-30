@@ -246,39 +246,65 @@ export default function Soporte() {
               <h1 className="text-lg font-extrabold text-slate-900 leading-tight">Centro de soporte</h1>
               <p className="text-xs text-slate-500 mt-0.5 truncate">
                 <span className="font-semibold text-slate-700">{abiertos}</span> {abiertos === 1 ? "ticket activo" : "tickets activos"}
-                {esGestor && (
-                  <> · Los tickets llegan a <span className="font-semibold text-slate-700">{soporteEmail || "— sin correo configurado —"}</span></>
-                )}
+                {esGestor
+                  ? <> · Los tickets llegan a <span className="font-semibold text-slate-700">{soporteEmail || "— sin correo configurado —"}</span></>
+                  : <> · Solo ves los tickets que has abierto tú</>}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button onClick={() => load(true)} title="Refrescar"
-              className="p-2 rounded-lg border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-300 hover:bg-red-50 transition-all">
-              <RefreshCw size={14} className={refreshSpin ? "animate-spin" : ""} />
-            </button>
-            <button onClick={() => setShowNew(true)} className={btnPrimary}>
-              <Plus size={14} /> <span className="hidden sm:inline">Nuevo ticket</span>
-            </button>
-          </div>
+          <button onClick={() => load(true)} title="Refrescar datos"
+            className="shrink-0 p-2 rounded-lg border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-300 hover:bg-red-50 transition-all">
+            <RefreshCw size={14} className={refreshSpin ? "animate-spin" : ""} />
+          </button>
         </div>
-        {esGestor && (
-          <div className="flex gap-1 mt-4 -mb-5">
-            {([["tickets", "Tickets", MessageSquare], ["estadisticas", "Estadísticas", BarChart3], ["config", "Correos de soporte", Settings]] as const).map(([id, label, Icon]) => (
-              <button key={id} onClick={() => setTab(id)}
-                className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold border-b-2 transition-colors ${
-                  tab === id ? "border-red-500 text-red-600" : "border-transparent text-slate-500 hover:text-slate-800"
-                }`}>
-                <Icon size={13} /> {label}
-              </button>
-            ))}
+      </div>
+
+      {/* ── BARRA DE ACCIONES ────────────────────────────────── */}
+      <div className="px-6 py-2.5 border-b border-slate-200 bg-slate-50 flex items-center justify-between gap-3 flex-shrink-0 z-10 overflow-x-auto animate-card-in-1">
+        <div className="flex items-center gap-1.5 min-w-max">
+          {esGestor ? (
+            // El operador de soporte gestiona tickets, no los abre: en su
+            // lugar ve las pestañas de gestión.
+            <div className="flex items-center bg-white p-0.5 rounded-lg border border-slate-200">
+              {([["tickets", "Tickets", MessageSquare], ["estadisticas", "Estadísticas", BarChart3], ["config", "Correos de soporte", Settings]] as const).map(([id, label, Icon]) => (
+                <button key={id} onClick={() => setTab(id)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs rounded-md transition-all ${
+                    tab === id ? "font-bold text-white bg-slate-800" : "font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                  }`}>
+                  <Icon size={12} /> {label}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <button onClick={() => setShowNew(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-bold hover:bg-red-700 transition-colors">
+              <Plus size={13} /> Nuevo ticket
+            </button>
+          )}
+        </div>
+        {tab === "tickets" && (
+          <div className="flex items-center gap-2 min-w-max">
+            <div className="relative">
+              <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar..."
+                className="w-48 pl-8 pr-7 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-red-400 focus:ring-1 focus:ring-red-100 placeholder:text-slate-300" />
+              {search && (
+                <button onClick={() => setSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500"><X size={11} /></button>
+              )}
+            </div>
+            <select value={filtro} onChange={(e) => setFiltro(e.target.value as any)}
+              className="px-2 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-red-400">
+              <option value="activos">Activos</option>
+              <option value="todos">Todos</option>
+              {ESTADOS.map((e) => <option key={e.id} value={e.id}>{e.label}</option>)}
+            </select>
           </div>
         )}
       </div>
 
       {/* Aviso de borrado próximo (solo soporte) */}
       {esGestor && retencion && retencion.pendientesBorrado > 0 && (
-        <div className="px-6 lg:px-8 py-2.5 bg-amber-50 border-b border-amber-200 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-amber-900 shrink-0">
+        <div className="px-6 py-2 bg-amber-50 border-b border-amber-200 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-amber-900 shrink-0">
           <Clock size={14} className="shrink-0 text-amber-600" />
           <span className="flex-1 min-w-[200px]">
             <b>{retencion.pendientesBorrado} {retencion.pendientesBorrado === 1 ? "ticket cerrado se borrará" : "tickets cerrados se borrarán"}</b>
@@ -287,7 +313,7 @@ export default function Soporte() {
           </span>
           {downloadError && <span className="text-red-600 font-semibold">{downloadError}</span>}
           <button onClick={descargarPendientes} disabled={downloading}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 text-white font-bold hover:bg-amber-700 disabled:opacity-50">
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-600 text-white font-bold hover:bg-amber-700 disabled:opacity-50">
             {downloading ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} Descargar CSV
           </button>
         </div>
@@ -298,37 +324,21 @@ export default function Soporte() {
       ) : tab === "estadisticas" && esGestor ? (
         <SoporteEstadisticas />
       ) : (
-        <div className="flex-1 min-h-0 flex">
+        <div className="flex-1 min-h-0 flex bg-white">
           {/* ── LISTA ─────────────────────────────────────────── */}
-          <div className={`${selectedId ? "hidden md:flex" : "flex"} w-full md:w-[380px] lg:w-[420px] shrink-0 flex-col border-r border-slate-200 bg-white min-h-0`}>
-            <div className="px-4 py-2.5 border-b border-slate-200 bg-slate-50 flex flex-col gap-2">
-              <div className="relative">
-                <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por asunto, nº o usuario..."
-                  className="w-full pl-8 pr-7 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-red-400 focus:ring-1 focus:ring-red-100 placeholder:text-slate-300" />
-                {search && (
-                  <button onClick={() => setSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500"><X size={11} /></button>
-                )}
-              </div>
-              <select value={filtro} onChange={(e) => setFiltro(e.target.value as any)}
-                className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-red-400">
-                <option value="activos">Activos (abiertos, en progreso, esperando)</option>
-                <option value="todos">Todos</option>
-                {ESTADOS.map((e) => <option key={e.id} value={e.id}>{e.label}</option>)}
-              </select>
-            </div>
+          <div className={`${selectedId ? "hidden md:flex" : "flex"} w-full md:w-[360px] lg:w-[400px] shrink-0 flex-col border-r border-slate-200 min-h-0`}>
             <div className="flex-1 min-h-0 overflow-y-auto">
               {filtered.length === 0 ? (
                 <div className="py-16 px-6 flex flex-col items-center gap-3 text-slate-400 text-center">
                   <LifeBuoy size={36} className="opacity-15" />
                   <p className="font-medium text-sm">{tickets.length ? "No hay tickets con este filtro" : "Todavía no hay tickets"}</p>
-                  {!tickets.length && (
+                  {!tickets.length && !esGestor && (
                     <button onClick={() => setShowNew(true)} className="text-red-600 text-xs font-bold hover:underline">+ Abrir el primer ticket</button>
                   )}
                 </div>
               ) : filtered.map((t) => (
                 <button key={t.id} onClick={() => setSelectedId(t.id)}
-                  className={`w-full text-left px-4 py-3 border-b border-slate-100 transition-colors border-l-2 ${
+                  className={`w-full text-left px-4 py-2.5 border-b border-slate-100 transition-colors border-l-2 ${
                     selectedId === t.id ? "bg-red-50 border-l-red-500" : "border-l-transparent hover:bg-slate-50"
                   }`}>
                   <div className="flex items-center justify-between gap-2">
@@ -339,8 +349,8 @@ export default function Soporte() {
                       <Badge list={ESTADOS} id={t.estado} />
                     </div>
                   </div>
-                  <p className="mt-1 text-sm font-semibold text-slate-800 truncate">{t.asunto}</p>
-                  <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-slate-400">
+                  <p className="mt-0.5 text-sm font-semibold text-slate-800 truncate">{t.asunto}</p>
+                  <div className="mt-0.5 flex items-center justify-between gap-2 text-[11px] text-slate-400">
                     <span className="truncate">{esGestor ? t.createdByName : CATEGORIAS.find((c) => c.id === t.categoria)?.label}</span>
                     <span className="shrink-0 flex items-center gap-2">
                       {!!t.mensajesCount && <span className="inline-flex items-center gap-0.5"><MessageSquare size={10} /> {t.mensajesCount}</span>}
@@ -348,7 +358,7 @@ export default function Soporte() {
                     </span>
                   </div>
                   {t.fechaBorrado && (
-                    <p className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700">
+                    <p className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700">
                       <Trash2 size={10} /> Se borrará el {fmtDia(t.fechaBorrado)}
                     </p>
                   )}
@@ -371,8 +381,10 @@ export default function Soporte() {
         </div>
       )}
 
-      <NuevoTicketModal open={showNew} onClose={() => setShowNew(false)}
-        onCreated={(t) => { setTickets((prev) => [t, ...prev]); setSelectedId(t.id); setFiltro("activos"); setTab("tickets"); }} />
+      {!esGestor && (
+        <NuevoTicketModal open={showNew} onClose={() => setShowNew(false)}
+          onCreated={(t) => { setTickets((prev) => [t, ...prev]); setSelectedId(t.id); setFiltro("activos"); }} />
+      )}
     </div>
   );
 }
@@ -678,18 +690,19 @@ function SoporteConfig({ onSaved }: { onSaved: () => void }) {
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto bg-slate-50">
-      <div className="max-w-3xl mx-auto p-6 space-y-4">
+      <div className="px-6 py-4 space-y-3">
         <div>
           <h2 className="text-sm font-extrabold text-slate-800">Correo de soporte por organización</h2>
-          <p className="text-xs text-slate-500 mt-1">
-            Los tickets que se abran en cada organización se enviarán a este correo. El envío sale desde la primera cuenta de correo configurada en esa organización.
+          <p className="text-xs text-slate-500 mt-0.5">
+            Los tickets que se abran en cada organización se enviarán a este correo. El envío sale desde la cuenta de correo de quien abre el ticket (o, si no tiene, desde la primera de la organización).
           </p>
         </div>
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
         {orgs.map((o) => {
           const dirty = (drafts[o.organizacionId] || "") !== (o.soporteEmail || "");
           return (
-            <div key={o.organizacionId} className="bg-white border border-slate-200 rounded-2xl p-4">
-              <div className="flex items-center gap-2 mb-3">
+            <div key={o.organizacionId} className="bg-white border border-slate-200 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2.5">
                 <Building2 size={15} className="text-slate-400" />
                 <span className="text-sm font-bold text-slate-800">{o.nombre}</span>
               </div>
@@ -718,6 +731,7 @@ function SoporteConfig({ onSaved }: { onSaved: () => void }) {
             </div>
           );
         })}
+        </div>
       </div>
     </div>
   );
@@ -767,11 +781,11 @@ function SoporteEstadisticas() {
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto bg-slate-50">
-      <div className="max-w-4xl mx-auto p-6 space-y-4">
+      <div className="px-6 py-4 space-y-3">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 className="text-sm font-extrabold text-slate-800">Tickets cerrados por mes</h2>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-xs text-slate-500 mt-0.5">
               Cuenta cada ticket en el mes en que se cerró. Incluye los tickets ya borrados automáticamente a los 15 días.
             </p>
           </div>
@@ -786,7 +800,7 @@ function SoporteEstadisticas() {
         </div>
         {error && <p className="text-xs font-semibold text-red-600">{error}</p>}
 
-        <div className="bg-white border border-slate-200 rounded-2xl overflow-x-auto">
+        <div className="bg-white border border-slate-200 rounded-xl overflow-x-auto">
           {stats.length === 0 ? (
             <div className="py-14 flex flex-col items-center gap-2 text-slate-400">
               <BarChart3 size={32} className="opacity-20" />

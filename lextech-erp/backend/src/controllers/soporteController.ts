@@ -362,6 +362,8 @@ export async function listTickets(req: Request, res: Response) {
 export async function createTicket(req: Request, res: Response) {
   const ctx = requireCtx(req, res);
   if (!ctx) return;
+  // El operador de soporte atiende los tickets, no los abre.
+  if (isGestor(ctx.rol)) return err(res, 'El equipo de soporte no puede abrir tickets.', 403);
   const asunto = String(req.body?.asunto || '').trim().slice(0, 200);
   const descripcion = String(req.body?.descripcion || '').trim();
   const categoria = CATEGORIAS.includes(req.body?.categoria) ? req.body.categoria : 'incidencia';
