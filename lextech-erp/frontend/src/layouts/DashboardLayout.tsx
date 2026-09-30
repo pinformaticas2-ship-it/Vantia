@@ -2371,8 +2371,8 @@ export default function DashboardLayout() {
         />
       )}
 
-      {/* Vantia flotante — oculto en módulos con su propio chat o con controles fijos en la esquina inferior (Correo: barra de "Responder a...") */}
-      {!location.pathname.startsWith('/dashboard/chat') && !location.pathname.startsWith('/dashboard/correo') && (
+      {/* Vantia flotante — oculto en módulos con su propio chat o con controles fijos en la esquina inferior (Correo: barra de "Responder a..."; Centro de soporte: botón de enviar respuesta del ticket) */}
+      {!location.pathname.startsWith('/dashboard/chat') && !location.pathname.startsWith('/dashboard/correo') && !location.pathname.startsWith('/dashboard/soporte') && (
         <VantiaWidget pathname={location.pathname} getToken={getToken} />
       )}
 
