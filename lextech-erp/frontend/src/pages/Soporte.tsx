@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import {
   LifeBuoy, Plus, RefreshCw, Search, X, Send, Mail, AlertTriangle, ChevronLeft,
-  MessageSquare, Settings, Check, Loader2, Building2,
+  MessageSquare, Settings, Check, Loader2, Building2, BarChart3, Download, Clock, Trash2,
 } from "lucide-react";
 import { apiFetch } from "../lib/api";
 import { Spinner } from "../components/Spinner";
@@ -30,6 +30,8 @@ interface Ticket {
   modulo: string | null;
   enviadoA: string | null;
   emailError: string | null;
+  cerradoAt: string | null;
+  fechaBorrado: string | null;
   mensajesCount?: number;
   createdAt: string;
   updatedAt: string;
@@ -42,6 +44,19 @@ interface Mensaje {
   esSoporte: boolean;
   mensaje: string;
   createdAt: string;
+}
+
+interface Retencion {
+  dias: number;
+  pendientesBorrado: number;
+  proximoBorrado: string | null;
+}
+
+interface EstadisticaMes {
+  mes: string; // "YYYY-MM"
+  total: number;
+  porCategoria: Partial<Record<Categoria, number>>;
+  horasMediaResolucion: number | null;
 }
 
 interface OrgSoporteConfig {
@@ -98,6 +113,40 @@ function nowLocalInput(): string {
 
 const ref = (n: number) => `#${String(n).padStart(4, "0")}`;
 const fmt = (d: string) => new Date(d).toLocaleString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+const fmtDia = (d: string) => new Date(d).toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" });
+
+function mesLabel(mes: string): string {
+  const [y, m] = mes.split("-").map(Number);
+  const s = new Date(y, m - 1, 15).toLocaleDateString("es-ES", { month: "long", year: "numeric" });
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function fmtHoras(h: number | null): string {
+  if (h == null) return "—";
+  if (h < 1) return `${Math.max(1, Math.round(h * 60))} min`;
+  if (h < 48) return `${h.toFixed(1).replace(".", ",")} h`;
+  return `${(h / 24).toFixed(1).replace(".", ",")} días`;
+}
+
+// Descarga un CSV del backend (autenticado) y lo guarda con el nombre que
+// manda el servidor en Content-Disposition.
+async function downloadCsv(getToken: () => Promise<string | null>, tipo: "pendientes" | "cerrados" | "todos" | "mensual") {
+  const token = await getToken();
+  const res = await fetch(`/api/soporte/export?tipo=${tipo}`, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) {
+    const d = await res.json().catch(() => null);
+    throw new Error(d?.error || `Error ${res.status} al descargar el CSV`);
+  }
+  const nombre = /filename="([^"]+)"/.exec(res.headers.get("Content-Disposition") || "")?.[1] || `soporte-${tipo}.csv`;
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = nombre;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
 function Badge({ list, id }: { list: { id: string; label: string; cls: string }[]; id: string }) {
   const item = list.find((x) => x.id === id);
@@ -111,10 +160,13 @@ const btnSecondary = "inline-flex items-center justify-center gap-1.5 px-4 py-2 
 
 export default function Soporte() {
   const { getToken } = useAuth();
-  const [tab, setTab] = useState<"tickets" | "config">("tickets");
+  const [tab, setTab] = useState<"tickets" | "estadisticas" | "config">("tickets");
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [esGestor, setEsGestor] = useState(false);
   const [soporteEmail, setSoporteEmail] = useState<string | null>(null);
+  const [retencion, setRetencion] = useState<Retencion | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshSpin, setRefreshSpin] = useState(false);
   const [error, setError] = useState("");
@@ -132,6 +184,7 @@ export default function Soporte() {
       setTickets(d.data.tickets || []);
       setEsGestor(Boolean(d.data.esGestor));
       setSoporteEmail(d.data.soporteEmail || null);
+      setRetencion(d.data.retencion || null);
     } catch (e: any) {
       setError(e.message || "Error al cargar los tickets");
     } finally {
@@ -153,6 +206,18 @@ export default function Soporte() {
   }, [tickets, filtro, search]);
 
   const onTicketChanged = (t: Ticket) => setTickets((prev) => prev.map((x) => (x.id === t.id ? { ...x, ...t } : x)));
+
+  const descargarPendientes = async () => {
+    setDownloading(true);
+    setDownloadError("");
+    try {
+      await downloadCsv(getToken, "pendientes");
+    } catch (e: any) {
+      setDownloadError(e.message);
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   if (loading) return (
     <div className="w-full min-h-[60vh] flex flex-col items-center justify-center gap-4">
@@ -199,7 +264,7 @@ export default function Soporte() {
         </div>
         {esGestor && (
           <div className="flex gap-1 mt-4 -mb-5">
-            {([["tickets", "Tickets", MessageSquare], ["config", "Correos de soporte", Settings]] as const).map(([id, label, Icon]) => (
+            {([["tickets", "Tickets", MessageSquare], ["estadisticas", "Estadísticas", BarChart3], ["config", "Correos de soporte", Settings]] as const).map(([id, label, Icon]) => (
               <button key={id} onClick={() => setTab(id)}
                 className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold border-b-2 transition-colors ${
                   tab === id ? "border-red-500 text-red-600" : "border-transparent text-slate-500 hover:text-slate-800"
@@ -211,8 +276,27 @@ export default function Soporte() {
         )}
       </div>
 
+      {/* Aviso de borrado próximo (solo soporte) */}
+      {esGestor && retencion && retencion.pendientesBorrado > 0 && (
+        <div className="px-6 lg:px-8 py-2.5 bg-amber-50 border-b border-amber-200 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-amber-900 shrink-0">
+          <Clock size={14} className="shrink-0 text-amber-600" />
+          <span className="flex-1 min-w-[200px]">
+            <b>{retencion.pendientesBorrado} {retencion.pendientesBorrado === 1 ? "ticket cerrado se borrará" : "tickets cerrados se borrarán"}</b>
+            {retencion.proximoBorrado && <> a partir del <b>{fmtDia(retencion.proximoBorrado)}</b></>}
+            {" "}({retencion.dias} días tras el cierre). Descarga el CSV si quieres conservarlos.
+          </span>
+          {downloadError && <span className="text-red-600 font-semibold">{downloadError}</span>}
+          <button onClick={descargarPendientes} disabled={downloading}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 text-white font-bold hover:bg-amber-700 disabled:opacity-50">
+            {downloading ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} Descargar CSV
+          </button>
+        </div>
+      )}
+
       {tab === "config" && esGestor ? (
         <SoporteConfig onSaved={() => load()} />
+      ) : tab === "estadisticas" && esGestor ? (
+        <SoporteEstadisticas />
       ) : (
         <div className="flex-1 min-h-0 flex">
           {/* ── LISTA ─────────────────────────────────────────── */}
@@ -263,6 +347,11 @@ export default function Soporte() {
                       {fmt(t.updatedAt)}
                     </span>
                   </div>
+                  {t.fechaBorrado && (
+                    <p className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700">
+                      <Trash2 size={10} /> Se borrará el {fmtDia(t.fechaBorrado)}
+                    </p>
+                  )}
                 </button>
               ))}
             </div>
@@ -489,6 +578,12 @@ function TicketDetail({ id, esGestor, onBack, onChanged }: {
             </>
           )}
         </div>
+        {ticket.fechaBorrado && (
+          <p className="mt-2 flex items-center gap-1 text-[11px] font-semibold text-amber-700">
+            <Trash2 size={11} /> Ticket cerrado{ticket.cerradoAt ? ` el ${fmt(ticket.cerradoAt)}` : ""}. Se borrará automáticamente el {fmtDia(ticket.fechaBorrado)}
+            {esGestor ? " (reábrelo si debe conservarse)." : "."}
+          </p>
+        )}
         {!esGestor ? null : ticket.emailError ? (
           <div className="mt-3 flex items-start gap-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-800">
             <AlertTriangle size={13} className="shrink-0 mt-0.5" />
@@ -623,6 +718,113 @@ function SoporteConfig({ onSaved }: { onSaved: () => void }) {
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+// ── Estadísticas mensuales de tickets cerrados ───────────────────────────────
+// Incluye los tickets ya borrados por retención (el backend guarda su
+// recuento mensual antes de borrarlos), así el histórico no se pierde.
+function SoporteEstadisticas() {
+  const { getToken } = useAuth();
+  const [stats, setStats] = useState<EstadisticaMes[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [downloading, setDownloading] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const d = await apiFetch("/api/soporte/estadisticas", { getToken });
+        if (!d?.success) throw new Error(d?.error || "No se pudieron cargar las estadísticas");
+        setStats(d.data || []);
+      } catch (e: any) {
+        setError(e.message);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [getToken]);
+
+  const descargar = async (tipo: "mensual" | "cerrados" | "todos") => {
+    setDownloading(tipo);
+    setError("");
+    try {
+      await downloadCsv(getToken, tipo);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setDownloading(null);
+    }
+  };
+
+  if (loading) return <div className="flex-1 flex items-center justify-center"><Spinner size="lg" /></div>;
+
+  const total = stats.reduce((s, m) => s + m.total, 0);
+  const th = "px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 text-right whitespace-nowrap";
+  const td = "px-3 py-2.5 text-sm text-slate-700 text-right tabular-nums";
+
+  return (
+    <div className="flex-1 min-h-0 overflow-y-auto bg-slate-50">
+      <div className="max-w-4xl mx-auto p-6 space-y-4">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-extrabold text-slate-800">Tickets cerrados por mes</h2>
+            <p className="text-xs text-slate-500 mt-1">
+              Cuenta cada ticket en el mes en que se cerró. Incluye los tickets ya borrados automáticamente a los 30 días.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {([["mensual", "Resumen mensual"], ["cerrados", "Tickets cerrados"], ["todos", "Todos los tickets"]] as const).map(([tipo, label]) => (
+              <button key={tipo} onClick={() => descargar(tipo)} disabled={downloading !== null}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-red-600 disabled:opacity-50">
+                {downloading === tipo ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} {label} (CSV)
+              </button>
+            ))}
+          </div>
+        </div>
+        {error && <p className="text-xs font-semibold text-red-600">{error}</p>}
+
+        <div className="bg-white border border-slate-200 rounded-2xl overflow-x-auto">
+          {stats.length === 0 ? (
+            <div className="py-14 flex flex-col items-center gap-2 text-slate-400">
+              <BarChart3 size={32} className="opacity-20" />
+              <p className="text-sm font-medium">Todavía no hay tickets cerrados</p>
+            </div>
+          ) : (
+            <table className="w-full min-w-[640px]">
+              <thead className="bg-slate-50 border-b border-slate-100">
+                <tr>
+                  <th className={`${th} text-left`}>Mes</th>
+                  <th className={th}>Cerrados</th>
+                  {CATEGORIAS.map((c) => <th key={c.id} className={th}>{c.label}</th>)}
+                  <th className={th}>Tiempo medio hasta el cierre</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats.map((m) => (
+                  <tr key={m.mes} className="border-b border-slate-50 hover:bg-slate-50/60">
+                    <td className={`${td} text-left font-semibold text-slate-800`}>{mesLabel(m.mes)}</td>
+                    <td className={`${td} font-extrabold text-slate-900`}>{m.total}</td>
+                    {CATEGORIAS.map((c) => <td key={c.id} className={td}>{m.porCategoria[c.id] || 0}</td>)}
+                    <td className={td}>{fmtHoras(m.horasMediaResolucion)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="bg-slate-50 border-t border-slate-200">
+                <tr>
+                  <td className={`${td} text-left font-bold text-slate-800`}>Total</td>
+                  <td className={`${td} font-extrabold text-slate-900`}>{total}</td>
+                  {CATEGORIAS.map((c) => (
+                    <td key={c.id} className={`${td} font-semibold`}>{stats.reduce((s, m) => s + (m.porCategoria[c.id] || 0), 0)}</td>
+                  ))}
+                  <td className={td} />
+                </tr>
+              </tfoot>
+            </table>
+          )}
+        </div>
       </div>
     </div>
   );

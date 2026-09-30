@@ -4,7 +4,7 @@ import { getClerk } from './activityController';
 import { resolveUserOrgMemberships } from './organizacionesController';
 import { decryptPassword } from '../utils/emailCrypto';
 import { dispatchEmail } from '../utils/mailer';
-import { SmtpConfig } from '../utils/smtp';
+import { SmtpConfig, MailAttachment } from '../utils/smtp';
 
 // ── Centro de soporte ────────────────────────────────────────────────────────
 // Sistema de tickets por organización: cualquier miembro abre tickets y ve
@@ -34,6 +34,31 @@ const PRIORIDAD_COLOR: Record<string, string> = { baja: '#64748b', media: '#0284
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// Retención de tickets cerrados: se borran a los RETENCION_DIAS de cerrarse,
+// y nunca antes de AVISO_DIAS_ANTES días desde que se mandó el aviso por
+// correo con el CSV (ver services/soporteRetencion.ts).
+export const RETENCION_DIAS = 30;
+export const AVISO_DIAS_ANTES = 7;
+const DIA_MS = 86_400_000;
+
+// Fecha prevista de borrado de un ticket cerrado (null si no está cerrado).
+function fechaBorrado(t: any): Date | null {
+  if (t.estado !== 'cerrado' || !t.cerrado_at) return null;
+  const base = new Date(t.cerrado_at).getTime() + RETENCION_DIAS * DIA_MS;
+  const trasAviso = t.aviso_borrado_at
+    ? new Date(t.aviso_borrado_at).getTime() + AVISO_DIAS_ANTES * DIA_MS
+    // Aún sin avisar: como pronto, 7 días después de que salga el aviso.
+    : Math.max(Date.now(), new Date(t.cerrado_at).getTime() + (RETENCION_DIAS - AVISO_DIAS_ANTES) * DIA_MS) + AVISO_DIAS_ANTES * DIA_MS;
+  return new Date(Math.max(base, trasAviso));
+}
+
+// SQL que mantiene cerrado_at/aviso_borrado_at coherentes con el nuevo
+// estado ($n = estado nuevo): cerrar fija la fecha (si no la tenía ya),
+// cualquier otro estado la borra y anula el aviso de borrado.
+const RETENCION_SET = (p: string) => `
+  cerrado_at = CASE WHEN ${p} = 'cerrado' THEN COALESCE(cerrado_at, NOW()) ELSE NULL END,
+  aviso_borrado_at = CASE WHEN ${p} = 'cerrado' THEN aviso_borrado_at ELSE NULL END`;
+
 function ok(res: Response, data: any) {
   return res.json({ success: true, data });
 }
@@ -55,7 +80,7 @@ function requireCtx(req: Request, res: Response): { organizacionId: string; rol:
   return { organizacionId, rol: (req as any).organizacionRol, userId };
 }
 
-function escapeHtml(s: string): string {
+export function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 const nl2br = (s: string) => escapeHtml(s).replace(/\n/g, '<br>');
@@ -78,8 +103,9 @@ async function getUserInfo(userId: string): Promise<{ nombre: string; email: str
 // cualquiera en vez de desde quien lo había abierto.
 // Devuelve el error como texto en vez de lanzarlo: el ticket se guarda igual
 // aunque el correo no salga, y el error queda visible en el propio ticket.
-async function sendOrgEmail(
+export async function sendOrgEmail(
   organizacionId: string, preferUserId: string, to: string, subject: string, html: string, replyTo?: string | null,
+  attachments?: MailAttachment[],
 ): Promise<string | null> {
   try {
     const { rows } = await pool.query(
@@ -100,6 +126,7 @@ async function sendOrgEmail(
       subject,
       html,
       replyTo: replyTo || undefined,
+      attachments,
     });
     return null;
   } catch (e: any) {
@@ -107,19 +134,19 @@ async function sendOrgEmail(
   }
 }
 
-async function getSoporteEmail(organizacionId: string): Promise<{ email: string | null; orgNombre: string }> {
+export async function getSoporteEmail(organizacionId: string): Promise<{ email: string | null; orgNombre: string }> {
   const { rows } = await pool.query(`SELECT nombre, soporte_email FROM organizaciones WHERE id = $1`, [organizacionId]);
   return { email: rows[0]?.soporte_email || null, orgNombre: rows[0]?.nombre || '' };
 }
 
-function ticketRef(numero: number) {
+export function ticketRef(numero: number) {
   return `#${String(numero).padStart(4, '0')}`;
 }
 
 // Fecha y hora completas en hora de España ("lunes, 29 de septiembre de
 // 2026, 10:32 h") -- el servidor corre en UTC, así que sin timeZone la hora
 // del correo saldría desplazada.
-function fmtFecha(d: string | Date | null | undefined): string {
+export function fmtFecha(d: string | Date | null | undefined): string {
   if (!d) return '—';
   const s = new Date(d).toLocaleString('es-ES', {
     timeZone: 'Europe/Madrid', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
@@ -170,7 +197,7 @@ function ticketDetailsHtml(ticket: any, orgNombre: string): string {
   </table>`;
 }
 
-function emailLayout(titulo: string, subtitulo: string, color: string, cuerpo: string, pie: string): string {
+export function emailLayout(titulo: string, subtitulo: string, color: string, cuerpo: string, pie: string): string {
   return `<div style="font-family:Segoe UI,Arial,sans-serif;max-width:680px;margin:0 auto;color:#0f172a">
     <div style="border-left:5px solid ${color};padding:4px 0 4px 14px;margin-bottom:18px">
       <div style="font-size:12px;font-weight:bold;letter-spacing:.06em;text-transform:uppercase;color:${color}">${escapeHtml(subtitulo)}</div>
@@ -283,6 +310,8 @@ function serializeTicket(t: any) {
     modulo: t.modulo,
     enviadoA: t.enviado_a,
     emailError: t.email_error,
+    cerradoAt: t.cerrado_at || null,
+    fechaBorrado: fechaBorrado(t),
     mensajesCount: t.mensajes_count != null ? Number(t.mensajes_count) : undefined,
     createdAt: t.created_at,
     updatedAt: t.updated_at,
@@ -309,7 +338,21 @@ export async function listTickets(req: Request, res: Response) {
       params,
     );
     const { email } = await getSoporteEmail(ctx.organizacionId);
-    return ok(res, { tickets: rows.map(serializeTicket), esGestor: gestor, soporteEmail: email });
+    const tickets = rows.map(serializeTicket);
+    // Tickets que se borrarán en los próximos AVISO_DIAS_ANTES días -- para el
+    // aviso de "descarga el CSV" dentro de la app (solo lo ve soporte).
+    const limite = Date.now() + AVISO_DIAS_ANTES * DIA_MS;
+    const proximos = gestor ? tickets.filter((t) => t.fechaBorrado && t.fechaBorrado.getTime() <= limite) : [];
+    return ok(res, {
+      tickets,
+      esGestor: gestor,
+      soporteEmail: email,
+      retencion: gestor ? {
+        dias: RETENCION_DIAS,
+        pendientesBorrado: proximos.length,
+        proximoBorrado: proximos.length ? new Date(Math.min(...proximos.map((t) => t.fechaBorrado!.getTime()))) : null,
+      } : null,
+    });
   } catch (e: any) {
     return err(res, e?.message || String(e));
   }
@@ -413,7 +456,7 @@ export async function addMensaje(req: Request, res: Response) {
       ? (ticket.estado === 'abierto' || ticket.estado === 'en_progreso' ? 'esperando' : ticket.estado)
       : (ticket.estado === 'esperando' || ticket.estado === 'resuelto' || ticket.estado === 'cerrado' ? 'abierto' : ticket.estado);
     const { rows: upd } = await pool.query(
-      `UPDATE soporte_tickets SET estado = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
+      `UPDATE soporte_tickets SET estado = $1::varchar, updated_at = NOW(), ${RETENCION_SET('$1::varchar')} WHERE id = $2 RETURNING *`,
       [nuevoEstado, ticket.id],
     );
 
@@ -445,7 +488,8 @@ export async function updateTicket(req: Request, res: Response) {
 
     const { rows } = await pool.query(
       `UPDATE soporte_tickets
-          SET estado = COALESCE($1, estado), prioridad = COALESCE($2, prioridad), updated_at = NOW()
+          SET estado = COALESCE($1::varchar, estado), prioridad = COALESCE($2, prioridad), updated_at = NOW(),
+              ${RETENCION_SET('COALESCE($1::varchar, estado)')}
         WHERE id = $3 RETURNING *`,
       [estado ?? null, prioridad ?? null, ticket.id],
     );
@@ -511,6 +555,157 @@ export async function updateSoporteConfig(req: Request, res: Response) {
       [email || null, organizacionId],
     );
     return ok(res, { organizacionId, soporteEmail: email || null });
+  } catch (e: any) {
+    return err(res, e?.message || String(e));
+  }
+}
+
+// ── CSV y estadísticas ───────────────────────────────────────────────────────
+// CSV con ";" y BOM UTF-8: es lo que Excel en español abre bien a la primera
+// (con "," lo mete todo en una columna y sin BOM rompe las tildes).
+
+function csvCell(v: any): string {
+  const s = v == null ? '' : String(v);
+  return /[";\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function toCsv(header: string[], rows: any[][]): string {
+  return '﻿' + [header, ...rows].map((r) => r.map(csvCell).join(';')).join('\r\n') + '\r\n';
+}
+
+function fmtCsvFecha(d: string | Date | null | undefined): string {
+  if (!d) return '';
+  return new Date(d).toLocaleString('es-ES', {
+    timeZone: 'Europe/Madrid', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  });
+}
+
+// CSV completo de una lista de tickets (con su conversación entera).
+export async function buildTicketsCsv(tickets: any[]): Promise<string> {
+  const ids = tickets.map((t) => t.id);
+  const { rows: mensajes } = ids.length
+    ? await pool.query(
+      `SELECT ticket_id, user_name, es_soporte, mensaje, created_at FROM soporte_ticket_mensajes
+        WHERE ticket_id = ANY($1::uuid[]) ORDER BY created_at ASC`,
+      [ids],
+    )
+    : { rows: [] as any[] };
+  const porTicket = new Map<string, any[]>();
+  for (const m of mensajes) {
+    if (!porTicket.has(m.ticket_id)) porTicket.set(m.ticket_id, []);
+    porTicket.get(m.ticket_id)!.push(m);
+  }
+  const header = [
+    'Nº ticket', 'Asunto', 'Categoría', 'Prioridad', 'Estado', 'Módulo afectado',
+    'Abierto por', 'Email', 'Rol', 'Fecha incidencia', 'Fecha apertura', 'Fecha cierre',
+    'Horas hasta el cierre', 'Borrado previsto', 'Descripción', 'Nº respuestas', 'Conversación',
+  ];
+  const rows = tickets.map((t) => {
+    const conv = porTicket.get(t.id) || [];
+    const horas = t.cerrado_at ? ((new Date(t.cerrado_at).getTime() - new Date(t.created_at).getTime()) / 3_600_000).toFixed(1).replace('.', ',') : '';
+    return [
+      ticketRef(t.numero), t.asunto, CATEGORIA_LABEL[t.categoria] || t.categoria, PRIORIDAD_LABEL[t.prioridad] || t.prioridad,
+      ESTADO_LABEL[t.estado] || t.estado, MODULO_LABEL[t.modulo] || '', t.created_by_name, t.created_by_email,
+      ROL_LABEL[t.created_by_rol] || t.created_by_rol || '', fmtCsvFecha(t.fecha_incidencia || t.created_at),
+      fmtCsvFecha(t.created_at), fmtCsvFecha(t.cerrado_at), horas, fmtCsvFecha(fechaBorrado(t)),
+      t.descripcion, conv.length,
+      conv.map((m) => `[${fmtCsvFecha(m.created_at)}] ${m.user_name || 'Usuario'}${m.es_soporte ? ' (Soporte)' : ''}: ${m.mensaje}`).join('\n'),
+    ];
+  });
+  return toCsv(header, rows);
+}
+
+// Tickets cerrados agrupados por mes de cierre: lo ya borrado (recuento
+// guardado en soporte_cierres_mensuales) + lo que todavía existe.
+export async function getEstadisticasMensuales(organizacionId: string) {
+  const { rows } = await pool.query(
+    `SELECT to_char(mes, 'YYYY-MM') AS mes, categoria, SUM(total)::int AS total, SUM(horas) AS horas
+       FROM (
+         SELECT mes, categoria, total, suma_horas_resolucion AS horas
+           FROM soporte_cierres_mensuales WHERE organizacion_id = $1
+         UNION ALL
+         SELECT date_trunc('month', cerrado_at AT TIME ZONE 'Europe/Madrid')::date, categoria, 1,
+                EXTRACT(EPOCH FROM (cerrado_at - created_at)) / 3600
+           FROM soporte_tickets
+          WHERE organizacion_id = $1 AND estado = 'cerrado' AND cerrado_at IS NOT NULL
+       ) x
+      GROUP BY mes, categoria
+      ORDER BY mes DESC`,
+    [organizacionId],
+  );
+  const meses = new Map<string, { mes: string; total: number; porCategoria: Record<string, number>; horas: number }>();
+  for (const r of rows) {
+    if (!meses.has(r.mes)) meses.set(r.mes, { mes: r.mes, total: 0, porCategoria: {}, horas: 0 });
+    const m = meses.get(r.mes)!;
+    m.total += r.total;
+    m.horas += Number(r.horas) || 0;
+    m.porCategoria[r.categoria] = (m.porCategoria[r.categoria] || 0) + r.total;
+  }
+  return [...meses.values()].map((m) => ({
+    mes: m.mes,
+    total: m.total,
+    porCategoria: m.porCategoria,
+    horasMediaResolucion: m.total ? m.horas / m.total : null,
+  }));
+}
+
+function mesLabel(mes: string): string {
+  const [y, mo] = mes.split('-').map(Number);
+  const s = new Date(Date.UTC(y, mo - 1, 15)).toLocaleString('es-ES', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// GET /api/soporte/estadisticas
+export async function getEstadisticas(req: Request, res: Response) {
+  try {
+    const ctx = requireCtx(req, res);
+    if (!ctx) return;
+    if (!isGestor(ctx.rol)) return err(res, 'Solo los informáticos del despacho pueden ver las estadísticas.', 403);
+    return ok(res, await getEstadisticasMensuales(ctx.organizacionId));
+  } catch (e: any) {
+    return err(res, e?.message || String(e));
+  }
+}
+
+// GET /api/soporte/export?tipo=pendientes|cerrados|todos|mensual — descarga CSV
+export async function exportCsv(req: Request, res: Response) {
+  try {
+    const ctx = requireCtx(req, res);
+    if (!ctx) return;
+    if (!isGestor(ctx.rol)) return err(res, 'Solo los informáticos del despacho pueden descargar tickets.', 403);
+    const tipo = String(req.query.tipo || 'cerrados');
+    const hoy = new Date().toISOString().slice(0, 10);
+    let csv: string;
+    let nombre: string;
+
+    if (tipo === 'mensual') {
+      const stats = await getEstadisticasMensuales(ctx.organizacionId);
+      csv = toCsv(
+        ['Mes', 'Tickets cerrados', ...CATEGORIAS.map((c) => CATEGORIA_LABEL[c]), 'Tiempo medio hasta el cierre (horas)'],
+        stats.map((s) => [
+          mesLabel(s.mes), s.total, ...CATEGORIAS.map((c) => s.porCategoria[c] || 0),
+          s.horasMediaResolucion != null ? s.horasMediaResolucion.toFixed(1).replace('.', ',') : '',
+        ]),
+      );
+      nombre = `soporte-resumen-mensual-${hoy}.csv`;
+    } else {
+      const where = tipo === 'todos' ? '' : `AND estado = 'cerrado'`;
+      const { rows } = await pool.query(
+        `SELECT * FROM soporte_tickets WHERE organizacion_id = $1 ${where} ORDER BY numero ASC`,
+        [ctx.organizacionId],
+      );
+      const limite = Date.now() + AVISO_DIAS_ANTES * DIA_MS;
+      const tickets = tipo === 'pendientes'
+        ? rows.filter((t) => { const f = fechaBorrado(t); return f && f.getTime() <= limite; })
+        : rows;
+      csv = await buildTicketsCsv(tickets);
+      nombre = `soporte-tickets-${tipo === 'pendientes' ? 'a-borrar' : tipo}-${hoy}.csv`;
+    }
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${nombre}"`);
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+    return res.send(csv);
   } catch (e: any) {
     return err(res, e?.message || String(e));
   }

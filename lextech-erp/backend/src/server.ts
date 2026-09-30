@@ -36,6 +36,7 @@ import { resolveOrg } from './middleware/resolveOrg';
 import { runMigrations } from './config/migrations';
 import { startLocalFilesWatcher } from './watchers/localFilesWatcher';
 import { startPlazoPushScheduler } from './services/plazoPushScheduler';
+import { startSoporteRetencionScheduler } from './services/soporteRetencion';
 import { migrateLocalFoldersStructure } from './controllers/filesController';
 import { logServerStart } from './controllers/activityController';
 import pool from './config/database';
@@ -365,6 +366,9 @@ runMigrations().then(() => {
 
     // Notificaciones push: aviso de plazos próximos a vencer
     startPlazoPushScheduler();
+
+    // Centro de soporte: aviso (con CSV) y borrado de tickets cerrados hace 30 días
+    startSoporteRetencionScheduler();
 
     // Quipu auto-sync: run once after 30s (let DB settle), then every 30 min
     setTimeout(() => {

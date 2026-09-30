@@ -2557,11 +2557,38 @@ export async function runMigrations(): Promise<void> {
       ['modulo',           `VARCHAR(40)`],
       ['created_by_rol',   `VARCHAR(20)`],
       ['user_agent',       `TEXT`],
+      // Retención: los tickets cerrados se borran a los 30 días de cerrarse,
+      // siempre después de haber avisado por correo (con el CSV adjunto) --
+      // ver services/soporteRetencion.ts.
+      ['cerrado_at',       `TIMESTAMPTZ`],
+      ['aviso_borrado_at', `TIMESTAMPTZ`],
     ] as [string, string][]) {
       try {
         await client.query(`ALTER TABLE soporte_tickets ADD COLUMN IF NOT EXISTS ${col} ${def};`);
       } catch (_e: any) {}
     }
+    try {
+      await client.query(`
+        UPDATE soporte_tickets SET cerrado_at = updated_at
+        WHERE estado = 'cerrado' AND cerrado_at IS NULL
+      `);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_soporte_tickets_cerrado_at ON soporte_tickets (cerrado_at) WHERE estado = 'cerrado';`);
+    } catch (_e: any) {}
+
+    // Recuento mensual de tickets cerrados que ya se han borrado -- al borrar
+    // un ticket por retención se suma aquí (mes de cierre, hora de Madrid),
+    // así las estadísticas mensuales no pierden nada aunque el ticket ya no
+    // exista. Las estadísticas = esta tabla + los cerrados que aún siguen vivos.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS soporte_cierres_mensuales (
+        organizacion_id       UUID        NOT NULL REFERENCES organizaciones(id) ON DELETE CASCADE,
+        mes                   DATE        NOT NULL,
+        categoria             VARCHAR(20) NOT NULL,
+        total                 INTEGER     NOT NULL DEFAULT 0,
+        suma_horas_resolucion DOUBLE PRECISION NOT NULL DEFAULT 0,
+        PRIMARY KEY (organizacion_id, mes, categoria)
+      );
+    `);
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS soporte_ticket_mensajes (
