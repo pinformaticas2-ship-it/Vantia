@@ -2539,6 +2539,113 @@ export async function runMigrations(): Promise<void> {
       );
     `);
 
+    // ── Centro de soporte: tickets por organización ─────────────────
+    // Cada organización tiene su propio correo de soporte (soporte_email) al
+    // que llegan los tickets nuevos y las respuestas de quien lo abrió --
+    // editable desde Centro de soporte → Configuración. Se precargan los dos
+    // despachos conocidos solo si todavía no tienen ninguno configurado, así
+    // un cambio hecho después desde la app nunca se pisa en un redeploy.
+    try {
+      await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS soporte_email TEXT;`);
+      await client.query(`
+        UPDATE organizaciones SET soporte_email = 'informatico@avalentia.com'
+        WHERE soporte_email IS NULL AND nombre ILIKE '%avalentia%'
+      `);
+      await client.query(`
+        UPDATE organizaciones SET soporte_email = 'informatico1@animalegis.es'
+        WHERE soporte_email IS NULL AND nombre ILIKE '%anima%legis%'
+      `);
+    } catch (_e: any) {}
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS soporte_tickets (
+        id               UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        organizacion_id  UUID         NOT NULL REFERENCES organizaciones(id) ON DELETE CASCADE,
+        numero           INTEGER      NOT NULL,
+        asunto           VARCHAR(200) NOT NULL,
+        descripcion      TEXT         NOT NULL,
+        categoria        VARCHAR(20)  NOT NULL DEFAULT 'incidencia'
+                         CHECK (categoria IN ('incidencia','consulta','peticion','otro')),
+        prioridad        VARCHAR(20)  NOT NULL DEFAULT 'media'
+                         CHECK (prioridad IN ('baja','media','alta','urgente')),
+        estado           VARCHAR(20)  NOT NULL DEFAULT 'abierto'
+                         CHECK (estado IN ('abierto','en_progreso','esperando','resuelto','cerrado')),
+        created_by       VARCHAR(150) NOT NULL,
+        created_by_name  TEXT,
+        created_by_email TEXT,
+        enviado_a        TEXT,
+        email_error      TEXT,
+        created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      );
+    `);
+    try {
+      await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_soporte_tickets_org_numero ON soporte_tickets (organizacion_id, numero);`);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_soporte_tickets_org_estado ON soporte_tickets (organizacion_id, estado, updated_at DESC);`);
+    } catch (_e: any) {}
+    // Datos extra para que el informático tenga el contexto completo en el
+    // correo: cuándo ocurrió de verdad la incidencia (no siempre coincide con
+    // cuándo se abre el ticket), en qué módulo, y desde qué navegador/equipo.
+    for (const [col, def] of [
+      ['fecha_incidencia', `TIMESTAMPTZ`],
+      ['modulo',           `VARCHAR(40)`],
+      ['created_by_rol',   `VARCHAR(20)`],
+      ['user_agent',       `TEXT`],
+      // Retención: los tickets cerrados se borran a los 15 días de cerrarse,
+      // siempre después de haber avisado por correo (con el CSV adjunto) --
+      // ver services/soporteRetencion.ts.
+      ['cerrado_at',       `TIMESTAMPTZ`],
+      ['aviso_borrado_at', `TIMESTAMPTZ`],
+      // Campana de notificaciones del ERP: hay aviso para quien abrió el
+      // ticket si soporte lo ha actualizado (respuesta o cambio de estado)
+      // después de la última vez que él lo abrió.
+      ['soporte_actualizado_at', `TIMESTAMPTZ`],
+      ['soporte_resumen',        `TEXT`],
+      ['creador_visto_at',       `TIMESTAMPTZ`],
+    ] as [string, string][]) {
+      try {
+        await client.query(`ALTER TABLE soporte_tickets ADD COLUMN IF NOT EXISTS ${col} ${def};`);
+      } catch (_e: any) {}
+    }
+    try {
+      await client.query(`
+        UPDATE soporte_tickets SET cerrado_at = updated_at
+        WHERE estado = 'cerrado' AND cerrado_at IS NULL
+      `);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_soporte_tickets_cerrado_at ON soporte_tickets (cerrado_at) WHERE estado = 'cerrado';`);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_soporte_tickets_creador_novedades ON soporte_tickets (created_by, soporte_actualizado_at DESC) WHERE soporte_actualizado_at IS NOT NULL;`);
+    } catch (_e: any) {}
+
+    // Recuento mensual de tickets cerrados que ya se han borrado -- al borrar
+    // un ticket por retención se suma aquí (mes de cierre, hora de Madrid),
+    // así las estadísticas mensuales no pierden nada aunque el ticket ya no
+    // exista. Las estadísticas = esta tabla + los cerrados que aún siguen vivos.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS soporte_cierres_mensuales (
+        organizacion_id       UUID        NOT NULL REFERENCES organizaciones(id) ON DELETE CASCADE,
+        mes                   DATE        NOT NULL,
+        categoria             VARCHAR(20) NOT NULL,
+        total                 INTEGER     NOT NULL DEFAULT 0,
+        suma_horas_resolucion DOUBLE PRECISION NOT NULL DEFAULT 0,
+        PRIMARY KEY (organizacion_id, mes, categoria)
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS soporte_ticket_mensajes (
+        id          UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+        ticket_id   UUID        NOT NULL REFERENCES soporte_tickets(id) ON DELETE CASCADE,
+        user_id     VARCHAR(150) NOT NULL,
+        user_name   TEXT,
+        es_soporte  BOOLEAN     NOT NULL DEFAULT false,
+        mensaje     TEXT        NOT NULL,
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+    try {
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_soporte_ticket_mensajes_ticket ON soporte_ticket_mensajes (ticket_id, created_at);`);
+    } catch (_e: any) {}
+
     // ── Permisos en schema public (requerido en PostgreSQL 15+) ────
     for (const grant of [
       `GRANT USAGE ON SCHEMA public TO admin`,

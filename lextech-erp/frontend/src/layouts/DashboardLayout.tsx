@@ -12,7 +12,7 @@ import {
   MessageSquare, LogOut, Mail, Library, Receipt, Sparkles, ChevronsUpDown,
   MoreVertical, RotateCcw, Copy, Check, Crown,
   Pen, AlertTriangle, RefreshCw, Link2, Plus, Trash2, Scale, Gavel, ChevronDown,
-  Wallet, CreditCard, Building2, BarChart3, FileText, Calculator, Square, BellRing,
+  Wallet, CreditCard, Building2, BarChart3, FileText, Calculator, Square, BellRing, LifeBuoy,
 } from "lucide-react";
 import { UserButton, useUser, useAuth, useClerk } from "@clerk/clerk-react";
 import { getDeviceId, safeJson, waitForClientIp, resolveUploadUrl } from "../lib/api";
@@ -95,6 +95,7 @@ const MODULES = [
   { name: "Cuentas",        path: "/dashboard/facturacion?tab=bank_accounts", icon: Building2,  desc: "Cuentas bancarias" },
   { name: "Conexión Quipu", path: "/dashboard/facturacion?tab=config",        icon: Settings,   desc: "Configuración de la conexión con Quipu" },
   { name: "Chat IA",        path: "/dashboard/chat-ia",      icon: Sparkles,        desc: "Asistente IA con herramientas e historial" },
+  { name: "Centro de soporte", path: "/dashboard/soporte",   icon: LifeBuoy,        desc: "Tickets de soporte técnico" },
   { name: "Configuración",  path: "/dashboard/config",       icon: Settings,        desc: "Ajustes del sistema" },
 ];
 
@@ -1007,7 +1008,7 @@ function WhatsAppWidget() {
 // ── Notifications Panel ──────────────────────────────────────────────────────
 type UnifiedNotification = {
   id: string;
-  kind: "chat" | "email" | "whatsapp" | "plazo";
+  kind: "chat" | "email" | "whatsapp" | "plazo" | "soporte";
   title: string;
   subtitle?: string;
   meta?: string;
@@ -1020,6 +1021,7 @@ function notificationIcon(kind: UnifiedNotification["kind"]) {
   if (kind === "chat") return "💬";
   if (kind === "email") return "✉️";
   if (kind === "plazo") return "⏰";
+  if (kind === "soporte") return "🛟";
   return "🟢";
 }
 
@@ -1839,8 +1841,23 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
 
       <div className="mx-3 border-t border-slate-800/70" />
 
-      {/* Configuración */}
-      <div className={`transition-all duration-300 pt-2 ${collapsed ? "px-2 pb-2" : "px-3 pb-2"}`}>
+      {/* Centro de soporte + Configuración */}
+      <div className={`transition-all duration-300 pt-2 space-y-0.5 ${collapsed ? "px-2 pb-2" : "px-3 pb-2"}`}>
+        {collapsed ? (
+          <Link to="/dashboard/soporte" onClick={onClose} title="Centro de soporte"
+            className={`flex items-center justify-center h-10 w-10 mx-auto rounded-lg transition-colors border-l-4 ${
+              pathname === "/dashboard/soporte" ? "erp-sidebar-nav-active bg-red-500/10 text-white border-red-500" : "erp-sidebar-nav-inactive text-slate-400 hover:bg-slate-800/50 hover:text-white border-transparent"
+            }`}>
+            <LifeBuoy className="erp-sidebar-icon-inactive h-5 w-5 text-slate-500" />
+          </Link>
+        ) : (
+          <Link to="/dashboard/soporte" onClick={onClose}
+            className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13px] font-medium transition-colors border-l-4 ${
+              pathname === "/dashboard/soporte" ? "erp-sidebar-nav-active bg-red-500/10 text-white border-red-500" : "erp-sidebar-nav-inactive text-slate-400 hover:bg-slate-800/50 hover:text-white border-transparent"
+            }`}>
+            <LifeBuoy className="erp-sidebar-icon-inactive h-4 w-4 shrink-0 text-slate-500" /> Centro de soporte
+          </Link>
+        )}
         {collapsed ? (
           <Link to="/dashboard/config" onClick={onClose} title="Configuración"
             className={`flex items-center justify-center h-10 w-10 mx-auto rounded-lg transition-colors border-l-4 ${
@@ -2045,20 +2062,22 @@ export default function DashboardLayout() {
       const token = await getToken({ skipCache: true });
       if (!token) return;
       const headers = { Authorization: `Bearer ${token}` };
-      const [chatRes, emailRes, waRes, tasksRes, expNotifRes] = await Promise.all([
+      const [chatRes, emailRes, waRes, tasksRes, expNotifRes, soporteRes] = await Promise.all([
         fetch("/api/chat/canales", { headers }),
         fetch("/api/email/messages?folder=INBOX&unread=1&page=1&pageSize=50", { headers }),
         fetch("/api/whatsapp/contacts", { headers }),
         fetch("/api/tasks/me", { headers }),
         fetch("/api/expedientes/notificaciones/pendientes", { headers }),
+        fetch("/api/soporte/notificaciones", { headers }),
       ]);
 
-      const [chatData, emailData, waData, tasksData, expNotifData] = await Promise.all([
+      const [chatData, emailData, waData, tasksData, expNotifData, soporteData] = await Promise.all([
         safeJson(chatRes),
         safeJson(emailRes),
         safeJson(waRes),
         safeJson(tasksRes),
         safeJson(expNotifRes),
+        safeJson(soporteRes),
       ]);
 
       const next: UnifiedNotification[] = [];
@@ -2217,6 +2236,26 @@ export default function DashboardLayout() {
         }
       }
 
+      // Centro de soporte: respuestas o cambios de estado de soporte en los
+      // tickets que ha abierto el usuario y que aún no ha visto. El id lleva
+      // la fecha de la actualización para que, si se descarta y luego llega
+      // otra respuesta, vuelva a aparecer.
+      if (soporteRes.ok) {
+        const soporteItems = Array.isArray(soporteData?.data) ? soporteData.data : [];
+        for (const s of soporteItems) {
+          if (!s?.ticketId) continue;
+          next.push({
+            id: `soporte-${s.ticketId}-${s.actualizadoAt}`,
+            kind: "soporte",
+            title: `Centro de soporte · Ticket ${s.referencia}`,
+            subtitle: s.asunto || undefined,
+            meta: s.resumen || `Estado: ${s.estadoLabel}`,
+            created_at: s.actualizadoAt || new Date().toISOString(),
+            onClick: () => navigate(`/dashboard/soporte?ticket=${encodeURIComponent(s.ticketId)}`),
+          });
+        }
+      }
+
       // Los avisos que el usuario ya cerró a mano (dismissNotification) no
       // deben resucitar solos en el próximo sondeo -- se filtran aquí. A la
       // vez, se olvida la marca de "descartado" en cuanto el propio origen
@@ -2316,6 +2355,7 @@ export default function DashboardLayout() {
       '/dashboard/chat-ia',
       '/dashboard/whatsapp',
       '/dashboard/config',
+      '/dashboard/soporte',
     ].includes(location.pathname) ||
     location.pathname.startsWith('/dashboard/facturacion') ||
     location.pathname.startsWith('/dashboard/expedientes/') ||
@@ -2354,8 +2394,8 @@ export default function DashboardLayout() {
         />
       )}
 
-      {/* Vantia flotante — oculto en módulos con su propio chat o con controles fijos en la esquina inferior (Correo: barra de "Responder a...") */}
-      {!location.pathname.startsWith('/dashboard/chat') && !location.pathname.startsWith('/dashboard/correo') && (
+      {/* Vantia flotante — oculto en módulos con su propio chat o con controles fijos en la esquina inferior (Correo: barra de "Responder a..."; Centro de soporte: botón de enviar respuesta del ticket) */}
+      {!location.pathname.startsWith('/dashboard/chat') && !location.pathname.startsWith('/dashboard/correo') && !location.pathname.startsWith('/dashboard/soporte') && (
         <VantiaWidget pathname={location.pathname} getToken={getToken} />
       )}
 

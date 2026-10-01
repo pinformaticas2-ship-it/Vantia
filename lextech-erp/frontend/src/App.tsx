@@ -31,6 +31,7 @@ import FormularioCliente from './pages/FormularioCliente';
 import AgendaBookingPublic from './pages/AgendaBookingPublic';
 import Facturacion from './pages/Facturacion';
 import Configuracion from './pages/Configuracion';
+import Soporte from './pages/Soporte';
 import ChatIA from './pages/ChatIA';
 import DirectorioProfesionales from './pages/DirectorioProfesionales';
 import DirectorioProfesionalForm from './pages/DirectorioProfesionalForm';
@@ -78,6 +79,7 @@ export default function App() {
             <Route path="facturacion/facturas/nueva" element={<RequireModuleAccess modulo="facturacion"><Facturacion /></RequireModuleAccess>} />
             <Route path="facturacion/facturas/:facturaId/editar" element={<RequireModuleAccess modulo="facturacion"><Facturacion /></RequireModuleAccess>} />
             <Route path="chat-ia" element={<ChatIA />} />
+            <Route path="soporte" element={<Soporte />} />
             <Route path="config" element={<Configuracion />} />
           </Route>
 

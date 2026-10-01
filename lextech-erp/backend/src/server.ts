@@ -28,6 +28,7 @@ import directorioRoutes     from './routes/directorio';
 import organizacionRoutes   from './routes/organizacion';
 import preferencesRoutes    from './routes/preferences';
 import pushRoutes           from './routes/push';
+import soporteRoutes        from './routes/soporte';
 import { syncAllQuipuUsers } from './controllers/quipuController';
 import { syncAllOrganizacionesDriveChanges } from './utils/googleDriveSync';
 import { clerkMiddleware } from '@clerk/express';
@@ -35,6 +36,7 @@ import { resolveOrg } from './middleware/resolveOrg';
 import { runMigrations } from './config/migrations';
 import { startLocalFilesWatcher } from './watchers/localFilesWatcher';
 import { startPlazoPushScheduler } from './services/plazoPushScheduler';
+import { startSoporteRetencionScheduler } from './services/soporteRetencion';
 import { migrateLocalFoldersStructure } from './controllers/filesController';
 import { logServerStart } from './controllers/activityController';
 import pool from './config/database';
@@ -248,6 +250,7 @@ app.use('/api/directorio',        directorioRoutes);
 app.use('/api/organizacion',      organizacionRoutes);
 app.use('/api/preferences',       preferencesRoutes);
 app.use('/api/push',              pushRoutes);
+app.use('/api/soporte',           soporteRoutes);
 
 // Health check básico
 app.get('/health', (_req, res) => {
@@ -363,6 +366,9 @@ runMigrations().then(() => {
 
     // Notificaciones push: aviso de plazos próximos a vencer
     startPlazoPushScheduler();
+
+    // Centro de soporte: aviso (con CSV) y borrado de tickets cerrados hace 15 días
+    startSoporteRetencionScheduler();
 
     // Quipu auto-sync: run once after 30s (let DB settle), then every 30 min
     setTimeout(() => {
