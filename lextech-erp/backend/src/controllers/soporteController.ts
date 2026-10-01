@@ -249,9 +249,9 @@ async function notifySoporte(ticket: any, mensaje?: { autorId: string; autor: st
       mensaje ? 'Nueva respuesta en ticket de soporte' : `Nuevo ticket de soporte · Prioridad ${PRIORIDAD_LABEL[ticket.prioridad]}`,
       color,
       cuerpo,
-      `Responde a este correo para contestar directamente a ${escapeHtml(ticket.created_by_name || 'quien abrió el ticket')}, o gestiona el ticket desde Vantia → Centro de soporte.`,
+      `Responde desde Vantia → Centro de soporte: ${escapeHtml(ticket.created_by_name || 'quien abrió el ticket')} verá la respuesta allí y recibirá una notificación. No respondas a este correo.`,
     );
-    error = await sendOrgEmail(ticket.organizacion_id, mensaje?.autorId || ticket.created_by, email, subject, html, ticket.created_by_email);
+    error = await sendOrgEmail(ticket.organizacion_id, mensaje?.autorId || ticket.created_by, email, subject, html);
   }
   await pool.query(
     `UPDATE soporte_tickets SET enviado_a = $1, email_error = $2 WHERE id = $3`,
@@ -260,27 +260,10 @@ async function notifySoporte(ticket: any, mensaje?: { autorId: string; autor: st
   if (error) console.warn(`Soporte: no se pudo enviar el ticket ${ticket.id} por correo:`, error);
 }
 
-// Aviso por correo a quien abrió el ticket cuando soporte responde o cambia
-// el estado (se envía desde la cuenta del informático que actúa). Best
-// effort: si falla no se registra nada en el ticket.
-async function notifyCreador(ticket: any, senderUserId: string, texto: string): Promise<void> {
-  if (!ticket.created_by_email) return;
-  const { orgNombre } = await getSoporteEmail(ticket.organizacion_id);
-  const html = emailLayout(
-    `${escapeHtml(ticketRef(ticket.numero))} · ${escapeHtml(ticket.asunto)}`,
-    'Actualización de tu ticket de soporte',
-    '#0284c7',
-    `<div style="${box};margin-bottom:20px">${nl2br(texto)}</div>
-     ${ticketDetailsHtml(ticket, orgNombre)}
-     ${await conversacionHtml(ticket.id)}`,
-    'Puedes responder desde Vantia → Centro de soporte.',
-  );
-  const error = await sendOrgEmail(ticket.organizacion_id, senderUserId, ticket.created_by_email, `[Soporte ${ticketRef(ticket.numero)}] ${ticket.asunto}`, html);
-  if (error) console.warn(`Soporte: no se pudo avisar al creador del ticket ${ticket.id}:`, error);
-}
-
 // Aviso a quien abrió el ticket cuando soporte le responde o cambia el
-// estado, por los dos canales del ERP (el correo va aparte, notifyCreador):
+// estado. A propósito NO se le manda correo: el correo es solo para el
+// buzón de soporte; el resto del equipo se entera por el propio Centro de
+// soporte y por estos dos canales del ERP:
 //   1. Campana de notificaciones de la app: se marca soporte_actualizado_at
 //      y el resumen; GET /api/soporte/notificaciones lo devuelve hasta que
 //      el creador abre el ticket (creador_visto_at).
@@ -524,7 +507,6 @@ export async function addMensaje(req: Request, res: Response) {
     );
 
     if (esSoporte) {
-      await notifyCreador(upd[0], ctx.userId, `${autor.nombre} ha respondido:\n\n${texto}`);
       await pushCreador(upd[0], `Soporte ha respondido a «${upd[0].asunto}»: ${texto}`);
     } else {
       await notifySoporte(upd[0], { autorId: ctx.userId, autor: autor.nombre, texto });
@@ -562,7 +544,6 @@ export async function updateTicket(req: Request, res: Response) {
     );
     const updated = rows[0];
     if (estado && estado !== ticket.estado && ticket.created_by !== ctx.userId) {
-      await notifyCreador(updated, ctx.userId, `El estado de tu ticket ha cambiado a: ${ESTADO_LABEL[estado]}.`);
       await pushCreador(updated, `«${updated.asunto}» ha pasado a: ${ESTADO_LABEL[estado]}.`);
     }
     return ok(res, serializeTicket(updated));
