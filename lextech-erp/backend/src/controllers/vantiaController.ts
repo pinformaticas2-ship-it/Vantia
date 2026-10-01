@@ -158,8 +158,8 @@ async function buildEntityContext(moduleId: string, userId: string, organizacion
          (SELECT COUNT(*)::int FROM client_tasks WHERE created_by=$1 AND plazo<NOW() AND estado!='completada')         AS t_vencidas,
          (SELECT COUNT(*)::int FROM client_tasks WHERE created_by=$1 AND estado='pendiente')                           AS t_pendientes,
          (SELECT COUNT(*)::int FROM agenda_events WHERE user_id=$1 AND start_at>=NOW() AND start_at<NOW()+INTERVAL '7 days') AS agenda_7d,
-         (SELECT COUNT(*)::int FROM facturacion_facturas WHERE estado='pendiente')                                     AS facturas_pendientes`,
-      [userId]
+         (SELECT COUNT(*)::int FROM facturacion_facturas WHERE estado='pendiente' AND organizacion_id=$2)              AS facturas_pendientes`,
+      [userId, organizacionId]
     );
     if (alertRes.rows.length) {
       const a = alertRes.rows[0];
@@ -743,9 +743,9 @@ async function callToolInner(name: string, args: Record<string, any>, userId: st
             (SELECT COUNT(*)::int FROM client_tasks WHERE created_by=$1 AND estado!='completada')                      AS tareas_pendientes,
             (SELECT COUNT(*)::int FROM client_tasks WHERE created_by=$1 AND estado='urgente')                          AS tareas_urgentes,
             (SELECT COUNT(*)::int FROM client_tasks WHERE created_by=$1 AND plazo<NOW() AND estado!='completada')      AS tareas_vencidas,
-            (SELECT COUNT(*)::int FROM facturacion_facturas WHERE estado='pendiente')                                  AS facturas_pendientes,
-            (SELECT COALESCE(SUM(total),0) FROM facturacion_facturas WHERE estado='pendiente')                         AS importe_pendiente_eur,
-            (SELECT COUNT(*)::int FROM facturacion_gastos WHERE estado='pendiente')                                    AS gastos_pendientes,
+            (SELECT COUNT(*)::int FROM facturacion_facturas WHERE estado='pendiente' AND organizacion_id=$2)           AS facturas_pendientes,
+            (SELECT COALESCE(SUM(total),0) FROM facturacion_facturas WHERE estado='pendiente' AND organizacion_id=$2)  AS importe_pendiente_eur,
+            (SELECT COUNT(*)::int FROM facturacion_gastos WHERE estado='pendiente' AND organizacion_id=$2)             AS gastos_pendientes,
             (SELECT COUNT(*)::int FROM agenda_events WHERE user_id=$1 AND start_at>=NOW())                             AS eventos_proximos
         `, [userId, organizacionId]);
         return { estadisticas: r.rows[0] };
@@ -912,35 +912,35 @@ async function callToolInner(name: string, args: Record<string, any>, userId: st
 
       case 'listar_facturas': {
         const limit = Math.min(Number(args.limit) || 10, 30);
-        const conds: string[] = [], params: any[] = [];
-        let pi = 1;
+        const conds: string[] = [`f.organizacion_id=$1`], params: any[] = [organizacionId];
+        let pi = 2;
         if (args.estado)     { conds.push(`f.estado=$${pi++}`); params.push(args.estado); }
         if (args.cliente_id) { conds.push(`f.entity_id=$${pi++}`); params.push(args.cliente_id); }
         if (args.busqueda)   { conds.push(`(f.num ILIKE $${pi} OR f.contacto ILIKE $${pi})`); params.push(`%${args.busqueda}%`); pi++; }
         params.push(limit);
-        const r = await pool.query(`SELECT f.num,f.contacto,f.total,f.estado,f.fecha,f.vencimiento FROM facturacion_facturas f ${conds.length ? 'WHERE '+conds.join(' AND ') : ''} ORDER BY f.fecha DESC LIMIT $${pi}`, params);
+        const r = await pool.query(`SELECT f.num,f.contacto,f.total,f.estado,f.fecha,f.vencimiento FROM facturacion_facturas f WHERE ${conds.join(' AND ')} ORDER BY f.fecha DESC LIMIT $${pi}`, params);
         return { total: r.rowCount, facturas: r.rows.map(f => ({ num: f.num, contacto: f.contacto, total_eur: Number(f.total).toFixed(2), estado: f.estado, fecha: f.fecha, vencimiento: f.vencimiento })) };
       }
 
       case 'listar_gastos': {
         const limit = Math.min(Number(args.limit) || 10, 30);
-        const conds: string[] = [], params: any[] = [];
-        let pi = 1;
+        const conds: string[] = [`organizacion_id=$1`], params: any[] = [organizacionId];
+        let pi = 2;
         if (args.estado)   { conds.push(`estado=$${pi++}`); params.push(args.estado); }
         if (args.busqueda) { conds.push(`(num ILIKE $${pi} OR proveedor ILIKE $${pi})`); params.push(`%${args.busqueda}%`); pi++; }
         params.push(limit);
-        const r = await pool.query(`SELECT num,proveedor,total,categoria,estado,fecha FROM facturacion_gastos ${conds.length ? 'WHERE '+conds.join(' AND ') : ''} ORDER BY fecha DESC LIMIT $${pi}`, params);
+        const r = await pool.query(`SELECT num,proveedor,total,categoria,estado,fecha FROM facturacion_gastos WHERE ${conds.join(' AND ')} ORDER BY fecha DESC LIMIT $${pi}`, params);
         return { total: r.rowCount, gastos: r.rows.map(g => ({ num: g.num, proveedor: g.proveedor, total_eur: Number(g.total).toFixed(2), categoria: g.categoria, estado: g.estado, fecha: g.fecha })) };
       }
 
       case 'listar_presupuestos': {
         const limit = Math.min(Number(args.limit) || 10, 30);
-        const conds: string[] = [], params: any[] = [];
-        let pi = 1;
+        const conds: string[] = [`organizacion_id=$1`], params: any[] = [organizacionId];
+        let pi = 2;
         if (args.estado)   { conds.push(`estado=$${pi++}`); params.push(args.estado); }
         if (args.busqueda) { conds.push(`(num ILIKE $${pi} OR contacto ILIKE $${pi})`); params.push(`%${args.busqueda}%`); pi++; }
         params.push(limit);
-        const r = await pool.query(`SELECT num,contacto,total,estado,fecha FROM facturacion_presupuestos ${conds.length ? 'WHERE '+conds.join(' AND ') : ''} ORDER BY fecha DESC LIMIT $${pi}`, params);
+        const r = await pool.query(`SELECT num,contacto,total,estado,fecha FROM facturacion_presupuestos WHERE ${conds.join(' AND ')} ORDER BY fecha DESC LIMIT $${pi}`, params);
         return { total: r.rowCount, presupuestos: r.rows.map(p => ({ num: p.num, contacto: p.contacto, total_eur: Number(p.total).toFixed(2), estado: p.estado, fecha: p.fecha })) };
       }
 

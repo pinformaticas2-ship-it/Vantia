@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import pool from '../config/database';
 import { logActivityForReq, resolveUserName } from './activityController';
+import { resolveUserOrgMemberships } from './organizacionesController';
 import {
   fetchQuipuBootstrap,
   quipuOwnerFetch,
@@ -745,6 +746,15 @@ export async function syncQuipuForUserInternal(userId: string): Promise<{
   const settings = await getStoredQuipuSettings(userId);
   if (!settings) throw new Error('No Quipu settings for user');
 
+  // quipu_settings es por usuario (no por organización -- cada persona conecta
+  // su propia cuenta de Quipu), así que las facturas/gastos que trae el sync no
+  // llevan organización propia; se atribuyen a la organización principal del
+  // usuario que conectó Quipu, igual que el resto de fallbacks "por usuario" de
+  // este fichero.
+  const memberships = await resolveUserOrgMemberships(userId);
+  const organizacionId = memberships[0]?.organizacionId;
+  if (!organizacionId) throw new Error('El usuario no pertenece a ninguna organización.');
+
   await ensureFacturasQuipuColumn();
   const bootstrap = await fetchQuipuBootstrap(settings);
   const summary = summarizeQuipuBootstrap(bootstrap);
@@ -768,12 +778,12 @@ export async function syncQuipuForUserInternal(userId: string): Promise<{
       const r = await pool.query(
         `INSERT INTO facturacion_facturas
            (user_id, created_by, num, contacto, fecha, vencimiento, total, estado,
-            area, responsable, forma_pago, serie, tipo_cliente, quipu_id)
-         VALUES ($1,'Quipu Sync',$2,$3,$4,$5,$6,$7,'procesal','Quipu','transferencia','QUIPU','empresa',$8)
+            area, responsable, forma_pago, serie, tipo_cliente, quipu_id, organizacion_id)
+         VALUES ($1,'Quipu Sync',$2,$3,$4,$5,$6,$7,'procesal','Quipu','transferencia','QUIPU','empresa',$8,$9)
          ON CONFLICT (user_id, quipu_id) WHERE quipu_id IS NOT NULL
          DO UPDATE SET num=$2, contacto=$3, fecha=$4, vencimiento=$5, total=$6, estado=$7, updated_at=NOW()
          RETURNING (xmax = 0) AS inserted`,
-        [userId, num, contacto, fecha, vencimiento, total, estado, quipuId],
+        [userId, num, contacto, fecha, vencimiento, total, estado, quipuId, organizacionId],
       );
       if (r.rows[0]?.inserted) imported++; else updated++;
     } catch (e: any) {
@@ -795,12 +805,12 @@ export async function syncQuipuForUserInternal(userId: string): Promise<{
       const r = await pool.query(
         `INSERT INTO facturacion_gastos
            (user_id, created_by, num, proveedor, fecha, total, categoria, estado,
-            area, responsable, deducible, quipu_id)
-         VALUES ($1,'Quipu Sync',$2,$3,$4,$5,$6,$7,'procesal','Quipu',true,$8)
+            area, responsable, deducible, quipu_id, organizacion_id)
+         VALUES ($1,'Quipu Sync',$2,$3,$4,$5,$6,$7,'procesal','Quipu',true,$8,$9)
          ON CONFLICT (user_id, quipu_id) WHERE quipu_id IS NOT NULL
          DO UPDATE SET proveedor=$3, fecha=$4, total=$5, estado=$7, updated_at=NOW()
          RETURNING (xmax = 0) AS inserted`,
-        [userId, num, proveedor, fecha, total, cat, estado, quipuId],
+        [userId, num, proveedor, fecha, total, cat, estado, quipuId, organizacionId],
       );
       if (r.rows[0]?.inserted) importedGastos++; else updatedGastos++;
     } catch (e: any) {

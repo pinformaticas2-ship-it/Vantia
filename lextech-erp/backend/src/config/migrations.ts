@@ -1957,6 +1957,40 @@ export async function runMigrations(): Promise<void> {
       await client.query(`CREATE INDEX IF NOT EXISTS idx_facturacion_gastos_organizacion_id ON facturacion_gastos (organizacion_id);`);
     } catch (_e: any) {}
 
+    // Facturación pasa de "privado por usuario" a "compartido por despacho" (ver
+    // feedback del usuario 2026-10-01): hasta ahora, aunque dos administradores
+    // del mismo despacho tuvieran permiso de edición sobre Tesorería, cada uno
+    // solo veía lo que él mismo había creado -- la numeración de facturas
+    // (num+serie) también era única solo "por usuario", así que dos personas
+    // del mismo despacho podían crear sin querer dos facturas con el mismo
+    // número. Se sustituye esa unicidad por una "por organización".
+    try {
+      await client.query(`DROP INDEX IF EXISTS ux_facturacion_facturas_user_serie_num;`);
+      await client.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_facturacion_facturas_org_serie_num
+        ON facturacion_facturas (organizacion_id, LOWER(COALESCE(serie, '')), LOWER(num))
+      `);
+    } catch (_e: any) {
+      // Si ya hay dos facturas del mismo despacho con el mismo num+serie
+      // (posible bajo la unicidad vieja, que era por usuario) el índice no se
+      // crea -- no bloqueamos el arranque por esto, pero queda sin la
+      // protección de unicidad hasta que alguien renombre el duplicado.
+    }
+
+    // billing_bank_accounts: mismo cambio -- de privado por usuario a
+    // compartido por despacho. No tiene cliente/expediente al que agarrarse
+    // para backfillear con precisión, así que cae a la organización sembrada
+    // como el resto de tablas sin esa referencia.
+    try {
+      await client.query(`ALTER TABLE billing_bank_accounts ADD COLUMN IF NOT EXISTS organizacion_id UUID REFERENCES organizaciones(id);`);
+      await client.query(`
+        UPDATE billing_bank_accounts SET organizacion_id = (SELECT id FROM organizaciones ORDER BY created_at ASC LIMIT 1)
+        WHERE organizacion_id IS NULL
+      `);
+      await client.query(`ALTER TABLE billing_bank_accounts ALTER COLUMN organizacion_id SET NOT NULL;`);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_billing_bank_accounts_organizacion_id ON billing_bank_accounts (organizacion_id);`);
+    } catch (_e: any) {}
+
     // ── Preferencias de usuario (tema de la interfaz, entre otras futuras) ──
     await client.query(`
       CREATE TABLE IF NOT EXISTS user_preferences (

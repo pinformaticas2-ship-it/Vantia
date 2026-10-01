@@ -51,7 +51,7 @@ const buildFacturaDisplayNumber = (num: any, serie?: any) => {
 };
 
 const ensureFacturaNumberAvailable = async (
-  userId: string,
+  organizacionId: string,
   num: any,
   serie: any,
   excludeId?: string | null,
@@ -63,12 +63,12 @@ const ensureFacturaNumberAvailable = async (
   const duplicated = await pool.query(
     `SELECT id
        FROM facturacion_facturas
-      WHERE user_id = $1
+      WHERE organizacion_id = $1
         AND LOWER(num) = LOWER($2)
         AND LOWER(COALESCE(serie, '')) = LOWER($3)
         AND ($4::uuid IS NULL OR id <> $4::uuid)
       LIMIT 1`,
-    [userId, cleanNum, cleanSerie, excludeId || null],
+    [organizacionId, cleanNum, cleanSerie, excludeId || null],
   );
 
   if (duplicated.rows.length > 0) {
@@ -102,16 +102,16 @@ export const getBillingBootstrap = async (req: any, res: Response) => {
         FROM facturacion_facturas ff
         LEFT JOIN expedientes e ON e.id = ff.expediente_id
         LEFT JOIN organizaciones o ON o.id = ff.organizacion_id
-        WHERE ff.user_id = $1
+        WHERE ff.organizacion_id = $1
         ORDER BY ff.fecha DESC, ff.created_at DESC
-      `, [userId]),
+      `, [organizacionId]),
       pool.query(`
         SELECT fg.*, o.nombre AS organizacion_nombre
         FROM facturacion_gastos fg
         LEFT JOIN organizaciones o ON o.id = fg.organizacion_id
-        WHERE fg.user_id = $1
+        WHERE fg.organizacion_id = $1
         ORDER BY fg.fecha DESC, fg.created_at DESC
-      `, [userId]),
+      `, [organizacionId]),
       pool.query(`
         SELECT fp.*,
                e.anio,
@@ -123,9 +123,9 @@ export const getBillingBootstrap = async (req: any, res: Response) => {
         FROM facturacion_presupuestos fp
         LEFT JOIN expedientes e ON e.id = fp.expediente_id
         LEFT JOIN organizaciones o ON o.id = fp.organizacion_id
-        WHERE fp.user_id = $1
+        WHERE fp.organizacion_id = $1
         ORDER BY fp.fecha DESC, fp.created_at DESC
-      `, [userId]),
+      `, [organizacionId]),
       pool.query(`
         SELECT e.id,
                e.first_name,
@@ -253,7 +253,7 @@ export const createFactura = async (req: any, res: Response) => {
   }
 
   try {
-    await ensureFacturaNumberAvailable(userId, num, serie);
+    await ensureFacturaNumberAvailable(organizacionId, num, serie);
     const result = await pool.query(
       `INSERT INTO facturacion_facturas
          (user_id, created_by, num, contacto, fecha, vencimiento, total, estado, area, responsable, forma_pago, serie, tipo_cliente, client_id, expediente_id, concepto, notas, base_unitaria, cantidad, descuento_pct, iva_pct, irpf_pct, organizacion_id)
@@ -307,6 +307,8 @@ export const updateFactura = async (req: any, res: Response) => {
   const userId = req.auth?.userId;
   const { id } = req.params;
   if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  const organizacionId = req.organizacionId;
+  if (!organizacionId) return res.status(400).json({ success: false, error: 'No se pudo determinar la organización activa.' });
   const {
     num, contacto, fecha, vencimiento, total, estado, area, responsable,
     formaPago, serie, tipoCliente, clientId, expedienteId, concepto, notas,
@@ -314,7 +316,7 @@ export const updateFactura = async (req: any, res: Response) => {
   } = req.body;
 
   try {
-    await ensureFacturaNumberAvailable(userId, num, serie, id);
+    await ensureFacturaNumberAvailable(organizacionId, num, serie, id);
     const result = await pool.query(
       `UPDATE facturacion_facturas
        SET num = $3,
@@ -338,11 +340,11 @@ export const updateFactura = async (req: any, res: Response) => {
            iva_pct = $21,
            irpf_pct = $22,
            updated_at = NOW()
-       WHERE id = $1 AND user_id = $2
+       WHERE id = $1 AND organizacion_id = $2
        RETURNING *`,
       [
         id,
-        userId,
+        organizacionId,
         sanitizeText(num),
         sanitizeText(contacto),
         fecha || null,
@@ -377,9 +379,11 @@ export const deleteFactura = async (req: any, res: Response) => {
   const userId = req.auth?.userId;
   const { id } = req.params;
   if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  const organizacionId = req.organizacionId;
+  if (!organizacionId) return res.status(400).json({ success: false, error: 'No se pudo determinar la organización activa.' });
 
   try {
-    const result = await pool.query(`DELETE FROM facturacion_facturas WHERE id = $1 AND user_id = $2 RETURNING num, contacto`, [id, userId]);
+    const result = await pool.query(`DELETE FROM facturacion_facturas WHERE id = $1 AND organizacion_id = $2 RETURNING num, contacto`, [id, organizacionId]);
     if (!result.rowCount) return res.status(404).json({ success: false, error: 'Factura no encontrada.' });
     await logActivityForReq(req, `Factura eliminada: ${result.rows[0].num}`, 'FACTURACION_FACTURA', id, result.rows[0].contacto, 'DELETE');
     res.json({ success: true });
@@ -432,6 +436,8 @@ export const updateGasto = async (req: any, res: Response) => {
   const userId = req.auth?.userId;
   const { id } = req.params;
   if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  const organizacionId = req.organizacionId;
+  if (!organizacionId) return res.status(400).json({ success: false, error: 'No se pudo determinar la organización activa.' });
   const { num, proveedor, fecha, total, cat, estado, area, responsable, deducible } = req.body;
 
   try {
@@ -447,9 +453,9 @@ export const updateGasto = async (req: any, res: Response) => {
            responsable = $10,
            deducible = $11,
            updated_at = NOW()
-       WHERE id = $1 AND user_id = $2
+       WHERE id = $1 AND organizacion_id = $2
        RETURNING *`,
-      [id, userId, sanitizeText(num), sanitizeText(proveedor), fecha || null, sanitizeAmount(total), sanitizeText(cat), sanitizeText(estado), sanitizeText(area), sanitizeText(responsable), Boolean(deducible)],
+      [id, organizacionId, sanitizeText(num), sanitizeText(proveedor), fecha || null, sanitizeAmount(total), sanitizeText(cat), sanitizeText(estado), sanitizeText(area), sanitizeText(responsable), Boolean(deducible)],
     );
     if (!result.rowCount) return res.status(404).json({ success: false, error: 'Gasto no encontrado.' });
     await logActivityForReq(req, `Gasto actualizado: ${sanitizeText(num)}`, 'FACTURACION_GASTO', id, sanitizeText(proveedor) || undefined, 'UPDATE');
@@ -463,9 +469,11 @@ export const deleteGasto = async (req: any, res: Response) => {
   const userId = req.auth?.userId;
   const { id } = req.params;
   if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  const organizacionId = req.organizacionId;
+  if (!organizacionId) return res.status(400).json({ success: false, error: 'No se pudo determinar la organización activa.' });
 
   try {
-    const result = await pool.query(`DELETE FROM facturacion_gastos WHERE id = $1 AND user_id = $2 RETURNING num, proveedor`, [id, userId]);
+    const result = await pool.query(`DELETE FROM facturacion_gastos WHERE id = $1 AND organizacion_id = $2 RETURNING num, proveedor`, [id, organizacionId]);
     if (!result.rowCount) return res.status(404).json({ success: false, error: 'Gasto no encontrado.' });
     await logActivityForReq(req, `Gasto eliminado: ${result.rows[0].num}`, 'FACTURACION_GASTO', id, result.rows[0].proveedor, 'DELETE');
     res.json({ success: true });
@@ -508,6 +516,8 @@ export const updatePresupuesto = async (req: any, res: Response) => {
   const userId = req.auth?.userId;
   const { id } = req.params;
   if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  const organizacionId = req.organizacionId;
+  if (!organizacionId) return res.status(400).json({ success: false, error: 'No se pudo determinar la organización activa.' });
   const { num, contacto, fecha, total, estado, area, responsable, iguala, clientId, expedienteId } = req.body;
 
   try {
@@ -524,9 +534,9 @@ export const updatePresupuesto = async (req: any, res: Response) => {
            client_id = $11,
            expediente_id = $12,
            updated_at = NOW()
-       WHERE id = $1 AND user_id = $2
+       WHERE id = $1 AND organizacion_id = $2
        RETURNING *`,
-      [id, userId, sanitizeText(num), sanitizeText(contacto), fecha || null, sanitizeAmount(total), sanitizeText(estado), sanitizeText(area), sanitizeText(responsable), Boolean(iguala), sanitizeText(clientId), sanitizeText(expedienteId)],
+      [id, organizacionId, sanitizeText(num), sanitizeText(contacto), fecha || null, sanitizeAmount(total), sanitizeText(estado), sanitizeText(area), sanitizeText(responsable), Boolean(iguala), sanitizeText(clientId), sanitizeText(expedienteId)],
     );
     if (!result.rowCount) return res.status(404).json({ success: false, error: 'Presupuesto no encontrado.' });
     await logActivityForReq(req, `Presupuesto actualizado: ${sanitizeText(num)}`, 'FACTURACION_PRESUPUESTO', id, sanitizeText(contacto) || undefined, 'UPDATE');
@@ -540,9 +550,11 @@ export const deletePresupuesto = async (req: any, res: Response) => {
   const userId = req.auth?.userId;
   const { id } = req.params;
   if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  const organizacionId = req.organizacionId;
+  if (!organizacionId) return res.status(400).json({ success: false, error: 'No se pudo determinar la organización activa.' });
 
   try {
-    const result = await pool.query(`DELETE FROM facturacion_presupuestos WHERE id = $1 AND user_id = $2 RETURNING num, contacto`, [id, userId]);
+    const result = await pool.query(`DELETE FROM facturacion_presupuestos WHERE id = $1 AND organizacion_id = $2 RETURNING num, contacto`, [id, organizacionId]);
     if (!result.rowCount) return res.status(404).json({ success: false, error: 'Presupuesto no encontrado.' });
     await logActivityForReq(req, `Presupuesto eliminado: ${result.rows[0].num}`, 'FACTURACION_PRESUPUESTO', id, result.rows[0].contacto, 'DELETE');
     res.json({ success: true });
@@ -555,9 +567,11 @@ export const deletePresupuesto = async (req: any, res: Response) => {
 export const listBankAccounts = async (req: any, res: Response) => {
   const userId = req.auth?.userId;
   if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  const organizacionId = req.organizacionId;
+  if (!organizacionId) return res.status(400).json({ success: false, error: 'No se pudo determinar la organización activa.' });
   try {
     const result = await pool.query(
-      `SELECT * FROM billing_bank_accounts WHERE user_id=$1 ORDER BY name ASC`, [userId]);
+      `SELECT * FROM billing_bank_accounts WHERE organizacion_id=$1 ORDER BY name ASC`, [organizacionId]);
     res.json({ success: true, data: result.rows });
   } catch (e: any) { res.status(500).json({ success: false, error: e?.message }); }
 };
@@ -565,13 +579,15 @@ export const listBankAccounts = async (req: any, res: Response) => {
 export const createBankAccount = async (req: any, res: Response) => {
   const userId = req.auth?.userId;
   if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  const organizacionId = req.organizacionId;
+  if (!organizacionId) return res.status(400).json({ success: false, error: 'No se pudo determinar la organización activa.' });
   const { name, bank_name, iban, balance, currency, notes } = req.body;
   if (!name) return res.status(400).json({ success: false, error: 'El nombre es obligatorio.' });
   try {
     const r = await pool.query(
-      `INSERT INTO billing_bank_accounts (user_id,name,bank_name,iban,balance,currency,notes)
-       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-      [userId, name, bank_name||null, iban||null, Number(balance||0), currency||'EUR', notes||null]);
+      `INSERT INTO billing_bank_accounts (user_id,name,bank_name,iban,balance,currency,notes,organizacion_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [userId, name, bank_name||null, iban||null, Number(balance||0), currency||'EUR', notes||null, organizacionId]);
     res.status(201).json({ success: true, data: r.rows[0] });
   } catch (e: any) { res.status(500).json({ success: false, error: e?.message }); }
 };
@@ -580,12 +596,14 @@ export const updateBankAccount = async (req: any, res: Response) => {
   const userId = req.auth?.userId;
   const { id } = req.params;
   if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  const organizacionId = req.organizacionId;
+  if (!organizacionId) return res.status(400).json({ success: false, error: 'No se pudo determinar la organización activa.' });
   const { name, bank_name, iban, balance, currency, notes } = req.body;
   try {
     const r = await pool.query(
       `UPDATE billing_bank_accounts SET name=$3,bank_name=$4,iban=$5,balance=$6,currency=$7,notes=$8,updated_at=NOW()
-       WHERE id=$1 AND user_id=$2 RETURNING *`,
-      [id, userId, name, bank_name||null, iban||null, Number(balance||0), currency||'EUR', notes||null]);
+       WHERE id=$1 AND organizacion_id=$2 RETURNING *`,
+      [id, organizacionId, name, bank_name||null, iban||null, Number(balance||0), currency||'EUR', notes||null]);
     if (!r.rowCount) return res.status(404).json({ success: false, error: 'Cuenta no encontrada.' });
     res.json({ success: true, data: r.rows[0] });
   } catch (e: any) { res.status(500).json({ success: false, error: e?.message }); }
@@ -595,8 +613,10 @@ export const deleteBankAccount = async (req: any, res: Response) => {
   const userId = req.auth?.userId;
   const { id } = req.params;
   if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  const organizacionId = req.organizacionId;
+  if (!organizacionId) return res.status(400).json({ success: false, error: 'No se pudo determinar la organización activa.' });
   try {
-    await pool.query(`DELETE FROM billing_bank_accounts WHERE id=$1 AND user_id=$2`, [id, userId]);
+    await pool.query(`DELETE FROM billing_bank_accounts WHERE id=$1 AND organizacion_id=$2`, [id, organizacionId]);
     res.json({ success: true });
   } catch (e: any) { res.status(500).json({ success: false, error: e?.message }); }
 };
