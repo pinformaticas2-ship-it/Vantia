@@ -29,6 +29,7 @@ import organizacionRoutes   from './routes/organizacion';
 import preferencesRoutes    from './routes/preferences';
 import pushRoutes           from './routes/push';
 import soporteRoutes        from './routes/soporte';
+import plaudRoutes          from './routes/plaud';
 import { syncAllQuipuUsers } from './controllers/quipuController';
 import { syncAllOrganizacionesDriveChanges } from './utils/googleDriveSync';
 import { clerkMiddleware } from '@clerk/express';
@@ -251,6 +252,7 @@ app.use('/api/organizacion',      organizacionRoutes);
 app.use('/api/preferences',       preferencesRoutes);
 app.use('/api/push',              pushRoutes);
 app.use('/api/soporte',           soporteRoutes);
+app.use('/api/plaud',             plaudRoutes);
 
 // Health check básico
 app.get('/health', (_req, res) => {

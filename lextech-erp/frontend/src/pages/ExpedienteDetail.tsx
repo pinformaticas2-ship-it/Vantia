@@ -54,6 +54,7 @@ import {
   FileText,
   MessageSquare,
   Video,
+  Mic,
 } from "lucide-react";
 import { safeJson, resolveApiUrl } from "../lib/api";
 import { ProfesionalInput, useProfesionalesOptions } from "../components/ProfesionalInput";
@@ -5421,6 +5422,10 @@ export default function ExpedienteDetail() {
     try { return sessionStorage.getItem(GCAL_TOKEN_KEY); } catch { return null; }
   });
   const [gcalError, setGcalError] = useState<string | null>(null);
+  const [plaudModalOpen, setPlaudModalOpen] = useState(false);
+  const [plaudStatus, setPlaudStatus] = useState<{ connected: boolean; webhookUrl?: string } | null>(null);
+  const [plaudLoading, setPlaudLoading] = useState(false);
+  const [plaudCopied, setPlaudCopied] = useState(false);
   const [indCollapsed, setIndCollapsed] = useState(() => localStorage.getItem('exp_indicadores_collapsed') === '1');
   const toggleIndCollapsed = () => {
     setIndCollapsed(prev => {
@@ -5767,6 +5772,51 @@ export default function ExpedienteDetail() {
     setTab("perfil");
   };
 
+  const openPlaudModal = async () => {
+    setPlaudModalOpen(true);
+    setPlaudCopied(false);
+    setPlaudLoading(true);
+    try {
+      const token = await getToken();
+      const res = await fetch(resolveApiUrl(`/api/plaud/expedientes/${id}/status`), { headers: { Authorization: `Bearer ${token}` } });
+      const data = await safeJson(res);
+      setPlaudStatus(res.ok ? data.data : { connected: false });
+    } catch {
+      setPlaudStatus({ connected: false });
+    } finally {
+      setPlaudLoading(false);
+    }
+  };
+
+  const connectPlaud = async () => {
+    setPlaudLoading(true);
+    try {
+      const token = await getToken();
+      const res = await fetch(resolveApiUrl(`/api/plaud/expedientes/${id}/connect`), {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await safeJson(res);
+      if (res.ok) setPlaudStatus({ connected: true, webhookUrl: data.data?.webhookUrl });
+    } finally {
+      setPlaudLoading(false);
+    }
+  };
+
+  const disconnectPlaud = async () => {
+    setPlaudLoading(true);
+    try {
+      const token = await getToken();
+      const res = await fetch(resolveApiUrl(`/api/plaud/expedientes/${id}/connect`), {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) setPlaudStatus({ connected: false });
+    } finally {
+      setPlaudLoading(false);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full overflow-hidden">
 
@@ -5806,6 +5856,12 @@ export default function ExpedienteDetail() {
               <ExternalLink size={14} className="text-slate-400" /> Ir a carpeta
             </a>
           )}
+          <button
+            onClick={openPlaudModal}
+            className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl shadow-sm active:scale-95 transition-all"
+          >
+            <Mic size={14} className="text-slate-400" /> Plaud
+          </button>
           <BackButton onClick={() => navigate("/dashboard/expedientes")} />
           {editing ? (
             <>
@@ -6827,6 +6883,80 @@ export default function ExpedienteDetail() {
 
         </div>{/* closes inner wrapper */}
       </div>{/* closes 3-col body */}
+
+      {plaudModalOpen && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4" onClick={() => setPlaudModalOpen(false)}>
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-50">
+                  <Mic size={15} className="text-violet-600" />
+                </div>
+                <h3 className="text-sm font-bold text-slate-800">Conectar con Plaud</h3>
+              </div>
+              <button onClick={() => setPlaudModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-5">
+              {plaudLoading && !plaudStatus ? (
+                <div className="flex items-center justify-center py-8"><Spinner size="sm" muted /></div>
+              ) : plaudStatus?.connected ? (
+                <>
+                  <p className="mb-3 flex items-center gap-1.5 text-xs font-bold text-emerald-600">
+                    <Check size={13} /> Este expediente está conectado
+                  </p>
+                  <p className="mb-2 text-xs text-slate-500">
+                    Pega este enlace en Zapier, como la URL de la acción <strong>"Webhooks by Zapier &rarr; POST"</strong>,
+                    cuando Plaud termine una transcripción nueva:
+                  </p>
+                  <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                    <code className="flex-1 truncate text-[11px] text-slate-600">{plaudStatus.webhookUrl}</code>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard?.writeText(plaudStatus.webhookUrl || "");
+                        setPlaudCopied(true);
+                        setTimeout(() => setPlaudCopied(false), 1500);
+                      }}
+                      className="shrink-0 rounded-md p-1.5 text-slate-500 hover:bg-slate-200"
+                      title="Copiar"
+                    >
+                      {plaudCopied ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+                    </button>
+                  </div>
+                  <p className="mt-3 text-[11px] leading-5 text-slate-400">
+                    En el título de la grabación en Plaud pon lo que quieras — la transcripción y el resumen se guardan
+                    como nota en este expediente, y el audio se adjunta como documento.
+                  </p>
+                  <button
+                    onClick={disconnectPlaud}
+                    disabled={plaudLoading}
+                    className="mt-4 flex items-center gap-1.5 text-xs font-semibold text-red-500 hover:text-red-600 disabled:opacity-50"
+                  >
+                    {plaudLoading ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />} Desconectar
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p className="mb-4 text-xs leading-5 text-slate-500">
+                    Genera un enlace único para este expediente. Al configurarlo en Zapier junto con tu cuenta de Plaud,
+                    cada grabación nueva se guardará aquí automáticamente: la transcripción como nota, y el audio como
+                    documento adjunto.
+                  </p>
+                  <button
+                    onClick={connectPlaud}
+                    disabled={plaudLoading}
+                    className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-violet-700 disabled:opacity-50"
+                  >
+                    {plaudLoading ? <Loader2 size={14} className="animate-spin" /> : <Mic size={14} />} Generar enlace de conexión
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }

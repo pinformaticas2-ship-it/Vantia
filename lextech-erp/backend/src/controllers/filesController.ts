@@ -421,6 +421,38 @@ export const uploadFiles = async (req: any, res: Response) => {
   }
 };
 
+// Variante de uploadFiles para orígenes que no llegan como multipart/form-data
+// (p.ej. el webhook de Plaud, que manda un Buffer ya descargado de una URL
+// externa) -- mismo camino de guardado (disco local + sync + nube si el
+// despacho la tiene conectada) sin pasar por multer.
+export async function saveExpedienteAttachmentFromBuffer(
+  expedienteId: string,
+  buffer: Buffer,
+  originalName: string,
+  mimetype: string,
+  createdBy: string,
+): Promise<any> {
+  const clientDir = ensureClientDir(expedienteId);
+  const storedName = `${crypto.randomUUID()}${path.extname(originalName) || ''}`;
+  const destPath = path.join(clientDir, storedName);
+  fs.writeFileSync(destPath, buffer);
+
+  const result = await pool.query(
+    `INSERT INTO client_files (client_id, original_name, stored_name, mimetype, size_bytes, created_by, attachment_type)
+     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+    [expedienteId, originalName, storedName, mimetype, buffer.length, createdBy, 'Sin clasificar'],
+  );
+
+  syncFileToLocal(expedienteId, originalName, destPath, 'Sin clasificar');
+  const uploaded = await tryUploadFileToCloud(expedienteId, result.rows[0].id, originalName, mimetype, destPath);
+  if (uploaded) {
+    result.rows[0].storage_provider = uploaded.provider;
+    if (uploaded.provider === 'drive') result.rows[0].drive_file_id = uploaded.id;
+    else result.rows[0].dropbox_file_id = uploaded.id;
+  }
+  return result.rows[0];
+}
+
 // ─────────────────────────────────────────────────────────────
 // GET /api/files/:clientId/:fileId/download  — servir archivo
 // ─────────────────────────────────────────────────────────────

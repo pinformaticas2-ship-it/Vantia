@@ -2653,6 +2653,30 @@ export async function runMigrations(): Promise<void> {
       await client.query(`CREATE INDEX IF NOT EXISTS idx_soporte_ticket_mensajes_ticket ON soporte_ticket_mensajes (ticket_id, created_at);`);
     } catch (_e: any) {}
 
+    // ── Vinculación de expedientes con Plaud (webhook de Zapier) ──────────────
+    // Cada expediente puede tener un enlace propio y secreto al que Zapier
+    // manda la transcripción/resumen/audio cuando Plaud termina de procesar
+    // una grabación. La seguridad es el propio token de la URL (como los
+    // enlaces públicos de reserva de agenda) -- no requiere sesión de Clerk,
+    // así que el webhook en sí vive fuera del aislamiento por organizacion_id
+    // habitual, pero el token ya lleva la organización/expediente amarrados
+    // desde que se generó.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS expediente_plaud_links (
+        id              UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+        expediente_id   UUID         NOT NULL,
+        organizacion_id UUID         NOT NULL REFERENCES organizaciones(id) ON DELETE CASCADE,
+        token           VARCHAR(64)  NOT NULL UNIQUE,
+        created_by      VARCHAR(150),
+        active          BOOLEAN      NOT NULL DEFAULT true,
+        created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      );
+    `);
+    try {
+      await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_expediente_plaud_links_expediente ON expediente_plaud_links (expediente_id);`);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_expediente_plaud_links_token ON expediente_plaud_links (token);`);
+    } catch (_e: any) {}
+
     // ── Permisos en schema public (requerido en PostgreSQL 15+) ────
     for (const grant of [
       `GRANT USAGE ON SCHEMA public TO admin`,
