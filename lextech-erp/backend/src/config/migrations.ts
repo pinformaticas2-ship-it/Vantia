@@ -2568,6 +2568,12 @@ export async function runMigrations(): Promise<void> {
       ['soporte_actualizado_at', `TIMESTAMPTZ`],
       ['soporte_resumen',        `TEXT`],
       ['creador_visto_at',       `TIMESTAMPTZ`],
+      // Lo mismo en sentido contrario, para los informáticos (rol soporte):
+      // ticket nuevo o respuesta de quien lo abrió que soporte aún no ha
+      // abierto. Compartido entre todos los de soporte de la organización.
+      ['usuario_actualizado_at', `TIMESTAMPTZ`],
+      ['usuario_resumen',        `TEXT`],
+      ['soporte_visto_at',       `TIMESTAMPTZ`],
     ] as [string, string][]) {
       try {
         await client.query(`ALTER TABLE soporte_tickets ADD COLUMN IF NOT EXISTS ${col} ${def};`);
@@ -2580,6 +2586,7 @@ export async function runMigrations(): Promise<void> {
       `);
       await client.query(`CREATE INDEX IF NOT EXISTS idx_soporte_tickets_cerrado_at ON soporte_tickets (cerrado_at) WHERE estado = 'cerrado';`);
       await client.query(`CREATE INDEX IF NOT EXISTS idx_soporte_tickets_creador_novedades ON soporte_tickets (created_by, soporte_actualizado_at DESC) WHERE soporte_actualizado_at IS NOT NULL;`);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_soporte_tickets_soporte_novedades ON soporte_tickets (organizacion_id, usuario_actualizado_at DESC) WHERE usuario_actualizado_at IS NOT NULL;`);
     } catch (_e: any) {}
 
     // Recuento mensual de tickets cerrados que ya se han borrado -- al borrar
