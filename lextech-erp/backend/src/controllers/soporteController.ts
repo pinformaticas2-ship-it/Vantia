@@ -5,7 +5,7 @@ import { resolveUserOrgMemberships } from './organizacionesController';
 import { decryptPassword } from '../utils/emailCrypto';
 import { dispatchEmail } from '../utils/mailer';
 import { SmtpConfig, MailAttachment } from '../utils/smtp';
-import { sendPushToUser } from '../utils/webPush';
+import { sendPushToUser, sendPushToUsers } from '../utils/webPush';
 
 // ── Centro de soporte ────────────────────────────────────────────────────────
 // Sistema de tickets por organización: cualquier miembro abre tickets y ve
@@ -285,6 +285,29 @@ async function pushCreador(ticket: any, body: string): Promise<void> {
   });
 }
 
+// El mismo aviso en sentido contrario: a los informáticos (rol soporte) de
+// la organización cuando entra un ticket nuevo o quien lo abrió responde --
+// igual que Chat/Correo/WhatsApp avisan a quien recibe el mensaje. Campana
+// del ERP (usuario_actualizado_at, hasta que alguien de soporte abre el
+// ticket) + push de Chrome a todos los de soporte.
+async function pushSoporte(ticket: any, titulo: string, body: string): Promise<void> {
+  const texto = body.replace(/\s+/g, ' ').trim();
+  await pool.query(
+    `UPDATE soporte_tickets SET usuario_actualizado_at = NOW(), usuario_resumen = $1 WHERE id = $2`,
+    [texto.slice(0, 300), ticket.id],
+  );
+  const { rows } = await pool.query(
+    `SELECT user_id FROM organizacion_miembros WHERE organizacion_id = $1 AND rol = 'soporte'`,
+    [ticket.organizacion_id],
+  );
+  await sendPushToUsers(rows.map((r) => r.user_id), {
+    title: `Centro de soporte · ${titulo} ${ticketRef(ticket.numero)}`,
+    body: texto.length > 160 ? `${texto.slice(0, 157)}…` : texto,
+    url: `/dashboard/soporte?ticket=${ticket.id}`,
+    tag: `soporte-ticket-${ticket.id}`,
+  }, ticket.created_by);
+}
+
 async function loadTicketForUser(req: Request, res: Response): Promise<{ ticket: any; ctx: { organizacionId: string; rol: string; userId: string } } | null> {
   const ctx = requireCtx(req, res);
   if (!ctx) return null;
@@ -417,6 +440,7 @@ export async function createTicket(req: Request, res: Response) {
   }
 
   await notifySoporte(ticket);
+  await pushSoporte(ticket, 'Nuevo ticket', `${autor.nombre} · ${PRIORIDAD_LABEL[prioridad]} · ${asunto}`);
   const { rows } = await pool.query(`SELECT * FROM soporte_tickets WHERE id = $1`, [ticket.id]);
   return ok(res, serializeTicket(rows[0]));
 }
@@ -429,6 +453,10 @@ export async function getTicket(req: Request, res: Response) {
     // Quien abrió el ticket lo está viendo: desaparece su aviso de la campana.
     if (loaded.ticket.created_by === loaded.ctx.userId) {
       await pool.query(`UPDATE soporte_tickets SET creador_visto_at = NOW() WHERE id = $1`, [loaded.ticket.id]);
+    }
+    // Y si lo abre alguien de soporte, desaparece el aviso para soporte.
+    if (isGestor(loaded.ctx.rol)) {
+      await pool.query(`UPDATE soporte_tickets SET soporte_visto_at = NOW() WHERE id = $1`, [loaded.ticket.id]);
     }
     const { rows } = await pool.query(
       `SELECT id, user_id, user_name, es_soporte, mensaje, created_at
@@ -446,24 +474,37 @@ export async function getTicket(req: Request, res: Response) {
   }
 }
 
-// GET /api/soporte/notificaciones — para la campana del ERP: tickets del
-// usuario con novedades de soporte que aún no ha visto. Se consulta cada
-// pocos segundos, así que es una sola consulta ligera por índice.
+// GET /api/soporte/notificaciones — para la campana del ERP. Para un usuario
+// normal: sus tickets con novedades de soporte que aún no ha visto. Para el
+// rol soporte: tickets nuevos o con respuesta del usuario que nadie de
+// soporte ha abierto todavía. Se consulta cada pocos segundos, así que es
+// una sola consulta ligera por índice.
 export async function listNotificaciones(req: Request, res: Response) {
   try {
     const ctx = requireCtx(req, res);
     if (!ctx) return;
-    if (isGestor(ctx.rol)) return ok(res, []);
-    const { rows } = await pool.query(
-      `SELECT id, numero, asunto, estado, soporte_resumen, soporte_actualizado_at
-         FROM soporte_tickets
-        WHERE organizacion_id = $1 AND created_by = $2
-          AND soporte_actualizado_at IS NOT NULL
-          AND (creador_visto_at IS NULL OR soporte_actualizado_at > creador_visto_at)
-        ORDER BY soporte_actualizado_at DESC
-        LIMIT 20`,
-      [ctx.organizacionId, ctx.userId],
-    );
+    const gestor = isGestor(ctx.rol);
+    const { rows } = gestor
+      ? await pool.query(
+        `SELECT id, numero, asunto, estado, usuario_resumen AS resumen, usuario_actualizado_at AS actualizado_at
+           FROM soporte_tickets
+          WHERE organizacion_id = $1
+            AND usuario_actualizado_at IS NOT NULL
+            AND (soporte_visto_at IS NULL OR usuario_actualizado_at > soporte_visto_at)
+          ORDER BY usuario_actualizado_at DESC
+          LIMIT 20`,
+        [ctx.organizacionId],
+      )
+      : await pool.query(
+        `SELECT id, numero, asunto, estado, soporte_resumen AS resumen, soporte_actualizado_at AS actualizado_at
+           FROM soporte_tickets
+          WHERE organizacion_id = $1 AND created_by = $2
+            AND soporte_actualizado_at IS NOT NULL
+            AND (creador_visto_at IS NULL OR soporte_actualizado_at > creador_visto_at)
+          ORDER BY soporte_actualizado_at DESC
+          LIMIT 20`,
+        [ctx.organizacionId, ctx.userId],
+      );
     return ok(res, rows.map((r) => ({
       ticketId: r.id,
       numero: r.numero,
@@ -471,8 +512,8 @@ export async function listNotificaciones(req: Request, res: Response) {
       asunto: r.asunto,
       estado: r.estado,
       estadoLabel: ESTADO_LABEL[r.estado] || r.estado,
-      resumen: r.soporte_resumen,
-      actualizadoAt: r.soporte_actualizado_at,
+      resumen: r.resumen,
+      actualizadoAt: r.actualizado_at,
     })));
   } catch (e: any) {
     return err(res, e?.message || String(e));
@@ -510,6 +551,7 @@ export async function addMensaje(req: Request, res: Response) {
       await pushCreador(upd[0], `Soporte ha respondido a «${upd[0].asunto}»: ${texto}`);
     } else {
       await notifySoporte(upd[0], { autorId: ctx.userId, autor: autor.nombre, texto });
+      await pushSoporte(upd[0], 'Respuesta en', `${autor.nombre} ha respondido a «${upd[0].asunto}»: ${texto}`);
     }
 
     const m = rows[0];
