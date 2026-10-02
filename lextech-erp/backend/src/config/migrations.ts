@@ -1311,12 +1311,6 @@ export async function runMigrations(): Promise<void> {
         WHERE quipu_id IS NOT NULL
       `);
     } catch (_e: any) {}
-    try {
-      await client.query(`
-        CREATE UNIQUE INDEX IF NOT EXISTS ux_facturacion_facturas_user_serie_num
-        ON facturacion_facturas (user_id, LOWER(COALESCE(serie, '')), LOWER(num))
-      `);
-    } catch (_e: any) {}
     for (const idx of [
       `CREATE INDEX IF NOT EXISTS idx_facturacion_facturas_user_fecha ON facturacion_facturas (user_id, fecha DESC)`,
       `CREATE INDEX IF NOT EXISTS idx_facturacion_facturas_estado ON facturacion_facturas (estado)`,
@@ -1989,6 +1983,59 @@ export async function runMigrations(): Promise<void> {
       `);
       await client.query(`ALTER TABLE billing_bank_accounts ALTER COLUMN organizacion_id SET NOT NULL;`);
       await client.query(`CREATE INDEX IF NOT EXISTS idx_billing_bank_accounts_organizacion_id ON billing_bank_accounts (organizacion_id);`);
+    } catch (_e: any) {}
+
+    // Duplicados de la sincronización con Quipu: el índice de unicidad era
+    // (user_id, quipu_id), así que si varias personas del MISMO despacho
+    // conectaban por separado la misma cuenta de Quipu, cada una generaba su
+    // propia copia de cada factura -- invisible mientras Facturación era
+    // privada por usuario, pero al pasar a compartida por despacho (arriba)
+    // las copias se ven todas a la vez y encima se regeneran solas cada 30
+    // min (el auto-sync de Quipu). Se limpia una vez y se cambia la
+    // unicidad a (organizacion_id, quipu_id) para que no vuelva a pasar --
+    // la limpieza se repite en cada arranque por si el auto-sync ha creado
+    // más duplicados entre deploy y deploy, hasta que todos los despachos
+    // afectados queden sin ninguno.
+    try {
+      await client.query(`
+        DELETE FROM facturacion_facturas
+        WHERE quipu_id IS NOT NULL
+          AND id NOT IN (
+            SELECT DISTINCT ON (organizacion_id, quipu_id) id
+            FROM facturacion_facturas
+            WHERE quipu_id IS NOT NULL
+            ORDER BY organizacion_id, quipu_id, created_at ASC
+          )
+      `);
+      await client.query(`
+        DELETE FROM facturacion_gastos
+        WHERE quipu_id IS NOT NULL
+          AND id NOT IN (
+            SELECT DISTINCT ON (organizacion_id, quipu_id) id
+            FROM facturacion_gastos
+            WHERE quipu_id IS NOT NULL
+            ORDER BY organizacion_id, quipu_id, created_at ASC
+          )
+      `);
+    } catch (_e: any) {}
+    try {
+      await client.query(`DROP INDEX IF EXISTS ux_facturacion_facturas_quipu_id;`);
+      await client.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_facturacion_facturas_org_quipu_id
+        ON facturacion_facturas (organizacion_id, quipu_id)
+        WHERE quipu_id IS NOT NULL
+      `);
+    } catch (_e: any) {}
+    try {
+      // facturacion_gastos nunca tuvo este índice -- el ON CONFLICT del
+      // código apuntaba a una restricción que no existía, así que cada
+      // intento de importar un gasto de Quipu fallaba en silencio (de ahí
+      // que la tabla estuviera siempre vacía pese a sincronizar).
+      await client.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_facturacion_gastos_org_quipu_id
+        ON facturacion_gastos (organizacion_id, quipu_id)
+        WHERE quipu_id IS NOT NULL
+      `);
     } catch (_e: any) {}
 
     // ── Preferencias de usuario (tema de la interfaz, entre otras futuras) ──

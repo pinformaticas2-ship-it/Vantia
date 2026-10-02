@@ -709,19 +709,27 @@ async function persistQuipuBootstrap(userId: string, settingId: string, bootstra
 }
 
 // ── Ensure quipu_id columns + unique indexes on billing tables ───────────────
-async function ensureFacturasQuipuColumn() {
+// Dedupe/índice por (organizacion_id, quipu_id) -- NO por user_id. Antes era
+// por usuario, así que si dos personas del mismo despacho conectaban por
+// separado la misma cuenta de Quipu, cada sync (cada 30 min, para cada una)
+// volvía a crear su propia copia de cada factura/gasto sin que esta función
+// lo detectara como duplicado. Se ejecuta en cada sync, no solo en el
+// arranque, así que corrige cualquier duplicado nuevo que se haya colado
+// entre despliegues.
+async function ensureFacturasQuipuColumn(organizacionId: string) {
   // facturacion_facturas
   try { await pool.query(`ALTER TABLE facturacion_facturas ADD COLUMN IF NOT EXISTS quipu_id VARCHAR(255)`); }
   catch (e: any) { console.warn('[Quipu] ADD COLUMN facturas.quipu_id:', e?.message); }
   try {
     await pool.query(`
-      DELETE FROM facturacion_facturas WHERE quipu_id IS NOT NULL
+      DELETE FROM facturacion_facturas WHERE quipu_id IS NOT NULL AND organizacion_id = $1
         AND id NOT IN (
-          SELECT DISTINCT ON (user_id, quipu_id) id FROM facturacion_facturas
-          WHERE quipu_id IS NOT NULL ORDER BY user_id, quipu_id, created_at DESC NULLS LAST
-        )`);
-    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS ux_facturacion_facturas_quipu_id
-      ON facturacion_facturas (user_id, quipu_id) WHERE quipu_id IS NOT NULL`);
+          SELECT DISTINCT ON (organizacion_id, quipu_id) id FROM facturacion_facturas
+          WHERE quipu_id IS NOT NULL AND organizacion_id = $1 ORDER BY organizacion_id, quipu_id, created_at ASC
+        )`, [organizacionId]);
+    await pool.query(`DROP INDEX IF EXISTS ux_facturacion_facturas_quipu_id`);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS ux_facturacion_facturas_org_quipu_id
+      ON facturacion_facturas (organizacion_id, quipu_id) WHERE quipu_id IS NOT NULL`);
   } catch (e: any) { console.warn('[Quipu] INDEX facturas.quipu_id:', e?.message); }
 
   // facturacion_gastos
@@ -729,13 +737,13 @@ async function ensureFacturasQuipuColumn() {
   catch (e: any) { console.warn('[Quipu] ADD COLUMN gastos.quipu_id:', e?.message); }
   try {
     await pool.query(`
-      DELETE FROM facturacion_gastos WHERE quipu_id IS NOT NULL
+      DELETE FROM facturacion_gastos WHERE quipu_id IS NOT NULL AND organizacion_id = $1
         AND id NOT IN (
-          SELECT DISTINCT ON (user_id, quipu_id) id FROM facturacion_gastos
-          WHERE quipu_id IS NOT NULL ORDER BY user_id, quipu_id, created_at DESC NULLS LAST
-        )`);
-    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS ux_facturacion_gastos_quipu_id
-      ON facturacion_gastos (user_id, quipu_id) WHERE quipu_id IS NOT NULL`);
+          SELECT DISTINCT ON (organizacion_id, quipu_id) id FROM facturacion_gastos
+          WHERE quipu_id IS NOT NULL AND organizacion_id = $1 ORDER BY organizacion_id, quipu_id, created_at ASC
+        )`, [organizacionId]);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS ux_facturacion_gastos_org_quipu_id
+      ON facturacion_gastos (organizacion_id, quipu_id) WHERE quipu_id IS NOT NULL`);
   } catch (e: any) { console.warn('[Quipu] INDEX gastos.quipu_id:', e?.message); }
 }
 
@@ -755,7 +763,7 @@ export async function syncQuipuForUserInternal(userId: string): Promise<{
   const organizacionId = memberships[0]?.organizacionId;
   if (!organizacionId) throw new Error('El usuario no pertenece a ninguna organización.');
 
-  await ensureFacturasQuipuColumn();
+  await ensureFacturasQuipuColumn(organizacionId);
   const bootstrap = await fetchQuipuBootstrap(settings);
   const summary = summarizeQuipuBootstrap(bootstrap);
   await persistQuipuBootstrap(userId, settings.id, bootstrap);
@@ -780,7 +788,7 @@ export async function syncQuipuForUserInternal(userId: string): Promise<{
            (user_id, created_by, num, contacto, fecha, vencimiento, total, estado,
             area, responsable, forma_pago, serie, tipo_cliente, quipu_id, organizacion_id)
          VALUES ($1,'Quipu Sync',$2,$3,$4,$5,$6,$7,'procesal','Quipu','transferencia','QUIPU','empresa',$8,$9)
-         ON CONFLICT (user_id, quipu_id) WHERE quipu_id IS NOT NULL
+         ON CONFLICT (organizacion_id, quipu_id) WHERE quipu_id IS NOT NULL
          DO UPDATE SET num=$2, contacto=$3, fecha=$4, vencimiento=$5, total=$6, estado=$7, updated_at=NOW()
          RETURNING (xmax = 0) AS inserted`,
         [userId, num, contacto, fecha, vencimiento, total, estado, quipuId, organizacionId],
@@ -807,7 +815,7 @@ export async function syncQuipuForUserInternal(userId: string): Promise<{
            (user_id, created_by, num, proveedor, fecha, total, categoria, estado,
             area, responsable, deducible, quipu_id, organizacion_id)
          VALUES ($1,'Quipu Sync',$2,$3,$4,$5,$6,$7,'procesal','Quipu',true,$8,$9)
-         ON CONFLICT (user_id, quipu_id) WHERE quipu_id IS NOT NULL
+         ON CONFLICT (organizacion_id, quipu_id) WHERE quipu_id IS NOT NULL
          DO UPDATE SET proveedor=$3, fecha=$4, total=$5, estado=$7, updated_at=NOW()
          RETURNING (xmax = 0) AS inserted`,
         [userId, num, proveedor, fecha, total, cat, estado, quipuId, organizacionId],
