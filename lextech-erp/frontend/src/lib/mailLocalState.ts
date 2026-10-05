@@ -58,3 +58,31 @@ export function getLastMailAccount(): LastMailAccount | null {
 export function saveLastMailAccount(account: LastMailAccount) {
   try { localStorage.setItem(lastAccountKey(), JSON.stringify(account)); } catch { /* noop */ }
 }
+
+// ── Borradores de correo guardados en el navegador ───────────────────────────
+// Antes iban en una clave global ('lextech-email-drafts-v1'): un borrador de
+// una organización salía en Borradores de cualquier otra (y de cualquier
+// usuario del mismo navegador). Los antiguos no se pueden atribuir con
+// certeza; para no perder texto escrito se trasladan UNA vez a la primera
+// organización en la que se abra Correo.
+const LEGACY_DRAFTS_KEY = 'lextech-email-drafts-v1';
+const draftsKey = () => `vantia-mail-drafts-v2:${scope()}`;
+
+export function readDraftsRaw(): string | null {
+  try {
+    const legacy = localStorage.getItem(LEGACY_DRAFTS_KEY);
+    if (legacy !== null) {
+      const current = JSON.parse(localStorage.getItem(draftsKey()) || '[]');
+      const old = JSON.parse(legacy || '[]');
+      localStorage.setItem(draftsKey(), JSON.stringify([...(Array.isArray(current) ? current : []), ...(Array.isArray(old) ? old : [])]));
+      localStorage.removeItem(LEGACY_DRAFTS_KEY);
+    }
+    return localStorage.getItem(draftsKey());
+  } catch {
+    return null;
+  }
+}
+
+export function writeDraftsRaw(value: string) {
+  try { localStorage.setItem(draftsKey(), value); } catch { /* noop */ }
+}

@@ -26,7 +26,7 @@ import {
   AlignLeft, AlignCenter, AlignRight, List, Pencil, Sun, Moon, Download, Briefcase, type LucideIcon,
 } from 'lucide-react';
 import MailboxProbeModal from '../components/MailboxProbeModal';
-import { getStoredGmailToken, saveGmailToken, clearGmailToken, getLastMailAccount, saveLastMailAccount } from '../lib/mailLocalState';
+import { getStoredGmailToken, saveGmailToken, clearGmailToken, getLastMailAccount, saveLastMailAccount, readDraftsRaw, writeDraftsRaw } from '../lib/mailLocalState';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -37,7 +37,6 @@ const GMAIL_SCOPES = [
   'https://www.googleapis.com/auth/gmail.modify',
   'https://www.googleapis.com/auth/gmail.labels',
 ].join(' ');
-const LOCAL_DRAFTS_KEY = 'lextech-email-drafts-v1';
 const MAIL_THEME_KEY = 'lextech-email-theme-v2';
 type MailTheme = 'dark' | 'light';
 // Key de pineados es por cuenta (evita que se mezclen Gmail e IMAP)
@@ -368,7 +367,8 @@ function b64d(str: string): string {
 
 function readLocalDrafts(): LocalDraft[] {
   try {
-    const raw = JSON.parse(localStorage.getItem(LOCAL_DRAFTS_KEY) || '[]');
+    // Por usuario y organización (ver lib/mailLocalState).
+    const raw = JSON.parse(readDraftsRaw() || '[]');
     return Array.isArray(raw) ? raw : [];
   } catch {
     return [];
@@ -376,7 +376,7 @@ function readLocalDrafts(): LocalDraft[] {
 }
 
 function writeLocalDrafts(drafts: LocalDraft[]) {
-  localStorage.setItem(LOCAL_DRAFTS_KEY, JSON.stringify(drafts));
+  writeDraftsRaw(JSON.stringify(drafts));
 }
 
 function upsertLocalDraft(draft: LocalDraft) {
