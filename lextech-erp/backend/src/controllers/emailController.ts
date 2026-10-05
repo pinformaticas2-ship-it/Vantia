@@ -1066,8 +1066,15 @@ export async function getMessages(req: Request, res: Response) {
   const offset   = (page - 1) * pageSize;
 
   try {
-    const params: any[] = [uid];
-    const conditions: string[] = ['e.user_id=$1'];
+    const params: any[] = [uid, organizacionId];
+    // Siempre acotado a los buzones de la organización activa -- sin esto, la
+    // lista sin cuenta concreta (widget del dashboard, campana) mezclaba los
+    // correos de todas las organizaciones del usuario. Los borradores sueltos
+    // (sin cuenta) son del propio usuario y se mantienen.
+    const conditions: string[] = [
+      'e.user_id=$1',
+      '(e.account_id IN (SELECT id FROM email_accounts WHERE organizacion_id=$2) OR e.gmail_profile_id IN (SELECT id FROM email_oauth_profiles WHERE organizacion_id=$2) OR (e.account_id IS NULL AND e.gmail_profile_id IS NULL))',
+    ];
 
     // account_id/gmail_profile_id llegan del selector del frontend, que ya
     // solo lista cuentas de la organización activa -- esta comprobación es
@@ -1908,14 +1915,15 @@ export async function getStats(req: Request, res: Response) {
   const gmailProfileId = req.query.gmail_profile_id as string | undefined;
 
   try {
-    const params: any[] = [uid];
-    let accCond = '';
+    const params: any[] = [uid, organizacionId];
+    // Contadores siempre de la organización activa (ver getMessages).
+    let accCond = `AND (account_id IN (SELECT id FROM email_accounts WHERE organizacion_id=$2) OR gmail_profile_id IN (SELECT id FROM email_oauth_profiles WHERE organizacion_id=$2) OR (account_id IS NULL AND gmail_profile_id IS NULL))`;
     if (accountId) {
-      params.push(accountId, organizacionId);
-      accCond = `AND account_id=$2 AND account_id IN (SELECT id FROM email_accounts WHERE organizacion_id=$3)`;
+      params.push(accountId);
+      accCond += ` AND account_id=$3`;
     } else if (gmailProfileId) {
-      params.push(gmailProfileId, organizacionId);
-      accCond = `AND gmail_profile_id=$2 AND gmail_profile_id IN (SELECT id FROM email_oauth_profiles WHERE organizacion_id=$3)`;
+      params.push(gmailProfileId);
+      accCond += ` AND gmail_profile_id=$3`;
     }
 
     const { rows } = await pool.query(

@@ -2788,6 +2788,34 @@ export async function runMigrations(): Promise<void> {
       try { await client.query(idx); } catch (_e: any) {}
     }
 
+    // ── Trazabilidad por organización ────────────────────────────────────────
+    // activity_log no guardaba la organización: la página de Trazabilidad y el
+    // widget del dashboard mostraban la actividad de TODAS las organizaciones
+    // (con nombres de clientes/expedientes de otros despachos). A partir de
+    // ahora cada registro lleva la organización activa de quien actúa; el
+    // histórico se asigna deduciéndola de la entidad afectada. Lo que no se
+    // puede deducir (inicios de sesión antiguos, arranques del servidor) se
+    // queda sin organización y no aparece en ninguna.
+    try { await client.query(`ALTER TABLE activity_log ADD COLUMN IF NOT EXISTS organizacion_id UUID`); } catch (_e: any) {}
+    try { await client.query(`CREATE INDEX IF NOT EXISTS idx_activity_log_org_created ON activity_log (organizacion_id, created_at DESC)`); } catch (_e: any) {}
+    for (const [entityTypes, source] of [
+      [`'CLIENT','CLIENTE'`, `SELECT organizacion_id FROM entities WHERE id::text = al.entity_id`],
+      [`'CLIENT','CLIENTE','EXPEDIENTE'`, `SELECT organizacion_id FROM expedientes WHERE id::text = al.entity_id`],
+      [`'AGENDA'`, `SELECT organizacion_id FROM agenda_events WHERE id::text = al.entity_id`],
+      [`'TASK'`, `SELECT organizacion_id FROM client_tasks WHERE id::text = al.entity_id`],
+      [`'FACTURACION_FACTURA'`, `SELECT organizacion_id FROM facturacion_facturas WHERE id::text = al.entity_id`],
+      [`'DIRECTORIO'`, `SELECT organizacion_id FROM directorio_profesionales WHERE id::text = al.entity_id`],
+      [`'EMAIL'`, `SELECT organizacion_id FROM email_accounts WHERE id::text = al.entity_id`],
+      [`'ORGANIZACION'`, `SELECT id FROM organizaciones WHERE id::text = al.entity_id`],
+    ] as const) {
+      try {
+        await client.query(
+          `UPDATE activity_log al SET organizacion_id = (${source})
+            WHERE al.organizacion_id IS NULL AND al.entity_type IN (${entityTypes}) AND al.entity_id IS NOT NULL`,
+        );
+      } catch (_e: any) {}
+    }
+
     // ── Quipu pertenece a una organización ───────────────────────────────────
     // La conexión era solo por usuario y sus facturas/contactos/cuentas se
     // mostraban en la organización que estuviera abierta (las facturas de un

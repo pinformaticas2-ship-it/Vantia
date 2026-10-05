@@ -77,6 +77,34 @@ function getDeviceId(req: Request): string | null {
   return trimmed ? trimmed.slice(0, 120) : null;
 }
 
+// De qué tabla sacar la organización según el tipo de entidad del registro.
+// "CLIENT" también se usa con ids de expediente (adjuntos de expediente).
+const ENTITY_ORG_SOURCES: Record<string, string[]> = {
+  CLIENT: ['entities', 'expedientes'],
+  CLIENTE: ['entities', 'expedientes'],
+  EXPEDIENTE: ['expedientes'],
+  AGENDA: ['agenda_events'],
+  TASK: ['client_tasks'],
+  FACTURACION_FACTURA: ['facturacion_facturas'],
+  DIRECTORIO: ['directorio_profesionales'],
+  EMAIL: ['email_accounts'],
+};
+
+/** Si quien registra no indica la organización (procesos sin sesión, p.ej.
+ *  la edición con Office), se deduce de la entidad afectada -- ningún registro
+ *  de actividad sobre datos de un despacho debe quedar fuera de su organización. */
+async function inferOrganizacionId(entityType?: string, entityId?: string): Promise<string | null> {
+  if (!entityType || !entityId) return null;
+  if (entityType === 'ORGANIZACION') return entityId;
+  for (const table of ENTITY_ORG_SOURCES[entityType] || []) {
+    try {
+      const { rows } = await pool.query(`SELECT organizacion_id FROM ${table} WHERE id::text = $1 LIMIT 1`, [entityId]);
+      if (rows[0]?.organizacion_id) return rows[0].organizacion_id;
+    } catch { /* tabla sin la columna: siguiente */ }
+  }
+  return null;
+}
+
 export async function logActivity(
   userId: string,
   userName: string,
@@ -84,14 +112,14 @@ export async function logActivity(
   entityType?: string,
   entityId?: string,
   entityName?: string,
-  opts?: { eventType?: EventType; ipAddress?: string; sessionId?: string; userAgent?: string; deviceId?: string }
+  opts?: { eventType?: EventType; ipAddress?: string; sessionId?: string; userAgent?: string; deviceId?: string; organizacionId?: string | null }
 ): Promise<void> {
   try {
     await pool.query(
       `INSERT INTO activity_log
          (user_id, user_name, action_type, entity_type, entity_id, entity_name,
-          event_type, ip_address, session_id, user_agent, device_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+          event_type, ip_address, session_id, user_agent, device_id, organizacion_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
       [
         userId,
         userName,
@@ -104,6 +132,7 @@ export async function logActivity(
         opts?.sessionId || null,
         opts?.userAgent || null,
         opts?.deviceId || null,
+        opts?.organizacionId || (await inferOrganizacionId(entityType, entityId)),
       ]
     );
   } catch (_e) {}
@@ -125,6 +154,7 @@ export async function logActivityForReq(
     ipAddress: getClientIp(req),
     userAgent: getUA(req),
     deviceId: getDeviceId(req),
+    organizacionId: (req as any).organizacionId || null,
   });
 }
 
@@ -167,7 +197,7 @@ export const registerLogin = async (req: Request, res: Response) => {
       undefined,
       undefined,
       undefined,
-      { eventType: 'LOGIN', ipAddress: ip, sessionId, userAgent: getUA(req), deviceId }
+      { eventType: 'LOGIN', ipAddress: ip, sessionId, userAgent: getUA(req), deviceId, organizacionId: (req as any).organizacionId || null }
     );
 
     return res.json({ success: true, data: { logged: true, ip } });
@@ -192,6 +222,7 @@ export const registerLogout = async (req: Request, res: Response) => {
       sessionId,
       userAgent: getUA(req),
       deviceId,
+      organizacionId: (req as any).organizacionId || null,
     });
 
     return res.json({ success: true });
@@ -205,8 +236,9 @@ export const getActivity = async (req: Request, res: Response) => {
   const eventType = (req.query.event_type as string) || '';
 
   try {
-    const params: any[] = [limit];
-    const filter = eventType ? `WHERE event_type=$2` : '';
+    // Solo la organización activa (ver migración 'Trazabilidad por organización').
+    const params: any[] = [limit, (req as any).organizacionId];
+    const filter = eventType ? `WHERE organizacion_id=$2 AND event_type=$3` : 'WHERE organizacion_id=$2';
     if (eventType) params.push(eventType);
 
     const { rows } = await pool.query(
@@ -244,10 +276,11 @@ export const getClientActivity = async (req: Request, res: Response) => {
         WHERE avatar_url IS NOT NULL AND avatar_url <> ''
         ORDER BY user_id, joined_at DESC NULLS LAST
       ) cm ON cm.user_id = al.user_id
-      WHERE al.entity_id = $1
-         OR al.entity_id IN (SELECT id FROM expedientes WHERE cliente_id = $1)
+      WHERE al.organizacion_id = $2
+        AND (al.entity_id = $1
+         OR al.entity_id IN (SELECT id::text FROM expedientes WHERE cliente_id::text = $1 AND organizacion_id = $2))
       ORDER BY al.created_at DESC LIMIT 200`,
-      [clientId]
+      [clientId, (req as any).organizacionId]
     );
 
     res.json({ success: true, data: rows });
@@ -268,9 +301,10 @@ export const addClientActivity = async (req: Request, res: Response) => {
 
   try {
     const cr = await pool.query(
-      `SELECT COALESCE(commercial_name,CONCAT(first_name,' ',last_name)) AS name FROM entities WHERE id=$1`, 
-      [clientId]
+      `SELECT COALESCE(commercial_name,CONCAT(first_name,' ',last_name)) AS name FROM entities WHERE id=$1 AND organizacion_id=$2`,
+      [clientId, (req as any).organizacionId]
     );
+    if (!cr.rows.length) return res.status(404).json({ success: false, error: 'Cliente no encontrado.' });
     const entityName = cr.rows[0]?.name || clientId;
     const fullAction = description?.trim()
       ? `${action_type.trim()}: ${description.trim()}`
@@ -278,9 +312,9 @@ export const addClientActivity = async (req: Request, res: Response) => {
 
     const { rows } = await pool.query(
       `INSERT INTO activity_log
-         (user_id,user_name,action_type,entity_type,entity_id,entity_name,event_type,ip_address,user_agent,device_id)
-       VALUES ($1,$2,$3,'CLIENT',$4,$5,'ACTION',$6,$7,$8) RETURNING *`,
-      [userId, userName, fullAction, clientId, entityName, getClientIp(req), getUA(req), getDeviceId(req)]
+         (user_id,user_name,action_type,entity_type,entity_id,entity_name,event_type,ip_address,user_agent,device_id,organizacion_id)
+       VALUES ($1,$2,$3,'CLIENT',$4,$5,'ACTION',$6,$7,$8,$9) RETURNING *`,
+      [userId, userName, fullAction, clientId, entityName, getClientIp(req), getUA(req), getDeviceId(req), (req as any).organizacionId]
     );
 
     res.status(201).json({ success: true, data: rows[0] });
@@ -289,7 +323,7 @@ export const addClientActivity = async (req: Request, res: Response) => {
   }
 };
 
-export const getActivityByUsers = async (_req: Request, res: Response) => {
+export const getActivityByUsers = async (req: Request, res: Response) => {
   try {
     const { rows } = await pool.query(`
       SELECT
@@ -308,10 +342,10 @@ export const getActivityByUsers = async (_req: Request, res: Response) => {
         json_agg(DISTINCT event_type) FILTER (WHERE event_type IS NOT NULL) AS event_types,
         json_agg(DISTINCT entity_type) FILTER (WHERE entity_type IS NOT NULL) AS entity_types
       FROM activity_log
-      WHERE user_id != 'SYSTEM'
+      WHERE user_id != 'SYSTEM' AND organizacion_id = $1
       GROUP BY user_id
       ORDER BY MAX(created_at) DESC
-    `);
+    `, [(req as any).organizacionId]);
 
     res.json({ success: true, data: rows });
   } catch (e: any) {
@@ -330,8 +364,8 @@ export const getUserActivity = async (req: Request, res: Response) => {
   try {
     // WHERE compartido entre la consulta de filas y la de total, para que
     // "Mostrando X de Y" y el paginado ("hay mas") reflejen los mismos filtros.
-    const conditions: string[] = ['user_id=$1'];
-    const whereParams: any[] = [userId];
+    const conditions: string[] = ['user_id=$1', 'organizacion_id=$2'];
+    const whereParams: any[] = [userId, (req as any).organizacionId];
     if (eventType) { whereParams.push(eventType); conditions.push(`event_type=$${whereParams.length}`); }
     if (dateFrom)  { whereParams.push(dateFrom);  conditions.push(`created_at >= $${whereParams.length}::date`); }
     if (dateTo)    { whereParams.push(dateTo);    conditions.push(`created_at < ($${whereParams.length}::date + INTERVAL '1 day')`); }
@@ -369,8 +403,8 @@ export const getMyActivity = async (req: Request, res: Response) => {
   const eventType = (req.query.event_type as string) || '';
 
   try {
-    const params: any[] = [userId, limit, offset];
-    const filter = eventType ? `AND event_type=$4` : '';
+    const params: any[] = [userId, limit, offset, (req as any).organizacionId];
+    const filter = eventType ? `AND event_type=$5` : '';
     if (eventType) params.push(eventType);
 
     const [rows, total] = await Promise.all([
@@ -381,12 +415,12 @@ export const getMyActivity = async (req: Request, res: Response) => {
                entity_type, entity_id, entity_name,
                event_type, ip_address, session_id, user_agent, device_id, created_at
         FROM activity_log
-        WHERE user_id=$1 ${filter}
+        WHERE user_id=$1 AND organizacion_id=$4 ${filter}
         ORDER BY created_at DESC LIMIT $2 OFFSET $3
       `,
         params
       ),
-      pool.query(`SELECT COUNT(*)::int AS total FROM activity_log WHERE user_id=$1`, [userId]),
+      pool.query(`SELECT COUNT(*)::int AS total FROM activity_log WHERE user_id=$1 AND organizacion_id=$2`, [userId, (req as any).organizacionId]),
     ]);
 
     return res.json({ success: true, data: rows.rows, total: total.rows[0]?.total ?? 0 });

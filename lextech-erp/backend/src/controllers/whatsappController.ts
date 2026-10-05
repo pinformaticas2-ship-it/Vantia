@@ -452,12 +452,17 @@ export async function sendWhatsAppMessage(req: any, res: Response) {
   }
 }
 
-export async function getSchedules(_req: Request, res: Response) {
+export async function getSchedules(req: Request, res: Response) {
   try {
+    // Solo los de clientes de la organización activa (los programados sin
+    // cliente vinculado siguen visibles, mismo criterio que whatsapp_messages).
     const result = await pool.query(
-      `SELECT *
-       FROM whatsapp_schedules
-       ORDER BY scheduled_for ASC, created_at DESC`,
+      `SELECT ws.*
+       FROM whatsapp_schedules ws
+       WHERE ws.client_id IS NULL
+          OR ws.client_id IN (SELECT id FROM entities WHERE organizacion_id = $1)
+       ORDER BY ws.scheduled_for ASC, ws.created_at DESC`,
+      [(req as any).organizacionId],
     );
     res.json({ success: true, data: result.rows });
   } catch (error: any) {
