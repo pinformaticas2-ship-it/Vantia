@@ -537,7 +537,14 @@ async function processOrganizacion(org: { id: string; nombre: string; vistas_aut
       WHERE ${mailboxCond}
         AND e.folder = 'INBOX'
         AND NOT e.is_draft
-        AND COALESCE(e.sent_at, e.created_at) >= $2
+        -- "Nuevo" = guardado en Vantia después de activar (created_at) y con
+        -- fecha de envío como mucho 1 h anterior (correos entregados con
+        -- retraso). Antes solo contaba la fecha del remitente, y un correo
+        -- fechado un minuto antes de activar pero entregado después se perdía.
+        -- La fecha de envío sigue excluyendo el histórico que la sincronización
+        -- automática de carpetas va bajando (correos de hace semanas).
+        AND e.created_at >= $2
+        AND COALESCE(e.sent_at, e.created_at) >= $2::timestamptz - interval '1 hour'
         AND NOT EXISTS (SELECT 1 FROM vistas_solicitudes vs WHERE vs.email_id = e.id)
       ORDER BY COALESCE(e.sent_at, e.created_at) ASC
       LIMIT ${MAX_EMAILS_PER_TICK}`,
@@ -654,10 +661,22 @@ async function sendDueReminders(): Promise<void> {
 // la vez y nunca se crean dos solicitudes ni se avisa dos veces.
 const ADVISORY_LOCK_KEY = 74_810_233;
 let running = false;
+// Organizaciones con correo nuevo avisado (IMAP IDLE) mientras ya había una
+// pasada en marcha: se procesan justo al terminarla, sin esperar al minuto.
+const pendingOrgs = new Set<string>();
 
-export async function runVistasTick(): Promise<void> {
+/** Revisión inmediata de una organización (la llama vistasIdle.ts en cuanto
+ *  el servidor de correo avisa de un mensaje nuevo). */
+export function requestVistasCheck(organizacionId: string): void {
+  pendingOrgs.add(organizacionId);
+  if (!running) void runVistasTick([...pendingOrgs]);
+}
+
+export async function runVistasTick(onlyOrgIds?: string[]): Promise<void> {
   if (running) return;
   running = true;
+  for (const id of onlyOrgIds || []) pendingOrgs.delete(id);
+  if (!onlyOrgIds) pendingOrgs.clear();
   const client = await pool.connect().catch(() => null);
   if (!client) { running = false; return; }
   try {
@@ -667,7 +686,9 @@ export async function runVistasTick(): Promise<void> {
       const { rows: orgs } = await pool.query(
         `SELECT id, nombre, vistas_auto_config, vistas_auto_activated_at
            FROM organizaciones
-          WHERE vistas_auto_enabled = true AND vistas_auto_activated_at IS NOT NULL`,
+          WHERE vistas_auto_enabled = true AND vistas_auto_activated_at IS NOT NULL
+            AND ($1::uuid[] IS NULL OR id = ANY($1::uuid[]))`,
+        [onlyOrgIds && onlyOrgIds.length ? onlyOrgIds : null],
       );
       for (const org of orgs) {
         let lastError: string | null = null;
@@ -691,13 +712,15 @@ export async function runVistasTick(): Promise<void> {
   } finally {
     client.release();
     running = false;
+    if (pendingOrgs.size) setImmediate(() => void runVistasTick([...pendingOrgs]));
   }
 }
 
 export function startVistasScheduler(): void {
-  // Primera pasada al minuto (deja asentarse BD y migraciones), luego cada 2 min.
+  // Red de seguridad cada minuto (Gmail, o si se cae la conexión IDLE); lo
+  // habitual es que el aviso inmediato de vistasIdle.ts llegue antes.
   setTimeout(() => {
     void runVistasTick();
-    setInterval(() => void runVistasTick(), 2 * 60 * 1000);
-  }, 60_000);
+    setInterval(() => void runVistasTick(), 60 * 1000);
+  }, 30_000);
 }

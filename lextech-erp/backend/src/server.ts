@@ -41,6 +41,7 @@ import { startPlazoPushScheduler } from './services/plazoPushScheduler';
 import { startSoporteRetencionScheduler } from './services/soporteRetencion';
 import { startVistasScheduler } from './services/vistasAutomation';
 import { startImapAutoSync } from './services/imapAutoSync';
+import { startVistasIdle } from './services/vistasIdle';
 import { migrateLocalFoldersStructure } from './controllers/filesController';
 import { logServerStart } from './controllers/activityController';
 import pool from './config/database';
@@ -380,6 +381,8 @@ runMigrations().then(() => {
     // Automatización de vistas por correo (solo actúa en las organizaciones
     // que la tengan activada en Configuración → Automatizaciones)
     startVistasScheduler();
+    // ...y aviso inmediato (IMAP IDLE) en cuanto entra un correo al buzón vigilado.
+    startVistasIdle();
 
     // Correo IMAP: todas las carpetas de todas las cuentas se actualizan solas
     // cada 5 min (como Thunderbird), aunque nadie tenga abierta la página de Correo.

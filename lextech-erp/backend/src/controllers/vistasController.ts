@@ -14,6 +14,7 @@ import {
   VistasConfig,
   PlantillaVars,
 } from '../services/vistasAutomation';
+import { reconcileVistasIdle } from '../services/vistasIdle';
 
 // ── Automatización de vistas: configuración y decisiones del abogado ────────
 // La parte automática (leer el correo, extraer datos, comprobar la agenda,
@@ -199,6 +200,8 @@ export async function updateVistasConfig(req: any, res: Response) {
       [org.id, enabled, JSON.stringify(next), restart],
     );
     await logActivityForReq(req, `Automatización de vistas ${enabled ? 'activada' : 'desactivada'}`, 'ORGANIZACION', org.id, org.nombre);
+    // Abrir (o cerrar) ya la escucha inmediata del buzón, sin esperar al minuto.
+    void reconcileVistasIdle();
     return getVistasConfig(req, res);
   } catch (e: any) {
     return fail(res, e?.message || 'Error guardando la configuración de vistas');
