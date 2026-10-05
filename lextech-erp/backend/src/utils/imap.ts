@@ -453,6 +453,19 @@ export class ImapClient {
 
   /** UID de los últimos `count` mensajes por posición -- no depende de SEARCH,
    *  así que sirve de plan B si el servidor rechaza las búsquedas. */
+  /** Todos los UID de la carpeta seleccionada (FETCH 1:* UID) -- no usa SEARCH. */
+  async allUids(): Promise<number[]> {
+    const client = this.ensureClient();
+    const exists = Number(client.mailbox?.exists || 0);
+    const uids: number[] = [];
+    if (exists > 0) {
+      for await (const msg of client.fetch('1:*', { uid: true }, { uid: false })) {
+        if (msg?.uid) uids.push(Number(msg.uid));
+      }
+    }
+    return uids;
+  }
+
   async recentUidsBySequence(count: number): Promise<number[]> {
     const client = this.ensureClient();
     const exists = Number(client.mailbox?.exists || 0);
@@ -607,13 +620,14 @@ export async function syncInbox(
    *  que falten (hasta maxMessages) para ir rellenando huecos. */
   knownUids?: Set<number>,
   report?: (warning: string) => void,
+  onServerState?: (state: FolderServerState) => void,
 ): Promise<ImapMessage[]> {
   const client = new ImapClient(cfg);
 
   try {
     await client.connect();
     await client.login();
-    return await fetchFolderEnvelopes(client, folder, maxMessages, since, knownUids, report);
+    return await fetchFolderEnvelopes(client, folder, maxMessages, since, knownUids, report, onServerState);
   } finally {
     await client.logout().catch(() => undefined);
   }
@@ -622,53 +636,61 @@ export async function syncInbox(
 /** Igual que syncInbox pero sobre una conexión ya abierta -- para recorrer
  *  todas las carpetas de una cuenta con un único login (ver
  *  syncImapAccountAllFolders en emailController.ts). */
-export type FolderClient = Pick<ImapClient, 'selectFolder' | 'searchUidsSince' | 'recentUidsBySequence' | 'searchUids' | 'fetchEnvelopes'>;
+export type FolderClient = Pick<ImapClient, 'selectFolder' | 'recentUidsBySequence' | 'allUids' | 'fetchEnvelopes'>;
 
+/** Estado de la carpeta en el servidor, para que quien llama pueda quitar de
+ *  Vantia lo que ya no existe allí (borrado o movido). allUids es null si no
+ *  hizo falta pedir la lista completa (la carpeta no había cambiado). */
+export interface FolderServerState { exists: number; allUids: number[] | null }
+
+/** Mensajes nuevos de las últimas posiciones a los que se refresca leído/destacado en cada pasada. */
+const FLAG_REFRESH_COUNT = 20;
+
+/**
+ * Trae la tanda de mensajes que toca de una carpeta, como Thunderbird:
+ *  - Si la carpeta no ha cambiado (mismo número de mensajes y su último ya
+ *    guardado) solo se refrescan los más recientes.
+ *  - Si no, se pide la lista COMPLETA de UID (FETCH 1:* UID; solo números, y
+ *    sin depender de SEARCH, que hay servidores que rechazan o devuelven
+ *    incompleto) y se descargan los que faltan por tandas, de más nuevo a más
+ *    antiguo, hasta que la carpeta queda completa.
+ * Regresiones que esto evita (05/10/2026): SEARCH rechazado en silencio dejaba
+ * Recibidos sin actualizar; la ventana de 120 días dejaba fuera el historial.
+ */
 export async function fetchFolderEnvelopes(
   client: FolderClient,
   folder: string,
   maxMessages = 50,
-  since?: Date,
+  _since?: Date,
   knownUids?: Set<number>,
-  /** Avisos de que algo no fue normal (búsqueda rechazada, plan B...) --
-   *  quien llama los registra en la cuenta para que no pasen en silencio. */
   report?: (warning: string) => void,
+  onServerState?: (state: FolderServerState) => void,
 ): Promise<ImapMessage[]> {
   const selected = await client.selectFolder(folder);
+  const exists = Number(selected.exists || 0);
+  if (!exists) { onServerState?.({ exists: 0, allUids: [] }); return []; }
 
-  if (!selected.exists) return [];
+  const known = knownUids || new Set<number>();
+  const [latest] = await client.recentUidsBySequence(1);
+  const unchanged = Boolean(latest) && known.has(latest) && known.size === exists;
 
-  let uids: number[];
-  if (since) {
-    let all = await client.searchUidsSince(since);
-    if (all === null) {
-      report?.(`${folder}: el servidor rechazó la búsqueda por fecha; se usaron los últimos mensajes por posición`);
-      all = await client.recentUidsBySequence(Math.max(maxMessages * 4, 200));
-    }
-    // Comprobación de seguridad: el último mensaje real de la carpeta tiene
-    // que estar ya guardado o venir en esta tanda. Si no, la búsqueda ha
-    // devuelto algo incompleto (sin dar error) y se completa por posición --
-    // así el correo más reciente nunca se queda sin bajar.
-    const [latest] = await client.recentUidsBySequence(1);
-    if (latest && !all.includes(latest) && !knownUids?.has(latest)) {
-      report?.(`${folder}: la búsqueda no incluía el último mensaje; se completó por posición`);
-      all = Array.from(new Set([...all, ...(await client.recentUidsBySequence(Math.max(maxMessages * 4, 200)))]));
-    }
-    all.sort((a, b) => a - b);
-    // Still cap at maxMessages most-recent to avoid huge fetches after long gaps
-    uids = all.slice(-maxMessages);
-    if (knownUids) {
-      const missing = all.filter((u) => !knownUids.has(u)).slice(-maxMessages);
-      uids = Array.from(new Set([...uids, ...missing])).sort((a, b) => a - b);
-    }
+  let missingBatch: number[] = [];
+  if (unchanged) {
+    onServerState?.({ exists, allUids: null });
   } else {
-    uids = await client.searchUids('ALL');
-    uids = uids.slice(-maxMessages);
+    const all = await client.allUids();
+    if (all.length !== exists) {
+      report?.(`${folder}: el servidor indica ${exists} mensajes pero devolvió ${all.length} identificadores`);
+    }
+    onServerState?.({ exists, allUids: all.length === exists ? all : null });
+    missingBatch = all.filter((u) => !known.has(u)).sort((a, b) => a - b).slice(-maxMessages);
+    if (latest && !known.has(latest) && !missingBatch.includes(latest)) missingBatch.push(latest);
   }
-
+  const recent = await client.recentUidsBySequence(Math.min(exists, FLAG_REFRESH_COUNT));
+  const uids = Array.from(new Set([...missingBatch, ...recent])).sort((a, b) => b - a);
   if (!uids.length) return [];
 
-  const envelopes = await client.fetchEnvelopes(uids.reverse());
+  const envelopes = await client.fetchEnvelopes(uids);
   return envelopes.map((message) => ({
     ...message,
     bodyText: '',

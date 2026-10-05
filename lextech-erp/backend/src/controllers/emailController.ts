@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import pool from '../config/database';
 import { UPLOADS_CLIENTS_ROOT } from '../config/paths';
-import { ImapClient, ImapConfig, syncInbox, testImapConnection, fetchFolderEnvelopes, withTimeout } from '../utils/imap';
+import { ImapClient, ImapConfig, syncInbox, testImapConnection, fetchFolderEnvelopes, withTimeout, FolderServerState } from '../utils/imap';
 
 // Límites para que un servidor lento o que deja de responder nunca cuelgue la
 // sincronización (antes una sola cuenta así bloqueaba la de todas).
@@ -854,9 +854,10 @@ export async function syncImapAccountRecord(acc: any, folder = 'INBOX', limit = 
     // leído/destacado). Cada pasada va rellenando los huecos que queden.
     const knownUids = await loadKnownImapUids(acc.id, folder);
     const warnings: string[] = [];
+    let serverState: FolderServerState | null = null;
     let messages: any[];
     try {
-      messages = await syncInbox(imapCfg, folder, limit, imapSyncSince(), knownUids, (w) => warnings.push(w));
+      messages = await syncInbox(imapCfg, folder, limit, imapSyncSince(), knownUids, (w) => warnings.push(w), (st) => { serverState = st; });
     } catch (e: any) {
       await recordSyncWarning(acc, [`${folder}: ${e?.message || e}`]);
       throw e;
@@ -864,6 +865,7 @@ export async function syncImapAccountRecord(acc: any, folder = 'INBOX', limit = 
     await recordSyncWarning(acc, warnings);
     synced = messages.length;
     inserted = (await saveImapEnvelopes(acc, folder, messages)).saved;
+    await pruneVanishedImapEmails(acc.id, folder, serverState);
   }
 
   await pool.query(`UPDATE email_accounts SET last_sync_at=NOW() WHERE id=$1`, [acc.id]);
@@ -880,6 +882,22 @@ async function loadKnownImapUids(accountId: string, folder: string): Promise<Set
     [accountId, folder],
   );
   return new Set<number>(rows.map((r: any) => Number(r.uid)));
+}
+
+/** Quita de Vantia los correos de una carpeta que ya no están en el servidor
+ *  (borrados o movidos a otra carpeta, que entrarán por esa otra), como hace
+ *  Thunderbird. Solo con la lista completa y coherente de UID del servidor;
+ *  nunca borra un correo vinculado a un expediente o a un cliente. */
+async function pruneVanishedImapEmails(accountId: string, folder: string, state: FolderServerState | null) {
+  if (!state || !state.allUids) return;
+  await pool.query(
+    `DELETE FROM emails
+      WHERE account_id = $1 AND folder = $2 AND uid IS NOT NULL
+        AND NOT (uid = ANY($3::bigint[]))
+        AND expediente_id IS NULL AND cliente_id IS NULL
+        AND NOT EXISTS (SELECT 1 FROM vistas_solicitudes vs WHERE vs.email_id = emails.id AND vs.estado IN ('pendiente', 'procesando', 'error'))`,
+    [accountId, folder, state.allUids],
+  ).catch((e) => console.warn('[imap-sync] limpieza', folder, e?.message || e));
 }
 
 /** Guarda (o refresca leído/destacado de) los mensajes de una carpeta IMAP.
@@ -918,7 +936,7 @@ async function saveImapEnvelopes(acc: any, folder: string, messages: any[], know
  *  "contenedor" se saltan). La usa el programador de services/imapAutoSync.ts
  *  para que las carpetas se actualicen solas, como en Thunderbird, aunque
  *  nadie tenga abierta la página de Correo. */
-export async function syncImapAccountAllFolders(acc: any, limitPerFolder = 30): Promise<{ folders: number; nuevos: number; errores: string[] }> {
+export async function syncImapAccountAllFolders(acc: any, limitPerFolder = 200): Promise<{ folders: number; nuevos: number; errores: string[] }> {
   const client = new ImapClient({
     host: acc.imap_host, port: acc.imap_port, secure: acc.imap_secure,
     user: acc.username, password: decryptPassword(acc.password_enc),
@@ -933,11 +951,13 @@ export async function syncImapAccountAllFolders(acc: any, limitPerFolder = 30): 
     for (const f of list) {
       try {
         const known = await loadKnownImapUids(acc.id, f.path);
+        let serverState: FolderServerState | null = null;
         const messages = await withTimeout(
-          fetchFolderEnvelopes(client, f.path, limitPerFolder, imapSyncSince(), known, (w) => errores.push(w)),
+          fetchFolderEnvelopes(client, f.path, limitPerFolder, imapSyncSince(), known, (w) => errores.push(w), (st) => { serverState = st; }),
           FOLDER_TIMEOUT_MS, `carpeta ${f.path}`,
         );
         nuevos += (await saveImapEnvelopes(acc, f.path, messages, known)).nuevos;
+        await pruneVanishedImapEmails(acc.id, f.path, serverState);
         folders++;
       } catch (e: any) {
         errores.push(`${f.path}: ${e?.message || e}`);
@@ -978,7 +998,7 @@ async function recordSyncWarning(acc: any, warnings: string[]) {
 // Se lanza al añadir una cuenta, al arrancar el servidor si no hay sondeo
 // reciente, y a mano desde Correo.
 
-export type FolderVerdict = 'ok' | 'vacia' | 'pendiente' | 'reparada' | 'error' | 'contenedor' | 'oculta';
+export type FolderVerdict = 'ok' | 'cargando' | 'vacia' | 'pendiente' | 'reparada' | 'error' | 'contenedor' | 'oculta';
 
 export async function probeImapAccount(acc: any, opts: { repair?: boolean } = {}) {
   const startedAt = Date.now();
@@ -1017,7 +1037,7 @@ export async function probeImapAccount(acc: any, opts: { repair?: boolean } = {}
       else if (f.error) verdict = 'error';
       else if (!row.visible) verdict = 'oculta';
       else if (!f.exists) verdict = 'vacia';
-      else if (db.tiene_ultimo) verdict = 'ok';
+      else if (db.tiene_ultimo) verdict = db.n < (f.exists || 0) ? 'cargando' : 'ok';
       else verdict = 'pendiente';
 
       // Reparación: bajar por tandas hasta tener el último mensaje del servidor.
@@ -1026,10 +1046,12 @@ export async function probeImapAccount(acc: any, opts: { repair?: boolean } = {}
           for (let round = 0; round < 10; round++) {
             const known = await loadKnownImapUids(acc.id, f.path);
             if (f.latestUid && known.has(f.latestUid)) break;
+            let serverState: FolderServerState | null = null;
             const messages = await withTimeout(
-              fetchFolderEnvelopes(client, f.path, 50, imapSyncSince(), known, (w) => row.notes.push(w)),
+              fetchFolderEnvelopes(client, f.path, 100, imapSyncSince(), known, (w) => row.notes.push(w), (st) => { serverState = st; }),
               FOLDER_TIMEOUT_MS, `carpeta ${f.path}`,
             );
+            await pruneVanishedImapEmails(acc.id, f.path, serverState);
             if (!messages.length) break;
             await saveImapEnvelopes(acc, f.path, messages, known);
           }

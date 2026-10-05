@@ -8,7 +8,7 @@ import { apiFetch } from '../lib/api';
 // con reparación de las carpetas atrasadas. Backend: probeImapAccount en
 // emailController.ts. El último informe se guarda en la cuenta.
 
-type Verdict = 'ok' | 'vacia' | 'pendiente' | 'reparada' | 'error' | 'contenedor' | 'oculta';
+type Verdict = 'ok' | 'cargando' | 'vacia' | 'pendiente' | 'reparada' | 'error' | 'contenedor' | 'oculta';
 interface FolderRow {
   path: string;
   name: string;
@@ -36,6 +36,7 @@ interface Report {
 const VERDICT: Record<Verdict, { label: string; cls: string }> = {
   ok:         { label: 'Al día',      cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
   reparada:   { label: 'Reparada',    cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  cargando:   { label: 'Cargando historial', cls: 'bg-sky-50 text-sky-700 border-sky-200' },
   vacia:      { label: 'Vacía',       cls: 'bg-slate-50 text-slate-500 border-slate-200' },
   pendiente:  { label: 'Atrasada',    cls: 'bg-amber-50 text-amber-700 border-amber-200' },
   error:      { label: 'Error',       cls: 'bg-red-50 text-red-700 border-red-200' },
@@ -160,7 +161,7 @@ export default function MailboxProbeModal({ accountId, accountEmail, onClose, on
               </table>
               <p className="mt-3 text-[11px] text-slate-400">
                 "No suscrita": la carpeta existe en el servidor pero tu programa de correo la oculta; Vantia hace lo mismo. "Agrupa": solo contiene otras carpetas.
-                "Vantia" cuenta los mensajes de los últimos 120 días.
+                "Cargando historial": lo nuevo ya está; los mensajes antiguos se van descargando por tandas cada pocos minutos hasta igualar al servidor.
               </p>
             </>
           )}
