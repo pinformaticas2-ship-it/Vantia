@@ -1490,7 +1490,7 @@ function ImapFolderTree({
 }
 
 function Sidebar({
-  userEmail, userName, userAvatar, gmailProfile, gmailConnected, savedGmailProfiles, labels,
+  userEmail, userName, userAvatar, accountLoading, gmailProfile, gmailConnected, savedGmailProfiles, labels,
   selectedFolder, onSelectFolder, onCompose, onDisconnectGmail,
   onReconnectGoogleProfile, onDeleteGoogleProfile, onConnectAccount,
   onSync, syncing, unreadCount, draftCount, pinnedCount, imapAccounts, selectedImapAccountId,
@@ -1500,6 +1500,8 @@ function Sidebar({
 }: {
   theme: MailTheme;
   userEmail: string; userName: string; userAvatar?: string;
+  /** Las cuentas aún no han llegado: no mostrar ningún correo como activo. */
+  accountLoading: boolean;
   gmailProfile: GmailProfile | null; gmailConnected: boolean;
   savedGmailProfiles: SavedOAuthProfile[];
   labels: GmailLabel[]; selectedFolder: FolderKey;
@@ -1588,9 +1590,13 @@ function Sidebar({
             <div className="min-w-0 flex-1">
               <p className={`truncate text-xs font-semibold leading-tight ${nameActiveCls}`}>{userName}</p>
               <p className={`truncate text-[10.5px] leading-tight ${mutedTextCls}`}>
-                {isImapActive
-                  ? (imapAccounts.find(a => a.id === selectedImapAccountId)?.email || userEmail)
-                  : (gmailProfile?.emailAddress || userEmail)}
+                {/* Nunca el correo de inicio de sesión del usuario: no tiene por
+                    qué ser una cuenta de esta organización. */}
+                {accountLoading
+                  ? <span className="animate-pulse">Cargando cuenta…</span>
+                  : isImapActive
+                    ? (imapAccounts.find(a => a.id === selectedImapAccountId)?.email || 'Ninguna cuenta seleccionada')
+                    : (gmailProfile?.emailAddress || 'Ninguna cuenta seleccionada')}
               </p>
             </div>
           </div>
@@ -3738,6 +3744,11 @@ export default function Email() {
   const [selectedImapAccountId, setSelectedImapAccountId] = useState<string | null>(null);
   const [imapFolders, setImapFolders] = useState<ImapFolderInfo[]>([]);
   const [probeOpen, setProbeOpen] = useState(false);
+  // Si ya han llegado las cuentas (aunque fallase la carga): hasta entonces la
+  // tarjeta de cuenta dice "Cargando cuenta…" en vez de enseñar un correo que
+  // no es el de la cuenta activa.
+  const [imapAccountsLoaded, setImapAccountsLoaded] = useState(false);
+  const [gmailProfilesLoaded, setGmailProfilesLoaded] = useState(false);
   const [loading, setLoading]           = useState(false);
   const [syncing, setSyncing]           = useState(false);
   const [searchQ, setSearchQ]           = useState('');
@@ -3918,8 +3929,9 @@ export default function Email() {
 
   const refreshImapAccounts = useCallback(async () => {
     const response = await authFetch(`${API}/email/accounts`).catch(() => null);
-    if (!response) return;
+    if (!response) { setImapAccountsLoaded(true); return; }
     const payload = await response.json().catch(() => null);
+    setImapAccountsLoaded(true);
     if (!response.ok || !payload?.success) return;
 
     const accounts: ImapAccount[] = payload.data || [];
@@ -3969,11 +3981,15 @@ export default function Email() {
   }, [authFetch]);
 
   const refreshSavedGmailProfiles = useCallback(async () => {
-    const response = await authFetch(`${API}/email/profiles?provider=google`).catch(() => null);
-    if (!response) return;
-    const payload = await response.json().catch(() => null);
-    if (!response.ok || !payload?.success) return;
-    setSavedGmailProfiles(Array.isArray(payload.data) ? payload.data : []);
+    try {
+      const response = await authFetch(`${API}/email/profiles?provider=google`).catch(() => null);
+      if (!response) return;
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.success) return;
+      setSavedGmailProfiles(Array.isArray(payload.data) ? payload.data : []);
+    } finally {
+      setGmailProfilesLoaded(true);
+    }
   }, [authFetch]);
 
   // Recibe el "code" de initCodeClient (access_type=offline) y lo canjea en
@@ -5371,6 +5387,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
           <Sidebar
             userEmail={userEmail}
             userName={userName}
+            accountLoading={!imapAccountsLoaded || !gmailProfilesLoaded || (Boolean(gmail) && !gmailProfile && !selectedImapAccountId)}
             userAvatar={userAvatar}
             gmailProfile={gmailProfile}
             gmailConnected={!!gmail}
