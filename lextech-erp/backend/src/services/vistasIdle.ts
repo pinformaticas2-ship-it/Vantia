@@ -1,6 +1,7 @@
 import pool from '../config/database';
 import { decryptPassword } from '../utils/emailCrypto';
 import { normalizeVistasConfig, requestVistasCheck } from './vistasAutomation';
+import { heartbeatEnd } from '../utils/heartbeat';
 
 const { ImapFlow } = require('imapflow');
 
@@ -101,8 +102,10 @@ export async function reconcileVistasIdle(): Promise<void> {
     for (const [accountId, { organizacionId, acc }] of desired) {
       if (!watchers.has(accountId)) await startWatcher(accountId, organizacionId, acc);
     }
-  } catch (e) {
+    await heartbeatEnd('vistas-idle', { buzonesVigilados: desired.size, conexionesAbiertas: watchers.size });
+  } catch (e: any) {
     console.error('[vistas-idle] reconcile:', e);
+    await heartbeatEnd('vistas-idle', {}, e?.message || String(e));
   }
 }
 

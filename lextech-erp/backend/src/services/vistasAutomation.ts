@@ -7,6 +7,7 @@ import {
   fetchEmailAttachmentBuffer,
 } from '../controllers/emailController';
 import { sendPushToUsers } from '../utils/webPush';
+import { heartbeatStart, heartbeatEnd } from '../utils/heartbeat';
 
 // ── Automatización de vistas por correo ──────────────────────────────────────
 // Flujo (activable por organización desde Configuración → Automatizaciones):
@@ -679,6 +680,8 @@ export async function runVistasTick(onlyOrgIds?: string[]): Promise<void> {
   if (!onlyOrgIds) pendingOrgs.clear();
   const client = await pool.connect().catch(() => null);
   if (!client) { running = false; return; }
+  await heartbeatStart('vistas');
+  let hbOrgs = 0;
   try {
     const { rows: lock } = await client.query(`SELECT pg_try_advisory_lock($1) AS ok`, [ADVISORY_LOCK_KEY]);
     if (!lock[0]?.ok) return;
@@ -690,6 +693,7 @@ export async function runVistasTick(onlyOrgIds?: string[]): Promise<void> {
             AND ($1::uuid[] IS NULL OR id = ANY($1::uuid[]))`,
         [onlyOrgIds && onlyOrgIds.length ? onlyOrgIds : null],
       );
+      hbOrgs = orgs.length;
       for (const org of orgs) {
         let lastError: string | null = null;
         try {
@@ -712,6 +716,7 @@ export async function runVistasTick(onlyOrgIds?: string[]): Promise<void> {
   } finally {
     client.release();
     running = false;
+    await heartbeatEnd('vistas', { organizaciones: hbOrgs, soloOrgs: onlyOrgIds?.length || null });
     if (pendingOrgs.size) setImmediate(() => void runVistasTick([...pendingOrgs]));
   }
 }

@@ -2788,6 +2788,23 @@ export async function runMigrations(): Promise<void> {
       try { await client.query(idx); } catch (_e: any) {}
     }
 
+    // ── Latido de los procesos de fondo ──────────────────────────────────────
+    // Cada programador (sincronización de carpetas, vistas, escucha IMAP)
+    // anota aquí cuándo arrancó/terminó y qué hizo. Antes, si uno no llegaba a
+    // ejecutarse (p.ej. desactivado por una variable de entorno) nadie se
+    // enteraba: el correo simplemente dejaba de actualizarse.
+    try {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS scheduler_heartbeats (
+          name         VARCHAR(60) PRIMARY KEY,
+          started_at   TIMESTAMPTZ,
+          finished_at  TIMESTAMPTZ,
+          last_error   TEXT,
+          details      JSONB,
+          updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`);
+    } catch (_e: any) {}
+
     // ── Trazabilidad por organización ────────────────────────────────────────
     // activity_log no guardaba la organización: la página de Trazabilidad y el
     // widget del dashboard mostraban la actividad de TODAS las organizaciones

@@ -42,6 +42,7 @@ import { startSoporteRetencionScheduler } from './services/soporteRetencion';
 import { startVistasScheduler } from './services/vistasAutomation';
 import { startImapAutoSync } from './services/imapAutoSync';
 import { startVistasIdle } from './services/vistasIdle';
+import { heartbeatEnd } from './utils/heartbeat';
 import { migrateLocalFoldersStructure } from './controllers/filesController';
 import { logServerStart } from './controllers/activityController';
 import pool from './config/database';
@@ -369,6 +370,18 @@ runMigrations().then(() => {
       startLocalFilesWatcher();
       migrateLocalFoldersStructure();
     }
+    // Qué integraciones ve este proceso (solo sí/no, nunca valores) -- para
+    // poder diagnosticar desde la BD por qué un proceso de fondo no corre.
+    void heartbeatEnd('server', {
+      commit: process.env.RAILWAY_GIT_COMMIT_SHA || null,
+      emailEngine: Boolean(process.env.EMAIL_ENGINE_URL),
+      gemini: Boolean(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY),
+      push: Boolean(process.env.VAPID_PUBLIC_KEY),
+      resend: Boolean(process.env.RESEND_API_KEY),
+      brevo: Boolean(process.env.BREVO_API_KEY),
+      smtpRelay: Boolean(process.env.SMTP_RELAY_HOST),
+    });
+
     // Registrar arranque en trazabilidad
     try { await logServerStart(); } catch { /**/ }
 
