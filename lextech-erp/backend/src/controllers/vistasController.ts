@@ -244,6 +244,9 @@ export async function listVistas(req: any, res: Response) {
  *  así que es una sola consulta indexada). */
 export async function getVistasAvisos(req: any, res: Response) {
   try {
+    // Con la automatización apagada el módulo no existe: la campana no avisa.
+    const { rows: on } = await pool.query(`SELECT vistas_auto_enabled FROM organizaciones WHERE id = $1`, [req.organizacionId]);
+    if (!on[0]?.vistas_auto_enabled) return ok(res, []);
     const params: any[] = [req.organizacionId];
     const scope = scopeCond(req, params);
     const { rows } = await pool.query(

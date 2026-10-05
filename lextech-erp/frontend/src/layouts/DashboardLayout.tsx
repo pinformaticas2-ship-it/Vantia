@@ -1243,8 +1243,10 @@ function QuickLinksPanel({ getToken, onClose }: { getToken: () => Promise<string
 function SearchDropdown({ query, onSelect }: { query: string; onSelect: () => void }) {
   const navigate  = useNavigate();
   const { puede } = useOrganizacion();
+  const { visible: vistasVisible } = useVistasStatus();
   const filtered  = MODULES
     .filter((m) => { const mod = moduloForPath(m.path); return !mod || puede(mod); })
+    .filter((m) => m.path !== "/dashboard/vistas" || vistasVisible)
     .filter(
       (m) => m.name.toLowerCase().includes(query.toLowerCase()) ||
              m.desc.toLowerCase().includes(query.toLowerCase())
@@ -2390,6 +2392,7 @@ export default function DashboardLayout() {
       '/dashboard/whatsapp',
       '/dashboard/config',
       '/dashboard/soporte',
+      '/dashboard/vistas',
     ].includes(location.pathname) ||
     location.pathname.startsWith('/dashboard/facturacion') ||
     location.pathname.startsWith('/dashboard/expedientes/') ||

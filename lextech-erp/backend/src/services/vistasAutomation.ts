@@ -626,6 +626,7 @@ async function sendDueReminders(): Promise<void> {
        FROM vistas_solicitudes vs
        JOIN organizaciones o ON o.id = vs.organizacion_id
       WHERE vs.estado = 'aceptada'
+        AND o.vistas_auto_enabled = true
         AND vs.recordatorio_at IS NOT NULL
         AND vs.recordatorio_at <= NOW()
         AND vs.recordatorio_enviado_at IS NULL

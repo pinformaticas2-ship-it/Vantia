@@ -11,6 +11,7 @@ export function useVistasStatus(pollMs = 60_000) {
   const { getToken } = useAuth();
   const [visible, setVisible] = useState(false);
   const [pendientes, setPendientes] = useState(0);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -21,13 +22,17 @@ export function useVistasStatus(pollMs = 60_000) {
         const show = Boolean(cfg?.success && cfg.data?.canSee && cfg.data?.enabled);
         if (cancelled) return;
         setVisible(show);
+        setLoaded(true);
         if (show) {
           const av = await apiFetch('/api/vistas/avisos', { getToken });
           if (!cancelled && av?.success) setPendientes((av.data || []).filter((a: any) => a.estado === 'pendiente').length);
         } else {
           setPendientes(0);
         }
-      } catch { /* sin conexión: se deja como estaba */ }
+      } catch {
+        // Sin conexión: se deja como estaba, pero sin quedarse "cargando" para siempre.
+        if (!cancelled) setLoaded(true);
+      }
     };
     void load();
     timer = window.setInterval(load, pollMs);
@@ -40,7 +45,7 @@ export function useVistasStatus(pollMs = 60_000) {
     };
   }, [getToken, pollMs]);
 
-  return { visible, pendientes };
+  return { visible, pendientes, loaded };
 }
 
 /** Avisa al menú y a la campana de que algo cambió (activar, aceptar...). */

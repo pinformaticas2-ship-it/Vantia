@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useSearchParams } from "react-router-dom";
 import {
   AlertTriangle, CalendarCheck, Check, CheckCircle2, ChevronDown, Clock, Eye, FileText, Gavel, Loader2,
   Mail, Paperclip, RefreshCw, RotateCcw, Settings, Undo2, X, XCircle,
 } from "lucide-react";
 import { apiFetch, resolveApiUrl } from "../lib/api";
-import { notifyVistasChanged } from "../lib/useVistasStatus";
+import { notifyVistasChanged, useVistasStatus } from "../lib/useVistasStatus";
 
 // ── Vistas recibidas por correo ──────────────────────────────────────────────
 // Página de la automatización de vistas (Configuración → Automatizaciones):
@@ -107,6 +107,14 @@ function Field({ label, children, className = "" }: { label: string; children: R
 const inputCls = "w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-red-400 focus:ring-1 focus:ring-red-100";
 
 export default function Vistas() {
+  // El módulo solo existe con la automatización activada (Ajustes → Automatizaciones).
+  const { visible, loaded } = useVistasStatus();
+  if (!loaded) return <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-slate-400" /></div>;
+  if (!visible) return <Navigate to="/dashboard" replace />;
+  return <VistasModulo />;
+}
+
+function VistasModulo() {
   const { getToken } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [tab, setTab] = useState("pendiente");
@@ -167,10 +175,10 @@ export default function Vistas() {
       <div className="flex-1 min-h-0 flex flex-col md:flex-row bg-white">
         {/* Lista */}
         <div className={`md:w-96 md:shrink-0 border-r border-slate-200 flex flex-col min-h-0 ${selectedId ? "hidden md:flex" : "flex"}`}>
-          <div className="px-3 py-2 border-b border-slate-200 bg-slate-50 flex gap-1 overflow-x-auto">
+          <div className="px-2 py-2 border-b border-slate-200 bg-slate-50 grid grid-cols-4 gap-1">
             {TABS.map((t) => (
               <button key={t.key} onClick={() => setTab(t.key)}
-                className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${tab === t.key ? "bg-white text-red-700 border border-slate-200 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>
+                className={`min-w-0 truncate px-1.5 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${tab === t.key ? "bg-white text-red-700 border border-slate-200 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>
                 {t.label}
               </button>
             ))}
