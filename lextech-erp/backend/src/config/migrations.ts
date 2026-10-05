@@ -2832,6 +2832,10 @@ export async function runMigrations(): Promise<void> {
     for (const sql of [
       `ALTER TABLE email_accounts ADD COLUMN IF NOT EXISTS sync_warning TEXT`,
       `ALTER TABLE email_accounts ADD COLUMN IF NOT EXISTS sync_warning_at TIMESTAMPTZ`,
+      // Último sondeo completo del buzón ("Diagnosticar buzón"): estructura de
+      // carpetas + estado de cada una frente a lo guardado en Vantia.
+      `ALTER TABLE email_accounts ADD COLUMN IF NOT EXISTS probe_report JSONB`,
+      `ALTER TABLE email_accounts ADD COLUMN IF NOT EXISTS probe_at TIMESTAMPTZ`,
     ]) {
       try { await client.query(sql); } catch (_e: any) {}
     }

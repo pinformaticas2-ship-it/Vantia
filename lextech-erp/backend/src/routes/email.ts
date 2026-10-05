@@ -30,6 +30,8 @@ import {
   logGmailSent,
   linkEmailToExpediente,
   emptyTrash,
+  probeAccount,
+  getAccountProbe,
   getMessageBodyFromEngine,
   downloadMessageAttachment,
   saveAttachmentToExpediente,
@@ -80,6 +82,8 @@ router.delete('/accounts/:id',    deleteAccount);
 router.get('/accounts/:id/folders', getAccountFolders);
 router.post('/accounts/:id/folders', createAccountFolder);
 router.post('/accounts/:id/sync', syncAccount);
+router.get('/accounts/:id/probe',  getAccountProbe);
+router.post('/accounts/:id/probe', costlyActionLimiter, probeAccount);
 router.post('/gmail/profiles/:profileId/sync', syncGmailProfile);
 
 // ── Mensajes ─────────────────────────────────────────────────────────────────

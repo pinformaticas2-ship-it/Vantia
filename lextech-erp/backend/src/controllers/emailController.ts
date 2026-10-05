@@ -566,6 +566,14 @@ export async function createAccount(req: Request, res: Response) {
       }).catch(() => {});
     }
 
+    // Sondeo + carga inicial de TODAS las carpetas del buzón recién añadido,
+    // en segundo plano (no hace esperar al usuario).
+    if (proto === 'imap') {
+      pool.query(`SELECT * FROM email_accounts WHERE id=$1`, [created.id])
+        .then(({ rows }) => rows[0] && probeImapAccount(rows[0], { repair: true }))
+        .then(() => emitEmailEvent(uid, { type: 'messageNew', accountId: created.id, folder: '*' }))
+        .catch((e) => console.warn('[imap-probe] alta de cuenta:', e?.message || e));
+    }
     return ok(res, { ...created, smtp_warning: smtpWarning });
   } catch (e: any) { return err(res, e.message); }
 }
@@ -951,6 +959,121 @@ async function recordSyncWarning(acc: any, warnings: string[]) {
     `UPDATE email_accounts SET sync_warning = $2, sync_warning_at = NOW() WHERE id = $1`,
     [acc.id, text],
   ).catch(() => {});
+}
+
+// ── Sondeo completo del buzón ("Diagnosticar buzón") ─────────────────────────
+// Recorre todas las carpetas del servidor, compara cada una con lo guardado en
+// Vantia, repara al momento las que estén atrasadas (descarga por tandas hasta
+// tener su último mensaje) y guarda el informe en email_accounts.probe_report.
+// Se lanza al añadir una cuenta, al arrancar el servidor si no hay sondeo
+// reciente, y a mano desde Correo.
+
+export type FolderVerdict = 'ok' | 'vacia' | 'pendiente' | 'reparada' | 'error' | 'contenedor' | 'oculta';
+
+export async function probeImapAccount(acc: any, opts: { repair?: boolean } = {}) {
+  const startedAt = Date.now();
+  const client = new ImapClient({
+    host: acc.imap_host, port: acc.imap_port, secure: acc.imap_secure,
+    user: acc.username, password: decryptPassword(acc.password_enc),
+  });
+  const report: any = { startedAt: new Date(startedAt).toISOString(), server: `${acc.imap_host}:${acc.imap_port}`, ok: false, folders: [] as any[] };
+  try {
+    await client.connect();
+    await client.login();
+    const { capabilities, folders } = await client.probeAll(imapSyncSince());
+    report.capabilities = capabilities;
+    // Carpetas que Vantia muestra/sincroniza (suscritas + sistema).
+    const visibles = new Set((await client.listFolders()).map((f) => f.path));
+
+    for (const f of folders) {
+      const row: any = {
+        path: f.path, name: f.name, delimiter: f.delimiter, specialUse: f.specialUse, subscribed: f.subscribed,
+        visible: visibles.has(f.path), serverMessages: f.exists ?? f.statusMessages, latestUid: f.latestUid,
+        latestDate: f.latestDate, latestSubject: f.latestSubject, searchRejected: f.searchRejected, ms: f.ms,
+        error: f.error, notes: [] as string[],
+      };
+      const { rows: [db] } = await pool.query(
+        `SELECT COUNT(*)::int AS n, MAX(sent_at) AS ultimo, BOOL_OR(uid = $3) AS tiene_ultimo
+           FROM emails WHERE account_id = $1 AND folder = $2 AND uid IS NOT NULL`,
+        [acc.id, f.path, f.latestUid ?? -1],
+      );
+      row.dbMessages = db.n;
+      row.dbLatestDate = db.ultimo;
+      if (f.searchRejected) row.notes.push('El servidor rechaza la búsqueda por fecha (se usa el plan B por posición).');
+
+      let verdict: FolderVerdict;
+      if (f.noSelect) verdict = 'contenedor';
+      else if (f.error) verdict = 'error';
+      else if (!row.visible) verdict = 'oculta';
+      else if (!f.exists) verdict = 'vacia';
+      else if (db.tiene_ultimo) verdict = 'ok';
+      else verdict = 'pendiente';
+
+      // Reparación: bajar por tandas hasta tener el último mensaje del servidor.
+      if (verdict === 'pendiente' && opts.repair) {
+        try {
+          for (let round = 0; round < 10; round++) {
+            const known = await loadKnownImapUids(acc.id, f.path);
+            if (f.latestUid && known.has(f.latestUid)) break;
+            const messages = await fetchFolderEnvelopes(client, f.path, 50, imapSyncSince(), known, (w) => row.notes.push(w));
+            if (!messages.length) break;
+            await saveImapEnvelopes(acc, f.path, messages, known);
+          }
+          const known = await loadKnownImapUids(acc.id, f.path);
+          verdict = f.latestUid && known.has(f.latestUid) ? 'reparada' : 'pendiente';
+          row.dbMessages = known.size;
+          if (verdict === 'pendiente') row.notes.push('No se pudo descargar el último mensaje de esta carpeta.');
+        } catch (e: any) {
+          verdict = 'error';
+          row.error = String(e?.message || e).slice(0, 300);
+        }
+      }
+      row.verdict = verdict;
+      report.folders.push(row);
+    }
+    report.ok = !report.folders.some((r: any) => r.verdict === 'error' || r.verdict === 'pendiente');
+  } catch (e: any) {
+    report.error = String(e?.responseText || e?.message || e).slice(0, 500);
+  } finally {
+    await client.logout().catch(() => undefined);
+  }
+  report.ms = Date.now() - startedAt;
+  await pool.query(
+    `UPDATE email_accounts SET probe_report = $2, probe_at = NOW() WHERE id = $1`,
+    [acc.id, JSON.stringify(report)],
+  ).catch(() => {});
+  const problems = report.error ? [report.error] : report.folders.filter((r: any) => r.verdict === 'error' || r.verdict === 'pendiente').map((r: any) => `${r.path}: ${r.error || r.notes.join(' ') || r.verdict}`);
+  if (problems.length) await recordSyncWarning(acc, problems);
+  return report;
+}
+
+/** POST /api/email/accounts/:id/probe — "Diagnosticar buzón" (y reparar). */
+export async function probeAccount(req: Request, res: Response) {
+  const uid = userId(req);
+  if (!uid) return err(res, 'No autenticado', 401);
+  try {
+    const { rows } = await pool.query(
+      `SELECT * FROM email_accounts WHERE id=$1 AND user_id=$2 AND organizacion_id=$3 AND active=true`,
+      [req.params.id, uid, (req as any).organizacionId],
+    );
+    if (!rows.length) return err(res, 'Cuenta no encontrada', 404);
+    if (String(rows[0].protocol || 'imap').toLowerCase() !== 'imap') return err(res, 'El diagnóstico solo está disponible para cuentas IMAP', 400);
+    const report = await probeImapAccount(rows[0], { repair: true });
+    emitEmailEvent(uid, { type: 'messageNew', accountId: rows[0].id, folder: '*' });
+    return ok(res, report);
+  } catch (e: any) { return err(res, e.message); }
+}
+
+/** GET /api/email/accounts/:id/probe — último informe guardado. */
+export async function getAccountProbe(req: Request, res: Response) {
+  const uid = userId(req);
+  if (!uid) return err(res, 'No autenticado', 401);
+  const { rows } = await pool.query(
+    `SELECT probe_report, probe_at FROM email_accounts WHERE id=$1 AND user_id=$2 AND organizacion_id=$3`,
+    [req.params.id, uid, (req as any).organizacionId],
+  );
+  if (!rows.length) return err(res, 'Cuenta no encontrada', 404);
+  return ok(res, { report: rows[0].probe_report, probeAt: rows[0].probe_at });
 }
 
 // ── Sincronización Gmail ──────────────────────────────────────────────────────

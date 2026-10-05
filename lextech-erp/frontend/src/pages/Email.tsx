@@ -21,10 +21,11 @@ import {
   Search, ChevronDown, X, Mail, MailOpen,
   Reply, ReplyAll, Forward, Paperclip, Loader2, CheckCircle2,
   MoreVertical, AlertCircle, Eye, EyeOff,
-  AlertTriangle, ChevronLeft, ChevronRight, Edit3, Tag, Wifi, Zap, Pin, FolderPlus, RotateCcw, Folder, Archive,
+  AlertTriangle, Stethoscope, ChevronLeft, ChevronRight, Edit3, Tag, Wifi, Zap, Pin, FolderPlus, RotateCcw, Folder, Archive,
   AtSign, Shield, Filter, LogIn, Maximize2, Minimize2, Bold, Italic, Underline,
   AlignLeft, AlignCenter, AlignRight, List, Pencil, Sun, Moon, Download, Briefcase, type LucideIcon,
 } from 'lucide-react';
+import MailboxProbeModal from '../components/MailboxProbeModal';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -1495,7 +1496,7 @@ function Sidebar({
   onSync, syncing, unreadCount, draftCount, pinnedCount, imapAccounts, selectedImapAccountId,
   imapFolders, imapSystemFolderMap, onSelectGmail, onSelectImapAccount,
   onCreateLabel, onDeleteLabel,
-  onCreateImapFolder, onDeleteImapAccount, canUseMailbox, theme,
+  onCreateImapFolder, onProbeImap, onDeleteImapAccount, canUseMailbox, theme,
 }: {
   theme: MailTheme;
   userEmail: string; userName: string; userAvatar?: string;
@@ -1518,6 +1519,7 @@ function Sidebar({
   onCreateLabel: () => void;
   onDeleteLabel: (labelId: string) => void;
   onCreateImapFolder: () => void;
+  onProbeImap: () => void;
   onDeleteImapAccount: (accountId: string) => void;
   canUseMailbox: boolean;
 }) {
@@ -1901,6 +1903,13 @@ function Sidebar({
                 className={`p-1 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${iconBtnCls}`}
                 title="Crear carpeta IMAP">
                 <FolderPlus size={12} />
+              </button>
+              <button
+                type="button"
+                onClick={onProbeImap}
+                className={`p-1 rounded-full transition-colors ${iconBtnCls}`}
+                title="Diagnosticar buzón: revisa todas las carpetas del servidor y repara las atrasadas">
+                <Stethoscope size={12} />
               </button>
             </div>
             <ImapFolderTree
@@ -3731,6 +3740,7 @@ export default function Email() {
   const [imapAccounts, setImapAccounts] = useState<ImapAccount[]>([]);
   const [selectedImapAccountId, setSelectedImapAccountId] = useState<string | null>(null);
   const [imapFolders, setImapFolders] = useState<ImapFolderInfo[]>([]);
+  const [probeOpen, setProbeOpen] = useState(false);
   const [loading, setLoading]           = useState(false);
   const [syncing, setSyncing]           = useState(false);
   const [searchQ, setSearchQ]           = useState('');
@@ -5392,6 +5402,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
             onCreateLabel={() => { setNewLabelName(''); setLabelModalOpen(true); }}
             onDeleteLabel={requestDeleteUserLabel}
             onCreateImapFolder={() => { setNewLabelName(''); setLabelModalOpen(true); }}
+            onProbeImap={() => setProbeOpen(true)}
             onDeleteImapAccount={requestDeleteImapAccount}
             canUseMailbox={hasActiveMailbox}
             theme={mailTheme}
@@ -5471,7 +5482,8 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
           {currentImapAccount?.sync_warning && (
             <div className="mx-3 mb-2 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900" title={currentImapAccount.sync_warning}>
               <AlertTriangle size={13} className="mt-0.5 shrink-0 text-amber-600" />
-              <span className="line-clamp-2">Problema al actualizar el correo: {currentImapAccount.sync_warning}</span>
+              <span className="line-clamp-2 flex-1">Problema al actualizar el correo: {currentImapAccount.sync_warning}</span>
+              <button type="button" onClick={() => setProbeOpen(true)} className="shrink-0 font-bold underline">Diagnosticar</button>
             </div>
           )}
 
@@ -5699,6 +5711,19 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
           onSent={handleComposeSent}
           autoOpenTemplates={pendingOpenTemplates}
           autoOpenAttachments={pendingOpenAttachments}
+        />
+      )}
+
+      {probeOpen && currentImapAccount && (
+        <MailboxProbeModal
+          accountId={currentImapAccount.id}
+          accountEmail={currentImapAccount.email}
+          onClose={() => setProbeOpen(false)}
+          onRepaired={() => {
+            void refreshImapFolders(currentImapAccount.id);
+            void refreshImapAccounts();
+            triggerRefreshRef.current?.();
+          }}
         />
       )}
 

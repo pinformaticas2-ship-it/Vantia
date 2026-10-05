@@ -1,5 +1,5 @@
 import pool from '../config/database';
-import { syncImapAccountAllFolders } from '../controllers/emailController';
+import { syncImapAccountAllFolders, probeImapAccount } from '../controllers/emailController';
 import { emitEmailEvent } from '../utils/emailSSE';
 
 // ── Sincronización automática de todas las carpetas IMAP ─────────────────────
@@ -31,6 +31,12 @@ export async function runImapAutoSync(): Promise<void> {
       );
       for (const acc of accounts) {
         try {
+          // Sondeo completo (estructura + estado de cada carpeta) y reparación
+          // de las atrasadas, como mucho una vez al día por cuenta -- deja el
+          // informe en probe_report para "Diagnosticar buzón".
+          if (!acc.probe_at || Date.now() - new Date(acc.probe_at).getTime() > 24 * 60 * 60 * 1000) {
+            await probeImapAccount(acc, { repair: true }).catch((e) => console.warn(`[imap-probe] ${acc.email}:`, e?.message || e));
+          }
           const r = await syncImapAccountAllFolders(acc);
           if (r.nuevos > 0) emitEmailEvent(acc.user_id, { type: 'messageNew', accountId: acc.id, folder: '*' });
           if (r.errores.length) console.warn(`[imap-auto] ${acc.email}: ${r.errores.length} carpeta(s) con error`, r.errores.slice(0, 3));

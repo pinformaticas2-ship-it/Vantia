@@ -33,6 +33,28 @@ export interface ImapEnvelope {
   hasAttachments: boolean;
 }
 
+export interface RawFolderProbe {
+  path: string;
+  name: string;
+  delimiter: string | null;
+  flags: string[];
+  specialUse: string | null;
+  subscribed: boolean;
+  noSelect: boolean;
+  /** Mensajes según STATUS (sin abrir la carpeta). */
+  statusMessages: number | null;
+  /** Mensajes según SELECT/EXAMINE. */
+  exists: number | null;
+  opened: boolean;
+  searchCount: number | null;
+  searchRejected: boolean;
+  latestUid: number | null;
+  latestDate: string | null;
+  latestSubject: string | null;
+  error: string | null;
+  ms: number;
+}
+
 export interface ImapAttachment {
   filename: string;
   contentType: string;
@@ -175,6 +197,64 @@ export class ImapClient {
       }
       this.mailboxLock = null;
     }
+  }
+
+  /** Sondeo completo del buzón (solo lectura): estructura de carpetas tal
+   *  cual la da el servidor y, para cada carpeta abrible, si se puede abrir,
+   *  cuántos mensajes tiene, si la búsqueda por fecha funciona y cuál es su
+   *  último mensaje. Lo usa probeImapAccount (emailController) para el
+   *  diagnóstico "Diagnosticar buzón". */
+  async probeAll(since: Date): Promise<{ capabilities: string[]; folders: RawFolderProbe[] }> {
+    const client = this.ensureClient();
+    await this.releaseMailboxLock();
+    const capabilities = client.capabilities ? Array.from((client.capabilities as Map<string, any>).keys()).map(String) : [];
+    let boxes: any[] = [];
+    try {
+      boxes = await client.list({ statusQuery: { messages: true, unseen: true, uidNext: true } });
+    } catch {
+      boxes = await client.list();
+    }
+    const folders: RawFolderProbe[] = [];
+    for (const box of boxes) {
+      const flags: string[] = box.flags instanceof Set ? Array.from(box.flags).map(String) : (Array.isArray(box.flags) ? box.flags.map(String) : []);
+      const probe: RawFolderProbe = {
+        path: String(box.path),
+        name: String(box.name || box.path),
+        delimiter: box.delimiter ? String(box.delimiter) : null,
+        flags,
+        specialUse: box.specialUse ? String(box.specialUse) : null,
+        subscribed: box.subscribed === true,
+        noSelect: flags.some((f) => f.toLowerCase() === '\\noselect'),
+        statusMessages: box.status?.messages ?? null,
+        exists: null, opened: false, searchCount: null, searchRejected: false, latestUid: null,
+        latestDate: null, latestSubject: null, error: null, ms: 0,
+      };
+      if (!probe.noSelect) {
+        const t0 = Date.now();
+        let lock: any = null;
+        try {
+          lock = await client.getMailboxLock(probe.path, { readOnly: true });
+          probe.opened = true;
+          probe.exists = Number(client.mailbox?.exists || 0);
+          const found = await client.search({ since }, { uid: true });
+          if (Array.isArray(found)) probe.searchCount = found.length; else probe.searchRejected = true;
+          if (probe.exists > 0) {
+            for await (const msg of client.fetch(`${probe.exists}:*`, { uid: true, envelope: true }, { uid: false })) {
+              probe.latestUid = Number(msg.uid);
+              probe.latestDate = msg.envelope?.date ? new Date(msg.envelope.date).toISOString() : null;
+              probe.latestSubject = msg.envelope?.subject ? String(msg.envelope.subject).slice(0, 120) : null;
+            }
+          }
+        } catch (e: any) {
+          probe.error = String(e?.responseText || e?.message || e).slice(0, 300);
+        } finally {
+          try { lock?.release(); } catch { /* noop */ }
+          probe.ms = Date.now() - t0;
+        }
+      }
+      folders.push(probe);
+    }
+    return { capabilities, folders };
   }
 
   async connect(): Promise<void> {
