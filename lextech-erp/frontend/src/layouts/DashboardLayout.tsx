@@ -12,7 +12,7 @@ import {
   MessageSquare, LogOut, Mail, Library, Receipt, Sparkles, ChevronsUpDown,
   MoreVertical, RotateCcw, Copy, Check, Crown,
   Pen, AlertTriangle, RefreshCw, Link2, Plus, Trash2, Scale, Gavel, ChevronDown,
-  Wallet, CreditCard, Building2, BarChart3, FileText, Calculator, Square, BellRing, LifeBuoy, CalendarCheck,
+  Wallet, CreditCard, Building2, BarChart3, FileText, Calculator, Square, BellRing, LifeBuoy, CalendarCheck, UserX,
 } from "lucide-react";
 import { UserButton, useUser, useAuth, useClerk } from "@clerk/clerk-react";
 import { getDeviceId, safeJson, waitForClientIp, resolveUploadUrl } from "../lib/api";
@@ -37,6 +37,7 @@ const NAV_MODULE_MAP: Record<string, Modulo> = {
   Clientes: "clientes",
   Procuradores: "directorio",
   Abogados: "directorio",
+  "Partes contrarias": "directorio",
   Expedientes: "expedientes",
   Agenda: "agenda",
   Tareas: "tareas",
@@ -58,7 +59,7 @@ const NAV_MODULE_MAP: Record<string, Modulo> = {
 };
 function moduloForPath(path: string): Modulo | null {
   if (path.startsWith("/dashboard/clientes")) return "clientes";
-  if (path.startsWith("/dashboard/procuradores") || path.startsWith("/dashboard/abogados")) return "directorio";
+  if (path.startsWith("/dashboard/procuradores") || path.startsWith("/dashboard/abogados") || path.startsWith("/dashboard/contrarios")) return "directorio";
   if (path.startsWith("/dashboard/expedientes")) return "expedientes";
   if (path.startsWith("/dashboard/agenda")) return "agenda";
   if (path.startsWith("/dashboard/tareas")) return "tareas";
@@ -79,6 +80,7 @@ const MODULES = [
   { name: "Nuevo Cliente",  path: "/dashboard/clientes/new", icon: Users,           desc: "Alta de nuevo cliente" },
   { name: "Procuradores",   path: "/dashboard/procuradores", icon: Scale,           desc: "Directorio de procuradores" },
   { name: "Abogados",       path: "/dashboard/abogados",     icon: Gavel,           desc: "Directorio de abogados" },
+  { name: "Partes contrarias", path: "/dashboard/contrarios", icon: UserX,         desc: "Partes contrarias habituales: correo y datos básicos" },
   { name: "Trazabilidad",   path: "/dashboard/trazabilidad", icon: History,         desc: "Historial de acciones por usuario" },
   { name: "Agenda",         path: "/dashboard/agenda",       icon: Calendar,        desc: "Calendario y citas" },
   { name: "Tareas",         path: "/dashboard/tareas",       icon: CheckCircle2,    desc: "Tareas y plazos del usuario" },
@@ -114,6 +116,7 @@ const NAV_ITEMS: NavItem[] = [
       { name: "Clientes",     href: "/dashboard/clientes",     icon: Users },
       { name: "Procuradores", href: "/dashboard/procuradores", icon: Scale },
       { name: "Abogados",     href: "/dashboard/abogados",     icon: Gavel },
+      { name: "Partes contrarias", href: "/dashboard/contrarios", icon: UserX },
     ],
   },
   { name: "Trazabilidad", href: "/dashboard/trazabilidad", icon: History },
@@ -2388,6 +2391,7 @@ export default function DashboardLayout() {
       '/dashboard/expedientes',
       '/dashboard/procuradores',
       '/dashboard/abogados',
+      '/dashboard/contrarios',
       '/dashboard/trazabilidad',
       '/dashboard/agenda',
       '/dashboard/chat',
@@ -2401,7 +2405,8 @@ export default function DashboardLayout() {
     location.pathname.startsWith('/dashboard/expedientes/') ||
     location.pathname.startsWith('/dashboard/clientes/') ||
     location.pathname.startsWith('/dashboard/procuradores/') ||
-    location.pathname.startsWith('/dashboard/abogados/')
+    location.pathname.startsWith('/dashboard/abogados/') ||
+    location.pathname.startsWith('/dashboard/contrarios/')
   ), [location.pathname]);
 
   return (

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
 import {
-  ChevronLeft, Scale, Gavel, X, CheckCircle2, AlertTriangle, Loader2, Save,
+  ChevronLeft, Scale, Gavel, UserX, X, CheckCircle2, AlertTriangle, Loader2, Save,
   BadgeCheck, Building2, Phone, StickyNote,
 } from "lucide-react";
 import { Spinner } from "../components/Spinner";
@@ -131,15 +131,17 @@ function ColegioProcuradorField({ value, onChange }: { value: string; onChange: 
 }
 
 export default function DirectorioProfesionalForm({ tipo, singular }: {
-  tipo: "PROCURADOR" | "ABOGADO";
+  tipo: "PROCURADOR" | "ABOGADO" | "CONTRARIO";
   singular: string;
 }) {
   const { getToken } = useAuth();
   const navigate = useNavigate();
   const { id } = useParams();
   const isEdit = !!id;
-  const base = tipo === "PROCURADOR" ? "procuradores" : "abogados";
-  const Icon = tipo === "PROCURADOR" ? Scale : Gavel;
+  const base = tipo === "PROCURADOR" ? "procuradores" : tipo === "CONTRARIO" ? "contrarios" : "abogados";
+  const Icon = tipo === "PROCURADOR" ? Scale : tipo === "CONTRARIO" ? UserX : Gavel;
+  // Las partes contrarias no son profesionales: sin colegiación ni despacho.
+  const esContrario = tipo === "CONTRARIO";
   const backTo = `/dashboard/${base}`;
 
   const [form, setForm]           = useState(EMPTY_FORM);
@@ -248,10 +250,10 @@ export default function DirectorioProfesionalForm({ tipo, singular }: {
           </div>
           <div className="flex flex-col justify-center">
             <h1 className="text-xl font-extrabold text-slate-800 leading-none tracking-tight mb-0.5">
-              {isEdit ? `Editar ${singular.toLowerCase()}` : `Nuevo ${singular.toLowerCase()}`}
+              {isEdit ? `Editar ${singular.toLowerCase()}` : `${esContrario ? "Nueva" : "Nuevo"} ${singular.toLowerCase()}`}
             </h1>
             <p className="text-[11px] font-medium text-slate-500">
-              {isEdit ? "Modifica los datos y pulsa Guardar cambios" : `Rellena la ficha de alta del ${singular.toLowerCase()}`}
+              {isEdit ? "Modifica los datos y pulsa Guardar cambios" : `Rellena la ficha de alta ${esContrario ? "de la" : "del"} ${singular.toLowerCase()}`}
             </p>
           </div>
         </div>
@@ -291,7 +293,7 @@ export default function DirectorioProfesionalForm({ tipo, singular }: {
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-6">
               <div className="flex flex-col gap-2">
-                <label className={lbl}>Nombre *</label>
+                <label className={lbl}>{esContrario ? "Nombre / Razón social *" : "Nombre *"}</label>
                 <input name="first_name" value={form.first_name} onChange={handleChange} className={inputCls} autoFocus />
               </div>
               <div className="flex flex-col gap-2">
@@ -313,6 +315,7 @@ export default function DirectorioProfesionalForm({ tipo, singular }: {
           </div>
 
           {/* COLEGIACIÓN */}
+          {!esContrario && (
           <div className="pt-8 border-t border-slate-100">
             <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-6 flex items-center gap-2">
               <BadgeCheck size={16} className="text-slate-400" /> Colegiación
@@ -360,17 +363,20 @@ export default function DirectorioProfesionalForm({ tipo, singular }: {
               )}
             </div>
           </div>
+          )}
 
           {/* DIRECCIÓN */}
           <div className="pt-8 border-t border-slate-100">
             <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-6 flex items-center gap-2">
-              <Building2 size={16} className="text-slate-400" /> Despacho y dirección
+              <Building2 size={16} className="text-slate-400" /> {esContrario ? "Dirección" : "Despacho y dirección"}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-6">
+              {!esContrario && (
               <div className="flex flex-col gap-2 md:col-span-3">
                 <label className={lbl}>Despacho / Bufete</label>
                 <input name="despacho" value={form.despacho} onChange={handleChange} className={inputCls} />
               </div>
+              )}
               <div className="flex flex-col gap-2 md:col-span-3">
                 <label className={lbl}>Dirección</label>
                 <input name="address_street" value={form.address_street} onChange={handleChange} className={inputCls} />

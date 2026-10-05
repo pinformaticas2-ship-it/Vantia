@@ -67,6 +67,9 @@ export default function App() {
             <Route path="abogados" element={<RequireModuleAccess modulo="directorio"><DirectorioProfesionales tipo="ABOGADO" title="Abogados" singular="Abogado" desc="abogados" /></RequireModuleAccess>} />
             <Route path="abogados/new" element={<RequireModuleAccess modulo="directorio"><DirectorioProfesionalForm tipo="ABOGADO" singular="Abogado" /></RequireModuleAccess>} />
             <Route path="abogados/:id/edit" element={<RequireModuleAccess modulo="directorio"><DirectorioProfesionalForm tipo="ABOGADO" singular="Abogado" /></RequireModuleAccess>} />
+            <Route path="contrarios" element={<RequireModuleAccess modulo="directorio"><DirectorioProfesionales tipo="CONTRARIO" title="Partes contrarias" singular="Parte contraria" desc="partes contrarias" /></RequireModuleAccess>} />
+            <Route path="contrarios/new" element={<RequireModuleAccess modulo="directorio"><DirectorioProfesionalForm tipo="CONTRARIO" singular="Parte contraria" /></RequireModuleAccess>} />
+            <Route path="contrarios/:id/edit" element={<RequireModuleAccess modulo="directorio"><DirectorioProfesionalForm tipo="CONTRARIO" singular="Parte contraria" /></RequireModuleAccess>} />
             <Route path="expedientes" element={<RequireModuleAccess modulo="expedientes"><ExpedienteList /></RequireModuleAccess>} />
             <Route path="expedientes/:id" element={<RequireModuleAccess modulo="expedientes"><ExpedienteDetail /></RequireModuleAccess>} />
             <Route path="trazabilidad" element={<Trazabilidad />} />

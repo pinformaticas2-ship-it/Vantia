@@ -4,9 +4,13 @@ import { logActivityForReq } from './activityController';
 
 const pgErr = (e: any) => `${e?.message || String(e)}${e?.code ? ' | code: ' + e.code : ''}`;
 
-function normalizeTipo(raw: any): 'PROCURADOR' | 'ABOGADO' | null {
+// CONTRARIO: partes contrarias habituales (aseguradoras, bancos...) con su
+// correo y datos básicos -- misma tabla y mismos campos que procuradores/abogados.
+type TipoDirectorio = 'PROCURADOR' | 'ABOGADO' | 'CONTRARIO';
+
+function normalizeTipo(raw: any): TipoDirectorio | null {
   const value = String(raw || '').trim().toUpperCase();
-  return value === 'PROCURADOR' || value === 'ABOGADO' ? value : null;
+  return value === 'PROCURADOR' || value === 'ABOGADO' || value === 'CONTRARIO' ? value : null;
 }
 
 function nullIfEmpty(v: any): string | null {
@@ -14,7 +18,7 @@ function nullIfEmpty(v: any): string | null {
   return value ? value : null;
 }
 
-const LABELS: Record<string, string> = { PROCURADOR: 'Procurador', ABOGADO: 'Abogado' };
+const LABELS: Record<string, string> = { PROCURADOR: 'Procurador', ABOGADO: 'Abogado', CONTRARIO: 'Parte contraria' };
 
 // Columnas de texto editables (comunes a Procurador/Abogado + las propias de
 // cada tipo, que simplemente quedan NULL para el tipo al que no le aplican)
@@ -35,7 +39,7 @@ function readTextFields(body: any): Record<string, string | null> {
 
 export const getProfesionales = async (req: any, res: Response) => {
   const tipo = normalizeTipo(req.query.tipo);
-  if (!tipo) return res.status(400).json({ success: false, error: 'tipo debe ser PROCURADOR o ABOGADO' });
+  if (!tipo) return res.status(400).json({ success: false, error: 'tipo debe ser PROCURADOR, ABOGADO o CONTRARIO' });
 
   const q = String(req.query.q || '').trim();
 
@@ -82,7 +86,7 @@ function normalizeEstado(raw: any): string {
 export const createProfesional = async (req: any, res: Response) => {
   const tipo = normalizeTipo(req.body?.tipo);
   const firstName = nullIfEmpty(req.body?.first_name);
-  if (!tipo) return res.status(400).json({ success: false, error: 'tipo debe ser PROCURADOR o ABOGADO' });
+  if (!tipo) return res.status(400).json({ success: false, error: 'tipo debe ser PROCURADOR, ABOGADO o CONTRARIO' });
   if (!firstName) return res.status(400).json({ success: false, error: 'El nombre es obligatorio' });
 
   const userId = req.auth?.userId || 'SYSTEM';

@@ -2868,6 +2868,53 @@ export async function runMigrations(): Promise<void> {
       try { await client.query(sql); } catch (_e: any) {}
     }
 
+    // ── Directorio: partes contrarias ────────────────────────────────
+    // Además de procuradores y abogados, el Directorio guarda las partes
+    // contrarias habituales (aseguradoras, bancos, comunidades...) con su
+    // correo y datos básicos, para no tener que buscarlos cada vez. Reutiliza
+    // la misma tabla: ya tiene NIF/CIF, correo, teléfonos, dirección y notas.
+    try {
+      await client.query(`ALTER TABLE directorio_profesionales DROP CONSTRAINT IF EXISTS directorio_profesionales_tipo_check;`);
+      await client.query(`
+        ALTER TABLE directorio_profesionales ADD CONSTRAINT directorio_profesionales_tipo_check
+          CHECK (tipo IN ('PROCURADOR','ABOGADO','CONTRARIO'));
+      `);
+    } catch (_e: any) {}
+
+    // ── Cargas de datos de una sola vez ──────────────────────────────
+    // Para altas de datos concretos que deben hacerse UNA vez: si después
+    // alguien borra el registro desde la app, no debe reaparecer en el
+    // siguiente arranque del backend.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS app_seeds (
+        key        TEXT        PRIMARY KEY,
+        applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+    try {
+      const { rows: seedHecho } = await client.query(`SELECT 1 FROM app_seeds WHERE key = 'procurador_constantino_gutierrez_avalentia'`);
+      const { rows: orgAvalentia } = await client.query(`SELECT 1 FROM organizaciones WHERE nombre ILIKE '%avalentia%' LIMIT 1`);
+      if (!seedHecho.length && orgAvalentia.length) {
+        // Procurador habitual de AVALENTIA. Solo si no está ya dado de alta
+        // (por nombre y apellidos, sin tildes ni mayúsculas).
+        await client.query(`
+          INSERT INTO directorio_profesionales (tipo, first_name, last_name, organizacion_id, created_by, estado, address_country)
+          SELECT 'PROCURADOR', 'Constantino Manuel', 'Gutiérrez Sarmiento', o.id, 'SYSTEM', 'Alta', 'España'
+            FROM organizaciones o
+           WHERE o.nombre ILIKE '%avalentia%'
+             AND NOT EXISTS (
+               SELECT 1 FROM directorio_profesionales d
+                WHERE d.organizacion_id = o.id AND d.tipo = 'PROCURADOR'
+                  AND unaccent(lower(COALESCE(d.first_name, '') || ' ' || COALESCE(d.last_name, '')))
+                      LIKE '%constantino%gutierrez%sarmiento%'
+             )
+        `);
+        await client.query(`INSERT INTO app_seeds (key) VALUES ('procurador_constantino_gutierrez_avalentia') ON CONFLICT DO NOTHING`);
+      }
+    } catch (e: any) {
+      console.warn('⚠️  No se pudo dar de alta al procurador Constantino Manuel Gutiérrez Sarmiento:', e?.message || e);
+    }
+
     // ── Permisos en schema public (requerido en PostgreSQL 15+) ────
     for (const grant of [
       `GRANT USAGE ON SCHEMA public TO admin`,

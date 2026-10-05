@@ -4,16 +4,20 @@ import { useAuth } from "@clerk/clerk-react";
 import {
   Scale, Gavel, Search, Plus, X, Edit3, Trash2, ExternalLink,
   RefreshCw, AlertCircle, Loader2, ChevronUp, ChevronDown, ChevronLeft, ChevronRight,
-  SlidersHorizontal,
+  SlidersHorizontal, UserX,
 } from "lucide-react";
 import { Spinner } from "../components/Spinner";
 import { ConnectionErrorBanner } from "../components/ConnectionErrorBanner";
 import { safeJson } from "../lib/api";
 import ColumnVisibilityModal from "../components/ColumnVisibilityModal";
 
+// CONTRARIO: partes contrarias habituales (aseguradoras, bancos...) -- misma
+// tabla y pantalla que procuradores/abogados, sin los campos de colegiación.
+export type TipoDirectorio = "PROCURADOR" | "ABOGADO" | "CONTRARIO";
+
 interface Profesional {
   id: string;
-  tipo: "PROCURADOR" | "ABOGADO";
+  tipo: TipoDirectorio;
   first_name: string;
   last_name: string | null;
   nif_cif: string | null;
@@ -51,16 +55,16 @@ type ColumnKey =
   | "address_province" | "address_country" | "email" | "website" | "phone_1" | "phone_2" | "phone_3"
   | "mobile" | "fax" | "estado";
 
-const ALL_COLUMNS: { key: ColumnKey; label: string; tipoOnly?: "PROCURADOR" | "ABOGADO" }[] = [
+const ALL_COLUMNS: { key: ColumnKey; label: string; tipoOnly?: "PROCURADOR" | "ABOGADO"; soloProfesional?: boolean }[] = [
   { key: "name",                   label: "Nombre y Apellidos" },
   { key: "nif_cif",                label: "NIF / CIF" },
-  { key: "colegio",                label: "Colegio" },
-  { key: "num_colegiado",          label: "Nº Colegiado" },
+  { key: "colegio",                label: "Colegio",               soloProfesional: true },
+  { key: "num_colegiado",          label: "Nº Colegiado",          soloProfesional: true },
   { key: "codigo_repre",           label: "Código REPRE",          tipoOnly: "PROCURADOR" },
   { key: "cuenta_consignaciones",  label: "Cuenta de consignaciones", tipoOnly: "PROCURADOR" },
   { key: "especialidad",           label: "Especialidad",          tipoOnly: "ABOGADO" },
   { key: "turno_oficio",           label: "Turno de oficio",       tipoOnly: "ABOGADO" },
-  { key: "despacho",               label: "Despacho" },
+  { key: "despacho",               label: "Despacho",              soloProfesional: true },
   { key: "address_street",         label: "Dirección" },
   { key: "address_cp",             label: "Código Postal" },
   { key: "address_town",           label: "Población" },
@@ -77,6 +81,9 @@ const ALL_COLUMNS: { key: ColumnKey; label: string; tipoOnly?: "PROCURADOR" | "A
 ];
 
 const DEFAULT_VISIBLE: ColumnKey[] = ["name", "colegio", "num_colegiado", "codigo_repre", "especialidad", "email", "phone_1", "estado"];
+const DEFAULT_VISIBLE_CONTRARIO: ColumnKey[] = ["name", "nif_cif", "email", "phone_1", "address_town", "estado"];
+
+const BASE_PATH: Record<TipoDirectorio, string> = { PROCURADOR: "procuradores", ABOGADO: "abogados", CONTRARIO: "contrarios" };
 
 function cellValue(p: Profesional, key: ColumnKey): React.ReactNode {
   switch (key) {
@@ -190,19 +197,21 @@ function PaginationBar({ currentPage, totalPages, onPageChange, totalItems, page
 }
 
 export default function DirectorioProfesionales({ tipo, title, singular, desc }: {
-  tipo: "PROCURADOR" | "ABOGADO";
+  tipo: TipoDirectorio;
   title: string;
   singular: string;
   desc: string;
 }) {
   const { getToken } = useAuth();
   const navigate = useNavigate();
-  const base = tipo === "PROCURADOR" ? "procuradores" : "abogados";
-  const Icon = tipo === "PROCURADOR" ? Scale : Gavel;
+  const base = BASE_PATH[tipo];
+  const Icon = tipo === "PROCURADOR" ? Scale : tipo === "CONTRARIO" ? UserX : Gavel;
   const storageKey = `directorio-${base}-visible-columns`;
 
   const columnsForTipo = useMemo(
-    () => ALL_COLUMNS.filter(c => !c.tipoOnly || c.tipoOnly === tipo),
+    () => ALL_COLUMNS
+      .filter(c => (!c.tipoOnly || c.tipoOnly === tipo) && !(c.soloProfesional && tipo === "CONTRARIO"))
+      .map(c => (c.key === "name" && tipo === "CONTRARIO" ? { ...c, label: "Nombre / Razón social" } : c)),
     [tipo]
   );
 
@@ -228,7 +237,7 @@ export default function DirectorioProfesionales({ tipo, title, singular, desc }:
         if (filtered.length) return filtered;
       }
     } catch {}
-    return DEFAULT_VISIBLE.filter(k => columnsForTipo.some(c => c.key === k));
+    return (tipo === "CONTRARIO" ? DEFAULT_VISIBLE_CONTRARIO : DEFAULT_VISIBLE).filter(k => columnsForTipo.some(c => c.key === k));
   });
 
   useEffect(() => {
@@ -415,7 +424,7 @@ export default function DirectorioProfesionales({ tipo, title, singular, desc }:
                     </p>
                     {!search && (
                       <button onClick={() => navigate(`/dashboard/${base}/new`)} className="text-red-600 text-xs font-bold hover:underline">
-                        + Crear el primer {singular.toLowerCase()}
+                        + Crear {tipo === "CONTRARIO" ? "la primera" : "el primer"} {singular.toLowerCase()}
                       </button>
                     )}
                   </div>

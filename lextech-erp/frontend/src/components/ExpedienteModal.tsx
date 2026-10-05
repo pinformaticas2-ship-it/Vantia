@@ -492,7 +492,8 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
   const set = (k: string, v: any) => setForm(p => ({ ...p, [k]: v }));
 
   // Sugerencias para autocompletar Parte Contraria / Procurador / Abogado
-  // (propio y contrario): contrarios ya usados en otros expedientes de la
+  // (propio y contrario): partes contrarias del Directorio (Directorio →
+  // Partes contrarias) + contrarios ya usados en otros expedientes de la
   // organización, y procuradores/abogados ya dados de alta en el Directorio.
   const [contrarioSuggestions, setContrarioSuggestions] = useState<string[]>([]);
   const [procuradorSuggestions, setProcuradorSuggestions] = useState<string[]>([]);
@@ -502,15 +503,20 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
       try {
         const token = await getToken({ skipCache: true });
         const headers = { Authorization: `Bearer ${token}` };
-        const [contrariosRes, procuradoresRes, abogadosRes] = await Promise.all([
+        const [contrariosRes, procuradoresRes, abogadosRes, dirContrariosRes] = await Promise.all([
           fetch("/api/expedientes/contrarios", { headers }),
           fetch("/api/directorio?tipo=PROCURADOR", { headers }),
           fetch("/api/directorio?tipo=ABOGADO", { headers }),
+          fetch("/api/directorio?tipo=CONTRARIO", { headers }),
         ]);
-        const [contrariosData, procuradoresData, abogadosData] = await Promise.all([
-          safeJson(contrariosRes), safeJson(procuradoresRes), safeJson(abogadosRes),
+        const [contrariosData, procuradoresData, abogadosData, dirContrariosData] = await Promise.all([
+          safeJson(contrariosRes), safeJson(procuradoresRes), safeJson(abogadosRes), safeJson(dirContrariosRes),
         ]);
-        if (contrariosRes.ok) setContrarioSuggestions(contrariosData.data || []);
+        const delDirectorio: string[] = dirContrariosRes.ok
+          ? (dirContrariosData.data || []).map((p: any) => `${p.first_name || ""} ${p.last_name || ""}`.trim()).filter(Boolean)
+          : [];
+        const usados: string[] = contrariosRes.ok ? (contrariosData.data || []) : [];
+        setContrarioSuggestions([...new Set([...delDirectorio, ...usados])]);
         if (procuradoresRes.ok) {
           setProcuradorSuggestions((procuradoresData.data || []).map((p: any) =>
             `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.despacho || ""

@@ -3326,9 +3326,11 @@ function PanelSection({ title, onAdd, titleExtra, children }: { title: string; o
 }
 
 // ── PartyRow: fila de parte con selector persona física/jurídica ───────────────
-function PartyRow({ color, value, onChange, onRemove }: {
+function PartyRow({ color, value, onChange, onRemove, list }: {
   color: "blue" | "red"; value: string;
   onChange: (v: string) => void; onRemove?: () => void;
+  /** id de un <datalist> con sugerencias (clientes existentes para nuestro lado). */
+  list?: string;
 }) {
   const dot = color === "blue" ? "bg-blue-500" : "bg-red-500";
   return (
@@ -3336,6 +3338,7 @@ function PartyRow({ color, value, onChange, onRemove }: {
       <div className={`w-2 h-2 rounded-full shrink-0 ${dot}`} />
       <input
         value={value}
+        list={list}
         onChange={e => onChange(e.target.value)}
         className="flex-1 min-w-0 border border-slate-200 rounded-lg px-2 py-1.5 text-sm text-slate-700 focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100 bg-white"
       />
@@ -3368,6 +3371,9 @@ function PersonSuggestInput({ value, onChange, options, placeholder, onCreateNew
   createLabel: string;
 }) {
   const [open, setOpen] = useState(false);
+  // Al abrir (clic o flecha) se ve la lista COMPLETA del Directorio, aunque el
+  // campo ya traiga el nombre que extrajo la IA; solo se filtra al escribir.
+  const [showAll, setShowAll] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -3379,17 +3385,28 @@ function PersonSuggestInput({ value, onChange, options, placeholder, onCreateNew
   }, []);
 
   const query = value.trim().toLowerCase();
-  const filtered = query ? options.filter(o => o.toLowerCase().includes(query)) : options;
+  const filtered = query && !showAll ? options.filter(o => o.toLowerCase().includes(query)) : options;
+  const openAll = () => { setShowAll(true); setOpen(true); };
 
   return (
     <div className="relative" ref={ref}>
       <input
         value={value}
-        onChange={e => onChange(e.target.value)}
-        onFocus={() => setOpen(true)}
+        onChange={e => { onChange(e.target.value); setShowAll(false); setOpen(true); }}
+        onFocus={openAll}
+        onClick={openAll}
         placeholder={placeholder}
-        className={`mt-1 ${inp}`}
+        className={`mt-1 ${inp} pr-9`}
       />
+      <button
+        type="button"
+        tabIndex={-1}
+        title="Ver la lista completa del Directorio"
+        onMouseDown={e => { e.preventDefault(); if (open) setOpen(false); else openAll(); }}
+        className="absolute right-1.5 top-[calc(50%+2px)] -translate-y-1/2 p-1 rounded text-slate-400 hover:text-slate-700"
+      >
+        <ChevronDown size={15} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
       {open && (
         <div className="absolute z-50 mt-1 w-full max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white py-1.5 shadow-[0_20px_50px_-24px_rgba(15,23,42,0.22)]">
           {filtered.length > 0 ? (
@@ -3398,13 +3415,16 @@ function PersonSuggestInput({ value, onChange, options, placeholder, onCreateNew
                 key={o}
                 type="button"
                 onMouseDown={() => { onChange(o); setOpen(false); }}
-                className="block w-[calc(100%-12px)] mx-1.5 truncate rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                className={`flex w-[calc(100%-12px)] mx-1.5 items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-50 ${
+                  o === value ? "font-semibold text-slate-900" : "text-slate-700"
+                }`}
               >
-                {o}
+                <span className="flex-1 truncate">{o}</span>
+                {o === value && <Check size={13} className="shrink-0 text-emerald-600" />}
               </button>
             ))
           ) : (
-            <p className="px-3 py-2 text-xs text-slate-400">Sin coincidencias en el Directorio.</p>
+            <p className="px-3 py-2 text-xs text-slate-400">{options.length ? "Sin coincidencias en el Directorio." : "Todavía no hay nadie dado de alta en el Directorio."}</p>
           )}
           <button
             type="button"
@@ -3450,21 +3470,27 @@ function DocumentImportVerifyView({
   const { getToken: getTokenVerify } = useAuth();
   const [abogadoOptions, setAbogadoOptions] = useState<string[]>([]);
   const [procuradorOptionsVerify, setProcuradorOptionsVerify] = useState<string[]>([]);
+  // Partes contrarias habituales del Directorio (Directorio → Partes contrarias).
+  const [contrarioOptionsVerify, setContrarioOptionsVerify] = useState<string[]>([]);
   useEffect(() => {
     (async () => {
       try {
         const token = await getTokenVerify({ skipCache: true });
         const headers = { Authorization: `Bearer ${token}` };
-        const [abogadosRes, procuradoresRes] = await Promise.all([
+        const [abogadosRes, procuradoresRes, contrariosRes] = await Promise.all([
           fetch("/api/directorio?tipo=ABOGADO", { headers }),
           fetch("/api/directorio?tipo=PROCURADOR", { headers }),
+          fetch("/api/directorio?tipo=CONTRARIO", { headers }),
         ]);
-        const [abogadosData, procuradoresData] = await Promise.all([safeJson(abogadosRes), safeJson(procuradoresRes)]);
+        const [abogadosData, procuradoresData, contrariosData] = await Promise.all([
+          safeJson(abogadosRes), safeJson(procuradoresRes), safeJson(contrariosRes),
+        ]);
         const toNames = (rows: any[]) => (rows || [])
           .map((p: any) => `${p.first_name || ""} ${p.last_name || ""}`.trim() || p.despacho || "")
           .filter(Boolean);
         if (abogadosRes.ok) setAbogadoOptions(toNames(abogadosData.data));
         if (procuradoresRes.ok) setProcuradorOptionsVerify(toNames(procuradoresData.data));
+        if (contrariosRes.ok) setContrarioOptionsVerify(toNames(contrariosData.data));
       } catch { /* la sugerencia es opcional, no bloquea el resto del formulario */ }
     })();
   }, [getTokenVerify]);
@@ -3555,7 +3581,6 @@ function DocumentImportVerifyView({
   // espacios a mano. Los "safe*" (recortados) se conservan para el resto de
   // usos (EyeBtn, validaciones, listas derivadas) donde sí interesa el trim.
   const rawClienteNombre = String(form.cliente_nombre ?? "");
-  const rawContrario     = String(form.contrario ?? "");
   const rawProcurador    = String(form.procurador ?? "");
 
   const safeJuzgado          = String(form.juzgado ?? "");
@@ -3578,69 +3603,64 @@ function DocumentImportVerifyView({
   const selectedClientLabel = clientOptions.find(o => o.value === safeClienteId)?.label || "";
   const clientInputValue    = selectedClientLabel || rawClienteNombre || "";
 
-  const handleClientInputChange = (value: string) => {
-    const norm = value.trim().toLowerCase();
-    const match = clientOptions.find(o => o.label.trim().toLowerCase() === norm);
-    if (match) { onChange("cliente_id", match.value); onChange("cliente_nombre", match.label); return; }
-    onChange("cliente_id", "");
-    onChange("cliente_nombre", value);
+  // ── Partes: nuestro cliente y la parte contraria según "Representamos a" ──
+  // Demandantes y demandados son las partes del procedimiento tal cual; cuál
+  // de las dos es NUESTRO CLIENTE lo decide representaA. Antes el cliente era
+  // siempre el primer demandante y el contrario siempre los demandados, sin
+  // mirar representaA -- al representar a la parte demandada, nuestro
+  // cliente acababa guardado como parte contraria.
+  const somosDemandantes = representaA === "demandantes";
+
+  // Borradores antiguos sin listas: se reconstruyen desde cliente/contrario
+  // en el lado que corresponda.
+  const legacyCliente   = clientInputValue ? [clientInputValue] : [];
+  const legacyContrario = safeContrario ? safeContrario.split(" | ").filter(Boolean) : [];
+  const demandantesList: string[] = Array.isArray(form.demandantes) && form.demandantes.length > 0
+    ? form.demandantes as string[]
+    : (somosDemandantes ? legacyCliente : legacyContrario);
+  const demandadosList: string[] = Array.isArray(form.demandados) && form.demandados.length > 0
+    ? form.demandados as string[]
+    : (somosDemandantes ? legacyContrario : legacyCliente);
+
+  // Cliente = primera parte de nuestro lado (vinculándolo a un cliente
+  // existente si el nombre coincide); contrario = todas las del otro lado.
+  const syncCliente = (nombre: string) => {
+    const norm = nombre.trim().toLowerCase();
+    const match = norm ? clientOptions.find(o => o.label.trim().toLowerCase() === norm) : undefined;
+    if (match) { onChange("cliente_id", match.value); onChange("cliente_nombre", match.label); }
+    else { onChange("cliente_id", ""); onChange("cliente_nombre", nombre); }
+  };
+  const syncPartes = (demandantes: string[], demandados: string[], repr: "demandantes" | "demandados") => {
+    const nuestras   = repr === "demandantes" ? demandantes : demandados;
+    const contrarias = repr === "demandantes" ? demandados : demandantes;
+    syncCliente(nuestras.find(n => n.trim()) ?? "");
+    onChange("contrario", contrarias.map(n => n.trim()).filter(Boolean).join(" | "));
   };
 
-  const demandantesList: string[] = (() => {
-    if (Array.isArray(form.demandantes) && form.demandantes.length > 0) return form.demandantes as string[];
-    return clientInputValue ? [clientInputValue] : [];
-  })();
-
-  const demandadosList: string[] = (() => {
-    if (Array.isArray(form.demandados) && form.demandados.length > 0) return form.demandados as string[];
-    return safeContrario ? safeContrario.split(" | ").filter(Boolean) : [];
-  })();
+  const updateDemandantes = (next: string[]) => {
+    onChange("demandantes", next);
+    syncPartes(next, demandadosList, representaA);
+  };
+  const updateDemandados = (next: string[]) => {
+    onChange("demandados", next);
+    syncPartes(demandantesList, next, representaA);
+  };
 
   const handleDemandanteChange = (index: number, value: string) => {
-    const next = [...demandantesList];
+    const next = demandantesList.length ? [...demandantesList] : [""];
     next[index] = value;
-    onChange("demandantes", next);
-    if (index === 0) {
-      const norm = value.trim().toLowerCase();
-      const match = clientOptions.find(o => o.label.trim().toLowerCase() === norm);
-      if (match) { onChange("cliente_id", match.value); onChange("cliente_nombre", match.label); }
-      else { onChange("cliente_id", ""); onChange("cliente_nombre", value); }
-    }
+    updateDemandantes(next);
   };
-
-  const addDemandante = () => {
-    const next = demandantesList.length ? [...demandantesList, ""] : [clientInputValue, ""];
-    onChange("demandantes", next);
-  };
-
-  const removeDemandante = (index: number) => {
-    const next = demandantesList.filter((_, i) => i !== index);
-    onChange("demandantes", next);
-    if (index === 0) {
-      const first = next[0] ?? "";
-      const norm = first.trim().toLowerCase();
-      const match = clientOptions.find(o => o.label.trim().toLowerCase() === norm);
-      if (match) { onChange("cliente_id", match.value); onChange("cliente_nombre", match.label); }
-      else { onChange("cliente_id", ""); onChange("cliente_nombre", first); }
-    }
-  };
+  const addDemandante = () => updateDemandantes([...(demandantesList.length ? demandantesList : [""]), ""]);
+  const removeDemandante = (index: number) => updateDemandantes(demandantesList.filter((_, i) => i !== index));
 
   const handleDemandadoChange = (index: number, value: string) => {
-    const next = [...demandadosList];
+    const next = demandadosList.length ? [...demandadosList] : [""];
     next[index] = value;
-    onChange("demandados", next);
-    onChange("contrario", next.filter(Boolean).join(" | "));
+    updateDemandados(next);
   };
-
-  const addDemandado = () => {
-    onChange("demandados", [...demandadosList, ""]);
-  };
-
-  const removeDemandado = (index: number) => {
-    const next = demandadosList.filter((_, i) => i !== index);
-    onChange("demandados", next);
-    onChange("contrario", next.filter(Boolean).join(" | "));
-  };
+  const addDemandado = () => updateDemandados([...(demandadosList.length ? demandadosList : [""]), ""]);
+  const removeDemandado = (index: number) => updateDemandados(demandadosList.filter((_, i) => i !== index));
 
   // Auto-rellenar abogado/procurador contrario al cambiar representaA. Si el
   // borrador ya lo guardó el usuario (draftEditedAt), NO se rellena al abrir:
@@ -3648,6 +3668,9 @@ function DocumentImportVerifyView({
   const skipMountAutofill = useRef(!!item.payload?.draftEditedAt);
   useEffect(() => {
     if (skipMountAutofill.current) { skipMountAutofill.current = false; return; }
+    // Cambiar de lado intercambia también quién es el cliente y quién la
+    // parte contraria (antes solo se cambiaban abogado/procurador).
+    syncPartes(demandantesList, demandadosList, representaA);
     const ext = (item.payload?.extractedData as any) || {};
     const aboD  = normalizeImportedName(ext.abogado_demandante);
     const aboDem = normalizeImportedName(ext.abogado_demandado);
@@ -3938,46 +3961,48 @@ function DocumentImportVerifyView({
             </div>
           </PanelSection>
 
-          {/* Demandantes */}
-          <PanelSection title="Demandantes" onAdd={addDemandante} titleExtra={<EyeBtn term={demandantesList.filter(Boolean).join(" ")} />}>
-            <datalist id={`doc-import-clients-${item.id}`}>
-              {clientOptions.map(o => <option key={o.value} value={o.label} />)}
-            </datalist>
-            {demandantesList.length === 0 ? (
-              <PartyRow color="blue" value={clientInputValue} onChange={handleClientInputChange} />
-            ) : (
-              demandantesList.map((name, i) => (
+          {/* Demandantes / Demandados: el lado que representamos es nuestro
+              cliente (azul, con sugerencias de clientes existentes); el otro
+              es la parte contraria (rojo). */}
+          <datalist id={`doc-import-clients-${item.id}`}>
+            {clientOptions.map(o => <option key={o.value} value={o.label} />)}
+          </datalist>
+          <datalist id={`doc-import-contrarios-${item.id}`}>
+            {contrarioOptionsVerify.map(n => <option key={n} value={n} />)}
+          </datalist>
+          {([
+            { titulo: "Demandantes", lista: demandantesList, nuestro: somosDemandantes,
+              onEdit: handleDemandanteChange, onAdd: addDemandante, onRemove: removeDemandante },
+            { titulo: "Demandados", lista: demandadosList, nuestro: !somosDemandantes,
+              onEdit: handleDemandadoChange, onAdd: addDemandado, onRemove: removeDemandado },
+          ]).map(lado => (
+            <PanelSection
+              key={lado.titulo}
+              title={lado.titulo}
+              onAdd={lado.onAdd}
+              titleExtra={
+                <span className="inline-flex items-center gap-1.5">
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                    lado.nuestro ? "bg-blue-50 text-blue-700 border border-blue-200" : "bg-red-50 text-red-700 border border-red-200"
+                  }`}>
+                    {lado.nuestro ? "Nuestro cliente" : "Parte contraria"}
+                  </span>
+                  <EyeBtn term={lado.lista.filter(Boolean).join(" ")} />
+                </span>
+              }
+            >
+              {(lado.lista.length ? lado.lista : [""]).map((name, i) => (
                 <PartyRow
                   key={i}
-                  color="blue"
+                  color={lado.nuestro ? "blue" : "red"}
                   value={name}
-                  onChange={v => handleDemandanteChange(i, v)}
-                  onRemove={demandantesList.length > 1 ? () => removeDemandante(i) : undefined}
+                  list={lado.nuestro ? `doc-import-clients-${item.id}` : `doc-import-contrarios-${item.id}`}
+                  onChange={v => lado.onEdit(i, v)}
+                  onRemove={lado.lista.length > 1 ? () => lado.onRemove(i) : undefined}
                 />
-              ))
-            )}
-          </PanelSection>
-
-          {/* Demandados */}
-          <PanelSection title="Demandados" onAdd={addDemandado} titleExtra={<EyeBtn term={demandadosList.filter(Boolean).join(" ")} />}>
-            {demandadosList.length === 0 ? (
-              <PartyRow
-                color="red"
-                value={rawContrario}
-                onChange={v => { onChange("contrario", v); onChange("demandados", v ? [v] : []); }}
-              />
-            ) : (
-              demandadosList.map((name, i) => (
-                <PartyRow
-                  key={i}
-                  color="red"
-                  value={name}
-                  onChange={v => handleDemandadoChange(i, v)}
-                  onRemove={demandadosList.length > 1 ? () => removeDemandado(i) : undefined}
-                />
-              ))
-            )}
-          </PanelSection>
+              ))}
+            </PanelSection>
+          ))}
 
           {/* Abogados y Procuradores */}
           <PanelSection title="Abogados y Procuradores">

@@ -1850,13 +1850,20 @@ export async function acceptDocumentImportItem(req: Request, res: Response) {
       return err(res, 'Indica un cliente escribiendo el nombre o seleccionando uno existente antes de aceptar el expediente', 400);
     }
 
-    const representacion = String(req.body?.representa_a || draft.representa_a || 'demandantes');
+    const representacion = String(req.body?.representa_a || draft.representa_a || 'demandantes') === 'demandados'
+      ? 'demandados' : 'demandantes';
     const demandantes = Array.isArray(draft.demandantes) ? draft.demandantes : [];
     const demandados = Array.isArray(draft.demandados) ? draft.demandados : [];
+    // Nuestro cliente sale del lado que representamos y la parte contraria
+    // del otro. Antes el respaldo era siempre demandantes = cliente y
+    // demandados = contrario, y al representar a la parte demandada nuestro
+    // cliente se guardaba como parte contraria.
+    const nuestras = representacion === 'demandados' ? demandados : demandantes;
+    const contrarias = representacion === 'demandados' ? demandantes : demandados;
     const finalDraft = {
       ...draft,
-      cliente_nombre: draft.cliente_nombre || demandantes[0] || '',
-      contrario: draft.contrario || demandados.join(' | '),
+      cliente_nombre: draft.cliente_nombre || nuestras[0] || '',
+      contrario: draft.contrario || contrarias.filter(Boolean).join(' | '),
       representa_a: representacion,
     };
 
