@@ -24,6 +24,7 @@ import Agenda from './pages/Agenda';
 import Tareas from './pages/Tareas';
 import Chat   from './pages/Chat';
 import Email  from './pages/Email';
+import Vistas from './pages/Vistas';
 import Documental from './pages/Documental';
 import WhatsApp from './pages/WhatsApp';
 import AltaConEnlace from './pages/AltaConEnlace';
@@ -74,6 +75,7 @@ export default function App() {
             <Route path="chat"   element={<RequireModuleAccess modulo="chat"><Chat /></RequireModuleAccess>} />
             <Route path="whatsapp" element={<RequireModuleAccess modulo="whatsapp"><WhatsApp /></RequireModuleAccess>} />
             <Route path="correo" element={<RequireModuleAccess modulo="correo"><Email /></RequireModuleAccess>} />
+            <Route path="vistas" element={<Vistas />} />
             <Route path="documental" element={<RequireModuleAccess modulo="documental"><Documental /></RequireModuleAccess>} />
             <Route path="facturacion" element={<RequireModuleAccess modulo="facturacion"><Facturacion /></RequireModuleAccess>} />
             <Route path="facturacion/facturas/nueva" element={<RequireModuleAccess modulo="facturacion"><Facturacion /></RequireModuleAccess>} />

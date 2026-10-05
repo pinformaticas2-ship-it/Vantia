@@ -1,0 +1,623 @@
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useAuth } from "@clerk/clerk-react";
+import { Link, useSearchParams } from "react-router-dom";
+import {
+  AlertTriangle, CalendarCheck, Check, CheckCircle2, ChevronDown, Clock, Eye, FileText, Gavel, Loader2,
+  Mail, Paperclip, RefreshCw, RotateCcw, Settings, Undo2, X, XCircle,
+} from "lucide-react";
+import { apiFetch, resolveApiUrl } from "../lib/api";
+import { notifyVistasChanged } from "../lib/useVistasStatus";
+
+// ── Vistas recibidas por correo ──────────────────────────────────────────────
+// Página de la automatización de vistas (Configuración → Automatizaciones):
+// aquí el abogado revisa lo que el sistema ha detectado en el correo, ve si
+// choca con su agenda y acepta o rechaza. Aceptar/rechazar responde al
+// remitente y, al aceptar, crea expediente, evento, documentos y recordatorio
+// (todo en el backend, controllers/vistasController.ts).
+
+type Estado = "pendiente" | "procesando" | "error" | "aceptada" | "rechazada" | "descartada";
+type Paso = { paso: string; ok: boolean; detalle: string };
+type Conflicto = { id: string; title: string; start_at: string; end_at: string | null; all_day: boolean; type: string };
+
+interface Solicitud {
+  id: string;
+  estado: Estado;
+  from_email: string | null;
+  from_name: string | null;
+  subject: string | null;
+  received_at: string | null;
+  datos: Record<string, any>;
+  extraccion_origen: string | null;
+  fecha_vista: string | null;
+  duracion_min: number | null;
+  responsable_user_id: string | null;
+  responsable_nombre: string | null;
+  conflictos: Conflicto[];
+  expediente_id: string | null;
+  recordatorio_at: string | null;
+  recordatorio_enviado_at: string | null;
+  pasos: Paso[];
+  error: string | null;
+  decidido_por_nombre: string | null;
+  decidido_at: string | null;
+  created_at: string;
+}
+
+interface Detalle extends Solicitud {
+  body_text: string | null;
+  adjuntos: { index: number; filename: string; contentType: string; size: number }[];
+  emailDisponible: boolean;
+  coincidencias: { id: string; anio: number; num_exp: number; descripcion: string | null; juzgado: string | null; num_autos: string | null; cliente_nombre: string | null }[];
+  miembros: { userId: string; nombre: string; rol: string }[];
+  expediente: { id: string; anio: number; num_exp: number; descripcion: string | null } | null;
+  defaults: { duracionMin: number; recordatorioDias: number; recordatorioHora: string; guardarAdjuntos: boolean; responsableUserId: string | null };
+}
+
+const TABS: { key: string; label: string }[] = [
+  { key: "pendiente", label: "Por confirmar" },
+  { key: "aceptada", label: "Aceptadas" },
+  { key: "rechazada", label: "Rechazadas" },
+  { key: "descartada", label: "Descartadas" },
+];
+
+const ESTADO_BADGE: Record<Estado, { label: string; cls: string }> = {
+  pendiente: { label: "Por confirmar", cls: "bg-amber-50 text-amber-700 border-amber-200" },
+  procesando: { label: "Procesando…", cls: "bg-blue-50 text-blue-700 border-blue-200" },
+  error: { label: "Con errores", cls: "bg-red-50 text-red-700 border-red-200" },
+  aceptada: { label: "Aceptada", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  rechazada: { label: "Rechazada", cls: "bg-slate-100 text-slate-600 border-slate-200" },
+  descartada: { label: "Descartada", cls: "bg-slate-100 text-slate-500 border-slate-200" },
+};
+
+const PASO_LABEL: Record<string, string> = {
+  correo: "Correo de respuesta", expediente: "Expediente", agenda: "Agenda", documentos: "Documentación", recordatorio: "Recordatorio",
+};
+
+function fmtFecha(iso: string | null, withTime = true) {
+  if (!iso) return "Sin fecha";
+  return new Date(iso).toLocaleString("es-ES", {
+    weekday: "short", day: "numeric", month: "short", year: "numeric",
+    ...(withTime ? { hour: "2-digit", minute: "2-digit" } : {}),
+  });
+}
+
+/** ISO → valor de <input type="datetime-local"> en la hora local del navegador. */
+function toLocalInput(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function fromLocalInput(v: string): string | null {
+  if (!v) return null;
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+function Field({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) {
+  return (
+    <label className={`block ${className}`}>
+      <span className="block text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+const inputCls = "w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-red-400 focus:ring-1 focus:ring-red-100";
+
+export default function Vistas() {
+  const { getToken } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [tab, setTab] = useState("pendiente");
+  const [items, setItems] = useState<Solicitud[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [listError, setListError] = useState("");
+  const selectedId = searchParams.get("id");
+
+  const loadList = useCallback(async () => {
+    setLoading(true); setListError("");
+    try {
+      const data = await apiFetch(`/api/vistas?estado=${tab}`, { getToken });
+      if (data?.success === false) throw new Error(data.error);
+      setItems(data.data || []);
+    } catch (e: any) {
+      setListError(e.message || "No se pudieron cargar las vistas");
+    } finally {
+      setLoading(false);
+    }
+  }, [getToken, tab]);
+
+  useEffect(() => { void loadList(); }, [loadList]);
+
+  const select = (id: string | null) => {
+    const next = new URLSearchParams(searchParams);
+    if (id) next.set("id", id); else next.delete("id");
+    setSearchParams(next, { replace: true });
+  };
+
+  const onChanged = () => { void loadList(); notifyVistasChanged(); };
+
+  return (
+    <div className="h-full min-h-0 flex flex-col overflow-hidden animate-page-in">
+      <div className="px-6 lg:px-8 py-5 border-b border-slate-200 bg-white flex-shrink-0">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-red-50 border border-red-100">
+              <CalendarCheck size={18} className="text-red-600" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-lg font-extrabold text-slate-900 leading-tight">Vistas por correo</h1>
+              <p className="text-xs text-slate-500 mt-0.5 truncate">Señalamientos detectados automáticamente en el buzón de la organización</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Link to="/dashboard/config?section=automatizaciones" title="Configurar automatización"
+              className="p-2 rounded-lg border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-300 hover:bg-red-50 transition-all">
+              <Settings size={15} />
+            </Link>
+            <button onClick={() => void loadList()} title="Actualizar"
+              className="p-2 rounded-lg border border-slate-200 text-slate-400 hover:text-red-600 hover:border-red-300 hover:bg-red-50 transition-all">
+              <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 min-h-0 flex flex-col md:flex-row bg-white">
+        {/* Lista */}
+        <div className={`md:w-96 md:shrink-0 border-r border-slate-200 flex flex-col min-h-0 ${selectedId ? "hidden md:flex" : "flex"}`}>
+          <div className="px-3 py-2 border-b border-slate-200 bg-slate-50 flex gap-1 overflow-x-auto">
+            {TABS.map((t) => (
+              <button key={t.key} onClick={() => setTab(t.key)}
+                className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${tab === t.key ? "bg-white text-red-700 border border-slate-200 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            {listError && <p className="m-4 text-sm text-red-600">{listError}</p>}
+            {!loading && !listError && items.length === 0 && (
+              <div className="py-16 px-6 flex flex-col items-center gap-3 text-slate-400 text-center">
+                <Gavel size={36} className="opacity-15" />
+                <p className="font-medium text-sm">{tab === "pendiente" ? "No hay vistas pendientes de confirmar" : "No hay vistas en esta lista"}</p>
+              </div>
+            )}
+            {items.map((s) => {
+              const badge = ESTADO_BADGE[s.estado] || ESTADO_BADGE.pendiente;
+              const conflict = (s.estado === "pendiente" || s.estado === "error") && s.conflictos?.length > 0;
+              return (
+                <button key={s.id} onClick={() => select(s.id)}
+                  className={`w-full text-left px-4 py-3 border-b border-slate-100 transition-colors ${selectedId === s.id ? "bg-red-50/60" : "hover:bg-slate-50"}`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-bold text-slate-800 truncate">{fmtFecha(s.fecha_vista)}</span>
+                    <span className={`shrink-0 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${badge.cls}`}>{badge.label}</span>
+                  </div>
+                  <p className="text-xs text-slate-600 truncate mt-0.5">{s.datos?.juzgado || s.subject || "(sin asunto)"}</p>
+                  <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-400">
+                    <span className="truncate">{s.from_name || s.from_email}</span>
+                    {s.datos?.num_autos && <span className="shrink-0">· autos {s.datos.num_autos}</span>}
+                  </div>
+                  {conflict && (
+                    <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700">
+                      <AlertTriangle size={11} /> Choca con {s.conflictos.length} evento{s.conflictos.length === 1 ? "" : "s"} de la agenda
+                    </p>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Detalle */}
+        <div className={`flex-1 min-h-0 overflow-y-auto bg-[#f4f6f8] ${selectedId ? "block" : "hidden md:block"}`}>
+          {selectedId
+            ? <VistaDetalle key={selectedId} id={selectedId} onClose={() => select(null)} onChanged={onChanged} />
+            : (
+              <div className="h-full flex flex-col items-center justify-center text-center p-10 text-slate-400">
+                <CalendarCheck size={40} className="opacity-15 mb-3" />
+                <p className="text-sm font-medium">Elige una vista de la lista para revisarla</p>
+              </div>
+            )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => void; onChanged: () => void }) {
+  const { getToken } = useAuth();
+  const [d, setD] = useState<Detalle | null>(null);
+  const [loadError, setLoadError] = useState("");
+  const [busy, setBusy] = useState<"" | "aceptar" | "rechazar" | "descartar" | "reabrir">("");
+  const [actionError, setActionError] = useState("");
+  const [resultado, setResultado] = useState<Paso[] | null>(null);
+  const [showBody, setShowBody] = useState(false);
+
+  // Formulario
+  const [fecha, setFecha] = useState("");
+  const [duracion, setDuracion] = useState(120);
+  const [tipoActo, setTipoActo] = useState("");
+  const [juzgado, setJuzgado] = useState("");
+  const [sala, setSala] = useState("");
+  const [autos, setAutos] = useState("");
+  const [nig, setNig] = useState("");
+  const [responsable, setResponsable] = useState("");
+  const [expModo, setExpModo] = useState<"nuevo" | "existente">("nuevo");
+  const [expId, setExpId] = useState("");
+  const [guardarAdjuntos, setGuardarAdjuntos] = useState(true);
+  const [conRecordatorio, setConRecordatorio] = useState(true);
+  const [recordatorio, setRecordatorio] = useState("");
+  const [enviarCorreo, setEnviarCorreo] = useState(true);
+  const [mensaje, setMensaje] = useState("");
+  const [modoRespuesta, setModoRespuesta] = useState<null | "aceptar" | "rechazar">(null);
+  const [asunto, setAsunto] = useState("");
+  const [cuerpo, setCuerpo] = useState("");
+  const [previewLoading, setPreviewLoading] = useState(false);
+
+  const [conflictos, setConflictos] = useState<Conflicto[]>([]);
+  const [checking, setChecking] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoadError("");
+    try {
+      const data = await apiFetch(`/api/vistas/${id}`, { getToken });
+      if (data?.success === false) throw new Error(data.error);
+      const v: Detalle = data.data;
+      setD(v);
+      setFecha(toLocalInput(v.fecha_vista));
+      setDuracion(v.duracion_min || v.defaults.duracionMin);
+      setTipoActo(v.datos?.tipo_acto || "");
+      setJuzgado(v.datos?.juzgado || "");
+      setSala(v.datos?.sala || "");
+      setAutos(v.datos?.num_autos || "");
+      setNig(v.datos?.nig || "");
+      setResponsable(v.responsable_user_id || v.defaults.responsableUserId || "");
+      if (v.expediente_id) { setExpModo("existente"); setExpId(v.expediente_id); }
+      else if (v.coincidencias.length) { setExpModo("existente"); setExpId(v.coincidencias[0].id); }
+      setGuardarAdjuntos(v.defaults.guardarAdjuntos);
+      setRecordatorio(toLocalInput(v.recordatorio_at));
+      // Si un intento anterior ya envió el correo, no se vuelve a enviar al reintentar.
+      setEnviarCorreo(!(v.pasos || []).some((p) => p.paso === "correo" && p.ok));
+      setConflictos(v.conflictos || []);
+    } catch (e: any) {
+      setLoadError(e.message || "No se pudo cargar la vista");
+    }
+  }, [getToken, id]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const editable = d && (d.estado === "pendiente" || d.estado === "error" || d.estado === "descartada");
+
+  // Comprobación del hueco en la agenda, en vivo al cambiar fecha/duración/responsable.
+  useEffect(() => {
+    if (!d || !editable) return;
+    const iso = fromLocalInput(fecha);
+    if (!iso) { setConflictos([]); return; }
+    const t = window.setTimeout(async () => {
+      setChecking(true);
+      try {
+        const qs = new URLSearchParams({ fecha: iso, duracion: String(duracion), responsable });
+        const data = await apiFetch(`/api/vistas/${id}/conflictos?${qs}`, { getToken });
+        if (data?.success) setConflictos(data.data || []);
+      } catch { /* se mantiene el último resultado */ } finally {
+        setChecking(false);
+      }
+    }, 400);
+    return () => window.clearTimeout(t);
+  }, [d, editable, fecha, duracion, responsable, id, getToken]);
+
+  const formBody = () => ({
+    fecha: fromLocalInput(fecha),
+    duracion_min: duracion,
+    tipo_acto: tipoActo,
+    juzgado, sala, num_autos: autos, nig,
+    responsable_user_id: responsable || undefined,
+    mensaje,
+  });
+
+  const loadPreview = async (tipo: "aceptar" | "rechazar") => {
+    setPreviewLoading(true); setActionError("");
+    try {
+      const data = await apiFetch(`/api/vistas/${id}/preview`, { method: "POST", getToken, body: JSON.stringify({ tipo, ...formBody() }) });
+      if (data?.success === false) throw new Error(data.error);
+      setAsunto(data.data.asunto); setCuerpo(data.data.texto); setModoRespuesta(tipo);
+    } catch (e: any) {
+      setActionError(e.message || "No se pudo preparar el correo");
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const run = async (accion: "aceptar" | "rechazar" | "descartar" | "reabrir") => {
+    setBusy(accion); setActionError(""); setResultado(null);
+    try {
+      let body: any = {};
+      if (accion === "aceptar") {
+        if (!fromLocalInput(fecha)) throw new Error("Indica la fecha y hora de la vista.");
+        if (expModo === "existente" && !expId) throw new Error("Elige el expediente al que vincular la vista.");
+        body = {
+          ...formBody(),
+          expediente: expModo === "existente" ? { modo: "existente", id: expId } : { modo: "nuevo" },
+          guardar_adjuntos: guardarAdjuntos,
+          recordatorio: conRecordatorio,
+          recordatorio_at: conRecordatorio && recordatorio ? fromLocalInput(recordatorio) : undefined,
+          enviar_correo: enviarCorreo,
+          ...(modoRespuesta === "aceptar" ? { asunto, cuerpo } : {}),
+        };
+      } else if (accion === "rechazar") {
+        body = { ...formBody(), enviar_correo: enviarCorreo, ...(modoRespuesta === "rechazar" ? { asunto, cuerpo } : {}) };
+      }
+      const data = await apiFetch(`/api/vistas/${id}/${accion}`, { method: "POST", getToken, body: JSON.stringify(body) });
+      if (data?.success === false) throw new Error(data.error);
+      if (data.data?.pasos) setResultado(data.data.pasos);
+      setModoRespuesta(null);
+      await load();
+      onChanged();
+    } catch (e: any) {
+      setActionError(e.message || "No se pudo completar la acción");
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const openAdjunto = async (index: number) => {
+    try {
+      const token = await getToken();
+      const res = await fetch(resolveApiUrl(`/api/vistas/${id}/adjuntos/${index}`), { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error("No disponible");
+      const url = URL.createObjectURL(await res.blob());
+      window.open(url, "_blank", "noopener");
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      setActionError("No se pudo abrir el adjunto (puede que el correo ya no esté en el buzón).");
+    }
+  };
+
+  const recordatorioTexto = useMemo(() => {
+    if (!d) return "";
+    const dias = d.defaults.recordatorioDias;
+    const base = d.datos?.fecha_preparacion ? "la fecha de preparación indicada en el correo" : "la vista";
+    return `${dias === 0 ? "El mismo día de" : `${dias} día${dias === 1 ? "" : "s"} antes de`} ${base}, a las ${d.defaults.recordatorioHora}`;
+  }, [d]);
+
+  if (loadError) return <div className="p-8 text-sm text-red-600">{loadError}</div>;
+  if (!d) return <div className="p-10 flex justify-center"><Loader2 className="animate-spin text-slate-400" /></div>;
+
+  const badge = ESTADO_BADGE[d.estado] || ESTADO_BADGE.pendiente;
+  const pasos = resultado || d.pasos || [];
+
+  return (
+    <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <button onClick={onClose} className="md:hidden text-xs font-semibold text-slate-500 mb-2">← Volver</button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-lg font-extrabold text-slate-900">{fmtFecha(d.fecha_vista)}</h2>
+            <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${badge.cls}`}>{badge.label}</span>
+            {d.extraccion_origen && (
+              <span className="text-[10px] font-semibold text-slate-400">
+                {d.extraccion_origen === "ia" ? "Datos leídos con IA" : d.extraccion_origen === "patrones" ? "Datos leídos sin IA — revísalos" : ""}
+              </span>
+            )}
+          </div>
+          {d.decidido_por_nombre && (
+            <p className="text-xs text-slate-500 mt-1">Decidido por {d.decidido_por_nombre} · {fmtFecha(d.decidido_at)}</p>
+          )}
+        </div>
+        <button onClick={onClose} className="hidden md:block p-1.5 rounded-lg text-slate-400 hover:bg-white hover:text-slate-700"><X size={16} /></button>
+      </div>
+
+      {/* Correo de origen */}
+      <section className="bg-white rounded-2xl border border-slate-200 p-4">
+        <div className="flex items-start gap-3">
+          <Mail size={16} className="text-slate-400 mt-0.5 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-slate-800 break-words">{d.subject || "(sin asunto)"}</p>
+            <p className="text-xs text-slate-500">{d.from_name ? `${d.from_name} · ` : ""}{d.from_email} · {fmtFecha(d.received_at)}</p>
+            {d.datos?.resumen && <p className="text-sm text-slate-700 mt-2">{d.datos.resumen}</p>}
+            {d.body_text && (
+              <button onClick={() => setShowBody((v) => !v)} className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:underline">
+                <ChevronDown size={12} className={showBody ? "rotate-180" : ""} /> {showBody ? "Ocultar correo" : "Ver correo completo"}
+              </button>
+            )}
+            {showBody && <pre className="mt-2 max-h-80 overflow-y-auto whitespace-pre-wrap text-xs text-slate-700 bg-slate-50 border border-slate-100 rounded-lg p-3 font-sans">{d.body_text}</pre>}
+            {d.adjuntos.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {d.adjuntos.map((a) => (
+                  <button key={a.index} onClick={() => void openAdjunto(a.index)}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-slate-200 text-xs text-slate-700 hover:border-red-300 hover:bg-red-50">
+                    <Paperclip size={12} className="text-slate-400" /> <span className="max-w-[220px] truncate">{a.filename}</span> <Eye size={11} className="text-slate-400" />
+                  </button>
+                ))}
+              </div>
+            )}
+            {!d.emailDisponible && <p className="mt-2 text-xs text-amber-700">El correo original ya no está en el buzón; se conserva su texto.</p>}
+          </div>
+        </div>
+      </section>
+
+      {/* Resultado de la última acción / pasos */}
+      {pasos.length > 0 && (
+        <section className="bg-white rounded-2xl border border-slate-200 p-4">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Qué se ha hecho</h3>
+          <ul className="space-y-1.5">
+            {pasos.map((p) => (
+              <li key={p.paso} className="flex items-start gap-2 text-sm">
+                {p.ok ? <CheckCircle2 size={15} className="text-emerald-500 mt-0.5 shrink-0" /> : <XCircle size={15} className="text-red-500 mt-0.5 shrink-0" />}
+                <span><span className="font-semibold text-slate-700">{PASO_LABEL[p.paso] || p.paso}:</span> <span className="text-slate-600">{p.detalle}</span></span>
+              </li>
+            ))}
+          </ul>
+          {d.expediente && (
+            <Link to={`/dashboard/expedientes/${d.expediente.id}`} className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-red-600 hover:underline">
+              <FileText size={13} /> Abrir expediente {d.expediente.anio}/{d.expediente.num_exp}
+            </Link>
+          )}
+          {d.recordatorio_at && d.estado === "aceptada" && (
+            <p className="mt-2 text-xs text-slate-500 flex items-center gap-1.5">
+              <Clock size={12} /> Recordatorio {d.recordatorio_enviado_at ? "enviado" : "programado"}: {fmtFecha(d.recordatorio_at)}
+            </p>
+          )}
+        </section>
+      )}
+
+      {editable && (
+        <>
+          {/* Datos de la vista */}
+          <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Datos de la vista</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Field label="Fecha y hora" className="sm:col-span-2">
+                <input type="datetime-local" value={fecha} onChange={(e) => setFecha(e.target.value)} className={inputCls} />
+              </Field>
+              <Field label="Duración (min)">
+                <input type="number" min={15} max={600} step={15} value={duracion} onChange={(e) => setDuracion(Number(e.target.value) || 120)} className={inputCls} />
+              </Field>
+              <Field label="Tipo de acto"><input value={tipoActo} onChange={(e) => setTipoActo(e.target.value)} placeholder="Vista, juicio, audiencia previa…" className={inputCls} /></Field>
+              <Field label="Juzgado" className="sm:col-span-2"><input value={juzgado} onChange={(e) => setJuzgado(e.target.value)} className={inputCls} /></Field>
+              <Field label="Sala"><input value={sala} onChange={(e) => setSala(e.target.value)} className={inputCls} /></Field>
+              <Field label="Nº autos"><input value={autos} onChange={(e) => setAutos(e.target.value)} className={inputCls} /></Field>
+              <Field label="NIG"><input value={nig} onChange={(e) => setNig(e.target.value)} className={inputCls} /></Field>
+              <Field label="Abogado que asiste" className="sm:col-span-3">
+                <select value={responsable} onChange={(e) => setResponsable(e.target.value)} className={inputCls}>
+                  <option value="">— Yo —</option>
+                  {d.miembros.filter((m) => m.rol !== "soporte").map((m) => <option key={m.userId} value={m.userId}>{m.nombre}</option>)}
+                </select>
+              </Field>
+            </div>
+
+            {/* Hueco en la agenda */}
+            <div className={`rounded-xl border p-3 text-sm ${conflictos.length ? "border-amber-200 bg-amber-50" : "border-emerald-200 bg-emerald-50"}`}>
+              <div className="flex items-center gap-2 font-semibold">
+                {checking ? <Loader2 size={14} className="animate-spin text-slate-400" />
+                  : conflictos.length ? <AlertTriangle size={14} className="text-amber-600" /> : <Check size={14} className="text-emerald-600" />}
+                <span className={conflictos.length ? "text-amber-800" : "text-emerald-800"}>
+                  {conflictos.length ? `Choca con ${conflictos.length} evento${conflictos.length === 1 ? "" : "s"} de la agenda` : "Hueco libre en la agenda"}
+                </span>
+              </div>
+              {conflictos.length > 0 && (
+                <ul className="mt-1.5 space-y-0.5 text-xs text-amber-900">
+                  {conflictos.map((c) => (
+                    <li key={c.id}>• {c.title} — {c.all_day ? `${fmtFecha(c.start_at, false)} (todo el día)` : `${fmtFecha(c.start_at)}${c.end_at ? " – " + new Date(c.end_at).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : ""}`}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </section>
+
+          {/* Expediente, documentos, recordatorio */}
+          <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Al aceptar</h3>
+            <div className="space-y-2">
+              <label className="flex items-start gap-2 text-sm">
+                <input type="radio" checked={expModo === "nuevo"} onChange={() => setExpModo("nuevo")} className="mt-1 accent-red-600" disabled={!!d.expediente_id} />
+                <span>Dar de alta un <b>expediente nuevo</b> con los datos de la vista</span>
+              </label>
+              {(d.coincidencias.length > 0 || d.expediente_id) && (
+                <label className="flex items-start gap-2 text-sm">
+                  <input type="radio" checked={expModo === "existente"} onChange={() => setExpModo("existente")} className="mt-1 accent-red-600" />
+                  <span className="flex-1">
+                    Vincular a un <b>expediente existente</b>
+                    {d.expediente_id
+                      ? <span className="block text-xs text-slate-500">Ya creado en un intento anterior: {d.expediente ? `${d.expediente.anio}/${d.expediente.num_exp}` : ""}</span>
+                      : (
+                        <select value={expId} onChange={(e) => { setExpId(e.target.value); setExpModo("existente"); }} className={`${inputCls} mt-1`}>
+                          {d.coincidencias.map((c) => (
+                            <option key={c.id} value={c.id}>{c.anio}/{c.num_exp} · {c.descripcion || c.cliente_nombre || "sin descripción"}{c.num_autos ? ` · autos ${c.num_autos}` : ""}</option>
+                          ))}
+                        </select>
+                      )}
+                    {!d.expediente_id && <span className="block text-[11px] text-slate-400 mt-0.5">Coincide el nº de autos o el NIG del correo</span>}
+                  </span>
+                </label>
+              )}
+            </div>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={guardarAdjuntos} onChange={(e) => setGuardarAdjuntos(e.target.checked)} className="accent-red-600" />
+              Guardar los {d.adjuntos.length || ""} adjunto{d.adjuntos.length === 1 ? "" : "s"} en la documentación del expediente
+            </label>
+            <div>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={conRecordatorio} onChange={(e) => setConRecordatorio(e.target.checked)} className="accent-red-600" />
+                Recordatorio para preparar la vista
+              </label>
+              {conRecordatorio && (
+                <div className="ml-6 mt-1.5 flex flex-wrap items-center gap-2">
+                  <input type="datetime-local" value={recordatorio} onChange={(e) => setRecordatorio(e.target.value)} className={`${inputCls} max-w-[240px]`} />
+                  <span className="text-xs text-slate-400">{recordatorio ? "" : `Por defecto: ${recordatorioTexto}`}</span>
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* Correo de respuesta */}
+          <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Respuesta a {d.from_email}</h3>
+              <label className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+                <input type="checkbox" checked={enviarCorreo} onChange={(e) => setEnviarCorreo(e.target.checked)} className="accent-red-600" /> Enviar correo
+              </label>
+            </div>
+            {enviarCorreo && (
+              <>
+                <Field label="Mensaje adicional (opcional)">
+                  <textarea value={mensaje} onChange={(e) => setMensaje(e.target.value)} rows={2} className={inputCls} placeholder="Se añade al texto de la plantilla" />
+                </Field>
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={() => void loadPreview("aceptar")} disabled={previewLoading}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                    <Eye size={12} /> Ver/editar correo de aceptación
+                  </button>
+                  <button onClick={() => void loadPreview("rechazar")} disabled={previewLoading}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                    <Eye size={12} /> Ver/editar correo de rechazo
+                  </button>
+                  {previewLoading && <Loader2 size={14} className="animate-spin text-slate-400 self-center" />}
+                </div>
+                {modoRespuesta && (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold uppercase text-slate-500">Correo de {modoRespuesta === "aceptar" ? "aceptación" : "rechazo"} (editable)</span>
+                      <button onClick={() => setModoRespuesta(null)} className="text-[11px] font-semibold text-slate-400 hover:text-slate-600">Usar la plantilla tal cual</button>
+                    </div>
+                    <input value={asunto} onChange={(e) => setAsunto(e.target.value)} className={inputCls} />
+                    <textarea value={cuerpo} onChange={(e) => setCuerpo(e.target.value)} rows={9} className={`${inputCls} font-sans`} />
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+
+          {actionError && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{actionError}</p>}
+
+          <div className="flex flex-wrap items-center gap-2 pb-6">
+            <button onClick={() => void run("aceptar")} disabled={!!busy}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-bold hover:bg-red-700 disabled:opacity-50">
+              {busy === "aceptar" ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
+              {d.estado === "error" ? "Reintentar" : "Aceptar vista"}
+            </button>
+            {d.estado !== "error" && (
+              <button onClick={() => void run("rechazar")} disabled={!!busy}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 text-sm font-bold hover:bg-slate-50 disabled:opacity-50">
+                {busy === "rechazar" ? <Loader2 size={15} className="animate-spin" /> : <X size={15} />} Rechazar
+              </button>
+            )}
+            {d.estado === "pendiente" && (
+              <button onClick={() => void run("descartar")} disabled={!!busy} title="No responde a nadie: solo la quita de la lista"
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-slate-500 text-xs font-semibold hover:bg-white disabled:opacity-50">
+                {busy === "descartar" ? <Loader2 size={13} className="animate-spin" /> : <Undo2 size={13} />} No es una vista
+              </button>
+            )}
+            {d.estado === "descartada" && (
+              <button onClick={() => void run("reabrir")} disabled={!!busy}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-slate-600 text-xs font-semibold hover:bg-white disabled:opacity-50">
+                {busy === "reabrir" ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />} Pasar a "por confirmar"
+              </button>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

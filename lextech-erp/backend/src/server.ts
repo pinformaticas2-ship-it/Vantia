@@ -30,6 +30,7 @@ import preferencesRoutes    from './routes/preferences';
 import pushRoutes           from './routes/push';
 import soporteRoutes        from './routes/soporte';
 import plaudRoutes          from './routes/plaud';
+import vistasRoutes         from './routes/vistas';
 import { syncAllQuipuUsers } from './controllers/quipuController';
 import { syncAllOrganizacionesDriveChanges } from './utils/googleDriveSync';
 import { clerkMiddleware } from '@clerk/express';
@@ -38,6 +39,7 @@ import { runMigrations } from './config/migrations';
 import { startLocalFilesWatcher } from './watchers/localFilesWatcher';
 import { startPlazoPushScheduler } from './services/plazoPushScheduler';
 import { startSoporteRetencionScheduler } from './services/soporteRetencion';
+import { startVistasScheduler } from './services/vistasAutomation';
 import { migrateLocalFoldersStructure } from './controllers/filesController';
 import { logServerStart } from './controllers/activityController';
 import pool from './config/database';
@@ -253,6 +255,7 @@ app.use('/api/preferences',       preferencesRoutes);
 app.use('/api/push',              pushRoutes);
 app.use('/api/soporte',           soporteRoutes);
 app.use('/api/plaud',             plaudRoutes);
+app.use('/api/vistas',            vistasRoutes);
 
 // Health check básico
 app.get('/health', (_req, res) => {
@@ -371,6 +374,10 @@ runMigrations().then(() => {
 
     // Centro de soporte: aviso (con CSV) y borrado de tickets cerrados hace 15 días
     startSoporteRetencionScheduler();
+
+    // Automatización de vistas por correo (solo actúa en las organizaciones
+    // que la tengan activada en Configuración → Automatizaciones)
+    startVistasScheduler();
 
     // Quipu auto-sync: run once after 30s (let DB settle), then every 30 min
     setTimeout(() => {

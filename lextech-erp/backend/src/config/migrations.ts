@@ -2724,6 +2724,70 @@ export async function runMigrations(): Promise<void> {
       await client.query(`CREATE INDEX IF NOT EXISTS idx_expediente_plaud_links_token ON expediente_plaud_links (token);`);
     } catch (_e: any) {}
 
+    // ── Automatización de vistas por correo (toggle por organización) ─────────
+    // vistas_auto_config guarda el buzón vigilado, el abogado responsable, la
+    // duración por defecto y las plantillas de respuesta (ver
+    // services/vistasAutomation.ts). vistas_auto_activated_at marca desde
+    // cuándo se procesan correos -- nunca se toca la bandeja histórica.
+    for (const sql of [
+      `ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS vistas_auto_enabled BOOLEAN NOT NULL DEFAULT false`,
+      `ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS vistas_auto_config JSONB NOT NULL DEFAULT '{}'::jsonb`,
+      `ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS vistas_auto_activated_at TIMESTAMPTZ`,
+      `ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS vistas_auto_last_run_at TIMESTAMPTZ`,
+      `ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS vistas_auto_last_error TEXT`,
+    ]) {
+      try { await client.query(sql); } catch (_e: any) {}
+    }
+    // Una fila por correo analizado (también los descartados, para no volver
+    // a analizarlos en cada pasada). email_id sin FK a propósito: si alguien
+    // borra el correo de la bandeja, la solicitud conserva su copia de los
+    // datos y sigue siendo legible.
+    try {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS vistas_solicitudes (
+          id                     UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+          organizacion_id        UUID         NOT NULL REFERENCES organizaciones(id) ON DELETE CASCADE,
+          email_id               UUID         NOT NULL,
+          account_id             UUID,
+          gmail_profile_id       UUID,
+          mailbox_user_id        VARCHAR(150),
+          estado                 VARCHAR(30)  NOT NULL DEFAULT 'pendiente',
+          from_email             VARCHAR(300),
+          from_name              VARCHAR(300),
+          subject                VARCHAR(1000),
+          message_id             VARCHAR(500),
+          body_text              TEXT,
+          received_at            TIMESTAMPTZ,
+          datos                  JSONB        NOT NULL DEFAULT '{}'::jsonb,
+          extraccion_origen      VARCHAR(20),
+          fecha_vista            TIMESTAMPTZ,
+          duracion_min           INTEGER,
+          responsable_user_id    VARCHAR(150),
+          responsable_nombre     VARCHAR(200),
+          conflictos             JSONB        NOT NULL DEFAULT '[]'::jsonb,
+          expediente_id          UUID,
+          agenda_event_id        UUID,
+          recordatorio_event_id  UUID,
+          recordatorio_at        TIMESTAMPTZ,
+          recordatorio_enviado_at TIMESTAMPTZ,
+          pasos                  JSONB        NOT NULL DEFAULT '[]'::jsonb,
+          error                  TEXT,
+          decidido_por           VARCHAR(150),
+          decidido_por_nombre    VARCHAR(200),
+          decidido_at            TIMESTAMPTZ,
+          created_at             TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+          updated_at             TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+        );
+      `);
+    } catch (_e: any) {}
+    for (const idx of [
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_vistas_solicitudes_email ON vistas_solicitudes (email_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_vistas_solicitudes_org_estado ON vistas_solicitudes (organizacion_id, estado, created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_vistas_solicitudes_recordatorio ON vistas_solicitudes (recordatorio_at) WHERE recordatorio_at IS NOT NULL AND recordatorio_enviado_at IS NULL`,
+    ]) {
+      try { await client.query(idx); } catch (_e: any) {}
+    }
+
     // ── Permisos en schema public (requerido en PostgreSQL 15+) ────
     for (const grant of [
       `GRANT USAGE ON SCHEMA public TO admin`,

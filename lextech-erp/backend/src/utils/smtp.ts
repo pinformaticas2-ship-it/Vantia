@@ -26,6 +26,7 @@ export interface MailMessage {
   text?: string;
   replyTo?: string;
   messageId?: string;
+  inReplyTo?: string;
   attachments?: MailAttachment[];
 }
 
@@ -69,6 +70,8 @@ export async function sendEmail(cfg: SmtpConfig, msg: MailMessage): Promise<void
       text: msg.text,
       replyTo: msg.replyTo,
       messageId: msg.messageId,
+      inReplyTo: msg.inReplyTo,
+      references: msg.inReplyTo,
       attachments: msg.attachments?.map((attachment) => ({
         filename: attachment.filename,
         contentType: attachment.contentType,

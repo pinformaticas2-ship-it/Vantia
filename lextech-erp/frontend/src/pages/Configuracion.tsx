@@ -3,7 +3,7 @@ import { startDropboxConnect } from '../lib/dropboxConnect';
 import { DriveLogo, DropboxLogo } from '../components/StorageStatusIcons';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { AlertTriangle, Bell, BellOff, BellRing, BookOpen, Building2, Camera, Check, ChevronDown, Cloud, Crown, Facebook, History, Instagram, KeyRound, Link2, Loader2, Lock, LockKeyhole, MessageCircle, Clock3, Mail as MailIcon, Phone, Palette, Plug, Plus, Settings, ShieldCheck, Trash2, UsersRound, X } from 'lucide-react';
+import { AlertTriangle, Bell, BellOff, BellRing, BookOpen, Building2, Camera, Check, ChevronDown, Cloud, Crown, Facebook, History, Instagram, KeyRound, Link2, Loader2, Lock, LockKeyhole, MessageCircle, Clock3, Mail as MailIcon, Phone, Palette, Plug, Plus, Settings, ShieldCheck, Trash2, UsersRound, X, Zap } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth, UserProfile } from '@clerk/clerk-react';
 import { useTheme, AppTheme } from '../lib/ThemeContext';
@@ -11,6 +11,7 @@ import { pickSidebarStyle, autoSidebarBorder, muteSidebarColor } from '../lib/th
 import { apiFetch, resolveUploadUrl, setActiveOrganizacionId } from '../lib/api';
 import { useOrganizacion, OrgRol, Modulo, NivelAcceso } from '../lib/useOrganizacion';
 import ManualPanel from './ManualPanel';
+import AutomatizacionesPanel from './AutomatizacionesPanel';
 import { usePushNotifications } from '../lib/usePushNotifications';
 
 const PALETTES: {
@@ -91,13 +92,14 @@ const PALETTES: {
   },
 ];
 
-type SectionKey = 'apariencia' | 'manual' | 'notificaciones' | 'despacho' | 'seguridad' | 'integraciones' | 'usuarios';
+type SectionKey = 'apariencia' | 'manual' | 'notificaciones' | 'despacho' | 'seguridad' | 'integraciones' | 'automatizaciones' | 'usuarios';
 
 const OTHER_SECTIONS: { key: SectionKey; label: string; desc: string; icon: any }[] = [
   { key: 'notificaciones', label: 'Notificaciones',        desc: 'Configura alertas por email y avisos emergentes del sistema.',            icon: Bell },
   { key: 'despacho',       label: 'Mi Despacho',           desc: 'Información fiscal del despacho, logotipo y textos legales para facturas.', icon: Building2 },
   { key: 'seguridad',      label: 'Seguridad',             desc: 'Cambio de contraseñas, autenticación en dos pasos (2FA) y sesiones activas.', icon: ShieldCheck },
   { key: 'integraciones',  label: 'Integraciones',         desc: 'Conecta Vantia con herramientas y servicios externos.',                    icon: Plug },
+  { key: 'automatizaciones', label: 'Automatizaciones',    desc: 'Flujos automáticos de la organización, como las vistas recibidas por correo.', icon: Zap },
   { key: 'usuarios',       label: 'Gestión de Usuarios',   desc: 'Administra los usuarios y permisos del despacho.',                          icon: UsersRound },
 ];
 
@@ -2132,7 +2134,7 @@ export default function Configuracion() {
   const [searchParams] = useSearchParams();
   const [activeSection, setActiveSection] = useState<SectionKey>(() => {
     const requested = searchParams.get('section') as SectionKey | null;
-    const valid: SectionKey[] = ['apariencia', 'manual', 'notificaciones', 'despacho', 'seguridad', 'integraciones', 'usuarios'];
+    const valid: SectionKey[] = ['apariencia', 'manual', 'notificaciones', 'despacho', 'seguridad', 'integraciones', 'automatizaciones', 'usuarios'];
     return requested && valid.includes(requested) ? requested : 'apariencia';
   });
   const activeOther = visibleOtherSections.find((s) => s.key === activeSection);
@@ -2324,6 +2326,8 @@ export default function Configuracion() {
             <SeguridadPanel />
           ) : activeSection === 'integraciones' ? (
             <IntegracionesPanel canManage={myRol === 'propietario' || myRol === 'admin'} />
+          ) : activeSection === 'automatizaciones' ? (
+            <AutomatizacionesPanel />
           ) : activeSection === 'usuarios' ? (
             <UsuariosPanel />
           ) : (

@@ -775,89 +775,97 @@ export async function syncAccount(req: Request, res: Response) {
       [id, uid, organizacionId],
     );
     if (!accs.length) return err(res, 'Cuenta no encontrada', 404);
-    const acc      = accs[0];
-    const password = decryptPassword(acc.password_enc);
-    const proto    = (acc.protocol || 'imap').toLowerCase();
-
-    let inserted = 0;
-    let synced   = 0;
-
-    if (proto === 'pop3') {
-      // ── POP3: descargar solo mensajes nuevos por UIDL ──────────────────────
-      const { rows: known } = await pool.query(
-        `SELECT message_id FROM emails WHERE account_id=$1 AND message_id IS NOT NULL`,
-        [acc.id],
-      );
-      const knownUidls = new Set(known.map((r: any) => String(r.message_id)));
-
-      const pop3Cfg: Pop3Config = {
-        host: acc.imap_host, port: acc.imap_port, secure: acc.imap_secure,
-        user: acc.username, password,
-      };
-      const messages = await syncPop3Inbox(pop3Cfg, knownUidls, limit);
-      synced = messages.length;
-
-      for (const msg of messages) {
-        const sentAt = msg.date ? new Date(msg.date) : null;
-        const { rowCount } = await pool.query(
-          `INSERT INTO emails
-             (account_id, user_id, message_id, folder, from_email, from_name,
-              to_emails, subject, snippet, body_text, body_html, is_read,
-              is_starred, size_bytes, sent_at)
-           VALUES ($1,$2,$3,'INBOX',$4,$5,$6,$7,$8,$9,$10,false,false,$11,$12)
-           ON CONFLICT DO NOTHING`,
-          [
-            acc.id, uid, msg.uidl,
-            msg.from || null, msg.fromName || null, msg.to || null,
-            msg.subject || '(Sin asunto)', msg.snippet || null,
-            msg.bodyText || null, msg.bodyHtml || null,
-            msg.size || 0, sentAt,
-          ],
-        );
-        if (rowCount) inserted++;
-      }
-    } else {
-      // ── IMAP ──────────────────────────────────────────────────────────────
-      const imapCfg: ImapConfig = {
-        host: acc.imap_host, port: acc.imap_port, secure: acc.imap_secure,
-        user: acc.username, password,
-      };
-      // Use last_sync_at so IMAP SEARCH SINCE skips already-synced messages.
-      // Fall back to 7 days ago on first-ever sync.
-      const sinceFallback = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-      const sinceDate: Date = acc.last_sync_at ? new Date(acc.last_sync_at) : sinceFallback;
-      const messages = await syncInbox(imapCfg, folder, limit, sinceDate);
-      synced = messages.length;
-
-      for (const msg of messages) {
-        const sentAt = msg.date ? new Date(msg.date) : null;
-        const { rowCount } = await pool.query(
-          `INSERT INTO emails
-             (account_id, user_id, uid, message_id, folder, from_email, from_name,
-              to_emails, subject, snippet, is_read, is_starred, has_attachments, size_bytes, sent_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
-           ON CONFLICT (account_id, uid, folder) DO UPDATE SET
-             is_read         = EXCLUDED.is_read,
-             is_starred      = EXCLUDED.is_starred,
-             has_attachments = EXCLUDED.has_attachments,
-             snippet         = COALESCE(EXCLUDED.snippet, emails.snippet)`,
-          [
-            acc.id, uid,
-            msg.uid > 0 ? msg.uid : null, msg.messageId || null,
-            folder, msg.from || null, msg.fromName || null, msg.to || null,
-            msg.subject || '(Sin asunto)', msg.snippet || null,
-            msg.flags.includes('\\Seen'), msg.flags.includes('\\Flagged'), msg.hasAttachments,
-            msg.size || 0, sentAt,
-          ],
-        );
-        if (rowCount) inserted++;
-      }
-    }
-
-    await pool.query(`UPDATE email_accounts SET last_sync_at=NOW() WHERE id=$1`, [acc.id]);
-
-    return ok(res, { synced, inserted, folder, protocol: proto });
+    const result = await syncImapAccountRecord(accs[0], folder, limit);
+    return ok(res, { ...result, folder });
   } catch (e: any) { return err(res, `Error de sincronización: ${e.message}`); }
+}
+
+// Sincroniza una cuenta IMAP/POP3 ya cargada de email_accounts. Separada del
+// handler para que la automatización de vistas (services/vistasAutomation.ts)
+// pueda sincronizar el buzón vigilado en segundo plano sin pasar por HTTP.
+export async function syncImapAccountRecord(acc: any, folder = 'INBOX', limit = 50) {
+  const uid      = acc.user_id;
+  const password = decryptPassword(acc.password_enc);
+  const proto    = (acc.protocol || 'imap').toLowerCase();
+
+  let inserted = 0;
+  let synced   = 0;
+
+  if (proto === 'pop3') {
+    // ── POP3: descargar solo mensajes nuevos por UIDL ──────────────────────
+    const { rows: known } = await pool.query(
+      `SELECT message_id FROM emails WHERE account_id=$1 AND message_id IS NOT NULL`,
+      [acc.id],
+    );
+    const knownUidls = new Set(known.map((r: any) => String(r.message_id)));
+
+    const pop3Cfg: Pop3Config = {
+      host: acc.imap_host, port: acc.imap_port, secure: acc.imap_secure,
+      user: acc.username, password,
+    };
+    const messages = await syncPop3Inbox(pop3Cfg, knownUidls, limit);
+    synced = messages.length;
+
+    for (const msg of messages) {
+      const sentAt = msg.date ? new Date(msg.date) : null;
+      const { rowCount } = await pool.query(
+        `INSERT INTO emails
+           (account_id, user_id, message_id, folder, from_email, from_name,
+            to_emails, subject, snippet, body_text, body_html, is_read,
+            is_starred, size_bytes, sent_at)
+         VALUES ($1,$2,$3,'INBOX',$4,$5,$6,$7,$8,$9,$10,false,false,$11,$12)
+         ON CONFLICT DO NOTHING`,
+        [
+          acc.id, uid, msg.uidl,
+          msg.from || null, msg.fromName || null, msg.to || null,
+          msg.subject || '(Sin asunto)', msg.snippet || null,
+          msg.bodyText || null, msg.bodyHtml || null,
+          msg.size || 0, sentAt,
+        ],
+      );
+      if (rowCount) inserted++;
+    }
+  } else {
+    // ── IMAP ──────────────────────────────────────────────────────────────
+    const imapCfg: ImapConfig = {
+      host: acc.imap_host, port: acc.imap_port, secure: acc.imap_secure,
+      user: acc.username, password,
+    };
+    // Use last_sync_at so IMAP SEARCH SINCE skips already-synced messages.
+    // Fall back to 7 days ago on first-ever sync.
+    const sinceFallback = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const sinceDate: Date = acc.last_sync_at ? new Date(acc.last_sync_at) : sinceFallback;
+    const messages = await syncInbox(imapCfg, folder, limit, sinceDate);
+    synced = messages.length;
+
+    for (const msg of messages) {
+      const sentAt = msg.date ? new Date(msg.date) : null;
+      const { rowCount } = await pool.query(
+        `INSERT INTO emails
+           (account_id, user_id, uid, message_id, folder, from_email, from_name,
+            to_emails, subject, snippet, is_read, is_starred, has_attachments, size_bytes, sent_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+         ON CONFLICT (account_id, uid, folder) DO UPDATE SET
+           is_read         = EXCLUDED.is_read,
+           is_starred      = EXCLUDED.is_starred,
+           has_attachments = EXCLUDED.has_attachments,
+           snippet         = COALESCE(EXCLUDED.snippet, emails.snippet)`,
+        [
+          acc.id, uid,
+          msg.uid > 0 ? msg.uid : null, msg.messageId || null,
+          folder, msg.from || null, msg.fromName || null, msg.to || null,
+          msg.subject || '(Sin asunto)', msg.snippet || null,
+          msg.flags.includes('\\Seen'), msg.flags.includes('\\Flagged'), msg.hasAttachments,
+          msg.size || 0, sentAt,
+        ],
+      );
+      if (rowCount) inserted++;
+    }
+  }
+
+  await pool.query(`UPDATE email_accounts SET last_sync_at=NOW() WHERE id=$1`, [acc.id]);
+
+  return { synced, inserted, protocol: proto };
 }
 
 // ── Sincronización Gmail ──────────────────────────────────────────────────────
@@ -870,82 +878,89 @@ export async function syncGmailProfile(req: Request, res: Response) {
   const limit  = Math.min(Number(req.query.limit) || 50, 200);
 
   try {
-    const accessToken = await getGmailAccessToken(profileId, uid, (req as any).organizacionId);
-
-    const LABEL_MAP: Record<string, string[]> = {
-      INBOX: ['INBOX'], SENT: ['SENT'], DRAFTS: ['DRAFT'], DRAFT: ['DRAFT'],
-      TRASH: ['TRASH'], SPAM: ['SPAM'], STARRED: ['STARRED'],
-    };
-    const labelIds = LABEL_MAP[folder.toUpperCase()] || [folder];
-
-    const params = new URLSearchParams({ maxResults: String(limit) });
-    labelIds.forEach(id => params.append('labelIds', id));
-    const listRes = await gmailApiGet(`/messages?${params}`, accessToken);
-    const messageIds: string[] = (listRes.messages || []).map((m: any) => String(m.id));
-
-    if (!messageIds.length) return ok(res, { synced: 0, inserted: 0, folder });
-
-    let inserted = 0; let synced = 0;
-
-    for (const msgId of messageIds) {
-      const metaP = new URLSearchParams({ format: 'metadata' });
-      ['From', 'To', 'Cc', 'Subject', 'Date', 'Message-ID'].forEach(h => metaP.append('metadataHeaders', h));
-      const msg = await gmailApiGet(`/messages/${msgId}?${metaP}`, accessToken);
-      synced++;
-
-      const hdrs: { name: string; value: string }[] = msg.payload?.headers || [];
-      const h = (name: string) => hdrs.find((x: any) => x.name.toLowerCase() === name.toLowerCase())?.value || '';
-
-      const fromRaw   = h('From');
-      const fromMatch = fromRaw.match(/^(?:"?([^"<]+)"?\s*)?<?([^>]+)>?$/);
-      const fromName  = (fromMatch?.[1] || '').trim() || null;
-      const fromEmail = (fromMatch?.[2] || fromRaw).trim().toLowerCase();
-
-      const dateRaw = h('Date');
-      const sentAt  = dateRaw ? new Date(dateRaw) : new Date(Number(msg.internalDate || 0));
-      const labels  = msg.labelIds || [];
-
-      let primaryFolder = folder;
-      if (labels.includes('DRAFT'))        primaryFolder = 'DRAFTS';
-      else if (labels.includes('SENT'))    primaryFolder = 'SENT';
-      else if (labels.includes('TRASH'))   primaryFolder = 'TRASH';
-      else if (labels.includes('SPAM'))    primaryFolder = 'SPAM';
-      else if (labels.includes('INBOX'))   primaryFolder = 'INBOX';
-
-      const isRead    = !labels.includes('UNREAD');
-      const isStarred = labels.includes('STARRED');
-      const isDraft   = labels.includes('DRAFT');
-      const hasAtt    = (msg.payload?.parts || []).some((p: any) => p.filename && p.filename.length > 0);
-      const msgId_    = h('Message-ID').replace(/[<>]/g, '') || null;
-
-      const { rowCount } = await pool.query(
-        `INSERT INTO emails
-           (gmail_profile_id, user_id, gmail_message_id, message_id, folder,
-            from_email, from_name, to_emails, cc_emails, subject, snippet,
-            is_read, is_starred, is_draft, has_attachments, size_bytes, sent_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
-         ON CONFLICT (gmail_profile_id, gmail_message_id)
-           WHERE gmail_profile_id IS NOT NULL
-         DO UPDATE SET
-           is_read    = EXCLUDED.is_read,
-           is_starred = EXCLUDED.is_starred,
-           folder     = EXCLUDED.folder,
-           snippet    = COALESCE(EXCLUDED.snippet, emails.snippet)`,
-        [
-          profileId, uid, msgId, msgId_,
-          primaryFolder, fromEmail, fromName, h('To') || null, h('Cc') || null,
-          h('Subject') || '(Sin asunto)', (msg.snippet || '').slice(0, 200),
-          isRead, isStarred, isDraft, hasAtt, msg.sizeEstimate || 0, sentAt,
-        ],
-      );
-      if (rowCount) inserted++;
-    }
-
-    await pool.query(`UPDATE email_oauth_profiles SET last_used_at=NOW() WHERE id=$1`, [profileId]);
-    return ok(res, { synced, inserted, folder });
+    const result = await syncGmailProfileRecord(profileId, uid, (req as any).organizacionId, folder, limit);
+    return ok(res, { ...result, folder });
   } catch (e: any) {
     return err(res, e.message, (e.code === 401 || e.code === 403) ? 401 : 500);
   }
+}
+
+// Igual que syncImapAccountRecord pero para perfiles de Gmail (API + refresh
+// token), reutilizable desde la automatización de vistas en segundo plano.
+export async function syncGmailProfileRecord(profileId: string, uid: string, organizacionId: string | undefined, folder = 'INBOX', limit = 50) {
+  const accessToken = await getGmailAccessToken(profileId, uid, organizacionId);
+
+  const LABEL_MAP: Record<string, string[]> = {
+    INBOX: ['INBOX'], SENT: ['SENT'], DRAFTS: ['DRAFT'], DRAFT: ['DRAFT'],
+    TRASH: ['TRASH'], SPAM: ['SPAM'], STARRED: ['STARRED'],
+  };
+  const labelIds = LABEL_MAP[folder.toUpperCase()] || [folder];
+
+  const params = new URLSearchParams({ maxResults: String(limit) });
+  labelIds.forEach(id => params.append('labelIds', id));
+  const listRes = await gmailApiGet(`/messages?${params}`, accessToken);
+  const messageIds: string[] = (listRes.messages || []).map((m: any) => String(m.id));
+
+  if (!messageIds.length) return { synced: 0, inserted: 0 };
+
+  let inserted = 0; let synced = 0;
+
+  for (const msgId of messageIds) {
+    const metaP = new URLSearchParams({ format: 'metadata' });
+    ['From', 'To', 'Cc', 'Subject', 'Date', 'Message-ID'].forEach(h => metaP.append('metadataHeaders', h));
+    const msg = await gmailApiGet(`/messages/${msgId}?${metaP}`, accessToken);
+    synced++;
+
+    const hdrs: { name: string; value: string }[] = msg.payload?.headers || [];
+    const h = (name: string) => hdrs.find((x: any) => x.name.toLowerCase() === name.toLowerCase())?.value || '';
+
+    const fromRaw   = h('From');
+    const fromMatch = fromRaw.match(/^(?:"?([^"<]+)"?\s*)?<?([^>]+)>?$/);
+    const fromName  = (fromMatch?.[1] || '').trim() || null;
+    const fromEmail = (fromMatch?.[2] || fromRaw).trim().toLowerCase();
+
+    const dateRaw = h('Date');
+    const sentAt  = dateRaw ? new Date(dateRaw) : new Date(Number(msg.internalDate || 0));
+    const labels  = msg.labelIds || [];
+
+    let primaryFolder = folder;
+    if (labels.includes('DRAFT'))        primaryFolder = 'DRAFTS';
+    else if (labels.includes('SENT'))    primaryFolder = 'SENT';
+    else if (labels.includes('TRASH'))   primaryFolder = 'TRASH';
+    else if (labels.includes('SPAM'))    primaryFolder = 'SPAM';
+    else if (labels.includes('INBOX'))   primaryFolder = 'INBOX';
+
+    const isRead    = !labels.includes('UNREAD');
+    const isStarred = labels.includes('STARRED');
+    const isDraft   = labels.includes('DRAFT');
+    const hasAtt    = (msg.payload?.parts || []).some((p: any) => p.filename && p.filename.length > 0);
+    const msgId_    = h('Message-ID').replace(/[<>]/g, '') || null;
+
+    const { rowCount } = await pool.query(
+      `INSERT INTO emails
+         (gmail_profile_id, user_id, gmail_message_id, message_id, folder,
+          from_email, from_name, to_emails, cc_emails, subject, snippet,
+          is_read, is_starred, is_draft, has_attachments, size_bytes, sent_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+       ON CONFLICT (gmail_profile_id, gmail_message_id)
+         WHERE gmail_profile_id IS NOT NULL
+       DO UPDATE SET
+         is_read    = EXCLUDED.is_read,
+         is_starred = EXCLUDED.is_starred,
+         folder     = EXCLUDED.folder,
+         snippet    = COALESCE(EXCLUDED.snippet, emails.snippet)`,
+      [
+        profileId, uid, msgId, msgId_,
+        primaryFolder, fromEmail, fromName, h('To') || null, h('Cc') || null,
+        h('Subject') || '(Sin asunto)', (msg.snippet || '').slice(0, 200),
+        isRead, isStarred, isDraft, hasAtt, msg.sizeEstimate || 0, sentAt,
+      ],
+    );
+    if (rowCount) inserted++;
+  }
+
+  await pool.query(`UPDATE email_oauth_profiles SET last_used_at=NOW() WHERE id=$1`, [profileId]);
+  return { synced, inserted };
 }
 
 // ── Mensajes ──────────────────────────────────────────────────────────────────
@@ -1831,4 +1846,176 @@ export async function getStats(req: Request, res: Response) {
     );
     return ok(res, rows[0]);
   } catch (e: any) { return err(res, e.message); }
+}
+
+// ── Helpers reutilizables fuera de HTTP (automatización de vistas) ───────────
+
+const EMAIL_ROW_WITH_ACCOUNT_SQL = `
+  SELECT e.*, a.imap_host, a.imap_port, a.imap_secure, a.username, a.password_enc
+    FROM emails e
+    LEFT JOIN email_accounts a ON a.id = e.account_id
+   WHERE e.id = $1`;
+
+function decodeGmailBase64(data: string): Buffer {
+  return Buffer.from(String(data || '').replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+}
+
+/** Devuelve el correo con cuerpo y lista de adjuntos cargados (y cacheados en
+ *  la BD), descargándolos de Gmail/IMAP si aún no se habían pedido nunca.
+ *  A diferencia de getMessage, NO marca el correo como leído -- lo usa un
+ *  proceso automático, y el abogado debe seguir viéndolo como no leído. */
+export async function loadEmailContent(emailId: string): Promise<any | null> {
+  const { rows } = await pool.query(EMAIL_ROW_WITH_ACCOUNT_SQL, [emailId]);
+  if (!rows.length) return null;
+  const row = rows[0];
+  const needsFetch = (!row.body_html && !row.body_text) || row.attachments_json == null;
+  if (!needsFetch) return row;
+
+  if (row.gmail_profile_id && row.gmail_message_id) {
+    const accessToken = await getGmailAccessToken(row.gmail_profile_id, row.user_id);
+    const full = await gmailApiGet(`/messages/${row.gmail_message_id}?format=full`, accessToken);
+    let bodyHtml = ''; let bodyText = '';
+    const attachments: { attachmentId: string; filename: string; contentType: string; size: number }[] = [];
+    const walkParts = (p: any) => {
+      if (!p) return;
+      const mt = p.mimeType || '';
+      if (p.filename && p.body?.attachmentId) {
+        attachments.push({ attachmentId: p.body.attachmentId, filename: p.filename, contentType: mt || 'application/octet-stream', size: Number(p.body.size || 0) });
+      } else if (mt === 'text/html' && p.body?.data && !bodyHtml) bodyHtml = decodeGmailBase64(p.body.data).toString('utf8');
+      else if (mt === 'text/plain' && p.body?.data && !bodyText) bodyText = decodeGmailBase64(p.body.data).toString('utf8');
+      if (p.parts) p.parts.forEach(walkParts);
+    };
+    walkParts(full.payload);
+    row.body_html = bodyHtml || row.body_html || '';
+    row.body_text = bodyText || row.body_text || '';
+    row.attachments_json = JSON.stringify(attachments);
+  } else if (row.uid && row.imap_host) {
+    const client = new ImapClient({
+      host: row.imap_host, port: row.imap_port, secure: row.imap_secure,
+      user: row.username, password: decryptPassword(row.password_enc),
+    });
+    try {
+      await client.connect(); await client.login(); await client.selectFolder(row.folder);
+      const full = await client.fetchFullMessage(Number(row.uid));
+      if (full) {
+        row.body_html = full.bodyHtml || row.body_html || '';
+        row.body_text = full.bodyText || row.body_text || '';
+        row.attachments_json = JSON.stringify(full.attachments);
+      }
+    } finally {
+      await client.logout().catch(() => undefined);
+    }
+  } else {
+    return row; // POP3 / EmailEngine: el cuerpo ya llega con la sincronización
+  }
+
+  let attachmentCount = 0;
+  try { attachmentCount = JSON.parse(row.attachments_json || '[]').length; } catch { /**/ }
+  await pool.query(
+    `UPDATE emails SET body_text=$1, body_html=$2, attachments_json=$3,
+            has_attachments = has_attachments OR $4,
+            snippet = COALESCE(NULLIF(snippet, ''), $5)
+      WHERE id=$6`,
+    [
+      row.body_text, row.body_html, row.attachments_json, attachmentCount > 0,
+      (row.body_text || String(row.body_html || '').replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim().slice(0, 200),
+      emailId,
+    ],
+  );
+  return row;
+}
+
+/** Descarga el contenido real de un adjunto (por su posición en attachments_json). */
+export async function fetchEmailAttachmentBuffer(emailId: string, index: number): Promise<{ filename: string; contentType: string; content: Buffer } | null> {
+  const { rows } = await pool.query(EMAIL_ROW_WITH_ACCOUNT_SQL, [emailId]);
+  if (!rows.length) return null;
+  const row = rows[0];
+  let meta: any[] = [];
+  try { meta = row.attachments_json ? JSON.parse(row.attachments_json) : []; } catch { /**/ }
+  const entry = meta[index];
+
+  if (row.gmail_profile_id && row.gmail_message_id) {
+    if (!entry?.attachmentId) return null;
+    const accessToken = await getGmailAccessToken(row.gmail_profile_id, row.user_id);
+    const part = await gmailApiGet(`/messages/${row.gmail_message_id}/attachments/${entry.attachmentId}`, accessToken);
+    return { filename: entry.filename || `adjunto_${index + 1}`, contentType: entry.contentType || 'application/octet-stream', content: decodeGmailBase64(part.data) };
+  }
+  if (row.uid && row.imap_host) {
+    const client = new ImapClient({
+      host: row.imap_host, port: row.imap_port, secure: row.imap_secure,
+      user: row.username, password: decryptPassword(row.password_enc),
+    });
+    try {
+      await client.connect(); await client.login(); await client.selectFolder(row.folder);
+      return await client.fetchAttachment(Number(row.uid), index);
+    } finally {
+      await client.logout().catch(() => undefined);
+    }
+  }
+  if (row.account_id && row.engine_msg_id && entry?.id) {
+    const { isEmailEngineEnabled, eeGetAttachment } = await import('../utils/emailEngineClient');
+    if (isEmailEngineEnabled()) {
+      const content = await eeGetAttachment(row.account_id, entry.id);
+      return { filename: entry.filename || `adjunto_${index + 1}`, contentType: entry.contentType || 'application/octet-stream', content };
+    }
+  }
+  return null;
+}
+
+function mimeEncodeHeader(value: string): string {
+  return /^[\x20-\x7E]*$/.test(value) ? value : `=?UTF-8?B?${Buffer.from(value, 'utf8').toString('base64')}?=`;
+}
+
+/** Envía un correo HTML desde un buzón concreto (cuenta IMAP/SMTP o perfil
+ *  Gmail) en nombre de su propietario, como respuesta a otro si se indica
+ *  inReplyTo. Las cuentas IMAP guardan copia en "Sent" igual que sendMail;
+ *  Gmail ya la guarda él solo en su carpeta de enviados. */
+export async function sendFromMailbox(opts: {
+  accountId?: string | null;
+  gmailProfileId?: string | null;
+  to: string;
+  subject: string;
+  html: string;
+  inReplyTo?: string | null;
+  expedienteId?: string | null;
+}): Promise<void> {
+  const text = opts.html.replace(/<br\s*\/?>/gi, '\n').replace(/<\/p>/gi, '\n\n').replace(/<[^>]+>/g, '').trim();
+  const replyId = opts.inReplyTo ? `<${String(opts.inReplyTo).replace(/[<>]/g, '')}>` : null;
+
+  if (opts.gmailProfileId) {
+    const { rows } = await pool.query(`SELECT id, user_id, email, display_name FROM email_oauth_profiles WHERE id=$1`, [opts.gmailProfileId]);
+    if (!rows.length) throw new Error('El perfil de Gmail del buzón vigilado ya no existe');
+    const profile = rows[0];
+    const accessToken = await getGmailAccessToken(profile.id, profile.user_id);
+    const headers = [
+      `From: ${profile.display_name ? `${mimeEncodeHeader(profile.display_name)} <${profile.email}>` : profile.email}`,
+      `To: ${opts.to}`,
+      `Subject: ${mimeEncodeHeader(opts.subject)}`,
+      'MIME-Version: 1.0',
+      ...(replyId ? [`In-Reply-To: ${replyId}`, `References: ${replyId}`] : []),
+      'Content-Type: text/html; charset="UTF-8"',
+      'Content-Transfer-Encoding: base64',
+    ];
+    const bodyB64 = Buffer.from(opts.html, 'utf8').toString('base64').replace(/(.{76})/g, '$1\r\n');
+    const raw = Buffer.from(`${headers.join('\r\n')}\r\n\r\n${bodyB64}`, 'utf8')
+      .toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    await gmailApiPost('/messages/send', accessToken, { raw });
+    return;
+  }
+
+  if (!opts.accountId) throw new Error('No hay buzón configurado para enviar la respuesta');
+  const { rows } = await pool.query(`SELECT * FROM email_accounts WHERE id=$1 AND active=true`, [opts.accountId]);
+  if (!rows.length) throw new Error('La cuenta de correo del buzón vigilado no existe o está desactivada');
+  const acc = rows[0];
+  await dispatchEmail(
+    { host: acc.smtp_host, port: acc.smtp_port, secure: acc.smtp_secure, user: acc.username, password: decryptPassword(acc.password_enc) },
+    { from: acc.email, fromName: acc.label, to: [opts.to], subject: opts.subject, html: opts.html, text, inReplyTo: replyId || undefined },
+  );
+  await pool.query(
+    `INSERT INTO emails (account_id, user_id, folder, from_email, from_name,
+       to_emails, subject, body_html, body_text, snippet, is_read, sent_at, expediente_id)
+     VALUES ($1,$2,'Sent',$3,$4,$5,$6,$7,$8,$9,true,NOW(),$10)`,
+    [acc.id, acc.user_id, acc.email, acc.label, opts.to, opts.subject, opts.html, text, text.slice(0, 200), opts.expedienteId || null],
+  );
+  emitEmailEvent(acc.user_id, { type: 'messageSent', accountId: acc.id, folder: 'Sent' });
 }

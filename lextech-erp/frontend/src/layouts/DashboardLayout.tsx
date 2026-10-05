@@ -12,7 +12,7 @@ import {
   MessageSquare, LogOut, Mail, Library, Receipt, Sparkles, ChevronsUpDown,
   MoreVertical, RotateCcw, Copy, Check, Crown,
   Pen, AlertTriangle, RefreshCw, Link2, Plus, Trash2, Scale, Gavel, ChevronDown,
-  Wallet, CreditCard, Building2, BarChart3, FileText, Calculator, Square, BellRing, LifeBuoy,
+  Wallet, CreditCard, Building2, BarChart3, FileText, Calculator, Square, BellRing, LifeBuoy, CalendarCheck,
 } from "lucide-react";
 import { UserButton, useUser, useAuth, useClerk } from "@clerk/clerk-react";
 import { getDeviceId, safeJson, waitForClientIp, resolveUploadUrl } from "../lib/api";
@@ -26,6 +26,7 @@ import { useEmailUnread } from "../contexts/EmailUnreadContext";
 import { useWhatsAppUnread, WA_LAST_SEEN_KEY } from "../contexts/WhatsAppUnreadContext";
 import { useDocumentProcessing } from "../contexts/DocumentProcessingContext";
 import { usePushNotifications } from "../lib/usePushNotifications";
+import { useVistasStatus } from "../lib/useVistasStatus";
 import type { Modulo } from "../lib/useOrganizacion";
 
 // Qué módulo de la matriz de permisos (Configuración → Gestión de usuarios →
@@ -84,6 +85,7 @@ const MODULES = [
   { name: "Chat",           path: "/dashboard/chat",         icon: MessageSquare,   desc: "Chat de equipo" },
   { name: "Comunicación Externa", path: "/dashboard/whatsapp", icon: MessageCircle, desc: "WhatsApp e Instagram — mensajería con clientes fuera de la app" },
   { name: "Correo",         path: "/dashboard/correo",       icon: Mail,            desc: "Gestor de correo electrónico" },
+  { name: "Vistas",         path: "/dashboard/vistas",       icon: CalendarCheck,   desc: "Vistas recibidas por correo pendientes de confirmar" },
   { name: "Documental",     path: "/dashboard/documental",   icon: Library,         desc: "Cendoj, BOE y Lexnet" },
   { name: "Facturación",    path: "/dashboard/facturacion",  icon: Receipt,         desc: "Vista general de tesorería" },
   { name: "Analítica",      path: "/dashboard/facturacion?tab=analitica",     icon: BarChart3,  desc: "Analítica financiera" },
@@ -120,6 +122,7 @@ const NAV_ITEMS: NavItem[] = [
   { name: "Chat",         href: "/dashboard/chat",        icon: MessageSquare },
   { name: "Comunicación Externa", href: "/dashboard/whatsapp", icon: MessageCircle },
   { name: "Correo",       href: "/dashboard/correo",      icon: Mail },
+  { name: "Vistas",       href: "/dashboard/vistas",      icon: CalendarCheck },
   { name: "Documental",   href: "/dashboard/documental",  icon: Library },
   {
     name: "Tesorería",
@@ -146,7 +149,7 @@ const NAV_GROUPS = [
   },
   {
     label: "Comunicación",
-    items: ["Chat", "Correo", "Comunicación Externa"],
+    items: ["Chat", "Correo", "Vistas", "Comunicación Externa"],
   },
   {
     label: "Gestión",
@@ -1008,7 +1011,7 @@ function WhatsAppWidget() {
 // ── Notifications Panel ──────────────────────────────────────────────────────
 type UnifiedNotification = {
   id: string;
-  kind: "chat" | "email" | "whatsapp" | "plazo" | "soporte";
+  kind: "chat" | "email" | "whatsapp" | "plazo" | "soporte" | "vista";
   title: string;
   subtitle?: string;
   meta?: string;
@@ -1022,6 +1025,7 @@ function notificationIcon(kind: UnifiedNotification["kind"]) {
   if (kind === "email") return "✉️";
   if (kind === "plazo") return "⏰";
   if (kind === "soporte") return "🛟";
+  if (kind === "vista") return "⚖️";
   return "🟢";
 }
 
@@ -1458,6 +1462,7 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
   const { unreadCount: emailUnreadCount } = useEmailUnread();
   const { unreadCount: waUnreadCount } = useWhatsAppUnread();
   const { isProcessing: isDocProcessing } = useDocumentProcessing();
+  const { visible: vistasVisible, pendientes: vistasPendientes } = useVistasStatus();
   const { organizacion, organizaciones, rol: orgRol, puede, switchOrganizacion, isLoaded: orgLoaded } = useOrganizacion();
   const [orgMenuOpen, setOrgMenuOpen] = useState(false);
   const orgMenuRef = useRef<HTMLDivElement>(null);
@@ -1684,6 +1689,9 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
           const items = group.items
             .map((name) => NAV_ITEMS.find((item) => item.name === name))
             .filter((item): item is (typeof NAV_ITEMS)[number] => !!item)
+            // "Vistas" solo existe si la organización tiene activada la
+            // automatización de vistas por correo y este usuario participa.
+            .filter((item) => item.name !== "Vistas" || vistasVisible)
             // Poda por la matriz de permisos: un grupo (p.ej. "Directorio" o
             // "Tesorería") se queda solo con los hijos a los que el rol tiene
             // acceso, y desaparece del todo si se queda sin ninguno.
@@ -1781,8 +1789,9 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
                   const chatBadge  = isChat  && !isActive && totalUnread > 0;
                   const emailBadge = isEmail && !isActive && emailUnreadCount > 0;
                   const waBadge    = isWA    && !isActive && waUnreadCount > 0;
-                  const badgeCount = chatBadge ? totalUnread : emailBadge ? emailUnreadCount : waUnreadCount;
-                  const hasBadge   = chatBadge || emailBadge || waBadge;
+                  const vistasBadge = href === "/dashboard/vistas" && vistasPendientes > 0;
+                  const badgeCount = chatBadge ? totalUnread : emailBadge ? emailUnreadCount : waBadge ? waUnreadCount : vistasPendientes;
+                  const hasBadge   = chatBadge || emailBadge || waBadge || vistasBadge;
                   // Expedientes: mientras se procesa un ZIP de documentos (cédula ->
                   // expediente) en segundo plano, el icono muestra un spinner para que
                   // quede claro que hay algo trabajando, se esté viendo esa pantalla o no.
@@ -2048,6 +2057,7 @@ export default function DashboardLayout() {
     if (location.pathname.startsWith("/dashboard/chat")) hidden.add("chat");
     if (location.pathname.startsWith("/dashboard/whatsapp")) hidden.add("whatsapp");
     if (location.pathname.startsWith("/dashboard/tareas")) hidden.add("plazo");
+    if (location.pathname.startsWith("/dashboard/vistas")) hidden.add("vista");
     return hidden;
   }, [location.pathname]);
 
@@ -2062,22 +2072,24 @@ export default function DashboardLayout() {
       const token = await getToken({ skipCache: true });
       if (!token) return;
       const headers = { Authorization: `Bearer ${token}` };
-      const [chatRes, emailRes, waRes, tasksRes, expNotifRes, soporteRes] = await Promise.all([
+      const [chatRes, emailRes, waRes, tasksRes, expNotifRes, soporteRes, vistasRes] = await Promise.all([
         fetch("/api/chat/canales", { headers }),
         fetch("/api/email/messages?folder=INBOX&unread=1&page=1&pageSize=50", { headers }),
         fetch("/api/whatsapp/contacts", { headers }),
         fetch("/api/tasks/me", { headers }),
         fetch("/api/expedientes/notificaciones/pendientes", { headers }),
         fetch("/api/soporte/notificaciones", { headers }),
+        fetch("/api/vistas/avisos", { headers }),
       ]);
 
-      const [chatData, emailData, waData, tasksData, expNotifData, soporteData] = await Promise.all([
+      const [chatData, emailData, waData, tasksData, expNotifData, soporteData, vistasData] = await Promise.all([
         safeJson(chatRes),
         safeJson(emailRes),
         safeJson(waRes),
         safeJson(tasksRes),
         safeJson(expNotifRes),
         safeJson(soporteRes),
+        vistasRes.ok ? safeJson(vistasRes) : Promise.resolve(null),
       ]);
 
       const next: UnifiedNotification[] = [];
@@ -2252,6 +2264,28 @@ export default function DashboardLayout() {
             meta: s.resumen || `Estado: ${s.estadoLabel}`,
             created_at: s.actualizadoAt || new Date().toISOString(),
             onClick: () => navigate(`/dashboard/soporte?ticket=${encodeURIComponent(s.ticketId)}`),
+          });
+        }
+      }
+
+      // Vistas recibidas por correo: pendientes de confirmar y recordatorios
+      // de "preparar vista" ya vencidos (automatización por organización).
+      if (vistasRes.ok) {
+        const vistaItems = Array.isArray(vistasData?.data) ? vistasData.data : [];
+        for (const v of vistaItems) {
+          if (!v?.id) continue;
+          const cuando = v.fecha_vista
+            ? new Date(v.fecha_vista).toLocaleString("es-ES", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+            : "Fecha por confirmar";
+          const pendiente = v.estado === "pendiente";
+          next.push({
+            id: `vista-${v.estado}-${v.id}`,
+            kind: "vista",
+            title: pendiente ? "Vista por confirmar" : "Preparar vista",
+            subtitle: `${cuando}${v.juzgado ? " · " + v.juzgado : ""}`,
+            meta: pendiente && Number(v.num_conflictos) > 0 ? "⚠️ Choca con tu agenda" : (v.subject || undefined),
+            created_at: (pendiente ? v.created_at : v.recordatorio_at) || new Date().toISOString(),
+            onClick: () => navigate(`/dashboard/vistas?id=${encodeURIComponent(v.id)}`),
           });
         }
       }
