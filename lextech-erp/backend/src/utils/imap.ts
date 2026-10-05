@@ -225,9 +225,17 @@ export class ImapClient {
     }
   }
 
-  async listFolders(): Promise<ImapFolderInfo[]> {
+  /** Por defecto, como Thunderbird: solo las carpetas suscritas (más Recibidos
+   *  y las del sistema, siempre). Si el servidor no informa de suscripciones se
+   *  devuelven todas. includeUnsubscribed=true las devuelve todas siempre (p.ej.
+   *  para comprobar si un nombre ya existe antes de crear una carpeta). */
+  async listFolders(opts: { includeUnsubscribed?: boolean } = {}): Promise<ImapFolderInfo[]> {
     const client = this.ensureClient();
     const boxes = await client.list();
+    const flat: any[] = [];
+    const collect = (items: any[]) => { for (const it of items || []) { flat.push(it); if (it.children?.length) collect(it.children); } };
+    collect(boxes);
+    const onlySubscribed = !opts.includeUnsubscribed && flat.some((it) => it.subscribed === true);
 
     // Gmail virtual labels not accessible via standard IMAP
     const BLOCKED_PATHS = new Set([
@@ -251,7 +259,9 @@ export class ImapClient {
 
         // Las contenedor (Noselect) también se devuelven, marcadas, para que
         // sus subcarpetas no queden huérfanas al montar el árbol en el cliente.
-        if (path && !BLOCKED_PATHS.has(path.toLowerCase())) {
+        const alwaysVisible = path.toUpperCase() === 'INBOX' || Boolean(item.specialUse);
+        const hidden = onlySubscribed && item.subscribed !== true && !alwaysVisible;
+        if (path && !hidden && !BLOCKED_PATHS.has(path.toLowerCase())) {
           folders.push({
             path,
             name: String(item.name || path.split(String(item.delimiter || '/')).pop() || path),
@@ -272,6 +282,9 @@ export class ImapClient {
   async createFolder(folder: string): Promise<void> {
     const client = this.ensureClient();
     await client.mailboxCreate(folder);
+    // Sin suscribirla, ni Thunderbird ni Vantia (que solo muestran las
+    // suscritas) la verían.
+    try { await client.mailboxSubscribe(folder); } catch { /* servidor sin suscripciones */ }
   }
 
   async selectFolder(folder: string): Promise<{ exists: number; unseen: number }> {

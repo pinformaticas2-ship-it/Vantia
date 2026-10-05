@@ -744,7 +744,7 @@ export async function createAccountFolder(req: Request, res: Response) {
     try {
       await client.connect();
       await client.login();
-      const existingFolders = await client.listFolders();
+      const existingFolders = await client.listFolders({ includeUnsubscribed: true });
       if (existingFolders.some((folder) => folder.path.toLowerCase() === name.toLowerCase())) {
         return err(res, 'Ya existe una carpeta con ese nombre', 409);
       }
