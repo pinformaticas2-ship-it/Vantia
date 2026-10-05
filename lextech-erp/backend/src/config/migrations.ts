@@ -2788,6 +2788,17 @@ export async function runMigrations(): Promise<void> {
       try { await client.query(idx); } catch (_e: any) {}
     }
 
+    // ── Estado de la sincronización IMAP por cuenta ─────────────────────────
+    // Cualquier anomalía (búsqueda rechazada por el servidor, plan B usado,
+    // carpeta con error) queda aquí y Correo la muestra -- antes una carpeta
+    // podía dejar de actualizarse sin que nada lo indicara.
+    for (const sql of [
+      `ALTER TABLE email_accounts ADD COLUMN IF NOT EXISTS sync_warning TEXT`,
+      `ALTER TABLE email_accounts ADD COLUMN IF NOT EXISTS sync_warning_at TIMESTAMPTZ`,
+    ]) {
+      try { await client.query(sql); } catch (_e: any) {}
+    }
+
     // ── Permisos en schema public (requerido en PostgreSQL 15+) ────
     for (const grant of [
       `GRANT USAGE ON SCHEMA public TO admin`,

@@ -21,7 +21,7 @@ import {
   Search, ChevronDown, X, Mail, MailOpen,
   Reply, ReplyAll, Forward, Paperclip, Loader2, CheckCircle2,
   MoreVertical, AlertCircle, Eye, EyeOff,
-  ChevronLeft, ChevronRight, Edit3, Tag, Wifi, Zap, Pin, FolderPlus, RotateCcw, Folder, Archive,
+  AlertTriangle, ChevronLeft, ChevronRight, Edit3, Tag, Wifi, Zap, Pin, FolderPlus, RotateCcw, Folder, Archive,
   AtSign, Shield, Filter, LogIn, Maximize2, Minimize2, Bold, Italic, Underline,
   AlignLeft, AlignCenter, AlignRight, List, Pencil, Sun, Moon, Download, Briefcase, type LucideIcon,
 } from 'lucide-react';
@@ -171,6 +171,8 @@ interface ImapAccount {
   username?: string;
   active: boolean;
   last_sync_at: string | null;
+  /** Anomalía reciente de sincronización (ver recordSyncWarning en el backend). */
+  sync_warning?: string | null;
 }
 
 interface ComposeData {
@@ -3923,6 +3925,14 @@ export default function Email() {
     }
   }, [authFetch, gmailToken, selectedImapAccountId]);
 
+  // Relee las cuentas cada minuto para que el aviso de "problema al actualizar"
+  // (sync_warning) aparezca y desaparezca solo, sin recargar la página.
+  useEffect(() => {
+    if (!selectedImapAccountId) return;
+    const t = window.setInterval(() => void refreshImapAccounts(), 60_000);
+    return () => window.clearInterval(t);
+  }, [selectedImapAccountId, refreshImapAccounts]);
+
   const refreshImapFolders = useCallback(async (accountId: string) => {
     if (!accountId) return;
     const response = await authFetch(`${API}/email/accounts/${accountId}/folders`).catch(() => null);
@@ -5456,6 +5466,14 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
               )}
             </form>
           </div>
+
+          {/* Aviso: la sincronización de esta cuenta ha tenido problemas */}
+          {currentImapAccount?.sync_warning && (
+            <div className="mx-3 mb-2 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900" title={currentImapAccount.sync_warning}>
+              <AlertTriangle size={13} className="mt-0.5 shrink-0 text-amber-600" />
+              <span className="line-clamp-2">Problema al actualizar el correo: {currentImapAccount.sync_warning}</span>
+            </div>
+          )}
 
           {/* List */}
           <div className="modules-scrollbar flex-1 overflow-y-auto bg-white pb-2">

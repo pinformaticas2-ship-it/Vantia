@@ -319,21 +319,29 @@ export class ImapClient {
     return uids;
   }
 
-  async searchUidsSince(since: Date): Promise<number[]> {
+  /** UID de los mensajes desde una fecha, o null si el servidor rechaza la
+   *  búsqueda. OJO: imapflow NO lanza excepción cuando el SEARCH falla,
+   *  devuelve `false` -- antes eso se trataba como "no hay mensajes" y la
+   *  carpeta dejaba de actualizarse en silencio (le pasó a Recibidos). */
+  async searchUidsSince(since: Date): Promise<number[] | null> {
     const client = this.ensureClient();
-    const uids: number[] = [];
     try {
       const found = await client.search({ since }, { uid: true });
-      if (Array.isArray(found)) {
-        for (const u of found) uids.push(Number(u));
-      }
+      return Array.isArray(found) ? found.map(Number) : null;
     } catch {
-      // Fallback: fetch the last 100 by sequence if SEARCH fails
-      const exists = Number(client.mailbox?.exists || 0);
-      if (exists > 0) {
-        for await (const msg of client.fetch(`${Math.max(1, exists - 99)}:*`, { uid: true }, { uid: false })) {
-          if (msg?.uid) uids.push(Number(msg.uid));
-        }
+      return null;
+    }
+  }
+
+  /** UID de los últimos `count` mensajes por posición -- no depende de SEARCH,
+   *  así que sirve de plan B si el servidor rechaza las búsquedas. */
+  async recentUidsBySequence(count: number): Promise<number[]> {
+    const client = this.ensureClient();
+    const exists = Number(client.mailbox?.exists || 0);
+    const uids: number[] = [];
+    if (exists > 0) {
+      for await (const msg of client.fetch(`${Math.max(1, exists - count + 1)}:*`, { uid: true }, { uid: false })) {
+        if (msg?.uid) uids.push(Number(msg.uid));
       }
     }
     return uids;
@@ -480,13 +488,14 @@ export async function syncInbox(
   /** UID que ya están guardados: además de los más recientes, se traen los
    *  que falten (hasta maxMessages) para ir rellenando huecos. */
   knownUids?: Set<number>,
+  report?: (warning: string) => void,
 ): Promise<ImapMessage[]> {
   const client = new ImapClient(cfg);
 
   try {
     await client.connect();
     await client.login();
-    return await fetchFolderEnvelopes(client, folder, maxMessages, since, knownUids);
+    return await fetchFolderEnvelopes(client, folder, maxMessages, since, knownUids, report);
   } finally {
     await client.logout().catch(() => undefined);
   }
@@ -495,12 +504,17 @@ export async function syncInbox(
 /** Igual que syncInbox pero sobre una conexión ya abierta -- para recorrer
  *  todas las carpetas de una cuenta con un único login (ver
  *  syncImapAccountAllFolders en emailController.ts). */
+export type FolderClient = Pick<ImapClient, 'selectFolder' | 'searchUidsSince' | 'recentUidsBySequence' | 'searchUids' | 'fetchEnvelopes'>;
+
 export async function fetchFolderEnvelopes(
-  client: ImapClient,
+  client: FolderClient,
   folder: string,
   maxMessages = 50,
   since?: Date,
   knownUids?: Set<number>,
+  /** Avisos de que algo no fue normal (búsqueda rechazada, plan B...) --
+   *  quien llama los registra en la cuenta para que no pasen en silencio. */
+  report?: (warning: string) => void,
 ): Promise<ImapMessage[]> {
   const selected = await client.selectFolder(folder);
 
@@ -508,7 +522,21 @@ export async function fetchFolderEnvelopes(
 
   let uids: number[];
   if (since) {
-    const all = (await client.searchUidsSince(since)).sort((a, b) => a - b);
+    let all = await client.searchUidsSince(since);
+    if (all === null) {
+      report?.(`${folder}: el servidor rechazó la búsqueda por fecha; se usaron los últimos mensajes por posición`);
+      all = await client.recentUidsBySequence(Math.max(maxMessages * 4, 200));
+    }
+    // Comprobación de seguridad: el último mensaje real de la carpeta tiene
+    // que estar ya guardado o venir en esta tanda. Si no, la búsqueda ha
+    // devuelto algo incompleto (sin dar error) y se completa por posición --
+    // así el correo más reciente nunca se queda sin bajar.
+    const [latest] = await client.recentUidsBySequence(1);
+    if (latest && !all.includes(latest) && !knownUids?.has(latest)) {
+      report?.(`${folder}: la búsqueda no incluía el último mensaje; se completó por posición`);
+      all = Array.from(new Set([...all, ...(await client.recentUidsBySequence(Math.max(maxMessages * 4, 200)))]));
+    }
+    all.sort((a, b) => a - b);
     // Still cap at maxMessages most-recent to avoid huge fetches after long gaps
     uids = all.slice(-maxMessages);
     if (knownUids) {

@@ -355,7 +355,8 @@ export async function getAccounts(req: Request, res: Response) {
       `SELECT id, label, email, imap_host, imap_port, imap_secure,
               smtp_host, smtp_port, smtp_secure, username, active,
               COALESCE(protocol, 'imap') AS protocol,
-              last_sync_at, created_at
+              last_sync_at, created_at,
+              CASE WHEN sync_warning_at > NOW() - interval '30 minutes' THEN sync_warning END AS sync_warning
        FROM email_accounts WHERE user_id=$1 AND organizacion_id=$2 ORDER BY created_at`,
       [uid, organizacionId],
     );
@@ -839,7 +840,15 @@ export async function syncImapAccountRecord(acc: any, folder = 'INBOX', limit = 
     // descargan los que aún no tenemos + los más recientes (para refrescar
     // leído/destacado). Cada pasada va rellenando los huecos que queden.
     const knownUids = await loadKnownImapUids(acc.id, folder);
-    const messages = await syncInbox(imapCfg, folder, limit, imapSyncSince(), knownUids);
+    const warnings: string[] = [];
+    let messages: any[];
+    try {
+      messages = await syncInbox(imapCfg, folder, limit, imapSyncSince(), knownUids, (w) => warnings.push(w));
+    } catch (e: any) {
+      await recordSyncWarning(acc, [`${folder}: ${e?.message || e}`]);
+      throw e;
+    }
+    await recordSyncWarning(acc, warnings);
     synced = messages.length;
     inserted = (await saveImapEnvelopes(acc, folder, messages)).saved;
   }
@@ -911,18 +920,37 @@ export async function syncImapAccountAllFolders(acc: any, limitPerFolder = 30): 
     for (const f of list) {
       try {
         const known = await loadKnownImapUids(acc.id, f.path);
-        const messages = await fetchFolderEnvelopes(client, f.path, limitPerFolder, imapSyncSince(), known);
+        const messages = await fetchFolderEnvelopes(client, f.path, limitPerFolder, imapSyncSince(), known, (w) => errores.push(w));
         nuevos += (await saveImapEnvelopes(acc, f.path, messages, known)).nuevos;
         folders++;
       } catch (e: any) {
         errores.push(`${f.path}: ${e?.message || e}`);
       }
     }
+  } catch (e: any) {
+    errores.push(`conexión: ${e?.message || e}`);
+    await recordSyncWarning(acc, errores);
+    throw e;
   } finally {
     await client.logout().catch(() => undefined);
   }
   await pool.query(`UPDATE email_accounts SET last_sync_at=NOW() WHERE id=$1`, [acc.id]);
+  await recordSyncWarning(acc, errores);
   return { folders, nuevos, errores };
+}
+
+/** Deja constancia en la cuenta de cualquier anomalía de sincronización para
+ *  que Correo la enseñe (caduca sola a los 30 min sin repetirse, ver
+ *  getAccounts) -- que una carpeta deje de actualizarse nunca debe pasar en
+ *  silencio. */
+async function recordSyncWarning(acc: any, warnings: string[]) {
+  if (!warnings.length) return;
+  const text = warnings.join(' · ').slice(0, 1000);
+  console.warn(`[imap-sync] ${acc.email}: ${text}`);
+  await pool.query(
+    `UPDATE email_accounts SET sync_warning = $2, sync_warning_at = NOW() WHERE id = $1`,
+    [acc.id, text],
+  ).catch(() => {});
 }
 
 // ── Sincronización Gmail ──────────────────────────────────────────────────────
