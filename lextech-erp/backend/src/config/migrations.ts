@@ -2780,6 +2780,17 @@ export async function runMigrations(): Promise<void> {
         );
       `);
     } catch (_e: any) {}
+    // tipo: 'vista' (señalamiento nuevo), 'cambio' (mismo procedimiento que una
+    // vista ya aceptada, con otra fecha) o 'documentacion' (correo de un
+    // procedimiento que ya tiene expediente). relacion: expediente/vista
+    // existentes con el mismo nº de autos o NIG.
+    for (const sql of [
+      `ALTER TABLE vistas_solicitudes ADD COLUMN IF NOT EXISTS tipo VARCHAR(20) NOT NULL DEFAULT 'vista'`,
+      `ALTER TABLE vistas_solicitudes ADD COLUMN IF NOT EXISTS relacion JSONB`,
+      `ALTER TABLE vistas_solicitudes ADD COLUMN IF NOT EXISTS aviso_email_at TIMESTAMPTZ`,
+    ]) {
+      try { await client.query(sql); } catch (_e: any) {}
+    }
     for (const idx of [
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_vistas_solicitudes_email ON vistas_solicitudes (email_id)`,
       `CREATE INDEX IF NOT EXISTS idx_vistas_solicitudes_org_estado ON vistas_solicitudes (organizacion_id, estado, created_at DESC)`,

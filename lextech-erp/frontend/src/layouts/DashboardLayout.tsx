@@ -2283,7 +2283,10 @@ export default function DashboardLayout() {
           next.push({
             id: `vista-${v.estado}-${v.id}`,
             kind: "vista",
-            title: pendiente ? "Vista por confirmar" : "Preparar vista",
+            title: !pendiente ? "Preparar vista"
+              : v.tipo === "cambio" ? "Cambio en una vista aceptada"
+              : v.tipo === "documentacion" ? "Nueva documentación de un procedimiento"
+              : "Vista por confirmar",
             subtitle: `${cuando}${v.juzgado ? " · " + v.juzgado : ""}`,
             meta: pendiente && Number(v.num_conflictos) > 0 ? "⚠️ Choca con tu agenda" : (v.subject || undefined),
             created_at: (pendiente ? v.created_at : v.recordatorio_at) || new Date().toISOString(),

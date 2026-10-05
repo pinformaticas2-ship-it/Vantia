@@ -14,6 +14,8 @@ import {
   descartarVista,
   reabrirVista,
   downloadVistaAdjunto,
+  documentarVista,
+  modificarVista,
 } from '../controllers/vistasController';
 
 // La visibilidad de cada solicitud la decide el propio controlador
@@ -33,6 +35,8 @@ router.get('/:id/adjuntos/:index', downloadVistaAdjunto);
 router.post('/:id/preview', previewVistaCorreo);
 router.post('/:id/aceptar', costlyActionLimiter, aceptarVista);
 router.post('/:id/rechazar', costlyActionLimiter, rechazarVista);
+router.post('/:id/documentar', costlyActionLimiter, documentarVista);
+router.post('/:id/modificar', costlyActionLimiter, modificarVista);
 router.post('/:id/descartar', descartarVista);
 router.post('/:id/reabrir', reabrirVista);
 

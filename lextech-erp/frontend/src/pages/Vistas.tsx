@@ -15,7 +15,14 @@ import { notifyVistasChanged, useVistasStatus } from "../lib/useVistasStatus";
 // remitente y, al aceptar, crea expediente, evento, documentos y recordatorio
 // (todo en el backend, controllers/vistasController.ts).
 
-type Estado = "pendiente" | "procesando" | "error" | "aceptada" | "rechazada" | "descartada";
+type Estado = "pendiente" | "procesando" | "error" | "aceptada" | "rechazada" | "descartada" | "documentada" | "modificada";
+type Tipo = "vista" | "cambio" | "documentacion";
+interface Relacion {
+  autos: string | null;
+  nig: string | null;
+  expediente: { id: string; anio: number; num_exp: number; descripcion: string | null; num_autos: string | null; cliente_nombre: string | null } | null;
+  vista: { id: string; fecha_vista: string; agenda_event_id: string | null; juzgado: string | null } | null;
+}
 type Paso = { paso: string; ok: boolean; detalle: string };
 type Conflicto = { id: string; title: string; start_at: string; end_at: string | null; all_day: boolean; type: string };
 
@@ -41,6 +48,8 @@ interface Solicitud {
   decidido_por_nombre: string | null;
   decidido_at: string | null;
   created_at: string;
+  tipo: Tipo;
+  relacion: Relacion | null;
 }
 
 interface Detalle extends Solicitud {
@@ -67,6 +76,16 @@ const ESTADO_BADGE: Record<Estado, { label: string; cls: string }> = {
   aceptada: { label: "Aceptada", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
   rechazada: { label: "Rechazada", cls: "bg-slate-100 text-slate-600 border-slate-200" },
   descartada: { label: "Descartada", cls: "bg-slate-100 text-slate-500 border-slate-200" },
+  documentada: { label: "Documentación añadida", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  modificada: { label: "Vista modificada", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+};
+
+// Qué es cada correo: señalamiento nuevo, cambio de una vista ya aceptada
+// (mismos autos, otra fecha) o documentación de un procedimiento conocido.
+const TIPO_BADGE: Record<Tipo, { label: string; cls: string }> = {
+  vista: { label: "Vista nueva", cls: "bg-red-50 text-red-700" },
+  cambio: { label: "Cambio de vista", cls: "bg-violet-50 text-violet-700" },
+  documentacion: { label: "Documentación", cls: "bg-sky-50 text-sky-700" },
 };
 
 const PASO_LABEL: Record<string, string> = {
@@ -201,7 +220,10 @@ function VistasModulo() {
                     <span className="text-sm font-bold text-slate-800 truncate">{fmtFecha(s.fecha_vista)}</span>
                     <span className={`shrink-0 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${badge.cls}`}>{badge.label}</span>
                   </div>
-                  <p className="text-xs text-slate-600 truncate mt-0.5">{s.datos?.juzgado || s.subject || "(sin asunto)"}</p>
+                  <p className="text-xs text-slate-600 truncate mt-0.5">
+                    {s.tipo && s.tipo !== "vista" && <span className={`mr-1.5 rounded px-1.5 py-0.5 text-[10px] font-bold ${TIPO_BADGE[s.tipo].cls}`}>{TIPO_BADGE[s.tipo].label}</span>}
+                    {s.datos?.juzgado || s.subject || "(sin asunto)"}
+                  </p>
                   <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-400">
                     <span className="truncate">{s.from_name || s.from_email}</span>
                     {s.datos?.num_autos && <span className="shrink-0">· autos {s.datos.num_autos}</span>}
@@ -237,7 +259,10 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
   const { getToken } = useAuth();
   const [d, setD] = useState<Detalle | null>(null);
   const [loadError, setLoadError] = useState("");
-  const [busy, setBusy] = useState<"" | "aceptar" | "rechazar" | "descartar" | "reabrir">("");
+  const [busy, setBusy] = useState<"" | "aceptar" | "rechazar" | "descartar" | "reabrir" | "documentar" | "modificar">("");
+  // Para correos de un procedimiento conocido, el formulario de vista nueva
+  // solo aparece si se elige "Es una vista nueva".
+  const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [actionError, setActionError] = useState("");
   const [resultado, setResultado] = useState<Paso[] | null>(null);
   const [showBody, setShowBody] = useState(false);
@@ -288,6 +313,7 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
       // Si un intento anterior ya envió el correo, no se vuelve a enviar al reintentar.
       setEnviarCorreo(!(v.pasos || []).some((p) => p.paso === "correo" && p.ok));
       setConflictos(v.conflictos || []);
+      setMostrarFormulario(v.tipo === "vista" || !v.relacion);
     } catch (e: any) {
       setLoadError(e.message || "No se pudo cargar la vista");
     }
@@ -337,7 +363,7 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
     }
   };
 
-  const run = async (accion: "aceptar" | "rechazar" | "descartar" | "reabrir") => {
+  const run = async (accion: "aceptar" | "rechazar" | "descartar" | "reabrir" | "documentar" | "modificar") => {
     setBusy(accion); setActionError(""); setResultado(null);
     try {
       let body: any = {};
@@ -351,6 +377,15 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
           recordatorio: conRecordatorio,
           recordatorio_at: conRecordatorio && recordatorio ? fromLocalInput(recordatorio) : undefined,
           enviar_correo: enviarCorreo,
+          ...(modoRespuesta === "aceptar" ? { asunto, cuerpo } : {}),
+        };
+      } else if (accion === "documentar") {
+        body = { expediente_id: d?.relacion?.expediente?.id, guardar_adjuntos: guardarAdjuntos };
+      } else if (accion === "modificar") {
+        if (!fromLocalInput(fecha)) throw new Error("Indica la nueva fecha y hora de la vista.");
+        body = {
+          vista_id: d?.relacion?.vista?.id, fecha: fromLocalInput(fecha), duracion_min: duracion,
+          guardar_adjuntos: guardarAdjuntos, enviar_correo: enviarCorreo, mensaje,
           ...(modoRespuesta === "aceptar" ? { asunto, cuerpo } : {}),
         };
       } else if (accion === "rechazar") {
@@ -470,7 +505,88 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
         </section>
       )}
 
-      {editable && (
+      {editable && d.relacion && d.tipo !== "vista" && (
+        <section className="rounded-2xl border border-sky-200 bg-sky-50/60 p-4 space-y-3">
+          <div className="flex items-start gap-2">
+            <FileText size={16} className="mt-0.5 shrink-0 text-sky-600" />
+            <div className="text-sm text-slate-700">
+              <p className="font-bold text-slate-800">
+                {d.tipo === "cambio" ? "Cambio en una vista ya aceptada" : "Mismo procedimiento que un expediente existente"}
+              </p>
+              {d.relacion.expediente && (
+                <p>
+                  Expediente <b>{d.relacion.expediente.anio}/{d.relacion.expediente.num_exp}</b>
+                  {d.relacion.expediente.descripcion ? ` · ${d.relacion.expediente.descripcion}` : ""}
+                  {d.relacion.expediente.num_autos ? ` · autos ${d.relacion.expediente.num_autos}` : ""}
+                </p>
+              )}
+              {d.relacion.vista && (
+                <p>
+                  Vista aceptada: <b>{fmtFecha(d.relacion.vista.fecha_vista)}</b>
+                  {d.tipo === "cambio" && d.fecha_vista ? <> → este correo indica <b>{fmtFecha(d.fecha_vista)}</b></> : null}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {d.tipo === "cambio" && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Field label="Nueva fecha y hora" className="sm:col-span-2">
+                <input type="datetime-local" value={fecha} onChange={(e) => setFecha(e.target.value)} className={inputCls} />
+              </Field>
+              <Field label="Duración (min)">
+                <input type="number" min={15} max={600} step={15} value={duracion} onChange={(e) => setDuracion(Number(e.target.value) || 120)} className={inputCls} />
+              </Field>
+              {conflictos.length > 0 && (
+                <p className="sm:col-span-3 flex items-center gap-1.5 text-xs font-semibold text-amber-800">
+                  <AlertTriangle size={13} /> La nueva fecha choca con {conflictos.length} evento{conflictos.length === 1 ? "" : "s"} de la agenda
+                </p>
+              )}
+              <label className="sm:col-span-3 flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={enviarCorreo} onChange={(e) => setEnviarCorreo(e.target.checked)} className="accent-red-600" />
+                Confirmar la nueva fecha por correo a {d.from_email}
+              </label>
+            </div>
+          )}
+
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={guardarAdjuntos} onChange={(e) => setGuardarAdjuntos(e.target.checked)} className="accent-red-600" />
+            Guardar los {d.adjuntos.length || ""} adjunto{d.adjuntos.length === 1 ? "" : "s"} y el correo en el expediente
+          </label>
+
+          {actionError && !mostrarFormulario && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{actionError}</p>}
+
+          <div className="flex flex-wrap items-center gap-2">
+            {d.tipo === "cambio" && d.relacion.vista && (
+              <button onClick={() => void run("modificar")} disabled={!!busy}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-bold hover:bg-red-700 disabled:opacity-50">
+                {busy === "modificar" ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />} Modificar la vista existente
+              </button>
+            )}
+            {d.relacion.expediente && (
+              <button onClick={() => void run("documentar")} disabled={!!busy}
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold disabled:opacity-50 ${d.tipo === "cambio" ? "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50" : "bg-red-600 text-white hover:bg-red-700"}`}>
+                {busy === "documentar" ? <Loader2 size={15} className="animate-spin" /> : <Paperclip size={15} />}
+                {d.tipo === "cambio" ? "Solo añadir documentación" : "Añadir documentación al expediente"}
+              </button>
+            )}
+            {!mostrarFormulario && (
+              <button onClick={() => setMostrarFormulario(true)} disabled={!!busy}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-white">
+                <CalendarCheck size={13} /> {d.tipo === "cambio" ? "Es otra vista distinta" : "Es una vista nueva"}
+              </button>
+            )}
+            {d.estado === "pendiente" && !mostrarFormulario && (
+              <button onClick={() => void run("descartar")} disabled={!!busy}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold text-slate-500 hover:bg-white">
+                <Undo2 size={13} /> No es relevante
+              </button>
+            )}
+          </div>
+        </section>
+      )}
+
+      {editable && mostrarFormulario && (
         <>
           {/* Datos de la vista */}
           <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">

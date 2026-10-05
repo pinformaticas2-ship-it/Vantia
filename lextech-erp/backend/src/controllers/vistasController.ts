@@ -11,6 +11,8 @@ import {
   computeRecordatorioAt,
   formatMadrid,
   geminiAvailable,
+  normalizeAutos,
+  normalizeNig,
   VistasConfig,
   PlantillaVars,
 } from '../services/vistasAutomation';
@@ -139,7 +141,10 @@ export async function updateVistasConfig(req: any, res: Response) {
     if (!loaded) return fail(res, 'Organización no encontrada', 404);
     const { org, cfg: current } = loaded;
     const enabled = req.body?.enabled === true;
-    const next = normalizeVistasConfig({ ...current, ...(req.body?.config || {}) });
+    // La dirección desde la que se usa Vantia, para el enlace de los avisos
+    // por correo (el backend no la conoce de otra forma).
+    const origin = String(req.headers?.origin || '');
+    const next = normalizeVistasConfig({ ...current, ...(req.body?.config || {}), ...(/^https?:\/\//.test(origin) ? { appUrl: origin } : {}) });
     const uid = req.auth?.userId;
 
     // Un único interruptor, sin pantalla de configuración: al activar, si no
@@ -213,7 +218,7 @@ export async function updateVistasConfig(req: any, res: Response) {
 const LIST_FIELDS = `id, estado, from_email, from_name, subject, received_at, datos, extraccion_origen,
   fecha_vista, duracion_min, responsable_user_id, responsable_nombre, conflictos, expediente_id,
   agenda_event_id, recordatorio_at, recordatorio_enviado_at, pasos, error, decidido_por_nombre,
-  decidido_at, created_at`;
+  decidido_at, created_at, tipo, relacion`;
 
 /** Condición SQL de visibilidad: propietario/admin ven todas; el resto, las
  *  suyas (como abogado responsable o dueño del buzón). */
@@ -230,7 +235,10 @@ export async function listVistas(req: any, res: Response) {
     let cond = `organizacion_id = $1`;
     if (estado === 'todas') cond += ` AND estado <> 'ignorada'`;
     else if (estado === 'pendiente') cond += ` AND estado IN ('pendiente','procesando','error')`;
-    else { params.push(estado); cond += ` AND estado = $${params.length}`; }
+    // 'Aceptadas' incluye lo resuelto sin crear vista nueva (documentación
+    // añadida a un expediente, vista existente modificada).
+    else if (estado === 'aceptada') cond += ` AND estado IN ('aceptada','documentada','modificada')`;
+    else { params.push(estado); cond += ` AND estado = ${params.length}`; }
     cond += scopeCond(req, params);
     const order = estado === 'aceptada' ? 'fecha_vista DESC NULLS LAST' : 'created_at DESC';
     const { rows } = await pool.query(
@@ -253,7 +261,7 @@ export async function getVistasAvisos(req: any, res: Response) {
     const params: any[] = [req.organizacionId];
     const scope = scopeCond(req, params);
     const { rows } = await pool.query(
-      `SELECT id, estado, subject, fecha_vista, datos->>'juzgado' AS juzgado,
+      `SELECT id, estado, tipo, subject, fecha_vista, datos->>'juzgado' AS juzgado,
               jsonb_array_length(conflictos) AS num_conflictos, recordatorio_at, created_at
          FROM vistas_solicitudes
         WHERE organizacion_id = $1 ${scope}
@@ -287,20 +295,19 @@ async function loadSolicitud(req: any, res: Response) {
 }
 
 async function findCoincidencias(organizacionId: string, datos: any) {
-  const autos = String(datos?.num_autos || '').trim();
-  const nig = String(datos?.nig || '').trim();
+  // Normalizado: '000945/2023' y '945/2023' son los mismos autos.
+  const autos = normalizeAutos(datos?.num_autos);
+  const nig = normalizeNig(datos?.nig);
   if (!autos && !nig) return [];
   const { rows } = await pool.query(
     `SELECT id, anio, num_exp, descripcion, juzgado, num_autos, nig, cliente_nombre
        FROM expedientes
-      WHERE organizacion_id = $1
-        AND (($2 <> '' AND REPLACE(COALESCE(num_autos,''),' ','') ILIKE REPLACE($2,' ',''))
-             OR ($3 <> '' AND COALESCE(nig,'') = $3))
+      WHERE organizacion_id = $1 AND (num_autos IS NOT NULL OR nig IS NOT NULL)
       ORDER BY created_at DESC
-      LIMIT 5`,
-    [organizacionId, autos, nig],
+      LIMIT 5000`,
+    [organizacionId],
   );
-  return rows;
+  return rows.filter((r: any) => (autos && normalizeAutos(r.num_autos) === autos) || (nig && normalizeNig(r.nig) === nig)).slice(0, 5);
 }
 
 export async function getVista(req: any, res: Response) {
@@ -363,7 +370,9 @@ export async function getVistaConflictos(req: any, res: Response) {
     if (!fecha) return ok(res, []);
     const dur = Math.min(600, Math.max(15, Number(req.query.duracion) || ctx.sol.duracion_min || ctx.cfg.duracionMin));
     const responsable = String(req.query.responsable || ctx.sol.responsable_user_id || ctx.cfg.responsableUserId || req.auth?.userId || '');
-    const exclude = [ctx.sol.agenda_event_id, ctx.sol.recordatorio_event_id].filter(Boolean);
+    // Ni los eventos de esta solicitud ni, si es un cambio de fecha, la propia
+    // vista que se va a mover cuentan como choque.
+    const exclude = [ctx.sol.agenda_event_id, ctx.sol.recordatorio_event_id, ctx.sol.relacion?.vista?.agenda_event_id].filter(Boolean);
     return ok(res, await findAgendaConflicts(req.organizacionId, responsable, fecha, dur, exclude));
   } catch (e: any) {
     return fail(res, e?.message || 'Error comprobando la agenda');
@@ -463,6 +472,47 @@ async function crearExpedienteComoUsuario(req: any, body: any): Promise<any> {
 }
 
 type Paso = { paso: string; ok: boolean; detalle: string };
+
+/** Paso común "documentación": vincula el correo al expediente, guarda sus
+ *  adjuntos en los documentos del expediente (Drive/Dropbox según la
+ *  organización) y el texto del correo como nota. Nunca lanza: devuelve el paso. */
+async function guardarDocumentacion(sol: any, expedienteId: string, guardarAdjuntos: boolean, deciderName: string): Promise<Paso> {
+  try {
+    let guardados = 0;
+    const fallidos: string[] = [];
+    const email = await loadEmailContent(sol.email_id).catch(() => null);
+    if (email) {
+      await pool.query(`UPDATE emails SET expediente_id = $1 WHERE id = $2 AND expediente_id IS NULL`, [expedienteId, sol.email_id]);
+      const adj = JSON.parse(email.attachments_json || '[]');
+      if (guardarAdjuntos) {
+        for (let i = 0; i < adj.length; i++) {
+          try {
+            const file = await fetchEmailAttachmentBuffer(sol.email_id, i);
+            if (!file) { fallidos.push(adj[i]?.filename || `adjunto ${i + 1}`); continue; }
+            await saveExpedienteAttachmentFromBuffer(expedienteId, file.content, file.filename, file.contentType, deciderName);
+            guardados++;
+          } catch {
+            fallidos.push(adj[i]?.filename || `adjunto ${i + 1}`);
+          }
+        }
+      }
+    }
+    const cuerpo = String(sol.body_text || '').trim();
+    await pool.query(
+      `INSERT INTO notes (expediente_id, content, category, priority, color, created_by)
+       VALUES ($1,$2,'legal','alta','#FCA5A5',$3)`,
+      [expedienteId, `✉️ Correo recibido — ${sol.from_name || sol.from_email || ''}\nAsunto: ${sol.subject || ''}\n\n${cuerpo.slice(0, 15000)}`, deciderName],
+    );
+    const detalle = !email
+      ? 'El correo original ya no está en la bandeja: solo se guardó su texto como nota'
+      : `${guardados} adjunto${guardados === 1 ? '' : 's'} guardado${guardados === 1 ? '' : 's'} y el correo como nota${fallidos.length ? ` · no se pudieron guardar: ${fallidos.join(', ')}` : ''}`;
+    // ok aunque fallase algún adjunto: así un reintento no vuelve a guardar
+    // (duplicados) los que sí se guardaron. El detalle lo dice.
+    return { paso: 'documentos', ok: true, detalle };
+  } catch (e: any) {
+    return { paso: 'documentos', ok: false, detalle: e?.message || String(e) };
+  }
+}
 
 // ── POST /api/vistas/:id/aceptar ────────────────────────────────────────────
 export async function aceptarVista(req: any, res: Response) {
@@ -602,42 +652,7 @@ export async function aceptarVista(req: any, res: Response) {
 
     // 7 · Documentación: adjuntos del correo + el propio correo como nota.
     if (expedienteId && !yaHecho('documentos')) {
-      const guardar = b.guardar_adjuntos ?? cfg.guardarAdjuntos;
-      try {
-        let guardados = 0;
-        const fallidos: string[] = [];
-        const email = await loadEmailContent(sol.email_id).catch(() => null);
-        if (email) {
-          await pool.query(`UPDATE emails SET expediente_id = $1 WHERE id = $2 AND expediente_id IS NULL`, [expedienteId, sol.email_id]);
-          const adj = JSON.parse(email.attachments_json || '[]');
-          if (guardar) {
-            for (let i = 0; i < adj.length; i++) {
-              try {
-                const file = await fetchEmailAttachmentBuffer(sol.email_id, i);
-                if (!file) { fallidos.push(adj[i]?.filename || `adjunto ${i + 1}`); continue; }
-                await saveExpedienteAttachmentFromBuffer(expedienteId, file.content, file.filename, file.contentType, deciderName);
-                guardados++;
-              } catch {
-                fallidos.push(adj[i]?.filename || `adjunto ${i + 1}`);
-              }
-            }
-          }
-        }
-        const cuerpo = String(sol.body_text || '').trim();
-        await pool.query(
-          `INSERT INTO notes (expediente_id, content, category, priority, color, created_by)
-           VALUES ($1,$2,'legal','alta','#FCA5A5',$3)`,
-          [expedienteId, `✉️ Correo de señalamiento — ${sol.from_name || sol.from_email || ''}\nAsunto: ${sol.subject || ''}\n\n${cuerpo.slice(0, 15000)}`, deciderName],
-        );
-        const detalle = !email
-          ? 'El correo original ya no está en la bandeja: solo se guardó su texto como nota'
-          : `${guardados} adjunto${guardados === 1 ? '' : 's'} guardado${guardados === 1 ? '' : 's'} y el correo como nota${fallidos.length ? ` · no se pudieron guardar: ${fallidos.join(', ')}` : ''}`;
-        // ok aunque fallase algún adjunto: así un reintento no vuelve a
-        // guardar (duplicados) los que sí se guardaron. El detalle lo dice.
-        pasos.push({ paso: 'documentos', ok: true, detalle });
-      } catch (e: any) {
-        pasos.push({ paso: 'documentos', ok: false, detalle: e?.message || String(e) });
-      }
+      pasos.push(await guardarDocumentacion(sol, expedienteId, b.guardar_adjuntos ?? cfg.guardarAdjuntos, deciderName));
     }
 
     // 8 · Recordatorio de preparación (por defecto 1 día antes).
@@ -739,6 +754,128 @@ export async function rechazarVista(req: any, res: Response) {
     return ok(res, { estado: 'rechazada', pasos });
   } catch (e: any) {
     return fail(res, e?.message || 'Error rechazando la vista');
+  }
+}
+
+// ── POST /api/vistas/:id/documentar ─────────────────────────────────────────
+// Correo de un procedimiento que ya tiene expediente (mismos autos/NIG):
+// se añade su documentación a ese expediente, sin crear nada nuevo.
+export async function documentarVista(req: any, res: Response) {
+  try {
+    const ctx = await loadSolicitud(req, res);
+    if (!ctx) return;
+    const { sol, cfg } = ctx;
+    const b = req.body || {};
+    const expedienteId = String(b.expediente_id || sol.relacion?.expediente?.id || '');
+    const { rows: exp } = await pool.query(
+      `SELECT id, anio, num_exp FROM expedientes WHERE id = $1 AND organizacion_id = $2`,
+      [expedienteId, req.organizacionId],
+    );
+    if (!exp.length) return fail(res, 'Elige el expediente al que añadir la documentación.', 400);
+    const previo = await claim(sol.id, ['pendiente', 'descartada', 'error']);
+    if (!previo) return fail(res, 'Esta solicitud ya se está procesando o ya se decidió.', 409);
+
+    const uid = req.auth?.userId;
+    const deciderName = await resolveUserName(uid);
+    const pasos: Paso[] = [await guardarDocumentacion(sol, exp[0].id, b.guardar_adjuntos ?? cfg.guardarAdjuntos, deciderName)];
+    pasos[0].detalle = `Expediente ${exp[0].anio}/${exp[0].num_exp}: ${pasos[0].detalle}`;
+    await pool.query(
+      `UPDATE vistas_solicitudes SET estado = $2, expediente_id = $3, pasos = $4, error = $5,
+              decidido_por = $6, decidido_por_nombre = $7, decidido_at = NOW(), updated_at = NOW()
+        WHERE id = $1`,
+      [sol.id, pasos[0].ok ? 'documentada' : 'error', exp[0].id, JSON.stringify(pasos), pasos[0].ok ? null : pasos[0].detalle, uid, deciderName],
+    );
+    await logActivityForReq(req, `Documentación añadida desde correo: ${sol.subject || ''}`, 'EXPEDIENTE', exp[0].id, sol.from_email || undefined);
+    return ok(res, { estado: pasos[0].ok ? 'documentada' : 'error', pasos, expedienteId: exp[0].id });
+  } catch (e: any) {
+    return fail(res, e?.message || 'Error añadiendo la documentación');
+  }
+}
+
+// ── POST /api/vistas/:id/modificar ──────────────────────────────────────────
+// Mismo procedimiento que una vista ya aceptada, con otra fecha (aplazamiento,
+// cambio de hora/sala...): se mueve ESA vista -- evento de agenda,
+// recordatorio de preparación -- en vez de crear otra, y se guarda la
+// documentación en su expediente. Opcionalmente se confirma por correo.
+export async function modificarVista(req: any, res: Response) {
+  const ctx = await loadSolicitud(req, res).catch((e) => { fail(res, e?.message || 'Error'); return null; });
+  if (!ctx) return;
+  const { sol, cfg } = ctx;
+  const b = req.body || {};
+  const vistaId = String(b.vista_id || sol.relacion?.vista?.id || '');
+  const { rows: origRows } = await pool.query(
+    `SELECT * FROM vistas_solicitudes WHERE id = $1 AND organizacion_id = $2 AND estado = 'aceptada'`,
+    [vistaId, req.organizacionId],
+  );
+  if (!origRows.length) return fail(res, 'No se encontró la vista aceptada que se quiere modificar.', 400);
+  const orig = origRows[0];
+  const fecha = parseDate(b.fecha) || (sol.fecha_vista ? new Date(sol.fecha_vista) : null);
+  if (!fecha) return fail(res, 'Indica la nueva fecha y hora de la vista.', 400);
+  const duracion = Math.min(600, Math.max(15, Number(b.duracion_min) || orig.duracion_min || cfg.duracionMin));
+
+  const previo = await claim(sol.id, ['pendiente', 'descartada', 'error']);
+  if (!previo) return fail(res, 'Esta solicitud ya se está procesando o ya se decidió.', 409);
+  const uid = req.auth?.userId;
+  const deciderName = await resolveUserName(uid);
+  const pasos: Paso[] = [];
+  const antes = orig.fecha_vista ? new Date(orig.fecha_vista) : null;
+  const fmtLargo = (d: Date) => formatMadrid(d, { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+
+  // Correo de confirmación de la nueva fecha (opcional; si falla, no se toca nada).
+  if (b.enviar_correo === true) {
+    try {
+      const vars = await buildPlantillaVars(req, { sol, org: ctx.org }, { ...orig.datos, ...b, fecha, responsable_user_id: orig.responsable_user_id });
+      const r = renderPlantilla(cfg.plantillaAceptar, vars);
+      await enviarRespuesta({ sol }, txt(b.asunto, 900) || r.asunto, String(b.cuerpo || '').trim() || r.texto, orig.expediente_id);
+      pasos.push({ paso: 'correo', ok: true, detalle: `Confirmación de la nueva fecha enviada a ${sol.from_email}` });
+    } catch (e: any) {
+      await unclaim(sol.id, previo, `No se pudo enviar el correo: ${e?.message || e}`);
+      return fail(res, `No se pudo enviar el correo: ${e?.message || e}`, 502);
+    }
+  }
+
+  try {
+    const fin = new Date(fecha.getTime() + duracion * 60000);
+    if (orig.agenda_event_id) {
+      await pool.query(
+        `UPDATE agenda_events SET start_at = $2, end_at = $3, updated_at = NOW() WHERE id = $1 AND organizacion_id = $4`,
+        [orig.agenda_event_id, fecha, fin, req.organizacionId],
+      );
+    }
+    pasos.push({ paso: 'agenda', ok: true, detalle: `Vista movida${antes ? ` del ${fmtLargo(antes)}` : ''} al ${fmtLargo(fecha)}` });
+
+    let recordatorioAt: Date | null = computeRecordatorioAt(fecha, sol.datos?.fecha_preparacion || orig.datos?.fecha_preparacion || null, cfg);
+    if (recordatorioAt && recordatorioAt >= fecha) recordatorioAt = null;
+    if (orig.recordatorio_event_id && recordatorioAt) {
+      await pool.query(
+        `UPDATE agenda_events SET start_at = $2, end_at = $3, updated_at = NOW() WHERE id = $1 AND organizacion_id = $4`,
+        [orig.recordatorio_event_id, recordatorioAt, new Date(recordatorioAt.getTime() + 30 * 60000), req.organizacionId],
+      );
+    }
+    if (recordatorioAt) pasos.push({ paso: 'recordatorio', ok: true, detalle: `Recordatorio movido al ${fmtLargo(recordatorioAt)}` });
+
+    await pool.query(
+      `UPDATE vistas_solicitudes
+          SET fecha_vista = $2, duracion_min = $3, recordatorio_at = $4, recordatorio_enviado_at = NULL,
+              datos = datos || $5::jsonb, updated_at = NOW()
+        WHERE id = $1`,
+      [orig.id, fecha, duracion, recordatorioAt, JSON.stringify({ modificada_por_solicitud: sol.id, fecha_anterior: antes })],
+    );
+
+    if (orig.expediente_id) pasos.push(await guardarDocumentacion(sol, orig.expediente_id, b.guardar_adjuntos ?? cfg.guardarAdjuntos, deciderName));
+
+    await pool.query(
+      `UPDATE vistas_solicitudes SET estado = 'modificada', expediente_id = $2, fecha_vista = $3, duracion_min = $4,
+              pasos = $5, error = NULL, decidido_por = $6, decidido_por_nombre = $7, decidido_at = NOW(), updated_at = NOW()
+        WHERE id = $1`,
+      [sol.id, orig.expediente_id, fecha, duracion, JSON.stringify(pasos), uid, deciderName],
+    );
+    await logActivityForReq(req, `Vista modificada: ${antes ? fmtLargo(antes) + ' → ' : ''}${fmtLargo(fecha)}`, orig.expediente_id ? 'EXPEDIENTE' : 'AGENDA', orig.expediente_id || orig.agenda_event_id || undefined, sol.subject || undefined);
+    return ok(res, { estado: 'modificada', pasos, vistaId: orig.id });
+  } catch (e: any) {
+    await pool.query(`UPDATE vistas_solicitudes SET estado = 'error', pasos = $2, error = $3, updated_at = NOW() WHERE id = $1`,
+      [sol.id, JSON.stringify(pasos), e?.message || String(e)]).catch(() => {});
+    return fail(res, e?.message || 'Error modificando la vista');
   }
 }
 

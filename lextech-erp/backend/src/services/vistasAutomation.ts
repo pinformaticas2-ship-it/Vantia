@@ -32,6 +32,8 @@ export interface VistasConfig {
   guardarAdjuntos: boolean;
   plantillaAceptar: VistasPlantilla;
   plantillaRechazar: VistasPlantilla;
+  /** Dirección de la aplicación (para el enlace de los avisos por correo). */
+  appUrl: string | null;
 }
 
 export const DEFAULT_PALABRAS_CLAVE = [
@@ -92,6 +94,7 @@ export function normalizeVistasConfig(raw: any): VistasConfig {
     guardarAdjuntos: raw?.guardarAdjuntos !== false,
     plantillaAceptar: cleanPlantilla(raw?.plantillaAceptar, DEFAULT_PLANTILLA_ACEPTAR),
     plantillaRechazar: cleanPlantilla(raw?.plantillaRechazar, DEFAULT_PLANTILLA_RECHAZAR),
+    appUrl: /^https?:\/\/\S+$/i.test(String(raw?.appUrl || '')) ? String(raw.appUrl).replace(/\/$/, '') : null,
   };
 }
 
@@ -496,16 +499,101 @@ async function syncMailbox(organizacionId: string, cfg: VistasConfig): Promise<{
   return { accountId: null, gmailProfileId: rows[0].id, ownerUserId: rows[0].user_id, syncError };
 }
 
-async function analyzeEmail(emailId: string, cfg: VistasConfig) {
+// ── Procedimientos ya conocidos (mismo nº de autos o NIG) ────────────────────
+
+/** "000945/2023", "945 / 2023", "945/23" → "945/2023". */
+export function normalizeAutos(s?: string | null): string | null {
+  const m = /(\d{1,7})\s*\/\s*(\d{2,4})/.exec(String(s || ''));
+  if (!m) return null;
+  const year = m[2].length === 2 ? `20${m[2]}` : m[2];
+  if (year.length !== 4) return null;
+  return `${parseInt(m[1], 10)}/${year}`;
+}
+
+export function normalizeNig(s?: string | null): string | null {
+  // Sin la etiqueta: "NIG: 3003…" y "3003…" son el mismo NIG.
+  const t = String(s || '').replace(/^\s*NIG\b[:.\s]*/i, '').replace(/[^0-9A-Za-z]/g, '').toUpperCase();
+  return t.length >= 10 ? t : null;
+}
+
+/** Números de autos y NIG que aparecen en un texto. Las fechas (06/10/2026)
+ *  no cuentan: el número no puede ir pegado a otra barra o cifra. */
+export function extractProcedureRefs(text: string): { autos: string[]; nigs: string[] } {
+  const autos = new Set<string>();
+  const re = /(?<![\d/])(\d{1,7})\s*\/\s*(\d{4})(?![\d/])/g;
+  for (let m; (m = re.exec(text));) {
+    const y = Number(m[2]);
+    if (y >= 1990 && y <= 2100) autos.add(`${parseInt(m[1], 10)}/${m[2]}`);
+  }
+  const nigs = new Set<string>();
+  for (const m of text.matchAll(/\bNIG[:.\s]*([0-9A-Z]{10,25})/gi)) { const n = normalizeNig(m[1]); if (n) nigs.add(n); }
+  for (const m of text.matchAll(/\b(\d{19})\b/g)) nigs.add(m[1]);
+  return { autos: [...autos], nigs: [...nigs] };
+}
+
+export interface Relacion {
+  autos: string | null;
+  nig: string | null;
+  expediente: { id: string; anio: number; num_exp: number; descripcion: string | null; num_autos: string | null; cliente_nombre: string | null } | null;
+  vista: { id: string; fecha_vista: string; agenda_event_id: string | null; juzgado: string | null } | null;
+}
+
+/** Expediente de la organización con esos autos/NIG y, si la hay, su vista ya
+ *  aceptada todavía por celebrar. */
+export async function findRelacion(organizacionId: string, autosList: string[], nigs: string[]): Promise<Relacion | null> {
+  const autos = [...new Set(autosList.map(normalizeAutos).filter(Boolean) as string[])];
+  const nigSet = [...new Set(nigs.map(normalizeNig).filter(Boolean) as string[])];
+  if (!autos.length && !nigSet.length) return null;
+
+  const { rows: exps } = await pool.query(
+    `SELECT id, anio, num_exp, descripcion, num_autos, nig, cliente_nombre
+       FROM expedientes
+      WHERE organizacion_id = $1 AND (num_autos IS NOT NULL OR nig IS NOT NULL)
+      ORDER BY updated_at DESC NULLS LAST
+      LIMIT 5000`,
+    [organizacionId],
+  );
+  const exp = exps.find((r: any) => autos.includes(normalizeAutos(r.num_autos) || '') || nigSet.includes(normalizeNig(r.nig) || '')) || null;
+
+  const { rows: vistas } = await pool.query(
+    `SELECT id, fecha_vista, agenda_event_id, expediente_id, datos->>'num_autos' AS autos, datos->>'juzgado' AS juzgado
+       FROM vistas_solicitudes
+      WHERE organizacion_id = $1 AND estado = 'aceptada' AND tipo = 'vista'
+        AND fecha_vista > NOW() - interval '1 day'
+      ORDER BY fecha_vista ASC`,
+    [organizacionId],
+  );
+  const vista = vistas.find((v: any) => (exp && v.expediente_id === exp.id) || autos.includes(normalizeAutos(v.autos) || '')) || null;
+  if (!exp && !vista) return null;
+  return {
+    autos: autos[0] || null,
+    nig: nigSet[0] || null,
+    expediente: exp ? { id: exp.id, anio: exp.anio, num_exp: exp.num_exp, descripcion: exp.descripcion, num_autos: exp.num_autos, cliente_nombre: exp.cliente_nombre } : null,
+    vista: vista ? { id: vista.id, fecha_vista: vista.fecha_vista, agenda_event_id: vista.agenda_event_id, juzgado: vista.juzgado } : null,
+  };
+}
+
+/** Prefijo de los avisos que manda Vantia: si llegan al buzón vigilado no se
+ *  vuelven a analizar (evita un bucle de avisos sobre avisos). */
+export const AVISO_SUBJECT_PREFIX = '[Vantia]';
+
+async function analyzeEmail(emailId: string, cfg: VistasConfig, organizacionId: string) {
   const row = await loadEmailContent(emailId);
   if (!row) return null;
   const text = emailPlainText(row);
   const attachments = parseAttachments(row);
   const haystack = `${row.subject || ''}\n${text}\n${attachments.map((a) => a.filename).join('\n')}`;
+  const ignorar = { row, text, datos: null as VistaDatos | null, origen: 'filtro' as const, relacion: null as Relacion | null };
 
-  if (!matchesSender(row.from_email, cfg.remitentes) || !matchesKeywords(haystack, cfg.palabrasClave)) {
-    return { row, text, datos: null as VistaDatos | null, origen: 'filtro' as const };
-  }
+  if (String(row.subject || '').startsWith(AVISO_SUBJECT_PREFIX)) return ignorar;
+
+  // Además de los correos "de vistas" (palabras clave), cualquier correo que
+  // cite los autos o el NIG de un expediente de la organización: remisiones de
+  // documentos, notificaciones, cambios de señalamiento...
+  const refs = extractProcedureRefs(haystack);
+  let relacion = await findRelacion(organizacionId, refs.autos, refs.nigs);
+  const porPalabras = matchesSender(row.from_email, cfg.remitentes) && matchesKeywords(haystack, cfg.palabrasClave);
+  if (!porPalabras && !relacion?.expediente) return ignorar;
 
   const pdfs: { filename: string; contentType: string; content: Buffer }[] = [];
   if (geminiAvailable()) {
@@ -521,8 +609,91 @@ async function analyzeEmail(emailId: string, cfg: VistasConfig) {
   }
 
   const ia = await extractWithGemini(row.subject || '', `${row.from_name || ''} <${row.from_email || ''}>`, text, pdfs);
-  if (ia) return { row, text, datos: ia, origen: 'ia' as const };
-  return { row, text, datos: extractWithPatterns(row.subject || '', text), origen: 'patrones' as const };
+  const datos = ia || extractWithPatterns(row.subject || '', text);
+  // Los autos/NIG que lea la IA (p.ej. de un PDF adjunto) también cuentan.
+  if (!relacion?.expediente && (datos.num_autos || datos.nig)) {
+    relacion = (await findRelacion(organizacionId, [datos.num_autos || ''], [datos.nig || ''])) || relacion;
+  }
+  return { row, text, datos, origen: (ia ? 'ia' : 'patrones') as 'ia' | 'patrones', relacion };
+}
+
+/** Qué es el correo:
+ *  - 'vista': señalamiento nuevo.
+ *  - 'cambio': mismo procedimiento que una vista ya aceptada, con otra fecha.
+ *  - 'documentacion': correo de un procedimiento con expediente (o el mismo
+ *    señalamiento repetido): para añadir su documentación.
+ *  - null: nada que hacer. */
+export function clasificarSolicitud(esVista: boolean, fechaVista: Date | null, relacion: Relacion | null): 'vista' | 'cambio' | 'documentacion' | null {
+  if (esVista && fechaVista) {
+    if (relacion?.vista) {
+      const misma = Math.abs(new Date(relacion.vista.fecha_vista).getTime() - fechaVista.getTime()) < 60_000;
+      return misma ? 'documentacion' : 'cambio';
+    }
+    return 'vista';
+  }
+  return relacion?.expediente ? 'documentacion' : null;
+}
+
+const TITULO_AVISO: Record<'vista' | 'cambio' | 'documentacion', string> = {
+  vista: 'Vista por confirmar',
+  cambio: 'Cambio en una vista ya aceptada',
+  documentacion: 'Nueva documentación de un procedimiento',
+};
+
+/** Aviso de una solicitud nueva: push + campana (por la propia solicitud) y
+ *  CORREO al abogado responsable (o propietario/administradores), para que
+ *  llegue aunque nadie tenga Vantia abierta ni las notificaciones activadas. */
+async function avisarSolicitud(
+  org: { id: string; nombre: string }, cfg: VistasConfig, solicitudId: string,
+  tipo: 'vista' | 'cambio' | 'documentacion', datos: VistaDatos, fechaVista: Date | null,
+  conflictos: AgendaConflict[], relacion: Relacion | null, email: { subject: string | null; from: string | null; mailboxOwner: string | null },
+) {
+  const destinatarios = await avisoDestinatarios(org.id, cfg.responsableUserId);
+  const cuando = fechaVista ? `${formatMadrid(fechaVista, { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}` : '';
+  const procedimiento = relacion?.expediente
+    ? `expediente ${relacion.expediente.anio}/${relacion.expediente.num_exp}${relacion.expediente.num_autos ? ` (autos ${relacion.expediente.num_autos})` : ''}`
+    : (datos.num_autos ? `autos ${datos.num_autos}` : '');
+  const titulo = tipo === 'vista' && conflictos.length ? `${TITULO_AVISO.vista} (choca con tu agenda)` : TITULO_AVISO[tipo];
+  const resumen = tipo === 'cambio' && relacion?.vista
+    ? `La vista del ${formatMadrid(new Date(relacion.vista.fecha_vista), { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })} pasaría al ${cuando}`
+    : [cuando, datos.juzgado, procedimiento].filter(Boolean).join(' · ');
+
+  await sendPushToUsers(destinatarios, {
+    title: `${tipo === 'documentacion' ? '📎' : tipo === 'cambio' ? '🔁' : '⚖️'} ${titulo}`,
+    body: resumen || (email.subject || ''),
+    url: `/dashboard/vistas?id=${solicitudId}`,
+    tag: `vista-${solicitudId}`,
+  });
+
+  const appUrl = (cfg.appUrl || process.env.FRONTEND_URL || '').replace(/\/$/, '');
+  const enlace = appUrl ? `${appUrl}/dashboard/vistas?id=${solicitudId}` : null;
+  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const html = [
+    `<p><b>${esc(titulo)}</b></p>`,
+    resumen ? `<p>${esc(resumen)}</p>` : '',
+    `<p>Correo recibido: <b>${esc(email.subject || '(sin asunto)')}</b><br>De: ${esc(email.from || '')}</p>`,
+    tipo === 'documentacion' && relacion?.expediente ? `<p>Es del mismo procedimiento que el ${esc(procedimiento)}. Puedes añadir su documentación al expediente o tratarlo como vista nueva.</p>` : '',
+    tipo === 'cambio' ? '<p>Puedes modificar la vista existente (agenda y recordatorio) o solo añadir la documentación.</p>' : '',
+    enlace ? `<p><a href="${enlace}">Revisar y decidir en Vantia</a></p>` : '<p>Revísalo en Vantia → Vistas.</p>',
+    `<p style="color:#888;font-size:12px">${esc(org.nombre)} · Automatización de vistas</p>`,
+  ].filter(Boolean).join('\n');
+
+  const { getClerk } = await import('../controllers/activityController');
+  const { sendOrgEmail } = await import('../controllers/soporteController');
+  const enviados = new Set<string>();
+  for (const uid of destinatarios) {
+    try {
+      const user = await getClerk().users.getUser(uid);
+      const to = user.primaryEmailAddress?.emailAddress || user.emailAddresses?.[0]?.emailAddress;
+      if (!to || enviados.has(to.toLowerCase())) continue;
+      enviados.add(to.toLowerCase());
+      const fallo = await sendOrgEmail(org.id, email.mailboxOwner || uid, to, `${AVISO_SUBJECT_PREFIX} ${titulo}: ${email.subject || ''}`.slice(0, 250), html);
+      if (fallo) console.warn('[vistas] aviso por correo a', to, ':', fallo);
+    } catch (e: any) {
+      console.warn('[vistas] aviso por correo:', e?.message || e);
+    }
+  }
+  if (enviados.size) await pool.query(`UPDATE vistas_solicitudes SET aviso_email_at = NOW() WHERE id = $1`, [solicitudId]).catch(() => {});
 }
 
 async function processOrganizacion(org: { id: string; nombre: string; vistas_auto_config: any; vistas_auto_activated_at: Date }): Promise<string | null> {
@@ -555,7 +726,7 @@ async function processOrganizacion(org: { id: string; nombre: string; vistas_aut
   for (const { id: emailId } of candidatos) {
     let analysis: Awaited<ReturnType<typeof analyzeEmail>> = null;
     try {
-      analysis = await analyzeEmail(emailId, cfg);
+      analysis = await analyzeEmail(emailId, cfg, org.id);
     } catch (e: any) {
       // No se pudo ni leer el correo (credenciales, red...): se reintentará en
       // la siguiente pasada, no se marca como procesado.
@@ -563,7 +734,7 @@ async function processOrganizacion(org: { id: string; nombre: string; vistas_aut
       continue;
     }
     if (!analysis) continue;
-    const { row, text, datos, origen } = analysis;
+    const { row, text, datos, origen, relacion } = analysis;
 
     const base = [
       org.id, emailId, mb.accountId, mb.gmailProfileId, mb.ownerUserId,
@@ -585,10 +756,14 @@ async function processOrganizacion(org: { id: string; nombre: string; vistas_aut
       continue;
     }
 
-    const esVista = datos.es_vista && Boolean(datos.fecha_vista);
     const duracion = datos.duracion_min || cfg.duracionMin;
     const fechaVista = datos.fecha_vista ? madridLocalToDate(datos.fecha_vista, datos.hora_vista || '09:00') : null;
-    const conflictos = esVista && fechaVista ? await findAgendaConflicts(org.id, cfg.responsableUserId, fechaVista, duracion) : [];
+    const tipo = clasificarSolicitud(Boolean(datos.es_vista), fechaVista, relacion);
+    // Hueco en la agenda para una vista nueva o para la nueva fecha de un
+    // cambio (sin contar el propio evento de la vista que se cambiaría).
+    const conflictos = (tipo === 'vista' || tipo === 'cambio') && fechaVista
+      ? await findAgendaConflicts(org.id, cfg.responsableUserId, fechaVista, duracion, relacion?.vista?.agenda_event_id ? [relacion.vista.agenda_event_id] : [])
+      : [];
     let responsableNombre: string | null = null;
     if (cfg.responsableUserId) {
       const { resolveUserName } = await import('../controllers/activityController');
@@ -600,26 +775,23 @@ async function processOrganizacion(org: { id: string; nombre: string; vistas_aut
          (organizacion_id, email_id, account_id, gmail_profile_id, mailbox_user_id,
           from_email, from_name, subject, message_id, received_at,
           estado, extraccion_origen, body_text, datos, fecha_vista, duracion_min,
-          responsable_user_id, responsable_nombre, conflictos)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+          responsable_user_id, responsable_nombre, conflictos, tipo, relacion)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
        ON CONFLICT (email_id) DO NOTHING
        RETURNING id`,
       [
         ...base,
-        esVista ? 'pendiente' : 'descartada', origen, text.slice(0, 20000), JSON.stringify(datos),
+        tipo ? 'pendiente' : 'descartada', origen, text.slice(0, 20000), JSON.stringify(datos),
         fechaVista, duracion, cfg.responsableUserId, responsableNombre, JSON.stringify(conflictos),
+        tipo || 'vista', relacion ? JSON.stringify(relacion) : null,
       ],
     );
 
-    if (esVista && inserted.length && fechaVista) {
-      const cuando = `${formatMadrid(fechaVista, { weekday: 'short', day: 'numeric', month: 'short' })} ${datos.hora_vista || ''}`.trim();
-      const destinatarios = await avisoDestinatarios(org.id, cfg.responsableUserId);
-      await sendPushToUsers(destinatarios, {
-        title: conflictos.length ? '⚠️ Vista por confirmar (choca con tu agenda)' : '⚖️ Vista por confirmar',
-        body: `${cuando}${datos.juzgado ? ' · ' + datos.juzgado : ''}`,
-        url: `/dashboard/vistas?id=${inserted[0].id}`,
-        tag: `vista-${inserted[0].id}`,
-      });
+    if (tipo && inserted.length) {
+      await avisarSolicitud(org, cfg, inserted[0].id, tipo, datos, fechaVista, conflictos, relacion, {
+        subject: row.subject || null, from: row.from_name ? `${row.from_name} <${row.from_email || ''}>` : (row.from_email || null),
+        mailboxOwner: mb.ownerUserId,
+      }).catch((e) => console.warn('[vistas] aviso:', e?.message || e));
     }
   }
 
