@@ -1,6 +1,12 @@
 import pool from '../config/database';
 import { syncImapAccountAllFolders, probeImapAccount } from '../controllers/emailController';
 import { emitEmailEvent } from '../utils/emailSSE';
+import { withTimeout } from '../utils/imap';
+
+// Tope por cuenta: aunque cada conexión/carpeta ya tiene su límite, una cuenta
+// nunca puede retener la pasada (antes una cuenta que no respondía dejaba sin
+// sincronizar a todas las demás).
+const ACCOUNT_TIMEOUT_MS = 5 * 60 * 1000;
 
 // ── Sincronización automática de todas las carpetas IMAP ─────────────────────
 // Antes solo se sincronizaba la carpeta que el usuario tenía abierta (más
@@ -35,9 +41,10 @@ export async function runImapAutoSync(): Promise<void> {
           // de las atrasadas, como mucho una vez al día por cuenta -- deja el
           // informe en probe_report para "Diagnosticar buzón".
           if (!acc.probe_at || Date.now() - new Date(acc.probe_at).getTime() > 24 * 60 * 60 * 1000) {
-            await probeImapAccount(acc, { repair: true }).catch((e) => console.warn(`[imap-probe] ${acc.email}:`, e?.message || e));
+            await withTimeout(probeImapAccount(acc, { repair: true }), ACCOUNT_TIMEOUT_MS, `sondeo de ${acc.email}`)
+              .catch((e) => console.warn(`[imap-probe] ${acc.email}:`, e?.message || e));
           }
-          const r = await syncImapAccountAllFolders(acc);
+          const r = await withTimeout(syncImapAccountAllFolders(acc), ACCOUNT_TIMEOUT_MS, `sincronización de ${acc.email}`);
           if (r.nuevos > 0) emitEmailEvent(acc.user_id, { type: 'messageNew', accountId: acc.id, folder: '*' });
           if (r.errores.length) console.warn(`[imap-auto] ${acc.email}: ${r.errores.length} carpeta(s) con error`, r.errores.slice(0, 3));
         } catch (e: any) {

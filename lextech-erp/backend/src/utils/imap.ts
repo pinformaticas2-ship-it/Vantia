@@ -33,6 +33,16 @@ export interface ImapEnvelope {
   hasAttachments: boolean;
 }
 
+/** Rechaza si la promesa no termina a tiempo (la operación de fondo no se
+ *  cancela sola: quien llama debe cerrar la conexión, ver forceClose). */
+export function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: NodeJS.Timeout;
+  return Promise.race([
+    promise.finally(() => clearTimeout(timer)),
+    new Promise<T>((_, reject) => { timer = setTimeout(() => reject(new Error(`Tiempo agotado (${Math.round(ms / 1000)} s): ${label}`)), ms); }),
+  ]);
+}
+
 export interface RawFolderProbe {
   path: string;
   name: string;
@@ -275,11 +285,38 @@ export class ImapClient {
       greetingTimeout: 10_000,
     });
 
+    // imapflow emite 'error' cuando la sesión muere a medias (p.ej. tras un
+    // corte por tiempo agotado); sin oyente, ese evento acaba como rechazo no
+    // controlado. Los errores reales ya llegan por las promesas de cada orden.
+    this.client.on('error', (e: any) => {
+      console.warn(`[imap] ${this.cfg.user}@${this.cfg.host}:`, e?.message || e);
+    });
+
     const connectPromise = this.client.connect();
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('IMAP connect timeout (15s)')), 15_000)
-    );
-    await Promise.race([connectPromise, timeoutPromise]);
+    let timer: NodeJS.Timeout | null = null;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error('El servidor de correo no responde (tiempo de conexión agotado)')), 15_000);
+    });
+    try {
+      await Promise.race([connectPromise, timeoutPromise]);
+    } catch (e) {
+      // Sin esto quedaba un cliente a medio conectar y el logout() posterior
+      // esperaba para siempre, colgando la sincronización de TODAS las cuentas.
+      connectPromise.catch(() => undefined);
+      this.forceClose();
+      throw e;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
+  /** Corta la conexión sin esperar respuesta del servidor. */
+  forceClose(): void {
+    const client = this.client;
+    this.client = null;
+    this.mailboxLock = null;
+    this.currentMailbox = '';
+    try { client?.close(); } catch { /* noop */ }
   }
 
   async login(): Promise<void> {
@@ -292,10 +329,11 @@ export class ImapClient {
     if (!this.client) return;
 
     try {
-      await this.client.logout();
+      // Un servidor que no contesta al LOGOUT no puede dejarnos esperando.
+      await withTimeout(this.client.logout(), 5_000, 'logout');
     } catch {
       try {
-        this.client.close();
+        this.client?.close();
       } catch {
         // noop
       }

@@ -4,7 +4,12 @@ import * as fs from 'fs';
 import * as path from 'path';
 import pool from '../config/database';
 import { UPLOADS_CLIENTS_ROOT } from '../config/paths';
-import { ImapClient, ImapConfig, syncInbox, testImapConnection, fetchFolderEnvelopes } from '../utils/imap';
+import { ImapClient, ImapConfig, syncInbox, testImapConnection, fetchFolderEnvelopes, withTimeout } from '../utils/imap';
+
+// Límites para que un servidor lento o que deja de responder nunca cuelgue la
+// sincronización (antes una sola cuenta así bloqueaba la de todas).
+const FOLDER_TIMEOUT_MS = 90_000;
+const LIST_TIMEOUT_MS = 60_000;
 import { Pop3Config, syncPop3Inbox, testPop3Connection } from '../utils/pop3';
 import { sendEmail, SmtpConfig, MailMessage, testSmtpConnection } from '../utils/smtp';
 import { dispatchEmail, getSendingProvider } from '../utils/mailer';
@@ -924,15 +929,20 @@ export async function syncImapAccountAllFolders(acc: any, limitPerFolder = 30): 
   try {
     await client.connect();
     await client.login();
-    const list = (await client.listFolders()).filter((f) => !f.noSelect);
+    const list = (await withTimeout(client.listFolders(), LIST_TIMEOUT_MS, 'listar carpetas')).filter((f) => !f.noSelect);
     for (const f of list) {
       try {
         const known = await loadKnownImapUids(acc.id, f.path);
-        const messages = await fetchFolderEnvelopes(client, f.path, limitPerFolder, imapSyncSince(), known, (w) => errores.push(w));
+        const messages = await withTimeout(
+          fetchFolderEnvelopes(client, f.path, limitPerFolder, imapSyncSince(), known, (w) => errores.push(w)),
+          FOLDER_TIMEOUT_MS, `carpeta ${f.path}`,
+        );
         nuevos += (await saveImapEnvelopes(acc, f.path, messages, known)).nuevos;
         folders++;
       } catch (e: any) {
         errores.push(`${f.path}: ${e?.message || e}`);
+        // Conexión colgada: se corta y se deja el resto para la próxima pasada.
+        if (/Tiempo agotado/.test(String(e?.message))) { client.forceClose(); break; }
       }
     }
   } catch (e: any) {
@@ -980,10 +990,11 @@ export async function probeImapAccount(acc: any, opts: { repair?: boolean } = {}
   try {
     await client.connect();
     await client.login();
-    const { capabilities, folders } = await client.probeAll(imapSyncSince());
+    const { capabilities, folders } = await withTimeout(client.probeAll(imapSyncSince()), 5 * 60_000, 'sondeo de carpetas')
+      .catch((e) => { client.forceClose(); throw e; });
     report.capabilities = capabilities;
     // Carpetas que Vantia muestra/sincroniza (suscritas + sistema).
-    const visibles = new Set((await client.listFolders()).map((f) => f.path));
+    const visibles = new Set((await withTimeout(client.listFolders(), LIST_TIMEOUT_MS, 'listar carpetas')).map((f) => f.path));
 
     for (const f of folders) {
       const row: any = {
@@ -1015,7 +1026,10 @@ export async function probeImapAccount(acc: any, opts: { repair?: boolean } = {}
           for (let round = 0; round < 10; round++) {
             const known = await loadKnownImapUids(acc.id, f.path);
             if (f.latestUid && known.has(f.latestUid)) break;
-            const messages = await fetchFolderEnvelopes(client, f.path, 50, imapSyncSince(), known, (w) => row.notes.push(w));
+            const messages = await withTimeout(
+              fetchFolderEnvelopes(client, f.path, 50, imapSyncSince(), known, (w) => row.notes.push(w)),
+              FOLDER_TIMEOUT_MS, `carpeta ${f.path}`,
+            );
             if (!messages.length) break;
             await saveImapEnvelopes(acc, f.path, messages, known);
           }
@@ -1026,6 +1040,7 @@ export async function probeImapAccount(acc: any, opts: { repair?: boolean } = {}
         } catch (e: any) {
           verdict = 'error';
           row.error = String(e?.message || e).slice(0, 300);
+          if (/Tiempo agotado/.test(String(e?.message))) client.forceClose();
         }
       }
       row.verdict = verdict;
