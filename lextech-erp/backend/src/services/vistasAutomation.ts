@@ -224,9 +224,11 @@ const EMPTY_DATOS: VistaDatos = {
 const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
 const MAX_INLINE_BYTES = 12 * 1024 * 1024;
 
+// Google emite claves con el formato antiguo (AIzaSy…) y con el nuevo (AQ.…):
+// basta con que haya una. Si no vale, la llamada falla y se usa el respaldo
+// por patrones igualmente.
 export function geminiAvailable(): boolean {
-  const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
-  return key.startsWith('AIzaSy');
+  return Boolean((process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '').trim());
 }
 
 function str(v: any, max = 500): string | null {
