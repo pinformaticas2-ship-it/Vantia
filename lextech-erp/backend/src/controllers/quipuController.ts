@@ -384,6 +384,44 @@ async function getStoredQuipuSettings(userId: string) {
   return result.rows[0] || null;
 }
 
+/** Organización a la que pertenece la conexión de Quipu del usuario (o null
+ *  si no tiene). Quipu es de UNA organización: la que estaba abierta al
+ *  conectarlo. Sus facturas/contactos/cuentas solo existen en esa. */
+export async function getQuipuOrganizacion(userId: string): Promise<{ id: string | null; nombre: string | null } | null> {
+  const { rows } = await pool.query(
+    `SELECT qs.organizacion_id AS id, o.nombre FROM quipu_settings qs
+       LEFT JOIN organizaciones o ON o.id = qs.organizacion_id
+      WHERE qs.user_id = $1 LIMIT 1`,
+    [userId],
+  );
+  return rows[0] || null;
+}
+
+/** Middleware para todas las rutas de Quipu salvo estado/conectar/desconectar:
+ *  si la conexión es de otra organización, aquí no se ve ni se modifica nada. */
+export const requireQuipuInActiveOrg = async (req: any, res: Response, next: () => void) => {
+  const userId = req.auth?.userId;
+  if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  try {
+    const org = await getQuipuOrganizacion(userId);
+    if (org && !org.id) {
+      return res.status(409).json({
+        success: false,
+        error: 'Quipu no está asignado a ninguna organización. Pulsa "Conectar" en Conexión Quipu desde la organización a la que pertenece.',
+      });
+    }
+    if (org && org.id !== req.organizacionId) {
+      return res.status(409).json({
+        success: false,
+        error: `Tu Quipu está conectado en la organización "${org.nombre || 'otra'}". Cámbiate a ella para usarlo.`,
+      });
+    }
+    next();
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e?.message || 'No se pudo comprobar la organización de Quipu.' });
+  }
+};
+
 async function getPreferredQuipuNumerationId(userId: string, preferredPrefix?: string | null): Promise<string | null> {
   const cleanPrefix = String(preferredPrefix || '').trim().toLowerCase();
   const result = await pool.query(
@@ -1035,6 +1073,16 @@ export const getQuipuStatus = async (req: any, res: Response) => {
     if (!settings) {
       return res.json({ success: true, data: { connected: false } });
     }
+    if (!settings.organizacion_id) {
+      // Conexión anterior a que Quipu fuese por organización: no se muestra en
+      // ninguna hasta que se vuelva a conectar desde la suya.
+      return res.json({ success: true, data: { connected: false, needsOrganizacion: true } });
+    }
+    if (settings.organizacion_id !== req.organizacionId) {
+      // Conectado, pero en otra organización: aquí cuenta como no conectado.
+      const org = await getQuipuOrganizacion(userId);
+      return res.json({ success: true, data: { connected: false, connectedInOtherOrg: org?.nombre || 'otra organización' } });
+    }
 
     res.json({
       success: true,
@@ -1061,6 +1109,13 @@ export const saveQuipuCredentials = async (req: any, res: Response) => {
   if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
 
   const existingSettings = await getStoredQuipuSettings(userId);
+  if (existingSettings?.organizacion_id && existingSettings.organizacion_id !== req.organizacionId) {
+    const org = await getQuipuOrganizacion(userId);
+    return res.status(409).json({
+      success: false,
+      error: `Tu Quipu ya está conectado en la organización "${org?.nombre || 'otra'}". Desconéctalo allí antes de conectarlo en esta.`,
+    });
+  }
   const appId = sanitizeText(req.body?.appId) || existingSettings?.app_id || '';
   const appSecret = sanitizeText(req.body?.appSecret) || existingSettings?.app_secret || '';
   const baseUrl = sanitizeText(req.body?.baseUrl) || 'https://getquipu.com';
@@ -1082,10 +1137,11 @@ export const saveQuipuCredentials = async (req: any, res: Response) => {
     const userName = await resolveUserName(userId);
     const result = await pool.query(
       `INSERT INTO quipu_settings
-         (user_id, app_id, app_secret, base_url, owner_slug, access_token, token_type, token_expires_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+         (user_id, app_id, app_secret, base_url, owner_slug, access_token, token_type, token_expires_at, organizacion_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
        ON CONFLICT (user_id) DO UPDATE
-       SET app_id = EXCLUDED.app_id,
+       SET organizacion_id = COALESCE(quipu_settings.organizacion_id, EXCLUDED.organizacion_id),
+           app_id = EXCLUDED.app_id,
            app_secret = EXCLUDED.app_secret,
            base_url = EXCLUDED.base_url,
            owner_slug = EXCLUDED.owner_slug,
@@ -1094,7 +1150,7 @@ export const saveQuipuCredentials = async (req: any, res: Response) => {
            token_expires_at = EXCLUDED.token_expires_at,
            updated_at = NOW()
        RETURNING *`,
-      [userId, appId, appSecret, baseUrl, ownerSlug, token.accessToken, token.tokenType, token.expiresAt],
+      [userId, appId, appSecret, baseUrl, ownerSlug, token.accessToken, token.tokenType, token.expiresAt, req.organizacionId],
     );
 
     await logActivityForReq(req, 'Configuración Quipu guardada', 'QUIPU', result.rows[0].id, userName, 'UPDATE');
@@ -1118,6 +1174,10 @@ export const disconnectQuipu = async (req: any, res: Response) => {
   if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
 
   try {
+    const org = await getQuipuOrganizacion(userId);
+    if (org?.id && org.id !== req.organizacionId) {
+      return res.status(409).json({ success: false, error: `Tu Quipu está conectado en la organización "${org.nombre || 'otra'}". Desconéctalo desde ella.` });
+    }
     await pool.query(`DELETE FROM quipu_settings WHERE user_id = $1`, [userId]);
     await logActivityForReq(req, 'Conexión Quipu eliminada', 'QUIPU', undefined, undefined, 'DELETE');
     res.json({ success: true });

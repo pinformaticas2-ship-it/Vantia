@@ -161,6 +161,10 @@ type BillingExpedienteOption = {
 
 type QuipuStatus = {
   connected: boolean;
+  /** Quipu está conectado, pero en otra organización (nombre). */
+  connectedInOtherOrg?: string;
+  /** Conexión anterior a que Quipu fuese por organización: hay que volver a conectarla. */
+  needsOrganizacion?: boolean;
   baseUrl?: string;
   ownerSlug?: string;
   lastSyncAt?: string | null;
@@ -2526,7 +2530,22 @@ function FacturacionContent() {
               {tab === "config" && (
                 <div className="space-y-4 max-w-2xl">
                   <OdooSection title="Conexión con Quipu" subtitle="Gestiona las credenciales API para sincronizar facturas, contactos y cuentas bancarias.">
-                    {quipuStatus.connected ? (
+                    {quipuStatus.needsOrganizacion && (
+                      <div className="mb-3 flex items-start gap-3 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3">
+                        <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
+                        <p className="text-sm text-amber-900">
+                          Ahora cada organización tiene su propia facturación y Quipu pertenece a la organización en la que se conecta. Si esta es la organización de tu Quipu, pulsa <b>Conectar</b> (no hace falta volver a escribir App ID ni App Secret, solo el owner_slug).
+                        </p>
+                      </div>
+                    )}
+                    {quipuStatus.connectedInOtherOrg ? (
+                      <div className="flex items-start gap-3 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3">
+                        <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
+                        <p className="text-sm text-amber-900">
+                          Tu Quipu está conectado en la organización <b>{quipuStatus.connectedInOtherOrg}</b>. Cada organización tiene su propia facturación: cámbiate a ella para usarlo, o desconéctalo allí si quieres conectarlo en esta.
+                        </p>
+                      </div>
+                    ) : quipuStatus.connected ? (
                       <div className="space-y-4">
                         <div className="flex items-center gap-3 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3">
                           <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />

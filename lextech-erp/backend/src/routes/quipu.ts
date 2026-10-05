@@ -34,6 +34,7 @@ import {
   getQuipuCompany,
   // Push local → Quipu
   pushLocalFacturaToQuipu,
+  requireQuipuInActiveOrg,
 } from '../controllers/quipuController';
 
 const router = Router();
@@ -44,10 +45,14 @@ router.use(requireModulePermission('facturacion'));
 
 // ── Configuración ──────────────────────────────────────────────
 router.get('/status',      requireAuth, getQuipuStatus);
-router.get('/diagnose',    requireAuth, diagnoseQuipu);
+router.get('/diagnose',    requireAuth, requireQuipuInActiveOrg, diagnoseQuipu);
 router.post('/connect',    requireAuth, saveQuipuCredentials);
-router.post('/sync',       requireAuth, syncQuipuBootstrap);
+router.post('/sync',       requireAuth, requireQuipuInActiveOrg, syncQuipuBootstrap);
 router.delete('/disconnect', requireAuth, disconnectQuipu);
+
+// Quipu pertenece a UNA organización (la que estaba abierta al conectarlo):
+// desde cualquier otra, ninguna de las rutas de abajo ve ni toca sus datos.
+router.use(requireAuth, requireQuipuInActiveOrg);
 
 // ── Datos sincronizados (BD local, sin llamadas en vivo) ───────
 router.get('/synced/contacts',      requireAuth, getSyncedContacts);

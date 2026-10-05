@@ -1048,22 +1048,9 @@ export default function DashboardHome() {
     const numFacturas    = facturas.length;
     const numGastos      = gastos.length;
 
-    // Desglose por organización -- un mismo usuario puede pertenecer a varios
-    // despachos y hasta ahora la facturación se mezclaba toda en un único total.
-    const orgMap = new Map<string, { id: string; nombre: string; ingresos: number; gastosTot: number }>();
-    const ensureOrg = (id: string | null | undefined, nombre: string | null | undefined) => {
-      const key = id || "sin-organizacion";
-      if (!orgMap.has(key)) orgMap.set(key, { id: key, nombre: nombre || "Sin organización", ingresos: 0, gastosTot: 0 });
-      return orgMap.get(key)!;
-    };
-    (billingRaw.organizaciones || []).forEach((o) => ensureOrg(o.id, o.nombre));
-    facturas.forEach((f:any) => { ensureOrg(f.organizacion_id, f.organizacion_nombre).ingresos += Number(f.total||0); });
-    gastos.forEach((g:any) => { ensureOrg(g.organizacion_id, g.organizacion_nombre).gastosTot += Number(g.total||0); });
-    const porOrganizacion = Array.from(orgMap.values())
-      .map((o) => ({ ...o, total: o.ingresos - o.gastosTot }))
-      .sort((a, b) => b.total - a.total);
-
-    return { ingresos, gastosTot, total, ivaIng, ivaGas, ivaLiq, cobrado, pendienteCobro, facturasVencidas, numFacturas, numGastos, porOrganizacion };
+    // Solo la organización activa: cada despacho ve únicamente su facturación
+    // (el bootstrap ya viene filtrado por organización).
+    return { ingresos, gastosTot, total, ivaIng, ivaGas, ivaLiq, cobrado, pendienteCobro, facturasVencidas, numFacturas, numGastos };
   })();
 
   // ── Widget renderers ──────────────────────────────────────────────────────
@@ -1593,20 +1580,6 @@ export default function DashboardHome() {
                   <p className="text-sm font-bold text-amber-600 leading-tight">{fmtEur(billingCalc.pendienteCobro)}</p>
                 </div>
               </div>
-
-              {billingCalc.porOrganizacion.length > 1 && (
-                <div className="mb-3">
-                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">Por organización</p>
-                  <div className="space-y-1 max-h-32 overflow-y-auto pr-0.5">
-                    {billingCalc.porOrganizacion.map((org) => (
-                      <div key={org.id} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-1.5">
-                        <span className="truncate text-xs font-semibold text-slate-600" title={org.nombre}>{org.nombre}</span>
-                        <span className={`shrink-0 pl-2 text-xs font-bold ${org.total >= 0 ? "text-slate-700" : "text-red-600"}`}>{fmtEur(org.total)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
 
               <div className="grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 -mx-4 -mb-4 px-4 pb-4 bg-slate-50 rounded-b-2xl">
                 <div>

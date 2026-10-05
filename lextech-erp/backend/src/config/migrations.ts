@@ -2788,6 +2788,15 @@ export async function runMigrations(): Promise<void> {
       try { await client.query(idx); } catch (_e: any) {}
     }
 
+    // ── Quipu pertenece a una organización ───────────────────────────────────
+    // La conexión era solo por usuario y sus facturas/contactos/cuentas se
+    // mostraban en la organización que estuviera abierta (las facturas de un
+    // despacho aparecían como dinero de otro). Decisión del usuario: Quipu es
+    // de la organización en la que se añade. Las conexiones anteriores se
+    // quedan SIN organización (no aparecen en ninguna) hasta que alguien pulse
+    // "Conectar" desde la organización a la que pertenecen.
+    try { await client.query(`ALTER TABLE quipu_settings ADD COLUMN IF NOT EXISTS organizacion_id UUID REFERENCES organizaciones(id) ON DELETE SET NULL`); } catch (_e: any) {}
+
     // ── Estado de la sincronización IMAP por cuenta ─────────────────────────
     // Cualquier anomalía (búsqueda rechazada por el servidor, plan B usado,
     // carpeta con error) queda aquí y Correo la muestra -- antes una carpeta

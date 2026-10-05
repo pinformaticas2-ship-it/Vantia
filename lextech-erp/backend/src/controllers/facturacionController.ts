@@ -1,7 +1,7 @@
 import { Response } from 'express';
 import pool from '../config/database';
 import { logActivityForReq, resolveUserName } from './activityController';
-import { syncQuipuForUserInternal, pushFacturaToQuipuInternal } from './quipuController';
+import { syncQuipuForUserInternal, pushFacturaToQuipuInternal, getQuipuOrganizacion } from './quipuController';
 import { resolveUserOrgMemberships } from './organizacionesController';
 
 const QUIPU_STALE_MS = 15 * 60 * 1000; // 15 minutes
@@ -158,9 +158,15 @@ export const getBillingBootstrap = async (req: any, res: Response) => {
       resolveUserOrgMemberships(userId),
     ]);
 
+    // Quipu pertenece a una organización: sus datos solo se mezclan aquí si es
+    // la activa. Antes se etiquetaban con la organización abierta, así que las
+    // facturas de Quipu de un despacho aparecían como dinero de cualquier otro.
+    const quipuOrg = await getQuipuOrganizacion(userId).catch(() => null);
+    const quipuAqui = Boolean(quipuOrg && quipuOrg.id === organizacionId);
+
     // Obtener facturas de Quipu que aún no están importadas en facturacion_facturas
     let quipuRows: any[] = [];
-    try {
+    if (quipuAqui) try {
       const quipuFacturas = await pool.query(`
         SELECT qi.id, qi.external_id,
                qi.number AS num, qi.contact_name AS contacto,
@@ -187,8 +193,6 @@ export const getBillingBootstrap = async (req: any, res: Response) => {
         client_id: null, expediente_id: null, quipu_id: qi.external_id,
         anio: null, num_exp: null, ref_expediente: null, ref_propia: null,
         expediente_descripcion: null,
-        // Quipu no está vinculado a una organización concreta -- se etiqueta con
-        // la organización activa de quien está mirando el bootstrap ahora mismo.
         organizacion_id: organizacionId, organizacion_nombre: orgActiva?.organizacionNombre || null,
       }));
     } catch { /* quipu_invoices may not exist */ }
@@ -198,7 +202,7 @@ export const getBillingBootstrap = async (req: any, res: Response) => {
     // Quipu synced contacts and bank accounts (loaded from local DB after sync)
     let quipuContactsRows: any[] = [];
     let quipuBankAccountsRows: any[] = [];
-    try {
+    if (quipuAqui) try {
       const [qc, qba] = await Promise.all([
         pool.query(
           `SELECT external_id AS id, kind, contact_name AS name, tax_id, email
@@ -289,7 +293,8 @@ export const createFactura = async (req: any, res: Response) => {
 
     // Auto-push to Quipu in background if connected
     const newId = result.rows[0].id;
-    pool.query(`SELECT 1 FROM quipu_settings WHERE user_id=$1 LIMIT 1`, [userId]).then(qs => {
+    // Solo si el Quipu del usuario es de la organización de esta factura.
+    pool.query(`SELECT 1 FROM quipu_settings WHERE user_id=$1 AND organizacion_id=$2 LIMIT 1`, [userId, organizacionId]).then(qs => {
       if (qs.rows.length > 0) {
         pushFacturaToQuipuInternal(userId, newId).catch(e =>
           console.error('[AutoPush/Quipu] factura=%s err=%s', newId, e?.message),
