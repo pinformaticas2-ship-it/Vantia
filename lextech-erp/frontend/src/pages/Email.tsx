@@ -26,6 +26,7 @@ import {
   AlignLeft, AlignCenter, AlignRight, List, Pencil, Sun, Moon, Download, Briefcase, type LucideIcon,
 } from 'lucide-react';
 import MailboxProbeModal from '../components/MailboxProbeModal';
+import { getStoredGmailToken, saveGmailToken, clearGmailToken, getLastMailAccount, saveLastMailAccount } from '../lib/mailLocalState';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -36,7 +37,6 @@ const GMAIL_SCOPES = [
   'https://www.googleapis.com/auth/gmail.modify',
   'https://www.googleapis.com/auth/gmail.labels',
 ].join(' ');
-const GMAIL_TOKEN_KEY = 'lextech-gmail-token-v1';
 const LOCAL_DRAFTS_KEY = 'lextech-email-drafts-v1';
 const MAIL_THEME_KEY = 'lextech-email-theme-v2';
 type MailTheme = 'dark' | 'light';
@@ -3707,11 +3707,8 @@ export default function Email() {
   // ── Google Identity Services ──────────────────────────────────────────────
   const [gisLoaded, setGisLoaded]   = useState(false);
   const [gmailToken, setGmailToken] = useState<string>(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem(GMAIL_TOKEN_KEY) || '{}');
-      if (stored.expires_at && Date.now() < stored.expires_at) return stored.access_token || '';
-      return '';
-    } catch { return ''; }
+    // Solo el acceso guardado para ESTA organización (ver lib/mailLocalState).
+    return getStoredGmailToken()?.access_token || '';
   });
   const [gmailProfile, setGmailProfile] = useState<GmailProfile | null>(null);
   const [savedGmailProfiles, setSavedGmailProfiles] = useState<SavedOAuthProfile[]>([]);
@@ -3878,13 +3875,11 @@ export default function Email() {
     if (gmailToken && gmailProfile?.emailAddress === profile.email) return;
 
     // Intentar restaurar desde localStorage sin OAuth
-    try {
-      const stored = JSON.parse(localStorage.getItem(GMAIL_TOKEN_KEY) || '{}');
-      if (stored.access_token && stored.expires_at && Date.now() < stored.expires_at - 60_000) {
-        setGmailToken(stored.access_token);
-        return;
-      }
-    } catch { /* noop */ }
+    const stored = getStoredGmailToken(60_000);
+    if (stored) {
+      setGmailToken(stored.access_token);
+      return;
+    }
 
     // Token expirado → mostrar pantalla de reconexión, no lanzar OAuth todavía
     setEmails([]);
@@ -3901,9 +3896,8 @@ export default function Email() {
     setSelectedEmail(null);
     setUnreadCount(0);
     setDraftCount(0);
-    localStorage.removeItem(GMAIL_TOKEN_KEY);
-    // Notificar a EmailUnreadContext para que limpie sus IDs
-    window.dispatchEvent(new StorageEvent('storage', { key: GMAIL_TOKEN_KEY, newValue: null }));
+    // También avisa a EmailUnreadContext para que limpie sus IDs.
+    clearGmailToken();
   }, []);
 
   // ── Abrir formulario IMAP/POP3 genérico ──────────────────────────────────
@@ -3917,7 +3911,7 @@ export default function Email() {
     const code = (e as any).code;
     if (code === 401 || code === 403) {
       setGmailToken('');
-      localStorage.removeItem(GMAIL_TOKEN_KEY);
+      clearGmailToken();
       setError('Tu sesión de Gmail expiró. Vuelve a conectar.');
     }
   }, []);
@@ -3930,8 +3924,15 @@ export default function Email() {
 
     const accounts: ImapAccount[] = payload.data || [];
     setImapAccounts(accounts);
-    if (!gmailToken && accounts.length > 0 && !selectedImapAccountId) {
-      setSelectedImapAccountId(accounts[0].id);
+    if (!selectedImapAccountId) {
+      // Cuenta predeterminada al abrir Correo: la última usada en ESTA
+      // organización; si no, la primera de la organización. Nunca una de otra.
+      const last = getLastMailAccount();
+      if (last?.type === 'imap' && accounts.some((a) => a.id === last.id)) {
+        setSelectedImapAccountId(last.id);
+      } else if ((!gmailToken || last?.type === 'imap') && accounts.length > 0) {
+        setSelectedImapAccountId(accounts[0].id);
+      }
     }
   }, [authFetch, gmailToken, selectedImapAccountId]);
 
@@ -3942,6 +3943,12 @@ export default function Email() {
     const t = window.setInterval(() => void refreshImapAccounts(), 60_000);
     return () => window.clearInterval(t);
   }, [selectedImapAccountId, refreshImapAccounts]);
+
+  // Recordar la cuenta en uso como predeterminada de esta organización.
+  useEffect(() => {
+    if (selectedImapAccountId) saveLastMailAccount({ type: 'imap', id: selectedImapAccountId });
+    else if (gmailProfile?.emailAddress) saveLastMailAccount({ type: 'gmail', id: gmailProfile.emailAddress });
+  }, [selectedImapAccountId, gmailProfile?.emailAddress]);
 
   const refreshImapFolders = useCallback(async (accountId: string) => {
     if (!accountId) return;
@@ -3999,7 +4006,7 @@ export default function Email() {
         setGmailToken(access_token);
         setGmailExpired(false);
         setError('');
-        localStorage.setItem(GMAIL_TOKEN_KEY, JSON.stringify({ access_token, expires_at: expiresAt }));
+        saveGmailToken(access_token, expiresAt);
         await refreshSavedGmailProfiles().catch(() => undefined);
       } catch (e: any) {
         setError(e.message || 'No se pudo conectar con Google');
@@ -4062,13 +4069,11 @@ export default function Email() {
     // Read token from localStorage to include it in the backend save
     let accessToken: string | undefined;
     let expiresIn: number | undefined;
-    try {
-      const stored = JSON.parse(localStorage.getItem(GMAIL_TOKEN_KEY) || '{}');
-      if (stored.access_token && stored.expires_at && Date.now() < stored.expires_at) {
-        accessToken = stored.access_token;
-        expiresIn = Math.floor((stored.expires_at - Date.now()) / 1000);
-      }
-    } catch { /* noop */ }
+    const stored = getStoredGmailToken();
+    if (stored) {
+      accessToken = stored.access_token;
+      expiresIn = Math.floor((stored.expires_at - Date.now()) / 1000);
+    }
     const res = await authFetch(`${API}/email/profiles`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -4085,6 +4090,13 @@ export default function Email() {
       // La cuenta puede pertenecer a otra organización (correo aislado por
       // organización) -- avisar en vez de fallar en silencio.
       setError(payload?.error || 'No se pudo guardar la cuenta de Gmail');
+      if (res.status === 409) {
+        // Ese Gmail es de otra organización: no se muestra su bandeja aquí.
+        clearGmailToken();
+        setGmailToken('');
+        setGmailProfile(null);
+        setEmails([]);
+      }
     }
     await refreshSavedGmailProfiles().catch(() => undefined);
     return (payload?.success ? payload.data : null) as SavedOAuthProfile | null;

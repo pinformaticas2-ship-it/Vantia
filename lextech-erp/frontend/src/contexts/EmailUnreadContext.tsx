@@ -1,13 +1,10 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
+import { getStoredGmailToken as getOrgGmailToken, GMAIL_TOKEN_CLEARED_EVENT } from "../lib/mailLocalState";
 
-const GMAIL_TOKEN_KEY_BASE = "lextech-gmail-token-v1";
 const KNOWN_IDS_KEY_BASE   = "lextech-gmail-known-ids-v1";
 const MAX_KNOWN            = 200;
 
-function gmailTokenKey(userId?: string | null): string {
-  return userId ? `${GMAIL_TOKEN_KEY_BASE}-${userId}` : GMAIL_TOKEN_KEY_BASE;
-}
 function knownIdsKey(userId?: string | null): string {
   return userId ? `${KNOWN_IDS_KEY_BASE}-${userId}` : KNOWN_IDS_KEY_BASE;
 }
@@ -41,15 +38,10 @@ async function gmailReq<T>(token: string, path: string): Promise<T> {
   return res.json();
 }
 
+// Solo el Gmail de la organización activa (antes leía una clave global y
+// vigilaba el buzón de Gmail conectado en otra organización).
 function getStoredGmailToken(_userId?: string | null): string {
-  // Gmail token is saved by Email.tsx using the base key — keep compatibility
-  try {
-    const stored = JSON.parse(localStorage.getItem(GMAIL_TOKEN_KEY_BASE) || "{}");
-    if (stored.expires_at && Date.now() < stored.expires_at) return stored.access_token || "";
-    return "";
-  } catch {
-    return "";
-  }
+  return getOrgGmailToken()?.access_token || "";
 }
 
 function loadKnownIds(userId?: string | null): Set<string> {
@@ -146,17 +138,15 @@ export function EmailUnreadProvider({ children }: { children: React.ReactNode })
 
   // Cuando Gmail se desconecta (token eliminado), limpiar IDs guardados
   useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === GMAIL_TOKEN_KEY_BASE && !e.newValue) {
-        knownIdsRef.current.clear();
-        saveKnownIds(knownIdsRef.current, userIdRef.current);
-        didBootstrapRef.current = false;
-        setUnreadCount(0);
-        setLatestUnread(null);
-      }
+    const onCleared = () => {
+      knownIdsRef.current.clear();
+      saveKnownIds(knownIdsRef.current, userIdRef.current);
+      didBootstrapRef.current = false;
+      setUnreadCount(0);
+      setLatestUnread(null);
     };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    window.addEventListener(GMAIL_TOKEN_CLEARED_EVENT, onCleared);
+    return () => window.removeEventListener(GMAIL_TOKEN_CLEARED_EVENT, onCleared);
   }, []);
 
   useEffect(() => {
