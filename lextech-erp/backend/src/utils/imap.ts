@@ -473,35 +473,48 @@ export async function syncInbox(
   try {
     await client.connect();
     await client.login();
-    const selected = await client.selectFolder(folder);
-
-    if (!selected.exists) return [];
-
-    let uids: number[];
-    if (since) {
-      const all = (await client.searchUidsSince(since)).sort((a, b) => a - b);
-      // Still cap at maxMessages most-recent to avoid huge fetches after long gaps
-      uids = all.slice(-maxMessages);
-      if (knownUids) {
-        const missing = all.filter((u) => !knownUids.has(u)).slice(-maxMessages);
-        uids = Array.from(new Set([...uids, ...missing])).sort((a, b) => a - b);
-      }
-    } else {
-      uids = await client.searchUids('ALL');
-      uids = uids.slice(-maxMessages);
-    }
-
-    if (!uids.length) return [];
-
-    const envelopes = await client.fetchEnvelopes(uids.reverse());
-    return envelopes.map((message) => ({
-      ...message,
-      bodyText: '',
-      bodyHtml: '',
-      snippet: '',
-      attachments: [],
-    }));
+    return await fetchFolderEnvelopes(client, folder, maxMessages, since, knownUids);
   } finally {
     await client.logout().catch(() => undefined);
   }
+}
+
+/** Igual que syncInbox pero sobre una conexión ya abierta -- para recorrer
+ *  todas las carpetas de una cuenta con un único login (ver
+ *  syncImapAccountAllFolders en emailController.ts). */
+export async function fetchFolderEnvelopes(
+  client: ImapClient,
+  folder: string,
+  maxMessages = 50,
+  since?: Date,
+  knownUids?: Set<number>,
+): Promise<ImapMessage[]> {
+  const selected = await client.selectFolder(folder);
+
+  if (!selected.exists) return [];
+
+  let uids: number[];
+  if (since) {
+    const all = (await client.searchUidsSince(since)).sort((a, b) => a - b);
+    // Still cap at maxMessages most-recent to avoid huge fetches after long gaps
+    uids = all.slice(-maxMessages);
+    if (knownUids) {
+      const missing = all.filter((u) => !knownUids.has(u)).slice(-maxMessages);
+      uids = Array.from(new Set([...uids, ...missing])).sort((a, b) => a - b);
+    }
+  } else {
+    uids = await client.searchUids('ALL');
+    uids = uids.slice(-maxMessages);
+  }
+
+  if (!uids.length) return [];
+
+  const envelopes = await client.fetchEnvelopes(uids.reverse());
+  return envelopes.map((message) => ({
+    ...message,
+    bodyText: '',
+    bodyHtml: '',
+    snippet: '',
+    attachments: [],
+  }));
 }

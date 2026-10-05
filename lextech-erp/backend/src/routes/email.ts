@@ -57,7 +57,9 @@ router.get('/events', async (req: Request, res: Response) => {
     const cleanup = addSSEClient(userId, res);
     const keepAlive = setInterval(() => { try { res.write('data: {"type":"ping"}\n\n'); } catch { /**/ } }, 25_000);
 
-    req.on('close', () => { cleanup(); clearInterval(keepAlive); });
+    // res (no req): 'close' de req puede saltar al terminar de leer la
+    // petición, no cuando el navegador se desconecta.
+    res.on('close', () => { cleanup(); clearInterval(keepAlive); });
   } catch {
     if (!res.headersSent) res.status(401).json({ error: 'Invalid token' });
   }

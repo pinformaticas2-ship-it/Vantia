@@ -40,6 +40,7 @@ import { startLocalFilesWatcher } from './watchers/localFilesWatcher';
 import { startPlazoPushScheduler } from './services/plazoPushScheduler';
 import { startSoporteRetencionScheduler } from './services/soporteRetencion';
 import { startVistasScheduler } from './services/vistasAutomation';
+import { startImapAutoSync } from './services/imapAutoSync';
 import { migrateLocalFoldersStructure } from './controllers/filesController';
 import { logServerStart } from './controllers/activityController';
 import pool from './config/database';
@@ -379,6 +380,10 @@ runMigrations().then(() => {
     // Automatización de vistas por correo (solo actúa en las organizaciones
     // que la tengan activada en Configuración → Automatizaciones)
     startVistasScheduler();
+
+    // Correo IMAP: todas las carpetas de todas las cuentas se actualizan solas
+    // cada 5 min (como Thunderbird), aunque nadie tenga abierta la página de Correo.
+    startImapAutoSync();
 
     // Quipu auto-sync: run once after 30s (let DB settle), then every 30 min
     setTimeout(() => {

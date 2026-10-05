@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import pool from '../config/database';
 import { UPLOADS_CLIENTS_ROOT } from '../config/paths';
-import { ImapClient, ImapConfig, syncInbox, testImapConnection } from '../utils/imap';
+import { ImapClient, ImapConfig, syncInbox, testImapConnection, fetchFolderEnvelopes } from '../utils/imap';
 import { Pop3Config, syncPop3Inbox, testPop3Connection } from '../utils/pop3';
 import { sendEmail, SmtpConfig, MailMessage, testSmtpConnection } from '../utils/smtp';
 import { dispatchEmail, getSendingProvider } from '../utils/mailer';
@@ -838,43 +838,91 @@ export async function syncImapAccountRecord(acc: any, folder = 'INBOX', limit = 
     // listan los UID de los últimos 120 días (solo números, barato) y se
     // descargan los que aún no tenemos + los más recientes (para refrescar
     // leído/destacado). Cada pasada va rellenando los huecos que queden.
-    const sinceDate = new Date(Date.now() - 120 * 24 * 60 * 60 * 1000);
-    const { rows: knownRows } = await pool.query(
-      `SELECT uid FROM emails WHERE account_id = $1 AND folder = $2 AND uid IS NOT NULL`,
-      [acc.id, folder],
-    );
-    const knownUids = new Set<number>(knownRows.map((r: any) => Number(r.uid)));
-    const messages = await syncInbox(imapCfg, folder, limit, sinceDate, knownUids);
+    const knownUids = await loadKnownImapUids(acc.id, folder);
+    const messages = await syncInbox(imapCfg, folder, limit, imapSyncSince(), knownUids);
     synced = messages.length;
-
-    for (const msg of messages) {
-      const sentAt = msg.date ? new Date(msg.date) : null;
-      const { rowCount } = await pool.query(
-        `INSERT INTO emails
-           (account_id, user_id, uid, message_id, folder, from_email, from_name,
-            to_emails, subject, snippet, is_read, is_starred, has_attachments, size_bytes, sent_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
-         ON CONFLICT (account_id, uid, folder) DO UPDATE SET
-           is_read         = EXCLUDED.is_read,
-           is_starred      = EXCLUDED.is_starred,
-           has_attachments = EXCLUDED.has_attachments,
-           snippet         = COALESCE(EXCLUDED.snippet, emails.snippet)`,
-        [
-          acc.id, uid,
-          msg.uid > 0 ? msg.uid : null, msg.messageId || null,
-          folder, msg.from || null, msg.fromName || null, msg.to || null,
-          msg.subject || '(Sin asunto)', msg.snippet || null,
-          msg.flags.includes('\\Seen'), msg.flags.includes('\\Flagged'), msg.hasAttachments,
-          msg.size || 0, sentAt,
-        ],
-      );
-      if (rowCount) inserted++;
-    }
+    inserted = (await saveImapEnvelopes(acc, folder, messages)).saved;
   }
 
   await pool.query(`UPDATE email_accounts SET last_sync_at=NOW() WHERE id=$1`, [acc.id]);
 
   return { synced, inserted, protocol: proto };
+}
+
+const IMAP_SYNC_WINDOW_MS = 120 * 24 * 60 * 60 * 1000;
+const imapSyncSince = () => new Date(Date.now() - IMAP_SYNC_WINDOW_MS);
+
+async function loadKnownImapUids(accountId: string, folder: string): Promise<Set<number>> {
+  const { rows } = await pool.query(
+    `SELECT uid FROM emails WHERE account_id = $1 AND folder = $2 AND uid IS NOT NULL`,
+    [accountId, folder],
+  );
+  return new Set<number>(rows.map((r: any) => Number(r.uid)));
+}
+
+/** Guarda (o refresca leído/destacado de) los mensajes de una carpeta IMAP.
+ *  `nuevos` cuenta solo los que no estaban antes en la BD. */
+async function saveImapEnvelopes(acc: any, folder: string, messages: any[], knownUids?: Set<number>): Promise<{ saved: number; nuevos: number }> {
+  let saved = 0;
+  let nuevos = 0;
+  for (const msg of messages) {
+    const sentAt = msg.date ? new Date(msg.date) : null;
+    const { rowCount } = await pool.query(
+      `INSERT INTO emails
+         (account_id, user_id, uid, message_id, folder, from_email, from_name,
+          to_emails, subject, snippet, is_read, is_starred, has_attachments, size_bytes, sent_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+       ON CONFLICT (account_id, uid, folder) DO UPDATE SET
+         is_read         = EXCLUDED.is_read,
+         is_starred      = EXCLUDED.is_starred,
+         has_attachments = EXCLUDED.has_attachments,
+         snippet         = COALESCE(EXCLUDED.snippet, emails.snippet)`,
+      [
+        acc.id, acc.user_id,
+        msg.uid > 0 ? msg.uid : null, msg.messageId || null,
+        folder, msg.from || null, msg.fromName || null, msg.to || null,
+        msg.subject || '(Sin asunto)', msg.snippet || null,
+        msg.flags.includes('\\Seen'), msg.flags.includes('\\Flagged'), msg.hasAttachments,
+        msg.size || 0, sentAt,
+      ],
+    );
+    if (rowCount) saved++;
+    if (knownUids && msg.uid > 0 && !knownUids.has(msg.uid)) nuevos++;
+  }
+  return { saved, nuevos };
+}
+
+/** Sincroniza TODAS las carpetas de una cuenta IMAP con un único login (las
+ *  "contenedor" se saltan). La usa el programador de services/imapAutoSync.ts
+ *  para que las carpetas se actualicen solas, como en Thunderbird, aunque
+ *  nadie tenga abierta la página de Correo. */
+export async function syncImapAccountAllFolders(acc: any, limitPerFolder = 30): Promise<{ folders: number; nuevos: number; errores: string[] }> {
+  const client = new ImapClient({
+    host: acc.imap_host, port: acc.imap_port, secure: acc.imap_secure,
+    user: acc.username, password: decryptPassword(acc.password_enc),
+  });
+  let folders = 0;
+  let nuevos = 0;
+  const errores: string[] = [];
+  try {
+    await client.connect();
+    await client.login();
+    const list = (await client.listFolders()).filter((f) => !f.noSelect);
+    for (const f of list) {
+      try {
+        const known = await loadKnownImapUids(acc.id, f.path);
+        const messages = await fetchFolderEnvelopes(client, f.path, limitPerFolder, imapSyncSince(), known);
+        nuevos += (await saveImapEnvelopes(acc, f.path, messages, known)).nuevos;
+        folders++;
+      } catch (e: any) {
+        errores.push(`${f.path}: ${e?.message || e}`);
+      }
+    }
+  } finally {
+    await client.logout().catch(() => undefined);
+  }
+  await pool.query(`UPDATE email_accounts SET last_sync_at=NOW() WHERE id=$1`, [acc.id]);
+  return { folders, nuevos, errores };
 }
 
 // ── Sincronización Gmail ──────────────────────────────────────────────────────
