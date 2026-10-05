@@ -21,7 +21,7 @@ import {
   Search, ChevronDown, X, Mail, MailOpen,
   Reply, ReplyAll, Forward, Paperclip, Loader2, CheckCircle2,
   MoreVertical, AlertCircle, Eye, EyeOff,
-  ChevronLeft, Edit3, Tag, Wifi, Zap, Pin, FolderPlus, RotateCcw, Folder, Archive,
+  ChevronLeft, ChevronRight, Edit3, Tag, Wifi, Zap, Pin, FolderPlus, RotateCcw, Folder, Archive,
   AtSign, Shield, Filter, LogIn, Maximize2, Minimize2, Bold, Italic, Underline,
   AlignLeft, AlignCenter, AlignRight, List, Pencil, Sun, Moon, Download, Briefcase, type LucideIcon,
 } from 'lucide-react';
@@ -153,6 +153,9 @@ interface ImapFolderInfo {
   name: string;
   specialUse?: string;
   flags: string[];
+  delimiter?: string;
+  /** Carpeta contenedor: solo agrupa subcarpetas, no se puede abrir. */
+  noSelect?: boolean;
 }
 
 interface ImapAccount {
@@ -1347,6 +1350,142 @@ function ConnectAccountModal({
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 
+// ── Árbol de carpetas IMAP (como Thunderbird) ────────────────────────────────
+// El servidor da las carpetas como lista plana con la ruta completa
+// ("Clientes/2025", "INBOX.Proveedores"...). Aquí se rehace la jerarquía con
+// el separador de cada servidor, se ordena alfabéticamente en cada nivel y se
+// permite plegar/desplegar. Las carpetas del sistema (Recibidos, Enviados...)
+// ya salen arriba, así que solo aparecen aquí si tienen subcarpetas.
+
+interface ImapFolderNode {
+  path: string;
+  name: string;
+  selectable: boolean;
+  children: ImapFolderNode[];
+}
+
+const IMAP_SYSTEM_LABELS: Record<ImapSystemFolderKey, string> = {
+  INBOX: 'Recibidos', SENT: 'Enviados', DRAFTS: 'Borradores', TRASH: 'Papelera', SPAM: 'Spam', ARCHIVE: 'Archivo',
+};
+
+function buildImapFolderTree(folders: ImapFolderInfo[], systemLabels: Map<string, string>): ImapFolderNode[] {
+  const nodes = new Map<string, ImapFolderNode>();
+  const parentOf = new Map<string, string | null>();
+  const ensure = (path: string, name: string, selectable: boolean) => {
+    const existing = nodes.get(path);
+    if (existing) { existing.selectable = existing.selectable || selectable; return existing; }
+    const node: ImapFolderNode = { path, name: systemLabels.get(path.toLowerCase()) || name, selectable, children: [] };
+    nodes.set(path, node);
+    return node;
+  };
+  for (const f of folders) {
+    const delim = f.delimiter || '/';
+    ensure(f.path, f.name, !f.noSelect);
+    // Crea también los padres que el servidor no haya listado (huecos).
+    let child = f.path;
+    let idx = child.lastIndexOf(delim);
+    while (idx > 0) {
+      const parent = child.slice(0, idx);
+      if (!parentOf.has(child)) parentOf.set(child, parent);
+      ensure(parent, parent.slice(parent.lastIndexOf(delim) + 1), false);
+      child = parent;
+      idx = child.lastIndexOf(delim);
+    }
+    if (!parentOf.has(child)) parentOf.set(child, null);
+  }
+  const roots: ImapFolderNode[] = [];
+  for (const node of nodes.values()) {
+    const parent = parentOf.get(node.path);
+    if (parent && nodes.has(parent)) {
+      const p = nodes.get(parent)!;
+      if (!p.children.includes(node)) p.children.push(node);
+    } else if (!roots.includes(node)) {
+      roots.push(node);
+    }
+  }
+  const byName = (a: ImapFolderNode, b: ImapFolderNode) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' });
+  const prune = (list: ImapFolderNode[]): ImapFolderNode[] => list
+    .map((n) => ({ ...n, children: prune(n.children) }))
+    // Una carpeta del sistema sin subcarpetas ya está arriba en la lista fija.
+    .filter((n) => !(systemLabels.has(n.path.toLowerCase()) && n.children.length === 0))
+    .sort(byName);
+  return prune(roots);
+}
+
+function ImapFolderTree({
+  folders, systemFolderMap, accountId, selectedFolder, onSelectFolder, disabled,
+  activeItemCls, inactiveItemCls, activeIconCls, inactiveIconCls, emptyCls,
+}: {
+  folders: ImapFolderInfo[];
+  systemFolderMap: Partial<Record<ImapSystemFolderKey, string>>;
+  accountId: string;
+  selectedFolder: FolderKey;
+  onSelectFolder: (f: FolderKey) => void;
+  disabled: boolean;
+  activeItemCls: string; inactiveItemCls: string; activeIconCls: string; inactiveIconCls: string; emptyCls: string;
+}) {
+  const storageKey = `vantia_imap_collapsed_${accountId}`;
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem(storageKey) || '[]')); } catch { return new Set(); }
+  });
+  useEffect(() => {
+    try { setCollapsed(new Set(JSON.parse(localStorage.getItem(storageKey) || '[]'))); } catch { setCollapsed(new Set()); }
+  }, [storageKey]);
+  const toggle = (path: string) => setCollapsed((prev) => {
+    const next = new Set(prev);
+    if (next.has(path)) next.delete(path); else next.add(path);
+    try { localStorage.setItem(storageKey, JSON.stringify([...next])); } catch { /* noop */ }
+    return next;
+  });
+
+  const tree = useMemo(() => {
+    const systemLabels = new Map<string, string>();
+    (Object.entries(systemFolderMap) as [ImapSystemFolderKey, string | undefined][]).forEach(([key, path]) => {
+      if (path) systemLabels.set(path.toLowerCase(), IMAP_SYSTEM_LABELS[key]);
+    });
+    return buildImapFolderTree(folders, systemLabels);
+  }, [folders, systemFolderMap]);
+
+  if (!tree.length) return <div className={`px-4 py-2 text-xs ${emptyCls}`}>No hay carpetas personalizadas en esta cuenta.</div>;
+
+  const renderNode = (node: ImapFolderNode, depth: number): React.ReactNode => {
+    const hasChildren = node.children.length > 0;
+    const isOpen = hasChildren && !collapsed.has(node.path);
+    const active = selectedFolder === node.path;
+    return (
+      <React.Fragment key={node.path}>
+        <div
+          className={`mx-2 flex w-[calc(100%-16px)] items-center rounded-lg text-[13px] transition-colors ${active ? activeItemCls : inactiveItemCls} ${disabled ? 'opacity-40' : ''}`}
+          style={{ paddingLeft: 4 + depth * 14 }}
+        >
+          <button
+            type="button"
+            onClick={() => hasChildren && toggle(node.path)}
+            className={`shrink-0 flex h-6 w-5 items-center justify-center ${hasChildren ? '' : 'invisible'}`}
+            title={isOpen ? 'Plegar' : 'Desplegar'}
+            tabIndex={hasChildren ? 0 : -1}
+          >
+            {isOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+          </button>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => (node.selectable ? onSelectFolder(node.path) : hasChildren && toggle(node.path))}
+            className="flex min-w-0 flex-1 items-center gap-2 py-2 pr-3 text-left disabled:cursor-not-allowed"
+            title={node.path}
+          >
+            <Folder size={12} className={`shrink-0 ${active ? activeIconCls : inactiveIconCls}`} />
+            <span className={`truncate ${node.selectable ? '' : 'italic opacity-80'}`}>{node.name}</span>
+          </button>
+        </div>
+        {isOpen && node.children.map((c) => renderNode(c, depth + 1))}
+      </React.Fragment>
+    );
+  };
+
+  return <>{tree.map((n) => renderNode(n, 0))}</>;
+}
+
 function Sidebar({
   userEmail, userName, userAvatar, gmailProfile, gmailConnected, savedGmailProfiles, labels,
   selectedFolder, onSelectFolder, onCompose, onDisconnectGmail,
@@ -1762,26 +1901,19 @@ function Sidebar({
                 <FolderPlus size={12} />
               </button>
             </div>
-            {imapFolders.length > 0 ? (
-              imapFolders.map((folder) => (
-                <button
-                  key={folder.path}
-                  type="button"
-                  disabled={!canUseMailbox}
-                  onClick={() => onSelectFolder(folder.path)}
-                  className={`mx-2 flex w-[calc(100%-16px)] items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] transition-colors ${
-                    selectedFolder === folder.path ? activeItemClsNoBold : inactiveItemCls
-                  } disabled:cursor-not-allowed disabled:opacity-40`}
-                  >
-                  <Folder size={12} className={selectedFolder === folder.path ? activeIconCls : inactiveIconCls} />
-                  <span className="truncate">{folder.name}</span>
-                </button>
-              ))
-            ) : (
-              <div className={`px-4 py-2 text-xs ${sectionLabelCls}`}>
-                No hay carpetas personalizadas en esta cuenta.
-              </div>
-            )}
+            <ImapFolderTree
+              folders={imapFolders}
+              systemFolderMap={imapSystemFolderMap}
+              accountId={selectedImapAccountId}
+              selectedFolder={selectedFolder}
+              onSelectFolder={onSelectFolder}
+              disabled={!canUseMailbox}
+              activeItemCls={activeItemClsNoBold}
+              inactiveItemCls={inactiveItemCls}
+              activeIconCls={activeIconCls}
+              inactiveIconCls={inactiveIconCls}
+              emptyCls={sectionLabelCls}
+            />
           </div>
         )}
       </nav>
@@ -3667,17 +3799,18 @@ export default function Email() {
       : 'default';
 
   const imapSystemFolderMap = useMemo(() => {
+    const selectable = imapFolders.filter((f) => !f.noSelect);
     const findBySpecialUse = (specialUse: string) =>
-      imapFolders.find((f) => f.specialUse === specialUse)?.path;
+      selectable.find((f) => f.specialUse === specialUse)?.path;
 
     const findByRegex = (patterns: RegExp[]) =>
-      imapFolders.find(({ path }) => {
+      selectable.find(({ path }) => {
         const norm = path.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
         return patterns.some((p) => p.test(norm));
       })?.path;
 
     const map: Partial<Record<ImapSystemFolderKey, string>> = {
-      INBOX: imapFolders.find((f) => f.path.toUpperCase() === 'INBOX')?.path || 'INBOX',
+      INBOX: selectable.find((f) => f.path.toUpperCase() === 'INBOX')?.path || 'INBOX',
       SENT:    findBySpecialUse('\\Sent')    || findByRegex([/^sent$/, /^sent items$/, /^enviados?$/, /sent/, /enviad/]),
       DRAFTS:  findBySpecialUse('\\Drafts')  || findByRegex([/^drafts?$/, /^borradores?$/, /draft/, /borrad/]),
       TRASH:   findBySpecialUse('\\Trash')   || findByRegex([/^trash$/, /^papelera$/, /^deleted(?: items)?$/, /trash/, /papelera/, /deleted/, /eliminad/]),
@@ -3687,18 +3820,6 @@ export default function Email() {
 
     return map;
   }, [imapFolders]);
-
-  const imapCustomFolders = useMemo(() => {
-    const reserved = new Set(
-      Object.values(imapSystemFolderMap)
-        .filter(Boolean)
-        .map((value) => String(value).toLowerCase()),
-    );
-
-    return imapFolders
-      .filter((folder) => !reserved.has(folder.path.toLowerCase()))
-      .sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
-  }, [imapFolders, imapSystemFolderMap]);
 
   const normalizedLabelName = newLabelName.trim().replace(/\s+/g, ' ');
   const applyPinnedState = useCallback((items: ParsedEmail[]) => {
@@ -5241,7 +5362,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
             pinnedCount={pinnedIds.length}
             imapAccounts={imapAccounts}
             selectedImapAccountId={selectedImapAccountId}
-            imapFolders={imapCustomFolders}
+            imapFolders={imapFolders}
             imapSystemFolderMap={imapSystemFolderMap}
             onSelectGmail={() => {
               // Al volver a Google desde una cuenta IMAP hay que resetear la
@@ -5344,7 +5465,10 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
                 onConnectOutlook={connectOutlook}
                 googleClientId={GMAIL_CLIENT_ID}
               />
-            ) : gmailExpired ? (
+            ) : gmailExpired && !currentImapAccount ? (
+              // Solo si la cuenta activa es Gmail: el aviso se queda guardado
+              // (p.ej. de antes de cambiar a una cuenta IMAP) y antes tapaba
+              // también la bandeja IMAP con un "Reconectar Gmail" sin sentido.
               <div className="flex flex-col items-center justify-center h-full px-6 text-center gap-4">
                 <svg width={44} height={44} viewBox="0 0 24 24" className="opacity-70">
                   <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>

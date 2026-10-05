@@ -14,6 +14,10 @@ export interface ImapFolderInfo {
   name: string;
   specialUse?: string;
   flags: string[];
+  /** Separador de jerarquía del servidor ("/" o ".") para montar el árbol de carpetas. */
+  delimiter?: string;
+  /** Carpeta contenedor (Noselect): solo agrupa subcarpetas, no tiene correo propio. */
+  noSelect?: boolean;
 }
 
 export interface ImapEnvelope {
@@ -245,12 +249,16 @@ export class ImapClient {
         const noSelect = flags.some(f => f.toLowerCase() === '\\noselect');
         const path = String(item.path || item.name || '');
 
-        if (!noSelect && path && !BLOCKED_PATHS.has(path.toLowerCase())) {
+        // Las contenedor (Noselect) también se devuelven, marcadas, para que
+        // sus subcarpetas no queden huérfanas al montar el árbol en el cliente.
+        if (path && !BLOCKED_PATHS.has(path.toLowerCase())) {
           folders.push({
             path,
             name: String(item.name || path.split(String(item.delimiter || '/')).pop() || path),
             specialUse: item.specialUse ? String(item.specialUse) : undefined,
             flags,
+            delimiter: item.delimiter ? String(item.delimiter) : undefined,
+            noSelect,
           });
         }
         if (item.children?.length) walk(item.children);
