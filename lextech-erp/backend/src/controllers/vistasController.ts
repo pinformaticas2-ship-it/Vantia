@@ -141,6 +141,29 @@ export async function updateVistasConfig(req: any, res: Response) {
     const next = normalizeVistasConfig({ ...current, ...(req.body?.config || {}) });
     const uid = req.auth?.userId;
 
+    // Un único interruptor, sin pantalla de configuración: al activar, si no
+    // hay un buzón válido ya elegido, se vigila uno del propio usuario en esta
+    // organización (primero una cuenta IMAP, si no un Gmail que pueda leerse
+    // en segundo plano).
+    if (enabled && (!next.mailbox || !(await mailboxOwnerOf(org.id, next)).owner)) {
+      const { rows: acc } = await pool.query(
+        `SELECT id FROM email_accounts WHERE organizacion_id = $1 AND user_id = $2 AND active = true ORDER BY created_at LIMIT 1`,
+        [org.id, uid],
+      );
+      if (acc.length) {
+        next.mailbox = { type: 'imap', id: acc[0].id };
+      } else {
+        const { rows: gp } = await pool.query(
+          `SELECT id FROM email_oauth_profiles WHERE organizacion_id = $1 AND user_id = $2 AND refresh_token_enc IS NOT NULL ORDER BY created_at LIMIT 1`,
+          [org.id, uid],
+        );
+        if (!gp.length) {
+          return fail(res, 'Conecta primero tu correo en el módulo Correo (en esta organización) para que la automatización tenga un buzón que vigilar.', 400);
+        }
+        next.mailbox = { type: 'gmail', id: gp[0].id };
+      }
+    }
+
     if (next.mailbox) {
       const changed = next.mailbox.id !== current.mailbox?.id;
       const table = next.mailbox.type === 'imap' ? 'email_accounts' : 'email_oauth_profiles';
