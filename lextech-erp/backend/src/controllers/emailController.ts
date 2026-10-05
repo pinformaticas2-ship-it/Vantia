@@ -831,11 +831,20 @@ export async function syncImapAccountRecord(acc: any, folder = 'INBOX', limit = 
       host: acc.imap_host, port: acc.imap_port, secure: acc.imap_secure,
       user: acc.username, password,
     };
-    // Use last_sync_at so IMAP SEARCH SINCE skips already-synced messages.
-    // Fall back to 7 days ago on first-ever sync.
-    const sinceFallback = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    const sinceDate: Date = acc.last_sync_at ? new Date(acc.last_sync_at) : sinceFallback;
-    const messages = await syncInbox(imapCfg, folder, limit, sinceDate);
+    // Antes se pedía "desde last_sync_at", que es UNA fecha para toda la
+    // cuenta: como Recibidos se sincroniza cada pocos segundos, al abrir
+    // Enviados u otra carpeta solo se pedía "desde ahora" y lo atrasado no
+    // bajaba nunca (la carpeta se quedaba congelada). Ahora, por carpeta: se
+    // listan los UID de los últimos 120 días (solo números, barato) y se
+    // descargan los que aún no tenemos + los más recientes (para refrescar
+    // leído/destacado). Cada pasada va rellenando los huecos que queden.
+    const sinceDate = new Date(Date.now() - 120 * 24 * 60 * 60 * 1000);
+    const { rows: knownRows } = await pool.query(
+      `SELECT uid FROM emails WHERE account_id = $1 AND folder = $2 AND uid IS NOT NULL`,
+      [acc.id, folder],
+    );
+    const knownUids = new Set<number>(knownRows.map((r: any) => Number(r.uid)));
+    const messages = await syncInbox(imapCfg, folder, limit, sinceDate, knownUids);
     synced = messages.length;
 
     for (const msg of messages) {

@@ -464,6 +464,9 @@ export async function syncInbox(
   folder = 'INBOX',
   maxMessages = 50,
   since?: Date,
+  /** UID que ya están guardados: además de los más recientes, se traen los
+   *  que falten (hasta maxMessages) para ir rellenando huecos. */
+  knownUids?: Set<number>,
 ): Promise<ImapMessage[]> {
   const client = new ImapClient(cfg);
 
@@ -476,9 +479,13 @@ export async function syncInbox(
 
     let uids: number[];
     if (since) {
-      uids = await client.searchUidsSince(since);
+      const all = (await client.searchUidsSince(since)).sort((a, b) => a - b);
       // Still cap at maxMessages most-recent to avoid huge fetches after long gaps
-      uids = uids.slice(-maxMessages);
+      uids = all.slice(-maxMessages);
+      if (knownUids) {
+        const missing = all.filter((u) => !knownUids.has(u)).slice(-maxMessages);
+        uids = Array.from(new Set([...uids, ...missing])).sort((a, b) => a - b);
+      }
     } else {
       uids = await client.searchUids('ALL');
       uids = uids.slice(-maxMessages);
