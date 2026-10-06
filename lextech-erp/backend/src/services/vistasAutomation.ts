@@ -548,15 +548,11 @@ export function buildRespuestaHtml(texto: string, formato: VistasCorreoFormato =
 
 // ── Destinatarios de los avisos ──────────────────────────────────────────────
 
-/** Quién debe enterarse de una vista pendiente: el abogado responsable y,
- *  si no hay ninguno configurado, el propietario y los administradores. */
-async function avisoDestinatarios(organizacionId: string, responsableUserId: string | null): Promise<string[]> {
-  if (responsableUserId) return [responsableUserId];
-  const { rows } = await pool.query(
-    `SELECT user_id FROM organizacion_miembros WHERE organizacion_id = $1 AND rol IN ('propietario','admin')`,
-    [organizacionId],
-  );
-  return rows.map((r: any) => r.user_id);
+/** Quién debe enterarse de una vista: el abogado responsable y, si no hay
+ *  ninguno, el dueño del buzón que la recibió -- los únicos que pueden verla
+ *  (ver canSeeVistas en vistasController.ts). */
+function avisoDestinatarios(responsableUserId: string | null, mailboxOwner: string | null): string[] {
+  return Array.from(new Set([responsableUserId || mailboxOwner].filter(Boolean) as string[]));
 }
 
 // ── Procesado de una organización ────────────────────────────────────────────
@@ -737,14 +733,14 @@ const TITULO_AVISO: Record<'vista' | 'cambio' | 'documentacion', string> = {
 };
 
 /** Aviso de una solicitud nueva: push + campana (por la propia solicitud) y
- *  CORREO al abogado responsable (o propietario/administradores), para que
+ *  CORREO al abogado responsable (o, si no hay, al dueño del buzón), para que
  *  llegue aunque nadie tenga Vantia abierta ni las notificaciones activadas. */
 async function avisarSolicitud(
   org: { id: string; nombre: string }, cfg: VistasConfig, solicitudId: string,
   tipo: 'vista' | 'cambio' | 'documentacion', datos: VistaDatos, fechaVista: Date | null,
   conflictos: AgendaConflict[], relacion: Relacion | null, email: { subject: string | null; from: string | null; mailboxOwner: string | null },
 ) {
-  const destinatarios = await avisoDestinatarios(org.id, cfg.responsableUserId);
+  const destinatarios = avisoDestinatarios(cfg.responsableUserId, email.mailboxOwner);
   const cuando = fechaVista ? `${formatMadrid(fechaVista, { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}` : '';
   const procedimiento = relacion?.expediente
     ? `expediente ${relacion.expediente.anio}/${relacion.expediente.num_exp}${relacion.expediente.num_autos ? ` (autos ${relacion.expediente.num_autos})` : ''}`
@@ -907,7 +903,7 @@ async function processOrganizacion(org: { id: string; nombre: string; vistas_aut
 
 async function sendDueReminders(): Promise<void> {
   const { rows } = await pool.query(
-    `SELECT vs.id, vs.organizacion_id, vs.responsable_user_id, vs.fecha_vista, vs.datos
+    `SELECT vs.id, vs.organizacion_id, vs.responsable_user_id, vs.mailbox_user_id, vs.fecha_vista, vs.datos
        FROM vistas_solicitudes vs
        JOIN organizaciones o ON o.id = vs.organizacion_id
       WHERE vs.estado = 'aceptada'
@@ -921,7 +917,7 @@ async function sendDueReminders(): Promise<void> {
   for (const r of rows) {
     const datos = r.datos || {};
     const fecha = new Date(r.fecha_vista);
-    const destinatarios = await avisoDestinatarios(r.organizacion_id, r.responsable_user_id);
+    const destinatarios = avisoDestinatarios(r.responsable_user_id, r.mailbox_user_id);
     await sendPushToUsers(destinatarios, {
       title: '📚 Preparar vista',
       body: `${formatMadrid(fecha, { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}${datos.juzgado ? ' · ' + datos.juzgado : ''}`,

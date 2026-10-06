@@ -42,10 +42,16 @@ async function loadOrgVistas(organizacionId: string) {
   return { org, cfg: normalizeVistasConfig(org.vistas_auto_config) };
 }
 
-/** Propietario/admin, el abogado responsable o el dueño del buzón vigilado. */
+// Permisos (06/10/2026): las vistas son correos de un buzón concreto, así que
+// solo las ven quien recibe ese correo (dueño del buzón vigilado) y el abogado
+// responsable. Propietario/administradores solo activan y configuran la
+// automatización; el rol soporte no ve nada de esto.
+const isSoporte = (req: any) => req.organizacionRol === 'soporte';
+
+/** El abogado responsable o el dueño del buzón vigilado (nunca soporte). */
 function canSeeVistas(req: any, cfg: VistasConfig, mailboxOwner: string | null): boolean {
   const uid = req.auth?.userId;
-  return isManagerRol(req.organizacionRol) || (!!uid && (uid === cfg.responsableUserId || uid === mailboxOwner));
+  return !isSoporte(req) && !!uid && (uid === cfg.responsableUserId || uid === mailboxOwner);
 }
 
 async function mailboxOwnerOf(organizacionId: string, cfg: VistasConfig): Promise<{ owner: string | null; label: string | null; hasRefreshToken?: boolean }> {
@@ -85,7 +91,8 @@ export async function getVistasConfig(req: any, res: Response) {
     const canSee = canSeeVistas(req, cfg, mailbox.owner);
     const base = { enabled: Boolean(org.vistas_auto_enabled), canManage, canSee };
     // ?lite=1: lo único que necesita el menú lateral (se consulta cada minuto).
-    if ((!canManage && !canSee) || req.query?.lite === '1') return ok(res, base);
+    // La configuración (buzón vigilado, textos, firma) solo la ven quienes la gestionan.
+    if (!canManage || req.query?.lite === '1') return ok(res, base);
 
     const uid = req.auth?.userId;
     // Solo se ofrecen como buzón a vigilar los del propio usuario -- un
@@ -138,6 +145,7 @@ export async function getVistasConfig(req: any, res: Response) {
 // el envío real, así lo que se ve es lo que sale.
 export async function previewVistasConfigCorreo(req: any, res: Response) {
   try {
+    if (!isManagerRol(req.organizacionRol)) return fail(res, 'Solo el propietario o un administrador pueden configurar esta automatización.', 403);
     const loaded = await loadOrgVistas(req.organizacionId);
     if (!loaded) return fail(res, 'Organización no encontrada', 404);
     const cfg = normalizeVistasConfig({ ...loaded.cfg, ...(req.body?.config || {}) });
@@ -259,10 +267,10 @@ const LIST_FIELDS = `id, estado, from_email, from_name, subject, received_at, da
   agenda_event_id, recordatorio_at, recordatorio_enviado_at, pasos, error, decidido_por_nombre,
   decidido_at, created_at, tipo, relacion`;
 
-/** Condición SQL de visibilidad: propietario/admin ven todas; el resto, las
- *  suyas (como abogado responsable o dueño del buzón). */
+/** Condición SQL de visibilidad: cada uno ve solo las suyas (como abogado
+ *  responsable o dueño del buzón), también propietario/admin; soporte, nada. */
 function scopeCond(req: any, params: any[]): string {
-  if (isManagerRol(req.organizacionRol)) return '';
+  if (isSoporte(req)) return ' AND false';
   params.push(req.auth?.userId || '');
   return ` AND (responsable_user_id = $${params.length} OR mailbox_user_id = $${params.length})`;
 }
@@ -277,7 +285,7 @@ export async function listVistas(req: any, res: Response) {
     // 'Aceptadas' incluye lo resuelto sin crear vista nueva (documentación
     // añadida a un expediente, vista existente modificada).
     else if (estado === 'aceptada') cond += ` AND estado IN ('aceptada','documentada','modificada')`;
-    else { params.push(estado); cond += ` AND estado = ${params.length}`; }
+    else { params.push(estado); cond += ` AND estado = $${params.length}`; }
     cond += scopeCond(req, params);
     const order = estado === 'aceptada' ? 'fecha_vista DESC NULLS LAST' : 'created_at DESC';
     const { rows } = await pool.query(
@@ -326,7 +334,7 @@ async function loadSolicitud(req: any, res: Response) {
   if (!rows.length) { fail(res, 'Solicitud de vista no encontrada', 404); return null; }
   const sol = rows[0];
   const uid = req.auth?.userId;
-  if (!isManagerRol(req.organizacionRol) && uid !== sol.responsable_user_id && uid !== sol.mailbox_user_id && uid !== loaded.cfg.responsableUserId) {
+  if (isSoporte(req) || !uid || (uid !== sol.responsable_user_id && uid !== sol.mailbox_user_id && uid !== loaded.cfg.responsableUserId)) {
     fail(res, 'No tienes acceso a esta vista.', 403);
     return null;
   }

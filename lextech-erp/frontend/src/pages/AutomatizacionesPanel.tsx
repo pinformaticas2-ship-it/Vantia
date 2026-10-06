@@ -159,6 +159,11 @@ export default function AutomatizacionesPanel() {
             {data?.canSee && <Link to="/dashboard/vistas" className="font-bold text-red-600 hover:underline">Ver vistas →</Link>}
           </div>
         )}
+        {enabled && (
+          <p className="mt-2 text-xs text-slate-500">
+            Por privacidad, las vistas (con sus correos y adjuntos) solo las ven el dueño del buzón vigilado y el abogado responsable.
+          </p>
+        )}
         {enabled && (data?.mailboxWarning || data?.lastError) && (
           <p className="mt-2 flex items-start gap-1.5 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
             <AlertTriangle size={13} className="shrink-0 mt-0.5" /> {data?.mailboxWarning || data?.lastError}

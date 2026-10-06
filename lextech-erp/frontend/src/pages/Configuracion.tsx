@@ -2109,7 +2109,8 @@ export default function Configuracion() {
   // antes se mostraba a cualquiera y solo se ocultaban los botones dentro
   // del panel, dejando la pestaña visible sin motivo para un rol "miembro".
   const visibleOtherSections = OTHER_SECTIONS.filter(
-    (s) => s.key !== 'usuarios' || myRol === 'propietario' || myRol === 'admin',
+    // Automatizaciones: igual, solo quien puede activarlas y configurarlas.
+    (s) => (s.key !== 'usuarios' && s.key !== 'automatizaciones') || myRol === 'propietario' || myRol === 'admin',
   );
   const { theme, setTheme, customColor, customSecondary, customSidebar, setCustomColors } = useTheme();
   const [draftPrimary, setDraftPrimary] = useState(customColor);
@@ -2326,7 +2327,7 @@ export default function Configuracion() {
             <SeguridadPanel />
           ) : activeSection === 'integraciones' ? (
             <IntegracionesPanel canManage={myRol === 'propietario' || myRol === 'admin'} />
-          ) : activeSection === 'automatizaciones' ? (
+          ) : activeSection === 'automatizaciones' && (myRol === 'propietario' || myRol === 'admin') ? (
             <AutomatizacionesPanel />
           ) : activeSection === 'usuarios' ? (
             <UsuariosPanel />

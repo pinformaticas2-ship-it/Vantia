@@ -90,7 +90,7 @@ test('widgets del dashboard: nada de la organización A visto desde la B', { ski
 });
 
 test('logActivity sin organización la deduce de la entidad', { skip }, async () => {
-  const { rows } = await pool.query(`SELECT organizacion_id FROM activity_log WHERE action_type = $1`, [`Office ${MARK}`]);
+  const { rows } = await pool.query(`SELECT organizacion_id FROM activity_log WHERE action_type = $1 ORDER BY created_at DESC LIMIT 1`, [`Office ${MARK}`]);
   assert.equal(rows[0]?.organizacion_id, orgA);
 });
 
