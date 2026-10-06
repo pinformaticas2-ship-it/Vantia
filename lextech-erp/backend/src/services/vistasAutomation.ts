@@ -623,6 +623,16 @@ async function analyzeEmail(emailId: string, cfg: VistasConfig, organizacionId: 
  *  - 'documentacion': correo de un procedimiento con expediente (o el mismo
  *    señalamiento repetido): para añadir su documentación.
  *  - null: nada que hacer. */
+/** Regla para proponer una vista (nueva o cambio de fecha): el correo tiene
+ *  que contener la palabra "vista" Y un número de autos (en el texto o leído
+ *  por la IA, p.ej. de un PDF). Así no se confunde con correos que solo
+ *  comentan algo o que no son de un procedimiento concreto. */
+export function cumpleReglaVista(texto: string, numAutosIA?: string | null): { ok: boolean; palabraVista: boolean; autos: string | null } {
+  const palabraVista = matchesKeywords(texto, ['vista']);
+  const autos = extractProcedureRefs(texto).autos[0] || normalizeAutos(numAutosIA);
+  return { ok: palabraVista && Boolean(autos), palabraVista, autos };
+}
+
 export function clasificarSolicitud(esVista: boolean, fechaVista: Date | null, relacion: Relacion | null): 'vista' | 'cambio' | 'documentacion' | null {
   if (esVista && fechaVista) {
     if (relacion?.vista) {
@@ -758,7 +768,16 @@ async function processOrganizacion(org: { id: string; nombre: string; vistas_aut
 
     const duracion = datos.duracion_min || cfg.duracionMin;
     const fechaVista = datos.fecha_vista ? madridLocalToDate(datos.fecha_vista, datos.hora_vista || '09:00') : null;
-    const tipo = clasificarSolicitud(Boolean(datos.es_vista), fechaVista, relacion);
+    let tipo = clasificarSolicitud(Boolean(datos.es_vista), fechaVista, relacion);
+    // Regla: solo se avisa de una vista si el correo dice "vista" y trae nº de
+    // autos. Si no, nada de vista: como mucho documentación de un expediente
+    // con esos mismos autos.
+    if (tipo === 'vista' || tipo === 'cambio') {
+      const textoCorreo = `${row.subject || ''}\n${text}\n${parseAttachments(row).map((a) => a.filename).join('\n')}`;
+      const regla = cumpleReglaVista(textoCorreo, datos.num_autos);
+      (datos as any).regla_vista = { palabra_vista: regla.palabraVista, autos: regla.autos };
+      if (!regla.ok) tipo = relacion?.expediente ? 'documentacion' : null;
+    }
     // Hueco en la agenda para una vista nueva o para la nueva fecha de un
     // cambio (sin contar el propio evento de la vista que se cambiaría).
     const conflictos = (tipo === 'vista' || tipo === 'cambio') && fechaVista

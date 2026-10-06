@@ -37,3 +37,17 @@ test('clasificación de los correos', () => {
   assert.equal(clasificarSolicitud(false, null, rel()), 'documentacion', 'correo sin señalamiento de un procedimiento conocido: documentación');
   assert.equal(clasificarSolicitud(false, null, null), null, 'correo sin relación ni vista: nada que hacer');
 });
+
+// Regla del 06/10/2026: solo se avisa de una vista si el correo contiene la
+// palabra "vista" Y un número de autos.
+import { cumpleReglaVista } from '../src/services/vistasAutomation';
+
+test('regla vista + autos', () => {
+  assert.equal(cumpleReglaVista('ASIGNO VISTA 06/10/2026 9:50 PLAZA 16 MURCIA AUTOS 000945/2023').ok, true, 'señalamiento real');
+  assert.equal(cumpleReglaVista('Nos vemos en la vista del 20/11/2026 a las 11:00').ok, false, 'habla de una vista pero sin autos');
+  assert.equal(cumpleReglaVista('Apartamento con vista al mar, oferta hasta el 20/11/2026').ok, false, 'publicidad');
+  assert.equal(cumpleReglaVista('Remito instructa de los autos 945/2023').ok, false, 'tiene autos pero no dice vista');
+  assert.equal(cumpleReglaVista('Se señala vista para el 20/11/2026 a las 11:00 en el Juzgado nº 3', '512/2026').ok, true, 'autos leídos por la IA (p.ej. del PDF)');
+  assert.equal(cumpleReglaVista('Entrevista el 20/11/2026, expediente 512/2026').ok, false, '"entrevista" no es "vista"');
+  assert.equal(cumpleReglaVista('Revista jurídica nº 945/2023').ok, false, '"revista" no es "vista"');
+});
