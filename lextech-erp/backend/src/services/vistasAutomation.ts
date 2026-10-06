@@ -21,6 +21,42 @@ import { heartbeatStart, heartbeatEnd } from '../utils/heartbeat';
 
 export interface VistasPlantilla { asunto: string; cuerpo: string }
 
+/** Aspecto de los correos de respuesta (Configuración → Automatizaciones →
+ *  Configurar correo). La firma se coloca donde la plantilla diga {firma}. */
+export interface VistasCorreoFormato {
+  fuente: string;
+  tamano: 'pequeno' | 'normal' | 'grande';
+  color: string;
+  firma: string;
+  citarOriginal: boolean;
+}
+
+export const FUENTES_CORREO: Record<string, string> = {
+  arial: 'Arial, Helvetica, sans-serif',
+  calibri: 'Calibri, Carlito, Arial, sans-serif',
+  verdana: 'Verdana, Geneva, sans-serif',
+  georgia: 'Georgia, serif',
+  times: '"Times New Roman", Times, serif',
+};
+const TAMANOS_CORREO = { pequeno: '13px', normal: '14px', grande: '16px' } as const;
+
+export const DEFAULT_FIRMA = 'Un cordial saludo,\n{abogado}\n{despacho}';
+export const DEFAULT_CORREO_FORMATO: VistasCorreoFormato = {
+  fuente: 'arial', tamano: 'normal', color: '#1f2937', firma: DEFAULT_FIRMA, citarOriginal: false,
+};
+
+function cleanCorreoFormato(v: any): VistasCorreoFormato {
+  const d = DEFAULT_CORREO_FORMATO;
+  return {
+    fuente: v?.fuente && FUENTES_CORREO[v.fuente] ? v.fuente : d.fuente,
+    tamano: v?.tamano in TAMANOS_CORREO ? v.tamano : d.tamano,
+    color: /^#[0-9a-f]{6}$/i.test(String(v?.color || '')) ? String(v.color) : d.color,
+    // La firma puede quedar vacía a propósito (solo si se manda la clave).
+    firma: v && typeof v.firma === 'string' ? v.firma.replace(/\r\n/g, '\n').trim().slice(0, 1000) : d.firma,
+    citarOriginal: v?.citarOriginal === true,
+  };
+}
+
 export interface VistasConfig {
   mailbox: { type: 'imap' | 'gmail'; id: string } | null;
   responsableUserId: string | null;
@@ -32,6 +68,7 @@ export interface VistasConfig {
   guardarAdjuntos: boolean;
   plantillaAceptar: VistasPlantilla;
   plantillaRechazar: VistasPlantilla;
+  correo: VistasCorreoFormato;
   /** Dirección de la aplicación (para el enlace de los avisos por correo). */
   appUrl: string | null;
 }
@@ -46,7 +83,7 @@ export const DEFAULT_PLANTILLA_ACEPTAR: VistasPlantilla = {
     'Buenos días,\n\n' +
     'Les confirmamos nuestra asistencia a la vista señalada para el {fecha} a las {hora}{juzgado_txt}{autos_txt}.\n\n' +
     '{mensaje}\n\n' +
-    'Un cordial saludo,\n{abogado}\n{despacho}',
+    '{firma}',
 };
 
 export const DEFAULT_PLANTILLA_RECHAZAR: VistasPlantilla = {
@@ -55,7 +92,7 @@ export const DEFAULT_PLANTILLA_RECHAZAR: VistasPlantilla = {
     'Buenos días,\n\n' +
     'Lamentamos comunicarles que no nos es posible asistir a la vista señalada para el {fecha} a las {hora}{juzgado_txt}{autos_txt}.\n\n' +
     '{mensaje}\n\n' +
-    'Un cordial saludo,\n{abogado}\n{despacho}',
+    '{firma}',
 };
 
 function clampInt(v: any, min: number, max: number, def: number): number {
@@ -70,7 +107,13 @@ function cleanList(v: any): string[] {
 
 function cleanPlantilla(v: any, def: VistasPlantilla): VistasPlantilla {
   const asunto = String(v?.asunto ?? '').trim().slice(0, 300);
-  const cuerpo = String(v?.cuerpo ?? '').trim().slice(0, 5000);
+  let cuerpo = String(v?.cuerpo ?? '').replace(/\r\n/g, '\n').trim().slice(0, 5000);
+  // Las plantillas guardadas antes de existir la firma terminaban con la
+  // despedida escrita a mano: se pasa a {firma} para que la firma configurada
+  // se aplique sin duplicarse.
+  if (!cuerpo.includes('{firma}') && cuerpo.endsWith(DEFAULT_FIRMA)) {
+    cuerpo = `${cuerpo.slice(0, -DEFAULT_FIRMA.length)}{firma}`;
+  }
   return { asunto: asunto || def.asunto, cuerpo: cuerpo || def.cuerpo };
 }
 
@@ -94,6 +137,7 @@ export function normalizeVistasConfig(raw: any): VistasConfig {
     guardarAdjuntos: raw?.guardarAdjuntos !== false,
     plantillaAceptar: cleanPlantilla(raw?.plantillaAceptar, DEFAULT_PLANTILLA_ACEPTAR),
     plantillaRechazar: cleanPlantilla(raw?.plantillaRechazar, DEFAULT_PLANTILLA_RECHAZAR),
+    correo: cleanCorreoFormato(raw?.correo),
     appUrl: /^https?:\/\/\S+$/i.test(String(raw?.appUrl || '')) ? String(raw.appUrl).replace(/\/$/, '') : null,
   };
 }
@@ -443,21 +487,42 @@ export interface PlantillaVars {
   mensaje: string;
 }
 
-function fillTemplate(tpl: string, vars: PlantillaVars): string {
+function fillTemplate(tpl: string, vars: PlantillaVars, firma = DEFAULT_FIRMA): string {
   const map: Record<string, string> = {
     ...vars,
     juzgado_txt: vars.juzgado ? ` en ${vars.juzgado}` : '',
     autos_txt: vars.autos ? ` (autos ${vars.autos})` : '',
   };
-  return tpl.replace(/\{(\w+)\}/g, (all, key) => (key in map ? map[key] : all));
+  const fill = (s: string) => s.replace(/\{(\w+)\}/g, (all, key) => (key in map ? map[key] : all));
+  // La firma admite a su vez {abogado}, {despacho}...
+  map.firma = fill(firma);
+  return fill(tpl);
 }
 
-export function renderPlantilla(tpl: VistasPlantilla, vars: PlantillaVars): { asunto: string; html: string; texto: string } {
+export function renderPlantilla(tpl: VistasPlantilla, vars: PlantillaVars, formato: VistasCorreoFormato = DEFAULT_CORREO_FORMATO): { asunto: string; html: string; texto: string } {
   const asunto = fillTemplate(tpl.asunto, vars).replace(/\s+/g, ' ').trim().slice(0, 900);
-  // Un {mensaje} vacío no debe dejar un hueco de párrafos en blanco.
-  const texto = fillTemplate(tpl.cuerpo, vars).replace(/\n{3,}/g, '\n\n').trim();
-  const html = texto.split(/\n{2,}/).map((p) => `<p>${escapeHtml(p).replace(/\n/g, '<br>')}</p>`).join('\n');
-  return { asunto, html, texto };
+  // Un {mensaje} o una firma vacíos no deben dejar huecos de párrafos en blanco.
+  const texto = fillTemplate(tpl.cuerpo, vars, formato.firma).replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  return { asunto, html: buildRespuestaHtml(texto, formato), texto };
+}
+
+export interface CorreoOriginal { from: string; fecha: Date | null; texto: string }
+
+/** HTML final del correo de respuesta: el texto (ya revisado por el abogado)
+ *  con la fuente, tamaño y color configurados y, si se pidió, el correo
+ *  original citado debajo, como hace cualquier cliente de correo. */
+export function buildRespuestaHtml(texto: string, formato: VistasCorreoFormato = DEFAULT_CORREO_FORMATO, original?: CorreoOriginal | null): string {
+  const style = `font-family:${FUENTES_CORREO[formato.fuente] || FUENTES_CORREO.arial};font-size:${TAMANOS_CORREO[formato.tamano] || '14px'};color:${formato.color};line-height:1.5`;
+  const parrafos = String(texto || '').replace(/\r\n/g, '\n').trim().split(/\n{2,}/)
+    .map((p) => `<p style="margin:0 0 12px">${escapeHtml(p).replace(/\n/g, '<br>')}</p>`).join('\n');
+  let cita = '';
+  if (formato.citarOriginal && original && original.texto.trim()) {
+    const cuando = original.fecha ? `El ${formatMadrid(original.fecha, { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}, ` : '';
+    const cuerpo = escapeHtml(original.texto.replace(/\r\n/g, '\n').trim().slice(0, 20000)).replace(/\n/g, '<br>');
+    cita = `\n<p style="margin:16px 0 6px;color:#6b7280">${escapeHtml(`${cuando}${original.from} escribió:`)}</p>` +
+      `\n<blockquote style="margin:0;padding-left:12px;border-left:3px solid #d1d5db;color:#6b7280">${cuerpo}</blockquote>`;
+  }
+  return `<div style="${style}">\n${parrafos}${cita}\n</div>`;
 }
 
 // ── Destinatarios de los avisos ──────────────────────────────────────────────

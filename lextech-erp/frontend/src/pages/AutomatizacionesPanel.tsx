@@ -1,13 +1,15 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, CalendarCheck, Loader2, Sparkles } from 'lucide-react';
+import { AlertTriangle, CalendarCheck, Loader2, Settings2, Sparkles } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { notifyVistasChanged } from '../lib/useVistasStatus';
+import VistasCorreoConfigModal, { CorreoConfig } from '../components/VistasCorreoConfigModal';
 
 // Configuración → Automatizaciones. Un único interruptor: al encenderlo se
 // activa la automatización de vistas por correo para la organización activa,
-// con valores por defecto (no hay pantalla de configuración por organización).
+// con valores por defecto. "Configurar correo" solo cambia cómo se ve el
+// correo de respuesta (textos, firma, formato).
 // Backend: services/vistasAutomation.ts + controllers/vistasController.ts.
 
 interface ConfigResponse {
@@ -20,6 +22,7 @@ interface ConfigResponse {
   lastRunAt?: string | null;
   lastError?: string | null;
   iaDisponible?: boolean;
+  config?: CorreoConfig;
 }
 
 const PASOS = [
@@ -43,6 +46,7 @@ export default function AutomatizacionesPanel() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [configOpen, setConfigOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true); setError('');
@@ -75,6 +79,15 @@ export default function AutomatizacionesPanel() {
     }
   };
 
+  const guardarCorreo = async (c: CorreoConfig) => {
+    const res = await apiFetch('/api/vistas/config', {
+      method: 'PUT', getToken,
+      body: JSON.stringify({ enabled: Boolean(data?.enabled), config: { plantillaAceptar: c.plantillaAceptar, plantillaRechazar: c.plantillaRechazar, correo: c.correo } }),
+    });
+    if (res?.success === false) throw new Error(res.error);
+    setData(res.data);
+  };
+
   if (loading) return <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-slate-400" /></div>;
 
   const enabled = Boolean(data?.enabled);
@@ -100,6 +113,13 @@ export default function AutomatizacionesPanel() {
               </p>
             </div>
           </div>
+          <div className="flex shrink-0 items-center gap-3">
+          {data?.config && (
+            <button type="button" onClick={() => setConfigOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50">
+              <Settings2 size={14} /> Configurar correo
+            </button>
+          )}
           <button
             type="button"
             role="switch"
@@ -113,6 +133,7 @@ export default function AutomatizacionesPanel() {
               ? <Loader2 size={14} className="mx-auto animate-spin text-white" />
               : <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${enabled ? 'translate-x-5' : 'translate-x-0.5'}`} />}
           </button>
+          </div>
         </div>
 
         <ol className="mt-4 grid gap-1.5 sm:grid-cols-2 text-xs text-slate-600">
@@ -151,6 +172,10 @@ export default function AutomatizacionesPanel() {
 
         {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
       </div>
+
+      {configOpen && data?.config && (
+        <VistasCorreoConfigModal initial={data.config} canManage={canManage} onClose={() => setConfigOpen(false)} onSave={guardarCorreo} />
+      )}
     </div>
   );
 }

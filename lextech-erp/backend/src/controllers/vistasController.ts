@@ -8,6 +8,7 @@ import {
   normalizeVistasConfig,
   findAgendaConflicts,
   renderPlantilla,
+  buildRespuestaHtml,
   computeRecordatorioAt,
   formatMadrid,
   geminiAvailable,
@@ -131,6 +132,42 @@ export async function getVistasConfig(req: any, res: Response) {
   }
 }
 
+// ── POST /api/vistas/config/preview ─────────────────────────────────────────
+// Vista previa de los correos de respuesta con la configuración que se está
+// editando (aún sin guardar) y unos datos de ejemplo. Usa el mismo render que
+// el envío real, así lo que se ve es lo que sale.
+export async function previewVistasConfigCorreo(req: any, res: Response) {
+  try {
+    const loaded = await loadOrgVistas(req.organizacionId);
+    if (!loaded) return fail(res, 'Organización no encontrada', 404);
+    const cfg = normalizeVistasConfig({ ...loaded.cfg, ...(req.body?.config || {}) });
+    const ejemploFecha = new Date(Date.now() + 14 * 86_400_000);
+    ejemploFecha.setUTCHours(9, 30, 0, 0);
+    const vars: PlantillaVars = {
+      asunto_original: 'Señalamiento de vista - Autos 945/2026',
+      fecha: formatMadrid(ejemploFecha, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
+      hora: formatMadrid(ejemploFecha, { hour: '2-digit', minute: '2-digit' }),
+      juzgado: 'Juzgado de Primera Instancia nº 3 de Murcia',
+      autos: '945/2026',
+      abogado: req.auth?.userId ? await resolveUserName(req.auth.userId) : 'Abogado',
+      despacho: loaded.org.nombre || '',
+      mensaje: '',
+    };
+    const original = {
+      from: 'Procurador Ejemplo <procurador@ejemplo.es>',
+      fecha: new Date(),
+      texto: 'Buenos días,\n\nLes comunico que se ha señalado vista en los autos 945/2026.\n\nUn saludo.',
+    };
+    const render = (tpl: typeof cfg.plantillaAceptar) => {
+      const r = renderPlantilla(tpl, vars, cfg.correo);
+      return { asunto: r.asunto, html: buildRespuestaHtml(r.texto, cfg.correo, original) };
+    };
+    return ok(res, { aceptar: render(cfg.plantillaAceptar), rechazar: render(cfg.plantillaRechazar) });
+  } catch (e: any) {
+    return fail(res, e?.message || 'Error generando la vista previa');
+  }
+}
+
 // ── PUT /api/vistas/config ──────────────────────────────────────────────────
 export async function updateVistasConfig(req: any, res: Response) {
   try {
@@ -204,7 +241,9 @@ export async function updateVistasConfig(req: any, res: Response) {
         WHERE id = $1`,
       [org.id, enabled, JSON.stringify(next), restart],
     );
-    await logActivityForReq(req, `Automatización de vistas ${enabled ? 'activada' : 'desactivada'}`, 'ORGANIZACION', org.id, org.nombre);
+    await logActivityForReq(req, enabled === Boolean(org.vistas_auto_enabled)
+      ? 'Configuración de la automatización de vistas actualizada'
+      : `Automatización de vistas ${enabled ? 'activada' : 'desactivada'}`, 'ORGANIZACION', org.id, org.nombre);
     // Abrir (o cerrar) ya la escucha inmediata del buzón, sin esperar al minuto.
     void reconcileVistasIdle();
     return getVistasConfig(req, res);
@@ -405,26 +444,25 @@ export async function previewVistaCorreo(req: any, res: Response) {
     const tipo = req.body?.tipo === 'rechazar' ? 'rechazar' : 'aceptar';
     const vars = await buildPlantillaVars(req, ctx, req.body);
     const tpl = tipo === 'aceptar' ? ctx.cfg.plantillaAceptar : ctx.cfg.plantillaRechazar;
-    const r = renderPlantilla(tpl, vars);
+    const r = renderPlantilla(tpl, vars, ctx.cfg.correo);
     return ok(res, { para: ctx.sol.from_email, asunto: r.asunto, texto: r.texto });
   } catch (e: any) {
     return fail(res, e?.message || 'Error generando el correo');
   }
 }
 
-function textoToHtml(texto: string): string {
-  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  return texto.trim().split(/\n{2,}/).map((p) => `<p>${esc(p).replace(/\n/g, '<br>')}</p>`).join('\n');
-}
-
-async function enviarRespuesta(ctx: { sol: any }, asunto: string, texto: string, expedienteId: string | null) {
+async function enviarRespuesta(ctx: { sol: any; cfg: VistasConfig }, asunto: string, texto: string, expedienteId: string | null) {
   if (!ctx.sol.from_email) throw new Error('El correo original no tiene remitente al que responder.');
   await sendFromMailbox({
     accountId: ctx.sol.account_id,
     gmailProfileId: ctx.sol.gmail_profile_id,
     to: ctx.sol.from_email,
     subject: asunto,
-    html: textoToHtml(texto),
+    html: buildRespuestaHtml(texto, ctx.cfg.correo, {
+      from: ctx.sol.from_name ? `${ctx.sol.from_name} <${ctx.sol.from_email}>` : ctx.sol.from_email,
+      fecha: ctx.sol.received_at ? new Date(ctx.sol.received_at) : null,
+      texto: String(ctx.sol.body_text || ''),
+    }),
     inReplyTo: ctx.sol.message_id,
     expedienteId,
   });
@@ -558,7 +596,7 @@ export async function aceptarVista(req: any, res: Response) {
     if (b.enviar_correo !== false && !yaHecho('correo')) {
       try {
         const vars = await buildPlantillaVars(req, ctx, { ...b, ...datos, fecha, responsable_user_id: responsableId });
-        const r = renderPlantilla(cfg.plantillaAceptar, vars);
+        const r = renderPlantilla(cfg.plantillaAceptar, vars, cfg.correo);
         await enviarRespuesta(ctx, txt(b.asunto, 900) || r.asunto, String(b.cuerpo || '').trim() || r.texto, expedienteId);
         pasos.push({ paso: 'correo', ok: true, detalle: `Confirmación enviada a ${sol.from_email}` });
       } catch (e: any) {
@@ -735,7 +773,7 @@ export async function rechazarVista(req: any, res: Response) {
     if (b.enviar_correo !== false) {
       try {
         const vars = await buildPlantillaVars(req, ctx, b);
-        const r = renderPlantilla(cfg.plantillaRechazar, vars);
+        const r = renderPlantilla(cfg.plantillaRechazar, vars, cfg.correo);
         await enviarRespuesta(ctx, txt(b.asunto, 900) || r.asunto, String(b.cuerpo || '').trim() || r.texto, null);
         pasos.push({ paso: 'correo', ok: true, detalle: `Respuesta de rechazo enviada a ${sol.from_email}` });
       } catch (e: any) {
@@ -825,8 +863,8 @@ export async function modificarVista(req: any, res: Response) {
   if (b.enviar_correo === true) {
     try {
       const vars = await buildPlantillaVars(req, { sol, org: ctx.org }, { ...orig.datos, ...b, fecha, responsable_user_id: orig.responsable_user_id });
-      const r = renderPlantilla(cfg.plantillaAceptar, vars);
-      await enviarRespuesta({ sol }, txt(b.asunto, 900) || r.asunto, String(b.cuerpo || '').trim() || r.texto, orig.expediente_id);
+      const r = renderPlantilla(cfg.plantillaAceptar, vars, cfg.correo);
+      await enviarRespuesta({ sol, cfg }, txt(b.asunto, 900) || r.asunto, String(b.cuerpo || '').trim() || r.texto, orig.expediente_id);
       pasos.push({ paso: 'correo', ok: true, detalle: `Confirmación de la nueva fecha enviada a ${sol.from_email}` });
     } catch (e: any) {
       await unclaim(sol.id, previo, `No se pudo enviar el correo: ${e?.message || e}`);

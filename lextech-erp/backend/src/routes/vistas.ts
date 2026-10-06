@@ -4,6 +4,7 @@ import { costlyActionLimiter } from '../middleware/rateLimits';
 import {
   getVistasConfig,
   updateVistasConfig,
+  previewVistasConfigCorreo,
   listVistas,
   getVistasAvisos,
   getVista,
@@ -27,6 +28,7 @@ router.use(requireAuth);
 
 router.get('/config', getVistasConfig);
 router.put('/config', updateVistasConfig);
+router.post('/config/preview', previewVistasConfigCorreo);
 router.get('/', listVistas);
 router.get('/avisos', getVistasAvisos);
 router.get('/:id', getVista);
