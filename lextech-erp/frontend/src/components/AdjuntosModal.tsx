@@ -6,13 +6,14 @@ import {
   X, Upload, FolderOpen, FilePlus2, Sparkles, Loader2,
   Eye, Download, Trash2, Edit3, ExternalLink, FileText,
   Search, ChevronDown, ChevronRight, Paperclip,
-  Star, Mail, MessageCircle, FileOutput, Table2, Settings2,
+  Star, Mail, MessageCircle, FileOutput, Table2, Settings2, Combine,
   ChevronLeft, LayoutList, Grid3X3, Folder, AlertTriangle,
 } from "lucide-react";
 import { safeJson } from "../lib/api";
 import { UndoToast } from "./UndoToast";
 import { useUndoDelete } from "../lib/useUndoDelete";
 import { Modal } from "./Modal";
+import PdfToolModal, { isPdfToolCompatible } from "./PdfToolModal";
 
 // ── helpers ───────────────────────────────────────────────────
 function fileIcon(mime: string, name: string) {
@@ -101,6 +102,8 @@ export default function AdjuntosModal({
   const { getToken } = useAuth();
 
   const [files, setFiles]               = useState<any[]>([]);
+  // Herramienta PDF (fusionar / editar páginas): ids con los que se abre.
+  const [pdfTool, setPdfTool]           = useState<string[] | null>(null);
   const [loadingFiles, setLoadingFiles] = useState(true);
   const [uploading, setUploading]       = useState(false);
   const [isDragOver, setIsDragOver]     = useState(false);
@@ -708,6 +711,14 @@ export default function AdjuntosModal({
               Plantillas
             </button>
             <button
+              onClick={() => setPdfTool([])}
+              title="Unir varios documentos en un PDF o quitar, ordenar y girar páginas"
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+            >
+              <Combine size={15} className="text-red-500" />
+              Fusionar PDF
+            </button>
+            <button
               onClick={() => folderInputRef.current?.click()}
               className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
             >
@@ -1154,6 +1165,12 @@ export default function AdjuntosModal({
                                   <Eye size={13} />
                                 </button>
                               )}
+                              {isPdfToolCompatible(f) && (
+                                <button onClick={() => setPdfTool([f.id])} title="Editar páginas / fusionar con otros"
+                                  className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                                  <Combine size={13} />
+                                </button>
+                              )}
                               {(canWord || canExcel) && (
                                 <button title={canWord ? "Abrir en Word" : "Abrir en Excel"}
                                   className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
@@ -1539,6 +1556,10 @@ export default function AdjuntosModal({
 
   const overlays = (
     <>
+      {pdfTool && (
+        <PdfToolModal entityId={entityId} files={files} initialFileIds={pdfTool}
+          onClose={() => setPdfTool(null)} onDone={() => { void loadFiles(true); }} />
+      )}
       <Modal
         open={!!confirmDeleteFileId}
         onClose={() => setConfirmDeleteFileId(null)}

@@ -7,6 +7,7 @@ const uuidv4 = () => crypto.randomUUID();
 import { requireAuth } from '../middleware/auth';
 import { requireFilesPermission } from '../middleware/requireFilesPermission';
 import { listFiles, uploadFiles, downloadFile, deleteFile, UPLOADS_ROOT, listTemplates, downloadTemplate, downloadMergedTemplate, downloadBlank, createBlankDocument, updateFileMetadata, openFileLocally, previewDocxAsHtml, previewExcelAsHtml, previewTemplateAsHtml, testPreviewImages, previewWordAsPdf, previewTemplateAsPdf, createTempToken, downloadByToken, launchWithOffice, officeBridgePage, syncClientFileByToken } from '../controllers/filesController';
+import { getFileAsPdf, runPdfTool } from '../controllers/pdfToolController';
 const router = Router();
 const rawBinary = express.raw({ type: 'application/octet-stream', limit: '100mb' });
 
@@ -54,6 +55,9 @@ router.get('/test-preview',           requireAuth, testPreviewImages);
 const filesGate = [requireAuth, requireFilesPermission];
 
 router.post('/:clientId/create-blank',              ...filesGate, createBlankDocument);
+// Herramienta PDF: fusionar y retocar páginas (controllers/pdfToolController.ts)
+router.post('/:clientId/pdf-tool',                  ...filesGate, runPdfTool);
+router.get('/:clientId/:fileId/as-pdf',             ...filesGate, getFileAsPdf);
 router.get('/:clientId',                            ...filesGate, listFiles);
 router.post('/:clientId',                           ...filesGate, upload.array('files', 50), uploadFiles);
 router.put('/:clientId/:fileId',                    ...filesGate, updateFileMetadata);

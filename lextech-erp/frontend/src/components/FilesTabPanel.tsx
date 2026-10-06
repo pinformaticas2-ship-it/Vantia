@@ -6,11 +6,13 @@ import {
   Upload, FolderOpen, FilePlus2, Sparkles, Loader2,
   Eye, Download, Trash2, Edit3, ExternalLink, FileText,
   ChevronDown, ChevronRight, X, Search, Copy, Clipboard, Cloud, Check,
+  Combine,
 } from "lucide-react";
 import { safeJson, resolveApiUrl } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
 import { usePasteFiles, setErpClipboard, getErpClipboard, clearErpClipboard } from "../lib/usePasteFiles";
 import { FilePreviewModal, isVideoFile, isAudioFile } from "./FilePreviewModal";
+import PdfToolModal, { isPdfToolCompatible } from "./PdfToolModal";
 import { useOrganizacion } from "../lib/useOrganizacion";
 import { DriveLogo, DropboxLogo } from "./StorageStatusIcons";
 
@@ -79,6 +81,8 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
   const [uploadProvider, setUploadProvider] = useState<"drive" | "dropbox" | "local">(defaultUploadProvider);
 
   const [files, setFiles]           = useState<any[]>([]);
+  // Herramienta PDF (fusionar / editar páginas): ids con los que se abre.
+  const [pdfTool, setPdfTool]       = useState<string[] | null>(null);
   const [loadingFiles, setLoadingFiles] = useState(true);
   const [uploading, setUploading]   = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -899,6 +903,15 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
           )}
         </div>
         <div className="flex flex-wrap gap-2">
+          {/* Fusionar / editar PDF */}
+          <button
+            onClick={() => !locked && setPdfTool([])}
+            disabled={locked}
+            title="Unir varios documentos en un PDF o quitar, ordenar y girar páginas"
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Combine size={13} /> Fusionar PDF
+          </button>
           {/* Importar carpeta */}
           <button
             onClick={() => !locked && folderInputRef.current?.click()}
@@ -1080,6 +1093,12 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
                               <button onClick={() => openRichPreview(f)} title="Vista previa" disabled={richPreviewLoading === f.id}
                                 className="p-1.5 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-60">
                                 {richPreviewLoading === f.id ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} />}
+                              </button>
+                            )}
+                            {!locked && isPdfToolCompatible(f) && (
+                              <button onClick={(e) => { e.stopPropagation(); setPdfTool([f.id]); }} title="Editar páginas / fusionar con otros"
+                                className="p-1.5 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors">
+                                <Combine size={14} />
                               </button>
                             )}
                             {/* Copiar al portapapeles del ERP — siempre visible */}
@@ -1748,6 +1767,10 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
           </div>
         </div>,
         document.body
+      )}
+      {pdfTool && (
+        <PdfToolModal entityId={entityId} files={files} initialFileIds={pdfTool}
+          onClose={() => setPdfTool(null)} onDone={() => { void loadFiles(true); }} />
       )}
     </div>
   );
