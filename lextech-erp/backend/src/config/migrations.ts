@@ -2788,11 +2788,6 @@ export async function runMigrations(): Promise<void> {
       `ALTER TABLE vistas_solicitudes ADD COLUMN IF NOT EXISTS tipo VARCHAR(20) NOT NULL DEFAULT 'vista'`,
       `ALTER TABLE vistas_solicitudes ADD COLUMN IF NOT EXISTS relacion JSONB`,
       `ALTER TABLE vistas_solicitudes ADD COLUMN IF NOT EXISTS aviso_email_at TIMESTAMPTZ`,
-      // Fiabilidad de la detección: nivel (alta/media/baja), puntuación y los
-      // motivos de cada señal (ver evaluarSenalamiento en vistasAutomation.ts).
-      `ALTER TABLE vistas_solicitudes ADD COLUMN IF NOT EXISTS confianza_nivel VARCHAR(10)`,
-      `ALTER TABLE vistas_solicitudes ADD COLUMN IF NOT EXISTS confianza_score INTEGER`,
-      `ALTER TABLE vistas_solicitudes ADD COLUMN IF NOT EXISTS motivos JSONB`,
     ]) {
       try { await client.query(sql); } catch (_e: any) {}
     }

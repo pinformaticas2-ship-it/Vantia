@@ -216,16 +216,13 @@ export interface VistaDatos {
   modalidad: string | null;
   enlace_telematico: string | null;
   resumen: string | null;
-  /** Seguridad de la IA (0-1) de que es un señalamiento real, y por qué. */
-  confianza: number | null;
-  motivo_ia: string | null;
 }
 
 const EMPTY_DATOS: VistaDatos = {
   es_vista: false, tipo_acto: null, fecha_vista: null, hora_vista: null, duracion_min: null,
   juzgado: null, sala: null, direccion: null, num_autos: null, nig: null, tipo_procedimiento: null,
   partes: null, cliente: null, contrario: null, fecha_preparacion: null, modalidad: null,
-  enlace_telematico: null, resumen: null, confianza: null, motivo_ia: null,
+  enlace_telematico: null, resumen: null,
 };
 
 const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
@@ -279,8 +276,6 @@ function sanitizeDatos(raw: any): VistaDatos {
     modalidad: str(raw?.modalidad, 40),
     enlace_telematico: str(raw?.enlace_telematico, 500),
     resumen: str(raw?.resumen, 1500),
-    confianza: Number.isFinite(Number(raw?.confianza)) ? Math.min(1, Math.max(0, Number(raw.confianza))) : null,
-    motivo_ia: str(raw?.motivo, 300),
   };
 }
 
@@ -294,22 +289,11 @@ async function extractWithGemini(
   const prompt = `Eres el asistente de un despacho de abogados en España. Hoy es ${hoy}.
 Analiza el correo siguiente (y los PDF adjuntos, si los hay) y decide si comunica el SEÑALAMIENTO
 de una vista, juicio, audiencia previa, comparecencia u otro acto procesal con fecha y hora al que
-deba asistir un abogado del despacho.
-
-Es un señalamiento SOLO si el correo (de un juzgado, LexNET, un procurador, la otra parte o un
-compañero que lo reenvía) FIJA o COMUNICA un acto procesal concreto con fecha (y normalmente hora)
-y un órgano judicial o procedimiento identificable.
-NO es un señalamiento (es_vista=false) aunque aparezca la palabra "vista", "juicio" o una fecha:
-- conversaciones que solo comentan o preguntan por una vista ("nos vemos en la vista", "¿qué tal
-  fue la vista?", "prepara la vista de mañana", "te paso lo de la vista");
-- consultas o mensajes de clientes, recordatorios internos, actas o resultados de vistas ya celebradas;
-- publicidad, boletines, cursos, ofertas ("vista al mar", "a primera vista"), facturas.
-Ante la duda, es_vista=false y confianza baja.
+deba asistir un abogado del despacho. Boletines, publicidad, facturas o correos que solo mencionan
+la palabra "vista" sin señalar un acto concreto NO son una vista.
 
 Devuelve SOLO este JSON (sin markdown), con null en lo que no aparezca:
 {"es_vista": true|false,
- "confianza": número de 0 a 1 (seguridad de que es un señalamiento real),
- "motivo": "una frase: por qué es o no es un señalamiento",
  "tipo_acto": "vista|juicio oral|audiencia previa|comparecencia|...",
  "fecha_vista": "YYYY-MM-DD", "hora_vista": "HH:MM", "duracion_min": número|null,
  "juzgado": "órgano judicial completo", "sala": "sala o despacho", "direccion": "dirección postal",
@@ -650,110 +634,6 @@ export function clasificarSolicitud(esVista: boolean, fechaVista: Date | null, r
   return relacion?.expediente ? 'documentacion' : null;
 }
 
-// ── Fiabilidad de la detección ───────────────────────────────────────────────
-// Ninguna señal sola decide (ni la palabra "vista", ni la IA): se suman
-// varias independientes y cada una deja su motivo, visible en la solicitud.
-//   alta  -> por confirmar y se avisa (push + correo)
-//   media -> por confirmar marcada "Dudosa", SIN avisar
-//   baja  -> descartada (se puede recuperar desde "Descartadas")
-
-export type NivelConfianza = 'alta' | 'media' | 'baja';
-export interface Motivo { texto: string; puntos: number }
-export interface Evaluacion { score: number; nivel: NivelConfianza; motivos: Motivo[] }
-
-export interface RemitenteInfo {
-  /** Por qué es de confianza (null si no lo es). */
-  confianza: 'directorio' | 'aceptado' | 'judicial' | null;
-  /** Ya se marcaron correos suyos como "No es una vista" y nunca se le aceptó ninguna. */
-  descartadoAntes: boolean;
-}
-
-const UMBRAL_ALTA = 55;
-const UMBRAL_MEDIA = 30;
-const nivelDe = (score: number): NivelConfianza => (score >= UMBRAL_ALTA ? 'alta' : score >= UMBRAL_MEDIA ? 'media' : 'baja');
-
-function puntosRemitente(r: RemitenteInfo, motivos: Motivo[]) {
-  if (r.confianza === 'directorio') motivos.push({ texto: 'Remitente de tu Directorio (procurador/abogado)', puntos: 20 });
-  else if (r.confianza === 'aceptado') motivos.push({ texto: 'Remitente de vistas que ya aceptaste', puntos: 20 });
-  else if (r.confianza === 'judicial') motivos.push({ texto: 'Remitente de un dominio judicial', puntos: 15 });
-  if (r.descartadoAntes) motivos.push({ texto: 'Ya marcaste correos de este remitente como "No es una vista"', puntos: -25 });
-}
-
-/** Puntúa un posible señalamiento (vista nueva o cambio de fecha). */
-export function evaluarSenalamiento(p: {
-  datos: VistaDatos; iaUsada: boolean; fechaVista: Date | null; now?: Date;
-  remitente: RemitenteInfo; esRespuesta: boolean; relacion: Relacion | null;
-}): Evaluacion {
-  const now = p.now || new Date();
-  const motivos: Motivo[] = [];
-  const d = p.datos;
-  if (p.iaUsada) {
-    if (d.es_vista) {
-      const conf = d.confianza ?? 0.75;
-      motivos.push({ texto: `IA: es un señalamiento (${Math.round(conf * 100)}%)${d.motivo_ia ? ` — ${d.motivo_ia}` : ''}`, puntos: Math.round(40 * conf) });
-    } else {
-      motivos.push({ texto: `IA: no es un señalamiento${d.motivo_ia ? ` — ${d.motivo_ia}` : ''}`, puntos: -40 });
-    }
-  } else {
-    motivos.push({ texto: 'Sin IA: datos leídos por patrones (menos fiable)', puntos: 0 });
-  }
-  if (p.fechaVista) {
-    const dias = (p.fechaVista.getTime() - now.getTime()) / 86_400_000;
-    if (dias < 0) motivos.push({ texto: 'La fecha indicada ya ha pasado', puntos: -30 });
-    else if (dias > 730) motivos.push({ texto: 'Fecha a más de dos años vista', puntos: -15 });
-    else if (d.hora_vista) motivos.push({ texto: 'Fecha y hora futuras', puntos: 15 });
-    else motivos.push({ texto: 'Fecha futura sin hora', puntos: 5 });
-  } else {
-    motivos.push({ texto: 'No indica fecha de señalamiento', puntos: -20 });
-  }
-  if (d.num_autos) motivos.push({ texto: `Nº de autos ${d.num_autos}`, puntos: 10 });
-  if (d.nig) motivos.push({ texto: 'Incluye NIG', puntos: 5 });
-  if (d.juzgado) motivos.push({ texto: `Órgano judicial: ${d.juzgado}`, puntos: 10 });
-  puntosRemitente(p.remitente, motivos);
-  if (p.esRespuesta && !d.num_autos) motivos.push({ texto: 'Respuesta en una conversación sin nº de autos', puntos: -10 });
-  if (p.relacion?.expediente) motivos.push({ texto: `Mismos autos/NIG que el expediente ${p.relacion.expediente.anio}/${p.relacion.expediente.num_exp}`, puntos: 10 });
-  const score = motivos.reduce((s, m) => s + m.puntos, 0);
-  return { score, nivel: nivelDe(score), motivos };
-}
-
-/** Puntúa un correo de un procedimiento conocido (para añadir documentación). */
-export function evaluarDocumentacion(p: {
-  relacion: Relacion; remitente: RemitenteInfo; esRespuesta: boolean; tieneAdjuntos: boolean;
-}): Evaluacion {
-  const motivos: Motivo[] = [];
-  const e = p.relacion.expediente;
-  motivos.push({ texto: e ? `Mismos autos/NIG que el expediente ${e.anio}/${e.num_exp}` : 'Mismos autos que una vista aceptada', puntos: 35 });
-  puntosRemitente(p.remitente, motivos);
-  if (p.tieneAdjuntos) motivos.push({ texto: 'Trae documentos adjuntos', puntos: 10 });
-  if (p.esRespuesta && !p.tieneAdjuntos) motivos.push({ texto: 'Respuesta en una conversación sin adjuntos', puntos: -10 });
-  const score = motivos.reduce((s, m) => s + m.puntos, 0);
-  return { score, nivel: score >= 45 ? 'alta' : nivelDe(score), motivos };
-}
-
-const DOMINIOS_JUDICIALES = /(^|[.@])(justicia\.es|justicia\.gob\.es|mjusticia\.gob\.es|poderjudicial\.es|cgpj\.es|lexnet[a-z.]*|juzgado[a-z0-9-]*\.[a-z.]+|tribunal[a-z0-9-]*\.[a-z.]+)$/i;
-
-/** De quién es el correo, según el Directorio, el historial de decisiones y el dominio. */
-export async function remitenteInfo(organizacionId: string, fromEmail: string | null): Promise<RemitenteInfo> {
-  const email = String(fromEmail || '').trim().toLowerCase();
-  if (!email) return { confianza: null, descartadoAntes: false };
-  const [dir, hist] = await Promise.all([
-    pool.query(
-      `SELECT 1 FROM directorio_profesionales WHERE organizacion_id = $1 AND LOWER(TRIM(email)) = $2 LIMIT 1`,
-      [organizacionId, email],
-    ).catch(() => ({ rows: [] as any[] })),
-    pool.query(
-      `SELECT COUNT(*) FILTER (WHERE estado IN ('aceptada','modificada','documentada'))::int AS aceptadas,
-              COUNT(*) FILTER (WHERE estado = 'descartada' AND decidido_por IS NOT NULL)::int AS descartadas
-         FROM vistas_solicitudes WHERE organizacion_id = $1 AND LOWER(from_email) = $2`,
-      [organizacionId, email],
-    ),
-  ]);
-  const aceptadas = hist.rows[0]?.aceptadas || 0;
-  const descartadas = hist.rows[0]?.descartadas || 0;
-  const confianza = dir.rows.length ? 'directorio' : aceptadas > 0 ? 'aceptado' : DOMINIOS_JUDICIALES.test(email) ? 'judicial' : null;
-  return { confianza, descartadoAntes: descartadas > 0 && aceptadas === 0 };
-}
-
 const TITULO_AVISO: Record<'vista' | 'cambio' | 'documentacion', string> = {
   vista: 'Vista por confirmar',
   cambio: 'Cambio en una vista ya aceptada',
@@ -878,26 +758,7 @@ async function processOrganizacion(org: { id: string; nombre: string; vistas_aut
 
     const duracion = datos.duracion_min || cfg.duracionMin;
     const fechaVista = datos.fecha_vista ? madridLocalToDate(datos.fecha_vista, datos.hora_vista || '09:00') : null;
-    let tipo = clasificarSolicitud(Boolean(datos.es_vista), fechaVista, relacion);
-
-    // Fiabilidad: varias señales independientes, no solo la palabra "vista" ni
-    // solo la IA. Baja -> descartada; media -> "dudosa" sin aviso; alta -> aviso.
-    const remitente = await remitenteInfo(org.id, row.from_email);
-    const esRespuesta = /^\s*(re|rv|aw)\s*:/i.test(String(row.subject || ''));
-    const tieneAdjuntos = parseAttachments(row).length > 0;
-    let evaluacion: Evaluacion | null = null;
-    if (tipo === 'vista' || tipo === 'cambio') {
-      evaluacion = evaluarSenalamiento({ datos, iaUsada: origen === 'ia', fechaVista, remitente, esRespuesta, relacion });
-      // Un "señalamiento" poco fiable de un procedimiento conocido se queda como
-      // documentación de ese expediente en vez de proponerse como vista.
-      if (evaluacion.nivel === 'baja' && relacion?.expediente) tipo = 'documentacion';
-    }
-    if (tipo === 'documentacion' && relacion && (!evaluacion || evaluacion.nivel === 'baja')) {
-      evaluacion = evaluarDocumentacion({ relacion, remitente, esRespuesta, tieneAdjuntos });
-    }
-    const nivel: NivelConfianza = evaluacion?.nivel || 'baja';
-    const estado = tipo && nivel !== 'baja' ? 'pendiente' : 'descartada';
-
+    const tipo = clasificarSolicitud(Boolean(datos.es_vista), fechaVista, relacion);
     // Hueco en la agenda para una vista nueva o para la nueva fecha de un
     // cambio (sin contar el propio evento de la vista que se cambiaría).
     const conflictos = (tipo === 'vista' || tipo === 'cambio') && fechaVista
@@ -914,23 +775,19 @@ async function processOrganizacion(org: { id: string; nombre: string; vistas_aut
          (organizacion_id, email_id, account_id, gmail_profile_id, mailbox_user_id,
           from_email, from_name, subject, message_id, received_at,
           estado, extraccion_origen, body_text, datos, fecha_vista, duracion_min,
-          responsable_user_id, responsable_nombre, conflictos, tipo, relacion,
-          confianza_nivel, confianza_score, motivos)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
+          responsable_user_id, responsable_nombre, conflictos, tipo, relacion)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
        ON CONFLICT (email_id) DO NOTHING
        RETURNING id`,
       [
         ...base,
-        estado, origen, text.slice(0, 20000), JSON.stringify(datos),
+        tipo ? 'pendiente' : 'descartada', origen, text.slice(0, 20000), JSON.stringify(datos),
         fechaVista, duracion, cfg.responsableUserId, responsableNombre, JSON.stringify(conflictos),
         tipo || 'vista', relacion ? JSON.stringify(relacion) : null,
-        nivel, evaluacion?.score ?? null, JSON.stringify(evaluacion?.motivos || []),
       ],
     );
 
-    // Solo se avisa (push + correo) de lo fiable; lo dudoso queda en la lista
-    // marcado para revisar, sin molestar.
-    if (tipo && estado === 'pendiente' && nivel === 'alta' && inserted.length) {
+    if (tipo && inserted.length) {
       await avisarSolicitud(org, cfg, inserted[0].id, tipo, datos, fechaVista, conflictos, relacion, {
         subject: row.subject || null, from: row.from_name ? `${row.from_name} <${row.from_email || ''}>` : (row.from_email || null),
         mailboxOwner: mb.ownerUserId,

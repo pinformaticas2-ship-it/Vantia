@@ -218,7 +218,7 @@ export async function updateVistasConfig(req: any, res: Response) {
 const LIST_FIELDS = `id, estado, from_email, from_name, subject, received_at, datos, extraccion_origen,
   fecha_vista, duracion_min, responsable_user_id, responsable_nombre, conflictos, expediente_id,
   agenda_event_id, recordatorio_at, recordatorio_enviado_at, pasos, error, decidido_por_nombre,
-  decidido_at, created_at, tipo, relacion, confianza_nivel, confianza_score, motivos`;
+  decidido_at, created_at, tipo, relacion`;
 
 /** Condición SQL de visibilidad: propietario/admin ven todas; el resto, las
  *  suyas (como abogado responsable o dueño del buzón). */
@@ -240,9 +240,7 @@ export async function listVistas(req: any, res: Response) {
     else if (estado === 'aceptada') cond += ` AND estado IN ('aceptada','documentada','modificada')`;
     else { params.push(estado); cond += ` AND estado = ${params.length}`; }
     cond += scopeCond(req, params);
-    // Por confirmar: primero las fiables, después las dudosas.
-    const order = estado === 'aceptada' ? 'fecha_vista DESC NULLS LAST'
-      : estado === 'pendiente' ? "(confianza_nivel = 'media') ASC, created_at DESC" : 'created_at DESC';
+    const order = estado === 'aceptada' ? 'fecha_vista DESC NULLS LAST' : 'created_at DESC';
     const { rows } = await pool.query(
       `SELECT ${LIST_FIELDS} FROM vistas_solicitudes WHERE ${cond} ORDER BY ${order} LIMIT 200`,
       params,
@@ -267,8 +265,7 @@ export async function getVistasAvisos(req: any, res: Response) {
               jsonb_array_length(conflictos) AS num_conflictos, recordatorio_at, created_at
          FROM vistas_solicitudes
         WHERE organizacion_id = $1 ${scope}
-          -- Las dudosas no avisan: se ven en la lista, marcadas para revisar.
-          AND ((estado = 'pendiente' AND COALESCE(confianza_nivel, 'alta') <> 'media')
+          AND (estado = 'pendiente'
                OR (estado = 'aceptada' AND recordatorio_at <= NOW() AND fecha_vista > NOW()))
         ORDER BY created_at DESC
         LIMIT 20`,
@@ -889,13 +886,9 @@ export async function descartarVista(req: any, res: Response) {
   try {
     const ctx = await loadSolicitud(req, res);
     if (!ctx) return;
-    // Quién y cuándo: así los próximos correos de ese remitente puntúan menos
-    // (ver remitenteInfo en vistasAutomation.ts).
-    const uid = req.auth?.userId;
     const { rowCount } = await pool.query(
-      `UPDATE vistas_solicitudes SET estado = 'descartada', decidido_por = $2, decidido_por_nombre = $3, decidido_at = NOW(), updated_at = NOW()
-        WHERE id = $1 AND estado = 'pendiente'`,
-      [ctx.sol.id, uid, await resolveUserName(uid)],
+      `UPDATE vistas_solicitudes SET estado = 'descartada', updated_at = NOW() WHERE id = $1 AND estado = 'pendiente'`,
+      [ctx.sol.id],
     );
     if (!rowCount) return fail(res, 'Solo se pueden descartar vistas pendientes.', 409);
     return ok(res, { estado: 'descartada' });
