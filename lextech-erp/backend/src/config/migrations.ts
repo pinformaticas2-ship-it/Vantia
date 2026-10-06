@@ -2915,6 +2915,22 @@ export async function runMigrations(): Promise<void> {
       console.warn('⚠️  No se pudo dar de alta al procurador Constantino Manuel Gutiérrez Sarmiento:', e?.message || e);
     }
 
+    // ── Firmas, plantillas y grupos de correo por organización (06/10/2026) ──
+    // shared_templates no tenía organizacion_id: lo creado en una organización
+    // se veía en todas. Lo existente pasa a la organización más antigua, igual
+    // que el resto de datos anteriores al multi-organización.
+    try {
+      await client.query(`ALTER TABLE shared_templates ADD COLUMN IF NOT EXISTS organizacion_id UUID REFERENCES organizaciones(id) ON DELETE CASCADE;`);
+      await client.query(`
+        UPDATE shared_templates SET organizacion_id = (SELECT id FROM organizaciones ORDER BY created_at ASC LIMIT 1)
+        WHERE organizacion_id IS NULL
+      `);
+      await client.query(`ALTER TABLE shared_templates ALTER COLUMN organizacion_id SET NOT NULL;`);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_shared_templates_org_type ON shared_templates (organizacion_id, type);`);
+    } catch (e: any) {
+      console.warn('⚠️  shared_templates.organizacion_id:', e?.message || e);
+    }
+
     // ── Permisos en schema public (requerido en PostgreSQL 15+) ────
     for (const grant of [
       `GRANT USAGE ON SCHEMA public TO admin`,

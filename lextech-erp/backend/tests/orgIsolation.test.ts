@@ -93,3 +93,23 @@ test('logActivity sin organización la deduce de la entidad', { skip }, async ()
   const { rows } = await pool.query(`SELECT organizacion_id FROM activity_log WHERE action_type = $1`, [`Office ${MARK}`]);
   assert.equal(rows[0]?.organizacion_id, orgA);
 });
+
+// 06/10/2026: firmas, plantillas y grupos de correo eran globales.
+test('firmas y plantillas de correo: cada organización las suyas', { skip }, async () => {
+  const st = await import('../src/controllers/sharedTemplatesController');
+  const created: any = await call(st.createSharedTemplate, orgA, { body: { type: 'email_signature', name: MARK, data: { html: MARK } } });
+  assert.equal(created.success, true);
+  const id = created.data.id;
+  assert.ok(!leaks(await call(st.listSharedTemplates, orgB, { query: { type: 'email_signature' } })), 'la firma de A se ve en B');
+  assert.ok(leaks(await call(st.listSharedTemplates, orgA, { query: { type: 'email_signature' } })), 'la firma de A debe verse en A');
+  // Desde B no se puede tocar.
+  assert.equal((await call(st.updateSharedTemplate, orgB, { params: { id }, body: { name: 'x', data: {} } })).success, false);
+  assert.equal((await call(st.setDefaultSharedTemplate, orgB, { params: { id } })).success, false);
+  assert.equal((await call(st.deleteSharedTemplate, orgB, { params: { id } })).success, false);
+  // Marcar predeterminada en B no quita la de A.
+  await call(st.setDefaultSharedTemplate, orgA, { params: { id } });
+  const b: any = await call(st.createSharedTemplate, orgB, { body: { type: 'email_signature', name: 'B', data: { html: 'B' } } });
+  await call(st.setDefaultSharedTemplate, orgB, { params: { id: b.data.id } });
+  const { rows } = await pool.query(`SELECT is_default FROM shared_templates WHERE id = $1`, [id]);
+  assert.equal(rows[0].is_default, true);
+});
