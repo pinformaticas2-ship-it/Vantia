@@ -28,6 +28,10 @@ export interface VistasCorreoFormato {
   tamano: 'pequeno' | 'normal' | 'grande';
   color: string;
   firma: string;
+  /** Firma registrada en Correo → Firmas (HTML), copiada al elegirla. Si hay
+   *  una, sustituye a la firma de texto y va al final del correo. */
+  firmaHtml: string;
+  firmaNombre: string;
   citarOriginal: boolean;
 }
 
@@ -42,8 +46,20 @@ const TAMANOS_CORREO = { pequeno: '13px', normal: '14px', grande: '16px' } as co
 
 export const DEFAULT_FIRMA = 'Un cordial saludo,\n{abogado}\n{despacho}';
 export const DEFAULT_CORREO_FORMATO: VistasCorreoFormato = {
-  fuente: 'arial', tamano: 'normal', color: '#1f2937', firma: DEFAULT_FIRMA, citarOriginal: false,
+  fuente: 'arial', tamano: 'normal', color: '#1f2937', firma: DEFAULT_FIRMA, firmaHtml: '', firmaNombre: '', citarOriginal: false,
 };
+
+/** Limpieza básica del HTML de una firma antes de enviarlo: sin scripts,
+ *  marcos, formularios, manejadores on* ni enlaces javascript:. */
+export function sanitizeFirmaHtml(html: string): string {
+  return String(html || '')
+    .replace(/<\s*(script|style|iframe|object|embed|form|textarea|select)\b[\s\S]*?<\s*\/\s*\1\s*>/gi, '')
+    .replace(/<\s*\/?\s*(script|style|iframe|object|embed|form|input|button|textarea|select|link|meta|base)\b[^>]*>/gi, '')
+    .replace(/\s+on[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(/\b(href|src)\s*=\s*(["']?)\s*(?:javascript|vbscript|data:text\/html)[^"'\s>]*\2/gi, '$1="#"')
+    .trim()
+    .slice(0, 50000);
+}
 
 function cleanCorreoFormato(v: any): VistasCorreoFormato {
   const d = DEFAULT_CORREO_FORMATO;
@@ -53,6 +69,8 @@ function cleanCorreoFormato(v: any): VistasCorreoFormato {
     color: /^#[0-9a-f]{6}$/i.test(String(v?.color || '')) ? String(v.color) : d.color,
     // La firma puede quedar vacía a propósito (solo si se manda la clave).
     firma: v && typeof v.firma === 'string' ? v.firma.replace(/\r\n/g, '\n').trim().slice(0, 1000) : d.firma,
+    firmaHtml: typeof v?.firmaHtml === 'string' ? sanitizeFirmaHtml(v.firmaHtml) : '',
+    firmaNombre: typeof v?.firmaNombre === 'string' && v?.firmaHtml ? v.firmaNombre.trim().slice(0, 200) : '',
     citarOriginal: v?.citarOriginal === true,
   };
 }
@@ -502,7 +520,9 @@ function fillTemplate(tpl: string, vars: PlantillaVars, firma = DEFAULT_FIRMA): 
 export function renderPlantilla(tpl: VistasPlantilla, vars: PlantillaVars, formato: VistasCorreoFormato = DEFAULT_CORREO_FORMATO): { asunto: string; html: string; texto: string } {
   const asunto = fillTemplate(tpl.asunto, vars).replace(/\s+/g, ' ').trim().slice(0, 900);
   // Un {mensaje} o una firma vacíos no deben dejar huecos de párrafos en blanco.
-  const texto = fillTemplate(tpl.cuerpo, vars, formato.firma).replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  // Con firma registrada (HTML), {firma} queda vacía en el texto y la firma se
+  // añade al final del HTML (buildRespuestaHtml).
+  const texto = fillTemplate(tpl.cuerpo, vars, formato.firmaHtml ? '' : formato.firma).replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
   return { asunto, html: buildRespuestaHtml(texto, formato), texto };
 }
 
@@ -522,7 +542,8 @@ export function buildRespuestaHtml(texto: string, formato: VistasCorreoFormato =
     cita = `\n<p style="margin:16px 0 6px;color:#6b7280">${escapeHtml(`${cuando}${original.from} escribió:`)}</p>` +
       `\n<blockquote style="margin:0;padding-left:12px;border-left:3px solid #d1d5db;color:#6b7280">${cuerpo}</blockquote>`;
   }
-  return `<div style="${style}">\n${parrafos}${cita}\n</div>`;
+  const firma = formato.firmaHtml ? `\n<div style="margin-top:12px">${formato.firmaHtml}</div>` : '';
+  return `<div style="${style}">\n${parrafos}${firma}${cita}\n</div>`;
 }
 
 // ── Destinatarios de los avisos ──────────────────────────────────────────────

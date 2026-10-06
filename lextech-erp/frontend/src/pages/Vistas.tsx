@@ -286,6 +286,7 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
   const [modoRespuesta, setModoRespuesta] = useState<null | "aceptar" | "rechazar">(null);
   const [asunto, setAsunto] = useState("");
   const [cuerpo, setCuerpo] = useState("");
+  const [firmaRegistrada, setFirmaRegistrada] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
 
   const [conflictos, setConflictos] = useState<Conflicto[]>([]);
@@ -355,7 +356,7 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
     try {
       const data = await apiFetch(`/api/vistas/${id}/preview`, { method: "POST", getToken, body: JSON.stringify({ tipo, ...formBody() }) });
       if (data?.success === false) throw new Error(data.error);
-      setAsunto(data.data.asunto); setCuerpo(data.data.texto); setModoRespuesta(tipo);
+      setAsunto(data.data.asunto); setCuerpo(data.data.texto); setFirmaRegistrada(data.data.firmaRegistrada || null); setModoRespuesta(tipo);
     } catch (e: any) {
       setActionError(e.message || "No se pudo preparar el correo");
     } finally {
@@ -815,6 +816,7 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
                     </div>
                     <input value={asunto} onChange={(e) => setAsunto(e.target.value)} className={inputCls} />
                     <textarea value={cuerpo} onChange={(e) => setCuerpo(e.target.value)} rows={9} className={`${inputCls} font-sans`} />
+                    {firmaRegistrada && <p className="text-[11px] text-slate-500">Al final se añadirá la firma «{firmaRegistrada}».</p>}
                   </div>
                 )}
               </>

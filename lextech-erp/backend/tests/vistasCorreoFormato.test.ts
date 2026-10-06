@@ -47,3 +47,16 @@ test('cita del correo original, escapada', () => {
   assert.match(html, /&lt;b&gt;vista&lt;\/b&gt;<br>autos/);
   assert.doesNotMatch(buildRespuestaHtml('Hola', normalizeVistasConfig({}).correo, { from: 'a', fecha: null, texto: 'x' }), /blockquote/);
 });
+
+test('firma registrada (HTML): sustituye a la de texto y se limpia', () => {
+  const cfg = normalizeVistasConfig({ correo: {
+    firmaNombre: 'Firma despacho',
+    firmaHtml: '<p onclick="x()">Ana<br><img src="https://x.es/logo.png"></p><script>alert(1)</script><a href="javascript:alert(1)">w</a>',
+  } });
+  assert.equal(cfg.correo.firmaNombre, 'Firma despacho');
+  assert.doesNotMatch(cfg.correo.firmaHtml, /script|onclick|javascript:/i);
+  assert.match(cfg.correo.firmaHtml, /<img src="https:\/\/x\.es\/logo\.png">/);
+  const r = renderPlantilla(cfg.plantillaAceptar, vars, cfg.correo);
+  assert.doesNotMatch(r.texto, /cordial|\{firma\}/, 'el texto editable no lleva la firma de texto');
+  assert.match(r.html, /<div style="margin-top:12px"><p>Ana/);
+});

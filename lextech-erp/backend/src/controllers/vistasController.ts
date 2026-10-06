@@ -445,7 +445,10 @@ export async function previewVistaCorreo(req: any, res: Response) {
     const vars = await buildPlantillaVars(req, ctx, req.body);
     const tpl = tipo === 'aceptar' ? ctx.cfg.plantillaAceptar : ctx.cfg.plantillaRechazar;
     const r = renderPlantilla(tpl, vars, ctx.cfg.correo);
-    return ok(res, { para: ctx.sol.from_email, asunto: r.asunto, texto: r.texto });
+    return ok(res, {
+      para: ctx.sol.from_email, asunto: r.asunto, texto: r.texto,
+      firmaRegistrada: ctx.cfg.correo.firmaHtml ? (ctx.cfg.correo.firmaNombre || 'registrada') : null,
+    });
   } catch (e: any) {
     return fail(res, e?.message || 'Error generando el correo');
   }

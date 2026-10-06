@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useAuth } from '@clerk/clerk-react';
 import { Loader2, RotateCcw, X } from 'lucide-react';
 import { apiFetch } from '../lib/api';
+import { fetchSharedTemplates } from '../lib/sharedTemplates';
 
 // Configuración → Automatizaciones → "Configurar correo": cómo se ve el correo
 // que Vantia envía al aceptar o rechazar una vista (textos, firma, tipo de
@@ -14,7 +15,21 @@ export interface CorreoFormato {
   tamano: 'pequeno' | 'normal' | 'grande';
   color: string;
   firma: string;
+  firmaHtml: string;
+  firmaNombre: string;
   citarOriginal: boolean;
+}
+interface FirmaRegistrada { id: string; name: string; html: string; isDefault: boolean }
+const GUARDADA = '__guardada';
+
+// Las firmas importadas pueden venir en quoted-printable (igual que en Email.tsx).
+function decodeQP(input: string): string {
+  return input
+    .replace(/=\r?\n/g, '')
+    .replace(/((?:=[0-9A-Fa-f]{2})+)/g, (match) => {
+      const bytes = (match.match(/=[0-9A-Fa-f]{2}/g) || []).map((b) => parseInt(b.slice(1), 16));
+      try { return new TextDecoder('utf-8').decode(new Uint8Array(bytes)); } catch { return match; }
+    });
 }
 interface Plantilla { asunto: string; cuerpo: string }
 export interface CorreoConfig {
@@ -60,7 +75,7 @@ const DEFAULTS: CorreoConfig = {
     asunto: 'Re: {asunto_original}',
     cuerpo: 'Buenos días,\n\nLamentamos comunicarles que no nos es posible asistir a la vista señalada para el {fecha} a las {hora}{juzgado_txt}{autos_txt}.\n\n{mensaje}\n\n{firma}',
   },
-  correo: { fuente: 'arial', tamano: 'normal', color: '#1f2937', firma: 'Un cordial saludo,\n{abogado}\n{despacho}', citarOriginal: false },
+  correo: { fuente: 'arial', tamano: 'normal', color: '#1f2937', firma: 'Un cordial saludo,\n{abogado}\n{despacho}', firmaHtml: '', firmaNombre: '', citarOriginal: false },
 };
 
 type Campo = 'firma' | 'aceptar' | 'rechazar';
@@ -95,6 +110,26 @@ export default function VistasCorreoConfigModal({ initial, canManage, onClose, o
     return () => { cancel = true; clearTimeout(t); };
   }, [cfg, getToken]);
 
+  // Firmas ya registradas en Correo → Firmas.
+  const [firmasRegistradas, setFirmasRegistradas] = useState<FirmaRegistrada[]>([]);
+  useEffect(() => {
+    fetchSharedTemplates('email_signature', getToken)
+      .then((rows) => setFirmasRegistradas(rows
+        .map((r) => ({ id: r.id, name: r.name, html: decodeQP(String((r.data as any)?.html || '')), isDefault: r.is_default }))
+        .filter((f) => f.html.trim())))
+      .catch(() => {});
+  }, [getToken]);
+  const firmaSel = !cfg.correo.firmaHtml
+    ? ''
+    : (firmasRegistradas.find((f) => f.name === cfg.correo.firmaNombre && f.html === cfg.correo.firmaHtml)?.id
+      || firmasRegistradas.find((f) => f.name === cfg.correo.firmaNombre)?.id
+      || GUARDADA);
+  const elegirFirma = (id: string) => {
+    if (id === GUARDADA) return;
+    const f = firmasRegistradas.find((x) => x.id === id);
+    setFormato(f ? { firmaHtml: f.html, firmaNombre: f.name } : { firmaHtml: '', firmaNombre: '' });
+  };
+
   const setFormato = (patch: Partial<CorreoFormato>) => setCfg((c) => ({ ...c, correo: { ...c.correo, ...patch } }));
   const setPlantilla = (which: 'aceptar' | 'rechazar', patch: Partial<Plantilla>) =>
     setCfg((c) => which === 'aceptar'
@@ -102,7 +137,7 @@ export default function VistasCorreoConfigModal({ initial, canManage, onClose, o
       : { ...c, plantillaRechazar: { ...c.plantillaRechazar, ...patch } });
 
   const insertar = (v: string) => {
-    const campo = focused === 'firma' ? 'firma' : tab;
+    const campo = focused === 'firma' && !cfg.correo.firmaHtml ? 'firma' : tab;
     const el = refs[campo].current;
     const actual = campo === 'firma' ? cfg.correo.firma : (campo === 'aceptar' ? cfg.plantillaAceptar.cuerpo : cfg.plantillaRechazar.cuerpo);
     const ini = el?.selectionStart ?? actual.length;
@@ -173,10 +208,24 @@ export default function VistasCorreoConfigModal({ initial, canManage, onClose, o
 
             <section>
               <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">Firma</h3>
-              <textarea ref={refs.firma} disabled={ro} rows={4} value={cfg.correo.firma} onFocus={() => setFocused('firma')}
-                onChange={(e) => setFormato({ firma: e.target.value })} className={`${input} font-mono text-xs`}
-                placeholder="Un cordial saludo,&#10;{abogado}&#10;{despacho}&#10;Tel. …" />
-              <p className="mt-1 text-[11px] text-slate-400">Se coloca donde la plantilla diga {'{firma}'}. Puedes poner teléfono, dirección, aviso legal…</p>
+              <select disabled={ro} value={firmaSel} onChange={(e) => elegirFirma(e.target.value)} className={`${input} mb-2`}>
+                <option value="">Escribirla aquí</option>
+                {firmasRegistradas.map((f) => <option key={f.id} value={f.id}>{f.name}{f.isDefault ? ' (predeterminada)' : ''}</option>)}
+                {firmaSel === GUARDADA && <option value={GUARDADA}>{cfg.correo.firmaNombre || 'Firma registrada'} (copia guardada)</option>}
+              </select>
+              {cfg.correo.firmaHtml ? (
+                <>
+                  <div className="max-h-40 overflow-auto rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs" dangerouslySetInnerHTML={{ __html: cfg.correo.firmaHtml }} />
+                  <p className="mt-1 text-[11px] text-slate-400">Firma registrada en Correo → Firmas. Se añade al final del correo. Si la cambias allí, vuelve a elegirla aquí para actualizarla.</p>
+                </>
+              ) : (
+                <>
+                  <textarea ref={refs.firma} disabled={ro} rows={4} value={cfg.correo.firma} onFocus={() => setFocused('firma')}
+                    onChange={(e) => setFormato({ firma: e.target.value })} className={`${input} font-mono text-xs`}
+                    placeholder="Un cordial saludo,&#10;{abogado}&#10;{despacho}&#10;Tel. …" />
+                  <p className="mt-1 text-[11px] text-slate-400">Se coloca donde la plantilla diga {'{firma}'}. Puedes poner teléfono, dirección, aviso legal…</p>
+                </>
+              )}
             </section>
 
             <section>
