@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useAuth } from '@clerk/clerk-react';
 import { Loader2, RotateCcw, X } from 'lucide-react';
 import { apiFetch } from '../lib/api';
@@ -123,9 +124,11 @@ export default function VistasCorreoConfigModal({ initial, canManage, onClose, o
   const ro = !canManage;
   const input = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-100 disabled:bg-slate-50';
 
-  return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/30 p-4" onMouseDown={(e) => { if (e.target === e.currentTarget && !saving) onClose(); }}>
-      <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+  // En un portal sobre <body>: dentro de Configuración, un contenedor con
+  // transform hacía que el fixed se recortara bajo la barra superior.
+  return createPortal(
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/30 p-4" onMouseDown={(e) => { if (e.target === e.currentTarget && !saving) onClose(); }}>
+      <div className="flex max-h-[calc(100dvh-2rem)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
           <div>
             <h2 className="text-base font-extrabold text-slate-800">Configurar correo de respuesta</h2>
@@ -219,7 +222,7 @@ export default function VistasCorreoConfigModal({ initial, canManage, onClose, o
                 <p><span className="text-slate-400">Asunto:</span> <b className="text-slate-700">{actual?.asunto || '…'}</b></p>
               </div>
               <iframe title="Vista previa del correo" sandbox="" srcDoc={actual ? `<!doctype html><meta charset="utf-8"><body style="margin:16px">${actual.html}</body>` : ''}
-                className="h-[420px] w-full" />
+                className="h-[min(420px,50vh)] w-full" />
             </div>
             <p className="mt-2 text-[11px] text-slate-400">Datos de ejemplo. En cada vista se usan los reales.</p>
           </div>
@@ -241,6 +244,7 @@ export default function VistasCorreoConfigModal({ initial, canManage, onClose, o
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
