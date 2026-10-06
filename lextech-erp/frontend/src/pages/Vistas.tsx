@@ -417,6 +417,24 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
     }
   };
 
+  // Detalles editables plegados por defecto; abiertos si los datos son dudosos
+  // (leídos sin IA o sin fecha), que es cuando conviene revisarlos.
+  const [detallesAbiertos, setDetallesAbiertos] = useState<boolean | null>(null);
+  const verDetalles = detallesAbiertos ?? Boolean(d && (!d.fecha_vista || d.extraccion_origen !== "ia"));
+
+  // Fecha real del recordatorio con los valores actuales del formulario.
+  const recordatorioCalculado = useMemo(() => {
+    if (!d || !conRecordatorio) return null;
+    if (recordatorio) return fromLocalInput(recordatorio);
+    const base = d.datos?.fecha_preparacion ? new Date(`${d.datos.fecha_preparacion}T00:00:00`) : (fromLocalInput(fecha) ? new Date(fromLocalInput(fecha)!) : null);
+    if (!base) return null;
+    const r = new Date(base);
+    r.setDate(r.getDate() - d.defaults.recordatorioDias);
+    const [hh, mm] = d.defaults.recordatorioHora.split(":").map(Number);
+    r.setHours(hh || 9, mm || 0, 0, 0);
+    return r.toISOString();
+  }, [d, conRecordatorio, recordatorio, fecha]);
+
   const recordatorioTexto = useMemo(() => {
     if (!d) return "";
     const dias = d.defaults.recordatorioDias;
@@ -430,28 +448,7 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
   const badge = ESTADO_BADGE[d.estado] || ESTADO_BADGE.pendiente;
   const pasos = resultado || d.pasos || [];
 
-  return (
-    <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <button onClick={onClose} className="md:hidden text-xs font-semibold text-slate-500 mb-2">← Volver</button>
-          <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="text-lg font-extrabold text-slate-900">{fmtFecha(d.fecha_vista)}</h2>
-            <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${badge.cls}`}>{badge.label}</span>
-            {d.extraccion_origen && (
-              <span className="text-[10px] font-semibold text-slate-400">
-                {d.extraccion_origen === "ia" ? "Datos leídos con IA" : d.extraccion_origen === "patrones" ? "Datos leídos sin IA — revísalos" : ""}
-              </span>
-            )}
-          </div>
-          {d.decidido_por_nombre && (
-            <p className="text-xs text-slate-500 mt-1">Decidido por {d.decidido_por_nombre} · {fmtFecha(d.decidido_at)}</p>
-          )}
-        </div>
-        <button onClick={onClose} className="hidden md:block p-1.5 rounded-lg text-slate-400 hover:bg-white hover:text-slate-700"><X size={16} /></button>
-      </div>
-
-      {/* Correo de origen */}
+  const correoOrigen = (
       <section className="bg-white rounded-2xl border border-slate-200 p-4">
         <div className="flex items-start gap-3">
           <Mail size={16} className="text-slate-400 mt-0.5 shrink-0" />
@@ -479,6 +476,40 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
           </div>
         </div>
       </section>
+  );
+
+  const nombreResponsable = d.miembros.find((m) => m.userId === responsable)?.nombre || "ti";
+  const expedienteElegido = expModo === "existente"
+    ? (d.expediente ? `${d.expediente.anio}/${d.expediente.num_exp}` : (() => { const c = d.coincidencias.find((x) => x.id === expId); return c ? `${c.anio}/${c.num_exp}${c.descripcion ? ` · ${c.descripcion}` : ""}` : ""; })())
+    : "";
+
+  return (
+    <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <button onClick={onClose} className="md:hidden text-xs font-semibold text-slate-500 mb-2">← Volver</button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-lg font-extrabold text-slate-900">
+              {editable && mostrarFormulario
+                ? (d.tipo === "cambio" ? "¿Es otra vista distinta?" : "¿Confirmas esta vista?")
+                : fmtFecha(d.fecha_vista)}
+            </h2>
+            <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${badge.cls}`}>{badge.label}</span>
+            {d.extraccion_origen && (
+              <span className="text-[10px] font-semibold text-slate-400">
+                {d.extraccion_origen === "ia" ? "Datos leídos con IA" : d.extraccion_origen === "patrones" ? "Datos leídos sin IA — revísalos" : ""}
+              </span>
+            )}
+          </div>
+          {d.decidido_por_nombre && (
+            <p className="text-xs text-slate-500 mt-1">Decidido por {d.decidido_por_nombre} · {fmtFecha(d.decidido_at)}</p>
+          )}
+        </div>
+        <button onClick={onClose} className="hidden md:block p-1.5 rounded-lg text-slate-400 hover:bg-white hover:text-slate-700"><X size={16} /></button>
+      </div>
+
+      {/* Correo recibido: arriba si no hay que decidir; si hay que decidir, al final */}
+      {!(editable && mostrarFormulario) && correoOrigen}
 
       {/* Resultado de la última acción / pasos */}
       {pasos.length > 0 && (
@@ -588,6 +619,83 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
 
       {editable && mostrarFormulario && (
         <>
+          {/* 1 · Ficha de la vista */}
+          <section className="rounded-2xl border border-slate-200 bg-white p-5">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-red-600">
+              {(tipoActo || "Vista")}{d.tipo === "cambio" ? " · cambio de fecha" : ""}
+            </p>
+            <p className="mt-1 text-2xl font-extrabold leading-tight text-slate-900">
+              {fromLocalInput(fecha) ? fmtFecha(fromLocalInput(fecha)) : "Sin fecha — indícala en «Revisar o cambiar detalles»"}
+            </p>
+            <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-1.5 text-sm sm:grid-cols-2">
+              <div className="flex gap-2"><dt className="w-20 shrink-0 text-slate-400">Juzgado</dt><dd className="font-medium text-slate-800">{juzgado || "—"}{sala ? ` · ${sala}` : ""}</dd></div>
+              <div className="flex gap-2"><dt className="w-20 shrink-0 text-slate-400">Autos</dt><dd className="font-medium text-slate-800">{autos || "—"}{nig ? ` · NIG ${nig}` : ""}</dd></div>
+              <div className="flex gap-2"><dt className="w-20 shrink-0 text-slate-400">Asiste</dt><dd className="font-medium text-slate-800">{nombreResponsable}</dd></div>
+              <div className="flex gap-2"><dt className="w-20 shrink-0 text-slate-400">Duración</dt><dd className="font-medium text-slate-800">{duracion} min</dd></div>
+            </dl>
+            <div className={`mt-4 flex items-start gap-2 rounded-xl px-3 py-2 text-sm font-semibold ${conflictos.length ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-800"}`}>
+              {checking ? <Loader2 size={15} className="mt-0.5 animate-spin" /> : conflictos.length ? <AlertTriangle size={15} className="mt-0.5" /> : <Check size={15} className="mt-0.5" />}
+              <span>
+                {conflictos.length
+                  ? `Choca con tu agenda: ${conflictos.map((c) => c.title).join(", ")}`
+                  : `Agenda libre a esa hora${nombreResponsable !== "ti" ? ` para ${nombreResponsable}` : ""}`}
+              </span>
+            </div>
+          </section>
+
+          {/* 2 · Qué pasará */}
+          <section className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-5">
+            <h3 className="text-sm font-bold text-slate-800">Si aceptas, Vantia hará esto:</h3>
+            <ol className="mt-2 space-y-1.5 text-sm text-slate-700">
+              <li className="flex items-start gap-2"><Mail size={15} className="mt-0.5 shrink-0 text-emerald-600" />{enviarCorreo ? <>Responder a <b>{d.from_email}</b> confirmando la asistencia</> : <span className="text-slate-500">No se enviará ninguna respuesta</span>}</li>
+              <li className="flex items-start gap-2"><FileText size={15} className="mt-0.5 shrink-0 text-emerald-600" />{expModo === "existente" && expedienteElegido ? <>Vincularla al expediente <b>{expedienteElegido}</b></> : <>Crear un <b>expediente nuevo</b> con estos datos</>}</li>
+              <li className="flex items-start gap-2"><CalendarCheck size={15} className="mt-0.5 shrink-0 text-emerald-600" />Apuntarla en la agenda de <b>{nombreResponsable}</b></li>
+              <li className="flex items-start gap-2"><Paperclip size={15} className="mt-0.5 shrink-0 text-emerald-600" />{guardarAdjuntos && d.adjuntos.length ? <>Guardar <b>{d.adjuntos.length} adjunto{d.adjuntos.length === 1 ? "" : "s"}</b> y el correo en el expediente</> : <>Guardar el correo como nota en el expediente</>}</li>
+              <li className="flex items-start gap-2"><Clock size={15} className="mt-0.5 shrink-0 text-emerald-600" />{conRecordatorio && recordatorioCalculado ? <>Recordarte prepararla el <b>{fmtFecha(recordatorioCalculado)}</b></> : <span className="text-slate-500">Sin recordatorio</span>}</li>
+            </ol>
+            <p className="mt-3 border-t border-emerald-100 pt-2 text-xs text-slate-500">
+              Si rechazas: {enviarCorreo ? <>se responderá a {d.from_email} que no podéis asistir</> : "no se responde a nadie"} y no se crea nada.
+            </p>
+          </section>
+
+          {actionError && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{actionError}</p>}
+
+          {/* 3 · Decisión */}
+          <div className="flex flex-wrap items-center gap-2">
+            <button onClick={() => void run("aceptar")} disabled={!!busy}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 text-white text-sm font-bold shadow-sm hover:bg-red-700 disabled:opacity-50">
+              {busy === "aceptar" ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
+              {d.estado === "error" ? "Reintentar" : "Aceptar vista"}
+            </button>
+            {d.estado !== "error" && (
+              <button onClick={() => void run("rechazar")} disabled={!!busy}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-700 text-sm font-bold hover:bg-slate-50 disabled:opacity-50">
+                {busy === "rechazar" ? <Loader2 size={15} className="animate-spin" /> : <X size={15} />} Rechazar
+              </button>
+            )}
+            {d.estado === "pendiente" && (
+              <button onClick={() => void run("descartar")} disabled={!!busy} title="No responde a nadie: solo la quita de la lista"
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-slate-500 text-xs font-semibold hover:bg-white disabled:opacity-50">
+                {busy === "descartar" ? <Loader2 size={13} className="animate-spin" /> : <Undo2 size={13} />} No es una vista
+              </button>
+            )}
+            {d.estado === "descartada" && (
+              <button onClick={() => void run("reabrir")} disabled={!!busy}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-slate-600 text-xs font-semibold hover:bg-white disabled:opacity-50">
+                {busy === "reabrir" ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />} Pasar a "por confirmar"
+              </button>
+            )}
+          </div>
+
+          {/* 4 · Detalles (plegado) */}
+          <section className="rounded-2xl border border-slate-200 bg-white">
+            <button type="button" onClick={() => setDetallesAbiertos(!verDetalles)}
+              className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-bold text-slate-700">
+              <span>Revisar o cambiar detalles <span className="font-normal text-slate-400">· fecha, juzgado, expediente, recordatorio, texto del correo</span></span>
+              <ChevronDown size={16} className={`shrink-0 text-slate-400 transition-transform ${verDetalles ? "rotate-180" : ""}`} />
+            </button>
+            {verDetalles && (
+              <div className="space-y-4 border-t border-slate-100 p-4">
           {/* Datos de la vista */}
           <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Datos de la vista</h3>
@@ -713,33 +821,13 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
             )}
           </section>
 
-          {actionError && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{actionError}</p>}
+              </div>
+            )}
+          </section>
 
-          <div className="flex flex-wrap items-center gap-2 pb-6">
-            <button onClick={() => void run("aceptar")} disabled={!!busy}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-bold hover:bg-red-700 disabled:opacity-50">
-              {busy === "aceptar" ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
-              {d.estado === "error" ? "Reintentar" : "Aceptar vista"}
-            </button>
-            {d.estado !== "error" && (
-              <button onClick={() => void run("rechazar")} disabled={!!busy}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 text-sm font-bold hover:bg-slate-50 disabled:opacity-50">
-                {busy === "rechazar" ? <Loader2 size={15} className="animate-spin" /> : <X size={15} />} Rechazar
-              </button>
-            )}
-            {d.estado === "pendiente" && (
-              <button onClick={() => void run("descartar")} disabled={!!busy} title="No responde a nadie: solo la quita de la lista"
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-slate-500 text-xs font-semibold hover:bg-white disabled:opacity-50">
-                {busy === "descartar" ? <Loader2 size={13} className="animate-spin" /> : <Undo2 size={13} />} No es una vista
-              </button>
-            )}
-            {d.estado === "descartada" && (
-              <button onClick={() => void run("reabrir")} disabled={!!busy}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-slate-600 text-xs font-semibold hover:bg-white disabled:opacity-50">
-                {busy === "reabrir" ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />} Pasar a "por confirmar"
-              </button>
-            )}
-          </div>
+          {/* 5 · Correo recibido */}
+          {correoOrigen}
+          <div className="pb-6" />
         </>
       )}
     </div>
