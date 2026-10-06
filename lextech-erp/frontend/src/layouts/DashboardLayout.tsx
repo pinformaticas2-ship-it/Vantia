@@ -1546,8 +1546,12 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
                   fallbackClassName={`bg-gradient-to-br ${orgAvatarGradient(organizacion.id)}`}
                   imgClassName="object-contain p-1.5"
                 />
+              ) : !orgLoaded ? (
+                // Cargando: nada de logos (antes salía el de Avalentia, que es lo
+                // que contiene vantia-sidebar-slate.png, en cualquier organización).
+                <span className="h-6 w-6 rounded-md bg-slate-700/60 animate-pulse" />
               ) : (
-                <img src="/vantia-sidebar-slate.png" alt="Vantia Legis" className="h-6 w-6 object-contain" />
+                <img src="/vantia-mark-96.png" alt="Vantia Legis" className="h-6 w-6 object-contain" />
               )}
             </button>
 
@@ -1616,8 +1620,10 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
                     fallbackClassName={`bg-gradient-to-br ${orgAvatarGradient(organizacion.id)}`}
                     imgClassName="object-contain p-1"
                   />
+                ) : !orgLoaded ? (
+                  <span className="h-7 w-7 rounded-md bg-slate-700/60 animate-pulse" />
                 ) : (
-                  <img src="/vantia-sidebar-slate.png" alt="Vantia Legis" className="h-7 w-7 object-contain" />
+                  <img src="/vantia-mark-96.png" alt="Vantia Legis" className="h-7 w-7 object-contain" />
                 )}
               </div>
               <div className="flex-1 min-w-0 text-left">
