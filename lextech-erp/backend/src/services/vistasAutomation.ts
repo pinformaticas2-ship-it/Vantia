@@ -738,7 +738,10 @@ export async function remitenteInfo(organizacionId: string, fromEmail: string | 
   if (!email) return { confianza: null, descartadoAntes: false };
   const [dir, hist] = await Promise.all([
     pool.query(
-      `SELECT 1 FROM directorio_profesionales WHERE organizacion_id = $1 AND LOWER(TRIM(email)) = $2 LIMIT 1`,
+      // Solo procuradores y abogados: el Directorio también guarda partes
+      // contrarias (aseguradoras, bancos...), que no son fuente de señalamientos.
+      `SELECT 1 FROM directorio_profesionales
+        WHERE organizacion_id = $1 AND LOWER(TRIM(email)) = $2 AND tipo IN ('PROCURADOR','ABOGADO') LIMIT 1`,
       [organizacionId, email],
     ).catch(() => ({ rows: [] as any[] })),
     pool.query(
