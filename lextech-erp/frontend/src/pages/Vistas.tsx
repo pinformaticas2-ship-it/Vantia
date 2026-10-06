@@ -50,6 +50,10 @@ interface Solicitud {
   created_at: string;
   tipo: Tipo;
   relacion: Relacion | null;
+  /** Fiabilidad de la detección (ver evaluarSenalamiento en el backend). */
+  confianza_nivel: "alta" | "media" | "baja" | null;
+  confianza_score: number | null;
+  motivos: { texto: string; puntos: number }[] | null;
 }
 
 interface Detalle extends Solicitud {
@@ -221,6 +225,9 @@ function VistasModulo() {
                     <span className={`shrink-0 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${badge.cls}`}>{badge.label}</span>
                   </div>
                   <p className="text-xs text-slate-600 truncate mt-0.5">
+                    {s.estado === "pendiente" && s.confianza_nivel === "media" && (
+                      <span className="mr-1.5 rounded px-1.5 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-800" title="Pocas señales de que sea un señalamiento real: no se ha avisado">Dudosa</span>
+                    )}
                     {s.tipo && s.tipo !== "vista" && <span className={`mr-1.5 rounded px-1.5 py-0.5 text-[10px] font-bold ${TIPO_BADGE[s.tipo].cls}`}>{TIPO_BADGE[s.tipo].label}</span>}
                     {s.datos?.juzgado || s.subject || "(sin asunto)"}
                   </p>
@@ -450,6 +457,30 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
         </div>
         <button onClick={onClose} className="hidden md:block p-1.5 rounded-lg text-slate-400 hover:bg-white hover:text-slate-700"><X size={16} /></button>
       </div>
+
+      {/* Por qué se ha detectado así: cada señal y sus puntos */}
+      {d.motivos && d.motivos.length > 0 && (
+        <details className={`rounded-2xl border p-4 ${d.confianza_nivel === "alta" ? "border-emerald-200 bg-emerald-50/50" : d.confianza_nivel === "media" ? "border-amber-200 bg-amber-50/60" : "border-slate-200 bg-white"}`} open={d.confianza_nivel !== "alta"}>
+          <summary className="cursor-pointer text-sm font-bold text-slate-800">
+            {d.confianza_nivel === "alta" ? "Detección fiable" : d.confianza_nivel === "media" ? "Detección dudosa: revísala (no se ha avisado)" : "Descartada automáticamente"}
+            <span className="ml-2 text-xs font-semibold text-slate-500">· {d.confianza_score ?? 0} puntos — por qué</span>
+          </summary>
+          <ul className="mt-2 space-y-1 text-xs">
+            {d.motivos.map((m, i) => (
+              <li key={i} className="flex items-start gap-2">
+                <span className={`w-9 shrink-0 text-right font-bold tabular-nums ${m.puntos > 0 ? "text-emerald-700" : m.puntos < 0 ? "text-red-600" : "text-slate-400"}`}>
+                  {m.puntos > 0 ? `+${m.puntos}` : m.puntos}
+                </span>
+                <span className="text-slate-700">{m.texto}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-[11px] text-slate-500">
+            Se avisa a partir de 55 puntos; entre 30 y 54 queda como dudosa sin avisar; por debajo se descarta.
+            Al pulsar "No es una vista", los próximos correos de ese remitente puntuarán menos.
+          </p>
+        </details>
+      )}
 
       {/* Correo de origen */}
       <section className="bg-white rounded-2xl border border-slate-200 p-4">
