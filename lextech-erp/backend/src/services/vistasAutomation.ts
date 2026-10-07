@@ -683,7 +683,9 @@ async function analyzeEmail(emailId: string, cfg: VistasConfig, organizacionId: 
   const haystack = `${row.subject || ''}\n${text}\n${attachments.map((a) => a.filename).join('\n')}`;
   const ignorar = { row, text, datos: null as VistaDatos | null, origen: 'filtro' as const, relacion: null as Relacion | null };
 
-  if (String(row.subject || '').startsWith(AVISO_SUBJECT_PREFIX)) return ignorar;
+  // Los avisos de Vantia y sus respuestas/reenvíos ("Re: [Vantia] Vista por
+  // confirmar...", 07/10/2026) nunca son vistas nuevas.
+  if (String(row.subject || '').toLowerCase().includes(AVISO_SUBJECT_PREFIX.toLowerCase())) return ignorar;
 
   // Además de los correos "de vistas" (palabras clave), cualquier correo que
   // cite los autos o el NIG de un expediente de la organización: remisiones de
@@ -751,12 +753,45 @@ const TITULO_AVISO: Record<'vista' | 'cambio' | 'documentacion', string> = {
 /** Aviso de una solicitud nueva: push + campana (por la propia solicitud) y
  *  CORREO al abogado responsable (o, si no hay, al dueño del buzón), para que
  *  llegue aunque nadie tenga Vantia abierta ni las notificaciones activadas. */
+/** Avisos ya enviados por correo recibido y persona ("messageId|userId"), por
+ *  si dos organizaciones procesan el mismo correo a la vez. */
+const avisosRecientes = new Map<string, number>();
+
+/** Quién ya recibió aviso de ESTE correo desde otra solicitud (normalmente de
+ *  otra organización que vigila el mismo buzón): 07/10/2026, el mismo buzón
+ *  vigilado en Avalentia y en PRUEBA mandaba dos avisos de cada vista. */
+export async function yaAvisados(solicitudId: string): Promise<{ messageId: string | null; usuarios: Set<string> }> {
+  const { rows } = await pool.query(
+    `SELECT me.message_id,
+            ARRAY(SELECT DISTINCT COALESCE(o.responsable_user_id, o.mailbox_user_id)
+                    FROM vistas_solicitudes o
+                   WHERE o.message_id = me.message_id AND o.id <> me.id
+                     AND o.created_at <= me.created_at AND o.estado <> 'ignorada') AS usuarios
+       FROM vistas_solicitudes me WHERE me.id = $1`,
+    [solicitudId],
+  );
+  const messageId = rows[0]?.message_id || null;
+  return { messageId, usuarios: new Set(messageId ? (rows[0].usuarios || []).filter(Boolean) : []) };
+}
+
 async function avisarSolicitud(
   org: { id: string; nombre: string }, cfg: VistasConfig, solicitudId: string,
   tipo: 'vista' | 'cambio' | 'documentacion', datos: VistaDatos, fechaVista: Date | null,
   conflictos: AgendaConflict[], relacion: Relacion | null, email: { subject: string | null; from: string | null; mailboxOwner: string | null },
 ) {
-  const destinatarios = avisoDestinatarios(cfg.responsableUserId, email.mailboxOwner);
+  const previos = await yaAvisados(solicitudId);
+  const ahora = Date.now();
+  for (const [k, t] of avisosRecientes) if (ahora - t > 15 * 60_000) avisosRecientes.delete(k);
+  const destinatarios = avisoDestinatarios(cfg.responsableUserId, email.mailboxOwner).filter((u) => {
+    if (previos.usuarios.has(u)) return false;
+    if (!previos.messageId) return true;
+    const k = `${previos.messageId}|${u}`;
+    if (avisosRecientes.has(k)) return false;
+    avisosRecientes.set(k, ahora);
+    return true;
+  });
+  // La solicitud queda igualmente en Vistas (y en la campana) de esta organización.
+  if (!destinatarios.length) return;
   const cuando = fechaVista ? `${formatMadrid(fechaVista, { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}` : '';
   const procedimiento = relacion?.expediente
     ? `expediente ${relacion.expediente.anio}/${relacion.expediente.num_exp}${relacion.expediente.num_autos ? ` (autos ${relacion.expediente.num_autos})` : ''}`

@@ -23,6 +23,7 @@ interface ConfigResponse {
   lastError?: string | null;
   iaDisponible?: boolean;
   config?: CorreoConfig;
+  mailboxCompartidoCon?: string[];
 }
 
 const PASOS = [
@@ -162,6 +163,12 @@ export default function AutomatizacionesPanel() {
         {enabled && (
           <p className="mt-2 text-xs text-slate-500">
             Por privacidad, las vistas (con sus correos y adjuntos) solo las ven el dueño del buzón vigilado y el abogado responsable.
+          </p>
+        )}
+        {enabled && !!data?.mailboxCompartidoCon?.length && (
+          <p className="mt-2 flex items-start gap-1.5 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            <AlertTriangle size={13} className="shrink-0 mt-0.5" />
+            <span>Este mismo buzón también lo vigila {data.mailboxCompartidoCon.join(', ')}: cada vista aparecerá en las dos organizaciones (el aviso solo te llega una vez). Si no lo necesitas, desactiva la automatización en una de ellas.</span>
           </p>
         )}
         {enabled && (data?.mailboxWarning || data?.lastError) && (

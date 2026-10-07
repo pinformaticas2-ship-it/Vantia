@@ -54,21 +54,21 @@ function canSeeVistas(req: any, cfg: VistasConfig, mailboxOwner: string | null):
   return !isSoporte(req) && !!uid && (uid === cfg.responsableUserId || uid === mailboxOwner);
 }
 
-async function mailboxOwnerOf(organizacionId: string, cfg: VistasConfig): Promise<{ owner: string | null; label: string | null; hasRefreshToken?: boolean }> {
+async function mailboxOwnerOf(organizacionId: string, cfg: VistasConfig): Promise<{ owner: string | null; label: string | null; hasRefreshToken?: boolean; email?: string }> {
   if (!cfg.mailbox) return { owner: null, label: null };
   if (cfg.mailbox.type === 'imap') {
     const { rows } = await pool.query(
       `SELECT user_id, label, email FROM email_accounts WHERE id = $1 AND organizacion_id = $2`,
       [cfg.mailbox.id, organizacionId],
     );
-    return rows.length ? { owner: rows[0].user_id, label: `${rows[0].label || rows[0].email} <${rows[0].email}>` } : { owner: null, label: null };
+    return rows.length ? { owner: rows[0].user_id, label: `${rows[0].label || rows[0].email} <${rows[0].email}>`, email: rows[0].email } : { owner: null, label: null };
   }
   const { rows } = await pool.query(
     `SELECT user_id, email, refresh_token_enc FROM email_oauth_profiles WHERE id = $1 AND organizacion_id = $2`,
     [cfg.mailbox.id, organizacionId],
   );
   return rows.length
-    ? { owner: rows[0].user_id, label: `Gmail · ${rows[0].email}`, hasRefreshToken: Boolean(rows[0].refresh_token_enc) }
+    ? { owner: rows[0].user_id, label: `Gmail · ${rows[0].email}`, hasRefreshToken: Boolean(rows[0].refresh_token_enc), email: rows[0].email }
     : { owner: null, label: null };
 }
 
@@ -120,9 +120,26 @@ export async function getVistasConfig(req: any, res: Response) {
       mailboxOptions.push({ type: cfg.mailbox.type, id: cfg.mailbox.id, label: `${mailbox.label} (de otro usuario)`, warning: null });
     }
 
+    // Otras organizaciones (de las que eres miembro) que vigilan este mismo
+    // buzón: cada una crea su vista; el aviso solo te llega una vez.
+    let mailboxCompartidoCon: string[] = [];
+    if (org.vistas_auto_enabled && mailbox.email) {
+      const { rows: otras } = await pool.query(
+        `SELECT o.nombre FROM organizaciones o
+           JOIN organizacion_miembros m ON m.organizacion_id = o.id AND m.user_id = $3
+          WHERE o.id <> $1 AND o.vistas_auto_enabled = true
+            AND (EXISTS (SELECT 1 FROM email_accounts a WHERE a.id::text = o.vistas_auto_config->'mailbox'->>'id' AND lower(a.email) = lower($2))
+              OR EXISTS (SELECT 1 FROM email_oauth_profiles p WHERE p.id::text = o.vistas_auto_config->'mailbox'->>'id' AND lower(p.email) = lower($2)))
+          ORDER BY o.nombre`,
+        [org.id, mailbox.email, uid],
+      );
+      mailboxCompartidoCon = otras.map((r: any) => r.nombre);
+    }
+
     return ok(res, {
       ...base,
       config: cfg,
+      mailboxCompartidoCon,
       mailboxLabel: mailbox.label,
       mailboxWarning: cfg.mailbox?.type === 'gmail' && mailbox.label && !mailbox.hasRefreshToken
         ? 'El Gmail vigilado necesita volver a conectarse desde Correo para poder leerse en segundo plano.'
