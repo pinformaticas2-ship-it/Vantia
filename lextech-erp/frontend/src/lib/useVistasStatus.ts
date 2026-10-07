@@ -7,11 +7,17 @@ import { apiFetch } from './api';
 // activada y él es propietario/admin, abogado responsable o dueño del buzón)
 // y cuántas vistas tiene pendientes de confirmar. Ver backend
 // controllers/vistasController.ts.
+// Último estado conocido: el menú ya lo ha cargado, así que la página de Vistas
+// (y cualquier otro sitio que use el hook) arranca con él en vez de mostrar un
+// spinner mientras vuelve a preguntar. Al cambiar de organización se recarga
+// la página, así que no se mezcla entre organizaciones.
+let ultimo: { visible: boolean; pendientes: number } | null = null;
+
 export function useVistasStatus(pollMs = 60_000) {
   const { getToken } = useAuth();
-  const [visible, setVisible] = useState(false);
-  const [pendientes, setPendientes] = useState(0);
-  const [loaded, setLoaded] = useState(false);
+  const [visible, setVisible] = useState(ultimo?.visible ?? false);
+  const [pendientes, setPendientes] = useState(ultimo?.pendientes ?? 0);
+  const [loaded, setLoaded] = useState(ultimo !== null);
 
   useEffect(() => {
     let cancelled = false;
@@ -25,9 +31,16 @@ export function useVistasStatus(pollMs = 60_000) {
         setLoaded(true);
         if (show) {
           const av = await apiFetch('/api/vistas/avisos', { getToken });
-          if (!cancelled && av?.success) setPendientes((av.data || []).filter((a: any) => a.estado === 'pendiente').length);
+          if (!cancelled && av?.success) {
+            const n = (av.data || []).filter((a: any) => a.estado === 'pendiente').length;
+            setPendientes(n);
+            ultimo = { visible: true, pendientes: n };
+          } else if (!cancelled) {
+            ultimo = { visible: true, pendientes: ultimo?.pendientes ?? 0 };
+          }
         } else {
           setPendientes(0);
+          ultimo = { visible: false, pendientes: 0 };
         }
       } catch {
         // Sin conexión: se deja como estaba, pero sin quedarse "cargando" para siempre.

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { Link, Navigate, useSearchParams } from "react-router-dom";
 import {
@@ -125,12 +125,46 @@ function Field({ label, children, className = "" }: { label: string; children: R
   );
 }
 
+// Lo ya cargado se enseña al instante (al volver a la página, cambiar de
+// pestaña o de vista) y se actualiza en segundo plano, sin spinners.
+const listaCache = new Map<string, Solicitud[]>();
+const detalleCache = new Map<string, Detalle>();
+const mismo = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+
+function ListaSkeleton() {
+  return (
+    <div className="anim-fade-in">
+      {[0, 1, 2, 3, 4].map((i) => (
+        <div key={i} className="px-4 py-3 border-b border-slate-100 space-y-2">
+          <div className="flex justify-between gap-2"><div className="h-3.5 w-40 rounded bg-slate-100 animate-pulse" /><div className="h-3.5 w-16 rounded-full bg-slate-100 animate-pulse" /></div>
+          <div className="h-3 w-56 rounded bg-slate-100 animate-pulse" />
+          <div className="h-2.5 w-32 rounded bg-slate-100 animate-pulse" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DetalleSkeleton() {
+  return (
+    <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-4 anim-fade-in">
+      <div className="h-6 w-64 rounded bg-slate-200/70 animate-pulse" />
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-3">
+        <div className="h-3 w-20 rounded bg-slate-100 animate-pulse" />
+        <div className="h-7 w-72 rounded bg-slate-100 animate-pulse" />
+        <div className="grid grid-cols-2 gap-2">{[0, 1, 2, 3].map((i) => <div key={i} className="h-3.5 rounded bg-slate-100 animate-pulse" />)}</div>
+      </div>
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-2">{[0, 1, 2, 3].map((i) => <div key={i} className="h-3.5 w-3/4 rounded bg-slate-100 animate-pulse" />)}</div>
+    </div>
+  );
+}
+
 const inputCls = "w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-red-400 focus:ring-1 focus:ring-red-100";
 
 export default function Vistas() {
   // El módulo solo existe con la automatización activada (Ajustes → Automatizaciones).
   const { visible, loaded } = useVistasStatus();
-  if (!loaded) return <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-slate-400" /></div>;
+  if (!loaded) return <div className="h-full" />;
   if (!visible) return <Navigate to="/dashboard" replace />;
   return <VistasModulo />;
 }
@@ -139,25 +173,55 @@ function VistasModulo() {
   const { getToken } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [tab, setTab] = useState("pendiente");
-  const [items, setItems] = useState<Solicitud[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [items, setItems] = useState<Solicitud[]>(() => listaCache.get("pendiente") || []);
+  // Primera carga de la pestaña (nada que enseñar todavía) / refresco en curso.
+  const [primeraCarga, setPrimeraCarga] = useState(() => !listaCache.has("pendiente"));
+  const [loading, setLoading] = useState(false);
   const [listError, setListError] = useState("");
   const selectedId = searchParams.get("id");
+  const tabActual = useRef(tab);
+  tabActual.current = tab;
 
-  const loadList = useCallback(async () => {
-    setLoading(true); setListError("");
+  const loadList = useCallback(async (silencioso = false) => {
+    if (!silencioso) setLoading(true);
     try {
       const data = await apiFetch(`/api/vistas?estado=${tab}`, { getToken });
       if (data?.success === false) throw new Error(data.error);
-      setItems(data.data || []);
+      const nuevos: Solicitud[] = data.data || [];
+      listaCache.set(tab, nuevos);
+      // Respuesta de una pestaña de la que ya se ha salido: solo a la caché.
+      if (tabActual.current !== tab) return;
+      // Solo se repinta si algo cambió: sin saltos en cada refresco.
+      setItems((prev) => (mismo(prev, nuevos) ? prev : nuevos));
+      setListError("");
     } catch (e: any) {
-      setListError(e.message || "No se pudieron cargar las vistas");
+      if (!silencioso) setListError(e.message || "No se pudieron cargar las vistas");
     } finally {
-      setLoading(false);
+      if (tabActual.current === tab) { setLoading(false); setPrimeraCarga(false); }
     }
   }, [getToken, tab]);
 
-  useEffect(() => { void loadList(); }, [loadList]);
+  // Al cambiar de pestaña: lo que hubiera en caché al instante, y a refrescar.
+  useEffect(() => {
+    const cached = listaCache.get(tab);
+    setItems(cached || []);
+    setPrimeraCarga(!cached);
+    void loadList(true);
+  }, [tab, loadList]);
+
+  // Refresco silencioso: cuando algo cambia (vista nueva, aceptar...), cada
+  // 30 s y al volver a la pestaña del navegador.
+  useEffect(() => {
+    const refrescar = () => { if (document.visibilityState === "visible") void loadList(true); };
+    const t = window.setInterval(refrescar, 30_000);
+    window.addEventListener("vistas:changed", refrescar);
+    document.addEventListener("visibilitychange", refrescar);
+    return () => {
+      window.clearInterval(t);
+      window.removeEventListener("vistas:changed", refrescar);
+      document.removeEventListener("visibilitychange", refrescar);
+    };
+  }, [loadList]);
 
   const select = (id: string | null) => {
     const next = new URLSearchParams(searchParams);
@@ -165,7 +229,7 @@ function VistasModulo() {
     setSearchParams(next, { replace: true });
   };
 
-  const onChanged = () => { void loadList(); notifyVistasChanged(); };
+  const onChanged = () => { void loadList(true); notifyVistasChanged(); };
 
   return (
     <div className="h-full min-h-0 flex flex-col overflow-hidden animate-page-in">
@@ -206,7 +270,8 @@ function VistasModulo() {
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto">
             {listError && <p className="m-4 text-sm text-red-600">{listError}</p>}
-            {!loading && !listError && items.length === 0 && (
+            {primeraCarga && !listError && <ListaSkeleton />}
+            {!primeraCarga && !listError && items.length === 0 && (
               <div className="py-16 px-6 flex flex-col items-center gap-3 text-slate-400 text-center">
                 <Gavel size={36} className="opacity-15" />
                 <p className="font-medium text-sm">{tab === "pendiente" ? "No hay vistas pendientes de confirmar" : "No hay vistas en esta lista"}</p>
@@ -295,12 +360,7 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
   const [conflictos, setConflictos] = useState<Conflicto[]>([]);
   const [checking, setChecking] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoadError("");
-    try {
-      const data = await apiFetch(`/api/vistas/${id}`, { getToken });
-      if (data?.success === false) throw new Error(data.error);
-      const v: Detalle = data.data;
+  const aplicar = useCallback((v: Detalle) => {
       setD(v);
       setFecha(toLocalInput(v.fecha_vista));
       setDuracion(v.duracion_min || v.defaults.duracionMin);
@@ -317,12 +377,30 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
       setEnviarCorreo(!(v.pasos || []).some((p) => p.paso === "correo" && p.ok));
       setConflictos(v.conflictos || []);
       setMostrarFormulario(v.tipo === "vista" || !v.relacion);
-    } catch (e: any) {
-      setLoadError(e.message || "No se pudo cargar la vista");
-    }
-  }, [getToken, id]);
+  }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  // silencioso: si ya se enseña lo de la caché, solo se aplica lo nuevo si
+  // algo cambió (no pisa lo que el usuario esté escribiendo).
+  const load = useCallback(async (silencioso = false) => {
+    try {
+      const data = await apiFetch(`/api/vistas/${id}`, { getToken });
+      if (data?.success === false) throw new Error(data.error);
+      const v: Detalle = data.data;
+      const previo = detalleCache.get(id);
+      detalleCache.set(id, v);
+      if (!silencioso || !previo || !mismo(previo, v)) aplicar(v);
+      setLoadError("");
+    } catch (e: any) {
+      if (!detalleCache.has(id)) setLoadError(e.message || "No se pudo cargar la vista");
+    }
+  }, [getToken, id, aplicar]);
+
+  // Lo de la caché antes de pintar (sin parpadeo), y después lo actual.
+  useLayoutEffect(() => {
+    const cached = detalleCache.get(id);
+    if (cached) aplicar(cached);
+  }, [id, aplicar]);
+  useEffect(() => { void load(Boolean(detalleCache.get(id))); }, [id, load]);
 
   const editable = d && (d.estado === "pendiente" || d.estado === "error" || d.estado === "descartada");
 
@@ -447,7 +525,7 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
   }, [d]);
 
   if (loadError) return <div className="p-8 text-sm text-red-600">{loadError}</div>;
-  if (!d) return <div className="p-10 flex justify-center"><Loader2 className="animate-spin text-slate-400" /></div>;
+  if (!d) return <DetalleSkeleton />;
 
   const badge = ESTADO_BADGE[d.estado] || ESTADO_BADGE.pendiente;
   const pasos = resultado || d.pasos || [];
