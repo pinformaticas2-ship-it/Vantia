@@ -61,16 +61,32 @@ export function sanitizeFirmaHtml(html: string): string {
     .slice(0, 50000);
 }
 
+/** ¿Es código HTML (etiquetas de bloque o con estilos) y no texto normal? */
+export function looksLikeHtml(s: string): boolean {
+  return /<\s*(div|p|table|span|br|img|a|b|strong|font|td|tr)\b[^>]*>/i.test(String(s || ''));
+}
+
 function cleanCorreoFormato(v: any): VistasCorreoFormato {
   const d = DEFAULT_CORREO_FORMATO;
+  let firma = v && typeof v.firma === 'string' ? v.firma.replace(/\r\n/g, '\n').trim() : d.firma;
+  let firmaHtml = typeof v?.firmaHtml === 'string' ? v.firmaHtml : '';
+  let firmaNombre = typeof v?.firmaNombre === 'string' ? v.firmaNombre.trim() : '';
+  // HTML pegado en la firma "de texto" (07/10/2026: un aviso legal con
+  // estilos salía como código y cortado): se trata como firma con formato.
+  if (!firmaHtml && looksLikeHtml(firma)) {
+    firmaHtml = firma;
+    firmaNombre = firmaNombre || 'Pegada (HTML)';
+    firma = d.firma;
+  }
+  firmaHtml = sanitizeFirmaHtml(firmaHtml);
   return {
     fuente: v?.fuente && FUENTES_CORREO[v.fuente] ? v.fuente : d.fuente,
     tamano: v?.tamano in TAMANOS_CORREO ? v.tamano : d.tamano,
     color: /^#[0-9a-f]{6}$/i.test(String(v?.color || '')) ? String(v.color) : d.color,
     // La firma puede quedar vacía a propósito (solo si se manda la clave).
-    firma: v && typeof v.firma === 'string' ? v.firma.replace(/\r\n/g, '\n').trim().slice(0, 1000) : d.firma,
-    firmaHtml: typeof v?.firmaHtml === 'string' ? sanitizeFirmaHtml(v.firmaHtml) : '',
-    firmaNombre: typeof v?.firmaNombre === 'string' && v?.firmaHtml ? v.firmaNombre.trim().slice(0, 200) : '',
+    firma: firma.slice(0, 5000),
+    firmaHtml,
+    firmaNombre: firmaHtml ? firmaNombre.slice(0, 200) : '',
     citarOriginal: v?.citarOriginal === true,
   };
 }

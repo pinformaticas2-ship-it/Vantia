@@ -21,6 +21,7 @@ export interface CorreoFormato {
 }
 interface FirmaRegistrada { id: string; name: string; html: string; isDefault: boolean }
 const GUARDADA = '__guardada';
+const PEGADA = 'Pegada (HTML)';
 
 // Las firmas importadas pueden venir en quoted-printable (igual que en Email.tsx).
 function decodeQP(input: string): string {
@@ -211,19 +212,28 @@ export default function VistasCorreoConfigModal({ initial, canManage, onClose, o
               <select disabled={ro} value={firmaSel} onChange={(e) => elegirFirma(e.target.value)} className={`${input} mb-2`}>
                 <option value="">Escribirla aquí</option>
                 {firmasRegistradas.map((f) => <option key={f.id} value={f.id}>{f.name}{f.isDefault ? ' (predeterminada)' : ''}</option>)}
-                {firmaSel === GUARDADA && <option value={GUARDADA}>{cfg.correo.firmaNombre || 'Firma registrada'} (copia guardada)</option>}
+                {firmaSel === GUARDADA && <option value={GUARDADA}>{cfg.correo.firmaNombre === PEGADA ? 'Pegada como HTML' : `${cfg.correo.firmaNombre || 'Firma registrada'} (copia guardada)`}</option>}
               </select>
               {cfg.correo.firmaHtml ? (
                 <>
                   <div className="max-h-40 overflow-auto rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs" dangerouslySetInnerHTML={{ __html: cfg.correo.firmaHtml }} />
-                  <p className="mt-1 text-[11px] text-slate-400">Firma registrada en Correo → Firmas. Se añade al final del correo. Si la cambias allí, vuelve a elegirla aquí para actualizarla.</p>
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    {cfg.correo.firmaNombre === PEGADA
+                      ? 'Firma pegada como HTML: se añade al final del correo con su formato. Para volver a escribirla como texto, elige «Escribirla aquí».'
+                      : 'Firma registrada en Correo → Firmas. Se añade al final del correo. Si la cambias allí, vuelve a elegirla aquí para actualizarla.'}
+                  </p>
                 </>
               ) : (
                 <>
                   <textarea ref={refs.firma} disabled={ro} rows={4} value={cfg.correo.firma} onFocus={() => setFocused('firma')}
-                    onChange={(e) => setFormato({ firma: e.target.value })} className={`${input} font-mono text-xs`}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      // HTML pegado (p.ej. un aviso legal con estilos): se usa como firma con formato.
+                      if (/<\s*(div|p|table|span|br|img|a|b|strong|font|td|tr)\b[^>]*>/i.test(v)) setFormato({ firmaHtml: v, firmaNombre: PEGADA });
+                      else setFormato({ firma: v });
+                    }} className={`${input} font-mono text-xs`}
                     placeholder="Un cordial saludo,&#10;{abogado}&#10;{despacho}&#10;Tel. …" />
-                  <p className="mt-1 text-[11px] text-slate-400">Se coloca donde la plantilla diga {'{firma}'}. Puedes poner teléfono, dirección, aviso legal…</p>
+                  <p className="mt-1 text-[11px] text-slate-400">Se coloca donde la plantilla diga {'{firma}'}. Para una firma con logo y colores, créala en Correo → Firmas y elígela arriba; si pegas código HTML aquí, se usará con su formato.</p>
                 </>
               )}
             </section>

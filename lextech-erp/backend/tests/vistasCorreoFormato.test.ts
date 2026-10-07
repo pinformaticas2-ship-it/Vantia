@@ -60,3 +60,18 @@ test('firma registrada (HTML): sustituye a la de texto y se limpia', () => {
   assert.doesNotMatch(r.texto, /cordial|\{firma\}/, 'el texto editable no lleva la firma de texto');
   assert.match(r.html, /<div style="margin-top:12px"><p>Ana/);
 });
+
+// 07/10/2026: un aviso legal en HTML pegado en la firma "de texto" salía como
+// código y cortado a 1000 caracteres.
+test('HTML pegado en la firma de texto se usa con su formato y sin cortar', () => {
+  const aviso = '<div style="font-size:10px;color:#666">' + 'Le informamos de que sus datos serán tratados... '.repeat(60) + 'FIN</div>';
+  const cfg = normalizeVistasConfig({ correo: { firma: aviso } });
+  assert.equal(cfg.correo.firmaNombre, 'Pegada (HTML)');
+  assert.match(cfg.correo.firmaHtml, /^<div style="font-size:10px;color:#666">/);
+  assert.match(cfg.correo.firmaHtml, /FIN<\/div>$/, 'no se corta');
+  const r = renderPlantilla(cfg.plantillaAceptar, vars, cfg.correo);
+  assert.doesNotMatch(r.texto, /<div/, 'el texto editable no lleva el código');
+  assert.match(r.html, /<div style="margin-top:12px"><div style="font-size:10px/);
+  // Texto normal sigue siendo texto (p.ej. "<3" o un correo entre <>).
+  assert.equal(normalizeVistasConfig({ correo: { firma: 'Ana <ana@x.es>' } }).correo.firmaHtml, '');
+});
