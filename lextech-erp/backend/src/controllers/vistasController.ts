@@ -433,7 +433,8 @@ export async function getVistaConflictos(req: any, res: Response) {
     const fecha = parseDate(req.query.fecha) || (ctx.sol.fecha_vista ? new Date(ctx.sol.fecha_vista) : null);
     if (!fecha) return ok(res, []);
     const dur = Math.min(600, Math.max(15, Number(req.query.duracion) || ctx.sol.duracion_min || ctx.cfg.duracionMin));
-    const responsable = String(req.query.responsable || ctx.sol.responsable_user_id || ctx.cfg.responsableUserId || req.auth?.userId || '');
+    // 07/10/2026: ya no se elige abogado; la vista va a la agenda de quien la acepta.
+    const responsable = String(req.auth?.userId || '');
     // Ni los eventos de esta solicitud ni, si es un cambio de fecha, la propia
     // vista que se va a mover cuentan como choque.
     const exclude = [ctx.sol.agenda_event_id, ctx.sol.recordatorio_event_id, ctx.sol.relacion?.vista?.agenda_event_id].filter(Boolean);
@@ -591,7 +592,8 @@ export async function aceptarVista(req: any, res: Response) {
   const duracion = Math.min(600, Math.max(15, Number(b.duracion_min) || sol.duracion_min || cfg.duracionMin));
   const uid = req.auth?.userId;
 
-  let responsableId: string = String(b.responsable_user_id || sol.responsable_user_id || cfg.responsableUserId || uid);
+  // 07/10/2026: ya no se elige abogado; la vista va a la agenda de quien la acepta.
+  let responsableId: string = String(uid);
   const { rows: miembro } = await pool.query(
     `SELECT 1 FROM organizacion_miembros WHERE organizacion_id = $1 AND user_id = $2`,
     [req.organizacionId, responsableId],

@@ -275,7 +275,6 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
   const [sala, setSala] = useState("");
   const [autos, setAutos] = useState("");
   const [nig, setNig] = useState("");
-  const [responsable, setResponsable] = useState("");
   const [expModo, setExpModo] = useState<"nuevo" | "existente">("nuevo");
   const [expId, setExpId] = useState("");
   const [guardarAdjuntos, setGuardarAdjuntos] = useState(true);
@@ -306,7 +305,6 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
       setSala(v.datos?.sala || "");
       setAutos(v.datos?.num_autos || "");
       setNig(v.datos?.nig || "");
-      setResponsable(v.responsable_user_id || v.defaults.responsableUserId || "");
       if (v.expediente_id) { setExpModo("existente"); setExpId(v.expediente_id); }
       else if (v.coincidencias.length) { setExpModo("existente"); setExpId(v.coincidencias[0].id); }
       setGuardarAdjuntos(v.defaults.guardarAdjuntos);
@@ -324,7 +322,7 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
 
   const editable = d && (d.estado === "pendiente" || d.estado === "error" || d.estado === "descartada");
 
-  // Comprobación del hueco en la agenda, en vivo al cambiar fecha/duración/responsable.
+  // Comprobación del hueco en la agenda, en vivo al cambiar fecha/duración (siempre en la agenda de quien decide).
   useEffect(() => {
     if (!d || !editable) return;
     const iso = fromLocalInput(fecha);
@@ -332,7 +330,7 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
     const t = window.setTimeout(async () => {
       setChecking(true);
       try {
-        const qs = new URLSearchParams({ fecha: iso, duracion: String(duracion), responsable });
+        const qs = new URLSearchParams({ fecha: iso, duracion: String(duracion) });
         const data = await apiFetch(`/api/vistas/${id}/conflictos?${qs}`, { getToken });
         if (data?.success) setConflictos(data.data || []);
       } catch { /* se mantiene el último resultado */ } finally {
@@ -340,14 +338,13 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
       }
     }, 400);
     return () => window.clearTimeout(t);
-  }, [d, editable, fecha, duracion, responsable, id, getToken]);
+  }, [d, editable, fecha, duracion, id, getToken]);
 
   const formBody = () => ({
     fecha: fromLocalInput(fecha),
     duracion_min: duracion,
     tipo_acto: tipoActo,
     juzgado, sala, num_autos: autos, nig,
-    responsable_user_id: responsable || undefined,
     mensaje,
   });
 
@@ -479,7 +476,6 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
       </section>
   );
 
-  const nombreResponsable = d.miembros.find((m) => m.userId === responsable)?.nombre || "ti";
   const expedienteElegido = expModo === "existente"
     ? (d.expediente ? `${d.expediente.anio}/${d.expediente.num_exp}` : (() => { const c = d.coincidencias.find((x) => x.id === expId); return c ? `${c.anio}/${c.num_exp}${c.descripcion ? ` · ${c.descripcion}` : ""}` : ""; })())
     : "";
@@ -631,7 +627,6 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
             <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-1.5 text-sm sm:grid-cols-2">
               <div className="flex gap-2"><dt className="w-20 shrink-0 text-slate-400">Juzgado</dt><dd className="font-medium text-slate-800">{juzgado || "—"}{sala ? ` · ${sala}` : ""}</dd></div>
               <div className="flex gap-2"><dt className="w-20 shrink-0 text-slate-400">Autos</dt><dd className="font-medium text-slate-800">{autos || "—"}{nig ? ` · NIG ${nig}` : ""}</dd></div>
-              <div className="flex gap-2"><dt className="w-20 shrink-0 text-slate-400">Asiste</dt><dd className="font-medium text-slate-800">{nombreResponsable}</dd></div>
               <div className="flex gap-2"><dt className="w-20 shrink-0 text-slate-400">Duración</dt><dd className="font-medium text-slate-800">{duracion} min</dd></div>
             </dl>
             <div className={`mt-4 flex items-start gap-2 rounded-xl px-3 py-2 text-sm font-semibold ${conflictos.length ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-800"}`}>
@@ -639,7 +634,7 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
               <span>
                 {conflictos.length
                   ? `Choca con tu agenda: ${conflictos.map((c) => c.title).join(", ")}`
-                  : `Agenda libre a esa hora${nombreResponsable !== "ti" ? ` para ${nombreResponsable}` : ""}`}
+                  : "Agenda libre a esa hora"}
               </span>
             </div>
           </section>
@@ -650,7 +645,7 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
             <ol className="mt-2 space-y-1.5 text-sm text-slate-700">
               <li className="flex items-start gap-2"><Mail size={15} className="mt-0.5 shrink-0 text-emerald-600" />{enviarCorreo ? <>Responder a <b>{d.from_email}</b> confirmando la asistencia</> : <span className="text-slate-500">No se enviará ninguna respuesta</span>}</li>
               <li className="flex items-start gap-2"><FileText size={15} className="mt-0.5 shrink-0 text-emerald-600" />{expModo === "existente" && expedienteElegido ? <>Vincularla al expediente <b>{expedienteElegido}</b></> : <>Crear un <b>expediente nuevo</b> con estos datos</>}</li>
-              <li className="flex items-start gap-2"><CalendarCheck size={15} className="mt-0.5 shrink-0 text-emerald-600" />Apuntarla en la agenda de <b>{nombreResponsable}</b></li>
+              <li className="flex items-start gap-2"><CalendarCheck size={15} className="mt-0.5 shrink-0 text-emerald-600" />Apuntarla en <b>tu agenda</b></li>
               <li className="flex items-start gap-2"><Paperclip size={15} className="mt-0.5 shrink-0 text-emerald-600" />{guardarAdjuntos && d.adjuntos.length ? <>Guardar <b>{d.adjuntos.length} adjunto{d.adjuntos.length === 1 ? "" : "s"}</b> y el correo en el expediente</> : <>Guardar el correo como nota en el expediente</>}</li>
               <li className="flex items-start gap-2"><Clock size={15} className="mt-0.5 shrink-0 text-emerald-600" />{conRecordatorio && recordatorioCalculado ? <>Recordarte prepararla el <b>{fmtFecha(recordatorioCalculado)}</b></> : <span className="text-slate-500">Sin recordatorio</span>}</li>
             </ol>
@@ -712,12 +707,6 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
               <Field label="Sala"><input value={sala} onChange={(e) => setSala(e.target.value)} className={inputCls} /></Field>
               <Field label="Nº autos"><input value={autos} onChange={(e) => setAutos(e.target.value)} className={inputCls} /></Field>
               <Field label="NIG"><input value={nig} onChange={(e) => setNig(e.target.value)} className={inputCls} /></Field>
-              <Field label="Abogado que asiste" className="sm:col-span-3">
-                <select value={responsable} onChange={(e) => setResponsable(e.target.value)} className={inputCls}>
-                  <option value="">— Yo —</option>
-                  {d.miembros.filter((m) => m.rol !== "soporte").map((m) => <option key={m.userId} value={m.userId}>{m.nombre}</option>)}
-                </select>
-              </Field>
             </div>
 
             {/* Hueco en la agenda */}
