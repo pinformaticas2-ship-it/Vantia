@@ -750,9 +750,8 @@ const TITULO_AVISO: Record<'vista' | 'cambio' | 'documentacion', string> = {
   documentacion: 'Nueva documentación de un procedimiento',
 };
 
-/** Aviso de una solicitud nueva: push + campana (por la propia solicitud) y
- *  CORREO al abogado responsable (o, si no hay, al dueño del buzón), para que
- *  llegue aunque nadie tenga Vantia abierta ni las notificaciones activadas. */
+/** Aviso de una solicitud nueva: notificación push al abogado responsable (o,
+ *  si no hay, al dueño del buzón) y campana (por la propia solicitud). */
 /** Avisos ya enviados por correo recibido y persona ("messageId|userId"), por
  *  si dos organizaciones procesan el mismo correo a la vez. */
 const avisosRecientes = new Map<string, number>();
@@ -808,35 +807,8 @@ async function avisarSolicitud(
     tag: `vista-${solicitudId}`,
   });
 
-  const appUrl = (cfg.appUrl || process.env.FRONTEND_URL || '').replace(/\/$/, '');
-  const enlace = appUrl ? `${appUrl}/dashboard/vistas?id=${solicitudId}` : null;
-  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const html = [
-    `<p><b>${esc(titulo)}</b></p>`,
-    resumen ? `<p>${esc(resumen)}</p>` : '',
-    `<p>Correo recibido: <b>${esc(email.subject || '(sin asunto)')}</b><br>De: ${esc(email.from || '')}</p>`,
-    tipo === 'documentacion' && relacion?.expediente ? `<p>Es del mismo procedimiento que el ${esc(procedimiento)}. Puedes añadir su documentación al expediente o tratarlo como vista nueva.</p>` : '',
-    tipo === 'cambio' ? '<p>Puedes modificar la vista existente (agenda y recordatorio) o solo añadir la documentación.</p>' : '',
-    enlace ? `<p><a href="${enlace}">Revisar y decidir en Vantia</a></p>` : '<p>Revísalo en Vantia → Vistas.</p>',
-    `<p style="color:#888;font-size:12px">${esc(org.nombre)} · Automatización de vistas</p>`,
-  ].filter(Boolean).join('\n');
-
-  const { getClerk } = await import('../controllers/activityController');
-  const { sendOrgEmail } = await import('../controllers/soporteController');
-  const enviados = new Set<string>();
-  for (const uid of destinatarios) {
-    try {
-      const user = await getClerk().users.getUser(uid);
-      const to = user.primaryEmailAddress?.emailAddress || user.emailAddresses?.[0]?.emailAddress;
-      if (!to || enviados.has(to.toLowerCase())) continue;
-      enviados.add(to.toLowerCase());
-      const fallo = await sendOrgEmail(org.id, email.mailboxOwner || uid, to, `${AVISO_SUBJECT_PREFIX} ${titulo}: ${email.subject || ''}`.slice(0, 250), html);
-      if (fallo) console.warn('[vistas] aviso por correo a', to, ':', fallo);
-    } catch (e: any) {
-      console.warn('[vistas] aviso por correo:', e?.message || e);
-    }
-  }
-  if (enviados.size) await pool.query(`UPDATE vistas_solicitudes SET aviso_email_at = NOW() WHERE id = $1`, [solicitudId]).catch(() => {});
+  // 07/10/2026: el correo "[Vantia] Vista por confirmar" ya no se envía (lo pidió
+  // el usuario): basta con la notificación y la campana / página Vistas.
 }
 
 async function processOrganizacion(org: { id: string; nombre: string; vistas_auto_config: any; vistas_auto_activated_at: Date }): Promise<string | null> {
