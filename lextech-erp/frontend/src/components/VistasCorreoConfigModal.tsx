@@ -4,6 +4,7 @@ import { useAuth } from '@clerk/clerk-react';
 import { Loader2, RotateCcw, X } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { fetchSharedTemplates } from '../lib/sharedTemplates';
+import { ImagenesNoAccesibles, imagenesNoAccesibles, resolverImagenesPegadas, useFirmaUpload } from './SignatureEditor';
 
 // Configuración → Automatizaciones → "Configurar correo": cómo se ve el correo
 // que Vantia envía al aceptar o rechazar una vista (textos, firma, tipo de
@@ -148,9 +149,19 @@ export default function VistasCorreoConfigModal({ initial, canManage, onClose, o
     requestAnimationFrame(() => { el?.focus(); el?.setSelectionRange(ini + v.length, ini + v.length); });
   };
 
+  const subirImagen = useFirmaUpload();
   const guardar = async () => {
     setSaving(true); setError('');
-    try { await onSave(cfg); onClose(); }
+    try {
+      let final = cfg;
+      if (cfg.correo.firmaHtml) {
+        // Imágenes incrustadas (data:) → se suben; las de tu ordenador hay que subirlas a mano.
+        const r = await resolverImagenesPegadas(cfg.correo.firmaHtml, subirImagen);
+        if (imagenesNoAccesibles(r.html).length) throw new Error('La firma tiene imágenes que solo están en tu ordenador: súbelas o quítalas (aviso en amarillo).');
+        final = { ...cfg, correo: { ...cfg.correo, firmaHtml: r.html } };
+      }
+      await onSave(final); onClose();
+    }
     catch (e: any) { setError(e?.message || 'No se pudo guardar'); }
     finally { setSaving(false); }
   };
@@ -217,6 +228,7 @@ export default function VistasCorreoConfigModal({ initial, canManage, onClose, o
               {cfg.correo.firmaHtml ? (
                 <>
                   <div className="max-h-40 overflow-auto rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs" dangerouslySetInnerHTML={{ __html: cfg.correo.firmaHtml }} />
+                  {!ro && <ImagenesNoAccesibles html={cfg.correo.firmaHtml} onChange={(h) => setFormato({ firmaHtml: h })} />}
                   <p className="mt-1 text-[11px] text-slate-400">
                     {cfg.correo.firmaNombre === PEGADA
                       ? 'Firma pegada como HTML: se añade al final del correo con su formato. Para volver a escribirla como texto, elige «Escribirla aquí».'

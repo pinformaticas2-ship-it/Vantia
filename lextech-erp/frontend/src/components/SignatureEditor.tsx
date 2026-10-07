@@ -105,8 +105,64 @@ export function useFirmaUpload() {
   };
 }
 
+/** Imágenes de una firma que nadie más podrá ver: rutas de tu ordenador
+ *  (Firma_archivos/image001.png, file:, cid: de Outlook...). Incluye fondos. */
+export function imagenesNoAccesibles(html: string): string[] {
+  const srcs = new Set<string>();
+  const ok = (s: string) => /^(https?:|data:image\/)/i.test(s.trim());
+  for (const m of html.matchAll(/<img\b[^>]*?\bsrc\s*=\s*(["'])(.*?)\1/gi)) if (!ok(m[2])) srcs.add(m[2]);
+  for (const m of html.matchAll(/\bbackground\s*=\s*(["'])(.*?)\1/gi)) if (m[2] && !ok(m[2])) srcs.add(m[2]);
+  for (const m of html.matchAll(/url\(\s*(?:&quot;|["'])?([^"')&]+)(?:&quot;|["'])?\s*\)/gi)) if (!ok(m[1])) srcs.add(m[1]);
+  return Array.from(srcs).filter(Boolean);
+}
+
+/** Lista de imágenes rotas con botón para subir cada una (o quitarla). */
+export function ImagenesNoAccesibles({ html, onChange }: { html: string; onChange: (html: string) => void }) {
+  const subir = useFirmaUpload();
+  const rotas = imagenesNoAccesibles(html);
+  const [subiendo, setSubiendo] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const objetivo = useRef<string>("");
+  if (!rotas.length) return null;
+  const reemplazar = (src: string, nuevo: string) => onChange(html.split(src).join(nuevo));
+  const quitar = (src: string) => {
+    const doc = new DOMParser().parseFromString(`<div id="r">${html}</div>`, "text/html");
+    const root = doc.getElementById("r")!;
+    root.querySelectorAll("img").forEach((img) => { if (img.getAttribute("src") === src) img.remove(); });
+    onChange(root.innerHTML.split(src).join(""));
+  };
+  return (
+    <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-900">
+      <p className="mb-1.5 flex items-center gap-1.5 font-semibold"><AlertTriangle size={13} /> {rotas.length === 1 ? "Hay una imagen" : `Hay ${rotas.length} imágenes`} que solo existe{rotas.length === 1 ? "" : "n"} en tu ordenador</p>
+      <p className="mb-2 text-amber-800">Vienen de la firma de Outlook o de una carpeta local: ni Vantia ni quien reciba el correo pueden verlas. Sube el archivo de cada una para que se vea en todas partes.</p>
+      <ul className="space-y-1">
+        {rotas.map((src) => (
+          <li key={src} className="flex items-center gap-2">
+            <span className="min-w-0 flex-1 truncate font-mono text-[11px]" title={src}>{decodeURIComponent(src.split(/[\\/]/).pop() || src)}</span>
+            <button type="button" disabled={!!subiendo} onClick={() => { objetivo.current = src; inputRef.current?.click(); }}
+              className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 font-semibold text-amber-900 ring-1 ring-amber-300 hover:bg-amber-100 disabled:opacity-50">
+              {subiendo === src ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />} Subir imagen
+            </button>
+            <button type="button" onClick={() => quitar(src)} className="text-amber-700 hover:text-red-600">Quitar</button>
+          </li>
+        ))}
+      </ul>
+      {error && <p className="mt-1 text-red-600">{error}</p>}
+      <input ref={inputRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" className="hidden"
+        onChange={async (e) => {
+          const f = e.target.files?.[0]; e.target.value = "";
+          const src = objetivo.current;
+          if (!f || !src) return;
+          setSubiendo(src); setError("");
+          try { reemplazar(src, await subir(f)); } catch (err: any) { setError(err?.message || "No se pudo subir"); } finally { setSubiendo(null); }
+        }} />
+    </div>
+  );
+}
+
 /** Sube las imágenes pegadas (data:) y avisa de las que no se podrán ver fuera. */
-async function resolverImagenesPegadas(html: string, subir: (b: Blob) => Promise<string>): Promise<{ html: string; avisos: string[] }> {
+export async function resolverImagenesPegadas(html: string, subir: (b: Blob) => Promise<string>): Promise<{ html: string; avisos: string[] }> {
   const doc = new DOMParser().parseFromString(`<div id="r">${html}</div>`, "text/html");
   const root = doc.getElementById("r")!;
   const avisos: string[] = [];
@@ -115,8 +171,6 @@ async function resolverImagenesPegadas(html: string, subir: (b: Blob) => Promise
     if (src.startsWith("data:image/")) {
       const blob = await (await fetch(src)).blob();
       img.setAttribute("src", await subir(blob));
-    } else if (/^(file:|cid:|blob:)/i.test(src) || !src) {
-      avisos.push("Alguna imagen pegada no se pudo copiar (viene de tu ordenador). Súbela con el botón de imagen.");
     }
   }
   root.querySelectorAll("script,iframe,object,embed,form").forEach((n) => n.remove());
@@ -191,6 +245,7 @@ export default function SignatureEditor({ initial, onSave, onCancel }: {
         out = r.html; setHtml(r.html);
         if (editableRef.current) editableRef.current.innerHTML = r.html;
         if (r.avisos.length) { setAvisos(r.avisos); return; }
+        if (imagenesNoAccesibles(r.html).length) { setAvisos(["Sube o quita las imágenes marcadas en amarillo antes de guardar."]); return; }
       }
       await onSave({ ...initial, name, html: out, design: { modo, ...(modo === "disenar" ? { diseno } : {}), ...(modo === "imagen" ? { imagen } : {}) } });
     } catch (e: any) {
@@ -279,6 +334,7 @@ export default function SignatureEditor({ initial, onSave, onCancel }: {
                 <div ref={editableRef} contentEditable suppressContentEditableWarning onInput={(e) => setHtml((e.target as HTMLDivElement).innerHTML)}
                   className="min-h-[180px] overflow-auto rounded-lg border border-gray-200 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
               )}
+              <ImagenesNoAccesibles html={html} onChange={(h) => { setHtml(h); if (editableRef.current) editableRef.current.innerHTML = h; }} />
               <p className="text-[11px] text-gray-400">Las imágenes pegadas se suben a Vantia al guardar, para que el destinatario las vea.</p>
             </div>
           )}
