@@ -82,9 +82,10 @@ test('la configuración solo la ven y cambian propietario/admin', { skip }, asyn
 test('un mismo correo en dos organizaciones: el aviso solo se manda una vez', { skip }, async () => {
   const { yaAvisados } = await import('../src/services/vistasAutomation');
   const org2 = (await pool.query(`INSERT INTO organizaciones (nombre) VALUES ('Org vistas 2') RETURNING id`)).rows[0].id;
+  const msgId = `msg-dup-${Date.now()}@x`;
   const ins = async (o: string, estado = 'pendiente') => (await pool.query(
     `INSERT INTO vistas_solicitudes (organizacion_id, email_id, mailbox_user_id, estado, subject, message_id)
-     VALUES ($1, uuid_generate_v4(), 'buzon', $2, 'VISTA 12/10/2026 autos 9/2026', 'msg-dup@x') RETURNING id`, [o, estado])).rows[0].id;
+     VALUES ($1, uuid_generate_v4(), 'buzon', $2, 'VISTA 12/10/2026 autos 9/2026', $3) RETURNING id`, [o, estado, msgId])).rows[0].id;
   const a = await ins(org);
   const b = await ins(org2);
   assert.equal((await yaAvisados(a)).usuarios.size, 0, 'la primera organización avisa');
