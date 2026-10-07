@@ -764,6 +764,9 @@ export async function aceptarVista(req: any, res: Response) {
     await pool.query(
       `UPDATE vistas_solicitudes
           SET estado = $2, datos = $3, fecha_vista = $4, duracion_min = $5,
+              -- Aceptada como vista (aunque llegara como "cambio" o "documentación"):
+              -- a partir de ahora es la vista de esos autos.
+              tipo = 'vista',
               responsable_user_id = $6, responsable_nombre = $7, expediente_id = $8,
               agenda_event_id = $9, recordatorio_event_id = $10, recordatorio_at = $11,
               recordatorio_enviado_at = NULL, pasos = $12, error = $13,
@@ -982,6 +985,69 @@ export async function reabrirVista(req: any, res: Response) {
     return ok(res, { estado: 'pendiente' });
   } catch (e: any) {
     return fail(res, e?.message || 'Error recuperando la vista');
+  }
+}
+
+// ── POST /api/vistas/:id/cancelar ───────────────────────────────────────────
+// Cancela una vista ya aceptada (07/10/2026): la quita de la agenda (vista y
+// recordatorio), y deja de contar como "la vista de esos autos", así que otro
+// señalamiento del mismo procedimiento se puede aceptar como vista nueva. El
+// expediente y su documentación se conservan.
+export async function cancelarVista(req: any, res: Response) {
+  try {
+    const ctx = await loadSolicitud(req, res);
+    if (!ctx) return;
+    const { sol } = ctx;
+    const motivo = String(req.body?.motivo || '').trim().slice(0, 500);
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const { rows } = await client.query(
+        `SELECT id, agenda_event_id, recordatorio_event_id, pasos FROM vistas_solicitudes
+          WHERE id = $1 AND organizacion_id = $2 AND estado = 'aceptada' FOR UPDATE`,
+        [sol.id, req.organizacionId],
+      );
+      if (!rows.length) {
+        await client.query('ROLLBACK');
+        return fail(res, 'Solo se pueden cancelar vistas aceptadas.', 409);
+      }
+      const eventos = [rows[0].agenda_event_id, rows[0].recordatorio_event_id].filter(Boolean);
+      if (eventos.length) {
+        await client.query(`DELETE FROM agenda_events WHERE id = ANY($1::uuid[]) AND organizacion_id = $2`, [eventos, req.organizacionId]);
+      }
+      const quien = await resolveUserName(req.auth?.userId);
+      const pasos = [...(Array.isArray(rows[0].pasos) ? rows[0].pasos : []), {
+        paso: 'cancelada', ok: true,
+        detalle: `Cancelada por ${quien}${motivo ? `: ${motivo}` : ''}. Quitada de la agenda; el expediente se conserva.`,
+      }];
+      await client.query(
+        `UPDATE vistas_solicitudes
+            SET estado = 'cancelada', agenda_event_id = NULL, recordatorio_event_id = NULL,
+                recordatorio_at = NULL, pasos = $2, updated_at = NOW()
+          WHERE id = $1`,
+        [sol.id, JSON.stringify(pasos)],
+      );
+      // Lo que estaba esperando como "cambio" o "repetición" de esta vista pasa
+      // a ser una vista nueva del mismo expediente (si trae fecha).
+      await client.query(
+        `UPDATE vistas_solicitudes
+            SET tipo = CASE WHEN fecha_vista IS NOT NULL THEN 'vista' ELSE tipo END,
+                relacion = relacion - 'vista', updated_at = NOW()
+          WHERE organizacion_id = $1 AND estado IN ('pendiente','descartada','error')
+            AND relacion->'vista'->>'id' = $2`,
+        [req.organizacionId, sol.id],
+      );
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw e;
+    } finally {
+      client.release();
+    }
+    await logActivityForReq(req, `Vista cancelada: ${sol.subject || ''}`.slice(0, 300), sol.expediente_id ? 'EXPEDIENTE' : 'AGENDA', sol.expediente_id || undefined, sol.subject || undefined);
+    return ok(res, { estado: 'cancelada' });
+  } catch (e: any) {
+    return fail(res, e?.message || 'Error cancelando la vista');
   }
 }
 

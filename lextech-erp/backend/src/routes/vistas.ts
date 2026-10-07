@@ -14,6 +14,7 @@ import {
   rechazarVista,
   descartarVista,
   reabrirVista,
+  cancelarVista,
   downloadVistaAdjunto,
   documentarVista,
   modificarVista,
@@ -41,5 +42,6 @@ router.post('/:id/documentar', costlyActionLimiter, documentarVista);
 router.post('/:id/modificar', costlyActionLimiter, modificarVista);
 router.post('/:id/descartar', descartarVista);
 router.post('/:id/reabrir', reabrirVista);
+router.post('/:id/cancelar', cancelarVista);
 
 export default router;

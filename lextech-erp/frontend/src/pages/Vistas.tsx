@@ -15,7 +15,7 @@ import { notifyVistasChanged, useVistasStatus } from "../lib/useVistasStatus";
 // remitente y, al aceptar, crea expediente, evento, documentos y recordatorio
 // (todo en el backend, controllers/vistasController.ts).
 
-type Estado = "pendiente" | "procesando" | "error" | "aceptada" | "rechazada" | "descartada" | "documentada" | "modificada";
+type Estado = "pendiente" | "procesando" | "error" | "aceptada" | "rechazada" | "descartada" | "documentada" | "modificada" | "cancelada";
 type Tipo = "vista" | "cambio" | "documentacion";
 interface Relacion {
   autos: string | null;
@@ -66,6 +66,7 @@ const TABS: { key: string; label: string }[] = [
   { key: "pendiente", label: "Por confirmar" },
   { key: "aceptada", label: "Aceptadas" },
   { key: "rechazada", label: "Rechazadas" },
+  { key: "cancelada", label: "Canceladas" },
   { key: "descartada", label: "Descartadas" },
 ];
 
@@ -78,6 +79,7 @@ const ESTADO_BADGE: Record<Estado, { label: string; cls: string }> = {
   descartada: { label: "Descartada", cls: "bg-slate-100 text-slate-500 border-slate-200" },
   documentada: { label: "Documentación añadida", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
   modificada: { label: "Vista modificada", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  cancelada: { label: "Cancelada", cls: "bg-slate-100 text-slate-500 border-slate-200 line-through" },
 };
 
 // Qué es cada correo: señalamiento nuevo, cambio de una vista ya aceptada
@@ -259,7 +261,9 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
   const { getToken } = useAuth();
   const [d, setD] = useState<Detalle | null>(null);
   const [loadError, setLoadError] = useState("");
-  const [busy, setBusy] = useState<"" | "aceptar" | "rechazar" | "descartar" | "reabrir" | "documentar" | "modificar">("");
+  const [busy, setBusy] = useState<"" | "aceptar" | "rechazar" | "descartar" | "reabrir" | "documentar" | "modificar" | "cancelar">("");
+  const [confirmarCancelar, setConfirmarCancelar] = useState(false);
+  const [motivoCancelar, setMotivoCancelar] = useState("");
   // Para correos de un procedimiento conocido, el formulario de vista nueva
   // solo aparece si se elige "Es una vista nueva".
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
@@ -361,7 +365,7 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
     }
   };
 
-  const run = async (accion: "aceptar" | "rechazar" | "descartar" | "reabrir" | "documentar" | "modificar") => {
+  const run = async (accion: "aceptar" | "rechazar" | "descartar" | "reabrir" | "documentar" | "modificar" | "cancelar") => {
     setBusy(accion); setActionError(""); setResultado(null);
     try {
       let body: any = {};
@@ -386,6 +390,8 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
           guardar_adjuntos: guardarAdjuntos, enviar_correo: enviarCorreo, mensaje,
           ...(modoRespuesta === "aceptar" ? { asunto, cuerpo } : {}),
         };
+      } else if (accion === "cancelar") {
+        body = { motivo: motivoCancelar };
       } else if (accion === "rechazar") {
         body = { ...formBody(), enviar_correo: enviarCorreo, ...(modoRespuesta === "rechazar" ? { asunto, cuerpo } : {}) };
       }
@@ -529,6 +535,29 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
             <p className="mt-2 text-xs text-slate-500 flex items-center gap-1.5">
               <Clock size={12} /> Recordatorio {d.recordatorio_enviado_at ? "enviado" : "programado"}: {fmtFecha(d.recordatorio_at)}
             </p>
+          )}
+          {d.estado === "aceptada" && (
+            <div className="mt-4 border-t border-slate-100 pt-3">
+              {!confirmarCancelar ? (
+                <button type="button" onClick={() => setConfirmarCancelar(true)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:border-red-200 hover:bg-red-50 hover:text-red-700">
+                  <X size={13} /> Cancelar esta vista
+                </button>
+              ) : (
+                <div className="space-y-2 rounded-xl border border-red-200 bg-red-50/60 p-3">
+                  <p className="text-sm font-semibold text-slate-800">¿Cancelar la vista?</p>
+                  <p className="text-xs text-slate-600">Se quita de la agenda (y su recordatorio). El expediente y la documentación se conservan. Después, otro señalamiento con los mismos autos se podrá aceptar como vista nueva. No se envía ningún correo.</p>
+                  <input value={motivoCancelar} onChange={(e) => setMotivoCancelar(e.target.value)} placeholder="Motivo (opcional): suspendida, desistimiento…" className={inputCls} />
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => void run("cancelar").then(() => setConfirmarCancelar(false))} disabled={!!busy}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-50">
+                      {busy === "cancelar" ? <Loader2 size={13} className="animate-spin" /> : <X size={13} />} Sí, cancelar vista
+                    </button>
+                    <button type="button" onClick={() => setConfirmarCancelar(false)} disabled={!!busy} className="rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-white">No</button>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </section>
       )}

@@ -90,3 +90,40 @@ test('un mismo correo en dos organizaciones: el aviso solo se manda una vez', { 
   assert.equal((await yaAvisados(a)).usuarios.size, 0, 'la primera organización avisa');
   assert.deepEqual([...(await yaAvisados(b)).usuarios], ['buzon'], 'la segunda ya no avisa al mismo usuario');
 });
+
+// 07/10/2026: cancelar una vista aceptada; después, otra vista con los mismos
+// autos se puede aceptar como nueva.
+test('cancelar una vista aceptada libera los autos', { skip }, async () => {
+  const v = await import('../src/controllers/vistasController');
+  const { findRelacion } = await import('../src/services/vistasAutomation');
+  const ev = (await pool.query(`INSERT INTO agenda_events (user_id, title, start_at, organizacion_id) VALUES ('buzon','Vista', NOW() + interval '5 days', $1) RETURNING id`, [org])).rows[0].id;
+  const rec = (await pool.query(`INSERT INTO agenda_events (user_id, title, start_at, organizacion_id) VALUES ('buzon','Preparar', NOW() + interval '4 days', $1) RETURNING id`, [org])).rows[0].id;
+  const aceptada = (await pool.query(
+    `INSERT INTO vistas_solicitudes (organizacion_id, email_id, mailbox_user_id, estado, tipo, subject, datos, fecha_vista, agenda_event_id, recordatorio_event_id, recordatorio_at, pasos)
+     VALUES ($1, uuid_generate_v4(), 'buzon', 'aceptada', 'vista', 'VISTA autos 777/2026', '{"num_autos":"777/2026"}', NOW() + interval '5 days', $2, $3, NOW() + interval '4 days', '[]') RETURNING id`,
+    [org, ev, rec])).rows[0].id;
+  const cambio = (await pool.query(
+    `INSERT INTO vistas_solicitudes (organizacion_id, email_id, mailbox_user_id, estado, tipo, subject, datos, fecha_vista, relacion)
+     VALUES ($1, uuid_generate_v4(), 'buzon', 'pendiente', 'cambio', 'VISTA nueva autos 777/2026', '{"num_autos":"777/2026"}', NOW() + interval '9 days', $2) RETURNING id`,
+    [org, JSON.stringify({ autos: '777/2026', vista: { id: aceptada } })])).rows[0].id;
+
+  assert.ok((await findRelacion(org, ['777/2026'], []))?.vista, 'antes de cancelar, los autos tienen vista');
+  // Solo quien la ve puede cancelarla.
+  assert.equal((await call(v.cancelarVista, 'otro', 'miembro', { params: { id: aceptada } })).status, 403);
+  const r = await call(v.cancelarVista, 'buzon', 'miembro', { params: { id: aceptada }, body: { motivo: 'Suspendida' } });
+  assert.equal(r.body.success, true, JSON.stringify(r.body));
+
+  const s = (await pool.query(`SELECT estado, agenda_event_id, recordatorio_at FROM vistas_solicitudes WHERE id = $1`, [aceptada])).rows[0];
+  assert.deepEqual([s.estado, s.agenda_event_id, s.recordatorio_at], ['cancelada', null, null]);
+  const { rows: eventos } = await pool.query(`SELECT id FROM agenda_events WHERE id = ANY($1::uuid[])`, [[ev, rec]]);
+  assert.equal(eventos.length, 0, 'vista y recordatorio fuera de la agenda');
+  assert.equal((await findRelacion(org, ['777/2026'], []))?.vista ?? null, null, 'los autos quedan libres');
+  const c = (await pool.query(`SELECT tipo, relacion FROM vistas_solicitudes WHERE id = $1`, [cambio])).rows[0];
+  assert.equal(c.tipo, 'vista', 'el cambio pendiente pasa a vista nueva');
+  assert.equal(c.relacion.vista, undefined);
+  // No se puede cancelar dos veces.
+  assert.equal((await call(v.cancelarVista, 'buzon', 'miembro', { params: { id: aceptada } })).status, 409);
+  // Aparece en la pestaña Canceladas.
+  const lista = await call(v.listVistas, 'buzon', 'miembro', { query: { estado: 'cancelada' } });
+  assert.ok(lista.body.data.some((x: any) => x.id === aceptada));
+});
