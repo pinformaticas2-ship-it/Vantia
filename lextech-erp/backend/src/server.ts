@@ -17,6 +17,7 @@ import chatRoutes           from './routes/chat';
 import emailRoutes          from './routes/email';
 import emailEngineWebhookRoute from './routes/emailEngineWebhook';
 import sharedTemplatesRoutes from './routes/sharedTemplates';
+import firmaImagenesRoutes, { servirFirmaImagen } from './routes/firmaImagenes';
 import whatsappRoutes       from './routes/whatsapp';
 import documentImportRoutes from './routes/documentImport';
 import documentalRoutes     from './routes/documental';
@@ -246,6 +247,9 @@ app.use('/api/agenda/booking', agendaBookingRoutes);
 app.use('/api/chat',              chatRoutes);
 app.use('/api/email',             emailRoutes);
 app.use('/api/shared-templates',  sharedTemplatesRoutes);
+// Imágenes de las firmas de correo: subir (con sesión) y servir (público, lo pide el destinatario).
+app.use('/api/firma-imagenes',    firmaImagenesRoutes);
+app.get('/api/public/firma-imagen/:file', servirFirmaImagen);
 app.use('/api/whatsapp',          whatsappRoutes);
 app.use('/api/documental',        documentalRoutes);
 app.use('/api/clientes/invites',  clientInviteRoutes);

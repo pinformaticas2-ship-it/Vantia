@@ -2931,6 +2931,25 @@ export async function runMigrations(): Promise<void> {
       console.warn('⚠️  shared_templates.organizacion_id:', e?.message || e);
     }
 
+    // ── Imágenes de las firmas de correo (07/10/2026) ──
+    // Logo, fondo o firma completa en imagen. En la BD porque el disco del
+    // servidor es efímero; se sirven públicamente (routes/firmaImagenes.ts).
+    try {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS firma_imagenes (
+          id               UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+          organizacion_id  UUID         NOT NULL REFERENCES organizaciones(id) ON DELETE CASCADE,
+          mimetype         VARCHAR(50)  NOT NULL,
+          size_bytes       INTEGER      NOT NULL,
+          data             BYTEA        NOT NULL,
+          created_by       VARCHAR(150),
+          created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+        )
+      `);
+    } catch (e: any) {
+      console.warn('⚠️  firma_imagenes:', e?.message || e);
+    }
+
     // ── Permisos en schema public (requerido en PostgreSQL 15+) ────
     for (const grant of [
       `GRANT USAGE ON SCHEMA public TO admin`,

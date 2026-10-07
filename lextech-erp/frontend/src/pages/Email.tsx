@@ -26,6 +26,7 @@ import {
   AlignLeft, AlignCenter, AlignRight, List, Pencil, Sun, Moon, Download, Briefcase, type LucideIcon,
 } from 'lucide-react';
 import MailboxProbeModal from '../components/MailboxProbeModal';
+import SignatureEditor from '../components/SignatureEditor';
 import { getStoredGmailToken, saveGmailToken, clearGmailToken, getLastMailAccount, saveLastMailAccount, readDraftsRaw, writeDraftsRaw } from '../lib/mailLocalState';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -731,15 +732,22 @@ function ComposeWindow({
     setShowTplMenu(false);
   };
 
-  // Auto-insertar firma predeterminada al abrir (solo si no hay body previo)
+  // Auto-insertar firma predeterminada al abrir (solo si no hay body previo).
+  // Las firmas llegan del servidor después de montar: antes este efecto corría
+  // con la lista vacía y la predeterminada no se ponía nunca.
+  const defaultSigApplied = useRef(false);
   useEffect(() => {
+    if (defaultSigApplied.current) return;
     const defaultSig = signatures.find(s => s.isDefault);
-    if (defaultSig && bodyRef.current && !data.body) {
+    if (!defaultSig || !bodyRef.current) return;
+    defaultSigApplied.current = true;
+    const vacio = !(bodyRef.current.textContent || '').trim() && !bodyRef.current.querySelector('img,table');
+    if (!data.body && vacio) {
       const sep = '<br/><br/><hr style="border:none;border-top:1px solid #e5e7eb;margin:8px 0"/>';
       bodyRef.current.innerHTML = sep + defaultSig.html;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [signatures]);
 
   // Cerrar menús al hacer clic fuera
   useEffect(() => {
@@ -3173,7 +3181,7 @@ function MailboxLockedState({
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-interface EmailSignature { id: string; name: string; html: string; isDefault?: boolean; }
+interface EmailSignature { id: string; name: string; html: string; isDefault?: boolean; design?: any; }
 interface EmailTemplate  { id: string; name: string; subject: string; html: string; }
 interface RecipientGroup { id: string; name: string; emails: string[]; }
 
@@ -3346,19 +3354,19 @@ function SignaturesPanel({ onClose, onSelect, getToken }: { onClose: () => void;
 
   useEffect(() => {
     fetchSharedTemplates('email_signature', getToken).then(rows => {
-      setSigs(rows.map(r => ({ id: r.id, name: r.name, html: decodeQP((r.data as any).html || ''), isDefault: r.is_default })));
+      setSigs(rows.map(r => ({ id: r.id, name: r.name, html: decodeQP((r.data as any).html || ''), isDefault: r.is_default, design: (r.data as any).design })));
       setLoading(false);
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const save = async (sig: EmailSignature) => {
-    const data = { html: sig.html };
+    const data = { html: sig.html, ...(sig.design ? { design: sig.design } : {}) };
     if (sigs.some(s => s.id === sig.id)) {
       const updated = await apiUpdateTpl(sig.id, sig.name, data, getToken);
       if (updated) setSigs(prev => prev.map(s => s.id === sig.id ? { ...sig } : s));
     } else {
       const created = await apiCreateTpl('email_signature', sig.name, data, getToken);
-      if (created) setSigs(prev => [...prev, { id: created.id, name: created.name, html: (created.data as any).html || '', isDefault: created.is_default }]);
+      if (created) setSigs(prev => [...prev, { id: created.id, name: created.name, html: (created.data as any).html || '', isDefault: created.is_default, design: (created.data as any).design }]);
     }
     setEditing(null);
   };
@@ -3375,7 +3383,7 @@ function SignaturesPanel({ onClose, onSelect, getToken }: { onClose: () => void;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent p-4">
-      <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col" style={{ maxHeight: '85vh' }}>
+      <div className={`w-full ${editing ? 'max-w-5xl' : 'max-w-2xl'} bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col`} style={{ maxHeight: '90vh' }}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <h3 className="font-semibold text-gray-900 flex items-center gap-2"><Edit3 size={18}/> Firmas</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-700"><X size={20}/></button>
@@ -3421,34 +3429,6 @@ function SignaturesPanel({ onClose, onSelect, getToken }: { onClose: () => void;
             </button>
           </div>
         )}
-      </div>
-    </div>
-  );
-}
-
-function SignatureEditor({ initial, onSave, onCancel }: { initial: EmailSignature; onSave: (s: EmailSignature) => void; onCancel: () => void }) {
-  const [name, setName] = useState(initial.name);
-  const [html, setHtml] = useState(initial.html);
-  return (
-    <div className="flex-1 p-6 flex flex-col gap-4 overflow-y-auto">
-      <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1">Nombre de la firma</label>
-        <input value={name} onChange={e => setName(e.target.value)} placeholder="Ej. Firma profesional"
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"/>
-      </div>
-      <div className="flex-1">
-        <label className="block text-xs font-medium text-gray-500 mb-1">Contenido (HTML)</label>
-        <textarea value={html} onChange={e => setHtml(e.target.value)} rows={8}
-          placeholder="<p>Nombre Apellido<br/>Cargo · Empresa<br/>Teléfono</p>"
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"/>
-        {html && (
-          <div className="mt-2 border border-gray-100 rounded-lg p-3 text-sm" dangerouslySetInnerHTML={{ __html: html }}/>
-        )}
-      </div>
-      <div className="flex gap-2 justify-end">
-        <button onClick={onCancel} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Cancelar</button>
-        <button onClick={() => onSave({ ...initial, name, html })} disabled={!name.trim()}
-          className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50">Guardar</button>
       </div>
     </div>
   );
