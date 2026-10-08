@@ -93,6 +93,7 @@ const TIPO_BADGE: Record<Tipo, { label: string; cls: string }> = {
 
 const PASO_LABEL: Record<string, string> = {
   correo: "Correo de respuesta", expediente: "Expediente", agenda: "Agenda", documentos: "Documentación", recordatorio: "Recordatorio",
+  nota: "Nota en el expediente", cancelada: "Cancelación",
 };
 
 function fmtFecha(iso: string | null, withTime = true) {
@@ -631,7 +632,7 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
               ) : (
                 <div className="space-y-2 rounded-xl border border-red-200 bg-red-50/60 p-3">
                   <p className="text-sm font-semibold text-slate-800">¿Cancelar la vista?</p>
-                  <p className="text-xs text-slate-600">Se quita de la agenda (y su recordatorio). El expediente y la documentación se conservan. Después, otro señalamiento con los mismos autos se podrá aceptar como vista nueva. No se envía ningún correo.</p>
+                  <p className="text-xs text-slate-600">Queda tachada como cancelada en la agenda (con su recordatorio) y se anota en el expediente; su documentación se conserva. Después, otro señalamiento con los mismos autos se podrá aceptar como vista nueva. No se envía ningún correo.</p>
                   <input value={motivoCancelar} onChange={(e) => setMotivoCancelar(e.target.value)} placeholder="Motivo (opcional): suspendida, desistimiento…" className={inputCls} />
                   <div className="flex gap-2">
                     <button type="button" onClick={() => void run("cancelar").then(() => setConfirmarCancelar(false))} disabled={!!busy}
@@ -703,7 +704,7 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
           <div className="flex flex-wrap items-center gap-2">
             {d.tipo === "cancelacion" && d.relacion.vista && (
               <button onClick={() => void run("aplicar-cancelacion")} disabled={!!busy}
-                title="La quita de la agenda (con su recordatorio) y guarda este correo en el expediente"
+                title="La deja tachada como cancelada en la agenda, lo anota en el expediente y guarda este correo"
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-600 text-white text-sm font-bold hover:bg-rose-700 disabled:opacity-50">
                 {busy === "aplicar-cancelacion" ? <Loader2 size={15} className="animate-spin" /> : <XCircle size={15} />} Cancelar la vista en Vantia
               </button>

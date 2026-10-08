@@ -543,6 +543,23 @@ type Paso = { paso: string; ok: boolean; detalle: string };
 /** Paso común "documentación": vincula el correo al expediente, guarda sus
  *  adjuntos en los documentos del expediente (Drive/Dropbox según la
  *  organización) y el texto del correo como nota. Nunca lanza: devuelve el paso. */
+/** Deja constancia en el expediente (pestaña Notas) de lo que pasa con su
+ *  vista: señalada, modificada o cancelada (08/10/2026). Nunca rompe el flujo. */
+async function notaVistaExpediente(expedienteId: string | null | undefined, contenido: string, autor: string, color = '#C4B5FD'): Promise<void> {
+  if (!expedienteId) return;
+  try {
+    await pool.query(
+      `INSERT INTO notes (expediente_id, content, category, priority, color, created_by)
+       VALUES ($1,$2,'legal','alta',$3,$4)`,
+      [expedienteId, contenido.slice(0, 15000), color, autor],
+    );
+  } catch (e: any) {
+    console.warn('[vistas] nota en el expediente:', e?.message || e);
+  }
+}
+
+const fechaLarga = (d: Date) => formatMadrid(d, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
 async function guardarDocumentacion(sol: any, expedienteId: string, guardarAdjuntos: boolean, deciderName: string): Promise<Paso> {
   try {
     let guardados = 0;
@@ -758,6 +775,18 @@ export async function aceptarVista(req: any, res: Response) {
       }
     }
 
+    // Constancia en el expediente (una sola vez aunque se reintente).
+    if (expedienteId && agendaEventId && !yaHecho('nota')) {
+      const lugarNota = [datos.juzgado, datos.sala, datos.direccion, datos.localidad].filter(Boolean).join(' · ');
+      await notaVistaExpediente(expedienteId, [
+        `⚖️ ${tituloBase} señalada para el ${fechaLarga(fecha)}`,
+        lugarNota ? `Lugar: ${lugarNota}` : '',
+        `Duración prevista: ${duracion} min · Asiste: ${responsableNombre}`,
+        `Aceptada por ${deciderName} desde el correo «${sol.subject || ''}» de ${sol.from_email || ''}`,
+      ].filter(Boolean).join('\n'), deciderName);
+      pasos.push({ paso: 'nota', ok: true, detalle: 'Anotada en el expediente' });
+    }
+
     // Un mismo paso puede aparecer varias veces tras reintentos -- se queda el último.
     const finalPasos = Object.values(pasos.reduce((acc: Record<string, Paso>, p) => { acc[p.paso] = p; return acc; }, {}));
     const errores = finalPasos.filter((p) => !p.ok);
@@ -912,8 +941,12 @@ export async function modificarVista(req: any, res: Response) {
     const fin = new Date(fecha.getTime() + duracion * 60000);
     if (orig.agenda_event_id) {
       await pool.query(
-        `UPDATE agenda_events SET start_at = $2, end_at = $3, updated_at = NOW() WHERE id = $1 AND organizacion_id = $4`,
-        [orig.agenda_event_id, fecha, fin, req.organizacionId],
+        `UPDATE agenda_events
+            SET start_at = $2, end_at = $3, status = 'pendiente', updated_at = NOW(),
+                description = COALESCE(description, '') || $5
+          WHERE id = $1 AND organizacion_id = $4`,
+        [orig.agenda_event_id, fecha, fin, req.organizacionId,
+          `\n\n🔁 Cambiada${antes ? ` del ${fmtLargo(antes)}` : ''} al ${fmtLargo(fecha)} (${deciderName}, correo «${String(sol.subject || '').slice(0, 120)}»)`],
       );
     }
     pasos.push({ paso: 'agenda', ok: true, detalle: `Vista movida${antes ? ` del ${fmtLargo(antes)}` : ''} al ${fmtLargo(fecha)}` });
@@ -937,6 +970,11 @@ export async function modificarVista(req: any, res: Response) {
     );
 
     if (orig.expediente_id) pasos.push(await guardarDocumentacion(sol, orig.expediente_id, b.guardar_adjuntos ?? cfg.guardarAdjuntos, deciderName));
+    await notaVistaExpediente(orig.expediente_id, [
+      `🔁 Vista modificada${antes ? `: antes el ${fechaLarga(antes)}` : ''}, ahora el ${fechaLarga(fecha)}`,
+      orig.datos?.juzgado ? `Lugar: ${orig.datos.juzgado}` : '',
+      `Cambio aplicado por ${deciderName} según el correo «${sol.subject || ''}» de ${sol.from_email || ''}`,
+    ].filter(Boolean).join('\n'), deciderName, '#FDE68A');
 
     await pool.query(
       `UPDATE vistas_solicitudes SET estado = 'modificada', expediente_id = $2, fecha_vista = $3, duracion_min = $4,
@@ -1004,7 +1042,7 @@ async function ejecutarCancelacion(organizacionId: string, vistaId: string, user
   try {
     await client.query('BEGIN');
     const { rows } = await client.query(
-      `SELECT id, agenda_event_id, recordatorio_event_id, expediente_id, pasos FROM vistas_solicitudes
+      `SELECT id, agenda_event_id, recordatorio_event_id, expediente_id, pasos, fecha_vista, datos FROM vistas_solicitudes
         WHERE id = $1 AND organizacion_id = $2 AND estado = 'aceptada' FOR UPDATE`,
       [vistaId, organizacionId],
     );
@@ -1012,19 +1050,28 @@ async function ejecutarCancelacion(organizacionId: string, vistaId: string, user
       await client.query('ROLLBACK');
       return { ok: false, expedienteId: null };
     }
+    const quien = await resolveUserName(userId);
+    // No se borran: quedan tachados como "cancelado" en la Agenda y en la
+    // pestaña Agenda del expediente, con el motivo (la búsqueda de huecos y los
+    // próximos eventos ya ignoran los cancelados).
     const eventos = [rows[0].agenda_event_id, rows[0].recordatorio_event_id].filter(Boolean);
     if (eventos.length) {
-      await client.query(`DELETE FROM agenda_events WHERE id = ANY($1::uuid[]) AND organizacion_id = $2`, [eventos, organizacionId]);
+      await client.query(
+        `UPDATE agenda_events
+            SET status = 'cancelado', updated_at = NOW(),
+                title = CASE WHEN title LIKE '❌%' THEN title ELSE left('❌ CANCELADA · ' || title, 300) END,
+                description = COALESCE(description, '') || $3
+          WHERE id = ANY($1::uuid[]) AND organizacion_id = $2`,
+        [eventos, organizacionId, `\n\n❌ Cancelada por ${quien}${detalleExtra ? `: ${detalleExtra}` : ''}`],
+      );
     }
-    const quien = await resolveUserName(userId);
     const pasos = [...(Array.isArray(rows[0].pasos) ? rows[0].pasos : []), {
       paso: 'cancelada', ok: true,
-      detalle: `Cancelada por ${quien}${detalleExtra ? `: ${detalleExtra}` : ''}. Quitada de la agenda; el expediente se conserva.`,
+      detalle: `Cancelada por ${quien}${detalleExtra ? `: ${detalleExtra}` : ''}. Queda tachada en la agenda y anotada en el expediente.`,
     }];
     await client.query(
       `UPDATE vistas_solicitudes
-          SET estado = 'cancelada', agenda_event_id = NULL, recordatorio_event_id = NULL,
-              recordatorio_at = NULL, pasos = $2, updated_at = NOW()
+          SET estado = 'cancelada', recordatorio_at = NULL, pasos = $2, updated_at = NOW()
         WHERE id = $1`,
       [vistaId, JSON.stringify(pasos)],
     );
@@ -1040,6 +1087,11 @@ async function ejecutarCancelacion(organizacionId: string, vistaId: string, user
       [organizacionId, vistaId],
     );
     await client.query('COMMIT');
+    const fv = rows[0].fecha_vista ? new Date(rows[0].fecha_vista) : null;
+    await notaVistaExpediente(rows[0].expediente_id, [
+      `❌ Vista cancelada${fv ? `: la del ${fechaLarga(fv)}` : ''}${rows[0].datos?.juzgado ? ` (${rows[0].datos.juzgado})` : ''}`,
+      `Cancelada por ${quien}${detalleExtra ? ` — ${detalleExtra}` : ''}`,
+    ].join('\n'), quien, '#FCA5A5');
     return { ok: true, expedienteId: rows[0].expediente_id || null };
   } catch (e) {
     await client.query('ROLLBACK').catch(() => {});
@@ -1085,7 +1137,7 @@ export async function aplicarCancelacionVista(req: any, res: Response) {
         : '';
       const r = await ejecutarCancelacion(req.organizacionId, sol.relacion.vista.id, uid, `según el correo «${String(sol.subject || '').slice(0, 120)}»`);
       pasos.push(r.ok
-        ? { paso: 'cancelada', ok: true, detalle: `Vista${fechaTxt ? ` del ${fechaTxt}` : ''} cancelada y quitada de la agenda` }
+        ? { paso: 'cancelada', ok: true, detalle: `Vista${fechaTxt ? ` del ${fechaTxt}` : ''} cancelada: tachada en la agenda y anotada en el expediente` }
         : { paso: 'cancelada', ok: true, detalle: 'La vista ya no estaba activa (cancelada o cambiada antes); no había nada que quitar de la agenda' });
       const { rows: v } = await pool.query(`SELECT expediente_id FROM vistas_solicitudes WHERE id = $1 AND organizacion_id = $2`, [sol.relacion.vista.id, req.organizacionId]);
       const expedienteId = r.expedienteId || v[0]?.expediente_id || sol.relacion?.expediente?.id || null;

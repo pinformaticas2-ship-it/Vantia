@@ -99,10 +99,14 @@ test('cancelar una vista aceptada libera los autos', { skip }, async () => {
   const { findRelacion } = await import('../src/services/vistasAutomation');
   const ev = (await pool.query(`INSERT INTO agenda_events (user_id, title, start_at, organizacion_id) VALUES ('buzon','Vista', NOW() + interval '5 days', $1) RETURNING id`, [org])).rows[0].id;
   const rec = (await pool.query(`INSERT INTO agenda_events (user_id, title, start_at, organizacion_id) VALUES ('buzon','Preparar', NOW() + interval '4 days', $1) RETURNING id`, [org])).rows[0].id;
+  // Expediente de la vista, para ver que la cancelación queda anotada en él.
+  await pool.query(`ALTER TABLE notes ADD COLUMN IF NOT EXISTS expediente_id UUID`);
+  const cli = (await pool.query(`INSERT INTO entities (type, first_name, nif_cif, organizacion_id) VALUES ('CLIENTE','Cli vista',$2,$1) RETURNING id`, [org, 'V' + (Date.now() % 1e7)])).rows[0].id;
+  const expId = (await pool.query(`INSERT INTO expedientes (anio, num_exp, descripcion, cliente_id, organizacion_id) VALUES (2026, $3, 'Exp vista', $2, $1) RETURNING id`, [org, cli, Date.now() % 100000])).rows[0].id;
   const aceptada = (await pool.query(
-    `INSERT INTO vistas_solicitudes (organizacion_id, email_id, mailbox_user_id, estado, tipo, subject, datos, fecha_vista, agenda_event_id, recordatorio_event_id, recordatorio_at, pasos)
-     VALUES ($1, uuid_generate_v4(), 'buzon', 'aceptada', 'vista', 'VISTA autos 777/2026', '{"num_autos":"777/2026"}', NOW() + interval '5 days', $2, $3, NOW() + interval '4 days', '[]') RETURNING id`,
-    [org, ev, rec])).rows[0].id;
+    `INSERT INTO vistas_solicitudes (organizacion_id, email_id, mailbox_user_id, estado, tipo, subject, datos, fecha_vista, agenda_event_id, recordatorio_event_id, recordatorio_at, pasos, expediente_id)
+     VALUES ($1, uuid_generate_v4(), 'buzon', 'aceptada', 'vista', 'VISTA autos 777/2026', '{"num_autos":"777/2026","juzgado":"JPI 3 de Murcia"}', NOW() + interval '5 days', $2, $3, NOW() + interval '4 days', '[]', $4) RETURNING id`,
+    [org, ev, rec, expId])).rows[0].id;
   const cambio = (await pool.query(
     `INSERT INTO vistas_solicitudes (organizacion_id, email_id, mailbox_user_id, estado, tipo, subject, datos, fecha_vista, relacion)
      VALUES ($1, uuid_generate_v4(), 'buzon', 'pendiente', 'cambio', 'VISTA nueva autos 777/2026', '{"num_autos":"777/2026"}', NOW() + interval '9 days', $2) RETURNING id`,
@@ -114,10 +118,15 @@ test('cancelar una vista aceptada libera los autos', { skip }, async () => {
   const r = await call(v.cancelarVista, 'buzon', 'miembro', { params: { id: aceptada }, body: { motivo: 'Suspendida' } });
   assert.equal(r.body.success, true, JSON.stringify(r.body));
 
-  const s = (await pool.query(`SELECT estado, agenda_event_id, recordatorio_at FROM vistas_solicitudes WHERE id = $1`, [aceptada])).rows[0];
-  assert.deepEqual([s.estado, s.agenda_event_id, s.recordatorio_at], ['cancelada', null, null]);
-  const { rows: eventos } = await pool.query(`SELECT id FROM agenda_events WHERE id = ANY($1::uuid[])`, [[ev, rec]]);
-  assert.equal(eventos.length, 0, 'vista y recordatorio fuera de la agenda');
+  const s = (await pool.query(`SELECT estado, recordatorio_at FROM vistas_solicitudes WHERE id = $1`, [aceptada])).rows[0];
+  assert.deepEqual([s.estado, s.recordatorio_at], ['cancelada', null]);
+  // Vista y recordatorio quedan tachados (cancelados) en la agenda, no borrados.
+  const { rows: eventos } = await pool.query(`SELECT status, title, description FROM agenda_events WHERE id = ANY($1::uuid[])`, [[ev, rec]]);
+  assert.equal(eventos.length, 2);
+  assert.ok(eventos.every((e: any) => e.status === 'cancelado' && e.title.startsWith('❌ CANCELADA') && /Suspendida/.test(e.description)));
+  // Y anotado en el expediente.
+  const { rows: notas } = await pool.query(`SELECT content FROM notes WHERE expediente_id = $1`, [expId]);
+  assert.ok(notas.some((n: any) => /❌ Vista cancelada/.test(n.content) && /JPI 3 de Murcia/.test(n.content) && /Suspendida/.test(n.content)), JSON.stringify(notas));
   assert.equal((await findRelacion(org, ['777/2026'], []))?.vista ?? null, null, 'los autos quedan libres');
   const c = (await pool.query(`SELECT tipo, relacion FROM vistas_solicitudes WHERE id = $1`, [cambio])).rows[0];
   assert.equal(c.tipo, 'vista', 'el cambio pendiente pasa a vista nueva');
@@ -148,7 +157,7 @@ test('aplicar la cancelación que llega por correo', { skip }, async () => {
   assert.equal(r.body.success, true, JSON.stringify(r.body));
   assert.equal((await pool.query(`SELECT estado FROM vistas_solicitudes WHERE id = $1`, [vista])).rows[0].estado, 'cancelada');
   assert.equal((await pool.query(`SELECT estado FROM vistas_solicitudes WHERE id = $1`, [aviso])).rows[0].estado, 'documentada');
-  assert.equal((await pool.query(`SELECT 1 FROM agenda_events WHERE id = $1`, [ev])).rows.length, 0);
+  assert.equal((await pool.query(`SELECT status FROM agenda_events WHERE id = $1`, [ev])).rows[0].status, 'cancelado');
   // Y no se puede aplicar dos veces.
   assert.equal((await call(v.aplicarCancelacionVista, 'buzon', 'miembro', { params: { id: aviso }, body: {} })).status, 409);
 });
