@@ -230,7 +230,7 @@ export function computeRecordatorioAt(fechaVista: Date, fechaPreparacionYmd: str
 
 // ── Detección: palabras clave ────────────────────────────────────────────────
 
-function fold(s: string): string {
+export function fold(s: string): string {
   return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
 
@@ -1220,4 +1220,33 @@ export function startVistasScheduler(): void {
     void runVistasTick();
     setInterval(() => void runVistasTick(), 60 * 1000);
   }, 30_000);
+}
+
+// ── Buscador del módulo Vistas ───────────────────────────────────────────────
+
+/** ¿La solicitud coincide con lo buscado? Todas las palabras tienen que
+ *  aparecer (sin tildes ni mayúsculas) en: asunto, remitente, autos (también
+ *  normalizados: "945/23" = "000945/2023"), NIG, juzgado, lugar, partes,
+ *  expediente, quién la decidió y la fecha de la vista ("1 de noviembre",
+ *  "01/11/2026"). */
+export function coincideBusqueda(row: any, q: string): boolean {
+  // Cada palabra vale tal cual o, si tiene forma de autos ("945/23") o de NIG,
+  // también normalizada. Una fecha "01/11/2026" no es un número de autos.
+  const terms = fold(q).split(/\s+/).filter(Boolean).map((t) => [t,
+    /^\d{1,6}\/\d{2,4}$/.test(t) ? normalizeAutos(t) : null,
+    /^\d{10,}$/.test(t) ? normalizeNig(t) : null,
+  ].filter(Boolean) as string[]);
+  if (!terms.length) return true;
+  const d = row.datos || {};
+  const fv = row.fecha_vista ? new Date(row.fecha_vista) : null;
+  const campos = [
+    row.subject, row.from_email, row.from_name, row.expediente_ref, row.responsable_nombre, row.decidido_por_nombre,
+    d.num_autos, normalizeAutos(d.num_autos), d.nig, normalizeNig(d.nig), d.juzgado, d.sala, d.localidad, d.direccion,
+    d.cliente, d.contrario, d.partes, d.tipo_procedimiento, d.tipo_acto, row.relacion?.autos,
+    fv ? formatMadrid(fv, { day: 'numeric', month: 'long', year: 'numeric' }) : '',
+    fv ? formatMadrid(fv, { day: '2-digit', month: '2-digit', year: 'numeric' }) : '',
+    fv ? formatMadrid(fv, { weekday: 'long' }) : '',
+  ];
+  const hay = fold(campos.filter(Boolean).join(' \n '));
+  return terms.every((variantes) => variantes.some((t) => hay.includes(t)));
 }

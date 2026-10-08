@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import { useAuth } from "@clerk/clerk-react";
 import { Link, Navigate, useSearchParams } from "react-router-dom";
 import {
-  AlertTriangle, Bell, BellOff, CalendarCheck, Check, CheckCircle2, ChevronDown, Clock, Eye, FileText, Gavel, Loader2,
+  AlertTriangle, Bell, BellOff, Search, CalendarCheck, Check, CheckCircle2, ChevronDown, Clock, Eye, FileText, Gavel, Loader2,
   Mail, Paperclip, RefreshCw, RotateCcw, Settings, Undo2, X, XCircle,
 } from "lucide-react";
 import { apiFetch, resolveApiUrl } from "../lib/api";
@@ -29,6 +29,7 @@ type Conflicto = { id: string; title: string; start_at: string; end_at: string |
 
 interface Solicitud {
   id: string;
+  expediente_ref?: string | null;
   estado: Estado;
   from_email: string | null;
   from_name: string | null;
@@ -65,6 +66,14 @@ interface Detalle extends Solicitud {
   expediente: { id: string; anio: number; num_exp: number; descripcion: string | null } | null;
   defaults: { duracionMin: number; recordatorioDias: number; recordatorioHora: string; guardarAdjuntos: boolean; responsableUserId: string | null };
 }
+
+const PERIODOS: { key: string; label: string }[] = [
+  { key: "", label: "Cualquier fecha" },
+  { key: "proximas", label: "Próximas" },
+  { key: "semana", label: "Esta semana" },
+  { key: "mes", label: "Este mes" },
+  { key: "pasadas", label: "Pasadas" },
+];
 
 const TABS: { key: string; label: string }[] = [
   { key: "pendiente", label: "Por confirmar" },
@@ -215,41 +224,59 @@ function VistasModulo() {
   const { getToken } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [tab, setTab] = useState("pendiente");
-  const [items, setItems] = useState<Solicitud[]>(() => listaCache.get("pendiente") || []);
+  // Buscador: lo que se escribe, y lo que se busca (con un pequeño retardo).
+  const [busqueda, setBusqueda] = useState("");
+  const [q, setQ] = useState("");
+  const [periodo, setPeriodo] = useState("");
+  const buscadorRef = useRef<HTMLInputElement>(null);
+  useEffect(() => { const t = window.setTimeout(() => setQ(busqueda.trim()), 250); return () => window.clearTimeout(t); }, [busqueda]);
+  // "/" lleva al buscador (si no se está escribiendo en otro campo).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement;
+      if (e.key === "/" && !/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) && !el.isContentEditable) { e.preventDefault(); buscadorRef.current?.focus(); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+  // Cada combinación pestaña + búsqueda + periodo tiene su caché.
+  const clave = `${tab}|${q}|${periodo}`;
+  const [items, setItems] = useState<Solicitud[]>(() => listaCache.get("pendiente||") || []);
   // Primera carga de la pestaña (nada que enseñar todavía) / refresco en curso.
-  const [primeraCarga, setPrimeraCarga] = useState(() => !listaCache.has("pendiente"));
+  const [primeraCarga, setPrimeraCarga] = useState(() => !listaCache.has("pendiente||"));
   const [loading, setLoading] = useState(false);
   const [listError, setListError] = useState("");
   const selectedId = searchParams.get("id");
-  const tabActual = useRef(tab);
-  tabActual.current = tab;
+  const tabActual = useRef(clave);
+  tabActual.current = clave;
 
   const loadList = useCallback(async (silencioso = false) => {
     if (!silencioso) setLoading(true);
     try {
-      const data = await apiFetch(`/api/vistas?estado=${tab}`, { getToken });
+      const qs = new URLSearchParams({ estado: tab, ...(q ? { q } : {}), ...(periodo ? { periodo } : {}) });
+      const data = await apiFetch(`/api/vistas?${qs}`, { getToken });
       if (data?.success === false) throw new Error(data.error);
       const nuevos: Solicitud[] = data.data || [];
-      listaCache.set(tab, nuevos);
-      // Respuesta de una pestaña de la que ya se ha salido: solo a la caché.
-      if (tabActual.current !== tab) return;
+      listaCache.set(clave, nuevos);
+      // Respuesta de una pestaña/búsqueda de la que ya se ha salido: solo a la caché.
+      if (tabActual.current !== clave) return;
       // Solo se repinta si algo cambió: sin saltos en cada refresco.
       setItems((prev) => (mismo(prev, nuevos) ? prev : nuevos));
       setListError("");
     } catch (e: any) {
       if (!silencioso) setListError(e.message || "No se pudieron cargar las vistas");
     } finally {
-      if (tabActual.current === tab) { setLoading(false); setPrimeraCarga(false); }
+      if (tabActual.current === clave) { setLoading(false); setPrimeraCarga(false); }
     }
-  }, [getToken, tab]);
+  }, [getToken, tab, q, periodo, clave]);
 
-  // Al cambiar de pestaña: lo que hubiera en caché al instante, y a refrescar.
+  // Al cambiar de pestaña, búsqueda o periodo: lo que hubiera en caché al instante, y a refrescar.
   useEffect(() => {
-    const cached = listaCache.get(tab);
+    const cached = listaCache.get(clave);
     setItems(cached || []);
     setPrimeraCarga(!cached);
     void loadList(true);
-  }, [tab, loadList]);
+  }, [clave, loadList]);
 
   // Refresco silencioso: cuando algo cambia (vista nueva, aceptar...), cada
   // 30 s y al volver a la pestaña del navegador.
@@ -304,21 +331,51 @@ function VistasModulo() {
       <div className="flex-1 min-h-0 flex flex-col md:flex-row bg-white">
         {/* Lista */}
         <div className={`md:w-96 md:shrink-0 border-r border-slate-200 flex flex-col min-h-0 ${selectedId ? "hidden md:flex" : "flex"}`}>
-          <div className="px-2 py-2 border-b border-slate-200 bg-slate-50 grid grid-cols-4 gap-1">
-            {TABS.map((t) => (
-              <button key={t.key} onClick={() => setTab(t.key)}
-                className={`min-w-0 truncate px-1.5 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${tab === t.key ? "bg-white text-red-700 border border-slate-200 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>
-                {t.label}
-              </button>
-            ))}
+          {/* Buscador */}
+          <div className="px-3 pt-3 pb-2 border-b border-slate-200 bg-slate-50 space-y-2">
+            <div className="relative">
+              <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input ref={buscadorRef} value={busqueda} onChange={(e) => setBusqueda(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Escape") setBusqueda(""); }}
+                placeholder="Buscar: autos, NIG, juzgado, cliente, fecha…   ( / )"
+                className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-8 pr-8 text-sm focus:border-red-400 focus:outline-none focus:ring-1 focus:ring-red-100" />
+              {busqueda && (
+                <button type="button" onClick={() => { setBusqueda(""); buscadorRef.current?.focus(); }} title="Borrar búsqueda"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"><X size={13} /></button>
+              )}
+            </div>
+            <div className="flex gap-1 overflow-x-auto pb-0.5">
+              {PERIODOS.map((p) => (
+                <button key={p.key || "todas"} type="button" onClick={() => setPeriodo(p.key)}
+                  className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold transition-colors ${periodo === p.key ? "border-red-300 bg-red-50 text-red-700" : "border-slate-200 bg-white text-slate-500 hover:text-slate-800"}`}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
           </div>
+          {q ? (
+            <div className="px-4 py-2 border-b border-slate-200 bg-white text-[11px] text-slate-500 flex items-center justify-between gap-2">
+              <span>Buscando «<b className="text-slate-700">{q}</b>» en todas las listas{!primeraCarga ? ` · ${items.length}${items.length === 200 ? "+" : ""} resultado${items.length === 1 ? "" : "s"}` : ""}</span>
+              <button type="button" onClick={() => setBusqueda("")} className="font-semibold text-red-600 hover:underline">Quitar</button>
+            </div>
+          ) : (
+            <div className="px-2 py-2 border-b border-slate-200 bg-slate-50 flex gap-1 overflow-x-auto">
+              {TABS.map((t) => (
+                <button key={t.key} onClick={() => setTab(t.key)}
+                  className={`shrink-0 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${tab === t.key ? "bg-white text-red-700 border border-slate-200 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="flex-1 min-h-0 overflow-y-auto">
             {listError && <p className="m-4 text-sm text-red-600">{listError}</p>}
             {primeraCarga && !listError && <ListaSkeleton />}
             {!primeraCarga && !listError && items.length === 0 && (
               <div className="py-16 px-6 flex flex-col items-center gap-3 text-slate-400 text-center">
                 <Gavel size={36} className="opacity-15" />
-                <p className="font-medium text-sm">{tab === "pendiente" ? "No hay vistas pendientes de confirmar" : "No hay vistas en esta lista"}</p>
+                <p className="font-medium text-sm">{q ? `Nada coincide con «${q}»` : periodo ? "No hay vistas en ese periodo" : tab === "pendiente" ? "No hay vistas pendientes de confirmar" : "No hay vistas en esta lista"}</p>
+                {(q || periodo) && <p className="text-xs">Prueba con los autos (p. ej. 945/23), el juzgado, el cliente o la fecha.</p>}
               </div>
             )}
             {items.map((s) => {
@@ -338,6 +395,7 @@ function VistasModulo() {
                   <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-400">
                     <span className="truncate">{s.from_name || s.from_email}</span>
                     {s.datos?.num_autos && <span className="shrink-0">· autos {s.datos.num_autos}</span>}
+                    {s.expediente_ref && <span className="shrink-0">· exp. {s.expediente_ref}</span>}
                   </div>
                   {conflict && (
                     <p className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700">

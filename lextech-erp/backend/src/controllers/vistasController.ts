@@ -14,6 +14,7 @@ import {
   geminiAvailable,
   normalizeAutos,
   normalizeNig,
+  coincideBusqueda,
   VistasConfig,
   PlantillaVars,
 } from '../services/vistasAutomation';
@@ -303,24 +304,43 @@ function scopeCond(req: any, params: any[]): string {
   return ` AND (responsable_user_id = $${params.length} OR mailbox_user_id = $${params.length})`;
 }
 
+/** GET /api/vistas?estado=&q=&periodo=
+ *  - estado: pestaña (pendiente, aceptada, rechazada, cancelada, descartada, todas).
+ *  - q: buscador. Con texto se busca en TODAS las listas (no se sabe en qué
+ *    estado está lo que se busca) -- ver coincideBusqueda().
+ *  - periodo: por fecha de la vista: proximas, semana, mes, pasadas. */
 export async function listVistas(req: any, res: Response) {
   try {
     const estado = String(req.query.estado || 'pendiente');
+    const q = String(req.query.q || '').trim().slice(0, 200);
+    const periodo = String(req.query.periodo || '');
     const params: any[] = [req.organizacionId];
     let cond = `organizacion_id = $1`;
-    if (estado === 'todas') cond += ` AND estado <> 'ignorada'`;
+    if (q || estado === 'todas') cond += ` AND estado <> 'ignorada'`;
     else if (estado === 'pendiente') cond += ` AND estado IN ('pendiente','procesando','error')`;
     // 'Aceptadas' incluye lo resuelto sin crear vista nueva (documentación
     // añadida a un expediente, vista existente modificada).
     else if (estado === 'aceptada') cond += ` AND estado IN ('aceptada','documentada','modificada')`;
     else { params.push(estado); cond += ` AND estado = $${params.length}`; }
+
+    // Periodo (hora de Madrid): desde hoy, esta semana (lunes-domingo), este mes, ya pasadas.
+    const hoy = `(NOW() AT TIME ZONE 'Europe/Madrid')`;
+    const fv = `(fecha_vista AT TIME ZONE 'Europe/Madrid')`;
+    if (periodo === 'proximas') cond += ` AND fecha_vista >= date_trunc('day', ${hoy}) AT TIME ZONE 'Europe/Madrid'`;
+    else if (periodo === 'semana') cond += ` AND date_trunc('week', ${fv}) = date_trunc('week', ${hoy})`;
+    else if (periodo === 'mes') cond += ` AND date_trunc('month', ${fv}) = date_trunc('month', ${hoy})`;
+    else if (periodo === 'pasadas') cond += ` AND fecha_vista < NOW()`;
+
     cond += scopeCond(req, params);
-    const order = estado === 'aceptada' ? 'fecha_vista DESC NULLS LAST' : 'created_at DESC';
+    const order = periodo === 'proximas' || periodo === 'semana' || periodo === 'mes' ? 'fecha_vista ASC NULLS LAST'
+      : periodo === 'pasadas' || estado === 'aceptada' ? 'fecha_vista DESC NULLS LAST' : 'created_at DESC';
     const { rows } = await pool.query(
-      `SELECT ${LIST_FIELDS} FROM vistas_solicitudes WHERE ${cond} ORDER BY ${order} LIMIT 200`,
+      `SELECT ${LIST_FIELDS},
+              (SELECT x.anio || '/' || x.num_exp FROM expedientes x WHERE x.id = vistas_solicitudes.expediente_id) AS expediente_ref
+         FROM vistas_solicitudes WHERE ${cond} ORDER BY ${order} LIMIT ${q ? 3000 : 200}`,
       params,
     );
-    return ok(res, rows);
+    return ok(res, q ? rows.filter((r: any) => coincideBusqueda(r, q)).slice(0, 200) : rows);
   } catch (e: any) {
     return fail(res, e?.message || 'Error listando vistas');
   }

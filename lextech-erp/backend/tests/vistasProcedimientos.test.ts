@@ -117,3 +117,22 @@ test('cambio de fecha sin fecha nueva NO es una cancelación', () => {
   assert.equal(esTextoDeCancelacion(canc), true);
   assert.equal(cancelaVista({ cancelada: true, cambio_fecha: false, fecha_vista: '2026-11-01' } as any, canc, { fecha_vista: '2026-11-01T09:00:00Z' }), true);
 });
+
+// 08/10/2026: buscador del módulo Vistas.
+import { coincideBusqueda } from '../src/services/vistasAutomation';
+
+test('buscador de vistas', () => {
+  const row = {
+    subject: 'ASIGNO VISTA PLAZA 16 MURCIA', from_email: 'procurador@ejemplo.es', from_name: 'Procuradora García',
+    expediente_ref: '2026/3', fecha_vista: '2026-11-01T09:00:00Z', decidido_por_nombre: 'Aimar',
+    datos: { num_autos: '000945/2023', nig: 'NIG 3003042120230012345', juzgado: 'Tribunal de Instancia de Murcia, Plaza nº 16', localidad: 'Murcia', cliente: 'Pérez López' },
+  };
+  const si = (q: string) => assert.equal(coincideBusqueda(row, q), true, q);
+  const no = (q: string) => assert.equal(coincideBusqueda(row, q), false, q);
+  si('945/23'); si('945/2023'); si('000945/2023');
+  si('3003042120230012345');
+  si('murcia'); si('MURCIA plaza 16'); si('perez'); si('garcía'); si('2026/3'); si('procurador@ejemplo');
+  si('1 de noviembre'); si('01/11/2026'); si('domingo');
+  si('');
+  no('946/2023'); no('cartagena'); no('murcia cartagena');
+});

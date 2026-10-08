@@ -197,3 +197,31 @@ test('al cambiar la fecha, las solicitudes pendientes que ya no corresponden que
   const det = await call(v.getVista, 'buzon', 'miembro', { params: { id: cancel1nov } });
   assert.equal(new Date(det.body.data.vistaActual.fecha_vista).toISOString(), '2027-11-03T09:00:00.000Z');
 });
+
+// 08/10/2026: buscador y filtros de fecha del módulo Vistas.
+test('buscador: en todas las listas, por autos normalizados, y filtros de fecha', { skip }, async () => {
+  const v = await import('../src/controllers/vistasController');
+  const ins = async (estado: string, autos: string, fecha: string | null, juzgado = 'JPI 1 de Lorca') => (await pool.query(
+    `INSERT INTO vistas_solicitudes (organizacion_id, email_id, mailbox_user_id, estado, tipo, subject, datos, fecha_vista)
+     VALUES ($1, uuid_generate_v4(), 'buzon', $2, 'vista', 'Señalamiento', $3, $4) RETURNING id`,
+    [org, estado, JSON.stringify({ num_autos: autos, juzgado }), fecha])).rows[0].id;
+  const futura = await ins('aceptada', '000512/2031', new Date(Date.now() + 3 * 86400000).toISOString());
+  const pasada = await ins('rechazada', '512/2031', new Date(Date.now() - 40 * 86400000).toISOString(), 'JS 2 de Cartagena');
+  await ins('ignorada', '512/2031', null);
+  const lista = async (query: any) => (await call(v.listVistas, 'buzon', 'miembro', { query })).body.data.map((r: any) => r.id);
+
+  // Con búsqueda se mira en todas las listas (aunque la pestaña sea "pendiente"), nunca en las ignoradas.
+  const r = await lista({ estado: 'pendiente', q: '512/31' });
+  assert.ok(r.includes(futura) && r.includes(pasada));
+  assert.equal(r.length, 2);
+  assert.deepEqual(await lista({ estado: 'pendiente', q: 'cartagena' }), [pasada]);
+  // Periodos.
+  const prox = await lista({ estado: 'todas', periodo: 'proximas' });
+  assert.ok(prox.includes(futura) && !prox.includes(pasada));
+  const pas = await lista({ estado: 'todas', periodo: 'pasadas' });
+  assert.ok(pas.includes(pasada) && !pas.includes(futura));
+  assert.equal((await call(v.listVistas, 'buzon', 'miembro', { query: { estado: 'todas', periodo: 'semana' } })).body.success, true);
+  assert.equal((await call(v.listVistas, 'buzon', 'miembro', { query: { estado: 'todas', periodo: 'mes' } })).body.success, true);
+  // Otro usuario no ve nada aunque busque.
+  assert.equal((await call(v.listVistas, 'otro', 'miembro', { query: { q: '512/2031' } })).body.data.filter((x: any) => x.id === futura).length, 0);
+});
