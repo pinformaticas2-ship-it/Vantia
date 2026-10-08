@@ -1034,10 +1034,24 @@ export async function reabrirVista(req: any, res: Response) {
 // recordatorio), y deja de contar como "la vista de esos autos", así que otro
 // señalamiento del mismo procedimiento se puede aceptar como vista nueva. El
 // expediente y su documentación se conservan.
+/** Cierra el expediente de una vista cancelada (si se pidió al cancelar):
+ *  estado "cerrado" y fecha de cierre de hoy, igual que al cerrarlo a mano. */
+async function cerrarExpedienteDeVista(organizacionId: string, expedienteId: string | null, quien: string): Promise<boolean> {
+  if (!expedienteId) return false;
+  const { rowCount } = await pool.query(
+    `UPDATE expedientes
+        SET estado = 'cerrado', fecha_cierre = (NOW() AT TIME ZONE 'Europe/Madrid')::date, updated_at = NOW()
+      WHERE id = $1 AND organizacion_id = $2 AND estado <> 'cerrado'`,
+    [expedienteId, organizacionId],
+  );
+  if (rowCount) await notaVistaExpediente(expedienteId, `🔒 Expediente cerrado por ${quien} al cancelar la vista`, quien, '#E5E7EB');
+  return Boolean(rowCount);
+}
+
 /** Cancela una vista aceptada de la organización: fuera de la agenda (vista y
  *  recordatorio), estado 'cancelada' y libera sus autos. 'no-aceptada' si ya
  *  no estaba aceptada (cancelada antes, por ejemplo). */
-async function ejecutarCancelacion(organizacionId: string, vistaId: string, userId: string, detalleExtra: string): Promise<{ ok: boolean; expedienteId: string | null }> {
+async function ejecutarCancelacion(organizacionId: string, vistaId: string, userId: string, detalleExtra: string, cerrarExpediente = false): Promise<{ ok: boolean; expedienteId: string | null; expedienteCerrado: boolean }> {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -1048,7 +1062,7 @@ async function ejecutarCancelacion(organizacionId: string, vistaId: string, user
     );
     if (!rows.length) {
       await client.query('ROLLBACK');
-      return { ok: false, expedienteId: null };
+      return { ok: false, expedienteId: null, expedienteCerrado: false };
     }
     const quien = await resolveUserName(userId);
     // No se borran: quedan tachados como "cancelado" en la Agenda y en la
@@ -1092,7 +1106,8 @@ async function ejecutarCancelacion(organizacionId: string, vistaId: string, user
       `❌ Vista cancelada${fv ? `: la del ${fechaLarga(fv)}` : ''}${rows[0].datos?.juzgado ? ` (${rows[0].datos.juzgado})` : ''}`,
       `Cancelada por ${quien}${detalleExtra ? ` — ${detalleExtra}` : ''}`,
     ].join('\n'), quien, '#FCA5A5');
-    return { ok: true, expedienteId: rows[0].expediente_id || null };
+    const expedienteCerrado = cerrarExpediente ? await cerrarExpedienteDeVista(organizacionId, rows[0].expediente_id, quien) : false;
+    return { ok: true, expedienteId: rows[0].expediente_id || null, expedienteCerrado };
   } catch (e) {
     await client.query('ROLLBACK').catch(() => {});
     throw e;
@@ -1107,10 +1122,11 @@ export async function cancelarVista(req: any, res: Response) {
     if (!ctx) return;
     const { sol } = ctx;
     const motivo = String(req.body?.motivo || '').trim().slice(0, 500);
-    const r = await ejecutarCancelacion(req.organizacionId, sol.id, req.auth?.userId, motivo);
+    const r = await ejecutarCancelacion(req.organizacionId, sol.id, req.auth?.userId, motivo, req.body?.cerrar_expediente === true);
     if (!r.ok) return fail(res, 'Solo se pueden cancelar vistas aceptadas.', 409);
+    if (r.expedienteCerrado) await logActivityForReq(req, 'Expediente cerrado al cancelar la vista', 'EXPEDIENTE', r.expedienteId || undefined, sol.subject || undefined);
     await logActivityForReq(req, `Vista cancelada: ${sol.subject || ''}`.slice(0, 300), sol.expediente_id ? 'EXPEDIENTE' : 'AGENDA', sol.expediente_id || undefined, sol.subject || undefined);
-    return ok(res, { estado: 'cancelada' });
+    return ok(res, { estado: 'cancelada', expedienteCerrado: r.expedienteCerrado });
   } catch (e: any) {
     return fail(res, e?.message || 'Error cancelando la vista');
   }
@@ -1135,12 +1151,16 @@ export async function aplicarCancelacionVista(req: any, res: Response) {
       const fechaTxt = sol.relacion.vista.fecha_vista
         ? formatMadrid(new Date(sol.relacion.vista.fecha_vista), { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })
         : '';
-      const r = await ejecutarCancelacion(req.organizacionId, sol.relacion.vista.id, uid, `según el correo «${String(sol.subject || '').slice(0, 120)}»`);
+      const cerrar = req.body?.cerrar_expediente === true;
+      const r = await ejecutarCancelacion(req.organizacionId, sol.relacion.vista.id, uid, `según el correo «${String(sol.subject || '').slice(0, 120)}»`, cerrar);
       pasos.push(r.ok
         ? { paso: 'cancelada', ok: true, detalle: `Vista${fechaTxt ? ` del ${fechaTxt}` : ''} cancelada: tachada en la agenda y anotada en el expediente` }
         : { paso: 'cancelada', ok: true, detalle: 'La vista ya no estaba activa (cancelada o cambiada antes); no había nada que quitar de la agenda' });
       const { rows: v } = await pool.query(`SELECT expediente_id FROM vistas_solicitudes WHERE id = $1 AND organizacion_id = $2`, [sol.relacion.vista.id, req.organizacionId]);
       const expedienteId = r.expedienteId || v[0]?.expediente_id || sol.relacion?.expediente?.id || null;
+      // Si la vista ya estaba cancelada, el expediente se cierra igualmente si se pidió.
+      const cerrado = r.expedienteCerrado || (cerrar && !r.ok && await cerrarExpedienteDeVista(req.organizacionId, expedienteId, deciderName));
+      if (cerrado) pasos.push({ paso: 'expediente', ok: true, detalle: 'Expediente cerrado' });
       if (expedienteId) pasos.push(await guardarDocumentacion(sol, expedienteId, req.body?.guardar_adjuntos ?? cfg.guardarAdjuntos, deciderName));
       const okTodo = pasos.every((p) => p.ok);
       await pool.query(

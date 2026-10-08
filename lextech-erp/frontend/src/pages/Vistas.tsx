@@ -331,6 +331,9 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
   const [busy, setBusy] = useState<"" | "aceptar" | "rechazar" | "descartar" | "reabrir" | "documentar" | "modificar" | "cancelar" | "aplicar-cancelacion">("");
   const [confirmarCancelar, setConfirmarCancelar] = useState(false);
   const [motivoCancelar, setMotivoCancelar] = useState("");
+  // Opcional al cancelar: cerrar también el expediente (una vista suspendida
+  // no siempre significa que el asunto haya terminado).
+  const [cerrarExpediente, setCerrarExpediente] = useState(false);
   // Para correos de un procedimiento conocido, el formulario de vista nueva
   // solo aparece si se elige "Es una vista nueva".
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
@@ -475,9 +478,9 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
           ...(modoRespuesta === "aceptar" ? { asunto, cuerpo } : {}),
         };
       } else if (accion === "aplicar-cancelacion") {
-        body = { guardar_adjuntos: guardarAdjuntos };
+        body = { guardar_adjuntos: guardarAdjuntos, cerrar_expediente: cerrarExpediente };
       } else if (accion === "cancelar") {
-        body = { motivo: motivoCancelar };
+        body = { motivo: motivoCancelar, cerrar_expediente: cerrarExpediente };
       } else if (accion === "rechazar") {
         body = { ...formBody(), enviar_correo: enviarCorreo, ...(modoRespuesta === "rechazar" ? { asunto, cuerpo } : {}) };
       }
@@ -634,6 +637,12 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
                   <p className="text-sm font-semibold text-slate-800">¿Cancelar la vista?</p>
                   <p className="text-xs text-slate-600">Queda tachada como cancelada en la agenda (con su recordatorio) y se anota en el expediente; su documentación se conserva. Después, otro señalamiento con los mismos autos se podrá aceptar como vista nueva. No se envía ningún correo.</p>
                   <input value={motivoCancelar} onChange={(e) => setMotivoCancelar(e.target.value)} placeholder="Motivo (opcional): suspendida, desistimiento…" className={inputCls} />
+                  {d.expediente && (
+                    <label className="flex items-center gap-2 text-sm text-slate-700">
+                      <input type="checkbox" checked={cerrarExpediente} onChange={(e) => setCerrarExpediente(e.target.checked)} className="accent-red-600" />
+                      Cerrar también el expediente {d.expediente.anio}/{d.expediente.num_exp}
+                    </label>
+                  )}
                   <div className="flex gap-2">
                     <button type="button" onClick={() => void run("cancelar").then(() => setConfirmarCancelar(false))} disabled={!!busy}
                       className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-50">
@@ -698,6 +707,13 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
             <input type="checkbox" checked={guardarAdjuntos} onChange={(e) => setGuardarAdjuntos(e.target.checked)} className="accent-red-600" />
             Guardar los {d.adjuntos.length || ""} adjunto{d.adjuntos.length === 1 ? "" : "s"} y el correo en el expediente
           </label>
+
+          {d.tipo === "cancelacion" && d.relacion.expediente && (
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={cerrarExpediente} onChange={(e) => setCerrarExpediente(e.target.checked)} className="accent-red-600" />
+              Al cancelar, cerrar también el expediente {d.relacion.expediente.anio}/{d.relacion.expediente.num_exp}
+            </label>
+          )}
 
           {actionError && !mostrarFormulario && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{actionError}</p>}
 

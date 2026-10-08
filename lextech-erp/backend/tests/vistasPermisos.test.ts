@@ -115,7 +115,7 @@ test('cancelar una vista aceptada libera los autos', { skip }, async () => {
   assert.ok((await findRelacion(org, ['777/2026'], []))?.vista, 'antes de cancelar, los autos tienen vista');
   // Solo quien la ve puede cancelarla.
   assert.equal((await call(v.cancelarVista, 'otro', 'miembro', { params: { id: aceptada } })).status, 403);
-  const r = await call(v.cancelarVista, 'buzon', 'miembro', { params: { id: aceptada }, body: { motivo: 'Suspendida' } });
+  const r = await call(v.cancelarVista, 'buzon', 'miembro', { params: { id: aceptada }, body: { motivo: 'Suspendida', cerrar_expediente: true } });
   assert.equal(r.body.success, true, JSON.stringify(r.body));
 
   const s = (await pool.query(`SELECT estado, recordatorio_at FROM vistas_solicitudes WHERE id = $1`, [aceptada])).rows[0];
@@ -124,6 +124,10 @@ test('cancelar una vista aceptada libera los autos', { skip }, async () => {
   const { rows: eventos } = await pool.query(`SELECT status, title, description FROM agenda_events WHERE id = ANY($1::uuid[])`, [[ev, rec]]);
   assert.equal(eventos.length, 2);
   assert.ok(eventos.every((e: any) => e.status === 'cancelado' && e.title.startsWith('❌ CANCELADA') && /Suspendida/.test(e.description)));
+  // Se pidió cerrar el expediente: queda cerrado, con fecha de cierre.
+  const ex = (await pool.query('SELECT estado, fecha_cierre FROM expedientes WHERE id = $1', [expId])).rows[0];
+  assert.equal(ex.estado, 'cerrado');
+  assert.ok(ex.fecha_cierre);
   // Y anotado en el expediente.
   const { rows: notas } = await pool.query(`SELECT content FROM notes WHERE expediente_id = $1`, [expId]);
   assert.ok(notas.some((n: any) => /❌ Vista cancelada/.test(n.content) && /JPI 3 de Murcia/.test(n.content) && /Suspendida/.test(n.content)), JSON.stringify(notas));
