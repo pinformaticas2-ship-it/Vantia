@@ -76,7 +76,7 @@ const PERIODOS: { key: string; label: string }[] = [
 ];
 
 const TABS: { key: string; label: string }[] = [
-  { key: "pendiente", label: "Por confirmar" },
+  { key: "pendiente", label: "Pendientes" },
   { key: "aceptada", label: "Aceptadas" },
   { key: "rechazada", label: "Rechazadas" },
   { key: "cancelada", label: "Canceladas" },
@@ -333,24 +333,24 @@ function VistasModulo() {
         <div className={`md:w-96 md:shrink-0 border-r border-slate-200 flex flex-col min-h-0 ${selectedId ? "hidden md:flex" : "flex"}`}>
           {/* Buscador */}
           <div className="px-3 pt-3 pb-2 border-b border-slate-200 bg-slate-50 space-y-2">
-            <div className="relative">
+            <div className="flex items-center gap-2">
+            <div className="relative min-w-0 flex-1">
               <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input ref={buscadorRef} value={busqueda} onChange={(e) => setBusqueda(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Escape") setBusqueda(""); }}
-                placeholder="Buscar: autos, NIG, juzgado, cliente, fecha…   ( / )"
+                placeholder="Buscar autos, cliente…"
+                title="Busca por autos, NIG, juzgado, localidad, remitente, cliente, expediente o fecha. Atajo: tecla /"
                 className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-8 pr-8 text-sm focus:border-red-400 focus:outline-none focus:ring-1 focus:ring-red-100" />
               {busqueda && (
                 <button type="button" onClick={() => { setBusqueda(""); buscadorRef.current?.focus(); }} title="Borrar búsqueda"
                   className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"><X size={13} /></button>
               )}
             </div>
-            <div className="flex gap-1 overflow-x-auto pb-0.5">
-              {PERIODOS.map((p) => (
-                <button key={p.key || "todas"} type="button" onClick={() => setPeriodo(p.key)}
-                  className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold transition-colors ${periodo === p.key ? "border-red-300 bg-red-50 text-red-700" : "border-slate-200 bg-white text-slate-500 hover:text-slate-800"}`}>
-                  {p.label}
-                </button>
-              ))}
+            {/* Filtro por fecha: desplegable compacto (antes, chips con barra de scroll). */}
+            <select value={periodo} onChange={(e) => setPeriodo(e.target.value)} title="Filtrar por fecha de la vista"
+              className={`shrink-0 rounded-lg border py-2 pl-2 pr-6 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-red-100 ${periodo ? "border-red-300 bg-red-50 text-red-700" : "border-slate-200 bg-white text-slate-600"}`}>
+              {PERIODOS.map((p) => <option key={p.key || "todas"} value={p.key}>{p.label}</option>)}
+            </select>
             </div>
           </div>
           {q ? (
@@ -359,10 +359,10 @@ function VistasModulo() {
               <button type="button" onClick={() => setBusqueda("")} className="font-semibold text-red-600 hover:underline">Quitar</button>
             </div>
           ) : (
-            <div className="px-2 py-2 border-b border-slate-200 bg-slate-50 flex gap-1 overflow-x-auto">
+            <div className="px-2 py-1.5 border-b border-slate-200 bg-slate-50 grid grid-cols-5 gap-0.5">
               {TABS.map((t) => (
-                <button key={t.key} onClick={() => setTab(t.key)}
-                  className={`shrink-0 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${tab === t.key ? "bg-white text-red-700 border border-slate-200 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>
+                <button key={t.key} onClick={() => setTab(t.key)} title={t.label}
+                  className={`min-w-0 truncate px-1 py-1.5 rounded-lg text-[11px] font-bold tracking-tight transition-colors ${tab === t.key ? "bg-white text-red-700 border border-slate-200 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}>
                   {t.label}
                 </button>
               ))}
