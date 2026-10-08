@@ -611,6 +611,8 @@ export async function aceptarVista(req: any, res: Response) {
     tipo_acto: txt(b.tipo_acto, 120) ?? sol.datos?.tipo_acto ?? null,
     juzgado: txt(b.juzgado) ?? sol.datos?.juzgado ?? null,
     sala: txt(b.sala, 120) ?? sol.datos?.sala ?? null,
+    direccion: txt(b.direccion, 300) ?? sol.datos?.direccion ?? null,
+    localidad: txt(b.localidad, 120) ?? sol.datos?.localidad ?? null,
     num_autos: txt(b.num_autos, 120) ?? sol.datos?.num_autos ?? null,
     nig: txt(b.nig, 60) ?? sol.datos?.nig ?? null,
   };
@@ -676,7 +678,8 @@ export async function aceptarVista(req: any, res: Response) {
       ? await pool.query(`SELECT cliente_id FROM expedientes WHERE id = $1`, [expedienteId])
       : { rows: [] as any[] };
     const clienteId = expRow[0]?.cliente_id || null;
-    const lugar = [datos.juzgado, datos.sala, sol.datos?.direccion].filter(Boolean).join(', ').slice(0, 300) || null;
+    const lugar = [datos.juzgado, datos.sala, datos.direccion, datos.localidad && !String(datos.localidad).startsWith('Provincia de') ? datos.localidad : null]
+      .filter(Boolean).join(', ').slice(0, 300) || null;
     const tituloBase = `${datos.tipo_acto ? String(datos.tipo_acto).replace(/^./, (c: string) => c.toUpperCase()) : 'Vista'}${datos.num_autos ? ` · autos ${datos.num_autos}` : ''}`;
     const descripcionEvento = [
       datos.juzgado && `Juzgado: ${datos.juzgado}`,
@@ -993,61 +996,115 @@ export async function reabrirVista(req: any, res: Response) {
 // recordatorio), y deja de contar como "la vista de esos autos", así que otro
 // señalamiento del mismo procedimiento se puede aceptar como vista nueva. El
 // expediente y su documentación se conservan.
+/** Cancela una vista aceptada de la organización: fuera de la agenda (vista y
+ *  recordatorio), estado 'cancelada' y libera sus autos. 'no-aceptada' si ya
+ *  no estaba aceptada (cancelada antes, por ejemplo). */
+async function ejecutarCancelacion(organizacionId: string, vistaId: string, userId: string, detalleExtra: string): Promise<{ ok: boolean; expedienteId: string | null }> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows } = await client.query(
+      `SELECT id, agenda_event_id, recordatorio_event_id, expediente_id, pasos FROM vistas_solicitudes
+        WHERE id = $1 AND organizacion_id = $2 AND estado = 'aceptada' FOR UPDATE`,
+      [vistaId, organizacionId],
+    );
+    if (!rows.length) {
+      await client.query('ROLLBACK');
+      return { ok: false, expedienteId: null };
+    }
+    const eventos = [rows[0].agenda_event_id, rows[0].recordatorio_event_id].filter(Boolean);
+    if (eventos.length) {
+      await client.query(`DELETE FROM agenda_events WHERE id = ANY($1::uuid[]) AND organizacion_id = $2`, [eventos, organizacionId]);
+    }
+    const quien = await resolveUserName(userId);
+    const pasos = [...(Array.isArray(rows[0].pasos) ? rows[0].pasos : []), {
+      paso: 'cancelada', ok: true,
+      detalle: `Cancelada por ${quien}${detalleExtra ? `: ${detalleExtra}` : ''}. Quitada de la agenda; el expediente se conserva.`,
+    }];
+    await client.query(
+      `UPDATE vistas_solicitudes
+          SET estado = 'cancelada', agenda_event_id = NULL, recordatorio_event_id = NULL,
+              recordatorio_at = NULL, pasos = $2, updated_at = NOW()
+        WHERE id = $1`,
+      [vistaId, JSON.stringify(pasos)],
+    );
+    // Lo que estaba esperando como "cambio" o "repetición" de esta vista pasa
+    // a ser una vista nueva del mismo expediente (si trae fecha). Los avisos
+    // de cancelación de esta misma vista se quedan como están.
+    await client.query(
+      `UPDATE vistas_solicitudes
+          SET tipo = CASE WHEN fecha_vista IS NOT NULL THEN 'vista' ELSE tipo END,
+              relacion = relacion - 'vista', updated_at = NOW()
+        WHERE organizacion_id = $1 AND estado IN ('pendiente','descartada','error')
+          AND tipo <> 'cancelacion' AND relacion->'vista'->>'id' = $2`,
+      [organizacionId, vistaId],
+    );
+    await client.query('COMMIT');
+    return { ok: true, expedienteId: rows[0].expediente_id || null };
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
 export async function cancelarVista(req: any, res: Response) {
   try {
     const ctx = await loadSolicitud(req, res);
     if (!ctx) return;
     const { sol } = ctx;
     const motivo = String(req.body?.motivo || '').trim().slice(0, 500);
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      const { rows } = await client.query(
-        `SELECT id, agenda_event_id, recordatorio_event_id, pasos FROM vistas_solicitudes
-          WHERE id = $1 AND organizacion_id = $2 AND estado = 'aceptada' FOR UPDATE`,
-        [sol.id, req.organizacionId],
-      );
-      if (!rows.length) {
-        await client.query('ROLLBACK');
-        return fail(res, 'Solo se pueden cancelar vistas aceptadas.', 409);
-      }
-      const eventos = [rows[0].agenda_event_id, rows[0].recordatorio_event_id].filter(Boolean);
-      if (eventos.length) {
-        await client.query(`DELETE FROM agenda_events WHERE id = ANY($1::uuid[]) AND organizacion_id = $2`, [eventos, req.organizacionId]);
-      }
-      const quien = await resolveUserName(req.auth?.userId);
-      const pasos = [...(Array.isArray(rows[0].pasos) ? rows[0].pasos : []), {
-        paso: 'cancelada', ok: true,
-        detalle: `Cancelada por ${quien}${motivo ? `: ${motivo}` : ''}. Quitada de la agenda; el expediente se conserva.`,
-      }];
-      await client.query(
-        `UPDATE vistas_solicitudes
-            SET estado = 'cancelada', agenda_event_id = NULL, recordatorio_event_id = NULL,
-                recordatorio_at = NULL, pasos = $2, updated_at = NOW()
-          WHERE id = $1`,
-        [sol.id, JSON.stringify(pasos)],
-      );
-      // Lo que estaba esperando como "cambio" o "repetición" de esta vista pasa
-      // a ser una vista nueva del mismo expediente (si trae fecha).
-      await client.query(
-        `UPDATE vistas_solicitudes
-            SET tipo = CASE WHEN fecha_vista IS NOT NULL THEN 'vista' ELSE tipo END,
-                relacion = relacion - 'vista', updated_at = NOW()
-          WHERE organizacion_id = $1 AND estado IN ('pendiente','descartada','error')
-            AND relacion->'vista'->>'id' = $2`,
-        [req.organizacionId, sol.id],
-      );
-      await client.query('COMMIT');
-    } catch (e) {
-      await client.query('ROLLBACK').catch(() => {});
-      throw e;
-    } finally {
-      client.release();
-    }
+    const r = await ejecutarCancelacion(req.organizacionId, sol.id, req.auth?.userId, motivo);
+    if (!r.ok) return fail(res, 'Solo se pueden cancelar vistas aceptadas.', 409);
     await logActivityForReq(req, `Vista cancelada: ${sol.subject || ''}`.slice(0, 300), sol.expediente_id ? 'EXPEDIENTE' : 'AGENDA', sol.expediente_id || undefined, sol.subject || undefined);
     return ok(res, { estado: 'cancelada' });
   } catch (e: any) {
     return fail(res, e?.message || 'Error cancelando la vista');
+  }
+}
+
+// ── POST /api/vistas/:id/aplicar-cancelacion ────────────────────────────────
+// Correo que comunica que se cancela/suspende una vista ya aceptada (mismos
+// autos y día): cancela esa vista en Vantia y guarda el correo y sus adjuntos
+// en el expediente. Si la vista ya estaba cancelada, solo se guarda el correo.
+export async function aplicarCancelacionVista(req: any, res: Response) {
+  try {
+    const ctx = await loadSolicitud(req, res);
+    if (!ctx) return;
+    const { sol, cfg } = ctx;
+    if (sol.tipo !== 'cancelacion' || !sol.relacion?.vista?.id) return fail(res, 'Este correo no es la cancelación de una vista.', 400);
+    const previo = await claim(sol.id, ['pendiente', 'descartada', 'error']);
+    if (!previo) return fail(res, 'Esta solicitud ya se está procesando o ya se decidió.', 409);
+    const uid = req.auth?.userId;
+    const deciderName = await resolveUserName(uid);
+    const pasos: Paso[] = [];
+    try {
+      const fechaTxt = sol.relacion.vista.fecha_vista
+        ? formatMadrid(new Date(sol.relacion.vista.fecha_vista), { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })
+        : '';
+      const r = await ejecutarCancelacion(req.organizacionId, sol.relacion.vista.id, uid, `según el correo «${String(sol.subject || '').slice(0, 120)}»`);
+      pasos.push(r.ok
+        ? { paso: 'cancelada', ok: true, detalle: `Vista${fechaTxt ? ` del ${fechaTxt}` : ''} cancelada y quitada de la agenda` }
+        : { paso: 'cancelada', ok: true, detalle: 'La vista ya no estaba activa (cancelada o cambiada antes); no había nada que quitar de la agenda' });
+      const { rows: v } = await pool.query(`SELECT expediente_id FROM vistas_solicitudes WHERE id = $1 AND organizacion_id = $2`, [sol.relacion.vista.id, req.organizacionId]);
+      const expedienteId = r.expedienteId || v[0]?.expediente_id || sol.relacion?.expediente?.id || null;
+      if (expedienteId) pasos.push(await guardarDocumentacion(sol, expedienteId, req.body?.guardar_adjuntos ?? cfg.guardarAdjuntos, deciderName));
+      const okTodo = pasos.every((p) => p.ok);
+      await pool.query(
+        `UPDATE vistas_solicitudes SET estado = $2, expediente_id = $3, pasos = $4, error = $5,
+                decidido_por = $6, decidido_por_nombre = $7, decidido_at = NOW(), updated_at = NOW()
+          WHERE id = $1`,
+        [sol.id, okTodo ? 'documentada' : 'error', expedienteId, JSON.stringify(pasos), okTodo ? null : pasos.filter((p) => !p.ok).map((p) => p.detalle).join(' | '), uid, deciderName],
+      );
+      await logActivityForReq(req, `Vista cancelada por correo: ${sol.subject || ''}`.slice(0, 300), expedienteId ? 'EXPEDIENTE' : 'AGENDA', expedienteId || undefined, sol.from_email || undefined);
+      return ok(res, { estado: okTodo ? 'documentada' : 'error', pasos });
+    } catch (e: any) {
+      await unclaim(sol.id, previo, e?.message || String(e));
+      throw e;
+    }
+  } catch (e: any) {
+    return fail(res, e?.message || 'Error aplicando la cancelación');
   }
 }
 

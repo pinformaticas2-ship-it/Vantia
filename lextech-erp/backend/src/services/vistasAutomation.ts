@@ -284,6 +284,10 @@ export interface VistaDatos {
   juzgado: string | null;
   sala: string | null;
   direccion: string | null;
+  /** Municipio de la sede (o la provincia deducida del NIG). */
+  localidad: string | null;
+  /** El correo comunica que un señalamiento se suspende / cancela / queda sin efecto. */
+  cancelada: boolean;
   num_autos: string | null;
   nig: string | null;
   tipo_procedimiento: string | null;
@@ -298,7 +302,7 @@ export interface VistaDatos {
 
 const EMPTY_DATOS: VistaDatos = {
   es_vista: false, tipo_acto: null, fecha_vista: null, hora_vista: null, duracion_min: null,
-  juzgado: null, sala: null, direccion: null, num_autos: null, nig: null, tipo_procedimiento: null,
+  juzgado: null, sala: null, direccion: null, localidad: null, cancelada: false, num_autos: null, nig: null, tipo_procedimiento: null,
   partes: null, cliente: null, contrario: null, fecha_preparacion: null, modalidad: null,
   enlace_telematico: null, resumen: null,
 };
@@ -344,6 +348,8 @@ function sanitizeDatos(raw: any): VistaDatos {
     juzgado: str(raw?.juzgado, 300),
     sala: str(raw?.sala, 120),
     direccion: str(raw?.direccion, 300),
+    localidad: str(raw?.localidad, 120),
+    cancelada: raw?.cancelada === true || raw?.cancelada === 'true',
     num_autos: str(raw?.num_autos, 120),
     nig: str(raw?.nig, 60),
     tipo_procedimiento: str(raw?.tipo_procedimiento, 200),
@@ -374,13 +380,31 @@ Devuelve SOLO este JSON (sin markdown), con null en lo que no aparezca:
 {"es_vista": true|false,
  "tipo_acto": "vista|juicio oral|audiencia previa|comparecencia|...",
  "fecha_vista": "YYYY-MM-DD", "hora_vista": "HH:MM", "duracion_min": número|null,
- "juzgado": "órgano judicial completo", "sala": "sala o despacho", "direccion": "dirección postal",
+ "juzgado": "órgano judicial COMPLETO: tipo, número/sección/plaza y localidad",
+ "sala": "sala de vistas o despacho",
+ "direccion": "dirección de la sede (calle y número, o edificio: Ciudad de la Justicia, Palacio de Justicia...)",
+ "localidad": "municipio donde está la sede",
+ "cancelada": true|false,
  "num_autos": "número de procedimiento, p.ej. 123/2026", "nig": "NIG",
  "tipo_procedimiento": "p.ej. Juicio verbal", "partes": "demandante contra demandado",
  "cliente": "parte a la que representa el despacho si se deduce", "contrario": "parte contraria",
  "fecha_preparacion": "YYYY-MM-DD solo si el correo indica expresamente cuándo preparar la vista o un plazo para prepararla",
  "modalidad": "presencial|telematica", "enlace_telematico": "url si la hay",
  "resumen": "1-2 frases en español"}
+
+DÓNDE SE CELEBRA (pon especial cuidado, el abogado tiene que saber a qué sede ir):
+- "juzgado" debe ser el órgano completo, p.ej. "Juzgado de Primera Instancia nº 3 de Murcia",
+  "Tribunal de Instancia de Orihuela, Sección Civil, Plaza nº 2", "Audiencia Provincial de Alicante, Sección 9ª".
+- Búscalo en TODO: asunto, cuerpo, membrete y pie de los PDF, sello, firma del Letrado de la
+  Administración de Justicia, encabezado de la cédula o diligencia de ordenación.
+- Abreviaturas habituales: "PLAZA 16 MURCIA" = "Tribunal de Instancia de Murcia, Plaza nº 16";
+  "JPI 3" = "Juzgado de Primera Instancia nº 3"; "JS" = Juzgado de lo Social; "JCA" = Contencioso-Administrativo.
+- "direccion" y "localidad": de la sede del órgano (pie de página de las resoluciones, "Sede:", "Domicilio:").
+- No inventes: si no aparece, null.
+
+"cancelada" = true solo si el correo comunica que un señalamiento ya hecho se SUSPENDE, se CANCELA,
+queda SIN EFECTO o se aplaza SIN fecha nueva. Si se aplaza a otra fecha, "cancelada" es false y la
+fecha nueva va en "fecha_vista".
 
 Remitente: ${from}
 Asunto: ${subject}
@@ -446,9 +470,7 @@ export function extractWithPatterns(subject: string, text: string): VistaDatos {
 
   const autos = /(?:autos|procedimiento|p\.?\s?o\.?|juicio verbal|ejecuci[oó]n|n[ºo°]\s*proc\.?)[^0-9]{0,25}(\d{1,6}\s*\/\s*\d{2,4})/i.exec(src);
   const nig = /\bNIG[:.\s]*([0-9A-Z]{8,25})/i.exec(src);
-  // El punto corta el nombre salvo en abreviaturas tipo "n.º 2".
-  const juzgado = /((?:Juzgado|Tribunal|Audiencia\s+Provincial|Secci[oó]n)\s+(?:[^\n.;,]|\.(?=\s*[º°ª0-9])){3,120})/i.exec(src);
-  const sala = /\b(Sala\s+(?:de\s+vistas\s+)?(?:n[ºo°.]*\s*)?[0-9A-Z]{1,4})\b/i.exec(src);
+  const lugar = extraerLugar(src);
 
   return {
     ...EMPTY_DATOS,
@@ -456,11 +478,146 @@ export function extractWithPatterns(subject: string, text: string): VistaDatos {
     tipo_acto: /audiencia previa/.test(f) ? 'audiencia previa' : /\bvista\b/.test(f) ? 'vista' : /juicio/.test(f) ? 'juicio' : /comparecencia/.test(f) ? 'comparecencia' : 'vista',
     fecha_vista: best?.ymd || null,
     hora_vista: best?.hm || null,
-    juzgado: juzgado ? juzgado[1].trim().slice(0, 300) : null,
-    sala: sala ? sala[1].trim() : null,
+    juzgado: lugar.juzgado,
+    sala: lugar.sala,
+    direccion: lugar.direccion,
+    localidad: lugar.localidad,
+    cancelada: esTextoDeCancelacion(src),
     num_autos: autos ? autos[1].replace(/\s+/g, '') : null,
     nig: nig ? nig[1] : null,
   };
+}
+
+// ── Dónde se celebra ─────────────────────────────────────────────────────────
+
+/** Provincia según el NIG: sus dos primeras cifras son el código INE de la
+ *  provincia del órgano (p.ej. 30030… → Murcia). */
+const PROVINCIAS_INE: Record<string, string> = {
+  '01': 'Álava', '02': 'Albacete', '03': 'Alicante', '04': 'Almería', '05': 'Ávila', '06': 'Badajoz',
+  '07': 'Illes Balears', '08': 'Barcelona', '09': 'Burgos', '10': 'Cáceres', '11': 'Cádiz', '12': 'Castellón',
+  '13': 'Ciudad Real', '14': 'Córdoba', '15': 'A Coruña', '16': 'Cuenca', '17': 'Girona', '18': 'Granada',
+  '19': 'Guadalajara', '20': 'Gipuzkoa', '21': 'Huelva', '22': 'Huesca', '23': 'Jaén', '24': 'León',
+  '25': 'Lleida', '26': 'La Rioja', '27': 'Lugo', '28': 'Madrid', '29': 'Málaga', '30': 'Murcia',
+  '31': 'Navarra', '32': 'Ourense', '33': 'Asturias', '34': 'Palencia', '35': 'Las Palmas', '36': 'Pontevedra',
+  '37': 'Salamanca', '38': 'Santa Cruz de Tenerife', '39': 'Cantabria', '40': 'Segovia', '41': 'Sevilla',
+  '42': 'Soria', '43': 'Tarragona', '44': 'Teruel', '45': 'Toledo', '46': 'Valencia', '47': 'Valladolid',
+  '48': 'Bizkaia', '49': 'Zamora', '50': 'Zaragoza', '51': 'Ceuta', '52': 'Melilla',
+};
+
+export function provinciaPorNig(nig: string | null | undefined): string | null {
+  const n = normalizeNig(nig);
+  if (!n || !/^\d{2}/.test(n)) return null;
+  const p = PROVINCIAS_INE[n.slice(0, 2)];
+  return p ? `Provincia de ${p} (según el NIG)` : null;
+}
+
+const capitalizar = (s: string) => s.toLowerCase().replace(/(^|[\s'’-])([a-záéíóúñ])/g, (_, a, b) => a + b.toUpperCase())
+  .replace(/\b(De|Del|La|Las|Los|El|Y|E)\b/g, (w) => w.toLowerCase()).replace(/^./, (c) => c.toUpperCase());
+
+// Palabras que siguen a la ciudad en asuntos tipo "PLAZA 16 MURCIA AUTOS 945/2023".
+const NO_CIUDAD = new Set(['AUTOS', 'NIG', 'VISTA', 'VISTAS', 'PROCEDIMIENTO', 'JUICIO', 'SALA', 'A', 'LAS', 'DIA', 'DÍA', 'EL', 'HORA', 'HORAS', 'EXP', 'EXPEDIENTE', 'SECCION', 'SECCIÓN', 'CIVIL', 'PENAL', 'SOCIAL', 'NUM', 'NÚM']);
+
+/** Localidad al final del nombre de un órgano: "... nº 3 de Murcia" → Murcia. */
+export function localidadDeJuzgado(juzgado: string | null | undefined): string | null {
+  const partes = String(juzgado || '').split(',')[0].split(/\s+de\s+/i);
+  if (partes.length < 2) return null;
+  const ult = partes[partes.length - 1].trim().replace(/[.;:]+$/, '');
+  if (!ult || /\d/.test(ult) || ult.length > 40) return null;
+  if (/^(primera|lo|la|instancia|instrucci|violencia|menores|vigilancia|paz|guardia)/i.test(ult)) return null;
+  return capitalizar(ult);
+}
+
+/** Juzgado, sala, dirección y localidad por patrones (sin IA). */
+export function extraerLugar(src: string): { juzgado: string | null; sala: string | null; direccion: string | null; localidad: string | null } {
+  let juzgado: string | null = null;
+
+  // "Tribunal de Instancia de Orihuela, Sección Civil, Plaza nº 2" (Ley 1/2025).
+  const ti = /Tribunal\s+de\s+Instancia\s+de\s+([A-Za-zÁÉÍÓÚÑáéíóúñ'’ -]{2,40}?)(?=\s*[,.\n]|\s+Secci|\s+Plaza|$)(?:[,.]?\s*Secci[oó]n\s+(?:de\s+)?([A-Za-zÁÉÍÓÚÑáéíóúñ ]{2,40}?)(?=\s*[,.\n]|\s+Plaza|$))?(?:[,.]?\s*Plaza\s+n?[ºo°.]*\s*(\d{1,3}))?/i.exec(src);
+  if (ti) {
+    juzgado = `Tribunal de Instancia de ${capitalizar(ti[1].trim())}${ti[2] ? `, Sección ${capitalizar(ti[2].trim())}` : ''}${ti[3] ? `, Plaza nº ${ti[3]}` : ''}`;
+  }
+  // Abreviatura del asunto: "PLAZA 16 MURCIA" = Plaza nº 16 del Tribunal de Instancia de Murcia.
+  if (!juzgado) {
+    const pz = /\bPLAZA\s+(?:N[ºO°.]*\s*)?(\d{1,3})\s+(?:DE\s+)?((?:[A-ZÁÉÍÓÚÑ]{2,}\s*){1,3})/.exec(src);
+    if (pz) {
+      const ciudad = pz[2].trim().split(/\s+/).filter((w, i, arr) => !arr.slice(0, i + 1).some((x) => NO_CIUDAD.has(x)));
+      if (ciudad.length) juzgado = `Tribunal de Instancia de ${capitalizar(ciudad.join(' '))}, Plaza nº ${pz[1]}`;
+    }
+  }
+  // Juzgado / Audiencia / Tribunal Superior: el punto corta salvo en "n.º 2", y
+  // la coma solo si no sigue "Sección".
+  if (!juzgado) {
+    const jz = /((?:Juzgado|Tribunal\s+Superior|Audiencia\s+Provincial|Audiencia\s+Nacional)\s+(?:[^\n.;,]|\.(?=\s*[º°ª0-9])|,(?=\s*Secci))*)/i.exec(src);
+    if (jz && jz[1].trim().length > 10) juzgado = jz[1].trim().replace(/\s+/g, ' ').slice(0, 300);
+  }
+  // Siglas: "JPI 3 de Murcia", "JPII nº 2 Orihuela".
+  if (!juzgado) {
+    const sig = /\b(JPII|JPI|JI|JS|JCA|JM|JVM)\s*(?:n[ºo°.]*\s*)?(\d{1,3})(?:\s+(?:de\s+)?([A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ]{2,}))?/.exec(src);
+    if (sig) {
+      const tipos: Record<string, string> = {
+        JPII: 'Juzgado de Primera Instancia e Instrucción', JPI: 'Juzgado de Primera Instancia', JI: 'Juzgado de Instrucción',
+        JS: 'Juzgado de lo Social', JCA: 'Juzgado de lo Contencioso-Administrativo', JM: 'Juzgado de lo Mercantil', JVM: 'Juzgado de Violencia sobre la Mujer',
+      };
+      const ciudad = sig[3] && !NO_CIUDAD.has(sig[3].toUpperCase()) ? ` de ${capitalizar(sig[3])}` : '';
+      juzgado = `${tipos[sig[1]]} nº ${sig[2]}${ciudad}`;
+    }
+  }
+
+  const sala = /\b(Sala\s+(?:de\s+vistas\s+)?(?:n[ºo°.]*\s*)?[0-9A-Z]{1,4})\b/i.exec(src);
+
+  // Sede: edificio conocido o calle con número.
+  const edificio = /((?:Ciudad|Palacio)\s+de\s+(?:la\s+)?Justicia(?:\s+de\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)?)/i.exec(src);
+  const calle = /\b((?:C\/|Calle|Avda\.?|Avenida|Paseo|P[ºo]\.?|Ronda|Gran\s+V[ií]a|Plaza\s+de|Pza\.?\s+de|Carretera|Ctra\.?)\s*[A-Za-zÁÉÍÓÚÑáéíóúñ0-9ºª.,'’ -]{3,80}?\d{1,4}[A-Za-z]?(?:[,\s-]+\d{5}\s+[A-Za-zÁÉÍÓÚÑáéíóúñ ]{2,30})?)/.exec(src);
+  const direccion = [edificio?.[1], calle?.[1]].filter(Boolean).map((s) => s!.trim().replace(/[,\s]+$/, '')).join(', ') || null;
+
+  // Localidad: del nombre del órgano, o del código postal ("03300 - ORIHUELA").
+  let localidad = localidadDeJuzgado(juzgado);
+  if (!localidad) {
+    const cp = /\b(?:0[1-9]|[1-4]\d|5[0-2])\d{3}\s*[-–]?\s*([A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ]{2,}(?:\s+(?:de\s+)?[A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ]{2,})?)/.exec(src);
+    if (cp && !NO_CIUDAD.has(cp[1].toUpperCase())) localidad = capitalizar(cp[1]);
+  }
+
+  return { juzgado, sala: sala ? sala[1].trim() : null, direccion: direccion ? direccion.slice(0, 300) : null, localidad };
+}
+
+// ── Cancelaciones ────────────────────────────────────────────────────────────
+
+/** Dónde se celebra, por orden: lo que lea la IA, los patrones del correo, el
+ *  juzgado de la vista anterior o del expediente con esos autos, y como mínimo
+ *  la provincia del NIG. */
+export function completarLugar(datos: VistaDatos, texto: string, relacion: Relacion | null): void {
+  const p = extraerLugar(texto);
+  datos.juzgado = datos.juzgado || p.juzgado || relacion?.vista?.juzgado || relacion?.expediente?.juzgado || null;
+  datos.sala = datos.sala || p.sala;
+  datos.direccion = datos.direccion || p.direccion;
+  datos.localidad = datos.localidad || p.localidad || localidadDeJuzgado(datos.juzgado) || provinciaPorNig(datos.nig);
+}
+
+/** El texto comunica que un señalamiento se suspende, cancela o queda sin
+ *  efecto (y NO que se vuelve a señalar para otra fecha). */
+export function esTextoDeCancelacion(texto: string): boolean {
+  const f = fold(texto);
+  const cancel = /\b(suspend\w*|suspension\w*|sin efecto|desconvoca\w*|cancela\w*|anula\w*|se deja sin|queda sin|aplaza\w*|aplazamiento)\b/;
+  const acto = /\b(vista|senalamiento|senalad\w*|juicio|audiencia|comparecencia|acto)\b/;
+  const m = cancel.exec(f);
+  if (!m) return false;
+  // La palabra de cancelación tiene que ir cerca del acto ("se suspende la vista", "vista ... queda sin efecto").
+  const zona = f.slice(Math.max(0, m.index - 120), m.index + 120);
+  if (!acto.test(zona)) return false;
+  // "...y se señala nuevamente para el día 20/11" → es un cambio de fecha, no una cancelación.
+  if (/\b(nuevo senalamiento|nueva fecha|se (vuelve a )?senala (nuevamente|de nuevo|para)|nuevamente senalad\w*|queda(ndo)? senalad\w* para|se resenala)\b/.test(f)) return false;
+  // "se aplaza la vista del 12/10 al 20/11" → también es un cambio de fecha.
+  if (/\baplaza\w*[^.]{0,100}?\b(al|para el|hasta el)\s+(dia\s+)?\d{1,2}(\s+de\s+[a-z]+|[/.-]\d{1,2})/.test(f)) return false;
+  return true;
+}
+
+/** ¿Este correo cancela la vista ya aceptada de esos autos? Mismo día (si el
+ *  correo trae fecha) — si trae otra fecha, es un cambio o una vista distinta. */
+export function cancelaVista(datos: VistaDatos, texto: string, vista: { fecha_vista: string } | null | undefined): boolean {
+  if (!vista) return false;
+  if (!datos.cancelada && !esTextoDeCancelacion(texto)) return false;
+  if (!datos.fecha_vista) return true;
+  return madridYmd(new Date(vista.fecha_vista)) === datos.fecha_vista;
 }
 
 // ── Hueco en la agenda ───────────────────────────────────────────────────────
@@ -632,7 +789,7 @@ export function extractProcedureRefs(text: string): { autos: string[]; nigs: str
 export interface Relacion {
   autos: string | null;
   nig: string | null;
-  expediente: { id: string; anio: number; num_exp: number; descripcion: string | null; num_autos: string | null; cliente_nombre: string | null } | null;
+  expediente: { id: string; anio: number; num_exp: number; descripcion: string | null; num_autos: string | null; cliente_nombre: string | null; juzgado?: string | null } | null;
   vista: { id: string; fecha_vista: string; agenda_event_id: string | null; juzgado: string | null } | null;
 }
 
@@ -644,7 +801,7 @@ export async function findRelacion(organizacionId: string, autosList: string[], 
   if (!autos.length && !nigSet.length) return null;
 
   const { rows: exps } = await pool.query(
-    `SELECT id, anio, num_exp, descripcion, num_autos, nig, cliente_nombre
+    `SELECT id, anio, num_exp, descripcion, num_autos, nig, cliente_nombre, juzgado
        FROM expedientes
       WHERE organizacion_id = $1 AND (num_autos IS NOT NULL OR nig IS NOT NULL)
       ORDER BY updated_at DESC NULLS LAST
@@ -666,7 +823,7 @@ export async function findRelacion(organizacionId: string, autosList: string[], 
   return {
     autos: autos[0] || null,
     nig: nigSet[0] || null,
-    expediente: exp ? { id: exp.id, anio: exp.anio, num_exp: exp.num_exp, descripcion: exp.descripcion, num_autos: exp.num_autos, cliente_nombre: exp.cliente_nombre } : null,
+    expediente: exp ? { id: exp.id, anio: exp.anio, num_exp: exp.num_exp, descripcion: exp.descripcion, num_autos: exp.num_autos, cliente_nombre: exp.cliente_nombre, juzgado: exp.juzgado || null } : null,
     vista: vista ? { id: vista.id, fecha_vista: vista.fecha_vista, agenda_event_id: vista.agenda_event_id, juzgado: vista.juzgado } : null,
   };
 }
@@ -714,6 +871,7 @@ async function analyzeEmail(emailId: string, cfg: VistasConfig, organizacionId: 
   if (!relacion?.expediente && (datos.num_autos || datos.nig)) {
     relacion = (await findRelacion(organizacionId, [datos.num_autos || ''], [datos.nig || ''])) || relacion;
   }
+  completarLugar(datos, `${row.subject || ''}\n${text}`, relacion);
   return { row, text, datos, origen: (ia ? 'ia' : 'patrones') as 'ia' | 'patrones', relacion };
 }
 
@@ -733,6 +891,8 @@ export function cumpleReglaVista(texto: string, numAutosIA?: string | null): { o
   return { ok: palabraVista && Boolean(autos), palabraVista, autos };
 }
 
+export type TipoSolicitud = 'vista' | 'cambio' | 'documentacion' | 'cancelacion';
+
 export function clasificarSolicitud(esVista: boolean, fechaVista: Date | null, relacion: Relacion | null): 'vista' | 'cambio' | 'documentacion' | null {
   if (esVista && fechaVista) {
     if (relacion?.vista) {
@@ -744,7 +904,8 @@ export function clasificarSolicitud(esVista: boolean, fechaVista: Date | null, r
   return relacion?.expediente ? 'documentacion' : null;
 }
 
-const TITULO_AVISO: Record<'vista' | 'cambio' | 'documentacion', string> = {
+const TITULO_AVISO: Record<TipoSolicitud, string> = {
+  cancelacion: 'Vista cancelada o suspendida',
   vista: 'Vista por confirmar',
   cambio: 'Cambio en una vista ya aceptada',
   documentacion: 'Nueva documentación de un procedimiento',
@@ -775,7 +936,7 @@ export async function yaAvisados(solicitudId: string): Promise<{ messageId: stri
 
 async function avisarSolicitud(
   org: { id: string; nombre: string }, cfg: VistasConfig, solicitudId: string,
-  tipo: 'vista' | 'cambio' | 'documentacion', datos: VistaDatos, fechaVista: Date | null,
+  tipo: TipoSolicitud, datos: VistaDatos, fechaVista: Date | null,
   conflictos: AgendaConflict[], relacion: Relacion | null, email: { subject: string | null; from: string | null; mailboxOwner: string | null },
 ) {
   const previos = await yaAvisados(solicitudId);
@@ -796,12 +957,14 @@ async function avisarSolicitud(
     ? `expediente ${relacion.expediente.anio}/${relacion.expediente.num_exp}${relacion.expediente.num_autos ? ` (autos ${relacion.expediente.num_autos})` : ''}`
     : (datos.num_autos ? `autos ${datos.num_autos}` : '');
   const titulo = tipo === 'vista' && conflictos.length ? `${TITULO_AVISO.vista} (choca con tu agenda)` : TITULO_AVISO[tipo];
-  const resumen = tipo === 'cambio' && relacion?.vista
+  const resumen = tipo === 'cancelacion' && relacion?.vista
+    ? `Se cancela la vista del ${formatMadrid(new Date(relacion.vista.fecha_vista), { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}${procedimiento ? ` (${procedimiento})` : ''}`
+    : tipo === 'cambio' && relacion?.vista
     ? `La vista del ${formatMadrid(new Date(relacion.vista.fecha_vista), { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })} pasaría al ${cuando}`
     : [cuando, datos.juzgado, procedimiento].filter(Boolean).join(' · ');
 
   await sendPushToUsers(destinatarios, {
-    title: `${tipo === 'documentacion' ? '📎' : tipo === 'cambio' ? '🔁' : '⚖️'} ${titulo}`,
+    title: `${tipo === 'cancelacion' ? '🚫' : tipo === 'documentacion' ? '📎' : tipo === 'cambio' ? '🔁' : '⚖️'} ${titulo}`,
     body: resumen || (email.subject || ''),
     url: `/dashboard/vistas?id=${solicitudId}`,
     tag: `vista-${solicitudId}`,
@@ -873,7 +1036,9 @@ async function processOrganizacion(org: { id: string; nombre: string; vistas_aut
 
     const duracion = datos.duracion_min || cfg.duracionMin;
     const fechaVista = datos.fecha_vista ? madridLocalToDate(datos.fecha_vista, datos.hora_vista || '09:00') : null;
-    let tipo = clasificarSolicitud(Boolean(datos.es_vista), fechaVista, relacion);
+    let tipo: TipoSolicitud | null = clasificarSolicitud(Boolean(datos.es_vista), fechaVista, relacion);
+    // Cancelación o suspensión de la vista ya aceptada de esos autos (mismo día).
+    if (relacion?.vista && cancelaVista(datos, `${row.subject || ''}\n${text}`, relacion.vista)) tipo = 'cancelacion';
     // Regla: solo se avisa de una vista si el correo dice "vista" y trae nº de
     // autos. Si no, nada de vista: como mucho documentación de un expediente
     // con esos mismos autos.

@@ -128,3 +128,27 @@ test('cancelar una vista aceptada libera los autos', { skip }, async () => {
   const lista = await call(v.listVistas, 'buzon', 'miembro', { query: { estado: 'cancelada' } });
   assert.ok(lista.body.data.some((x: any) => x.id === aceptada));
 });
+
+// 08/10/2026: un correo que cancela la vista aceptada de esos autos.
+test('aplicar la cancelación que llega por correo', { skip }, async () => {
+  const v = await import('../src/controllers/vistasController');
+  const ev = (await pool.query(`INSERT INTO agenda_events (user_id, title, start_at, organizacion_id) VALUES ('buzon','Vista', NOW() + interval '6 days', $1) RETURNING id`, [org])).rows[0].id;
+  const vista = (await pool.query(
+    `INSERT INTO vistas_solicitudes (organizacion_id, email_id, mailbox_user_id, estado, tipo, subject, datos, fecha_vista, agenda_event_id, pasos)
+     VALUES ($1, uuid_generate_v4(), 'buzon', 'aceptada', 'vista', 'VISTA autos 888/2026', '{"num_autos":"888/2026"}', NOW() + interval '6 days', $2, '[]') RETURNING id`,
+    [org, ev])).rows[0].id;
+  const aviso = (await pool.query(
+    `INSERT INTO vistas_solicitudes (organizacion_id, email_id, mailbox_user_id, estado, tipo, subject, datos, relacion)
+     VALUES ($1, uuid_generate_v4(), 'buzon', 'pendiente', 'cancelacion', 'SUSPENSIÓN VISTA autos 888/2026', '{}', $2) RETURNING id`,
+    [org, JSON.stringify({ autos: '888/2026', vista: { id: vista, fecha_vista: new Date(Date.now() + 6 * 86400000).toISOString() } })])).rows[0].id;
+
+  // Una vista normal no se puede "aplicar como cancelación".
+  assert.equal((await call(v.aplicarCancelacionVista, 'buzon', 'miembro', { params: { id: vista } })).status, 400);
+  const r = await call(v.aplicarCancelacionVista, 'buzon', 'miembro', { params: { id: aviso }, body: {} });
+  assert.equal(r.body.success, true, JSON.stringify(r.body));
+  assert.equal((await pool.query(`SELECT estado FROM vistas_solicitudes WHERE id = $1`, [vista])).rows[0].estado, 'cancelada');
+  assert.equal((await pool.query(`SELECT estado FROM vistas_solicitudes WHERE id = $1`, [aviso])).rows[0].estado, 'documentada');
+  assert.equal((await pool.query(`SELECT 1 FROM agenda_events WHERE id = $1`, [ev])).rows.length, 0);
+  // Y no se puede aplicar dos veces.
+  assert.equal((await call(v.aplicarCancelacionVista, 'buzon', 'miembro', { params: { id: aviso }, body: {} })).status, 409);
+});

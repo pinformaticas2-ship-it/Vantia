@@ -16,7 +16,7 @@ import { notifyVistasChanged, useVistasStatus } from "../lib/useVistasStatus";
 // (todo en el backend, controllers/vistasController.ts).
 
 type Estado = "pendiente" | "procesando" | "error" | "aceptada" | "rechazada" | "descartada" | "documentada" | "modificada" | "cancelada";
-type Tipo = "vista" | "cambio" | "documentacion";
+type Tipo = "vista" | "cambio" | "documentacion" | "cancelacion";
 interface Relacion {
   autos: string | null;
   nig: string | null;
@@ -88,6 +88,7 @@ const TIPO_BADGE: Record<Tipo, { label: string; cls: string }> = {
   vista: { label: "Vista nueva", cls: "bg-red-50 text-red-700" },
   cambio: { label: "Cambio de vista", cls: "bg-violet-50 text-violet-700" },
   documentacion: { label: "Documentación", cls: "bg-sky-50 text-sky-700" },
+  cancelacion: { label: "Cancelación", cls: "bg-rose-50 text-rose-700" },
 };
 
 const PASO_LABEL: Record<string, string> = {
@@ -326,7 +327,7 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
   const { getToken } = useAuth();
   const [d, setD] = useState<Detalle | null>(null);
   const [loadError, setLoadError] = useState("");
-  const [busy, setBusy] = useState<"" | "aceptar" | "rechazar" | "descartar" | "reabrir" | "documentar" | "modificar" | "cancelar">("");
+  const [busy, setBusy] = useState<"" | "aceptar" | "rechazar" | "descartar" | "reabrir" | "documentar" | "modificar" | "cancelar" | "aplicar-cancelacion">("");
   const [confirmarCancelar, setConfirmarCancelar] = useState(false);
   const [motivoCancelar, setMotivoCancelar] = useState("");
   // Para correos de un procedimiento conocido, el formulario de vista nueva
@@ -344,6 +345,8 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
   const [sala, setSala] = useState("");
   const [autos, setAutos] = useState("");
   const [nig, setNig] = useState("");
+  const [direccion, setDireccion] = useState("");
+  const [localidad, setLocalidad] = useState("");
   const [expModo, setExpModo] = useState<"nuevo" | "existente">("nuevo");
   const [expId, setExpId] = useState("");
   const [guardarAdjuntos, setGuardarAdjuntos] = useState(true);
@@ -369,6 +372,8 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
       setSala(v.datos?.sala || "");
       setAutos(v.datos?.num_autos || "");
       setNig(v.datos?.nig || "");
+      setDireccion(v.datos?.direccion || "");
+      setLocalidad(v.datos?.localidad || "");
       if (v.expediente_id) { setExpModo("existente"); setExpId(v.expediente_id); }
       else if (v.coincidencias.length) { setExpModo("existente"); setExpId(v.coincidencias[0].id); }
       setGuardarAdjuntos(v.defaults.guardarAdjuntos);
@@ -426,7 +431,7 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
     fecha: fromLocalInput(fecha),
     duracion_min: duracion,
     tipo_acto: tipoActo,
-    juzgado, sala, num_autos: autos, nig,
+    juzgado, sala, num_autos: autos, nig, direccion, localidad,
     mensaje,
   });
 
@@ -443,7 +448,7 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
     }
   };
 
-  const run = async (accion: "aceptar" | "rechazar" | "descartar" | "reabrir" | "documentar" | "modificar" | "cancelar") => {
+  const run = async (accion: "aceptar" | "rechazar" | "descartar" | "reabrir" | "documentar" | "modificar" | "cancelar" | "aplicar-cancelacion") => {
     setBusy(accion); setActionError(""); setResultado(null);
     try {
       let body: any = {};
@@ -468,6 +473,8 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
           guardar_adjuntos: guardarAdjuntos, enviar_correo: enviarCorreo, mensaje,
           ...(modoRespuesta === "aceptar" ? { asunto, cuerpo } : {}),
         };
+      } else if (accion === "aplicar-cancelacion") {
+        body = { guardar_adjuntos: guardarAdjuntos };
       } else if (accion === "cancelar") {
         body = { motivo: motivoCancelar };
       } else if (accion === "rechazar") {
@@ -641,12 +648,13 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
       )}
 
       {editable && d.relacion && d.tipo !== "vista" && (
-        <section className="rounded-2xl border border-sky-200 bg-sky-50/60 p-4 space-y-3">
+        <section className={`rounded-2xl border p-4 space-y-3 ${d.tipo === "cancelacion" ? "border-rose-200 bg-rose-50/60" : "border-sky-200 bg-sky-50/60"}`}>
           <div className="flex items-start gap-2">
-            <FileText size={16} className="mt-0.5 shrink-0 text-sky-600" />
+            {d.tipo === "cancelacion" ? <XCircle size={16} className="mt-0.5 shrink-0 text-rose-600" /> : <FileText size={16} className="mt-0.5 shrink-0 text-sky-600" />}
             <div className="text-sm text-slate-700">
               <p className="font-bold text-slate-800">
-                {d.tipo === "cambio" ? "Cambio en una vista ya aceptada" : "Mismo procedimiento que un expediente existente"}
+                {d.tipo === "cancelacion" ? "Este correo cancela o suspende una vista ya aceptada"
+                  : d.tipo === "cambio" ? "Cambio en una vista ya aceptada" : "Mismo procedimiento que un expediente existente"}
               </p>
               {d.relacion.expediente && (
                 <p>
@@ -659,6 +667,7 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
                 <p>
                   Vista aceptada: <b>{fmtFecha(d.relacion.vista.fecha_vista)}</b>
                   {d.tipo === "cambio" && d.fecha_vista ? <> → este correo indica <b>{fmtFecha(d.fecha_vista)}</b></> : null}
+                  {d.tipo === "cancelacion" ? <> → <b className="text-rose-700">se cancela</b>{d.relacion.vista.juzgado ? ` · ${d.relacion.vista.juzgado}` : ""}</> : null}
                 </p>
               )}
             </div>
@@ -692,6 +701,13 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
           {actionError && !mostrarFormulario && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{actionError}</p>}
 
           <div className="flex flex-wrap items-center gap-2">
+            {d.tipo === "cancelacion" && d.relacion.vista && (
+              <button onClick={() => void run("aplicar-cancelacion")} disabled={!!busy}
+                title="La quita de la agenda (con su recordatorio) y guarda este correo en el expediente"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-600 text-white text-sm font-bold hover:bg-rose-700 disabled:opacity-50">
+                {busy === "aplicar-cancelacion" ? <Loader2 size={15} className="animate-spin" /> : <XCircle size={15} />} Cancelar la vista en Vantia
+              </button>
+            )}
             {d.tipo === "cambio" && d.relacion.vista && (
               <button onClick={() => void run("modificar")} disabled={!!busy}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-bold hover:bg-red-700 disabled:opacity-50">
@@ -700,12 +716,12 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
             )}
             {d.relacion.expediente && (
               <button onClick={() => void run("documentar")} disabled={!!busy}
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold disabled:opacity-50 ${d.tipo === "cambio" ? "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50" : "bg-red-600 text-white hover:bg-red-700"}`}>
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold disabled:opacity-50 ${d.tipo === "cambio" || d.tipo === "cancelacion" ? "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50" : "bg-red-600 text-white hover:bg-red-700"}`}>
                 {busy === "documentar" ? <Loader2 size={15} className="animate-spin" /> : <Paperclip size={15} />}
-                {d.tipo === "cambio" ? "Solo añadir documentación" : "Añadir documentación al expediente"}
+                {d.tipo === "cancelacion" ? "No cancelar, solo guardar el correo" : d.tipo === "cambio" ? "Solo añadir documentación" : "Añadir documentación al expediente"}
               </button>
             )}
-            {!mostrarFormulario && (
+            {!mostrarFormulario && d.tipo !== "cancelacion" && (
               <button onClick={() => setMostrarFormulario(true)} disabled={!!busy}
                 className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-white">
                 <CalendarCheck size={13} /> {d.tipo === "cambio" ? "Es otra vista distinta" : "Es una vista nueva"}
@@ -714,7 +730,7 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
             {d.estado === "pendiente" && !mostrarFormulario && (
               <button onClick={() => void run("descartar")} disabled={!!busy}
                 className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold text-slate-500 hover:bg-white">
-                <Undo2 size={13} /> No es relevante
+                <Undo2 size={13} /> {d.tipo === "cancelacion" ? "No es una cancelación" : "No es relevante"}
               </button>
             )}
           </div>
@@ -733,6 +749,15 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
             </p>
             <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-1.5 text-sm sm:grid-cols-2">
               <div className="flex gap-2"><dt className="w-20 shrink-0 text-slate-400">Juzgado</dt><dd className="font-medium text-slate-800">{juzgado || "—"}{sala ? ` · ${sala}` : ""}</dd></div>
+              {(direccion || localidad) && (
+                <div className="flex gap-2 sm:col-span-2"><dt className="w-20 shrink-0 text-slate-400">Dónde</dt>
+                  <dd className="font-medium text-slate-800">
+                    {[direccion, localidad].filter(Boolean).join(" · ")}{" "}
+                    <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([juzgado, direccion, localidad?.replace(/\s*\(según el NIG\)/, "")].filter(Boolean).join(", "))}`}
+                      target="_blank" rel="noreferrer" className="ml-1 text-xs font-semibold text-red-600 hover:underline">Ver en el mapa</a>
+                  </dd>
+                </div>
+              )}
               <div className="flex gap-2"><dt className="w-20 shrink-0 text-slate-400">Autos</dt><dd className="font-medium text-slate-800">{autos || "—"}{nig ? ` · NIG ${nig}` : ""}</dd></div>
               <div className="flex gap-2"><dt className="w-20 shrink-0 text-slate-400">Duración</dt><dd className="font-medium text-slate-800">{duracion} min</dd></div>
             </dl>
@@ -814,6 +839,8 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
               <Field label="Sala"><input value={sala} onChange={(e) => setSala(e.target.value)} className={inputCls} /></Field>
               <Field label="Nº autos"><input value={autos} onChange={(e) => setAutos(e.target.value)} className={inputCls} /></Field>
               <Field label="NIG"><input value={nig} onChange={(e) => setNig(e.target.value)} className={inputCls} /></Field>
+              <Field label="Dirección de la sede" className="sm:col-span-2"><input value={direccion} onChange={(e) => setDireccion(e.target.value)} placeholder="Ciudad de la Justicia, calle…" className={inputCls} /></Field>
+              <Field label="Localidad"><input value={localidad} onChange={(e) => setLocalidad(e.target.value)} className={inputCls} /></Field>
             </div>
 
             {/* Hueco en la agenda */}

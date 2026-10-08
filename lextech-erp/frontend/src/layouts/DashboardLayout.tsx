@@ -2293,6 +2293,7 @@ export default function DashboardLayout() {
             id: `vista-${v.estado}-${v.id}`,
             kind: "vista",
             title: !pendiente ? "Preparar vista"
+              : v.tipo === "cancelacion" ? "Vista cancelada o suspendida"
               : v.tipo === "cambio" ? "Cambio en una vista aceptada"
               : v.tipo === "documentacion" ? "Nueva documentación de un procedimiento"
               : "Vista por confirmar",

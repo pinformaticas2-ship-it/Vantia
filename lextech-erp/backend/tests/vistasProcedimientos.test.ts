@@ -51,3 +51,47 @@ test('regla vista + autos', () => {
   assert.equal(cumpleReglaVista('Entrevista el 20/11/2026, expediente 512/2026').ok, false, '"entrevista" no es "vista"');
   assert.equal(cumpleReglaVista('Revista jurídica nº 945/2023').ok, false, '"revista" no es "vista"');
 });
+
+// 08/10/2026: detectar mejor dónde se celebra y las cancelaciones.
+import { extraerLugar, provinciaPorNig, localidadDeJuzgado, esTextoDeCancelacion, cancelaVista, extractWithPatterns } from '../src/services/vistasAutomation';
+
+test('dónde se celebra: juzgado, sede y localidad', () => {
+  assert.equal(extraerLugar('ASIGNO VISTA 06/10/2026 9:50 PLAZA 16 MURCIA AUTOS 000945/2023').juzgado, 'Tribunal de Instancia de Murcia, Plaza nº 16');
+  const ti = extraerLugar('TRIBUNAL DE INSTANCIA DE ORIHUELA, Sección Civil, Plaza nº 2\nCédula de citación');
+  assert.equal(ti.juzgado, 'Tribunal de Instancia de Orihuela, Sección Civil, Plaza nº 2');
+  assert.equal(ti.localidad, 'Orihuela');
+  const jpi = extraerLugar('JUZGADO DE PRIMERA INSTANCIA Nº 3 DE MURCIA\nCiudad de la Justicia, Avda. Ronda de Garay, 5, 30003 Murcia');
+  assert.equal(jpi.juzgado, 'JUZGADO DE PRIMERA INSTANCIA Nº 3 DE MURCIA');
+  assert.equal(jpi.localidad, 'Murcia');
+  assert.match(jpi.direccion || '', /Ciudad de la Justicia/);
+  assert.match(jpi.direccion || '', /Ronda de Garay, 5/);
+  assert.equal(extraerLugar('Señalamiento JPI 4 de Cartagena, autos 12/2026').juzgado, 'Juzgado de Primera Instancia nº 4 de Cartagena');
+  assert.equal(extraerLugar('Audiencia Provincial de Alicante, Sección 9ª, rollo 55/2026').juzgado, 'Audiencia Provincial de Alicante, Sección 9ª');
+  assert.equal(extraerLugar('Domicilio: C/ Mayor 4, 03300 ORIHUELA').localidad, 'Orihuela');
+  assert.equal(localidadDeJuzgado('Juzgado de Primera Instancia e Instrucción nº 2 de Orihuela'), 'Orihuela');
+  assert.equal(localidadDeJuzgado('Juzgado de Primera Instancia e Instrucción'), null);
+  assert.equal(provinciaPorNig('3003042120230012345'), 'Provincia de Murcia (según el NIG)');
+  assert.equal(provinciaPorNig('0309942120230012345'), 'Provincia de Alicante (según el NIG)');
+  // Sin IA: los patrones devuelven ya juzgado y localidad.
+  const p = extractWithPatterns('VISTA 20/11/2027 10:00 PLAZA 3 ORIHUELA', 'Autos 77/2027');
+  assert.equal(p.juzgado, 'Tribunal de Instancia de Orihuela, Plaza nº 3');
+  assert.equal(p.localidad, 'Orihuela');
+});
+
+test('cancelaciones: suspensión de la misma vista sí; cambio de fecha no', () => {
+  assert.equal(esTextoDeCancelacion('Se suspende la vista señalada para el día 12/10/2026 en los autos 945/2023'), true);
+  assert.equal(esTextoDeCancelacion('El señalamiento del juicio queda sin efecto.'), true);
+  assert.equal(esTextoDeCancelacion('SUSPENSIÓN VISTA AUTOS 945/2023'), true);
+  assert.equal(esTextoDeCancelacion('Se suspende la vista y se señala nuevamente para el 20/11/2026'), false);
+  assert.equal(esTextoDeCancelacion('Se aplaza la vista del 12/10/2026 al 20/11/2026'), false);
+  assert.equal(esTextoDeCancelacion('Le recordamos la vista del 12/10/2026'), false);
+  assert.equal(esTextoDeCancelacion('Cancelamos la suscripción a la revista'), false, 'sin acto procesal cerca');
+
+  const vista = { fecha_vista: '2026-10-12T10:00:00Z' };
+  const base = { es_vista: false, cancelada: false, fecha_vista: null } as any;
+  assert.equal(cancelaVista({ ...base, fecha_vista: '2026-10-12' }, 'Se suspende la vista', vista), true, 'mismo día');
+  assert.equal(cancelaVista({ ...base }, 'Se suspende la vista', vista), true, 'sin fecha en el correo: la vista de esos autos');
+  assert.equal(cancelaVista({ ...base, fecha_vista: '2026-10-19' }, 'Se suspende la vista', vista), false, 'otro día: no es esa vista');
+  assert.equal(cancelaVista({ ...base, cancelada: true, fecha_vista: '2026-10-12' }, 'Diligencia', vista), true, 'la IA lo detecta');
+  assert.equal(cancelaVista({ ...base }, 'Se suspende la vista', null), false, 'sin vista aceptada no hay nada que cancelar');
+});
