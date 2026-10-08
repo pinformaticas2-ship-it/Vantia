@@ -460,6 +460,76 @@ const MESES: Record<string, number> = {
   agosto: 8, septiembre: 9, setiembre: 9, octubre: 10, noviembre: 11, diciembre: 12,
 };
 
+/** Mes por nombre completo o abreviado ("nov", "nov.", "sept", "noviembre"). */
+function mesDe(token: string | undefined): number | null {
+  const t = fold(String(token || '')).replace(/\.$/, '');
+  if (!t) return null;
+  if (MESES[t]) return MESES[t];
+  const abrev: Record<string, number> = { ene: 1, feb: 2, mar: 3, abr: 4, may: 5, jun: 6, jul: 7, ago: 8, sep: 9, sept: 9, set: 9, oct: 10, nov: 11, dic: 12 };
+  return abrev[t] || null;
+}
+
+function fechaValida(y: number, m: number, d: number): string | null {
+  if (!y || m < 1 || m > 12 || d < 1 || d > 31) return null;
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  if (dt.getUTCMonth() !== m - 1) return null; // 31 de noviembre, etc.
+  return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+/** Año de una fecha sin año: la próxima vez que llegue (hoy incluido). */
+function anioProximo(hoyYmd: string, mes: number, dia: number): number {
+  const [y] = hoyYmd.split('-').map(Number);
+  const md = `${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+  return md >= hoyYmd.slice(5) ? y : y + 1;
+}
+
+/** Fecha NUEVA en un correo de cambio de fecha, aunque venga incompleta:
+ *  "del día 3 de nov al 4 a la misma hora", "del 03/11 al 04/11 a las 11:00",
+ *  "se traslada al día 4", "pasa al 4 de noviembre". Lo que falte (mes, año,
+ *  hora) se toma de la vista actual. 08/10/2026: sin IA, "Del dia 3 de nov al
+ *  4 a la misma hora" se quedaba sin fecha. */
+export function extraerNuevaFecha(texto: string, anterior: Date | null): { ymd: string; hm: string | null } | null {
+  const f = fold(texto);
+  const hoy = madridYmd(new Date());
+  const [ay, am, ad] = (anterior ? madridYmd(anterior) : hoy).split('-').map(Number);
+  const horaAnterior = anterior ? formatMadrid(anterior, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }) : null;
+  const horaTras = (idx: number): string | null => {
+    const cola = f.slice(idx, idx + 70);
+    if (/misma hora/.test(cola)) return horaAnterior;
+    const m = /(?:a\s+las|a\s+la|las|,)?\s*(\d{1,2})[:.h](\d{2})/.exec(cola);
+    return m ? normHm(`${m[1]}:${m[2]}`) : horaAnterior;
+  };
+  const DIA = String.raw`(?:dia\s+)?(\d{1,2})(?:\s*[/.-]\s*(\d{1,2})(?:\s*[/.-]\s*(\d{2,4}))?|\s+de\s+([a-z]+)\.?(?:\s+(?:de|del)\s+(\d{4}))?)?`;
+  const construir = (d: string, mNum?: string, yNum?: string, mTxt?: string, yTxt?: string, mesDefecto?: number, anioDefecto?: number) => {
+    const mes = mNum ? Number(mNum) : mTxt ? mesDe(mTxt) : (mesDefecto || null);
+    if (!mes) return null;
+    let anio = yNum ? Number(yNum.length === 2 ? `20${yNum}` : yNum) : yTxt ? Number(yTxt) : (anioDefecto || anioProximo(hoy, mes, Number(d)));
+    return fechaValida(anio, mes, Number(d));
+  };
+
+  // 1) "del X ... al Y": la nueva es la segunda.
+  const reDelAl = new RegExp(String.raw`\bdel?\s+${DIA}\s+(?:al|a|para el|hasta el)\s+${DIA}`, 'g');
+  for (let m; (m = reDelAl.exec(f));) {
+    const mesX = m[2] ? Number(m[2]) : mesDe(m[4]) || am;
+    const anioX = m[3] ? Number(m[3].length === 2 ? `20${m[3]}` : m[3]) : m[5] ? Number(m[5]) : ay;
+    // Si Y no dice el mes: el de X (o el siguiente si Y < X: "del 30 al 2").
+    let mesY = m[7] ? Number(m[7]) : mesDe(m[9]) || mesX;
+    let anioY = m[8] ? Number(m[8].length === 2 ? `20${m[8]}` : m[8]) : m[10] ? Number(m[10]) : anioX;
+    if (!m[7] && !m[9] && Number(m[6]) < Number(m[1])) { mesY += 1; if (mesY > 12) { mesY = 1; anioY += 1; } }
+    const ymd = fechaValida(anioY, mesY, Number(m[6]));
+    if (ymd) return { ymd, hm: horaTras(m.index + m[0].length) };
+  }
+  // 2) "se traslada / pasa / se aplaza / nueva fecha ... (al|para el) Y".
+  const reNueva = new RegExp(String.raw`\b(?:traslad\w*|pasa\w*|aplaz\w*|cambi\w*|resenal\w*|senal\w*|nueva fecha|reprogram\w*)\b[^.\n]{0,60}?\b(?:al|para el|el)\s+${DIA}`, 'g');
+  for (let m; (m = reNueva.exec(f));) {
+    const ymd = construir(m[1], m[2], m[3], m[4], m[5], am, ay);
+    // No vale la propia fecha antigua ("la vista del día 3...").
+    if (ymd && !(anterior && ymd === madridYmd(anterior))) return { ymd, hm: horaTras(m.index + m[0].length) };
+  }
+  void ad;
+  return null;
+}
+
 /** Respaldo sin IA (Gemini no configurado o caído): busca la primera fecha
  *  futura acompañada de una hora, más autos/NIG/juzgado por patrones típicos
  *  de las cédulas de citación. Menos fino que la IA, pero el abogado siempre
@@ -481,10 +551,14 @@ export function extractWithPatterns(subject: string, text: string): VistaDatos {
     const ymd = normYmd(`${m[1]}/${m[2]}/${m[3]}`);
     if (ymd) candidates.push({ ymd, hm: timeAfter(m.index + m[0].length), idx: m.index });
   }
-  const reTxt = /\b(\d{1,2})\s+de\s+([a-z]+)\s+(?:de|del)\s+(\d{4})\b/g;
+  // "3 de noviembre de 2026", "3 de nov.", "3 de noviembre" (sin año: la próxima vez que llegue esa fecha).
+  const reTxt = /\b(\d{1,2})\s+de\s+([a-z]+)\.?(?:\s+(?:de|del)\s+(\d{4}))?/g;
   for (let m; (m = reTxt.exec(f));) {
-    const mes = MESES[m[2]];
-    if (mes) candidates.push({ ymd: `${m[3]}-${String(mes).padStart(2, '0')}-${m[1].padStart(2, '0')}`, hm: timeAfter(m.index + m[0].length), idx: m.index });
+    const mes = mesDe(m[2]);
+    if (!mes) continue;
+    const anio = m[3] ? Number(m[3]) : anioProximo(today, mes, Number(m[1]));
+    const ymd = fechaValida(anio, mes, Number(m[1]));
+    if (ymd) candidates.push({ ymd, hm: timeAfter(m.index + m[0].length), idx: m.index });
   }
 
   const futuras = candidates.filter((c) => c.ymd >= today).sort((a, b) => (Number(!!b.hm) - Number(!!a.hm)) || a.idx - b.idx);
@@ -1078,10 +1152,22 @@ async function processOrganizacion(org: { id: string; nombre: string; vistas_aut
       // Cambio de fecha de la vista aceptada. Si la única fecha del correo es la
       // antigua, no hay fecha nueva todavía: la pone el abogado al aplicar el cambio.
       tipo = 'cambio';
-      if (fechaVista && madridYmd(fechaVista) === madridYmd(new Date(relacion.vista.fecha_vista))) {
+      const anterior = new Date(relacion.vista.fecha_vista);
+      if (fechaVista && madridYmd(fechaVista) === madridYmd(anterior)) {
         fechaVista = null;
         (datos as any).fecha_anterior = datos.fecha_vista;
         datos.fecha_vista = null; datos.hora_vista = null;
+      }
+      // Fecha nueva incompleta ("del día 3 de nov al 4 a la misma hora"): se
+      // completa con el mes, año y hora de la vista actual.
+      if (!fechaVista) {
+        const nueva = extraerNuevaFecha(textoAsunto, anterior);
+        if (nueva) {
+          datos.fecha_vista = nueva.ymd;
+          datos.hora_vista = nueva.hm;
+          fechaVista = madridLocalToDate(nueva.ymd, nueva.hm || '09:00');
+          (datos as any).fecha_anterior = (datos as any).fecha_anterior || madridYmd(anterior);
+        }
       }
     }
     // Regla: solo se avisa de una vista si el correo dice "vista" y trae nº de

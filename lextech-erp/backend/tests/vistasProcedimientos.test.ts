@@ -155,3 +155,18 @@ test('adjuntos reales: documentos sí, logos de firma no', () => {
     { filename: 'Auto.pdf', contentType: 'application/pdf', size: 120000 },
   ])).length, 1);
 });
+
+// 08/10/2026: "Del dia 3 de nov al 4 a la misma hora" (sin IA) se quedaba sin fecha.
+import { extraerNuevaFecha } from '../src/services/vistasAutomation';
+
+test('fecha nueva de un cambio, aunque venga incompleta', () => {
+  const anterior = new Date('2026-11-03T09:00:00Z'); // 3 nov 2026, 10:00 en Madrid
+  const t = (s: string) => extraerNuevaFecha(s, anterior);
+  assert.deepEqual(t('Buenas le comentamos que hay un cambio de fechas para la vista con autos 901/25. Del dia 3 de nov al 4 a la misma hora'), { ymd: '2026-11-04', hm: '10:00' });
+  assert.deepEqual(t('Se aplaza la vista del 03/11/2026 al 05/11/2026 a las 12:30'), { ymd: '2026-11-05', hm: '12:30' });
+  assert.deepEqual(t('del 3/11 al 6/11'), { ymd: '2026-11-06', hm: '10:00' }, 'sin hora: la de la vista');
+  assert.deepEqual(t('Se traslada la vista al día 10 de diciembre a las 9:15'), { ymd: '2026-12-10', hm: '09:15' });
+  assert.deepEqual(t('la vista pasa al 7 de noviembre'), { ymd: '2026-11-07', hm: '10:00' });
+  assert.deepEqual(extraerNuevaFecha('del 30 de diciembre al 2', new Date('2026-12-30T09:00:00Z')), { ymd: '2027-01-02', hm: '10:00' }, 'cambia de mes');
+  assert.equal(t('Le recordamos la vista de los autos 901/25'), null);
+});
