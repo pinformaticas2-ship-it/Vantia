@@ -14,6 +14,7 @@ import {
   geminiAvailable,
   normalizeAutos,
   normalizeNig,
+  adjuntosReales,
   coincideBusqueda,
   VistasConfig,
   PlantillaVars,
@@ -416,7 +417,12 @@ export async function getVista(req: any, res: Response) {
       const { rows } = await pool.query(`SELECT attachments_json FROM emails WHERE id = $1`, [sol.email_id]);
       if (rows.length) {
         emailDisponible = true;
-        adjuntos = JSON.parse(rows[0].attachments_json || '[]').map((a: any, i: number) => ({ index: i, filename: a.filename, contentType: a.contentType, size: a.size }));
+        // Sin los logos de las firmas (image001.png...), que también llegan como adjuntos.
+        const reales = new Set(adjuntosReales(rows[0]));
+        adjuntos = JSON.parse(rows[0].attachments_json || '[]')
+          .map((a: any, i: number) => ({ index: i, filename: a.filename, contentType: a.contentType, size: a.size, real: [...reales].some((r) => r.filename === a.filename && r.size === a.size) }))
+          .filter((a: any) => a.real)
+          .map(({ real, ...a }: any) => a);
       }
     } catch { /**/ }
     const [coincidencias, miembros] = await Promise.all([findCoincidencias(req.organizacionId, sol.datos), listMiembros(req.organizacionId)]);
@@ -608,8 +614,11 @@ async function guardarDocumentacion(sol: any, expedienteId: string, guardarAdjun
     if (email) {
       await pool.query(`UPDATE emails SET expediente_id = $1 WHERE id = $2 AND expediente_id IS NULL`, [expedienteId, sol.email_id]);
       const adj = JSON.parse(email.attachments_json || '[]');
+      const reales = adjuntosReales(email);
       if (guardarAdjuntos) {
         for (let i = 0; i < adj.length; i++) {
+          // Los logos de las firmas no se guardan en el expediente.
+          if (!reales.some((r) => r.filename === adj[i]?.filename && r.size === adj[i]?.size)) continue;
           try {
             const file = await fetchEmailAttachmentBuffer(sol.email_id, i);
             if (!file) { fallidos.push(adj[i]?.filename || `adjunto ${i + 1}`); continue; }

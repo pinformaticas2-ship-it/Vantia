@@ -256,6 +256,20 @@ function parseAttachments(row: any): { filename: string; contentType: string; si
   try { return JSON.parse(row?.attachments_json || '[]') || []; } catch { return []; }
 }
 
+/** Adjuntos de verdad (escritos, resoluciones, escaneos...): sin los logos e
+ *  iconos de las firmas (image001.png de Outlook, imágenes pequeñas), que
+ *  también llegan como adjuntos. */
+export function adjuntosReales(row: any): { filename: string; contentType: string; size: number }[] {
+  return parseAttachments(row).filter((a) => {
+    const tipo = String(a?.contentType || '').toLowerCase();
+    const nombre = String(a?.filename || '');
+    const esImagen = tipo.startsWith('image/') || /\.(png|jpe?g|gif|bmp|webp)$/i.test(nombre);
+    if (!esImagen) return true;
+    const firma = /^(image|img|outlook|logo|firma|signature)[-_ ]?[0-9a-f-]*\./i.test(nombre);
+    return !firma && Number(a?.size || 0) >= 60 * 1024;
+  });
+}
+
 function matchesKeywords(text: string, palabras: string[]): boolean {
   const t = fold(text);
   return palabras.some((p) => {
@@ -1079,6 +1093,14 @@ async function processOrganizacion(org: { id: string; nombre: string; vistas_aut
       (datos as any).regla_vista = { palabra_vista: regla.palabraVista, autos: regla.autos };
       if (!regla.ok) tipo = relacion?.expediente ? 'documentacion' : null;
     }
+    // Mismo procedimiento (y misma vista) sin nada nuevo que guardar: si no trae
+    // adjuntos de verdad, ni se muestra (08/10/2026). Con adjuntos, se ofrece
+    // añadirlos al expediente.
+    let ignoradaSinAdjuntos = false;
+    if (tipo === 'documentacion' && !adjuntosReales(row).length) {
+      tipo = null;
+      ignoradaSinAdjuntos = true;
+    }
     // Hueco en la agenda para una vista nueva o para la nueva fecha de un
     // cambio (sin contar el propio evento de la vista que se cambiaría).
     const conflictos = (tipo === 'vista' || tipo === 'cambio') && fechaVista
@@ -1101,7 +1123,7 @@ async function processOrganizacion(org: { id: string; nombre: string; vistas_aut
        RETURNING id`,
       [
         ...base,
-        tipo ? 'pendiente' : 'descartada', origen, text.slice(0, 20000), JSON.stringify(datos),
+        tipo ? 'pendiente' : (ignoradaSinAdjuntos ? 'ignorada' : 'descartada'), origen, text.slice(0, 20000), JSON.stringify(datos),
         fechaVista, duracion, cfg.responsableUserId, responsableNombre, JSON.stringify(conflictos),
         tipo || 'vista', relacion ? JSON.stringify(relacion) : null,
       ],

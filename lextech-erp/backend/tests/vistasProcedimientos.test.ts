@@ -136,3 +136,22 @@ test('buscador de vistas', () => {
   si('');
   no('946/2023'); no('cartagena'); no('murcia cartagena');
 });
+
+// 08/10/2026: mismo procedimiento/vista sin adjuntos → ni se muestra. Los logos
+// de las firmas (image001.png...) no cuentan como adjuntos.
+import { adjuntosReales } from '../src/services/vistasAutomation';
+
+test('adjuntos reales: documentos sí, logos de firma no', () => {
+  const row = (adj: any[]) => ({ attachments_json: JSON.stringify(adj) });
+  assert.equal(adjuntosReales(row([])).length, 0);
+  assert.equal(adjuntosReales(row([{ filename: 'image001.png', contentType: 'image/png', size: 4000 }])).length, 0, 'logo de Outlook');
+  assert.equal(adjuntosReales(row([{ filename: 'Outlook-abc123.png', contentType: 'image/png', size: 300000 }])).length, 0, 'logo de Outlook grande');
+  assert.equal(adjuntosReales(row([{ filename: 'icono.gif', contentType: 'image/gif', size: 2000 }])).length, 0, 'icono pequeño');
+  assert.equal(adjuntosReales(row([{ filename: 'Diligencia ordenacion.pdf', contentType: 'application/pdf', size: 80000 }])).length, 1);
+  assert.equal(adjuntosReales(row([{ filename: 'escrito.docx', contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', size: 20000 }])).length, 1);
+  assert.equal(adjuntosReales(row([{ filename: 'foto_contrato.jpg', contentType: 'image/jpeg', size: 900000 }])).length, 1, 'escaneo o foto');
+  assert.equal(adjuntosReales(row([
+    { filename: 'image001.png', contentType: 'image/png', size: 4000 },
+    { filename: 'Auto.pdf', contentType: 'application/pdf', size: 120000 },
+  ])).length, 1);
+});
