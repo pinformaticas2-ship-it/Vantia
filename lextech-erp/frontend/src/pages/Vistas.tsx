@@ -54,6 +54,9 @@ interface Solicitud {
 }
 
 interface Detalle extends Solicitud {
+  /** Cómo está AHORA la vista con la que se relaciona el correo (puede haber
+   *  cambiado de fecha o haberse cancelado después de llegar el correo). */
+  vistaActual?: { estado: string; fecha_vista: string | null } | null;
   body_text: string | null;
   adjuntos: { index: number; filename: string; contentType: string; size: number }[];
   emailDisponible: boolean;
@@ -712,10 +715,22 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
                   {d.relacion.expediente.num_autos ? ` · autos ${d.relacion.expediente.num_autos}` : ""}
                 </p>
               )}
+              {d.relacion.vista && d.vistaActual && (d.vistaActual.estado !== "aceptada"
+                || (d.vistaActual.fecha_vista && new Date(d.vistaActual.fecha_vista).toDateString() !== new Date(d.relacion.vista.fecha_vista).toDateString())) && (
+                <p className="mt-1 flex items-start gap-1.5 rounded-lg bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800">
+                  <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+                  {d.vistaActual.estado === "cancelada"
+                    ? "Esa vista ya está cancelada: este correo puede ser antiguo."
+                    : d.vistaActual.estado !== "aceptada"
+                      ? "Esa vista ya no está activa: este correo puede ser antiguo."
+                      : `Ojo: esa vista ahora es el ${fmtFecha(d.vistaActual.fecha_vista)} (cambió después de este correo).`}
+                </p>
+              )}
               {d.relacion.vista && (
                 <p>
-                  Vista aceptada: <b>{fmtFecha(d.relacion.vista.fecha_vista)}</b>
+                  Vista aceptada: <b>{fmtFecha(d.vistaActual?.estado === "aceptada" && d.vistaActual.fecha_vista ? d.vistaActual.fecha_vista : d.relacion.vista.fecha_vista)}</b>
                   {d.tipo === "cambio" && d.fecha_vista ? <> → este correo indica <b>{fmtFecha(d.fecha_vista)}</b></> : null}
+                  {d.tipo === "cambio" && !d.fecha_vista ? <> → <b>cambia de fecha</b>, pero el correo no dice la nueva: indícala abajo</> : null}
                   {d.tipo === "cancelacion" ? <> → <b className="text-rose-700">se cancela</b>{d.relacion.vista.juzgado ? ` · ${d.relacion.vista.juzgado}` : ""}</> : null}
                 </p>
               )}

@@ -95,3 +95,25 @@ test('cancelaciones: suspensión de la misma vista sí; cambio de fecha no', () 
   assert.equal(cancelaVista({ ...base, cancelada: true, fecha_vista: '2026-10-12' }, 'Diligencia', vista), true, 'la IA lo detecta');
   assert.equal(cancelaVista({ ...base }, 'Se suspende la vista', null), false, 'sin vista aceptada no hay nada que cancelar');
 });
+
+// 08/10/2026: "Cambiamos de fecha la vista del 3 de nov con autos 901/25" se
+// tomó por una cancelación.
+import { esTextoDeCambioFecha } from '../src/services/vistasAutomation';
+
+test('cambio de fecha sin fecha nueva NO es una cancelación', () => {
+  const cambio = 'Cambiamos de fecha la vista del 3 de nov con autos 901/25';
+  assert.equal(esTextoDeCambioFecha(cambio), true);
+  assert.equal(esTextoDeCancelacion(cambio), false);
+  const vista = { fecha_vista: '2026-11-03T09:00:00Z' };
+  // Aunque la IA diga "cancelada", si habla de cambiar la fecha es un cambio.
+  assert.equal(cancelaVista({ cancelada: true, cambio_fecha: false, fecha_vista: '2026-11-03' } as any, cambio, vista), false);
+  assert.equal(cancelaVista({ cancelada: false, cambio_fecha: true, fecha_vista: null } as any, 'Le comunicamos la nueva fecha', vista), false);
+  for (const t of ['Se aplaza la vista', 'Se traslada la vista al día 5', 'Reprogramación del señalamiento', 'Se modifica la hora de la vista', 'nuevo señalamiento para el juicio']) {
+    assert.equal(esTextoDeCambioFecha(t), true, t);
+  }
+  // Cancelación real (texto del correo de prueba, con su errata).
+  const canc = 'LAMENTAMOS INFORMAR QUE CANCELASMPS LA VISTA DE 1 DE NOV CON AUTOS 901/25';
+  assert.equal(esTextoDeCambioFecha(canc), false);
+  assert.equal(esTextoDeCancelacion(canc), true);
+  assert.equal(cancelaVista({ cancelada: true, cambio_fecha: false, fecha_vista: '2026-11-01' } as any, canc, { fecha_vista: '2026-11-01T09:00:00Z' }), true);
+});

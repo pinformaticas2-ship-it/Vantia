@@ -165,3 +165,35 @@ test('aplicar la cancelación que llega por correo', { skip }, async () => {
   // Y no se puede aplicar dos veces.
   assert.equal((await call(v.aplicarCancelacionVista, 'buzon', 'miembro', { params: { id: aviso }, body: {} })).status, 409);
 });
+
+// 08/10/2026: quedaba pendiente una "cancelación de la vista del 1 nov" después
+// de moverla al 3 nov. Al modificar, lo que ya no corresponde queda superado.
+test('al cambiar la fecha, las solicitudes pendientes que ya no corresponden quedan superadas', { skip }, async () => {
+  const v = await import('../src/controllers/vistasController');
+  const ev = (await pool.query(`INSERT INTO agenda_events (user_id, title, start_at, organizacion_id) VALUES ('buzon','Vista', '2027-11-01T09:00:00Z', $1) RETURNING id`, [org])).rows[0].id;
+  const vista = (await pool.query(
+    `INSERT INTO vistas_solicitudes (organizacion_id, email_id, mailbox_user_id, estado, tipo, subject, datos, fecha_vista, agenda_event_id, pasos, duracion_min)
+     VALUES ($1, uuid_generate_v4(), 'buzon', 'aceptada', 'vista', 'VISTA autos 901/2027', '{"num_autos":"901/2027"}', '2027-11-01T09:00:00Z', $2, '[]', 60) RETURNING id`,
+    [org, ev])).rows[0].id;
+  const rel = JSON.stringify({ autos: '901/2027', vista: { id: vista, fecha_vista: '2027-11-01T09:00:00Z' } });
+  const ins = async (tipo: string, datos: any, fecha: string | null) => (await pool.query(
+    `INSERT INTO vistas_solicitudes (organizacion_id, email_id, mailbox_user_id, estado, tipo, subject, datos, fecha_vista, relacion)
+     VALUES ($1, uuid_generate_v4(), 'buzon', 'pendiente', $2, 'x autos 901/2027', $3, $4, $5) RETURNING id`,
+    [org, tipo, JSON.stringify(datos), fecha, rel])).rows[0].id;
+  const cancel1nov = await ins('cancelacion', { fecha_vista: '2027-11-01' }, '2027-11-01T09:00:00Z');
+  const cambio = await ins('cambio', {}, null);
+  const doc = await ins('documentacion', {}, null);
+
+  const r = await call(v.modificarVista, 'buzon', 'miembro', { params: { id: cambio }, body: { fecha: '2027-11-03T09:00:00Z' } });
+  assert.equal(r.body.success, true, JSON.stringify(r.body));
+  const estado = async (id: string) => (await pool.query(`SELECT estado, error, relacion FROM vistas_solicitudes WHERE id = $1`, [id])).rows[0];
+  const c = await estado(cancel1nov);
+  assert.equal(c.estado, 'descartada', 'la cancelación del 1 nov ya no corresponde');
+  assert.match(c.error, /Superada/);
+  const d = await estado(doc);
+  assert.equal(d.estado, 'pendiente', 'la documentación sigue pendiente');
+  assert.equal(new Date(d.relacion.vista.fecha_vista).toISOString(), '2027-11-03T09:00:00.000Z', 'con la fecha actual de la vista');
+  // getVista avisa de la fecha actual.
+  const det = await call(v.getVista, 'buzon', 'miembro', { params: { id: cancel1nov } });
+  assert.equal(new Date(det.body.data.vistaActual.fecha_vista).toISOString(), '2027-11-03T09:00:00.000Z');
+});

@@ -408,8 +408,17 @@ export async function getVista(req: any, res: Response) {
       );
       expediente = rows[0] || null;
     }
+    let vistaActual: { estado: string; fecha_vista: string | null } | null = null;
+    if (sol.relacion?.vista?.id) {
+      const { rows } = await pool.query(
+        `SELECT estado, fecha_vista FROM vistas_solicitudes WHERE id = $1 AND organizacion_id = $2`,
+        [sol.relacion.vista.id, req.organizacionId],
+      );
+      vistaActual = rows[0] || null;
+    }
     return ok(res, {
       ...sol,
+      vistaActual,
       adjuntos,
       emailDisponible,
       coincidencias,
@@ -981,6 +990,29 @@ export async function modificarVista(req: any, res: Response) {
       [orig.id, fecha, duracion, recordatorioAt, JSON.stringify({ modificada_por_solicitud: sol.id, fecha_anterior: antes })],
     );
 
+    // Lo pendiente sobre ESTA vista que ya no corresponde (08/10/2026: quedaba
+    // una "cancelación de la vista del 1 nov" después de moverla al 3 nov):
+    //  - cancelaciones de otro día y cambios a esta misma fecha → superados;
+    //  - el resto se queda, pero con la fecha actual de la vista.
+    await pool.query(
+      `UPDATE vistas_solicitudes
+          SET estado = 'descartada', updated_at = NOW(),
+              error = CASE WHEN tipo = 'cancelacion' THEN 'Superada: la vista cambió de fecha después de este correo'
+                           ELSE 'Superada: ese cambio de fecha ya está aplicado' END
+        WHERE organizacion_id = $1 AND id <> $2 AND estado IN ('pendiente','error')
+          AND relacion->'vista'->>'id' = $3
+          AND ((tipo = 'cancelacion' AND datos->>'fecha_vista' IS NOT NULL
+                AND datos->>'fecha_vista' <> to_char($4::timestamptz AT TIME ZONE 'Europe/Madrid', 'YYYY-MM-DD'))
+            OR (tipo = 'cambio' AND fecha_vista IS NOT NULL AND abs(extract(epoch FROM (fecha_vista - $4::timestamptz))) < 60))`,
+      [req.organizacionId, sol.id, orig.id, fecha],
+    );
+    await pool.query(
+      `UPDATE vistas_solicitudes
+          SET relacion = jsonb_set(relacion, '{vista,fecha_vista}', to_jsonb($3::timestamptz)), updated_at = NOW()
+        WHERE organizacion_id = $1 AND estado IN ('pendiente','error','descartada') AND relacion->'vista'->>'id' = $2`,
+      [req.organizacionId, orig.id, fecha],
+    );
+
     if (orig.expediente_id) pasos.push(await guardarDocumentacion(sol, orig.expediente_id, b.guardar_adjuntos ?? cfg.guardarAdjuntos, deciderName));
     await notaVistaExpediente(orig.expediente_id, [
       `🔁 Vista modificada${antes ? `: antes el ${fechaLarga(antes)}` : ''}, ahora el ${fechaLarga(fecha)}`,
@@ -1102,9 +1134,17 @@ async function ejecutarCancelacion(organizacionId: string, vistaId: string, user
         WHERE id = $1`,
       [vistaId, JSON.stringify(pasos)],
     );
+    // Otras cancelaciones pendientes de esta misma vista: superadas (ya está
+    // cancelada). Quedan en Descartadas por si hiciera falta recuperarlas.
+    await client.query(
+      `UPDATE vistas_solicitudes
+          SET estado = 'descartada', error = 'Superada: la vista ya se canceló', updated_at = NOW()
+        WHERE organizacion_id = $1 AND estado IN ('pendiente','error')
+          AND tipo = 'cancelacion' AND relacion->'vista'->>'id' = $2`,
+      [organizacionId, vistaId],
+    );
     // Lo que estaba esperando como "cambio" o "repetición" de esta vista pasa
-    // a ser una vista nueva del mismo expediente (si trae fecha). Los avisos
-    // de cancelación de esta misma vista se quedan como están.
+    // a ser una vista nueva del mismo expediente (si trae fecha).
     await client.query(
       `UPDATE vistas_solicitudes
           SET tipo = CASE WHEN fecha_vista IS NOT NULL THEN 'vista' ELSE tipo END,

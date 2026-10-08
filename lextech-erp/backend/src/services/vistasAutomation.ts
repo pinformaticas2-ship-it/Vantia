@@ -288,6 +288,8 @@ export interface VistaDatos {
   localidad: string | null;
   /** El correo comunica que un señalamiento se suspende / cancela / queda sin efecto. */
   cancelada: boolean;
+  /** El correo comunica que la vista CAMBIA de fecha/hora (aunque no diga la nueva). */
+  cambio_fecha: boolean;
   num_autos: string | null;
   nig: string | null;
   tipo_procedimiento: string | null;
@@ -302,7 +304,7 @@ export interface VistaDatos {
 
 const EMPTY_DATOS: VistaDatos = {
   es_vista: false, tipo_acto: null, fecha_vista: null, hora_vista: null, duracion_min: null,
-  juzgado: null, sala: null, direccion: null, localidad: null, cancelada: false, num_autos: null, nig: null, tipo_procedimiento: null,
+  juzgado: null, sala: null, direccion: null, localidad: null, cancelada: false, cambio_fecha: false, num_autos: null, nig: null, tipo_procedimiento: null,
   partes: null, cliente: null, contrario: null, fecha_preparacion: null, modalidad: null,
   enlace_telematico: null, resumen: null,
 };
@@ -350,6 +352,7 @@ function sanitizeDatos(raw: any): VistaDatos {
     direccion: str(raw?.direccion, 300),
     localidad: str(raw?.localidad, 120),
     cancelada: raw?.cancelada === true || raw?.cancelada === 'true',
+    cambio_fecha: raw?.cambio_fecha === true || raw?.cambio_fecha === 'true',
     num_autos: str(raw?.num_autos, 120),
     nig: str(raw?.nig, 60),
     tipo_procedimiento: str(raw?.tipo_procedimiento, 200),
@@ -385,6 +388,7 @@ Devuelve SOLO este JSON (sin markdown), con null en lo que no aparezca:
  "direccion": "dirección de la sede (calle y número, o edificio: Ciudad de la Justicia, Palacio de Justicia...)",
  "localidad": "municipio donde está la sede",
  "cancelada": true|false,
+ "cambio_fecha": true|false,
  "num_autos": "número de procedimiento, p.ej. 123/2026", "nig": "NIG",
  "tipo_procedimiento": "p.ej. Juicio verbal", "partes": "demandante contra demandado",
  "cliente": "parte a la que representa el despacho si se deduce", "contrario": "parte contraria",
@@ -402,9 +406,13 @@ DÓNDE SE CELEBRA (pon especial cuidado, el abogado tiene que saber a qué sede 
 - "direccion" y "localidad": de la sede del órgano (pie de página de las resoluciones, "Sede:", "Domicilio:").
 - No inventes: si no aparece, null.
 
-"cancelada" = true solo si el correo comunica que un señalamiento ya hecho se SUSPENDE, se CANCELA,
-queda SIN EFECTO o se aplaza SIN fecha nueva. Si se aplaza a otra fecha, "cancelada" es false y la
-fecha nueva va en "fecha_vista".
+"cancelada" = true SOLO si el correo comunica que un señalamiento ya hecho se SUSPENDE, se CANCELA,
+se ANULA o queda SIN EFECTO, sin hablar de moverlo a otro día.
+"cambio_fecha" = true si comunica que la vista CAMBIA de fecha u hora (cambio de fecha, aplazamiento,
+traslado, reprogramación, se adelanta, se retrasa, nuevo señalamiento), AUNQUE no diga la fecha nueva.
+Un cambio de fecha NUNCA es "cancelada".
+"fecha_vista" = la fecha NUEVA del acto. Si el correo solo menciona la fecha antigua (la que se
+cambia o se cancela) y no da la nueva, "fecha_vista" = null.
 
 Remitente: ${from}
 Asunto: ${subject}
@@ -593,11 +601,20 @@ export function completarLugar(datos: VistaDatos, texto: string, relacion: Relac
   datos.localidad = datos.localidad || p.localidad || localidadDeJuzgado(datos.juzgado) || provinciaPorNig(datos.nig);
 }
 
+/** El texto comunica que la vista cambia de fecha u hora, aunque no diga la
+ *  nueva (08/10/2026: "Cambiamos de fecha la vista del 3 de nov" se tomó por
+ *  una cancelación). */
+export function esTextoDeCambioFecha(texto: string): boolean {
+  const f = fold(texto);
+  return /\b(cambi\w*\s+(de\s+)?(la\s+)?(fecha|hora|dia)|cambio de (fecha|hora|dia|senalamiento)|nueva (fecha|hora)|nuevo senalamiento|aplaza\w*|aplazamiento|traslad\w*\s+(la\s+|el\s+)?(vista|juicio|senalamiento|acto)|reprogram\w*|resenala\w*|se (vuelve a )?senala (nuevamente|de nuevo)|adelant\w*\s+(la\s+)?(vista|hora|fecha)|retras\w*\s+(la\s+)?(vista|hora|fecha)|modific\w*\s+(la\s+|el\s+)?(fecha|hora|senalamiento))\b/.test(f);
+}
+
 /** El texto comunica que un señalamiento se suspende, cancela o queda sin
- *  efecto (y NO que se vuelve a señalar para otra fecha). */
+ *  efecto (y NO que cambia de fecha). */
 export function esTextoDeCancelacion(texto: string): boolean {
   const f = fold(texto);
-  const cancel = /\b(suspend\w*|suspension\w*|sin efecto|desconvoca\w*|cancela\w*|anula\w*|se deja sin|queda sin|aplaza\w*|aplazamiento)\b/;
+  if (esTextoDeCambioFecha(texto)) return false;
+  const cancel = /\b(suspend\w*|suspension\w*|sin efecto|desconvoca\w*|cancela\w*|anula\w*|se deja sin|queda sin)\b/;
   const acto = /\b(vista|senalamiento|senalad\w*|juicio|audiencia|comparecencia|acto)\b/;
   const m = cancel.exec(f);
   if (!m) return false;
@@ -615,6 +632,8 @@ export function esTextoDeCancelacion(texto: string): boolean {
  *  correo trae fecha) — si trae otra fecha, es un cambio o una vista distinta. */
 export function cancelaVista(datos: VistaDatos, texto: string, vista: { fecha_vista: string } | null | undefined): boolean {
   if (!vista) return false;
+  // Si habla de cambiar la fecha, es un cambio aunque la IA diga "cancelada".
+  if (datos.cambio_fecha || esTextoDeCambioFecha(texto)) return false;
   if (!datos.cancelada && !esTextoDeCancelacion(texto)) return false;
   if (!datos.fecha_vista) return true;
   return madridYmd(new Date(vista.fecha_vista)) === datos.fecha_vista;
@@ -1035,10 +1054,22 @@ async function processOrganizacion(org: { id: string; nombre: string; vistas_aut
     }
 
     const duracion = datos.duracion_min || cfg.duracionMin;
-    const fechaVista = datos.fecha_vista ? madridLocalToDate(datos.fecha_vista, datos.hora_vista || '09:00') : null;
+    let fechaVista = datos.fecha_vista ? madridLocalToDate(datos.fecha_vista, datos.hora_vista || '09:00') : null;
     let tipo: TipoSolicitud | null = clasificarSolicitud(Boolean(datos.es_vista), fechaVista, relacion);
-    // Cancelación o suspensión de la vista ya aceptada de esos autos (mismo día).
-    if (relacion?.vista && cancelaVista(datos, `${row.subject || ''}\n${text}`, relacion.vista)) tipo = 'cancelacion';
+    const textoAsunto = `${row.subject || ''}\n${text}`;
+    if (relacion?.vista && cancelaVista(datos, textoAsunto, relacion.vista)) {
+      // Cancelación o suspensión de la vista ya aceptada de esos autos (mismo día).
+      tipo = 'cancelacion';
+    } else if (relacion?.vista && (datos.cambio_fecha || esTextoDeCambioFecha(textoAsunto))) {
+      // Cambio de fecha de la vista aceptada. Si la única fecha del correo es la
+      // antigua, no hay fecha nueva todavía: la pone el abogado al aplicar el cambio.
+      tipo = 'cambio';
+      if (fechaVista && madridYmd(fechaVista) === madridYmd(new Date(relacion.vista.fecha_vista))) {
+        fechaVista = null;
+        (datos as any).fecha_anterior = datos.fecha_vista;
+        datos.fecha_vista = null; datos.hora_vista = null;
+      }
+    }
     // Regla: solo se avisa de una vista si el correo dice "vista" y trae nº de
     // autos. Si no, nada de vista: como mucho documentación de un expediente
     // con esos mismos autos.
