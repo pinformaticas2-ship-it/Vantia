@@ -3713,7 +3713,7 @@ export default function Agenda() {
   return (
     <div className="agenda-google-shell flex flex-col animate-in fade-in duration-500 h-full">
       {/* ── Cabecera ─────────────────────────────────────────── */}
-      <div className="agenda-google-topbar flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-white shrink-0">
+      <div className="agenda-google-topbar flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-100 bg-white shrink-0">
         {/* Título */}
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 bg-red-50 rounded-lg flex items-center justify-center border border-red-100 shrink-0">
@@ -3721,14 +3721,14 @@ export default function Agenda() {
           </div>
           <div>
             <h1 className="text-lg font-extrabold text-slate-900 leading-tight">Agenda</h1>
-            <p className="text-xs text-slate-400 font-medium mt-0.5">Calendario y eventos del despacho</p>
+            <p className="hidden sm:block text-xs text-slate-400 font-medium mt-0.5">Calendario y eventos del despacho</p>
           </div>
         </div>
 
         {/* Acciones derecha */}
-        <div className="flex items-center gap-2.5">
-          {/* Toasts inline */}
-          <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 sm:gap-2.5">
+          {/* Toasts inline (en pantallas pequeñas no caben al lado de los botones) */}
+          <div className="hidden lg:flex items-center gap-2">
             <span className={`max-w-xs overflow-hidden rounded-lg border px-2 py-1 text-xs text-red-600 transition-all duration-300 ${smoothGcalError ? "translate-y-0 border-red-200 bg-red-50 opacity-100" : "pointer-events-none -translate-y-1 border-transparent bg-transparent opacity-0"}`} title={smoothGcalError || ""}>
               ⚠ {gcalError}
             </span>
@@ -3775,7 +3775,7 @@ export default function Agenda() {
                 className="px-3 h-full flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors border-r border-slate-200 disabled:opacity-40"
               >
                 {gcalImporting ? <Loader2 size={11} className="animate-spin" /> : <Link2 size={11} />}
-                Importar a agenda
+                <span className="hidden sm:inline">Importar a agenda</span><span className="sm:hidden">Importar</span>
               </button>
               {/* Desconectar */}
               <button
@@ -3792,53 +3792,53 @@ export default function Agenda() {
               className="flex items-center gap-1.5 px-3 h-10 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-sm"
             >
               <img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_16dp.png" alt="GCal" className="w-4 h-4" />
-              Conectar Google Calendar
+              <span className="hidden md:inline">Conectar Google Calendar</span><span className="md:hidden">Google</span>
             </button>
           )}
 
           {/* Nuevo evento */}
           <button
             onClick={(e) => openNew(undefined, e)}
-            className="flex items-center gap-1.5 px-4 h-10 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-sm shadow-red-600/20 transition-colors"
+            className="flex items-center gap-1.5 px-3 sm:px-4 h-10 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-sm shadow-red-600/20 transition-colors"
           >
-            <Plus size={13} /> Nuevo evento
+            <Plus size={13} /> <span className="hidden sm:inline">Nuevo evento</span><span className="sm:hidden">Nuevo</span>
           </button>
         </div>
       </div>
 
       {/* ── Toolbar (controles del calendario) ───────────────── */}
-      <div className="flex items-center justify-between px-6 py-3 border-b border-slate-200 bg-white shrink-0">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 sm:px-6 py-2.5 sm:py-3 border-b border-slate-200 bg-white shrink-0">
         {/* Selector de vista */}
         <div className="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200/60 shadow-inner">
           <button
             onClick={() => setView("month")}
-            className={`px-4 py-1.5 text-xs rounded-md transition-all duration-200 ${view === "month" ? "font-bold text-slate-800 bg-white shadow-sm border border-slate-200/50" : "font-medium text-slate-600 hover:text-slate-900"}`}
+            className={`px-3 sm:px-4 py-1.5 text-xs rounded-md transition-all duration-200 ${view === "month" ? "font-bold text-slate-800 bg-white shadow-sm border border-slate-200/50" : "font-medium text-slate-600 hover:text-slate-900"}`}
           >
             Mes
           </button>
           <button
             onClick={() => setView("week")}
-            className={`px-4 py-1.5 text-xs rounded-md transition-all duration-200 ${view === "week" ? "font-bold text-slate-800 bg-white shadow-sm border border-slate-200/50" : "font-medium text-slate-600 hover:text-slate-900"}`}
+            className={`px-3 sm:px-4 py-1.5 text-xs rounded-md transition-all duration-200 ${view === "week" ? "font-bold text-slate-800 bg-white shadow-sm border border-slate-200/50" : "font-medium text-slate-600 hover:text-slate-900"}`}
           >
             Semana
           </button>
           <button
             onClick={() => setView("day")}
-            className={`px-4 py-1.5 text-xs rounded-md transition-all duration-200 ${view === "day" ? "font-bold text-slate-800 bg-white shadow-sm border border-slate-200/50" : "font-medium text-slate-600 hover:text-slate-900"}`}
+            className={`px-3 sm:px-4 py-1.5 text-xs rounded-md transition-all duration-200 ${view === "day" ? "font-bold text-slate-800 bg-white shadow-sm border border-slate-200/50" : "font-medium text-slate-600 hover:text-slate-900"}`}
           >
             Día
           </button>
         </div>
 
         {/* Navegación de fecha */}
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 items-center gap-1.5 sm:gap-3">
           <button
             onClick={navigatePrev}
             className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition-colors"
           >
             <ChevronLeft size={14} />
           </button>
-          <h2 className="text-sm font-bold text-slate-800 min-w-[160px] text-center">
+          <h2 className="min-w-0 truncate text-sm font-bold text-slate-800 sm:min-w-[160px] text-center">
             {navLabel}
           </h2>
           <button
@@ -3953,6 +3953,8 @@ export default function Agenda() {
                                 onClick={e => {
                                   if (draggingEventId) return;
                                   setSelectedDay(key);
+                                  // Sin sitio para el panel del día (pantallas < 1024px): se abre la vista de ese día.
+                                  if (window.innerWidth < 1024) { setView("day"); return; }
                                   openNew(key, e);
                                 }}
                                 className={`border-b border-r border-slate-100 min-h-[80px] p-1.5 cursor-pointer transition-all ${
@@ -4065,7 +4067,7 @@ export default function Agenda() {
         </div>
 
         {/* ── Panel día seleccionado ──────────────────────────── */}
-        <aside className="agenda-google-sidebar w-64 shrink-0 flex flex-col overflow-hidden bg-white">
+        <aside className="agenda-google-sidebar hidden lg:flex w-64 shrink-0 flex-col overflow-hidden bg-white">
           {/* cabecera panel */}
           <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50 shrink-0">
             <div className="flex items-center justify-between">

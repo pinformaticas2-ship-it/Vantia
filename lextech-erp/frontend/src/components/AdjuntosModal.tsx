@@ -983,7 +983,7 @@ export default function AdjuntosModal({
         <div className="flex flex-1 overflow-hidden">
 
           {/* Sidebar */}
-          <div className="w-52 shrink-0 bg-white border-r border-slate-200 overflow-y-auto">
+          <div className="hidden md:block w-52 shrink-0 bg-white border-r border-slate-200 overflow-y-auto">
             {/* Storage folder */}
             <div className="px-3 pt-4 pb-2">
               <div className="flex items-center gap-1.5 px-2 py-1.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
@@ -1029,7 +1029,7 @@ export default function AdjuntosModal({
 
           {/* Content area */}
           <div
-            className="flex-1 overflow-hidden flex flex-col relative"
+            className={`${preview ? "hidden md:flex" : "flex"} flex-1 min-w-0 overflow-hidden flex-col relative`}
             onDrop={onDrop}
             onDragOver={e => { e.preventDefault(); e.stopPropagation(); setIsDragOver(true); }}
             onDragEnter={e => { e.preventDefault(); e.stopPropagation(); setIsDragOver(true); }}
@@ -1265,7 +1265,7 @@ export default function AdjuntosModal({
 
           {/* Preview panel */}
           {preview && (
-            <div className="w-[520px] shrink-0 border-l border-slate-200 bg-white flex flex-col overflow-hidden">
+            <div className="w-full md:w-[440px] lg:w-[520px] shrink-0 border-l border-slate-200 bg-white flex flex-col overflow-hidden">
               <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 border-b border-slate-100 shrink-0">
                 <span className="text-xs font-bold text-slate-700 truncate flex-1">{preview.name}</span>
                 <div className="flex items-center gap-1 shrink-0 ml-2">

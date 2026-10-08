@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth, useUser } from '@clerk/clerk-react';
-import {
+import { Menu,
   Plus, Trash2, Copy, RotateCcw, ThumbsUp, ThumbsDown,
   Paperclip, Link2, Send, MessageSquare, Sparkles, MoreHorizontal, Loader2,
   Check, X, Search, StopCircle, Download, FileText, ChevronDown, History,
@@ -300,6 +300,9 @@ export default function ChatIA() {
   const [selectedModel, setSelectedModel] = useState<string>(pickInitialModel);
   const [showModelPicker, setShowModelPicker] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  // Móvil: la lista de conversaciones es un panel desplegable (en pantallas
+  // grandes está siempre a la izquierda).
+  const [convsAbiertas, setConvsAbiertas] = useState(false);
   const modelPickerRef = useRef<HTMLDivElement>(null);
   const activeModel = AI_MODELS.find(m => m.id === selectedModel) || AI_MODELS[0];
   const modelUsage = useVantiaUsageOnDemand(getToken);
@@ -777,7 +780,11 @@ export default function ChatIA() {
       <div className="flex h-full bg-white overflow-hidden relative">
 
         {/* ── Sidebar ──────────────────────────────────────────────────────── */}
-        <aside className="w-64 shrink-0 flex flex-col border-r border-slate-100 bg-slate-50 cia-sidebar">
+        {convsAbiertas && <div className="absolute inset-0 z-30 bg-slate-900/30 md:hidden" onClick={() => setConvsAbiertas(false)} />}
+        <aside
+          // Al elegir una conversación o empezar una nueva, el panel móvil se cierra.
+          onClick={(e) => { if ((e.target as HTMLElement).closest('button')) setConvsAbiertas(false); }}
+          className={`${convsAbiertas ? "absolute inset-y-0 left-0 z-40 flex shadow-2xl" : "hidden"} md:static md:z-auto md:flex md:shadow-none w-72 max-w-[85%] md:w-64 md:max-w-none shrink-0 flex-col border-r border-slate-100 bg-slate-50 cia-sidebar`}>
           {/* Brand header */}
           <div className="px-4 pt-5 pb-4">
             <div className="flex items-center gap-2.5 mb-4">
@@ -879,13 +886,17 @@ export default function ChatIA() {
         <div className="flex-1 flex flex-col relative overflow-hidden bg-white">
 
           {/* Topbar */}
-          <div className="cia-topbar shrink-0 flex items-center justify-between px-6 py-3 border-b border-slate-100 bg-white/90 backdrop-blur-sm z-10">
-            <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-red-600 to-red-900 flex items-center justify-center shadow-md shadow-red-100">
+          <div className="cia-topbar shrink-0 flex items-center justify-between gap-2 px-3 sm:px-6 py-3 border-b border-slate-100 bg-white/90 backdrop-blur-sm z-10">
+            <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+              <button type="button" onClick={() => setConvsAbiertas(true)} title="Conversaciones"
+                className="md:hidden shrink-0 rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-50">
+                <Menu className="h-4 w-4" />
+              </button>
+              <div className="hidden sm:flex h-9 w-9 shrink-0 rounded-xl bg-gradient-to-br from-red-600 to-red-900 items-center justify-center shadow-md shadow-red-100">
                 <Sparkles className="h-4 w-4 text-white" />
               </div>
-              <div>
-                <h1 className="text-sm font-bold text-slate-800 leading-tight">Vantia Legal Pro</h1>
+              <div className="min-w-0">
+                <h1 className="truncate text-sm font-bold text-slate-800 leading-tight">Vantia Legal Pro</h1>
                 <div className="relative mt-0.5" ref={modelPickerRef}>
                   <button
                     onClick={() => setShowModelPicker(v => !v)}
@@ -894,7 +905,7 @@ export default function ChatIA() {
                     <span className="relative h-1.5 w-1.5 inline-block cia-ring">
                       <span className="block h-1.5 w-1.5 rounded-full bg-green-500" />
                     </span>
-                    En línea · {activeModel.label}
+                    <span className="truncate">En línea · {activeModel.label}</span>
                     <ChevronDown className={`h-2.5 w-2.5 transition-transform ${showModelPicker ? 'rotate-180' : ''}`} />
                   </button>
                   {showModelPicker && (
@@ -911,7 +922,7 @@ export default function ChatIA() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
               {activeModuleId && messages.length > 0 && (
                 <button
                   onClick={() => navigator.clipboard.writeText(
@@ -920,7 +931,7 @@ export default function ChatIA() {
                   className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 border border-slate-200 hover:border-slate-300 px-3 py-1.5 rounded-lg transition-all hover:bg-slate-50 active:scale-95"
                 >
                   <Copy className="h-3.5 w-3.5" />
-                  Copiar chat
+                  <span className="hidden sm:inline">Copiar chat</span>
                 </button>
               )}
               <button
@@ -928,7 +939,7 @@ export default function ChatIA() {
                 className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 border border-slate-200 hover:border-slate-300 px-3 py-1.5 rounded-lg transition-all hover:bg-slate-50 active:scale-95"
               >
                 <History className="h-3.5 w-3.5" />
-                Historial
+                <span className="hidden sm:inline">Historial</span>
               </button>
               <div className="relative" ref={topMenuRef}>
                 <button

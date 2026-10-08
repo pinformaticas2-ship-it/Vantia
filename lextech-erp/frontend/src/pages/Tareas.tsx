@@ -644,7 +644,7 @@ function TaskRow({
       </div>
 
       {/* Tipo */}
-      <div className="w-[130px] hidden md:flex items-center justify-center shrink-0 px-2">
+      <div className="w-[130px] hidden lg:flex items-center justify-center shrink-0 px-2">
         <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg truncate ${tipoConf.color}`}>
           {tipoConf.label}
         </span>
@@ -1690,7 +1690,7 @@ export default function Tareas() {
                   </div>
                   <div className="w-10 shrink-0" />
                   <div className="flex-1 pr-4"><SortBtn col="titulo" label="Tarea" /></div>
-                  <div className="w-[130px] hidden md:block text-center">
+                  <div className="w-[130px] hidden lg:block text-center">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Tipo</span>
                   </div>
                   <div className="w-[130px] hidden sm:block px-2"><SortBtn col="plazo" label="Fecha límite" /></div>

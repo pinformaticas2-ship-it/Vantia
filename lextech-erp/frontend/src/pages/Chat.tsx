@@ -2358,7 +2358,7 @@ function PanelMiembros({ canal, sysUsers, getToken, currentUserId, onClose, onDM
   const myRole = miembrosNormalizados.find(m=>m.user_id===currentUserId)?.role;
 
   return (
-    <aside className="w-72 shrink-0 flex flex-col bg-white border-l border-slate-200 overflow-hidden">
+    <aside className="absolute inset-y-0 right-0 z-30 w-full max-w-sm shadow-2xl lg:static lg:z-auto lg:shadow-none lg:max-w-none lg:w-72 shrink-0 flex flex-col bg-white border-l border-slate-200 overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3.5 border-b border-slate-100 bg-slate-50">
         <h3 className="text-slate-800 font-bold text-sm flex items-center gap-2">
@@ -2490,7 +2490,7 @@ function PanelFijados({ canalId, getToken, onClose, onGoTo, onTogglePinned, reso
     setFijados(p=>p.filter(f=>f.mensaje_id!==msgId));
   };
   return (
-    <aside className="w-64 shrink-0 flex flex-col bg-white border-l border-slate-200 overflow-hidden">
+    <aside className="absolute inset-y-0 right-0 z-30 w-full max-w-sm shadow-2xl lg:static lg:z-auto lg:shadow-none lg:max-w-none lg:w-64 shrink-0 flex flex-col bg-white border-l border-slate-200 overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3.5 border-b border-slate-100 bg-slate-50">
         <h3 className="text-slate-800 font-bold text-sm flex items-center gap-2"><Pin size={14} className="text-red-500"/>Mensajes fijados</h3>
         <BackButton onClick={onClose} />
@@ -2554,7 +2554,7 @@ function PanelFavoritos({ canalId, getToken, onClose, onGoTo, onToggleFavorite, 
     setFavoritos(p=>p.filter(f=>f.mensaje_id!==msgId));
   };
   return (
-    <aside className="w-64 shrink-0 flex flex-col bg-white border-l border-slate-200 overflow-hidden">
+    <aside className="absolute inset-y-0 right-0 z-30 w-full max-w-sm shadow-2xl lg:static lg:z-auto lg:shadow-none lg:max-w-none lg:w-64 shrink-0 flex flex-col bg-white border-l border-slate-200 overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3.5 border-b border-slate-100 bg-amber-50/70">
         <h3 className="text-slate-800 font-bold text-sm flex items-center gap-2"><Star size={14} className="text-amber-500 fill-amber-300"/>Favoritos</h3>
         <BackButton onClick={onClose} />

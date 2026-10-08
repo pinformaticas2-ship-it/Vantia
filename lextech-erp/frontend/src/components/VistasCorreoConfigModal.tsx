@@ -189,7 +189,7 @@ export default function VistasCorreoConfigModal({ initial, canManage, onClose, o
           <div className="space-y-5 border-slate-200 p-5 lg:border-r">
             <section>
               <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">Formato</h3>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <label className="text-xs text-slate-600">Tipo de letra
                   <select disabled={ro} value={cfg.correo.fuente} onChange={(e) => setFormato({ fuente: e.target.value })} className={`${input} mt-1`}>
                     {FUENTES.map((f) => <option key={f.id} value={f.id}>{f.label}</option>)}

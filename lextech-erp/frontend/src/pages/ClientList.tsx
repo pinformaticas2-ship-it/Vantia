@@ -1294,7 +1294,7 @@ function FilterRow({
   inputRef?: React.RefObject<HTMLInputElement>;
 }) {
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex min-w-0 w-full sm:w-auto items-center gap-1.5">
       {/* Selector de campo */}
       <FieldDropdown
         value={filter.field}
@@ -1303,14 +1303,14 @@ function FilterRow({
       />
 
       {/* Input de valor */}
-      <div className="relative">
+      <div className="relative min-w-0 flex-1 sm:flex-none">
         <input
           ref={inputRef}
           type="text"
           value={filter.value}
           onChange={e => onChange(filter.id, { value: e.target.value })}
           placeholder={filter.field === "any" ? "Buscar…" : `Filtrar por ${FILTER_FIELDS.find(f => f.value === filter.field)?.label ?? ""}…`}
-          className="w-44 pl-2.5 pr-7 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-red-400 focus:ring-1 focus:ring-red-100 placeholder:text-slate-300"
+          className="w-full sm:w-44 pl-2.5 pr-7 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-red-400 focus:ring-1 focus:ring-red-100 placeholder:text-slate-300"
         />
         {filter.value && (
           <button
@@ -2346,8 +2346,9 @@ export default function ClientList() {
       <div className="bg-white flex flex-col overflow-hidden flex-1 min-h-0">
 
         {/* ── BARRA DE ACCIONES ────────────────────────────────── */}
-        <div className="px-6 py-2.5 border-b border-slate-200 bg-slate-50 flex items-center flex-shrink-0 z-10 overflow-x-auto animate-card-in-1">
-          <div className="flex items-center gap-1.5 min-w-max pb-0.5">
+        <div className="px-4 sm:px-6 py-2.5 border-b border-slate-200 bg-slate-50 flex items-center flex-shrink-0 z-10 animate-card-in-1">
+          {/* Varias líneas si no cabe (antes: scroll horizontal que escondía botones incluso en portátiles). */}
+          <div className="flex flex-wrap items-center gap-1.5 pb-0.5">
 
           {/* ─ Alta ─ */}
           <AltaOptionsBtn

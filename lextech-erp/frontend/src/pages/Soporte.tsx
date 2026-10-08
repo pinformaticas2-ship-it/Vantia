@@ -273,7 +273,7 @@ export default function Soporte() {
       </div>
 
       {/* ── BARRA DE ACCIONES ────────────────────────────────── */}
-      <div className="px-6 py-2.5 border-b border-slate-200 bg-slate-50 flex items-center justify-between gap-3 flex-shrink-0 z-10 overflow-x-auto animate-card-in-1">
+      <div className="px-4 sm:px-6 py-2.5 border-b border-slate-200 bg-slate-50 flex flex-wrap items-center justify-between gap-2 sm:gap-3 flex-shrink-0 z-10 animate-card-in-1">
         <div className="flex items-center gap-1.5 min-w-max">
           {esGestor ? (
             // El operador de soporte gestiona tickets, no los abre: en su
@@ -296,11 +296,11 @@ export default function Soporte() {
           )}
         </div>
         {tab === "tickets" && (
-          <div className="flex items-center gap-2 min-w-max">
-            <div className="relative">
+          <div className="flex min-w-0 w-full sm:w-auto items-center gap-2">
+            <div className="relative min-w-0 flex-1 sm:flex-none">
               <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar..."
-                className="w-48 pl-8 pr-7 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-red-400 focus:ring-1 focus:ring-red-100 placeholder:text-slate-300" />
+                className="w-full sm:w-48 pl-8 pr-7 py-1.5 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-red-400 focus:ring-1 focus:ring-red-100 placeholder:text-slate-300" />
               {search && (
                 <button onClick={() => setSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500"><X size={11} /></button>
               )}

@@ -5138,7 +5138,7 @@ function PanelIndicadoresExpediente({ expedienteId, onTabChange, collapsed, onTo
   }
 
   return (
-    <aside className="relative w-52 shrink-0 flex flex-col min-h-0 transition-all duration-200">
+    <aside className="relative w-full shrink-0 flex flex-col min-h-0 transition-all duration-200">
       <button
         type="button"
         onClick={onToggleCollapsed}
@@ -5895,37 +5895,37 @@ export default function ExpedienteDetail() {
 
       {/* ── 3-column body ── */}
       <div className="flex-1 overflow-auto bg-[#f4f6f8]">
-        <div className={`w-full p-6 sm:p-8 flex flex-col gap-8 items-start ${isCollapsed ? "md:flex-row" : "lg:flex-row"}`}>
+        <div className="w-full p-4 sm:p-6 lg:p-8 flex flex-col gap-6 lg:gap-8 items-start lg:flex-row lg:flex-wrap xl:flex-nowrap">
 
           {/* Columna 1: Nav vertical */}
-          <div className={`anim-fade-up w-full flex-shrink-0 ${isCollapsed ? "md:w-56 md:sticky md:top-6" : "lg:w-56 lg:sticky lg:top-6"}`} style={{ animationDelay: '60ms' }}>
+          <div className="anim-fade-up w-full flex-shrink-0 lg:w-56 lg:sticky lg:top-6" style={{ animationDelay: '60ms' }}>
             <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-3 mb-3">Secciones del Expediente</h3>
-            <nav className="flex gap-1.5 overflow-x-auto pb-1 modules-scrollbar sm:flex-col sm:gap-0.5 sm:overflow-visible sm:pb-0">
+            <nav className="flex gap-1.5 overflow-x-auto pb-1 modules-scrollbar lg:flex-col lg:gap-0.5 lg:overflow-visible lg:pb-0">
               {DETAIL_TABS.slice(0, 8).map((tabItem) => {
                 const Icon = tabItem.icon;
                 const active = tab === tabItem.key;
                 return (
                   <button key={tabItem.key} onClick={() => setTab(tabItem.key)}
-                    className={`shrink-0 rounded-xl px-4 py-2.5 flex items-center gap-2 sm:gap-3 text-sm whitespace-nowrap transition-all text-left ${active ? "bg-white text-red-600 shadow-sm ring-1 ring-slate-200/50 font-semibold" : "text-slate-600 hover:bg-white hover:shadow-sm hover:text-slate-900 font-medium"}`}
+                    className={`shrink-0 rounded-xl px-4 py-2.5 flex items-center gap-2 lg:gap-3 text-sm whitespace-nowrap transition-all text-left ${active ? "bg-white text-red-600 shadow-sm ring-1 ring-slate-200/50 font-semibold" : "text-slate-600 hover:bg-white hover:shadow-sm hover:text-slate-900 font-medium"}`}
                   >
                     <Icon size={14} className={active ? "text-red-500 shrink-0" : "text-slate-400 shrink-0"} />
                     {tabItem.label}
-                    {active && <div className="hidden sm:block w-1.5 h-1.5 rounded-full bg-red-500 ml-auto shrink-0 shadow-[0_0_6px_rgba(239,68,68,0.7)]" />}
+                    {active && <div className="hidden lg:block w-1.5 h-1.5 rounded-full bg-red-500 ml-auto shrink-0 shadow-[0_0_6px_rgba(239,68,68,0.7)]" />}
                   </button>
                 );
               })}
-              <div className="hidden sm:block h-px w-full bg-slate-200 my-1.5" />
-              <div className="shrink-0 w-px self-stretch bg-slate-200 sm:hidden" />
+              <div className="hidden lg:block h-px w-full bg-slate-200 my-1.5" />
+              <div className="shrink-0 w-px self-stretch bg-slate-200 lg:hidden" />
               {DETAIL_TABS.slice(8).map((tabItem) => {
                 const Icon = tabItem.icon;
                 const active = tab === tabItem.key;
                 return (
                   <button key={tabItem.key} onClick={() => setTab(tabItem.key)}
-                    className={`shrink-0 rounded-xl px-4 py-2.5 flex items-center gap-2 sm:gap-3 text-sm whitespace-nowrap transition-all text-left ${active ? "bg-white text-red-600 shadow-sm ring-1 ring-slate-200/50 font-semibold" : "text-slate-600 hover:bg-white hover:shadow-sm hover:text-slate-900 font-medium"}`}
+                    className={`shrink-0 rounded-xl px-4 py-2.5 flex items-center gap-2 lg:gap-3 text-sm whitespace-nowrap transition-all text-left ${active ? "bg-white text-red-600 shadow-sm ring-1 ring-slate-200/50 font-semibold" : "text-slate-600 hover:bg-white hover:shadow-sm hover:text-slate-900 font-medium"}`}
                   >
                     <Icon size={14} className={active ? "text-red-500 shrink-0" : "text-slate-400 shrink-0"} />
                     {tabItem.label}
-                    {active && <div className="hidden sm:block w-1.5 h-1.5 rounded-full bg-red-500 ml-auto shrink-0 shadow-[0_0_6px_rgba(239,68,68,0.7)]" />}
+                    {active && <div className="hidden lg:block w-1.5 h-1.5 rounded-full bg-red-500 ml-auto shrink-0 shadow-[0_0_6px_rgba(239,68,68,0.7)]" />}
                   </button>
                 );
               })}
@@ -6869,7 +6869,7 @@ export default function ExpedienteDetail() {
           {/* Columna 3: Panel indicadores */}
           {id && (
             <div
-              className={`anim-fade-up w-full flex-shrink-0 ${indCollapsed ? "!w-4" : ""} ${isCollapsed ? "md:w-[280px] md:sticky md:top-6" : "lg:w-[280px] xl:w-[300px] lg:sticky lg:top-6"}`}
+              className={`anim-fade-up w-full flex-shrink-0 ${indCollapsed ? "xl:!w-4" : ""} xl:w-[280px] 2xl:w-[300px] xl:sticky xl:top-6`}
               style={{ animationDelay: '200ms' }}
             >
               <PanelIndicadoresExpediente

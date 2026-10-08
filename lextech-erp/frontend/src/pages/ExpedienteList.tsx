@@ -4439,7 +4439,7 @@ function FilterRow({
   inputRef?: React.RefObject<HTMLInputElement>;
 }) {
   return (
-    <div className="flex h-8 items-center rounded-lg border border-slate-200 bg-white shadow-sm transition-colors focus-within:border-red-400">
+    <div className="flex h-8 min-w-0 w-full sm:w-auto items-center rounded-lg border border-slate-200 bg-white shadow-sm transition-colors focus-within:border-red-400">
       <FieldDropdown
         value={filter.field}
         onChange={val => onChange(filter.id, { field: val, value: "" })}
@@ -4451,7 +4451,7 @@ function FilterRow({
         value={filter.value}
         onChange={e => onChange(filter.id, { value: e.target.value })}
         placeholder="Buscar..."
-        className="h-full w-48 border-0 bg-transparent px-2.5 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-0"
+        className="h-full min-w-0 flex-1 sm:flex-none sm:w-48 border-0 bg-transparent px-2.5 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-0"
       />
       {canRemove && (
         <>
@@ -7243,8 +7243,9 @@ export default function ExpedienteList() {
         <div className="bg-white flex flex-col overflow-hidden flex-1 min-h-0">
 
           {/* ── Toolbar 1: Acciones ──────────────────────────── */}
-          <div className="px-6 py-2.5 border-b border-slate-200 bg-slate-50 flex items-center flex-shrink-0 z-10 overflow-x-auto">
-            <div className="flex items-center gap-1.5 min-w-max pb-0.5">
+          <div className="px-4 sm:px-6 py-2.5 border-b border-slate-200 bg-slate-50 flex items-center flex-shrink-0 z-10">
+            {/* Varias líneas si no cabe (antes: scroll horizontal que escondía botones incluso en portátiles). */}
+            <div className="flex items-center gap-1.5 flex-wrap pb-0.5">
 
               {/* Alta */}
               <div ref={altaMenuRef}>

@@ -1936,7 +1936,19 @@ export default function DashboardLayout() {
   const isMobile = useIsMobile();
   const pushNotifications = usePushNotifications();
   const [isMobileOpen,    setIsMobileOpen]    = useState(false);
-  const [isCollapsed,     setIsCollapsed]     = useState(() => localStorage.getItem("sidebar_collapsed") === "1");
+  // Preferencia guardada (pantallas grandes). En pantallas medianas (tablet,
+  // portátil pequeño: < 1280px) el menú va plegado por defecto para dejar sitio
+  // al contenido; se puede desplegar a mano, sin cambiar la preferencia.
+  const [colapsadoPref,   setColapsadoPref]   = useState(() => localStorage.getItem("sidebar_collapsed") === "1");
+  const [pantallaMedia,   setPantallaMedia]   = useState(() => typeof window !== "undefined" && window.matchMedia("(max-width: 1279px)").matches);
+  const [abiertoEnMedia,  setAbiertoEnMedia]  = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 1279px)");
+    const onChange = () => { setPantallaMedia(mq.matches); setAbiertoEnMedia(false); };
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  const isCollapsed = pantallaMedia ? !abiertoEnMedia : colapsadoPref;
   const [isNotifOpen,     setIsNotifOpen]     = useState(false);
   const [isLinksOpen,     setIsLinksOpen]     = useState(false);
   const [searchQuery,     setSearchQuery]     = useState("");
@@ -2042,12 +2054,13 @@ export default function DashboardLayout() {
   }, [getToken, clerk]);
 
   const toggleSidebar = useCallback(() => {
-    setIsCollapsed(prev => {
+    if (pantallaMedia) { setAbiertoEnMedia((v) => !v); return; }
+    setColapsadoPref(prev => {
       const next = !prev;
       localStorage.setItem("sidebar_collapsed", next ? "1" : "0");
       return next;
     });
-  }, []);
+  }, [pantallaMedia]);
 
   // Cerrar paneles al clicar fuera
   useEffect(() => {

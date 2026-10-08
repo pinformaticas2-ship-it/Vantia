@@ -301,14 +301,14 @@ export default function Trazabilidad() {
     <div className="flex flex-col h-full bg-[#f4f6f8]">
 
       {/* HEADER DEL MÓDULO */}
-      <div className="px-6 py-5 bg-white border-b border-slate-200 flex items-center justify-between gap-4 shrink-0">
-        <div className="flex items-center gap-4">
+      <div className="px-4 sm:px-6 py-4 sm:py-5 bg-white border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
+        <div className="flex min-w-0 items-center gap-3 sm:gap-4">
           <div className="w-10 h-10 rounded-lg bg-red-50 text-red-600 flex items-center justify-center border border-red-100 shrink-0">
             <History size={18} />
           </div>
           <div>
             <h1 className="text-xl font-extrabold text-slate-800 leading-none tracking-tight mb-1">Trazabilidad</h1>
-            <p className="text-xs font-medium text-slate-500">Auditoría completa de sesiones y acciones del sistema</p>
+            <p className="hidden sm:block text-xs font-medium text-slate-500">Auditoría completa de sesiones y acciones del sistema</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -319,7 +319,7 @@ export default function Trazabilidad() {
             onClick={fetchUsers}
             className="px-4 py-2 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-md hover:bg-slate-50 transition-colors shadow-sm flex items-center gap-2"
           >
-            <RefreshCw size={13} /> Actualizar
+            <RefreshCw size={13} /> <span className="hidden sm:inline">Actualizar</span>
           </button>
         </div>
       </div>
@@ -328,7 +328,7 @@ export default function Trazabilidad() {
       <main className="flex-1 flex overflow-hidden">
 
         {/* PANEL IZQUIERDO — Lista de usuarios */}
-        <div className="w-80 shrink-0 flex flex-col bg-white border-r border-slate-200 z-10">
+        <div className={`${selected ? "hidden md:flex" : "flex"} w-full md:w-80 shrink-0 flex-col bg-white border-r border-slate-200 z-10`}>
 
           {/* Buscador */}
           <div className="p-4 border-b border-slate-100 bg-slate-50/50 shrink-0">
@@ -417,7 +417,7 @@ export default function Trazabilidad() {
         </div>
 
         {/* PANEL DERECHO — Timeline */}
-        <div className="flex-1 flex flex-col min-w-0 bg-[#f4f6f8]">
+        <div className={`${selected ? "flex" : "hidden md:flex"} flex-1 flex-col min-w-0 bg-[#f4f6f8]`}>
 
           {!selected ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-3 bg-white">
@@ -430,8 +430,12 @@ export default function Trazabilidad() {
           ) : (
             <>
               {/* Cabecera del usuario seleccionado */}
-              <div className="px-8 py-6 bg-white border-b border-slate-200 shrink-0 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.02)]">
-                <div className="flex items-center gap-4">
+              <div className="px-4 sm:px-8 py-4 sm:py-6 bg-white border-b border-slate-200 shrink-0 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.02)]">
+                <button type="button" onClick={() => setSelected(null)}
+                  className="md:hidden mb-3 inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-800">
+                  ← Usuarios
+                </button>
+                <div className="flex min-w-0 items-center gap-3 sm:gap-4">
                   <div className={`w-14 h-14 rounded-full ${COLORS[colorIdx(selected.user_id)].bg} ${COLORS[colorIdx(selected.user_id)].text} flex items-center justify-center font-bold text-xl shrink-0 border ${COLORS[colorIdx(selected.user_id)].border} shadow-sm`}>
                     {initials(selected.user_name)}
                   </div>

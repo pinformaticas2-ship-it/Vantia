@@ -328,9 +328,9 @@ function VistasModulo() {
 
       <AvisoNotificaciones />
 
-      <div className="flex-1 min-h-0 flex flex-col md:flex-row bg-white">
+      <div className="flex-1 min-h-0 flex flex-col lg:flex-row bg-white">
         {/* Lista */}
-        <div className={`md:w-96 md:shrink-0 border-r border-slate-200 flex flex-col min-h-0 ${selectedId ? "hidden md:flex" : "flex"}`}>
+        <div className={`lg:w-96 lg:shrink-0 border-r border-slate-200 flex flex-col min-h-0 ${selectedId ? "hidden lg:flex" : "flex"}`}>
           {/* Buscador */}
           <div className="px-3 pt-3 pb-2 border-b border-slate-200 bg-slate-50 space-y-2">
             <div className="flex items-center gap-2">
@@ -409,7 +409,7 @@ function VistasModulo() {
         </div>
 
         {/* Detalle */}
-        <div className={`flex-1 min-h-0 overflow-y-auto bg-[#f4f6f8] ${selectedId ? "block" : "hidden md:block"}`}>
+        <div className={`flex-1 min-h-0 overflow-y-auto bg-[#f4f6f8] ${selectedId ? "block" : "hidden lg:block"}`}>
           {selectedId
             ? <VistaDetalle key={selectedId} id={selectedId} onClose={() => select(null)} onChanged={onChanged} />
             : (
@@ -679,7 +679,7 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
     <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <button onClick={onClose} className="md:hidden text-xs font-semibold text-slate-500 mb-2">← Volver</button>
+          <button onClick={onClose} className="lg:hidden text-xs font-semibold text-slate-500 mb-2">← Volver</button>
           <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-lg font-extrabold text-slate-900">
               {editable && mostrarFormulario
@@ -697,7 +697,7 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
             <p className="text-xs text-slate-500 mt-1">Decidido por {d.decidido_por_nombre} · {fmtFecha(d.decidido_at)}</p>
           )}
         </div>
-        <button onClick={onClose} className="hidden md:block p-1.5 rounded-lg text-slate-400 hover:bg-white hover:text-slate-700"><X size={16} /></button>
+        <button onClick={onClose} className="hidden lg:block p-1.5 rounded-lg text-slate-400 hover:bg-white hover:text-slate-700"><X size={16} /></button>
       </div>
 
       {/* Correo recibido: arriba si no hay que decidir; si hay que decidir, al final */}
@@ -904,11 +904,11 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
           <section className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-5">
             <h3 className="text-sm font-bold text-slate-800">Si aceptas, Vantia hará esto:</h3>
             <ol className="mt-2 space-y-1.5 text-sm text-slate-700">
-              <li className="flex items-start gap-2"><Mail size={15} className="mt-0.5 shrink-0 text-emerald-600" />{enviarCorreo ? <>Responder a <b>{d.from_email}</b> confirmando la asistencia</> : <span className="text-slate-500">No se enviará ninguna respuesta</span>}</li>
-              <li className="flex items-start gap-2"><FileText size={15} className="mt-0.5 shrink-0 text-emerald-600" />{expModo === "existente" && expedienteElegido ? <>Vincularla al expediente <b>{expedienteElegido}</b></> : <>Crear un <b>expediente nuevo</b> con estos datos</>}</li>
-              <li className="flex items-start gap-2"><CalendarCheck size={15} className="mt-0.5 shrink-0 text-emerald-600" />Apuntarla en <b>tu agenda</b></li>
-              <li className="flex items-start gap-2"><Paperclip size={15} className="mt-0.5 shrink-0 text-emerald-600" />{guardarAdjuntos && d.adjuntos.length ? <>Guardar <b>{d.adjuntos.length} adjunto{d.adjuntos.length === 1 ? "" : "s"}</b> y el correo en el expediente</> : <>Guardar el correo como nota en el expediente</>}</li>
-              <li className="flex items-start gap-2"><Clock size={15} className="mt-0.5 shrink-0 text-emerald-600" />{conRecordatorio && recordatorioCalculado ? <>Recordarte prepararla el <b>{fmtFecha(recordatorioCalculado)}</b></> : <span className="text-slate-500">Sin recordatorio</span>}</li>
+              <li className="flex items-start gap-2"><Mail size={15} className="mt-0.5 shrink-0 text-emerald-600" /><span className="min-w-0 break-words">{enviarCorreo ? <>Responder a <b>{d.from_email}</b> confirmando la asistencia</> : <span className="text-slate-500">No se enviará ninguna respuesta</span>}</span></li>
+              <li className="flex items-start gap-2"><FileText size={15} className="mt-0.5 shrink-0 text-emerald-600" /><span className="min-w-0 break-words">{expModo === "existente" && expedienteElegido ? <>Vincularla al expediente <b>{expedienteElegido}</b></> : <>Crear un <b>expediente nuevo</b> con estos datos</>}</span></li>
+              <li className="flex items-start gap-2"><CalendarCheck size={15} className="mt-0.5 shrink-0 text-emerald-600" /><span className="min-w-0 break-words">Apuntarla en <b>tu agenda</b></span></li>
+              <li className="flex items-start gap-2"><Paperclip size={15} className="mt-0.5 shrink-0 text-emerald-600" /><span className="min-w-0 break-words">{guardarAdjuntos && d.adjuntos.length ? <>Guardar <b>{d.adjuntos.length} adjunto{d.adjuntos.length === 1 ? "" : "s"}</b> y el correo en el expediente</> : <>Guardar el correo como nota en el expediente</>}</span></li>
+              <li className="flex items-start gap-2"><Clock size={15} className="mt-0.5 shrink-0 text-emerald-600" /><span className="min-w-0 break-words">{conRecordatorio && recordatorioCalculado ? <>Recordarte prepararla el <b>{fmtFecha(recordatorioCalculado)}</b></> : <span className="text-slate-500">Sin recordatorio</span>}</span></li>
             </ol>
             <p className="mt-3 border-t border-emerald-100 pt-2 text-xs text-slate-500">
               Si rechazas: {enviarCorreo ? <>se responderá a {d.from_email} que no podéis asistir</> : "no se responde a nadie"} y no se crea nada.
