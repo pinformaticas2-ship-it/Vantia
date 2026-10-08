@@ -2,11 +2,12 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import { useAuth } from "@clerk/clerk-react";
 import { Link, Navigate, useSearchParams } from "react-router-dom";
 import {
-  AlertTriangle, CalendarCheck, Check, CheckCircle2, ChevronDown, Clock, Eye, FileText, Gavel, Loader2,
+  AlertTriangle, Bell, BellOff, CalendarCheck, Check, CheckCircle2, ChevronDown, Clock, Eye, FileText, Gavel, Loader2,
   Mail, Paperclip, RefreshCw, RotateCcw, Settings, Undo2, X, XCircle,
 } from "lucide-react";
 import { apiFetch, resolveApiUrl } from "../lib/api";
 import { notifyVistasChanged, useVistasStatus } from "../lib/useVistasStatus";
+import { usePushNotifications } from "../lib/usePushNotifications";
 
 // ── Vistas recibidas por correo ──────────────────────────────────────────────
 // Página de la automatización de vistas (Configuración → Automatizaciones):
@@ -161,6 +162,42 @@ function DetalleSkeleton() {
   );
 }
 
+/** Sin notificaciones push activadas en este navegador no llega ningún aviso
+ *  de vista nueva fuera de la campana: se ofrece activarlas aquí mismo. */
+function AvisoNotificaciones() {
+  const push = usePushNotifications();
+  const [hecho, setHecho] = useState(false);
+  const [fallo, setFallo] = useState(false);
+  if (hecho) {
+    return (
+      <div className="px-6 lg:px-8 py-2 bg-emerald-50 border-b border-emerald-100 text-xs font-semibold text-emerald-800 flex items-center gap-2">
+        <CheckCircle2 size={14} /> Notificaciones activadas: te avisaremos de cada vista nueva, cambio o cancelación.
+      </div>
+    );
+  }
+  if (push.supported && push.serverEnabled && push.permission === "denied") {
+    return (
+      <div className="px-6 lg:px-8 py-2 bg-amber-50 border-b border-amber-100 text-xs text-amber-900 flex items-center gap-2">
+        <BellOff size={14} className="shrink-0" />
+        <span>Las notificaciones están <b>bloqueadas</b> en este navegador, así que no te llegarán avisos de vistas. Pulsa el candado junto a la dirección → <b>Notificaciones</b> → <b>Permitir</b>, y recarga la página.</span>
+      </div>
+    );
+  }
+  if (!push.canOffer) return null;
+  return (
+    <div className="px-6 lg:px-8 py-2 bg-red-50 border-b border-red-100 text-xs text-red-900 flex flex-wrap items-center gap-x-3 gap-y-1">
+      <Bell size={14} className="shrink-0" />
+      <span className="flex-1 min-w-[200px]">Activa las notificaciones para enterarte <b>al momento</b> de cada vista nueva, cambio o cancelación, aunque no tengas Vantia abierta.</span>
+      {fallo && <span className="text-red-700">No se pudo activar. Revisa el permiso del navegador.</span>}
+      <button type="button" disabled={push.busy}
+        onClick={async () => { const ok = await push.subscribe(); setHecho(ok); setFallo(!ok); }}
+        className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 font-bold text-white hover:bg-red-700 disabled:opacity-50">
+        {push.busy ? <Loader2 size={13} className="animate-spin" /> : <Bell size={13} />} Activar notificaciones
+      </button>
+    </div>
+  );
+}
+
 const inputCls = "w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-red-400 focus:ring-1 focus:ring-red-100";
 
 export default function Vistas() {
@@ -258,6 +295,8 @@ function VistasModulo() {
           </div>
         </div>
       </div>
+
+      <AvisoNotificaciones />
 
       <div className="flex-1 min-h-0 flex flex-col md:flex-row bg-white">
         {/* Lista */}

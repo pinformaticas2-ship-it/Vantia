@@ -48,6 +48,20 @@ export function usePushNotifications() {
         const reg = await navigator.serviceWorker.register("/sw.js");
         const existing = await reg.pushManager.getSubscription();
         if (!cancelled) setSubscribed(Boolean(existing));
+        // Autorreparación (08/10/2026): el navegador puede conservar una
+        // suscripción que el servidor ya no tiene a nombre de este usuario
+        // (caducada y limpiada, o de otra cuenta en el mismo navegador). Se
+        // vuelve a registrar en cada carga: es idempotente (upsert por endpoint).
+        if (existing && Notification.permission === "granted") {
+          const t = await getToken();
+          if (t) {
+            await fetch("/api/push/subscribe", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` },
+              body: JSON.stringify({ subscription: existing.toJSON() }),
+            }).catch(() => {});
+          }
+        }
       } catch { /* silencioso */ }
     })();
     return () => { cancelled = true; };

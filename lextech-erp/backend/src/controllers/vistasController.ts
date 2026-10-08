@@ -18,6 +18,17 @@ import {
   PlantillaVars,
 } from '../services/vistasAutomation';
 import { reconcileVistasIdle } from '../services/vistasIdle';
+import { sendPushToUsers } from '../utils/webPush';
+
+/** Push a los implicados en una vista (abogado responsable y dueño del buzón)
+ *  cuando alguien la acepta, modifica o cancela -- menos a quien lo hizo, que
+ *  ya lo sabe. 08/10/2026: "que aparezcan notificaciones push cuando se
+ *  registra una vista por lo que sea". */
+function pushImplicados(sol: any, actorId: string | null | undefined, title: string, body: string) {
+  const ids = [sol?.responsable_user_id, sol?.mailbox_user_id].filter(Boolean) as string[];
+  void sendPushToUsers(ids, { title, body, url: `/dashboard/vistas?id=${sol.id}`, tag: `vista-${sol.id}-${Date.now()}` }, actorId)
+    .catch(() => {});
+}
 
 // ── Automatización de vistas: configuración y decisiones del abogado ────────
 // La parte automática (leer el correo, extraer datos, comprobar la agenda,
@@ -812,6 +823,7 @@ export async function aceptarVista(req: any, res: Response) {
       ],
     );
     await logActivityForReq(req, `Vista aceptada: ${tituloBase}`, expedienteId ? 'EXPEDIENTE' : 'AGENDA', expedienteId || agendaEventId || undefined, sol.subject || undefined);
+    if (!critico) pushImplicados(sol, uid, `✅ Vista aceptada por ${deciderName}`, `${fechaLarga(fecha)}${datos.juzgado ? ` · ${datos.juzgado}` : ''}`);
     return ok(res, { estado: critico ? 'error' : 'aceptada', pasos: finalPasos, expedienteId, agendaEventId });
   } catch (e: any) {
     await pool.query(
@@ -983,6 +995,7 @@ export async function modificarVista(req: any, res: Response) {
       [sol.id, orig.expediente_id, fecha, duracion, JSON.stringify(pasos), uid, deciderName],
     );
     await logActivityForReq(req, `Vista modificada: ${antes ? fmtLargo(antes) + ' → ' : ''}${fmtLargo(fecha)}`, orig.expediente_id ? 'EXPEDIENTE' : 'AGENDA', orig.expediente_id || orig.agenda_event_id || undefined, sol.subject || undefined);
+    pushImplicados(orig, uid, `🔁 Vista modificada por ${deciderName}`, `${antes ? `Del ${fmtLargo(antes)} ` : ''}al ${fmtLargo(fecha)}`);
     return ok(res, { estado: 'modificada', pasos, vistaId: orig.id });
   } catch (e: any) {
     await pool.query(`UPDATE vistas_solicitudes SET estado = 'error', pasos = $2, error = $3, updated_at = NOW() WHERE id = $1`,
@@ -1126,6 +1139,8 @@ export async function cancelarVista(req: any, res: Response) {
     if (!r.ok) return fail(res, 'Solo se pueden cancelar vistas aceptadas.', 409);
     if (r.expedienteCerrado) await logActivityForReq(req, 'Expediente cerrado al cancelar la vista', 'EXPEDIENTE', r.expedienteId || undefined, sol.subject || undefined);
     await logActivityForReq(req, `Vista cancelada: ${sol.subject || ''}`.slice(0, 300), sol.expediente_id ? 'EXPEDIENTE' : 'AGENDA', sol.expediente_id || undefined, sol.subject || undefined);
+    pushImplicados(sol, req.auth?.userId, `❌ Vista cancelada por ${await resolveUserName(req.auth?.userId)}`,
+      `${sol.fecha_vista ? fechaLarga(new Date(sol.fecha_vista)) : ''}${motivo ? ` · ${motivo}` : ''}`);
     return ok(res, { estado: 'cancelada', expedienteCerrado: r.expedienteCerrado });
   } catch (e: any) {
     return fail(res, e?.message || 'Error cancelando la vista');
@@ -1170,6 +1185,7 @@ export async function aplicarCancelacionVista(req: any, res: Response) {
         [sol.id, okTodo ? 'documentada' : 'error', expedienteId, JSON.stringify(pasos), okTodo ? null : pasos.filter((p) => !p.ok).map((p) => p.detalle).join(' | '), uid, deciderName],
       );
       await logActivityForReq(req, `Vista cancelada por correo: ${sol.subject || ''}`.slice(0, 300), expedienteId ? 'EXPEDIENTE' : 'AGENDA', expedienteId || undefined, sol.from_email || undefined);
+      if (r.ok) pushImplicados(sol, uid, `❌ Vista cancelada por ${deciderName}`, `Según el correo «${String(sol.subject || '').slice(0, 80)}»`);
       return ok(res, { estado: okTodo ? 'documentada' : 'error', pasos });
     } catch (e: any) {
       await unclaim(sol.id, previo, e?.message || String(e));
