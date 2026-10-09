@@ -145,9 +145,12 @@ app.use('/api', (_req, res, next) => {
 // justo el tipo de cosa que puede desordenar el framing HTTP y provocar
 // cortes de conexión con el navegador. Saltarse compression() del todo para
 // esta ruta, en vez de solo decirle "no comprimas", es la manera segura.
+// Lo mismo para /api/email/events (avisos de correo y chat en tiempo real):
+// con gzip los avisos se quedaban en el búfer del compresor y el navegador
+// no recibía nada (09/10/2026).
 const compressionMw = compression();
 app.use((req, res, next) => {
-  if (req.path === '/api/vantia/chat/stream') return next();
+  if (req.path === '/api/vantia/chat/stream' || req.path === '/api/email/events') return next();
   return compressionMw(req, res, next);
 });
 

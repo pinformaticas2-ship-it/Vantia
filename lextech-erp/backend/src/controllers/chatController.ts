@@ -369,6 +369,39 @@ export async function getMensajes(req: Request, res: Response) {
   }
 }
 
+/** GET /canales/:id/cambios?desde=ISO — mensajes EDITADOS o con reacciones
+ *  nuevas y mensajes BORRADOS desde esa hora (09/10/2026: "since" solo traía
+ *  mensajes nuevos; las ediciones, borrados y reacciones de los demás no se
+ *  veían hasta cambiar de conversación). "ahora" es la hora del servidor, para
+ *  la siguiente consulta (sin depender del reloj del navegador). */
+export async function getCambiosMensajes(req: Request, res: Response) {
+  const userId = (req as any).auth?.userId;
+  if (!userId) return err(res, 'No autenticado', 401);
+  const { id } = req.params;
+  const desde = new Date(String(req.query.desde || ''));
+  if (Number.isNaN(desde.getTime())) return err(res, 'Parámetro "desde" no válido', 400);
+  try {
+    if (!(await assertCanalInOrg(id, (req as any).organizacionId))) return err(res, 'Canal no encontrado', 404);
+    const [{ rows: ahora }, { rows: cambiados }, { rows: borrados }] = await Promise.all([
+      pool.query(`SELECT NOW() AS ahora`),
+      pool.query(
+        `SELECT m.*,
+           (SELECT json_agg(json_build_object('emoji', r.emoji, 'user_id', r.user_id, 'user_name', r.user_name))
+              FROM chat_reacciones r WHERE r.mensaje_id = m.id) AS reacciones,
+           (SELECT row_to_json(r2.*) FROM chat_mensajes r2 WHERE r2.id = m.reply_to_id) AS reply_to
+           FROM chat_mensajes m
+          WHERE m.canal_id = $1 AND m.deleted_at IS NULL AND m.updated_at > $2 AND m.updated_at > m.created_at
+          ORDER BY m.updated_at ASC LIMIT 200`,
+        [id, desde],
+      ),
+      pool.query(`SELECT id FROM chat_mensajes WHERE canal_id = $1 AND deleted_at > $2 LIMIT 500`, [id, desde]),
+    ]);
+    return ok(res, { cambiados, borrados: borrados.map((r: any) => r.id), ahora: ahora[0].ahora });
+  } catch (e: any) {
+    return err(res, e.message);
+  }
+}
+
 export async function sendMensaje(req: Request, res: Response) {
   const userId   = (req as any).auth?.userId;
   const userName = resolveAuthDisplayName((req as any).auth);
@@ -750,7 +783,7 @@ export async function deleteMensaje(req: Request, res: Response) {
       }
     }
 
-    await pool.query(`UPDATE chat_mensajes SET deleted_at = NOW() WHERE id = $1`, [id]);
+    await pool.query(`UPDATE chat_mensajes SET deleted_at = NOW(), updated_at = NOW() WHERE id = $1`, [id]);
     return ok(res, { id });
   } catch (e: any) {
     return err(res, e.message);
@@ -771,9 +804,12 @@ export async function toggleReaccion(req: Request, res: Response) {
     const existing = await pool.query(`SELECT id FROM chat_reacciones WHERE mensaje_id = $1 AND user_id = $2 AND emoji = $3`, [id, userId, emoji]);
     if (existing.rows.length) {
       await pool.query(`DELETE FROM chat_reacciones WHERE id = $1`, [existing.rows[0].id]);
+      // Para que los demás vean el cambio (ver getCambiosMensajes).
+      await pool.query(`UPDATE chat_mensajes SET updated_at = NOW() WHERE id = $1`, [id]);
       return ok(res, { action: 'removed', emoji });
     } else {
       await pool.query(`INSERT INTO chat_reacciones (mensaje_id, user_id, user_name, emoji) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`, [id, userId, userName, emoji]);
+      await pool.query(`UPDATE chat_mensajes SET updated_at = NOW() WHERE id = $1`, [id]);
       return ok(res, { action: 'added', emoji });
     }
   } catch (e: any) {

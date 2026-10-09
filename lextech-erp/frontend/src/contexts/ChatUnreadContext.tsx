@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { useAuth } from "@clerk/clerk-react";
+import { iniciarTiempoReal, suscribirTiempoReal } from "../lib/realtime";
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
 interface ChatUnreadCtx {
@@ -95,6 +96,23 @@ export function ChatUnreadProvider({ children }: { children: React.ReactNode }) 
   // Ref siempre actualizado para usarlo en el intervalo
   const doFetchRef = useRef(doFetch);
   useEffect(() => { doFetchRef.current = doFetch; }, [doFetch]);
+
+  // Tiempo real: la conexión de eventos (una para toda la app) arranca aquí, y
+  // los no leídos se actualizan en cuanto llega un mensaje (el sondeo de 8s
+  // queda de respaldo). Ver lib/realtime.ts y backend utils/chatRealtime.ts.
+  useEffect(() => {
+    if (!isLoaded) return;
+    iniciarTiempoReal(() => getTokenRef.current());
+    let t: number | null = null;
+    const off = suscribirTiempoReal((ev) => {
+      if (ev?.type !== "chat" || ev.kind === "typing" || ev.kind === "presencia") return;
+      if (t) clearTimeout(t);
+      // Pequeño margen para agrupar varios avisos seguidos; si había una consulta
+      // en curso, se repite al terminar.
+      t = window.setTimeout(() => { t = null; if (busyRef.current) window.setTimeout(() => void doFetchRef.current(), 400); else void doFetchRef.current(); }, 200);
+    });
+    return () => { off(); if (t) clearTimeout(t); };
+  }, [isLoaded]);
 
   const startPolling = () => {
     if (timerRef.current) clearInterval(timerRef.current);

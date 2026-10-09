@@ -5,7 +5,7 @@ import { requireModulePermission } from '../middleware/requireModulePermission';
 import { costlyActionLimiter } from '../middleware/rateLimits';
 import {
   getCanales, createCanal, updateCanal, archivarCanal, marcarLeido, marcarTodoLeido, getCanalMiembros,
-  getMensajes, sendMensaje, editMensaje, deleteMensaje,
+  getMensajes, sendMensaje, editMensaje, deleteMensaje, getCambiosMensajes,
   toggleReaccion,
   getFijados, fijarMensaje, desfijarMensaje, getFavoritos, toggleFavorito,
   buscarMensajes, getMiembrosGlobal, getOrCreateDM,
@@ -17,9 +17,12 @@ import {
   getSesionExpediente, iniciarSesionExpediente, cerrarSesionExpediente,
   getMyStatus, updateHeartbeat, getPresence, getLinkPreview,
 } from '../controllers/chatController';
+import { avisosChatEnTiempoReal } from '../utils/chatRealtime';
 
 const router = Router();
 router.use(requireModulePermission('chat'));
+// Avisos en tiempo real cuando algo cambia (utils/chatRealtime.ts).
+router.use(avisosChatEnTiempoReal);
 
 // memoryStorage (no diskStorage): el disco de Railway es efímero y se borra
 // en cada redeploy/reinicio -- las imágenes y archivos del chat se guardan
@@ -77,6 +80,7 @@ router.put   ('/canales/:id/miembros/:uid/role', requireAuth, updateMiembroRole)
 
 // Mensajes de un canal
 router.get   ('/canales/:id/mensajes',           requireAuth, getMensajes);
+router.get   ('/canales/:id/cambios',            requireAuth, getCambiosMensajes);
 router.post  ('/canales/:id/mensajes',           requireAuth, sendMensaje);
 router.get   ('/canales/:id/typing',             requireAuth, getTypingStatus);
 router.post  ('/canales/:id/typing',             requireAuth, updateTypingStatus);

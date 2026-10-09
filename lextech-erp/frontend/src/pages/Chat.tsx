@@ -1,4 +1,5 @@
-﻿import React, {
+﻿import { suscribirTiempoReal, useTiempoRealConectado } from "../lib/realtime";
+import React, {
   useEffect, useLayoutEffect, useState, useRef, useCallback, useMemo,
 } from "react";
 import { Spinner } from "../components/Spinner";
@@ -3703,9 +3704,12 @@ export default function Chat() {
   // DOM todavía mostrando la conversación anterior, aterrizando en un punto
   // que no era el fondo real de la conversación nueva).
   const pendingScrollToBottomRef = useRef(false);
-  const activePollMs = isPageVisible ? 700 : 1800;
-  const sidebarPollMs = isPageVisible ? 1400 : 3200;
-  const typingPollMs = isPageVisible ? 1200 : 2600;
+  // Con el tiempo real conectado (lib/realtime.ts) el servidor avisa en cuanto
+  // algo cambia; el sondeo queda solo de respaldo. Sin él, como antes.
+  const tiempoReal = useTiempoRealConectado();
+  const activePollMs = tiempoReal ? 10_000 : (isPageVisible ? 700 : 1800);
+  const sidebarPollMs = tiempoReal ? 20_000 : (isPageVisible ? 1400 : 3200);
+  const typingPollMs = tiempoReal ? 8_000 : (isPageVisible ? 1200 : 2600);
   const canalActivoId = canalActivo?.id ?? null;
   const canalActivoDmTargetId = canalActivo?.dm_target_user_id ?? null;
 
@@ -4021,7 +4025,10 @@ export default function Chat() {
             return msgs[msgs.length - initialUnreadCount]?.id ?? null;
           });
         }
+        // Canal vacío: sin fecha de referencia el sondeo no arrancaba y el primer
+        // mensaje de otro no aparecía hasta volver a entrar. "Desde siempre" = todo.
         if (msgs.length) lastAt.current = msgs[msgs.length-1].created_at;
+        else if (isFirstLoad) lastAt.current = new Date(0).toISOString();
         if (msgs.length<60) setHasMore(false);
         // Scroll evaluado DESPUÉS del fetch: si el usuario subió mientras cargaba, atBottom es false → no se fuerza
         if (isFirstLoad || atBottom.current) {
@@ -4120,6 +4127,79 @@ export default function Chat() {
       pollMensajesInFlightRef.current = false;
     }
   }, [canalActivoDmTargetId, canalActivoId, clearUnread, currentUserId, hdr, markFreshIncomingMessages, notificationsPaused, refreshUnread]);
+
+  // ── Ediciones, borrados y reacciones de los demás (09/10/2026: "since" solo
+  // trae mensajes nuevos, así que esto no se veía hasta cambiar de conversación).
+  const cambiosDesdeRef = useRef<string | null>(null);
+  const pollCambios = useCallback(async () => {
+    const canalId = canalActivoIdRef.current;
+    if (!canalId) return;
+    const desde = cambiosDesdeRef.current || new Date(Date.now() - 5 * 60_000).toISOString();
+    try {
+      const h = await hdr();
+      const res = await fetch(`/api/chat/canales/${canalId}/cambios?desde=${encodeURIComponent(desde)}`, { headers: h });
+      const d = await safeJson(res);
+      if (!res.ok || canalActivoIdRef.current !== canalId || !d?.data) return;
+      cambiosDesdeRef.current = d.data.ahora;
+      const cambiados: Mensaje[] = d.data.cambiados || [];
+      const borrados = new Set<string>(d.data.borrados || []);
+      if (!cambiados.length && !borrados.size) return;
+      const porId = new Map(cambiados.map((m) => [m.id, m]));
+      setMensajes((prev) => {
+        let cambio = false;
+        const next = prev
+          .filter((m) => { if (borrados.has(m.id)) { cambio = true; mensajesIdsRef.current.delete(m.id); return false; } return true; })
+          .map((m) => { const c = porId.get(m.id); if (c) { cambio = true; return { ...m, ...c }; } return m; });
+        return cambio ? next : prev;
+      });
+    } catch { /* el sondeo de respaldo lo reintentará */ }
+  }, [hdr]);
+  const pollCambiosRef = useRef(pollCambios);
+  useEffect(() => { pollCambiosRef.current = pollCambios; }, [pollCambios]);
+
+  // ── Avisos en tiempo real del servidor (backend utils/chatRealtime.ts) ──
+  useEffect(() => {
+    let sidebarTimer: number | null = null;
+    const refrescarSidebar = () => {
+      if (sidebarTimer) return;
+      sidebarTimer = window.setTimeout(() => { sidebarTimer = null; void fetchCanalesRef.current(); }, 250);
+    };
+    const traerMensajes = (intento = 0) => {
+      // Si ya hay una consulta en curso, se repite en un momento (si no, el aviso se perdería).
+      if (pollMensajesInFlightRef.current || fetchMensajesInFlightRef.current) {
+        if (intento < 6) window.setTimeout(() => traerMensajes(intento + 1), 300);
+        return;
+      }
+      void pollMensajesRef.current();
+    };
+    const off = suscribirTiempoReal((ev) => {
+      if (ev?.type !== "chat") return;
+      const activo = canalActivoIdRef.current;
+      const esActivo = !!activo && (!ev.canalId || ev.canalId === activo);
+      switch (ev.kind) {
+        case "mensajes":
+          if (esActivo) { traerMensajes(); void pollCambiosRef.current(); }
+          refrescarSidebar();
+          break;
+        case "typing":
+          if (esActivo && activo) void fetchTypingUsersRef.current(activo);
+          break;
+        case "fijados":
+          if (esActivo && activo) void fetchPinnedRef.current(activo);
+          break;
+        case "miembros":
+          if (esActivo && activo) void fetchMiembrosRef.current(activo);
+          refrescarSidebar();
+          break;
+        case "presencia":
+          void fetchPresenceRef.current();
+          break;
+        default:
+          refrescarSidebar();
+      }
+    });
+    return () => { off(); if (sidebarTimer) clearTimeout(sidebarTimer); };
+  }, []);
 
   // ── Scroll helpers
   const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
@@ -4265,6 +4345,7 @@ export default function Chat() {
       pollCycleRef.current += 1;
       void pollMensajesRef.current();
       if (pollCycleRef.current % 4 === 0) {
+        void pollCambiosRef.current();
         void fetchMiembrosRef.current(canalActivoId);
         // Fijados es un estado compartido por todo el canal (no por usuario,
         // como favoritos) -- se refresca aquí para que si otra persona fija/
@@ -4333,6 +4414,7 @@ export default function Chat() {
     // Resetear flags de inflight para que el nuevo canal pueda hacer su primer fetch/poll sin esperar al anterior
     fetchMensajesInFlightRef.current = false;
     pollMensajesInFlightRef.current = false;
+    cambiosDesdeRef.current = new Date().toISOString();
     scrollRestoreRef.current = null;
     mensajesIdsRef.current = new Set();
     setIsSwitchingChat(true);
