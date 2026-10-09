@@ -5,7 +5,7 @@ export function useSidebar() { return useContext(SidebarContext); }
 import { Spinner } from "../components/Spinner";
 import { createPortal } from "react-dom";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
-import {
+import { Clock,
   LayoutDashboard, Briefcase, Users, Settings,
   Menu, Search, X, Bell, Calendar,
   MessageCircle, Bot, Send, ChevronRight, ChevronLeft, Loader2, History, CheckCircle2,
@@ -1803,6 +1803,15 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
                   const vistasBadge = href === "/dashboard/vistas" && vistasPendientes > 0;
                   const badgeCount = chatBadge ? totalUnread : emailBadge ? emailUnreadCount : waBadge ? waUnreadCount : vistasPendientes;
                   const hasBadge   = chatBadge || emailBadge || waBadge || vistasBadge;
+                  // Qué cuenta el número (al pasar el ratón y para lectores de pantalla).
+                  // Vistas es "pendiente de decidir" (ámbar + reloj); el resto, "sin leer".
+                  const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
+                  const badgeTitulo = chatBadge ? plural(badgeCount, "mensaje sin leer en el chat", "mensajes sin leer en el chat")
+                    : emailBadge ? plural(badgeCount, "correo sin leer", "correos sin leer")
+                    : waBadge ? plural(badgeCount, "mensaje de WhatsApp sin leer", "mensajes de WhatsApp sin leer")
+                    : vistasBadge ? plural(badgeCount, "vista por confirmar", "vistas por confirmar") : "";
+                  const badgeAccion = vistasBadge && !chatBadge && !emailBadge && !waBadge;
+                  const badgeTexto = badgeCount > 99 ? "99+" : String(badgeCount);
                   // Expedientes: mientras se procesa un ZIP de documentos (cédula ->
                   // expediente) en segundo plano, el icono muestra un spinner para que
                   // quede claro que hay algo trabajando, se esté viendo esa pantalla o no.
@@ -1810,7 +1819,7 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
 
                   if (collapsed) {
                     return (
-                      <Link key={item.name} to={href} onClick={onClose} title={showProcessingSpinner ? `${item.name} — procesando documentos…` : item.name}
+                      <Link key={item.name} to={href} onClick={onClose} title={showProcessingSpinner ? `${item.name} — procesando documentos…` : hasBadge ? `${item.name} — ${badgeTitulo}` : item.name}
                         className={`relative flex items-center justify-center h-10 w-10 mx-auto rounded-lg transition-colors border-l-4 ${
                           isActive ? "erp-sidebar-nav-active bg-red-500/10 text-white border-red-500"
                                    : "erp-sidebar-nav-inactive text-slate-400 hover:bg-slate-800/50 hover:text-white border-transparent"
@@ -1822,7 +1831,10 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
                           </span>
                         )}
                         {!showProcessingSpinner && hasBadge && (
-                          <span className="erp-sidebar-badge-dot absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full ring-1 ring-slate-900" />
+                          <span aria-label={badgeTitulo}
+                            className={`absolute -top-1 -right-1.5 min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center text-[9px] font-bold leading-none ring-2 ring-slate-900 ${badgeAccion ? "bg-amber-400 text-slate-900" : "erp-sidebar-badge bg-red-600 text-white"}`}>
+                            {badgeTexto}
+                          </span>
                         )}
                       </Link>
                     );
@@ -1846,8 +1858,10 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
                         <span className="text-[9px] font-bold uppercase tracking-wider text-red-400/80 shrink-0">Procesando</span>
                       )}
                       {!showProcessingSpinner && hasBadge && (
-                        <span className="erp-sidebar-badge ml-auto min-w-[20px] h-5 bg-red-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1.5">
-                          {badgeCount > 99 ? "99+" : badgeCount}
+                        <span title={badgeTitulo} aria-label={badgeTitulo}
+                          className={`ml-auto min-w-[20px] h-5 text-[10px] font-bold rounded-full flex items-center justify-center gap-0.5 px-1.5 ${badgeAccion ? "bg-amber-400 text-slate-900" : "erp-sidebar-badge bg-red-600 text-white"}`}>
+                          {badgeAccion && <Clock size={10} strokeWidth={2.5} />}
+                          {badgeTexto}
                         </span>
                       )}
                     </Link>
