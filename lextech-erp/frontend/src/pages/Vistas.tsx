@@ -6,6 +6,7 @@ import {
   Mail, Paperclip, RefreshCw, RotateCcw, Settings, Undo2, X, XCircle,
 } from "lucide-react";
 import { apiFetch, resolveApiUrl } from "../lib/api";
+import { FilePreviewModal } from "../components/FilePreviewModal";
 import { notifyVistasChanged, useVistasStatus } from "../lib/useVistasStatus";
 import { usePushNotifications } from "../lib/usePushNotifications";
 
@@ -599,17 +600,36 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
     }
   };
 
+  // Los adjuntos se ven en el mismo visor que en Correo, Expedientes o Chat
+  // (antes se abrían en otra pestaña, y un .html salía como código).
+  const [adjuntoAbierto, setAdjuntoAbierto] = useState<{ src: string; fileName: string; mime: string } | null>(null);
+  const [abriendoAdjunto, setAbriendoAdjunto] = useState<number | null>(null);
   const openAdjunto = async (index: number) => {
+    const a = d?.adjuntos.find((x) => x.index === index);
+    setAbriendoAdjunto(index);
     try {
       const token = await getToken();
       const res = await fetch(resolveApiUrl(`/api/vistas/${id}/adjuntos/${index}`), { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) throw new Error("No disponible");
-      const url = URL.createObjectURL(await res.blob());
-      window.open(url, "_blank", "noopener");
-      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      const blob = await res.blob();
+      setAdjuntoAbierto({ src: URL.createObjectURL(blob), fileName: a?.filename || "adjunto", mime: a?.contentType || blob.type });
     } catch {
       setActionError("No se pudo abrir el adjunto (puede que el correo ya no esté en el buzón).");
+    } finally {
+      setAbriendoAdjunto(null);
     }
+  };
+  const cerrarAdjunto = useCallback(() => {
+    setAdjuntoAbierto((prev) => { if (prev) URL.revokeObjectURL(prev.src); return null; });
+  }, []);
+  const descargarAdjunto = () => {
+    if (!adjuntoAbierto) return;
+    const link = document.createElement("a");
+    link.href = adjuntoAbierto.src;
+    link.download = adjuntoAbierto.fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
   };
 
   // Detalles editables plegados por defecto; abiertos si los datos son dudosos
@@ -662,10 +682,14 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
                 {d.adjuntos.map((a) => (
                   <button key={a.index} onClick={() => void openAdjunto(a.index)}
                     className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-slate-200 text-xs text-slate-700 hover:border-red-300 hover:bg-red-50">
-                    <Paperclip size={12} className="text-slate-400" /> <span className="max-w-[220px] truncate">{a.filename}</span> <Eye size={11} className="text-slate-400" />
+                    <Paperclip size={12} className="text-slate-400" /> <span className="max-w-[220px] truncate">{a.filename}</span> {abriendoAdjunto === a.index ? <Loader2 size={11} className="animate-spin text-slate-400" /> : <Eye size={11} className="text-slate-400" />}
                   </button>
                 ))}
               </div>
+            )}
+            {adjuntoAbierto && (
+              <FilePreviewModal src={adjuntoAbierto.src} fileName={adjuntoAbierto.fileName} mime={adjuntoAbierto.mime}
+                subtitle={d.subject || null} onDownload={descargarAdjunto} onClose={cerrarAdjunto} />
             )}
             {!d.emailDisponible && <p className="mt-2 text-xs text-amber-700">El correo original ya no está en el buzón; se conserva su texto.</p>}
           </div>

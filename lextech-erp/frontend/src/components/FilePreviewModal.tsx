@@ -61,6 +61,11 @@ export function isAudioFile(fileName?: string | null, mime?: string | null): boo
   const ext = fileExt(fileName);
   return ["mp3", "wav", "ogg", "m4a", "aac"].includes(ext) || (mime || "").toLowerCase().startsWith("audio/");
 }
+export function isHtmlFile(fileName?: string | null, mime?: string | null): boolean {
+  const ext = fileExt(fileName);
+  return ext === "html" || ext === "htm" || (mime || "").toLowerCase().startsWith("text/html");
+}
+
 export function isTextFile(fileName?: string | null, mime?: string | null): boolean {
   const ext = fileExt(fileName);
   const m = (mime || "").toLowerCase();
@@ -113,6 +118,7 @@ export function FilePreviewModal({
   const isImage = isImageFile(fileName, mime);
   const isVideo = isVideoFile(fileName, mime);
   const isAudio = isAudioFile(fileName, mime);
+  const isHtml = isHtmlFile(fileName, mime);
   const isText = isTextFile(fileName, mime);
   const isWord = isWordFile(fileName, mime);
   const isExcel = isExcelFile(fileName, mime);
@@ -200,6 +206,8 @@ export function FilePreviewModal({
             {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
             <audio src={src} controls autoPlay className="w-full max-w-md" />
           </div>
+        ) : isHtml ? (
+          <HtmlFilePreview src={src} />
         ) : isText ? (
           <TextFilePreview src={src} />
         ) : isWord ? (
@@ -235,6 +243,59 @@ export function FilePreviewModal({
 // Vista de texto plano/código: se descarga el contenido como texto (con un
 // tope de tamaño, ver TEXT_PREVIEW_MAX_BYTES) y se muestra en monoespaciada
 // con scroll -- evita intentar "renderizar" el archivo y simplemente lo lee.
+/** Un .html (p.ej. un informe adjunto a un correo) se ve como página, no como
+ *  código. Va en un iframe con sandbox vacío: sin scripts, sin formularios,
+ *  sin acceso a la app (origen opaco). Botón para ver el código si hace falta. */
+function HtmlFilePreview({ src }: { src: string }) {
+  const [html, setHtml] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+  const [codigo, setCodigo] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    setHtml(null); setError(false);
+    (async () => {
+      try {
+        const res = await fetch(src);
+        if (!res.ok) throw new Error("fetch");
+        const text = await res.text();
+        if (!cancelled) setHtml(text.length > TEXT_PREVIEW_MAX_BYTES * 4 ? null : text);
+        if (!cancelled && text.length > TEXT_PREVIEW_MAX_BYTES * 4) setError(true);
+      } catch {
+        if (!cancelled) setError(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [src]);
+  if (codigo) {
+    return (
+      <div className="relative h-full">
+        <button type="button" onClick={() => setCodigo(false)} className="absolute right-3 top-3 z-10 rounded-lg bg-white/90 px-2.5 py-1 text-xs font-semibold text-slate-700 shadow hover:bg-white">Ver como página</button>
+        <TextFilePreview src={src} />
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div className="flex h-full items-center justify-center rounded-xl border border-slate-700 bg-slate-900 px-6 text-center">
+        <p className="text-sm text-slate-300">No se ha podido previsualizar este archivo -- descárgalo para verlo.</p>
+      </div>
+    );
+  }
+  if (html === null) {
+    return (
+      <div className="flex h-full items-center justify-center rounded-xl border border-slate-700 bg-slate-900">
+        <Loader2 size={20} className="animate-spin text-slate-400" />
+      </div>
+    );
+  }
+  return (
+    <div className="relative h-full overflow-hidden rounded-xl border border-slate-700 bg-white">
+      <button type="button" onClick={() => setCodigo(true)} className="absolute right-3 top-3 z-10 rounded-lg bg-slate-900/80 px-2.5 py-1 text-xs font-semibold text-white shadow hover:bg-slate-900">Ver código</button>
+      <iframe title="Vista previa" sandbox="" srcDoc={html} className="h-full w-full bg-white" />
+    </div>
+  );
+}
+
 function TextFilePreview({ src }: { src: string }) {
   const [state, setState] = useState<{ status: "loading" } | { status: "ok"; text: string } | { status: "too-big" } | { status: "error" }>({ status: "loading" });
 
