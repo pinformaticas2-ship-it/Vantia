@@ -123,10 +123,22 @@ export async function getVistasConfig(req: any, res: Response) {
       ),
       listMiembros(org.id),
     ]);
-    const mailboxOptions = [
-      ...accounts.rows.map((a: any) => ({ type: 'imap', id: a.id, label: `${a.label || a.email} <${a.email}>`, warning: null })),
+    // Para cada buzón: qué otras organizaciones (de las tuyas) ya vigilan esa
+    // misma dirección -- así, al elegir, se ve antes de duplicar avisos.
+    const { rows: vigilados } = await pool.query(
+      `SELECT o.nombre, lower(COALESCE(a.email, p.email)) AS email
+         FROM organizaciones o
+         JOIN organizacion_miembros m ON m.organizacion_id = o.id AND m.user_id = $2
+         LEFT JOIN email_accounts a ON a.id::text = o.vistas_auto_config->'mailbox'->>'id'
+         LEFT JOIN email_oauth_profiles p ON p.id::text = o.vistas_auto_config->'mailbox'->>'id'
+        WHERE o.id <> $1 AND o.vistas_auto_enabled = true AND COALESCE(a.email, p.email) IS NOT NULL`,
+      [org.id, uid],
+    );
+    const vigiladoPor = (email: string) => vigilados.filter((v: any) => v.email === String(email || '').toLowerCase()).map((v: any) => v.nombre);
+    const mailboxOptions: { type: string; id: string; label: string; email?: string; warning: string | null; vigiladoPor?: string[] }[] = [
+      ...accounts.rows.map((a: any) => ({ type: 'imap', id: a.id, label: `${a.label || a.email} <${a.email}>`, email: a.email, warning: null, vigiladoPor: vigiladoPor(a.email) })),
       ...profiles.rows.map((p: any) => ({
-        type: 'gmail', id: p.id, label: `Gmail · ${p.email}`,
+        type: 'gmail', id: p.id, label: `Gmail · ${p.email}`, email: p.email, vigiladoPor: vigiladoPor(p.email),
         warning: p.refresh_token_enc ? null : 'Este Gmail se conectó antes de poder trabajar en segundo plano: vuelve a conectarlo desde Correo para que la automatización pueda leerlo.',
       })),
     ];
@@ -159,6 +171,8 @@ export async function getVistasConfig(req: any, res: Response) {
         ? 'El Gmail vigilado necesita volver a conectarse desde Correo para poder leerse en segundo plano.'
         : (cfg.mailbox && !mailbox.label ? 'El buzón configurado ya no existe. Elige otro.' : null),
       mailboxOptions,
+      mailboxId: cfg.mailbox?.id || null,
+      organizacionNombre: org.nombre,
       miembros,
       activatedAt: org.vistas_auto_activated_at,
       lastRunAt: org.vistas_auto_last_run_at,
@@ -223,26 +237,23 @@ export async function updateVistasConfig(req: any, res: Response) {
     const next = normalizeVistasConfig({ ...current, ...(req.body?.config || {}), ...(/^https?:\/\//.test(origin) ? { appUrl: origin } : {}) });
     const uid = req.auth?.userId;
 
-    // Un único interruptor, sin pantalla de configuración: al activar, si no
-    // hay un buzón válido ya elegido, se vigila uno del propio usuario en esta
-    // organización (primero una cuenta IMAP, si no un Gmail que pueda leerse
-    // en segundo plano).
-    if (enabled && (!next.mailbox || !(await mailboxOwnerOf(org.id, next)).owner)) {
-      const { rows: acc } = await pool.query(
-        `SELECT id FROM email_accounts WHERE organizacion_id = $1 AND user_id = $2 AND active = true ORDER BY created_at LIMIT 1`,
-        [org.id, uid],
+    // 09/10/2026: al activar se pregunta SIEMPRE qué correo se revisa en esta
+    // organización (antes se cogía solo el primero del usuario, y así acababa
+    // vigilado un buzón que no tocaba, o el mismo en dos organizaciones).
+    const activando = enabled && !org.vistas_auto_enabled;
+    if (activando && !req.body?.config?.mailbox) {
+      return fail(res, 'Elige qué correo se revisará para buscar vistas en esta organización.', 400);
+    }
+    if (enabled && next.mailbox && !(await mailboxOwnerOf(org.id, next)).owner) {
+      return fail(res, 'El buzón configurado ya no existe. Elige otro.', 400);
+    }
+    if (next.mailbox?.type === 'gmail' && next.mailbox.id !== current.mailbox?.id) {
+      const { rows } = await pool.query(
+        `SELECT refresh_token_enc FROM email_oauth_profiles WHERE id = $1 AND organizacion_id = $2`,
+        [next.mailbox.id, org.id],
       );
-      if (acc.length) {
-        next.mailbox = { type: 'imap', id: acc[0].id };
-      } else {
-        const { rows: gp } = await pool.query(
-          `SELECT id FROM email_oauth_profiles WHERE organizacion_id = $1 AND user_id = $2 AND refresh_token_enc IS NOT NULL ORDER BY created_at LIMIT 1`,
-          [org.id, uid],
-        );
-        if (!gp.length) {
-          return fail(res, 'Conecta primero tu correo en el módulo Correo (en esta organización) para que la automatización tenga un buzón que vigilar.', 400);
-        }
-        next.mailbox = { type: 'gmail', id: gp[0].id };
+      if (rows.length && !rows[0].refresh_token_enc) {
+        return fail(res, 'Este Gmail no puede leerse en segundo plano: vuelve a conectarlo desde Correo y elígelo otra vez.', 400);
       }
     }
 

@@ -91,6 +91,8 @@ async function startWatcher(accountId: string, organizacionId: string, acc: any)
 }
 
 export async function reconcileVistasIdle(): Promise<void> {
+  // Tests: no abrir conexiones IMAP reales con las cuentas de prueba.
+  if (process.env.VISTAS_IDLE_DISABLED === '1') return;
   try {
     const desired = await desiredMailboxes();
     for (const [accountId, w] of watchers) {
