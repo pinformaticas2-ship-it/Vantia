@@ -14,6 +14,7 @@ import {
   geminiAvailable,
   normalizeAutos,
   normalizeNig,
+  PREFIJO_MESSAGE_ID_AUTO,
   adjuntosReales,
   coincideBusqueda,
   VistasConfig,
@@ -540,6 +541,8 @@ async function enviarRespuesta(ctx: { sol: any; cfg: VistasConfig }, asunto: str
     }),
     inReplyTo: ctx.sol.message_id,
     expedienteId,
+    // Reconocible si vuelve al buzón vigilado (ver esRespuestaAutomatica).
+    messageId: `<${PREFIJO_MESSAGE_ID_AUTO}${crypto.randomUUID()}@vantia.app>`,
   });
 }
 

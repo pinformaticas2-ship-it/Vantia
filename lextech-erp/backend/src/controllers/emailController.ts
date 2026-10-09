@@ -2231,6 +2231,8 @@ export async function sendFromMailbox(opts: {
   html: string;
   inReplyTo?: string | null;
   expedienteId?: string | null;
+  /** Message-ID propio (p.ej. respuestas automáticas de vistas, para reconocerlas si vuelven). */
+  messageId?: string | null;
 }): Promise<void> {
   const text = opts.html.replace(/<br\s*\/?>/gi, '\n').replace(/<\/p>/gi, '\n\n').replace(/<[^>]+>/g, '').trim();
   const replyId = opts.inReplyTo ? `<${String(opts.inReplyTo).replace(/[<>]/g, '')}>` : null;
@@ -2245,6 +2247,7 @@ export async function sendFromMailbox(opts: {
       `To: ${opts.to}`,
       `Subject: ${mimeEncodeHeader(opts.subject)}`,
       'MIME-Version: 1.0',
+      ...(opts.messageId ? [`Message-ID: ${opts.messageId}`] : []),
       ...(replyId ? [`In-Reply-To: ${replyId}`, `References: ${replyId}`] : []),
       'Content-Type: text/html; charset="UTF-8"',
       'Content-Transfer-Encoding: base64',
@@ -2262,7 +2265,7 @@ export async function sendFromMailbox(opts: {
   const acc = rows[0];
   await dispatchEmail(
     { host: acc.smtp_host, port: acc.smtp_port, secure: acc.smtp_secure, user: acc.username, password: decryptPassword(acc.password_enc) },
-    { from: acc.email, fromName: acc.label, to: [opts.to], subject: opts.subject, html: opts.html, text, inReplyTo: replyId || undefined },
+    { from: acc.email, fromName: acc.label, to: [opts.to], subject: opts.subject, html: opts.html, text, inReplyTo: replyId || undefined, messageId: opts.messageId || undefined },
   );
   await pool.query(
     `INSERT INTO emails (account_id, user_id, folder, from_email, from_name,

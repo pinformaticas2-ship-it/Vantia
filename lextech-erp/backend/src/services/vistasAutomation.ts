@@ -823,7 +823,8 @@ export function buildRespuestaHtml(texto: string, formato: VistasCorreoFormato =
       `\n<blockquote style="margin:0;padding-left:12px;border-left:3px solid #d1d5db;color:#6b7280">${cuerpo}</blockquote>`;
   }
   const firma = formato.firmaHtml ? `\n<div style="margin-top:12px">${formato.firmaHtml}</div>` : '';
-  return `<div style="${style}">\n${parrafos}${firma}${cita}\n</div>`;
+  // Marca invisible de "respuesta automática de Vantia" (ver esRespuestaAutomatica).
+  return `<!--${MARCA_RESPUESTA_AUTO}--><div data-${MARCA_RESPUESTA_AUTO}="1" style="${style}">\n${parrafos}${firma}${cita}\n</div>`;
 }
 
 // ── Destinatarios de los avisos ──────────────────────────────────────────────
@@ -939,6 +940,36 @@ export async function findRelacion(organizacionId: string, autosList: string[], 
  *  vuelven a analizar (evita un bucle de avisos sobre avisos). */
 export const AVISO_SUBJECT_PREFIX = '[Vantia]';
 
+/** Marca de los correos que Vantia envía solo (ver buildRespuestaHtml y
+ *  enviarRespuesta en vistasController.ts). */
+export const MARCA_RESPUESTA_AUTO = 'vantia-auto-respuesta';
+export const PREFIJO_MESSAGE_ID_AUTO = 'vantia-vistas-';
+
+/** ¿Es una respuesta automática de Vantia que ha vuelto al buzón? Por su
+ *  Message-ID, o porque la envía el propio buzón vigilado y lleva la marca en
+ *  el HTML (Brevo, que es por donde salen en producción, pone su propio
+ *  Message-ID). La marca dentro de una CITA de otro remitente no cuenta: la
+ *  respuesta de un procurador que cita nuestro correo sí se analiza. */
+export async function esRespuestaAutomatica(row: any): Promise<boolean> {
+  const mid = String(row?.message_id || '').replace(/[<>]/g, '').toLowerCase();
+  if (mid.startsWith(PREFIJO_MESSAGE_ID_AUTO)) return true;
+  // La marca tiene que estar AL PRINCIPIO del correo (es nuestro propio
+  // mensaje), no más abajo dentro de una cita de una respuesta escrita a mano.
+  const inicio = String(row?.body_html || '')
+    .replace(/<head[\s\S]*?<\/head>/i, '').replace(/<!doctype[^>]*>/i, '').replace(/<\/?(html|body)[^>]*>/gi, '')
+    .trimStart();
+  const pos = inicio.indexOf(MARCA_RESPUESTA_AUTO);
+  if (pos < 0 || pos > 200) return false;
+  const from = String(row?.from_email || '').trim().toLowerCase();
+  if (!from) return false;
+  const propio = row?.account_id
+    ? (await pool.query(`SELECT 1 FROM email_accounts WHERE id = $1 AND lower(email) = $2`, [row.account_id, from])).rows.length > 0
+    : row?.gmail_profile_id
+      ? (await pool.query(`SELECT 1 FROM email_oauth_profiles WHERE id = $1 AND lower(email) = $2`, [row.gmail_profile_id, from])).rows.length > 0
+      : false;
+  return propio;
+}
+
 async function analyzeEmail(emailId: string, cfg: VistasConfig, organizacionId: string) {
   const row = await loadEmailContent(emailId);
   if (!row) return null;
@@ -950,6 +981,11 @@ async function analyzeEmail(emailId: string, cfg: VistasConfig, organizacionId: 
   // Los avisos de Vantia y sus respuestas/reenvíos ("Re: [Vantia] Vista por
   // confirmar...", 07/10/2026) nunca son vistas nuevas.
   if (String(row.subject || '').toLowerCase().includes(AVISO_SUBJECT_PREFIX.toLowerCase())) return ignorar;
+
+  // Las respuestas automáticas de Vantia (aceptar / rechazar / cambio de fecha)
+  // que vuelven al propio buzón tampoco: si no, se reprocesaban como una vista
+  // y se volvía a mandar otra confirmación (09/10/2026).
+  if (await esRespuestaAutomatica(row)) return ignorar;
 
   // Además de los correos "de vistas" (palabras clave), cualquier correo que
   // cite los autos o el NIG de un expediente de la organización: remisiones de

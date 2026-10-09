@@ -483,7 +483,9 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
       setGuardarAdjuntos(v.defaults.guardarAdjuntos);
       setRecordatorio(toLocalInput(v.recordatorio_at));
       // Si un intento anterior ya envió el correo, no se vuelve a enviar al reintentar.
-      setEnviarCorreo(!(v.pasos || []).some((p) => p.paso === "correo" && p.ok));
+      // En un cambio de fecha no se responde por defecto (09/10/2026: la confirmación
+      // volvía al buzón y se generaba otra solicitud). Sigue siendo opcional.
+      setEnviarCorreo(v.tipo !== "cambio" && !(v.pasos || []).some((p) => p.paso === "correo" && p.ok));
       setConflictos(v.conflictos || []);
       setMostrarFormulario(v.tipo === "vista" || !v.relacion);
   }, []);
@@ -810,7 +812,7 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
               )}
               <label className="sm:col-span-3 flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={enviarCorreo} onChange={(e) => setEnviarCorreo(e.target.checked)} className="accent-red-600" />
-                Confirmar la nueva fecha por correo a {d.from_email}
+                Avisar de la nueva fecha por correo a {d.from_email} <span className="text-slate-400">(opcional)</span>
               </label>
             </div>
           )}

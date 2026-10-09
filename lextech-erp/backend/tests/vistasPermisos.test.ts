@@ -225,3 +225,23 @@ test('buscador: en todas las listas, por autos normalizados, y filtros de fecha'
   // Otro usuario no ve nada aunque busque.
   assert.equal((await call(v.listVistas, 'otro', 'miembro', { query: { q: '512/2031' } })).body.data.filter((x: any) => x.id === futura).length, 0);
 });
+
+// 09/10/2026: la confirmación de un cambio de fecha volvía al buzón vigilado y
+// se procesaba otra vez (y se mandaba otra confirmación).
+test('las respuestas automáticas de Vantia que vuelven al buzón se ignoran', { skip }, async () => {
+  const { esRespuestaAutomatica, buildRespuestaHtml } = await import('../src/services/vistasAutomation');
+  const acc = (await pool.query(
+    `INSERT INTO email_accounts (user_id, label, email, imap_host, smtp_host, username, password_enc, organizacion_id)
+     VALUES ('buzon','Buzón','buzon@despacho.es','h','h','u','p',$1) RETURNING id`, [org])).rows[0].id;
+  const nuestro = buildRespuestaHtml('Les confirmamos la nueva fecha de la vista.');
+  // Nuestro propio correo, enviado desde el buzón vigilado (p.ej. a sí mismo).
+  assert.equal(await esRespuestaAutomatica({ account_id: acc, from_email: 'BUZON@despacho.es', body_html: `<html><body>${nuestro}</body></html>` }), true);
+  // Por su Message-ID (Gmail / SMTP directo).
+  assert.equal(await esRespuestaAutomatica({ account_id: acc, from_email: 'otro@x.es', message_id: '<vantia-vistas-123@vantia.app>' }), true);
+  // Un procurador que responde citando nuestro correo: se analiza.
+  assert.equal(await esRespuestaAutomatica({ account_id: acc, from_email: 'procurador@x.es', body_html: `Recibido, gracias.<blockquote>${nuestro}</blockquote>` }), false);
+  // Respuesta escrita a mano desde el propio buzón, citando nuestro correo más abajo: se analiza.
+  assert.equal(await esRespuestaAutomatica({ account_id: acc, from_email: 'buzon@despacho.es', body_html: `<p>${'Nueva vista señalada para el 20/11/2026 en los autos 33/2026. '.repeat(5)}</p><blockquote>${nuestro}</blockquote>` }), false);
+  // Correo normal.
+  assert.equal(await esRespuestaAutomatica({ account_id: acc, from_email: 'buzon@despacho.es', body_html: '<p>VISTA 20/11/2026 autos 33/2026</p>' }), false);
+});
