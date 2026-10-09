@@ -134,12 +134,20 @@ export function ChatUnreadProvider({ children }: { children: React.ReactNode }) 
   // "ausente" y luego a "desconectado" en el cálculo que hace cada cliente al
   // leer /api/chat/presence, sin que nadie tenga que marcarlo a mano.
   const heartbeatTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const sendHeartbeat = useCallback(async () => {
+  // 09/10/2026: en segundo plano ya no se para del todo -- manda cada minuto
+  // un latido "oculto" que solo dice "tengo la app abierta". Así quien tiene
+  // Vantia en otra pestaña sale como "ausente", y "desconectado" queda para
+  // quien de verdad la cerró.
+  const sendHeartbeat = useCallback(async (oculto = false) => {
     if (!isLoadedRef.current) return;
     try {
       const token = await getTokenRef.current();
       if (!token) return;
-      await fetch("/api/chat/me/heartbeat", { method: "PUT", headers: { Authorization: `Bearer ${token}` } });
+      await fetch("/api/chat/me/heartbeat", {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ oculto }),
+      });
     } catch { /* silencioso */ }
   }, []);
   const sendHeartbeatRef = useRef(sendHeartbeat);
@@ -148,9 +156,9 @@ export function ChatUnreadProvider({ children }: { children: React.ReactNode }) 
   const startHeartbeat = () => {
     if (heartbeatTimerRef.current) { clearInterval(heartbeatTimerRef.current); heartbeatTimerRef.current = null; }
     const isVisible = typeof document === "undefined" || document.visibilityState === "visible";
-    if (!isVisible) return;
-    void sendHeartbeatRef.current();
-    heartbeatTimerRef.current = setInterval(() => sendHeartbeatRef.current(), 20_000);
+    const oculto = !isVisible;
+    void sendHeartbeatRef.current(oculto);
+    heartbeatTimerRef.current = setInterval(() => sendHeartbeatRef.current(oculto), oculto ? 60_000 : 20_000);
   };
 
   // Montar intervalo UNA sola vez — estable

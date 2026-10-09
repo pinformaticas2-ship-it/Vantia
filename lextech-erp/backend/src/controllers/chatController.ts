@@ -5,6 +5,7 @@ import net from 'net';
 import pool from '../config/database';
 import { sendPushToUsers } from '../utils/webPush';
 import { resolveUserName } from './activityController';
+import { avisarOrganizacionChat } from '../utils/chatRealtime';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 const ok  = (res: Response, data: any, status = 200) => res.status(status).json({ success: true,  data });
@@ -57,7 +58,7 @@ export async function getCanales(req: Request, res: Response) {
   try {
     const { rows } = await pool.query(`
       SELECT
-        c.id, c.nombre, c.descripcion, c.tipo,
+        c.id, c.nombre, c.descripcion, c.tipo, c.foto_url,
         c.expediente_id, c.cliente_id, c.archivado, c.created_at,
         m.last_read_at, m.role_label, m.status AS my_status,
         ${unreadCountExpr('$1')} AS no_leidos,
@@ -154,12 +155,28 @@ export async function updateCanal(req: Request, res: Response) {
   if (!userId) return err(res, 'No autenticado', 401);
   const { id } = req.params;
   const { nombre, descripcion } = req.body;
+  // Foto del grupo: solo una imagen subida al chat (/api/chat/uploads/image);
+  // null la quita. Sin la clave en el body, no se toca.
+  const cambiaFoto = Object.prototype.hasOwnProperty.call(req.body || {}, 'foto_url');
+  const fotoUrl = cambiaFoto ? (req.body.foto_url ?? null) : null;
+  if (cambiaFoto && fotoUrl !== null && (typeof fotoUrl !== 'string' || !/^\/uploads\/chat\/[\w.-]+\.(png|jpe?g|gif|webp)$/i.test(fotoUrl))) {
+    return err(res, 'Foto no válida', 400);
+  }
   try {
     if (!(await assertCanalInOrg(id, (req as any).organizacionId))) return err(res, 'Canal no encontrado', 404);
+    if (cambiaFoto) {
+      const { rows: miembro } = await pool.query(
+        `SELECT c.tipo FROM chat_canales c JOIN chat_miembros m ON m.canal_id = c.id AND m.user_id = $2 WHERE c.id = $1`,
+        [id, userId],
+      );
+      if (!miembro.length) return err(res, 'Solo los miembros del grupo pueden cambiar su foto', 403);
+      if (miembro[0].tipo === 'directo') return err(res, 'Los mensajes directos usan la foto de la persona', 400);
+    }
     const { rows } = await pool.query(`
-      UPDATE chat_canales SET nombre = COALESCE($1, nombre), descripcion = COALESCE($2, descripcion), updated_at = NOW()
+      UPDATE chat_canales SET nombre = COALESCE($1, nombre), descripcion = COALESCE($2, descripcion),
+        foto_url = CASE WHEN $4 THEN $5 ELSE foto_url END, updated_at = NOW()
       WHERE id = $3 RETURNING *
-    `, [nombre?.trim() || null, descripcion ?? null, id]);
+    `, [nombre?.trim() || null, descripcion ?? null, id, cambiaFoto, fotoUrl]);
     if (!rows.length) return err(res, 'Canal no encontrado', 404);
     return ok(res, rows[0]);
   } catch (e: any) {
@@ -225,37 +242,77 @@ export async function getCanalMiembros(req: Request, res: Response) {
 // ── Status y Rol ──────────────────────────────────────────────────────────────
 
 /** PUT /api/chat/me/status */
-// "Disponible" y "Ausente" ya no son avisos manuales -- se calculan solos a
-// partir del latido de presencia (ver getPresence/computeEffectiveStatus en
-// el frontend). Solo estos 4 representan una señal deliberada de la
-// persona ("estoy en juicio", "no molestar"...); status=null quita
-// cualquier aviso puesto y deja el estado en automático.
-const MANUAL_STATUS_OVERRIDES = new Set(['ocupado', 'no_molestar', 'en_juicio', 'en_reunion']);
+// "Disponible" sale solo del latido de presencia (ver getPresence y
+// computeEffectiveStatus en el frontend). Estos son avisos deliberados de la
+// persona ("estoy en juicio", "no molestar", "ausente"...); status=null deja
+// el estado en automático. Además puede llevar un estado personalizado
+// (texto + emoji + color) y una caducidad ("hasta").
+//
+// 09/10/2026: se guarda en chat_presence por (usuario, organización). Antes
+// iba en chat_miembros.status (se perdía si no estabas en ningún canal y cada
+// organización pisaba a las demás) y el personalizado solo en el navegador.
+const MANUAL_STATUS_OVERRIDES = new Set(['ocupado', 'no_molestar', 'en_juicio', 'en_reunion', 'ausente']);
+const COLORES_ESTADO = new Set(['emerald', 'blue', 'amber', 'violet', 'rose', 'slate']);
 
 export async function updateMyStatus(req: Request, res: Response) {
   const userId = (req as any).auth?.userId;
   if (!userId) return err(res, 'No autenticado', 401);
-  const { status } = req.body as { status: string | null };
+  const organizacionId = (req as any).organizacionId;
+  if (!organizacionId) return err(res, 'Organización no resuelta', 400);
+  const body = (req.body || {}) as { status?: string | null; texto?: string | null; emoji?: string | null; color?: string | null; hasta?: string | null };
+  const status = body.status ?? null;
   if (status !== null && !MANUAL_STATUS_OVERRIDES.has(status)) return err(res, 'Status no válido', 400);
+  const texto = typeof body.texto === 'string' ? body.texto.trim().slice(0, 100) || null : null;
+  const emoji = texto && typeof body.emoji === 'string' ? body.emoji.trim().slice(0, 16) || null : null;
+  const color = texto && typeof body.color === 'string' && COLORES_ESTADO.has(body.color) ? body.color : null;
+  let hasta: Date | null = null;
+  if (body.hasta) {
+    const d = new Date(body.hasta);
+    if (Number.isNaN(d.getTime()) || d.getTime() <= Date.now()) return err(res, 'Fecha de caducidad no válida', 400);
+    if (d.getTime() - Date.now() > 31 * 24 * 3600_000) return err(res, 'Como máximo un mes', 400);
+    hasta = d;
+  }
+  if (!status && !texto) hasta = null;
   try {
-    await pool.query(`UPDATE chat_miembros SET status = $1 WHERE user_id = $2`, [status, userId]);
-    return ok(res, { status });
+    await pool.query(`
+      INSERT INTO chat_presence (user_id, organizacion_id, last_active_at, last_seen_at, estado, estado_texto, estado_emoji, estado_color, estado_hasta)
+      VALUES ($1, $2, NOW(), NOW(), $3, $4, $5, $6, $7)
+      ON CONFLICT (user_id, organizacion_id) DO UPDATE SET
+        estado = EXCLUDED.estado, estado_texto = EXCLUDED.estado_texto, estado_emoji = EXCLUDED.estado_emoji,
+        estado_color = EXCLUDED.estado_color, estado_hasta = EXCLUDED.estado_hasta
+    `, [userId, organizacionId, status, texto, emoji, color, hasta]);
+    return ok(res, { status, texto, emoji, color, hasta: hasta?.toISOString() ?? null });
   } catch (e: any) {
     return err(res, e.message);
   }
 }
 
-/** GET /api/chat/me/status — el aviso manual que había guardado la última vez
- *  (o null si no hay ninguno puesto), para no perderlo en cada recarga de la
- *  página. Los valores antiguos "disponible"/"ausente" (de antes de este
- *  cambio) se tratan como "sin aviso" -- ya no son avisos manuales válidos. */
+/** Estado guardado que sigue vigente (todo null si caducó o no hay). */
+function estadoVigente(row: any) {
+  const vacio = { status: null, texto: null, emoji: null, color: null, hasta: null };
+  if (!row) return vacio;
+  if (row.estado_hasta && new Date(row.estado_hasta).getTime() <= Date.now()) return vacio;
+  return {
+    status: row.estado && MANUAL_STATUS_OVERRIDES.has(row.estado) ? row.estado : null,
+    texto: row.estado_texto || null,
+    emoji: row.estado_emoji || null,
+    color: row.estado_color || null,
+    hasta: row.estado_hasta ? new Date(row.estado_hasta).toISOString() : null,
+  };
+}
+
+/** GET /api/chat/me/status — el estado que había guardado (en esta
+ *  organización), para no perderlo al recargar ni al cambiar de equipo. */
 export async function getMyStatus(req: Request, res: Response) {
   const userId = (req as any).auth?.userId;
   if (!userId) return err(res, 'No autenticado', 401);
+  const organizacionId = (req as any).organizacionId;
   try {
-    const { rows } = await pool.query(`SELECT status FROM chat_miembros WHERE user_id = $1 LIMIT 1`, [userId]);
-    const raw = rows[0]?.status;
-    return ok(res, { status: raw && MANUAL_STATUS_OVERRIDES.has(raw) ? raw : null });
+    const { rows } = await pool.query(
+      `SELECT estado, estado_texto, estado_emoji, estado_color, estado_hasta FROM chat_presence WHERE user_id = $1 AND organizacion_id = $2`,
+      [userId, organizacionId],
+    );
+    return ok(res, estadoVigente(rows[0]));
   } catch (e: any) {
     return err(res, e.message);
   }
@@ -263,33 +320,61 @@ export async function getMyStatus(req: Request, res: Response) {
 
 // ── Presencia real (conectado / ausente / desconectado) ─────────────────────
 
-/** PUT /api/chat/me/heartbeat — "sigo aquí"; lo manda el frontend cada pocos
- *  segundos mientras la pestaña está abierta y visible. */
+// Umbrales (en segundos) para decidir si alguien "acaba de conectarse" y
+// avisar al momento; el frontend usa los mismos (PRESENCE_* en Chat.tsx).
+const PRESENCIA_ACTIVO_S = 45;
+const PRESENCIA_ABIERTA_S = 180;
+
+/** PUT /api/chat/me/heartbeat — "sigo aquí". Con la pestaña visible lo manda
+ *  cada 20 s; en segundo plano ({ oculto: true }) cada minuto, y solo dice
+ *  "tengo la app abierta" (→ ausente, no desconectado). */
 export async function updateHeartbeat(req: Request, res: Response) {
   const userId = (req as any).auth?.userId;
   if (!userId) return err(res, 'No autenticado', 401);
   const organizacionId = (req as any).organizacionId;
   if (!organizacionId) return err(res, 'Organización no resuelta', 400);
+  const oculto = (req.body as any)?.oculto === true;
   try {
     // Clave (user_id, organizacion_id) -- no solo user_id -- para que alguien
     // que pertenece a varias organizaciones tenga una fila de presencia POR
     // organización, no una sola compartida que la última organización activa
     // le "robaba" a las demás (ver migración chat_presence en migrations.ts).
-    await pool.query(`
-      INSERT INTO chat_presence (user_id, organizacion_id, last_active_at)
-      VALUES ($1, $2, NOW())
-      ON CONFLICT (user_id, organizacion_id) DO UPDATE SET last_active_at = NOW()
-    `, [userId, organizacionId]);
+    const { rows: antes } = await pool.query(
+      `SELECT EXTRACT(EPOCH FROM (NOW() - last_active_at))::int AS activo_s,
+              EXTRACT(EPOCH FROM (NOW() - GREATEST(last_active_at, COALESCE(last_seen_at, last_active_at))))::int AS visto_s
+         FROM chat_presence WHERE user_id = $1 AND organizacion_id = $2`,
+      [userId, organizacionId],
+    );
+    if (oculto) {
+      await pool.query(`
+        INSERT INTO chat_presence (user_id, organizacion_id, last_active_at, last_seen_at)
+        VALUES ($1, $2, NOW() - INTERVAL '1 hour', NOW())
+        ON CONFLICT (user_id, organizacion_id) DO UPDATE SET last_seen_at = NOW()
+      `, [userId, organizacionId]);
+    } else {
+      await pool.query(`
+        INSERT INTO chat_presence (user_id, organizacion_id, last_active_at, last_seen_at)
+        VALUES ($1, $2, NOW(), NOW())
+        ON CONFLICT (user_id, organizacion_id) DO UPDATE SET last_active_at = NOW(), last_seen_at = NOW()
+      `, [userId, organizacionId]);
+    }
+    // Si con este latido cambia lo que ven los demás (se acaba de conectar,
+    // o vuelve a la pestaña tras estar ausente), se les avisa al momento en
+    // vez de esperar a su siguiente consulta.
+    const prev = antes[0];
+    const cambia = !prev
+      || prev.visto_s > PRESENCIA_ABIERTA_S
+      || (!oculto && prev.activo_s > PRESENCIA_ACTIVO_S);
+    if (cambia) void avisarOrganizacionChat(organizacionId, 'presencia', null).catch(() => {});
     return ok(res, { ok: true });
   } catch (e: any) {
     return err(res, e.message);
   }
 }
 
-/** GET /api/chat/presence — último latido de cada persona de la organización
- *  activa; el frontend calcula con esto si está conectado, ausente o
- *  desconectado (no se guarda un "estado" fijo en el servidor: el latido
- *  simplemente va envejeciendo y el cliente decide el umbral). */
+/** GET /api/chat/presence — último latido y estado de cada persona de la
+ *  organización activa; el frontend calcula con esto si está conectado,
+ *  ausente o desconectado. */
 export async function getPresence(req: Request, res: Response) {
   const userId = (req as any).auth?.userId;
   if (!userId) return err(res, 'No autenticado', 401);
@@ -303,11 +388,20 @@ export async function getPresence(req: Request, res: Response) {
     // misma -- como ausente/desconectado aunque los datos reales fueran
     // correctos. Así el cálculo no depende de qué hora marque cada equipo.
     const { rows } = await pool.query(
-      `SELECT user_id, EXTRACT(EPOCH FROM (NOW() - last_active_at))::int AS age_seconds
+      `SELECT user_id,
+              EXTRACT(EPOCH FROM (NOW() - last_active_at))::int AS age_seconds,
+              EXTRACT(EPOCH FROM (NOW() - GREATEST(last_active_at, COALESCE(last_seen_at, last_active_at))))::int AS seen_age_seconds,
+              estado, estado_texto, estado_emoji, estado_color, estado_hasta
        FROM chat_presence WHERE organizacion_id = $1`,
       [organizacionId]
     );
-    return ok(res, rows);
+    return ok(res, rows.map((r: any) => {
+      const e = estadoVigente(r);
+      return {
+        user_id: r.user_id, age_seconds: r.age_seconds, seen_age_seconds: r.seen_age_seconds,
+        estado: e.status, estado_texto: e.texto, estado_emoji: e.emoji, estado_color: e.color,
+      };
+    }));
   } catch (e: any) {
     return err(res, e.message);
   }

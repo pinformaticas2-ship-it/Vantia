@@ -2347,6 +2347,39 @@ export async function runMigrations(): Promise<void> {
       await client.query(`ALTER TABLE chat_presence ADD PRIMARY KEY (user_id, organizacion_id);`);
     } catch (_e: any) {}
 
+    // ── Estados del chat por organización (09/10/2026) ──
+    // El aviso manual ("En juicio"...) vivía en chat_miembros.status (una fila
+    // por canal, sin organización: se perdía si no tenías canales y los demás
+    // leían una fila cualquiera) y el estado personalizado solo en el
+    // navegador de cada uno (nadie más lo veía). Ahora todo va aquí, por
+    // (usuario, organización). last_seen_at = "tiene la app abierta" aunque
+    // sea en segundo plano (last_active_at = pestaña visible).
+    try {
+      await client.query(`
+        ALTER TABLE chat_presence
+          ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ,
+          ADD COLUMN IF NOT EXISTS estado VARCHAR(30),
+          ADD COLUMN IF NOT EXISTS estado_texto VARCHAR(100),
+          ADD COLUMN IF NOT EXISTS estado_emoji VARCHAR(16),
+          ADD COLUMN IF NOT EXISTS estado_color VARCHAR(20),
+          ADD COLUMN IF NOT EXISTS estado_hasta TIMESTAMPTZ;
+      `);
+      // Los avisos que ya había puestos se pasan una vez a su organización y
+      // se vacían en chat_miembros (si no, volverían tras quitarlos).
+      await client.query(`
+        INSERT INTO chat_presence (user_id, organizacion_id, last_active_at, last_seen_at, estado)
+        SELECT DISTINCT ON (m.user_id, c.organizacion_id) m.user_id, c.organizacion_id, NOW() - INTERVAL '1 day', NOW() - INTERVAL '1 day', m.status
+          FROM chat_miembros m JOIN chat_canales c ON c.id = m.canal_id
+         WHERE m.status IN ('ocupado', 'no_molestar', 'en_juicio', 'en_reunion')
+        ON CONFLICT (user_id, organizacion_id) DO UPDATE SET estado = COALESCE(chat_presence.estado, EXCLUDED.estado);
+      `);
+      await client.query(`UPDATE chat_miembros SET status = NULL WHERE status IS NOT NULL;`);
+    } catch (_e: any) {}
+    // Foto de cada grupo/canal (subida por /api/chat/uploads/image).
+    try {
+      await client.query(`ALTER TABLE chat_canales ADD COLUMN IF NOT EXISTS foto_url TEXT;`);
+    } catch (_e: any) {}
+
     // ── Correo de bienvenida al cliente: asunto/cuerpo personalizables ──
     // Antes el texto estaba fijo en el código (sendClientWelcomeEmail). Si
     // están vacías (NULL), se usa el texto por defecto -- no hace falta que

@@ -25,6 +25,11 @@ export async function emitirChat(destinatarios: string[], kind: ChatEventKind, c
   for (const uid of new Set(destinatarios)) emitEmailEvent(uid, data);
 }
 
+/** Avisa a toda la organización (p.ej. alguien acaba de conectarse). */
+export async function avisarOrganizacionChat(organizacionId: string, kind: ChatEventKind, canalId: string | null): Promise<void> {
+  await emitirChat(await miembrosOrganizacion(organizacionId), kind, canalId);
+}
+
 /** Qué tipo de cambio es cada petición del chat (null: no avisa a nadie). */
 function clasificar(req: Request): { kind: ChatEventKind; soloYo?: boolean } | null {
   const m = req.method;

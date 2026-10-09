@@ -15,7 +15,7 @@ import {
   Video, Pencil, ChevronUp, Layers, MessagesSquare, Star, Download,
   Share2, ExternalLink, Copy, Minus, RotateCcw, Sparkles, Clock3, Eye,
   PawPrint, UtensilsCrossed, Trophy, Flag, User, FileText, Briefcase, type LucideIcon,
-  ArrowLeft,
+  ArrowLeft, Camera,
 } from "lucide-react";
 import { safeJson, resolveUploadUrl, getActiveOrganizacionId } from "../lib/api";
 import { createPortal } from "react-dom";
@@ -41,6 +41,7 @@ interface Canal {
   dm_target_user_id?: string | null;
   dm_target_user_name?: string | null;
   dm_target_avatar_url?: string | null;
+  foto_url?: string | null;
 }
 interface CanalBuscado {
   id: string; nombre: string; descripcion: string | null;
@@ -104,36 +105,115 @@ const STATUS_CFG: Record<string, { label: string; color: string }> = {
 // "Disponible"/"Ausente") el estado real que se muestra sale de si ha
 // mandado un latido hace poco, no de lo último que pulsó en el desplegable.
 const STATUS_OVERRIDE_LIST = ["ocupado", "no_molestar", "en_juicio", "en_reunion"] as const;
-const STATUS_OVERRIDES = new Set<string>(STATUS_OVERRIDE_LIST);
-const PRESENCE_ONLINE_MS = 45_000;      // late fresco -> conectado
-const PRESENCE_AWAY_MS   = 5 * 60_000;  // sin latido más de esto -> desconectado
+// "Ausente" también puede ponerse a mano (botón aparte en el selector).
+const STATUS_OVERRIDES = new Set<string>([...STATUS_OVERRIDE_LIST, "ausente"]);
+const PRESENCE_ONLINE_MS = 45_000;      // latido con la pestaña visible -> disponible
+const PRESENCE_AWAY_MS   = 3 * 60_000;  // ni la app abierta en segundo plano -> desconectado
 
-/** Estado real de una persona: combina lo que eligió a mano (si es una señal
- *  deliberada) con la presencia calculada a partir de su último latido.
- *  `presenceByUserId` guarda, para cada persona, un instante en epoch-ms ya
- *  anclado al reloj de ESTE navegador (ver fetchPresence) -- así el cálculo
- *  no depende de si el reloj del servidor o el de otro equipo están bien
- *  puestos, solo del propio, que es el mismo que usa Date.now() aquí. */
+/** Lo que se sabe de cada persona (organización activa): cuándo usó la app
+ *  con la pestaña visible, cuándo la tenía abierta aunque fuera en segundo
+ *  plano, y el estado que eligió (09/10/2026: antes el personalizado solo lo
+ *  veía uno mismo). Los instantes son epoch-ms ya anclados al reloj de ESTE
+ *  navegador (ver fetchPresence), así no depende de si el reloj del servidor
+ *  o el de otro equipo están bien puestos. */
+interface Presencia {
+  activoAt: number;
+  vistoAt: number;
+  estado: string | null;
+  texto: string | null;
+  emoji: string | null;
+  color: string | null;
+}
+type MapaPresencia = Record<string, Presencia>;
+interface EstadoPropio { status: string | null; texto: string; emoji: string; color: string }
+
+/** Estado real de una persona: lo que eligió a mano (si es un aviso
+ *  deliberado) combinado con su presencia. `manualStatus` solo se pasa para
+ *  uno mismo (lo local es más reciente); si no, se usa lo del servidor. */
 function computeEffectiveStatus(
   userId: string | null | undefined,
-  manualStatus: string | null | undefined,
-  presenceByUserId: Record<string, number>,
+  presence: MapaPresencia,
+  manualStatus?: string | null,
 ): string {
-  // "Disponible" y "Ausente" YA NO son valores manuales válidos -- si llega
-  // uno de esos dos aquí es un dato antiguo (de antes de este cambio) y se
-  // ignora a propósito, para que no se quede "pegado" para siempre aunque
-  // la persona vuelva a estar conectada. Solo los 4 avisos deliberados
-  // cuentan como override real.
-  const hasOverride = !!manualStatus && STATUS_OVERRIDES.has(manualStatus);
-  if (!userId) return hasOverride ? manualStatus! : "disponible";
-  const lastActiveAtMs = presenceByUserId[userId];
-  const ageMs = lastActiveAtMs ? Date.now() - lastActiveAtMs : Infinity;
+  const p = userId ? presence[userId] : undefined;
+  const manual = manualStatus !== undefined ? manualStatus : (p?.estado ?? null);
+  const hasOverride = !!manual && STATUS_OVERRIDES.has(manual);
+  if (!userId) return hasOverride ? manual! : "disponible";
+  if (!p || Date.now() - p.vistoAt > PRESENCE_AWAY_MS) return "desconectado";
   // Desconectado de verdad pisa cualquier aviso manual -- si alguien puso
   // "En juicio" y luego cerró el portátil y se fue a casa, mejor mostrar
   // que está desconectado que dejar "En juicio" para siempre.
-  if (ageMs > PRESENCE_AWAY_MS) return "desconectado";
-  if (hasOverride) return manualStatus!;
-  return ageMs > PRESENCE_ONLINE_MS ? "ausente" : "disponible";
+  if (hasOverride) return manual!;
+  return Date.now() - p.activoAt > PRESENCE_ONLINE_MS ? "ausente" : "disponible";
+}
+
+/** Punto de color y texto del estado de una persona, con su estado
+ *  personalizado si tiene uno ("⚖️ En sala 3"). `elegido` = lo eligió ella
+ *  (aviso manual o personalizado), no es solo su presencia. */
+function estadoVisible(
+  userId: string | null | undefined,
+  presence: MapaPresencia,
+  propio?: EstadoPropio,
+): { key: string; label: string; color: string; elegido: boolean } {
+  const p = userId ? presence[userId] : undefined;
+  const manual = propio ? propio.status : (p?.estado ?? null);
+  const key = computeEffectiveStatus(userId, presence, manual);
+  const cfg = STATUS_CFG[key] || STATUS_CFG.disponible;
+  const texto = (propio ? propio.texto : p?.texto || "").trim();
+  if (texto && key !== "desconectado") {
+    const emoji = (propio ? propio.emoji : p?.emoji) || "💬";
+    const colorKey = propio ? propio.color : p?.color;
+    const color = key === "ausente" ? cfg.color : (CUSTOM_STATUS_COLORS.find((c) => c.key === colorKey)?.className || cfg.color);
+    return { key, label: key === "ausente" ? `${emoji} ${texto} · Ausente` : `${emoji} ${texto}`, color, elegido: true };
+  }
+  return { key, label: cfg.label, color: cfg.color, elegido: key !== "desconectado" && !!manual && STATUS_OVERRIDES.has(manual) };
+}
+
+const DURACIONES_ESTADO = [
+  { k: "", label: "No quitar" },
+  { k: "30", label: "30 minutos" },
+  { k: "60", label: "1 hora" },
+  { k: "240", label: "4 horas" },
+  { k: "hoy", label: "Hoy" },
+] as const;
+function hastaDeDuracion(k: string): string | null {
+  if (!k) return null;
+  const d = new Date();
+  if (k === "hoy") d.setHours(23, 59, 0, 0);
+  else d.setMinutes(d.getMinutes() + Number(k));
+  return d.toISOString();
+}
+function horaCorta(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const hoy = new Date();
+  const hora = d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+  return d.toDateString() === hoy.toDateString() ? hora : `${d.toLocaleDateString("es-ES", { day: "numeric", month: "short" })} ${hora}`;
+}
+
+/** Foto del grupo recortada al centro en cuadrado y reducida (pesa poco y
+ *  se ve igual en todos los sitios). */
+async function recortarFotoCuadrada(file: File, lado = 256): Promise<Blob> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((ok, ko) => {
+      const i = new Image();
+      i.onload = () => ok(i);
+      i.onerror = () => ko(new Error("No se pudo leer la imagen"));
+      i.src = url;
+    });
+    const s = Math.min(img.naturalWidth, img.naturalHeight);
+    const canvas = document.createElement("canvas");
+    canvas.width = lado; canvas.height = lado;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("No se pudo procesar la imagen");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, lado, lado);
+    ctx.drawImage(img, (img.naturalWidth - s) / 2, (img.naturalHeight - s) / 2, s, s, 0, 0, lado, lado);
+    return await new Promise<Blob>((ok, ko) => canvas.toBlob((b) => (b ? ok(b) : ko(new Error("No se pudo procesar la imagen"))), "image/jpeg", 0.88));
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
 const CHAT_CANALES_CACHE_KEY = "chat-canales-cache-v1";
 const CHAT_USERS_CACHE_KEY = "chat-users-cache-v1";
@@ -1751,6 +1831,7 @@ function MentionDropdown({ miembros, query, onSelect }: { miembros: Miembro[]; q
 function StatusSelector({
   anchorRef,
   current,
+  hasta,
   currentLabel,
   currentColorClass,
   customStatusText,
@@ -1770,6 +1851,7 @@ function StatusSelector({
 }: {
   anchorRef: React.RefObject<HTMLElement | null>;
   current: string | null;
+  hasta: string | null;
   currentLabel: string;
   currentColorClass: string;
   customStatusText: string;
@@ -1778,8 +1860,8 @@ function StatusSelector({
   userName: string;
   userAvatar?: string | null;
   notificationsPaused: boolean;
-  onSelect:(s:string|null)=>void;
-  onSaveCustomStatus:(value:string, emoji:string, colorKey:string)=>void;
+  onSelect:(s:string|null, hasta?:string|null)=>void;
+  onSaveCustomStatus:(value:string, emoji:string, colorKey:string, hasta?:string|null)=>void;
   onClearCustomStatus:()=>void;
   onToggleNotifications:()=>void;
   onProfile:()=>void;
@@ -1791,6 +1873,7 @@ function StatusSelector({
   const [draftStatus, setDraftStatus] = useState(customStatusText || "");
   const [draftEmoji, setDraftEmoji] = useState(customStatusEmoji || CUSTOM_STATUS_EMOJIS[0]);
   const [draftColor, setDraftColor] = useState<(typeof CUSTOM_STATUS_COLORS)[number]["key"]>(customStatusColor || "emerald");
+  const [duracion, setDuracion] = useState<string>("");
   const [isVisible, setIsVisible] = useState(false);
   const [pickerStyle, setPickerStyle] = useState<React.CSSProperties>({
     position: "fixed",
@@ -1873,6 +1956,7 @@ function StatusSelector({
           <div className="mt-0.5 flex items-center gap-2 text-sm text-slate-500">
             <span className={`h-2.5 w-2.5 rounded-full ${currentColorClass}`}/>
             <span className="truncate">{currentLabel}</span>
+            {hasta && (current || customStatusText) && <span className="shrink-0 text-xs text-slate-400">· hasta {horaCorta(hasta)}</span>}
             {notificationsPaused ? (
               <BellOff size={13} className="shrink-0 text-slate-400" />
             ) : (
@@ -1884,7 +1968,17 @@ function StatusSelector({
 
       <div className="px-4 pb-3">
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-400">Estado</p>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-400">Estado</p>
+            <label className="flex items-center gap-1.5 text-xs text-slate-500">
+              <Clock3 size={12} className="text-slate-400"/>
+              <span className="hidden min-[360px]:inline">Quitar</span>
+              <select value={duracion} onChange={(e) => setDuracion(e.target.value)} title="Cuándo se quita solo el estado que elijas"
+                className="rounded-lg border border-slate-200 bg-white px-1.5 py-1 text-xs text-slate-700 outline-none focus:border-[#ab0433]/35">
+                {DURACIONES_ESTADO.map((d) => <option key={d.k} value={d.k}>{d.k ? `en ${d.label.toLowerCase()}` : d.label}</option>)}
+              </select>
+            </label>
+          </div>
           <div className="grid grid-cols-2 gap-2">
             <button type="button" onClick={()=>onSelect(null)}
               className={`col-span-2 flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm transition-all duration-150 active:scale-[0.985] ${
@@ -1899,7 +1993,7 @@ function StatusSelector({
             {STATUS_OVERRIDE_LIST.map(k=>{
               const v = STATUS_CFG[k];
               return (
-                <button type="button" key={k} onClick={()=>onSelect(k)}
+                <button type="button" key={k} onClick={()=>onSelect(k, hastaDeDuracion(duracion))}
                   className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm transition-all duration-150 active:scale-[0.985] ${
                     current===k
                       ? "border-emerald-200 bg-emerald-50 text-emerald-700"
@@ -1948,6 +2042,8 @@ function StatusSelector({
               <input
                 value={draftStatus}
                 onChange={(e)=>setDraftStatus(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && draftStatus.trim()) { onSaveCustomStatus(draftStatus.trim(), draftEmoji, draftColor, hastaDeDuracion(duracion)); setDraftStatus(""); } }}
+                maxLength={100}
                 placeholder="Ej. En audiencia, revisando demanda..."
                 className="h-10 flex-1 rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-[#ab0433]/35 focus:ring-2 focus:ring-[#ab0433]/10"
               />
@@ -1956,7 +2052,7 @@ function StatusSelector({
               type="button"
               onClick={() => {
                 if (!draftStatus.trim()) return;
-                onSaveCustomStatus(draftStatus.trim(), draftEmoji, draftColor);
+                onSaveCustomStatus(draftStatus.trim(), draftEmoji, draftColor, hastaDeDuracion(duracion));
                 setDraftStatus("");
               }}
               className="mt-3 w-full rounded-xl bg-[#ab0433] px-3 py-2.5 text-sm font-semibold text-white transition-all duration-150 hover:bg-[#92042c] active:scale-[0.985]"
@@ -1973,10 +2069,12 @@ function StatusSelector({
           </div>
           <button
             type="button"
-            onClick={() => onSelect("ausente")}
+            onClick={() => (current === "ausente" ? onSelect(null) : onSelect("ausente", hastaDeDuracion(duracion)))}
             className="mt-3 flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-left text-sm text-slate-700 transition-all duration-150 hover:bg-slate-100 active:scale-[0.985]"
           >
-            <span>Cambiar tu estado a <span className="font-semibold">ausente</span></span>
+            {current === "ausente"
+              ? <span>Volver a estar <span className="font-semibold">disponible</span></span>
+              : <span>Cambiar tu estado a <span className="font-semibold">ausente</span></span>}
             <ChevronRight size={14} className="text-slate-400"/>
           </button>
           <button
@@ -2300,7 +2398,7 @@ function ModalCrearCanal({ sysUsers, getToken, onClose, onCreate }: {
 function PanelMiembros({ canal, sysUsers, getToken, currentUserId, onClose, onDM, onRefresh, presenceByUserId }: {
   canal: Canal; sysUsers: SysUser[]; getToken: ()=>Promise<string|null>;
   currentUserId: string; onClose:()=>void; onDM:(m:Miembro)=>void; onRefresh:()=>void;
-  presenceByUserId: Record<string, number>;
+  presenceByUserId: MapaPresencia;
 }) {
   const [miembros, setMiembros] = useState<Miembro[]>([]);
   const [tab, setTab] = useState<"ver"|"añadir">("ver");
@@ -2433,10 +2531,9 @@ function PanelMiembros({ canal, sysUsers, getToken, currentUserId, onClose, onDM
 
 function MiembroRow({ m, isMe, canAdmin, acting, onDM, onRemove, presenceByUserId }: {
   m: Miembro; isMe: boolean; canAdmin: boolean; acting: string|null;
-  onDM:()=>void; onRemove:()=>void; presenceByUserId: Record<string, number>;
+  onDM:()=>void; onRemove:()=>void; presenceByUserId: MapaPresencia;
 }) {
-  const effectiveStatus = computeEffectiveStatus(m.user_id, m.status, presenceByUserId);
-  const st = STATUS_CFG[effectiveStatus]||STATUS_CFG.disponible;
+  const st = estadoVisible(m.user_id, presenceByUserId);
   return (
     <div className="flex items-center gap-2.5 px-3 py-2.5 hover:bg-slate-50 group transition-colors border-b border-slate-50 last:border-0">
       <div className="relative shrink-0">
@@ -3479,6 +3576,17 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
 // ══════════════════════════════════════════════════════════════════════════════
 // SIDEBAR ITEMS
 // ══════════════════════════════════════════════════════════════════════════════
+/** Foto del grupo, o su icono (# / candado) si no tiene o no carga. */
+function IconoCanal({ canal, size, className = "" }: { canal: Canal; size: number; className?: string }) {
+  const url = mediaUrl(canal.foto_url);
+  const [fallo, setFallo] = useState(false);
+  useEffect(() => { setFallo(false); }, [url]);
+  if (url && !fallo) return <img src={url} alt="" className="h-full w-full object-cover" onError={() => setFallo(true)}/>;
+  return canal.tipo === "privado"
+    ? <Lock size={size} className={`shrink-0 ${className}`}/>
+    : <Hash size={size} className={`shrink-0 ${className}`}/>;
+}
+
 function CanalItem({ canal, activo, onClick, unreadCount = 0 }: { canal: Canal; activo: boolean; onClick:()=>void; unreadCount?: number }) {
   const hasUnread = unreadCount > 0 && !activo;
   return (
@@ -3488,7 +3596,9 @@ function CanalItem({ canal, activo, onClick, unreadCount = 0 }: { canal: Canal; 
         hasUnread ? "border border-slate-200 bg-white text-slate-800 shadow-sm" :
         "border border-transparent text-slate-500 hover:bg-white hover:text-slate-800 hover:border-slate-200"
       }`}>
-      {canal.tipo==="privado"
+      {canal.foto_url
+        ? <span className="flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-md bg-slate-100"><IconoCanal canal={canal} size={11} className="text-slate-400"/></span>
+        : canal.tipo==="privado"
         ? <Lock size={13} className={`shrink-0 ${activo || hasUnread ? "text-red-500" : "text-slate-400"}`}/>
         : <Hash size={13} className={`shrink-0 ${activo || hasUnread ? "text-red-500" : "text-slate-400"}`}/>
       }
@@ -3505,14 +3615,14 @@ function CanalItem({ canal, activo, onClick, unreadCount = 0 }: { canal: Canal; 
 // UserDMItem — muestra un usuario del sistema en la sección DMs
 function UserDMItem({ user: u, dmCanal, activo, loading, onClick, unreadCount = 0, presenceByUserId }: {
   user: SysUser; dmCanal?: Canal; activo: boolean; loading: boolean; onClick:()=>void; unreadCount?: number;
-  presenceByUserId: Record<string, number>;
+  presenceByUserId: MapaPresencia;
 }) {
-  const effectiveStatus = computeEffectiveStatus(u.user_id, u.status, presenceByUserId);
-  const st = STATUS_CFG[effectiveStatus] || STATUS_CFG.disponible;
+  const st = estadoVisible(u.user_id, presenceByUserId);
   const safeUnreadCount = loading ? 0 : unreadCount;
   const hasUnread = safeUnreadCount > 0 && !activo;
   const displayName = u.user_name?.trim() || dmCanal?.dm_target_user_name?.trim() || "Usuario";
-  const displayRole = u.role_label?.trim() || "Colaborador";
+  // Si eligió un estado ("En juicio", "⚖️ En sala 3"...), se ve en la lista.
+  const displayRole = st.elegido ? st.label : (u.role_label?.trim() || "Colaborador");
   return (
     <button onClick={onClick} disabled={loading}
       className={`relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all duration-200 text-xs group ${
@@ -3608,24 +3718,18 @@ export default function Chat() {
   // presencia real). Solo tiene un valor no-null si elegiste a propósito
   // Ocupado/No molestar/En juicio/En reunión.
   const [myStatus, setMyStatus]           = useState<string | null>(null);
+  // Cuándo se quita solo el estado elegido (null = no caduca).
+  const [myStatusHasta, setMyStatusHasta] = useState<string | null>(null);
   // user_id → ISO timestamp del último latido de esa persona (organización
   // activa). Se usa junto con el status manual para calcular quién está
   // realmente conectado/ausente/desconectado -- ver computeEffectiveStatus.
-  const [presenceByUserId, setPresenceByUserId] = useState<Record<string, number>>({});
+  const [presenceByUserId, setPresenceByUserId] = useState<MapaPresencia>({});
   const [showStatus, setShowStatus]       = useState(false);
-  const [customStatusLabel, setCustomStatusLabel] = useState(
-    () => (typeof window !== "undefined" ? localStorage.getItem(CHAT_CUSTOM_STATUS_KEY) || "" : "")
-  );
-  const [customStatusEmoji, setCustomStatusEmoji] = useState(
-    () => (typeof window !== "undefined" ? localStorage.getItem(CHAT_CUSTOM_STATUS_EMOJI_KEY) || "" : "")
-  );
-  const [customStatusColor, setCustomStatusColor] = useState<(typeof CUSTOM_STATUS_COLORS)[number]["key"]>(
-    () => {
-      if (typeof window === "undefined") return "emerald";
-      const saved = localStorage.getItem(CHAT_CUSTOM_STATUS_COLOR_KEY);
-      return (CUSTOM_STATUS_COLORS.some((color) => color.key === saved) ? saved : "emerald") as (typeof CUSTOM_STATUS_COLORS)[number]["key"];
-    }
-  );
+  // El estado personalizado se guarda en el servidor (lo ven todos); se
+  // carga en fetchMyStatus.
+  const [customStatusLabel, setCustomStatusLabel] = useState("");
+  const [customStatusEmoji, setCustomStatusEmoji] = useState("");
+  const [customStatusColor, setCustomStatusColor] = useState<(typeof CUSTOM_STATUS_COLORS)[number]["key"]>("emerald");
   const [notificationsPaused, setNotificationsPaused] = useState(
     () => (typeof window !== "undefined" ? localStorage.getItem(CHAT_NOTIFICATIONS_PAUSED_KEY) === "1" : false)
   );
@@ -3861,10 +3965,18 @@ export default function Chat() {
     const d = await safeJson(res);
     if (!res.ok) return;
     const fetchedAtMs = Date.now();
-    const map: Record<string, number> = {};
+    const map: MapaPresencia = {};
     for (const row of (d.data || [])) {
       if (row?.user_id && typeof row?.age_seconds === "number") {
-        map[row.user_id] = fetchedAtMs - row.age_seconds * 1000;
+        const visto = typeof row.seen_age_seconds === "number" ? row.seen_age_seconds : row.age_seconds;
+        map[row.user_id] = {
+          activoAt: fetchedAtMs - row.age_seconds * 1000,
+          vistoAt: fetchedAtMs - visto * 1000,
+          estado: row.estado ?? null,
+          texto: row.estado_texto ?? null,
+          emoji: row.estado_emoji ?? null,
+          color: row.estado_color ?? null,
+        };
       }
     }
     setPresenceByUserId(map);
@@ -3873,13 +3985,47 @@ export default function Chat() {
   // El aviso manual (ocupado, en juicio...) se guarda en el servidor -- se
   // lee aquí al entrar para no perderlo en cada recarga. null = ninguno
   // puesto (estado automático).
+  const aplicarMiEstado = useCallback((e: any) => {
+    setMyStatus(e?.status ?? null);
+    setCustomStatusLabel(e?.texto || "");
+    setCustomStatusEmoji(e?.emoji || "");
+    setCustomStatusColor((CUSTOM_STATUS_COLORS.some((c) => c.key === e?.color) ? e.color : "emerald") as (typeof CUSTOM_STATUS_COLORS)[number]["key"]);
+    setMyStatusHasta(e?.hasta ?? null);
+  }, []);
   const fetchMyStatus = useCallback(async () => {
     const h = await hdr();
     const res = await fetch(`/api/chat/me/status`, { headers: h });
     const d = await safeJson(res);
     if (!res.ok) return;
-    setMyStatus(d.data?.status ?? null);
-  }, [hdr]);
+    let e = d.data || {};
+    // Antes el estado personalizado vivía solo en este navegador: si había uno
+    // guardado aquí y en el servidor no, se sube una vez para que lo vean todos.
+    try {
+      const local = (localStorage.getItem(CHAT_CUSTOM_STATUS_KEY) || "").trim();
+      if (local && !e.texto) {
+        const r2 = await fetch("/api/chat/me/status", { method: "PUT", headers: h, body: JSON.stringify({
+          status: e.status ?? null, texto: local,
+          emoji: localStorage.getItem(CHAT_CUSTOM_STATUS_EMOJI_KEY) || null,
+          color: localStorage.getItem(CHAT_CUSTOM_STATUS_COLOR_KEY) || null,
+          hasta: e.hasta ?? null,
+        }) });
+        const d2 = await safeJson(r2);
+        if (r2.ok && d2?.data) e = d2.data;
+      }
+      [CHAT_CUSTOM_STATUS_KEY, CHAT_CUSTOM_STATUS_EMOJI_KEY, CHAT_CUSTOM_STATUS_COLOR_KEY].forEach((k) => localStorage.removeItem(k));
+    } catch { /* sin almacenamiento local: nada que migrar */ }
+    aplicarMiEstado(e);
+  }, [hdr, aplicarMiEstado]);
+  const fetchMyStatusRef = useRef(fetchMyStatus);
+  useEffect(() => { fetchMyStatusRef.current = fetchMyStatus; }, [fetchMyStatus]);
+  // Al llegar la hora elegida, el estado se quita solo.
+  useEffect(() => {
+    if (!myStatusHasta) return;
+    const ms = new Date(myStatusHasta).getTime() - Date.now() + 1000;
+    if (!(ms > 0) || ms > 2 ** 31 - 1) return;
+    const t = window.setTimeout(() => { void fetchMyStatusRef.current(); void fetchPresenceRef.current(); }, ms);
+    return () => clearTimeout(t);
+  }, [myStatusHasta]);
 
   const updateTypingStatus = useCallback(async (canalId: string, typing: boolean) => {
     const h = await hdr();
@@ -4193,6 +4339,7 @@ export default function Chat() {
           break;
         case "presencia":
           void fetchPresenceRef.current();
+          void fetchMyStatusRef.current();
           break;
         default:
           refrescarSidebar();
@@ -4641,49 +4788,72 @@ export default function Chat() {
     setDmLoadingId(null);
   };
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (customStatusLabel.trim()) localStorage.setItem(CHAT_CUSTOM_STATUS_KEY, customStatusLabel.trim());
-    else localStorage.removeItem(CHAT_CUSTOM_STATUS_KEY);
-  }, [customStatusLabel]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (customStatusEmoji.trim()) localStorage.setItem(CHAT_CUSTOM_STATUS_EMOJI_KEY, customStatusEmoji.trim());
-    else localStorage.removeItem(CHAT_CUSTOM_STATUS_EMOJI_KEY);
-  }, [customStatusEmoji]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    localStorage.setItem(CHAT_CUSTOM_STATUS_COLOR_KEY, customStatusColor);
-  }, [customStatusColor]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     localStorage.setItem(CHAT_NOTIFICATIONS_PAUSED_KEY, notificationsPaused ? "1" : "0");
   }, [notificationsPaused]);
 
-  const handleStatusChange = async (s: string | null) => {
-    setMyStatus(s);
-    setCustomStatusLabel("");
-    setCustomStatusEmoji("");
-    setCustomStatusColor("emerald");
-    setShowStatus(false);
+  // Guarda el estado completo (aviso + personalizado + caducidad). Se ve al
+  // momento aquí y a los demás les llega por el tiempo real.
+  const guardarEstado = useCallback(async (e: EstadoPropio & { hasta: string | null }) => {
+    aplicarMiEstado(e);
     const h = await hdr();
-    await fetch("/api/chat/me/status", { method:"PUT", headers: h, body: JSON.stringify({ status:s }) });
+    try {
+      const res = await fetch("/api/chat/me/status", { method:"PUT", headers: h, body: JSON.stringify({
+        status: e.status, texto: e.texto || null, emoji: e.emoji || null, color: e.color || null, hasta: e.hasta,
+      }) });
+      if (!res.ok) throw new Error();
+      void fetchPresenceRef.current();
+    } catch {
+      void fetchMyStatusRef.current(); // vuelve a lo que de verdad quedó guardado
+    }
+  }, [aplicarMiEstado, hdr]);
+
+  // ── Foto del grupo
+  const fotoGrupoInputRef = useRef<HTMLInputElement>(null);
+  const [subiendoFotoGrupo, setSubiendoFotoGrupo] = useState(false);
+  const [menuFotoGrupo, setMenuFotoGrupo] = useState(false);
+  const guardarFotoGrupo = useCallback(async (canalId: string, fotoUrl: string | null) => {
+    const h = await hdr();
+    const res = await fetch(`/api/chat/canales/${canalId}`, { method:"PUT", headers: h, body: JSON.stringify({ foto_url: fotoUrl }) });
+    const d = await safeJson(res);
+    if (!res.ok) { window.alert(d?.error || "No se pudo guardar la foto del grupo"); return; }
+    setCanales((prev) => prev.map((c) => (c.id === canalId ? { ...c, foto_url: fotoUrl } : c)));
+    setCanalActivo((prev) => (prev && prev.id === canalId ? { ...prev, foto_url: fotoUrl } : prev));
+  }, [hdr]);
+  const subirFotoGrupo = async (canalId: string, file: File) => {
+    if (!file.type.startsWith("image/") || file.type === "image/svg+xml") { window.alert("Elige una imagen (JPG, PNG, GIF o WebP)."); return; }
+    setSubiendoFotoGrupo(true);
+    try {
+      const recortada = await recortarFotoCuadrada(file);
+      const form = new FormData();
+      form.append("image", recortada, "grupo.jpg");
+      const token = await getAuthToken();
+      const res = await fetch("/api/chat/uploads/image", { method: "POST", headers: token ? { Authorization: `Bearer ${token}` } : undefined, body: form });
+      const d = await safeJson(res);
+      if (!res.ok || !d?.data?.image_url) throw new Error(d?.error || "No se pudo subir la foto");
+      await guardarFotoGrupo(canalId, d.data.image_url);
+    } catch (e: any) {
+      window.alert(e?.message || "No se pudo subir la foto");
+    } finally {
+      setSubiendoFotoGrupo(false);
+    }
+  };
+  useEffect(() => { setMenuFotoGrupo(false); }, [canalActivoId]);
+
+  const handleStatusChange = (s: string | null, hasta: string | null = null) => {
+    setShowStatus(false);
+    void guardarEstado({ status: s, texto: "", emoji: "", color: "emerald", hasta: s ? hasta : null });
   };
 
-  const handleSaveCustomStatus = useCallback((value: string, emoji: string, colorKey: string) => {
-    setCustomStatusLabel(value);
-    setCustomStatusEmoji(emoji);
-    setCustomStatusColor(colorKey as (typeof CUSTOM_STATUS_COLORS)[number]["key"]);
-  }, []);
+  const handleSaveCustomStatus = useCallback((value: string, emoji: string, colorKey: string, hasta: string | null = null) => {
+    void guardarEstado({ status: myStatus, texto: value, emoji, color: colorKey, hasta });
+  }, [guardarEstado, myStatus]);
 
   const handleClearCustomStatus = useCallback(() => {
-    setCustomStatusLabel("");
-    setCustomStatusEmoji("");
-    setCustomStatusColor("emerald");
-  }, []);
+    void guardarEstado({ status: myStatus, texto: "", emoji: "", color: "emerald", hasta: myStatus ? myStatusHasta : null });
+  }, [guardarEstado, myStatus, myStatusHasta]);
 
   const joinFromSearch = async (c: CanalBuscado) => {
     setJoiningId(c.id);
@@ -4719,13 +4889,14 @@ export default function Chat() {
   const canalesPublicos   = canales.filter(c=>c.tipo==="publico");
   const canalesPrivados   = canales.filter(c=>c.tipo==="privado");
   const canalDMs          = canales.filter(c=>c.tipo==="directo");
-  const myEffectiveStatus = computeEffectiveStatus(currentUserId, myStatus, presenceByUserId);
-  const statusCfg         = STATUS_CFG[myEffectiveStatus]||STATUS_CFG.disponible;
-  const customStatusColorClass = CUSTOM_STATUS_COLORS.find((color) => color.key === customStatusColor)?.className || "bg-emerald-500";
-  const displayedStatusLabel = customStatusLabel.trim()
-    ? `${customStatusEmoji || "💼"} ${customStatusLabel.trim()}`
-    : statusCfg.label;
-  const displayedStatusColorClass = customStatusLabel.trim() ? customStatusColorClass : statusCfg.color;
+  // Yo estoy mirando la pantalla: para mí mismo, siempre "conectado ahora".
+  const miEstado = estadoVisible(
+    currentUserId,
+    currentUserId ? { ...presenceByUserId, [currentUserId]: { activoAt: Date.now(), vistoAt: Date.now(), estado: myStatus, texto: null, emoji: null, color: null } } : presenceByUserId,
+    { status: myStatus, texto: customStatusLabel, emoji: customStatusEmoji, color: customStatusColor },
+  );
+  const displayedStatusLabel = miEstado.label;
+  const displayedStatusColorClass = miEstado.color;
   const getUnreadCountForCanal = useCallback((canal?: Canal) => {
     if (!canal) return 0;
     if (!unreadLoaded) return canal.no_leidos ?? 0;
@@ -4832,7 +5003,7 @@ export default function Chat() {
     ? (canalActivo?.dm_target_user_id || activeDirectUser?.user_id || null)
     : null;
   const activeChatStatusCfg = canalActivo?.tipo === "directo"
-    ? STATUS_CFG[computeEffectiveStatus(activeChatUserId, activeDirectUser?.status, presenceByUserId)] || STATUS_CFG.disponible
+    ? estadoVisible(activeChatUserId, presenceByUserId)
     : null;
   const activeChatStatusLabel = canalActivo?.tipo === "directo"
     ? activeChatStatusCfg!.label
@@ -5089,6 +5260,7 @@ export default function Chat() {
             <StatusSelector
               anchorRef={statusButtonRef}
               current={myStatus}
+              hasta={myStatusHasta}
               currentLabel={displayedStatusLabel}
               currentColorClass={displayedStatusColorClass}
               customStatusText={customStatusLabel}
@@ -5152,10 +5324,33 @@ export default function Chat() {
                     <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white ${activeChatStatusCfg?.color || "bg-emerald-500"}`} />
                   </div>
                 ) : (
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-500 shrink-0">
-                    {canalActivo.tipo==="privado"
-                      ? <Lock size={16} className="text-slate-400 shrink-0"/>
-                      : <Hash size={16} className="text-slate-400 shrink-0"/>}
+                  <div className="relative shrink-0">
+                    <button type="button" disabled={subiendoFotoGrupo}
+                      onClick={() => (canalActivo.foto_url ? setMenuFotoGrupo((v) => !v) : fotoGrupoInputRef.current?.click())}
+                      title={canalActivo.foto_url ? "Foto del grupo" : "Poner foto al grupo"}
+                      className="group/foto relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-slate-100 text-slate-500">
+                      <IconoCanal canal={canalActivo} size={16} className="text-slate-400"/>
+                      <span className={`absolute inset-0 flex items-center justify-center bg-black/45 text-white transition-opacity ${subiendoFotoGrupo ? "opacity-100" : "opacity-0 group-hover/foto:opacity-100"}`}>
+                        {subiendoFotoGrupo ? <Loader2 size={14} className="animate-spin"/> : <Camera size={14}/>}
+                      </span>
+                    </button>
+                    {menuFotoGrupo && canalActivo.foto_url && (
+                      <>
+                        <button type="button" aria-label="Cerrar" className="fixed inset-0 z-30 cursor-default" onClick={() => setMenuFotoGrupo(false)}/>
+                        <div className="absolute left-0 top-11 z-40 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
+                          <button type="button" onClick={() => { setMenuFotoGrupo(false); fotoGrupoInputRef.current?.click(); }}
+                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50">
+                            <Camera size={14} className="text-slate-400"/> Cambiar foto
+                          </button>
+                          <button type="button" onClick={() => { setMenuFotoGrupo(false); void guardarFotoGrupo(canalActivo.id, null); }}
+                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50">
+                            <Trash2 size={14}/> Quitar foto
+                          </button>
+                        </div>
+                      </>
+                    )}
+                    <input ref={fotoGrupoInputRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" className="hidden"
+                      onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ""; if (file) void subirFotoGrupo(canalActivo.id, file); }}/>
                   </div>
                 )}
                 <div className="min-w-0">
