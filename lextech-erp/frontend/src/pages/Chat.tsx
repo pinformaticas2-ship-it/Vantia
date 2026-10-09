@@ -56,6 +56,29 @@ interface Mensaje {
   reply_to: Mensaje | null;
   reacciones: { emoji: string; user_id: string; user_name: string }[] | null;
   editado: boolean; deleted_at: string | null; created_at: string;
+  /** Solo en mensajes propios que aún no ha confirmado el servidor. */
+  _envio?: "enviando" | "error";
+}
+/** Un mensaje que se acaba de escribir (sale en pantalla al instante). */
+interface EnvioNuevo {
+  texto: string;
+  gifUrl?: string;
+  replyId?: string;
+  imagen?: { file: File; previewUrl: string };
+  archivo?: File;
+}
+/** Quita los mensajes provisionales que ya han llegado de verdad (mismo
+ *  autor y mismo texto) -- por si el aviso en tiempo real o el sondeo traen
+ *  el mensaje antes que la respuesta del envío. */
+function quitarProvisionalesConfirmados(lista: Mensaje[], reales: Mensaje[], currentUserId: string): Mensaje[] {
+  const mios = reales.filter((r) => r.user_id === currentUserId);
+  if (!mios.length || !lista.some((m) => m._envio === "enviando")) return lista;
+  const quitar = new Set<string>();
+  for (const r of mios) {
+    const t = lista.find((m) => m._envio === "enviando" && !quitar.has(m.id) && m.contenido === r.contenido && !!m.gif_url === !!r.gif_url);
+    if (t) quitar.add(t.id);
+  }
+  return quitar.size ? lista.filter((m) => !quitar.has(m.id)) : lista;
 }
 interface SesionExpediente {
   id: string; canal_id: string; expediente_id: string;
@@ -2692,9 +2715,10 @@ function PanelFavoritos({ canalId, getToken, onClose, onGoTo, onToggleFavorite, 
 // elementos y el componente padre repinta con cada poll (cada ~700ms
 // mientras la pestaña está visible) -- sin memo, cada mensaje se volvía a
 // renderizar entero en cada ciclo aunque su contenido no hubiera cambiado.
-const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserId, isHighlighted, isFreshIncoming = false, showReadReceipt = false, isReadByRecipient = false, onReply, onReact, onEdit, onDelete, onPin, onFavorite, isFavorite, isPinned, resolveDisplayName, resolveAvatarUrl, getToken }: {
+const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserId, isHighlighted, isFreshIncoming = false, showReadReceipt = false, isReadByRecipient = false, onReintentar, onDescartar, onReply, onReact, onEdit, onDelete, onPin, onFavorite, isFavorite, isPinned, resolveDisplayName, resolveAvatarUrl, getToken }: {
   msg: Mensaje; prevMsg: Mensaje|null; currentUserId: string; isHighlighted: boolean; isFreshIncoming?: boolean;
   showReadReceipt?: boolean; isReadByRecipient?: boolean;
+  onReintentar?:(id:string)=>void; onDescartar?:(id:string)=>void;
   onReply:(m:Mensaje)=>void; onReact:(id:string,e:string)=>void;
   onEdit:(m:Mensaje)=>void; onDelete:(id:string)=>void; onPin:(id:string)=>void; onFavorite:(id:string)=>void;
   isFavorite?: boolean; isPinned?: boolean;
@@ -2727,6 +2751,14 @@ const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserI
   }, [msg.reacciones, currentUserId]);
   const imageSrc = msg.tipo !== 'archivo' ? mediaUrl(msg.image_url) : null;
   const fileSrc  = msg.tipo === 'archivo' ? mediaUrl(msg.file_url ?? msg.image_url) : null;
+  // Enviando: no se muestra nada (el mensaje ya está en pantalla); solo si
+  // tarda de verdad (>1,5 s, p.ej. una imagen grande) aparece un relojito.
+  const [envioLento, setEnvioLento] = useState(false);
+  useEffect(() => {
+    if (msg._envio !== "enviando") { setEnvioLento(false); return; }
+    const t = window.setTimeout(() => setEnvioLento(true), 1500);
+    return () => clearTimeout(t);
+  }, [msg._envio]);
   const previewUrl = !msg.gif_url && !fileSrc && msg.contenido !== IMAGE_PLACEHOLDER_TEXT
     ? firstUrlIn(msg.contenido || '')
     : null;
@@ -2981,8 +3013,18 @@ const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserI
                 <p className="whitespace-pre-wrap text-slate-700 text-[15px] leading-relaxed break-words">{renderText(msg.contenido)}</p>
               )
             }
-            {previewUrl && <LinkPreviewCard url={previewUrl} getToken={getToken} />}
+            {previewUrl && !msg._envio && <LinkPreviewCard url={previewUrl} getToken={getToken} />}
           </div>
+          {msg._envio === "enviando" && envioLento && (
+            <p className="mt-0.5 flex items-center gap-1 text-[11px] text-slate-400"><Clock3 size={11}/> Enviando…</p>
+          )}
+          {msg._envio === "error" && (
+            <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-red-600">
+              <span>No se ha podido enviar.</span>
+              <button type="button" onClick={() => onReintentar?.(msg.id)} className="font-semibold underline-offset-2 hover:underline">Reintentar</button>
+              <button type="button" onClick={() => onDescartar?.(msg.id)} className="text-slate-500 underline-offset-2 hover:underline">Descartar</button>
+            </p>
+          )}
 
           {/* Reacciones */}
           {reactions.length > 0 && (
@@ -3000,7 +3042,7 @@ const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserI
       </div>
 
       {/* Hover toolbar */}
-      {(hover || showEmoji) && (
+      {(hover || showEmoji) && !msg._envio && (
         <div className="absolute right-4 -top-4 flex items-center gap-0.5 bg-white border border-slate-200 rounded-lg shadow-md px-1 py-0.5 z-20">
           <div className="relative">
             <button ref={emojiButtonRef} onClick={()=>setShowEmoji(v=>!v)} title="Reaccionar"
@@ -3043,15 +3085,18 @@ function DateSep({ date }: { date: string }) {
 // ══════════════════════════════════════════════════════════════════════════════
 // MESSAGE INPUT
 // ══════════════════════════════════════════════════════════════════════════════
-function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, miembros, currentUserId, resolveDisplayName, onTypingChange, onSend, onCancelReply, onCancelEdit }: {
+function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, miembros, currentUserId, resolveDisplayName, onTypingChange, onSend, onSendOptimista, onCancelReply, onCancelEdit }: {
   canalId: string; canalNombre: string; isDirect?: boolean; replyTo: Mensaje|null; editingMsg: Mensaje|null; miembros: Miembro[]; currentUserId: string;
   resolveDisplayName:(userId?: string | null, name?: string | null, isSelf?: boolean)=>string;
   onTypingChange:(canalId: string, typing: boolean)=>void;
   onSend:(text:string,gifUrl?:string,replyId?:string,editId?:string,imageUrl?:string,fileUrl?:string,fileName?:string,fileMime?:string)=>Promise<void>;
+  onSendOptimista:(items: EnvioNuevo[])=>void;
   onCancelReply:()=>void; onCancelEdit:()=>void;
 }) {
   const [text, setText] = useState("");
-  const [sending, setSending] = useState(false);
+  // El envío ya no bloquea el cuadro (09/10/2026): el mensaje sale en pantalla
+  // al momento y el servidor lo confirma por detrás (ver enviarOptimista).
+  const sending = false;
   const [showMediaPicker, setShowMediaPicker] = useState(false);
   const [mentionQ, setMentionQ] = useState<string|null>(null);
   // Arrays (antes admitían solo uno) -- cada imagen / archivo se manda como
@@ -3145,80 +3190,34 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
   };
 
   const doSend = async () => {
-    if (sendLockRef.current) return;
     const trimmed = text.trim();
     if (!trimmed && !editingMsg && selectedImages.length === 0 && selectedFiles.length === 0) return;
-    sendLockRef.current = true;
     stopTypingSignal();
-    setSending(true);
-    try {
-      if (editingMsg && selectedImages.length === 0 && selectedFiles.length === 0) {
-        await onSend(trimmed||editingMsg.contenido, undefined, undefined, editingMsg.id);
-        setText("");
-        return;
-      }
-      // Cada imagen y cada archivo van en su propio mensaje (el modelo de
-      // datos es un adjunto por mensaje). El texto escrito y la respuesta,
-      // si los hay, se mandan con el PRIMER mensaje para que no queden
-      // sueltos.
-      let firstDone = false;
-      const sendOne = async (a: { imageUrl?: string; fileUrl?: string; fileName?: string; fileMime?: string }) => {
-        await onSend(
-          firstDone ? "" : (trimmed || ""),
-          undefined,
-          firstDone ? undefined : replyTo?.id,
-          undefined,
-          a.imageUrl,
-          a.fileUrl,
-          a.fileName,
-          a.fileMime,
-        );
-        firstDone = true;
-      };
-
-      for (const img of selectedImages) {
-        const form = new FormData();
-        form.append("image", img.file);
-        const token = await getToken();
-        const res = await fetch("/api/chat/uploads/image", {
-          method: "POST",
-          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-          body: form,
-        });
-        const data = await safeJson(res);
-        if (!res.ok) continue;
-        await sendOne({ imageUrl: data.data?.image_url });
-      }
-
-      for (const sf of selectedFiles) {
-        const form = new FormData();
-        form.append("file", sf.file);
-        const token = await getToken();
-        const res = await fetch("/api/chat/uploads/file", {
-          method: "POST",
-          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-          body: form,
-        });
-        const data = await safeJson(res);
-        if (!res.ok) continue;
-        await sendOne({ fileUrl: data.data?.file_url, fileName: data.data?.file_name, fileMime: data.data?.file_mime });
-      }
-
-      if (!firstDone) {
-        await onSend(trimmed || "", undefined, replyTo?.id, undefined, undefined, undefined, undefined, undefined);
-      }
-
+    if (editingMsg && selectedImages.length === 0 && selectedFiles.length === 0) {
+      // La edición también se ve al instante (handleSend la aplica antes de esperar).
+      void onSend(trimmed||editingMsg.contenido, undefined, undefined, editingMsg.id).catch(() => {});
       setText("");
-      for (const img of selectedImages) URL.revokeObjectURL(img.previewUrl);
-      setSelectedImages([]);
-      setSelectedFiles([]);
-      if (fileRef.current) fileRef.current.value = "";
-      if (attachFileRef.current) attachFileRef.current.value = "";
       taRef.current && (taRef.current.style.height="auto");
-    } finally {
-      setSending(false);
-      sendLockRef.current = false;
+      return;
     }
+    // Cada imagen y cada archivo van en su propio mensaje (el modelo de
+    // datos es un adjunto por mensaje). El texto escrito y la respuesta,
+    // si los hay, van con el PRIMER mensaje para que no queden sueltos.
+    const items: EnvioNuevo[] = [];
+    const primero = () => (items.length === 0 ? { texto: trimmed, replyId: replyTo?.id } : { texto: "" });
+    for (const img of selectedImages) items.push({ ...primero(), imagen: { file: img.file, previewUrl: img.previewUrl } });
+    for (const sf of selectedFiles) items.push({ ...primero(), archivo: sf.file });
+    if (!items.length) items.push({ texto: trimmed, replyId: replyTo?.id });
+    onSendOptimista(items);
+    // Las vistas previas de las imágenes las sigue usando el mensaje
+    // provisional; se liberan cuando llega la imagen de verdad.
+    setText("");
+    setSelectedImages([]);
+    setSelectedFiles([]);
+    if (fileRef.current) fileRef.current.value = "";
+    if (attachFileRef.current) attachFileRef.current.value = "";
+    taRef.current && (taRef.current.style.height="auto");
+    taRef.current?.focus();
   };
 
   const insertFmt = (wrap: string) => {
@@ -3309,18 +3308,10 @@ function MessageInput({ canalId, canalNombre, isDirect, replyTo, editingMsg, mie
     setTimeout(()=>{ ta.focus(); ta.setSelectionRange(before.length, before.length); },0);
   };
 
-  const sendGif = async (url: string) => {
-    if (sendLockRef.current) return;
-    sendLockRef.current = true;
+  const sendGif = (url: string) => {
     setShowMediaPicker(false);
     stopTypingSignal();
-    setSending(true);
-    try {
-      await onSend("GIF", url, replyTo?.id);
-    } finally {
-      setSending(false);
-      sendLockRef.current = false;
-    }
+    onSendOptimista([{ texto: "GIF", gifUrl: url, replyId: replyTo?.id }]);
   };
 
   const chooseImages = (files: (File | null | undefined)[]) => {
@@ -3792,6 +3783,16 @@ export default function Chat() {
   const mensajesCountRef = useRef(0);
   const mensajesIdsRef = useRef<Set<string>>(new Set());
   const mensajesRef = useRef<Mensaje[]>([]);
+  // Mensajes propios aún sin confirmar (tmpId → datos para enviarlo). Se
+  // vuelven a poner tras cada recarga completa de la conversación.
+  const enviosRef = useRef(new Map<string, { canalId: string; item: EnvioNuevo; msg: Mensaje }>());
+  const colaEnvioRef = useRef<Promise<void>>(Promise.resolve());
+  const conProvisionales = useCallback((canalId: string, msgs: Mensaje[]): Mensaje[] => {
+    const pend = [...enviosRef.current.values()].filter((e) => e.canalId === canalId).map((e) => e.msg);
+    if (!pend.length) return msgs;
+    const pendientes = quitarProvisionalesConfirmados(pend, msgs, currentUserId);
+    return pendientes.length ? [...msgs, ...pendientes] : msgs;
+  }, [currentUserId]);
   const fetchMensajesInFlightRef = useRef(false);
   const pollMensajesInFlightRef = useRef(false);
   const loadMoreInFlightRef = useRef(false);
@@ -4163,7 +4164,8 @@ export default function Chat() {
       if (canalActivoIdRef.current !== expectedCanalId) return;
       if (res.ok) {
         const msgs: Mensaje[] = d.data||[];
-        setMensajes(prev => (areMensajesEquivalent(prev, msgs) ? prev : msgs));
+        const conPend = conProvisionales(canal.id, msgs);
+        setMensajes(prev => (areMensajesEquivalent(prev, conPend) ? prev : conPend));
         // firstUnreadMarkerId solo se fija en la primera carga del canal (no en full-syncs)
         if (isFirstLoad) {
           setFirstUnreadMarkerId(() => {
@@ -4251,7 +4253,7 @@ export default function Chat() {
           ? []
           : actualFresh.filter(m => m.user_id !== currentUserId).map(m => m.id);
         if (incomingFreshIds.length) markFreshIncomingMessages(incomingFreshIds);
-        return actualFresh.length ? [...prev, ...actualFresh] : prev;
+        return actualFresh.length ? [...quitarProvisionalesConfirmados(prev, actualFresh, currentUserId), ...actualFresh] : prev;
       });
       const latestMsg = nuevos[nuevos.length-1];
       lastAt.current = latestMsg.created_at;
@@ -4630,13 +4632,23 @@ export default function Chat() {
     imageUrl?: string, fileUrl?: string, fileName?: string, fileMime?: string
   ) => {
     if (editId) {
-      const h = await hdr();
-      const res = await fetch(`/api/chat/mensajes/${editId}`, {
-        method:"PUT", headers: h, body: JSON.stringify({ contenido: text }),
-      });
-      const d = await safeJson(res);
-      if (res.ok) setMensajes(prev=>prev.map(m=>m.id===editId?{...m,...d.data,editado:true}:m));
-      setEditingMsg(null); return;
+      // Se ve al instante; si el servidor no lo acepta, vuelve a como estaba.
+      const antes = mensajesRef.current.find(m=>m.id===editId);
+      setMensajes(prev=>prev.map(m=>m.id===editId?{...m,contenido:text,editado:true}:m));
+      setEditingMsg(null);
+      try {
+        const h = await hdr();
+        const res = await fetch(`/api/chat/mensajes/${editId}`, {
+          method:"PUT", headers: h, body: JSON.stringify({ contenido: text }),
+        });
+        const d = await safeJson(res);
+        if (!res.ok) throw new Error(d?.error || "No se pudo guardar el cambio");
+        setMensajes(prev=>prev.map(m=>m.id===editId?{...m,...d.data,editado:true}:m));
+      } catch (e: any) {
+        if (antes) setMensajes(prev=>prev.map(m=>m.id===editId?antes:m));
+        window.alert(e?.message || "No se pudo guardar el cambio");
+      }
+      return;
     }
     if (!canalActivo) return;
     const h = await hdr();
@@ -4667,6 +4679,116 @@ export default function Chat() {
     clearUnread(canalActivo.id, canalActivo.dm_target_user_id);
     void refreshUnread();
   };
+
+  // ── Envío optimista (09/10/2026) ──────────────────────────────────────────
+  // El mensaje sale en la conversación en cuanto pulsas enviar y el cuadro
+  // queda libre para el siguiente; la subida del adjunto y la petición van
+  // por detrás, en cola (para que lleguen en orden). Antes había que esperar
+  // a la respuesta del servidor con el texto aún en el cuadro.
+  const procesarEnvio = useCallback(async (tmpId: string) => {
+    const env = enviosRef.current.get(tmpId);
+    if (!env) return;
+    const { canalId, item } = env;
+    const marcar = (estado: "enviando" | "error") => {
+      env.msg = { ...env.msg, _envio: estado };
+      setMensajes(prev => prev.map(m => m.id === tmpId ? env.msg : m));
+    };
+    try {
+      const subir = async (ruta: string, campo: string, file: File) => {
+        const form = new FormData();
+        form.append(campo, file);
+        const token = await getAuthToken();
+        const res = await fetch(ruta, { method: "POST", headers: token ? { Authorization: `Bearer ${token}` } : undefined, body: form });
+        const d = await safeJson(res);
+        if (!res.ok) throw new Error(d?.error || "No se pudo subir");
+        return d.data;
+      };
+      const body: Record<string, any> = {
+        contenido: item.texto || (item.gifUrl ? "GIF" : item.imagen ? IMAGE_PLACEHOLDER_TEXT : item.archivo ? (item.archivo.name || "Archivo") : ""),
+      };
+      if (item.gifUrl) body.gif_url = item.gifUrl;
+      if (item.replyId) body.reply_to_id = item.replyId;
+      if (item.imagen) body.image_url = (await subir("/api/chat/uploads/image", "image", item.imagen.file))?.image_url;
+      if (item.archivo) {
+        const up = await subir("/api/chat/uploads/file", "file", item.archivo);
+        body.file_url = up?.file_url; body.file_name = up?.file_name; body.file_mime = up?.file_mime;
+      }
+      const h = await hdr();
+      const res = await fetch(`/api/chat/canales/${canalId}/mensajes`, { method: "POST", headers: h, body: JSON.stringify(body) });
+      const d = await safeJson(res);
+      if (!res.ok || !d?.data?.id) throw new Error(d?.error || "Error al enviar el mensaje");
+      const real: Mensaje = { ...d.data, reacciones: null, reply_to: env.msg.reply_to };
+      // Imagen: se espera a que la de verdad esté cargada antes de cambiarla,
+      // para que no parpadee.
+      const src = mediaUrl(real.image_url);
+      if (item.imagen && src) {
+        await new Promise<void>((ok) => {
+          const img = new Image();
+          const t = window.setTimeout(ok, 4000);
+          img.onload = img.onerror = () => { clearTimeout(t); ok(); };
+          img.src = src;
+        });
+      }
+      enviosRef.current.delete(tmpId);
+      mensajesIdsRef.current.add(real.id);
+      if (canalActivoIdRef.current === canalId) {
+        setMensajes(prev => prev.some(m => m.id === real.id)
+          ? prev.filter(m => m.id !== tmpId)
+          : prev.map(m => m.id === tmpId ? real : m));
+      }
+      if (item.imagen) window.setTimeout(() => URL.revokeObjectURL(item.imagen!.previewUrl), 1000);
+      setCanales(prev => prev.map(c => c.id === canalId ? {
+        ...c, ultimo_mensaje: real.contenido, ultimo_mensaje_autor: real.user_name, ultimo_mensaje_at: real.created_at,
+      } : c));
+      clearUnread(canalId, canalActivoRef.current?.id === canalId ? canalActivoRef.current?.dm_target_user_id : undefined);
+      void refreshUnread();
+    } catch {
+      marcar("error");
+    }
+  }, [clearUnread, getAuthToken, hdr, refreshUnread]);
+
+  const enviarOptimista = useCallback((items: EnvioNuevo[]) => {
+    const canal = canalActivoRef.current;
+    if (!canal || !items.length) return;
+    const yo = user?.fullName || user?.username || "Tú";
+    const base = Date.now();
+    const nuevos = items.map((item, i) => {
+      const tmpId = `tmp-${base}-${i}-${Math.random().toString(36).slice(2, 8)}`;
+      const msg: Mensaje = {
+        id: tmpId, canal_id: canal.id, user_id: currentUserId, user_name: yo, avatar_url: user?.imageUrl || null,
+        contenido: item.texto || (item.gifUrl ? "GIF" : item.imagen ? IMAGE_PLACEHOLDER_TEXT : item.archivo ? (item.archivo.name || "Archivo") : ""),
+        tipo: item.archivo ? "archivo" : item.imagen ? "imagen" : item.gifUrl ? "gif" : "texto",
+        gif_url: item.gifUrl || null,
+        image_url: item.imagen?.previewUrl || null,
+        file_url: null, file_name: item.archivo?.name || null, file_mime: item.archivo?.type || null,
+        reply_to_id: item.replyId || null,
+        reply_to: item.replyId ? mensajesRef.current.find(m => m.id === item.replyId) || null : null,
+        reacciones: null, editado: false, deleted_at: null,
+        created_at: new Date(base + i).toISOString(),
+        _envio: "enviando",
+      };
+      enviosRef.current.set(tmpId, { canalId: canal.id, item, msg });
+      return msg;
+    });
+    setMensajes(prev => [...prev, ...nuevos]);
+    setReplyTo(null);
+    setTimeout(() => scrollToBottom("instant"), 0);
+    for (const m of nuevos) colaEnvioRef.current = colaEnvioRef.current.then(() => procesarEnvio(m.id));
+  }, [currentUserId, procesarEnvio, user]);
+
+  const reintentarEnvio = useCallback((tmpId: string) => {
+    const env = enviosRef.current.get(tmpId);
+    if (!env) return;
+    env.msg = { ...env.msg, _envio: "enviando" };
+    setMensajes(prev => prev.map(m => m.id === tmpId ? env.msg : m));
+    colaEnvioRef.current = colaEnvioRef.current.then(() => procesarEnvio(tmpId));
+  }, [procesarEnvio]);
+  const descartarEnvio = useCallback((tmpId: string) => {
+    const env = enviosRef.current.get(tmpId);
+    enviosRef.current.delete(tmpId);
+    if (env?.item.imagen) URL.revokeObjectURL(env.item.imagen.previewUrl);
+    setMensajes(prev => prev.filter(m => m.id !== tmpId));
+  }, []);
 
   // useCallback con identidad estable: se pasan como prop a MensajeItem
   // (envuelto en React.memo), y una función recreada en cada render del
@@ -5522,6 +5644,7 @@ export default function Chat() {
                             isFreshIncoming={freshIncomingMessageIds.has(m.id)}
                             showReadReceipt={canalActivo.tipo==="directo"}
                             isReadByRecipient={readReceiptByMessageId.get(m.id) ?? false}
+                            onReintentar={reintentarEnvio} onDescartar={descartarEnvio}
                             onReply={setReplyTo} onReact={handleReact}
                             onEdit={setEditingMsg} onDelete={handleDelete} onPin={handlePin} onFavorite={handleFavorite}
                             isFavorite={favoriteIds.has(m.id)}
@@ -5574,6 +5697,7 @@ export default function Chat() {
                     resolveDisplayName={resolveDisplayName}
                     onTypingChange={updateTypingStatus}
                     onSend={handleSend}
+                    onSendOptimista={enviarOptimista}
                     onCancelReply={()=>setReplyTo(null)}
                     onCancelEdit={()=>setEditingMsg(null)}
                   />
