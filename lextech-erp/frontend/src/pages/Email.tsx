@@ -26,6 +26,7 @@ import {
   AlignLeft, AlignCenter, AlignRight, List, Pencil, Sun, Moon, Download, Briefcase, type LucideIcon,
 } from 'lucide-react';
 import MailboxProbeModal from '../components/MailboxProbeModal';
+import { getActiveOrganizacionId } from '../lib/api';
 import SignatureEditor from '../components/SignatureEditor';
 import { getStoredGmailToken, saveGmailToken, clearGmailToken, getLastMailAccount, saveLastMailAccount, readDraftsRaw, writeDraftsRaw } from '../lib/mailLocalState';
 
@@ -3660,10 +3661,36 @@ function GroupEditor({ initial, onSave, onCancel }: { initial: RecipientGroup; o
 
 // ─── Main Email Component ─────────────────────────────────────────────────────
 
+// Última lista de cada buzón + carpeta, SOLO en memoria (se pierde al recargar
+// la página o cambiar de organización, que recarga). Al volver al Correo o a
+// una carpeta ya vista se pinta al instante y se actualiza por detrás, sin
+// pantalla de "cargando".
+const listaCorreoCache = new Map<string, ParsedEmail[]>();
+// Solo con un buzón identificado (cuenta IMAP o perfil de Gmail guardado): una
+// clave genérica podría coincidir entre dos usuarios del mismo navegador.
+const claveListaCorreo = (imapId: string | undefined, gmailProfileId: string | undefined, carpeta: string): string | null =>
+  imapId ? `imap:${imapId}|${carpeta}` : gmailProfileId ? `gmail:${gmailProfileId}|${carpeta}` : null;
+
+// Cuentas IMAP ya cargadas, también solo en memoria y ligadas al usuario: al
+// volver al Correo desde otro módulo se pinta la cuenta y su lista al instante
+// (antes la lista desaparecía hasta volver a pedir las cuentas).
+let cuentasImapCache: { userId: string; orgId: string | null; cuentas: ImapAccount[] } | null = null;
+function cuentasEnCache(userId: string | null | undefined): ImapAccount[] | null {
+  return cuentasImapCache && userId && cuentasImapCache.userId === userId && cuentasImapCache.orgId === getActiveOrganizacionId()
+    ? cuentasImapCache.cuentas : null;
+}
+function cuentaInicial(cuentas: ImapAccount[] | null): string | null {
+  if (!cuentas?.length) return null;
+  const last = getLastMailAccount();
+  if (last?.type === 'imap' && cuentas.some((a) => a.id === last.id)) return last.id;
+  return last?.type === 'gmail' ? null : cuentas[0].id;
+}
+
 export default function Email() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { getToken } = useAuth();
+  const { getToken, userId: authUserId } = useAuth();
   const { user }    = useUser();
+  const [cuentasPrevias] = useState(() => cuentasEnCache(authUserId));
 
   const userEmail  = user?.primaryEmailAddress?.emailAddress || '';
   const userName   = user?.fullName || user?.firstName || userEmail.split('@')[0] || 'Usuario';
@@ -3706,7 +3733,10 @@ export default function Email() {
 
   // ── UI state ──────────────────────────────────────────────────────────────
   const [selectedFolder, setSelectedFolder] = useState<FolderKey>('INBOX');
-  const [emails, setEmails]             = useState<ParsedEmail[]>([]);
+  const [emails, setEmails]             = useState<ParsedEmail[]>(() => {
+    const clave = claveListaCorreo(cuentaInicial(cuentasPrevias) || undefined, undefined, 'INBOX');
+    return (clave && listaCorreoCache.get(clave)) || [];
+  });
   const [selectedEmail, setSelectedEmail] = useState<ParsedEmail | null>(null);
   const [fullscreenEmail, setFullscreenEmail] = useState<ParsedEmail | null>(null);
   // ── Vincular correos/adjuntos a un expediente ──────────────────────────────
@@ -3720,14 +3750,14 @@ export default function Email() {
     label: string; email: string; imap_host: string; imap_port: number;
     imap_secure: boolean; smtp_host: string; smtp_port: number; smtp_secure: boolean;
   }> | null>(null);
-  const [imapAccounts, setImapAccounts] = useState<ImapAccount[]>([]);
-  const [selectedImapAccountId, setSelectedImapAccountId] = useState<string | null>(null);
+  const [imapAccounts, setImapAccounts] = useState<ImapAccount[]>(() => cuentasPrevias || []);
+  const [selectedImapAccountId, setSelectedImapAccountId] = useState<string | null>(() => cuentaInicial(cuentasPrevias));
   const [imapFolders, setImapFolders] = useState<ImapFolderInfo[]>([]);
   const [probeOpen, setProbeOpen] = useState(false);
   // Si ya han llegado las cuentas (aunque fallase la carga): hasta entonces la
   // tarjeta de cuenta dice "Cargando cuenta…" en vez de enseñar un correo que
   // no es el de la cuenta activa.
-  const [imapAccountsLoaded, setImapAccountsLoaded] = useState(false);
+  const [imapAccountsLoaded, setImapAccountsLoaded] = useState(() => cuentasPrevias !== null);
   const [gmailProfilesLoaded, setGmailProfilesLoaded] = useState(false);
   const [loading, setLoading]           = useState(false);
   const [syncing, setSyncing]           = useState(false);
@@ -3916,6 +3946,7 @@ export default function Email() {
 
     const accounts: ImapAccount[] = payload.data || [];
     setImapAccounts(accounts);
+    if (authUserId) cuentasImapCache = { userId: authUserId, orgId: getActiveOrganizacionId(), cuentas: accounts };
     if (!selectedImapAccountId) {
       // Cuenta predeterminada al abrir Correo: la última usada en ESTA
       // organización; si no, la primera de la organización. Nunca una de otra.
@@ -4186,6 +4217,7 @@ export default function Email() {
 
     const silent = Boolean(options?.silent);
     const preserveSelection = Boolean(options?.preserveSelection);
+    const claveCache = searchQ.trim() ? null : claveListaCorreo(currentImapAccount?.id, currentGmailProfileRef.current?.id, selectedFolder);
     const previousSelectedId = preserveSelection ? selectedEmailRef.current?.id || null : null;
     // Guardar el body del email abierto para no perderlo al refrescar la lista
     const previousSelectedBody = preserveSelection ? {
@@ -4215,6 +4247,7 @@ export default function Email() {
         const nextEmails: ParsedEmail[] = (payload.data?.emails || []).map((row: ImapApiEmail) => parseImapEmail(row));
         if (isStale()) return;
         setEmails(nextEmails);
+        if (claveCache) listaCorreoCache.set(claveCache, nextEmails);
         if (previousSelectedId && bodyLoadingRef.current !== previousSelectedId) {
           const nextSelected = nextEmails.find((item) => item.id === previousSelectedId) || null;
           if (nextSelected) setSelectedEmail(previousSelectedBody
@@ -4264,6 +4297,7 @@ export default function Email() {
           if (isStale()) return;
           if (reset || isBackground) {
             setEmails(nextEmails);
+            if (claveCache) listaCorreoCache.set(claveCache, nextEmails);
             if (previousSelectedId && bodyLoadingRef.current !== previousSelectedId) {
               const nextSel = nextEmails.find(item => item.id === previousSelectedId) || null;
               if (nextSel) setSelectedEmail(previousSelectedBody
@@ -4443,7 +4477,17 @@ export default function Email() {
 
   // ── Reload when folder / provider changes ─────────────────────────────────
   useEffect(() => {
-    if (gmail || currentImapAccount) loadEmails(true);
+    if (!gmail && !currentImapAccount) return;
+    const clave = searchQ.trim() ? null : claveListaCorreo(currentImapAccount?.id, currentGmailProfileRef.current?.id, selectedFolder);
+    const cached = clave ? listaCorreoCache.get(clave) : undefined;
+    if (cached) {
+      // Ya vista: se enseña al momento y se actualiza por detrás.
+      setSelectedEmail(null);
+      setEmails(cached);
+      loadEmails(true, undefined, { silent: true });
+    } else {
+      loadEmails(true);
+    }
   }, [gmail, currentImapAccount, selectedFolder]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -5185,7 +5229,7 @@ export default function Email() {
     setDraftCount((gmailLabels.find((label) => label.id === 'DRAFT')?.messagesTotal || 0) + nextDrafts.length);
     setCompose(null);
     if (selectedFolder === 'SENT') {
-      loadEmails(true);
+      void refrescarSinParpadeo();
     } else {
       setSelectedFolder('SENT');
       // useEffect [selectedFolder] llamará loadEmails(true) automáticamente
@@ -5242,13 +5286,22 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
     }
   }, [authFetch, imapSystemFolderMap]);
 
+  // Refresco "sin que se note": la lista y el correo abierto se quedan en
+  // pantalla mientras llegan los datos nuevos (solo gira el icono). Antes
+  // Recargar/Sincronizar vaciaban la lista y cerraban el correo abierto.
+  const refrescarSinParpadeo = useCallback(async () => {
+    setBgRefreshing(true);
+    try { await loadEmails(true, undefined, { silent: true, preserveSelection: true }); }
+    finally { setBgRefreshing(false); }
+  }, [loadEmails]);
+
   const handleSync = async () => {
     setSyncing(true);
     try {
       if (currentImapAccount) {
         await refreshImapFolders(currentImapAccount.id);
         await syncImapAccountFolders(currentImapAccount, selectedFolder);
-        await loadEmails(true);
+        await refrescarSinParpadeo();
       } else if (gmail) {
         const { labels } = await gmail.listLabels();
         setGmailLabels((labels || []).map((label: any) => ({
@@ -5257,7 +5310,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
         })));
         const inbox = labels.find(l => l.id === 'INBOX');
         if (inbox?.messagesUnread !== undefined) setUnreadCount(inbox.messagesUnread);
-        await loadEmails(true);
+        await refrescarSinParpadeo();
       }
     } catch (e: any) {
       if (!currentImapAccount) handleGmailError(e);
@@ -5367,7 +5420,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
           <Sidebar
             userEmail={userEmail}
             userName={userName}
-            accountLoading={!imapAccountsLoaded || !gmailProfilesLoaded || (Boolean(gmail) && !gmailProfile && !selectedImapAccountId)}
+            accountLoading={!(currentImapAccount && imapAccountsLoaded) && (!imapAccountsLoaded || !gmailProfilesLoaded || (Boolean(gmail) && !gmailProfile && !selectedImapAccountId))}
             userAvatar={userAvatar}
             gmailProfile={gmailProfile}
             gmailConnected={!!gmail}
@@ -5448,7 +5501,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
                 {SYSTEM_FOLDERS.find(f => f.key === selectedFolder)?.label || selectedFolder}
               </h2>
               <button
-                onClick={() => loadEmails(true)} disabled={loading || !hasActiveMailbox}
+                onClick={() => void refrescarSinParpadeo()} disabled={loading || bgRefreshing || !hasActiveMailbox}
                 title="Recargar"
                 className="text-slate-400 hover:text-slate-700 transition-colors">
                 <RefreshCw size={13} className={loading || bgRefreshing ? 'animate-spin' : ''} />
