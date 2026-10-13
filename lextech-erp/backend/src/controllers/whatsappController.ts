@@ -592,6 +592,7 @@ export async function receiveWebhook(req: Request, res: Response) {
             body: body || 'Mensaje recibido',
             url: client?.id ? `/dashboard/whatsapp?clientId=${client.id}&mode=thread` : '/dashboard/whatsapp',
             tag: `whatsapp-${fromPhone}`,
+            tipo: 'whatsapp' as const,
           };
           const messageOrgId = webhookOrgId || client?.organizacion_id;
           if (messageOrgId) void sendPushToOrgModule(messageOrgId, 'whatsapp', pushPayload);

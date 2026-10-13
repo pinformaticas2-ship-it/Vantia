@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import pool from '../config/database';
-import { pushEnabled, vapidPublicKey } from '../utils/webPush';
+import { pushEnabled, vapidPublicKey, sendPushToUser } from '../utils/webPush';
+import { prefsDe, normalizarPrefs, enSilencio } from '../utils/avisoPreferencias';
 
 export async function getPushConfig(_req: Request, res: Response) {
   return res.json({ data: { enabled: pushEnabled(), publicKey: vapidPublicKey() } });
@@ -68,6 +69,94 @@ export async function dismissPlazoPush(req: Request, res: Response) {
     );
     if (!rowCount) return res.status(404).json({ error: 'Aviso no encontrado o ya resuelto' });
     return res.json({ data: { dismissed: true } });
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message });
+  }
+}
+
+// ── Preferencias de avisos (13/10/2026) ─────────────────────────────────────
+// Qué tipos de aviso push quiere cada uno y su horario de silencio (ver
+// utils/avisoPreferencias.ts), y los avisos de la campana ya descartados
+// (guardados aquí para que descartar en un equipo valga en todos).
+
+export async function getAvisoPrefs(req: Request, res: Response) {
+  const userId = (req as any).auth?.userId;
+  if (!userId) return res.status(401).json({ error: 'No autenticado' });
+  try {
+    const prefs = (await prefsDe([userId])).get(userId)!;
+    return res.json({ data: { prefs, enSilencioAhora: enSilencio(prefs) } });
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message });
+  }
+}
+
+export async function putAvisoPrefs(req: Request, res: Response) {
+  const userId = (req as any).auth?.userId;
+  if (!userId) return res.status(401).json({ error: 'No autenticado' });
+  const prefs = normalizarPrefs(req.body?.prefs);
+  try {
+    await pool.query(
+      `INSERT INTO aviso_preferencias (user_id, prefs) VALUES ($1, $2)
+       ON CONFLICT (user_id) DO UPDATE SET prefs = EXCLUDED.prefs, updated_at = NOW()`,
+      [userId, JSON.stringify(prefs)],
+    );
+    return res.json({ data: { prefs, enSilencioAhora: enSilencio(prefs) } });
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message });
+  }
+}
+
+/** "Enviar aviso de prueba": a todos los dispositivos de la persona, sin
+ *  filtros (para comprobar que llegan). */
+export async function testPush(req: Request, res: Response) {
+  const userId = (req as any).auth?.userId;
+  if (!userId) return res.status(401).json({ error: 'No autenticado' });
+  if (!pushEnabled()) return res.status(400).json({ error: 'Las notificaciones push no están configuradas en el servidor.' });
+  try {
+    const { rows } = await pool.query(`SELECT count(*)::int AS n FROM push_subscriptions WHERE user_id = $1`, [userId]);
+    if (!rows[0].n) return res.status(400).json({ error: 'No tienes ningún dispositivo con los avisos activados.' });
+    await sendPushToUser(userId, {
+      title: 'Aviso de prueba',
+      body: 'Si ves esto, los avisos de Vantia te llegan a este dispositivo.',
+      url: '/dashboard/config?section=notificaciones',
+      tag: `prueba-${Date.now()}`,
+    });
+    return res.json({ data: { dispositivos: rows[0].n } });
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message });
+  }
+}
+
+const MAX_DESCARTADOS = 500;
+
+export async function getDescartados(req: Request, res: Response) {
+  const userId = (req as any).auth?.userId;
+  if (!userId) return res.status(401).json({ error: 'No autenticado' });
+  try {
+    const { rows } = await pool.query(`SELECT descartados FROM aviso_preferencias WHERE user_id = $1`, [userId]);
+    return res.json({ data: Array.isArray(rows[0]?.descartados) ? rows[0].descartados : [] });
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message });
+  }
+}
+
+/** Añade ids descartados (no reemplaza: dos equipos pueden descartar a la vez). */
+export async function addDescartados(req: Request, res: Response) {
+  const userId = (req as any).auth?.userId;
+  if (!userId) return res.status(401).json({ error: 'No autenticado' });
+  const ids: string[] = (Array.isArray(req.body?.ids) ? req.body.ids : [])
+    .map((x: any) => String(x).slice(0, 200)).filter(Boolean).slice(0, MAX_DESCARTADOS);
+  if (!ids.length) return res.json({ data: [] });
+  try {
+    const { rows } = await pool.query(`SELECT descartados FROM aviso_preferencias WHERE user_id = $1`, [userId]);
+    const previos: string[] = Array.isArray(rows[0]?.descartados) ? rows[0].descartados : [];
+    const todos = [...previos.filter((x) => !ids.includes(x)), ...ids].slice(-MAX_DESCARTADOS);
+    await pool.query(
+      `INSERT INTO aviso_preferencias (user_id, descartados) VALUES ($1, $2)
+       ON CONFLICT (user_id) DO UPDATE SET descartados = EXCLUDED.descartados, updated_at = NOW()`,
+      [userId, JSON.stringify(todos)],
+    );
+    return res.json({ data: todos });
   } catch (e: any) {
     return res.status(500).json({ error: e.message });
   }

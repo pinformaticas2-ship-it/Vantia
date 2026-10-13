@@ -67,6 +67,7 @@ export async function handleEngineWebhook(req: Request, res: Response) {
             body: msg.subject || '(Sin asunto)',
             url: '/dashboard/correo',
             tag: `email-${accountId}`,
+            tipo: 'correo',
           });
         }
         break;

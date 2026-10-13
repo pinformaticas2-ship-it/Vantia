@@ -282,6 +282,7 @@ async function pushCreador(ticket: any, body: string): Promise<void> {
     body: texto.length > 160 ? `${texto.slice(0, 157)}…` : texto,
     url: `/dashboard/soporte?ticket=${ticket.id}`,
     tag: `soporte-ticket-${ticket.id}`,
+    tipo: 'soporte',
   });
 }
 
@@ -305,6 +306,7 @@ async function pushSoporte(ticket: any, titulo: string, body: string): Promise<v
     body: texto.length > 160 ? `${texto.slice(0, 157)}…` : texto,
     url: `/dashboard/soporte?ticket=${ticket.id}`,
     tag: `soporte-ticket-${ticket.id}`,
+    tipo: 'soporte',
   }, ticket.created_by);
 }
 

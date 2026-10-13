@@ -1111,6 +1111,7 @@ async function avisarSolicitud(
     body: resumen || (email.subject || ''),
     url: `/dashboard/vistas?id=${solicitudId}`,
     tag: `vista-${solicitudId}`,
+    tipo: 'vista',
   });
 
   // 07/10/2026: el correo "[Vantia] Vista por confirmar" ya no se envía (lo pidió
@@ -1286,6 +1287,7 @@ async function sendDueReminders(): Promise<void> {
       body: `${formatMadrid(fecha, { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}${datos.juzgado ? ' · ' + datos.juzgado : ''}`,
       url: `/dashboard/vistas?id=${r.id}`,
       tag: `vista-recordatorio-${r.id}`,
+      tipo: 'vista',
     });
     await pool.query(`UPDATE vistas_solicitudes SET recordatorio_enviado_at = NOW(), updated_at = NOW() WHERE id = $1`, [r.id]);
   }

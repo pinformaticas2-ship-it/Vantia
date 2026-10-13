@@ -29,7 +29,7 @@ import { sendPushToUsers } from '../utils/webPush';
  *  registra una vista por lo que sea". */
 function pushImplicados(sol: any, actorId: string | null | undefined, title: string, body: string) {
   const ids = [sol?.responsable_user_id, sol?.mailbox_user_id].filter(Boolean) as string[];
-  void sendPushToUsers(ids, { title, body, url: `/dashboard/vistas?id=${sol.id}`, tag: `vista-${sol.id}-${Date.now()}` }, actorId)
+  void sendPushToUsers(ids, { title, body, url: `/dashboard/vistas?id=${sol.id}`, tag: `vista-${sol.id}-${Date.now()}`, tipo: 'vista' }, actorId)
     .catch(() => {});
 }
 

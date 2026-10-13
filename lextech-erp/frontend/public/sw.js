@@ -28,7 +28,24 @@ self.addEventListener("push", (event) => {
     actions: payload.dismissUrl ? [{ action: "dismiss-plazo", title: "No volver a avisar" }] : undefined,
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil((async () => {
+    // Si ya estás mirando esa misma sección de Vantia (ventana en primer
+    // plano), no hace falta el aviso del sistema: lo estás viendo en la app
+    // (13/10/2026: antes llegaba igual, p.ej. con el chat abierto).
+    try {
+      const destino = new URL(options.data.url, self.location.origin).pathname;
+      if (destino.length > "/dashboard".length) {
+        const ventanas = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+        const mirando = ventanas.some((c) => {
+          try {
+            return c.focused && c.visibilityState === "visible" && new URL(c.url).pathname.startsWith(destino);
+          } catch { return false; }
+        });
+        if (mirando) return;
+      }
+    } catch { /* ante la duda, se avisa */ }
+    await self.registration.showNotification(title, options);
+  })());
 });
 
 self.addEventListener("notificationclick", (event) => {

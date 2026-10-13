@@ -1,6 +1,7 @@
 import webpush from 'web-push';
 import pool from '../config/database';
 import { Modulo, resolveEffectivePermission } from '../config/permissions';
+import { TipoAviso, filtrarPorPreferencias } from './avisoPreferencias';
 
 // ── Notificaciones push del navegador ────────────────────────────────────────
 // Envío best-effort: si faltan las claves VAPID en el entorno (no configuradas
@@ -39,19 +40,29 @@ export interface PushPayload {
    * avisar" del propio aviso -- si se indica, el SW añade ese botón.
    */
   dismissUrl?: string;
+  /** Tipo de aviso: con él se aplican las preferencias de cada persona (tipos
+   *  desactivados y horario de silencio, ver utils/avisoPreferencias.ts). */
+  tipo?: TipoAviso;
 }
 
 interface SubRow { id: string; endpoint: string; p256dh: string; auth: string; }
 
+/** Resultado de un envío: a quién se le mandó y a quién se le guardó por
+ *  estar en su horario de silencio (los plazos lo reintentan más tarde). */
+export interface ResultadoPush { enviados: number; silenciados: number }
+
 async function deliver(subs: SubRow[], payload: PushPayload): Promise<void> {
   if (!enabled || !subs.length) return;
-  const body = JSON.stringify(payload);
+  const { tipo: _tipo, ...visible } = payload;
+  const body = JSON.stringify(visible);
   await Promise.all(subs.map(async (s) => {
     try {
       await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, body);
     } catch (e: any) {
-      // 404/410 = el navegador revocó o caducó esa suscripción -- se limpia sola.
-      if (e?.statusCode === 404 || e?.statusCode === 410) {
+      // 404/410 = el navegador revocó o caducó esa suscripción; 401/403 = se
+      // hizo con otras claves del servidor (ya no sirve). Se limpia sola; el
+      // navegador se vuelve a suscribir en la próxima carga.
+      if ([401, 403, 404, 410].includes(e?.statusCode)) {
         try { await pool.query(`DELETE FROM push_subscriptions WHERE id = $1`, [s.id]); } catch { /* noop */ }
       } else {
         console.error('[push] error enviando notificación:', e?.statusCode || e?.message || e);
@@ -60,27 +71,29 @@ async function deliver(subs: SubRow[], payload: PushPayload): Promise<void> {
   }));
 }
 
-export async function sendPushToUser(userId: string | null | undefined, payload: PushPayload): Promise<void> {
-  if (!enabled || !userId) return;
-  try {
-    const { rows } = await pool.query<SubRow>(
-      `SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = $1`,
-      [userId],
-    );
-    await deliver(rows, payload);
-  } catch (e) { console.error('[push] sendPushToUser:', e); }
+export async function sendPushToUser(userId: string | null | undefined, payload: PushPayload): Promise<ResultadoPush> {
+  return sendPushToUsers(userId ? [userId] : [], payload);
 }
 
-export async function sendPushToUsers(userIds: string[], payload: PushPayload, excludeUserId?: string | null): Promise<void> {
-  const ids = [...new Set(userIds.filter((id) => id && id !== excludeUserId))];
-  if (!enabled || !ids.length) return;
+export async function sendPushToUsers(userIds: string[], payload: PushPayload, excludeUserId?: string | null): Promise<ResultadoPush> {
+  let ids = [...new Set(userIds.filter((id) => id && id !== excludeUserId))];
+  const resultado: ResultadoPush = { enviados: 0, silenciados: 0 };
+  if (!enabled || !ids.length) return resultado;
   try {
+    if (payload.tipo) {
+      const f = await filtrarPorPreferencias(ids, payload.tipo);
+      ids = f.destinatarios;
+      resultado.silenciados = f.silenciados.length;
+    }
+    if (!ids.length) return resultado;
+    resultado.enviados = ids.length;
     const { rows } = await pool.query<SubRow>(
       `SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = ANY($1::text[])`,
       [ids],
     );
     await deliver(rows, payload);
   } catch (e) { console.error('[push] sendPushToUsers:', e); }
+  return resultado;
 }
 
 /** Miembros de la organización que pueden ver un módulo (según los permisos
@@ -104,9 +117,9 @@ export async function miembrosConAcceso(organizacionId: string, modulo: Modulo):
  *  mundo": un aviso sin organización conocida no se envía a nadie. */
 export async function sendPushToOrgModule(
   organizacionId: string | null | undefined, modulo: Modulo, payload: PushPayload, excludeUserId?: string | null,
-): Promise<void> {
-  if (!enabled || !organizacionId) return;
+): Promise<ResultadoPush> {
+  if (!enabled || !organizacionId) return { enviados: 0, silenciados: 0 };
   try {
-    await sendPushToUsers(await miembrosConAcceso(organizacionId, modulo), payload, excludeUserId);
-  } catch (e) { console.error('[push] sendPushToOrgModule:', e); }
+    return await sendPushToUsers(await miembrosConAcceso(organizacionId, modulo), payload, excludeUserId);
+  } catch (e) { console.error('[push] sendPushToOrgModule:', e); return { enviados: 0, silenciados: 0 }; }
 }

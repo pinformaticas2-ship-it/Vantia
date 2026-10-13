@@ -36,6 +36,7 @@ export async function avisarCorreosNuevos(acc: { id: string; user_id: string; em
       body: c.subject || '(Sin asunto)',
       url: `/dashboard/correo?openEmail=${encodeURIComponent(c.id)}`,
       tag: `correo-${acc.id}`,
+      tipo: 'correo',
     });
     return;
   }
@@ -45,5 +46,6 @@ export async function avisarCorreosNuevos(acc: { id: string; user_id: string; em
     body: remitentes.slice(0, 3).join(', ') + (remitentes.length > 3 ? ` y ${remitentes.length - 3} más` : ''),
     url: '/dashboard/correo',
     tag: `correo-${acc.id}`,
+    tipo: 'correo',
   });
 }

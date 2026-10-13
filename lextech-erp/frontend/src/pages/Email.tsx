@@ -178,6 +178,8 @@ interface ImapAccount {
   last_sync_at: string | null;
   /** Anomalía reciente de sincronización (ver recordSyncWarning en el backend). */
   sync_warning?: string | null;
+  /** Lo enviado puede ir a spam: dominio sin verificar en Brevo (ver avisoEnvioDominio). */
+  envio_warning?: string | null;
 }
 
 interface ComposeData {
@@ -5572,6 +5574,14 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
               <AlertTriangle size={13} className="mt-0.5 shrink-0 text-amber-600" />
               <span className="line-clamp-2 flex-1">Problema al actualizar el correo: {currentImapAccount.sync_warning}</span>
               <button type="button" onClick={() => setProbeOpen(true)} className="shrink-0 font-bold underline">Diagnosticar</button>
+            </div>
+          )}
+
+          {/* Aviso: lo que se envíe desde esta cuenta puede acabar en spam */}
+          {currentImapAccount?.envio_warning && (
+            <div className="mx-3 mb-2 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900" title={currentImapAccount.envio_warning}>
+              <AlertTriangle size={13} className="mt-0.5 shrink-0 text-amber-600" />
+              <span className="line-clamp-3 flex-1">{currentImapAccount.envio_warning}</span>
             </div>
           )}
 

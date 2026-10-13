@@ -27,6 +27,22 @@ import { useWhatsAppUnread, WA_LAST_SEEN_KEY } from "../contexts/WhatsAppUnreadC
 import { useDocumentProcessing } from "../contexts/DocumentProcessingContext";
 import { usePushNotifications, soltarPushDeEsteNavegador } from "../lib/usePushNotifications";
 import { useVistasStatus } from "../lib/useVistasStatus";
+import { suscribirTiempoReal } from "../lib/realtime";
+
+// Días entre hoy y una fecha, contados en el calendario de Madrid (antes en
+// la hora local del navegador y con redondeos: de noche decía "Vence hoy"
+// cuando era mañana).
+const ymdMadrid = (d: Date) => new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Madrid" }).format(d);
+function diasHastaMadrid(fecha: string | Date): number {
+  const a = Date.parse(ymdMadrid(new Date()) + "T00:00:00Z");
+  const b = Date.parse(ymdMadrid(new Date(fecha)) + "T00:00:00Z");
+  return Math.round((b - a) / 86_400_000);
+}
+// De qué fuente viene cada aviso de la campana (por el prefijo de su id).
+const fuenteDeAviso = (id: string) =>
+  id.startsWith("chat-") ? "chat" : id.startsWith("email-") ? "email" : id.startsWith("wa-") ? "wa"
+  : id.startsWith("plazo-exp-") ? "exp" : id.startsWith("plazo-") ? "tareas" : id.startsWith("soporte-") ? "soporte"
+  : id.startsWith("vista-") ? "vistas" : "otro";
 import type { Modulo } from "../lib/useOrganizacion";
 
 // Qué módulo de la matriz de permisos (Configuración → Gestión de usuarios →
@@ -1989,7 +2005,31 @@ export default function DashboardLayout() {
       const ids: string[] = raw ? JSON.parse(raw) : [];
       dismissedNotifIdsRef.current = new Set(ids);
     } catch { /* localStorage no disponible o dato corrupto -- se ignora */ }
-  }, [dismissedNotifStorageKey]);
+    // Lo descartado en otro equipo (13/10/2026: antes solo valía en este navegador).
+    void (async () => {
+      try {
+        const token = await getToken();
+        if (!token) return;
+        const res = await fetch("/api/push/descartados", { headers: { Authorization: `Bearer ${token}` } });
+        const d = await safeJson(res);
+        if (!res.ok || !Array.isArray(d?.data)) return;
+        for (const id of d.data) dismissedNotifIdsRef.current.add(String(id));
+        setNotifications((prev) => prev.filter((n) => !dismissedNotifIdsRef.current.has(n.id)));
+      } catch { /* sin conexión: queda lo de este navegador */ }
+    })();
+  }, [dismissedNotifStorageKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const syncDescartados = useCallback(async (ids: string[]) => {
+    if (!ids.length) return;
+    try {
+      const token = await getToken();
+      if (!token) return;
+      await fetch("/api/push/descartados", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+    } catch { /* se queda al menos en este navegador */ }
+  }, [getToken]);
   const persistDismissedNotifIds = useCallback(() => {
     if (!dismissedNotifStorageKey) return;
     try {
@@ -2110,7 +2150,8 @@ export default function DashboardLayout() {
     notifBusyRef.current = true;
     if (showLoader) setNotifLoading(true);
     try {
-      const token = await getToken({ skipCache: true });
+      // Sin skipCache: antes pedía a Clerk un token nuevo en CADA consulta.
+      const token = await getToken();
       if (!token) return;
       const headers = { Authorization: `Bearer ${token}` };
       const [chatRes, emailRes, waRes, tasksRes, expNotifRes, soporteRes, vistasRes] = await Promise.all([
@@ -2134,6 +2175,14 @@ export default function DashboardLayout() {
       ]);
 
       const next: UnifiedNotification[] = [];
+      const inicioDeHoyIso = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.toISOString(); })();
+      // Fuentes que han respondido bien en esta consulta: solo de esas se
+      // pueden olvidar los descartados que ya no aparecen (antes un fallo
+      // momentáneo de una fuente hacía reaparecer todo lo descartado).
+      const fuentesOk = new Set<string>([
+        chatRes.ok && "chat", emailRes.ok && "email", waRes.ok && "wa", tasksRes.ok && "tareas",
+        expNotifRes.ok && "exp", soporteRes.ok && "soporte", vistasRes.ok && "vistas",
+      ].filter(Boolean) as string[]);
 
       if (chatRes.ok) {
         const chatItems = Array.isArray(chatData?.data) ? chatData.data : [];
@@ -2234,14 +2283,14 @@ export default function DashboardLayout() {
 
       if (tasksRes.ok) {
         const taskItems = Array.isArray(tasksData?.data) ? tasksData.data : [];
-        const now = new Date(); now.setHours(0, 0, 0, 0);
-        const alertLimit = new Date(now); alertLimit.setDate(alertLimit.getDate() + PLAZO_ALERT_DAYS);
-        const nowIso = new Date().toISOString();
+        // Los plazos no son "de ahora mismo": van con fecha de hoy a primera
+        // hora, para no tapar lo que acaba de llegar (antes salían arriba siempre).
+        const nowIso = inicioDeHoyIso;
         for (const t of taskItems) {
           if (!t?.plazo || t?.estado === "completada") continue;
-          const plazoDate = new Date(t.plazo);
-          if (Number.isNaN(plazoDate.getTime()) || plazoDate > alertLimit) continue;
-          const diffDays = Math.round((plazoDate.getTime() - now.getTime()) / 86_400_000);
+          if (Number.isNaN(new Date(t.plazo).getTime())) continue;
+          const diffDays = diasHastaMadrid(t.plazo);
+          if (diffDays > PLAZO_ALERT_DAYS) continue;
           const subtitle =
             diffDays < 0  ? `Vencida hace ${Math.abs(diffDays)} día${Math.abs(diffDays) === 1 ? "" : "s"}` :
             diffDays === 0 ? "Vence hoy" :
@@ -2264,14 +2313,12 @@ export default function DashboardLayout() {
 
       if (expNotifRes.ok) {
         const expItems = Array.isArray(expNotifData?.data) ? expNotifData.data : [];
-        const now = new Date(); now.setHours(0, 0, 0, 0);
-        const alertLimit = new Date(now); alertLimit.setDate(alertLimit.getDate() + PLAZO_ALERT_DAYS);
-        const nowIso = new Date().toISOString();
+        const nowIso = inicioDeHoyIso;
         for (const n of expItems) {
           if (!n?.fecha_limite) continue;
-          const limitDate = new Date(n.fecha_limite);
-          if (Number.isNaN(limitDate.getTime()) || limitDate > alertLimit) continue;
-          const diffDays = Math.round((limitDate.getTime() - now.getTime()) / 86_400_000);
+          if (Number.isNaN(new Date(n.fecha_limite).getTime())) continue;
+          const diffDays = diasHastaMadrid(n.fecha_limite);
+          if (diffDays > PLAZO_ALERT_DAYS) continue;
           const subtitle =
             diffDays < 0  ? `Vencida hace ${Math.abs(diffDays)} día${Math.abs(diffDays) === 1 ? "" : "s"}` :
             diffDays === 0 ? "Vence hoy" :
@@ -2342,7 +2389,7 @@ export default function DashboardLayout() {
       // no acumular ids para siempre.
       const freshIds = new Set(next.map((n) => n.id));
       for (const id of dismissedNotifIdsRef.current) {
-        if (!freshIds.has(id)) dismissedNotifIdsRef.current.delete(id);
+        if (!freshIds.has(id) && fuentesOk.has(fuenteDeAviso(id))) dismissedNotifIdsRef.current.delete(id);
       }
       const filtered = next.filter((n) => !dismissedNotifIdsRef.current.has(n.id));
 
@@ -2363,16 +2410,18 @@ export default function DashboardLayout() {
   const dismissNotification = useCallback((id: string) => {
     dismissedNotifIdsRef.current.add(id);
     persistDismissedNotifIds();
+    void syncDescartados([id]);
     setNotifications((prev) => prev.filter((n) => n.id !== id));
-  }, [persistDismissedNotifIds]);
+  }, [persistDismissedNotifIds, syncDescartados]);
 
   const dismissAllNotifications = useCallback(() => {
     setNotifications((prev) => {
       for (const n of prev) dismissedNotifIdsRef.current.add(n.id);
+      void syncDescartados(prev.map((n) => n.id));
       return [];
     });
     persistDismissedNotifIds();
-  }, [persistDismissedNotifIds]);
+  }, [persistDismissedNotifIds, syncDescartados]);
 
   useEffect(() => {
     let interval: number | null = null;
@@ -2385,13 +2434,22 @@ export default function DashboardLayout() {
       startPolling();
     };
 
+    // 13/10/2026: antes 7 consultas cada 3 s por usuario (lo más pesado de
+    // la app). Ahora cada minuto de respaldo, y al momento cuando el tiempo
+    // real avisa de un mensaje de chat o un correo nuevo.
     const startPolling = () => {
       if (interval) window.clearInterval(interval);
       interval = window.setInterval(
         handleRefresh,
-        document.visibilityState === "visible" ? 3000 : 9000,
+        document.visibilityState === "visible" ? 60_000 : 180_000,
       );
     };
+    let pendiente: number | null = null;
+    const offTiempoReal = suscribirTiempoReal((ev) => {
+      const util = (ev?.type === "chat" && ev.kind !== "typing" && ev.kind !== "presencia") || ev?.type === "messageNew";
+      if (!util || pendiente) return;
+      pendiente = window.setTimeout(() => { pendiente = null; handleRefresh(); }, 600);
+    });
 
     handleRefresh();
     startPolling();
@@ -2400,6 +2458,8 @@ export default function DashboardLayout() {
 
     return () => {
       if (interval) window.clearInterval(interval);
+      if (pendiente) window.clearTimeout(pendiente);
+      offTiempoReal();
       window.removeEventListener("focus", handleRefresh);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };

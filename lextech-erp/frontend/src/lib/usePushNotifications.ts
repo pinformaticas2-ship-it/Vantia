@@ -86,6 +86,19 @@ export function usePushNotifications() {
       try {
         const reg = await navigator.serviceWorker.register("/sw.js");
         let existing = await reg.pushManager.getSubscription();
+        // Suscripción hecha con otras claves del servidor (se cambiaron): ya
+        // no sirve y el servidor la rechaza. Se rehace sola.
+        if (existing && key) {
+          const actual = existing.options?.applicationServerKey;
+          const esperada = urlBase64ToUint8Array(key);
+          const iguales = actual && actual.byteLength === esperada.byteLength
+            && new Uint8Array(actual).every((b, i) => b === esperada[i]);
+          if (actual && !iguales) {
+            await existing.unsubscribe().catch(() => false);
+            existing = null;
+            if (Notification.permission === "granted") marcarActivo(userId, true);
+          }
+        }
         // Vuelve a entrar quien los tenía activados en este navegador: se
         // reactivan solos (el permiso ya está concedido, no hace falta clic).
         if (!existing && Notification.permission === "granted" && estabaActivo(userId) && key) {

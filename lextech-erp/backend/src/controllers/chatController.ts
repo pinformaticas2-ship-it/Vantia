@@ -530,12 +530,18 @@ export async function sendMensaje(req: Request, res: Response) {
     // respuesta del envío del mensaje.
     void (async () => {
       try {
-        const { rows: canalRows } = await pool.query(`SELECT nombre, tipo FROM chat_canales WHERE id = $1`, [id]);
+        const { rows: canalRows } = await pool.query(`SELECT nombre, tipo, organizacion_id FROM chat_canales WHERE id = $1`, [id]);
         const canal = canalRows[0];
         if (!canal) return;
+        // Quien se puso "No molestar", "En juicio" o "En reunión" (y sigue
+        // vigente) no recibe push del chat: lo verá al volver (13/10/2026).
         const { rows: miembros } = await pool.query(
-          `SELECT user_id FROM chat_miembros WHERE canal_id = $1 AND user_id <> $2`,
-          [id, userId],
+          `SELECT m.user_id FROM chat_miembros m
+             LEFT JOIN chat_presence p ON p.user_id = m.user_id AND p.organizacion_id = $3
+            WHERE m.canal_id = $1 AND m.user_id <> $2
+              AND NOT (COALESCE(p.estado, '') IN ('no_molestar', 'en_juicio', 'en_reunion')
+                       AND (p.estado_hasta IS NULL OR p.estado_hasta > NOW()))`,
+          [id, userId, canal.organizacion_id],
         );
         if (!miembros.length) return;
         const isDM = canal.tipo === 'directo';
@@ -552,6 +558,7 @@ export async function sendMensaje(req: Request, res: Response) {
             body: isDM ? preview : `${senderName}: ${preview}`,
             url: `/dashboard/chat?canal=${id}`,
             tag: `chat-${id}`,
+            tipo: isDM ? 'chat_dm' : 'chat',
           },
         );
       } catch { /* el push nunca debe romper el envío del mensaje */ }

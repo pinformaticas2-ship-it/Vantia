@@ -12,7 +12,7 @@ const FOLDER_TIMEOUT_MS = 90_000;
 const LIST_TIMEOUT_MS = 60_000;
 import { Pop3Config, syncPop3Inbox, testPop3Connection } from '../utils/pop3';
 import { sendEmail, SmtpConfig, MailMessage, testSmtpConnection } from '../utils/smtp';
-import { dispatchEmail, getSendingProvider } from '../utils/mailer';
+import { dispatchEmail, getSendingProvider, avisoEnvioDominio } from '../utils/mailer';
 import { logActivityForReq } from './activityController';
 import { emitEmailEvent } from '../utils/emailSSE';
 import { avisarCorreosNuevos, CorreoNuevo } from '../utils/correoPush';
@@ -367,6 +367,8 @@ export async function getAccounts(req: Request, res: Response) {
        FROM email_accounts WHERE user_id=$1 AND organizacion_id=$2 ORDER BY created_at`,
       [uid, organizacionId],
     );
+    // ¿Lo que se envíe desde esta cuenta llegará bien? (ver avisoEnvioDominio)
+    for (const r of rows) r.envio_warning = await avisoEnvioDominio(r.email).catch(() => null);
     return ok(res, rows);
   } catch (e: any) { return err(res, e.message); }
 }

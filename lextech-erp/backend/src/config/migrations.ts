@@ -2380,6 +2380,29 @@ export async function runMigrations(): Promise<void> {
       await client.query(`ALTER TABLE chat_canales ADD COLUMN IF NOT EXISTS foto_url TEXT;`);
     } catch (_e: any) {}
 
+    // ── Avisos (13/10/2026): preferencias por persona (qué tipos quiere y
+    // horario de silencio) y avisos de la campana ya descartados, para que
+    // descartar en un equipo valga en todos. Ver utils/avisoPreferencias.ts.
+    try {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS aviso_preferencias (
+          user_id      VARCHAR(150) PRIMARY KEY,
+          prefs        JSONB        NOT NULL DEFAULT '{}'::jsonb,
+          descartados  JSONB        NOT NULL DEFAULT '[]'::jsonb,
+          updated_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+        );
+      `);
+    } catch (_e: any) {}
+    // Plazos: en qué "fase" se avisó por última vez (pronto / mañana / hoy /
+    // vencida) y cuántas veces ya vencida -- antes se repetía cada ~20 h para
+    // siempre (también de madrugada).
+    try {
+      await client.query(`ALTER TABLE client_tasks ADD COLUMN IF NOT EXISTS plazo_push_fase VARCHAR(20);`);
+      await client.query(`ALTER TABLE client_tasks ADD COLUMN IF NOT EXISTS plazo_push_vencida_n INTEGER NOT NULL DEFAULT 0;`);
+      await client.query(`ALTER TABLE exp_notificaciones ADD COLUMN IF NOT EXISTS push_fase VARCHAR(20);`);
+      await client.query(`ALTER TABLE exp_notificaciones ADD COLUMN IF NOT EXISTS push_vencida_n INTEGER NOT NULL DEFAULT 0;`);
+    } catch (_e: any) {}
+
     // ── Correo de bienvenida al cliente: asunto/cuerpo personalizables ──
     // Antes el texto estaba fijo en el código (sendClientWelcomeEmail). Si
     // están vacías (NULL), se usa el texto por defecto -- no hace falta que

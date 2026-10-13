@@ -2018,9 +2018,71 @@ function ConfigInput({ label, value, onChange, placeholder }: {
   );
 }
 
+type TipoPrefAviso = 'chat' | 'correo' | 'whatsapp' | 'plazo' | 'vista' | 'soporte';
+interface AvisoPrefs {
+  tipos: Record<TipoPrefAviso, boolean>;
+  silencio: { activo: boolean; desde: string; hasta: string; finDeSemana: boolean };
+}
+
 function NotificacionesPanel() {
   const push = usePushNotifications();
+  const { getToken } = useAuth();
   const [error, setError] = useState<string | null>(null);
+  // Preferencias (13/10/2026): qué tipos de aviso y horario de silencio.
+  // Se guardan en el servidor, valen para todos tus dispositivos.
+  const [prefs, setPrefs] = useState<AvisoPrefs | null>(null);
+  const [enSilencioAhora, setEnSilencioAhora] = useState(false);
+  const [guardado, setGuardado] = useState<'' | 'guardando' | 'ok' | 'error'>('');
+  const [prueba, setPrueba] = useState<'' | 'enviando' | 'ok' | string>('');
+  const guardarTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await getToken();
+        const res = await fetch('/api/push/preferencias', { headers: { Authorization: `Bearer ${token}` } });
+        const d = await res.json().catch(() => null);
+        if (!cancelled && res.ok && d?.data?.prefs) { setPrefs(d.data.prefs); setEnSilencioAhora(Boolean(d.data.enSilencioAhora)); }
+      } catch { /* se queda sin cargar */ }
+    })();
+    return () => { cancelled = true; };
+  }, [getToken]);
+
+  const cambiarPrefs = (next: AvisoPrefs) => {
+    setPrefs(next);
+    setGuardado('guardando');
+    if (guardarTimer.current) window.clearTimeout(guardarTimer.current);
+    guardarTimer.current = window.setTimeout(async () => {
+      try {
+        const token = await getToken();
+        const res = await fetch('/api/push/preferencias', {
+          method: 'PUT',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prefs: next }),
+        });
+        const d = await res.json().catch(() => null);
+        if (!res.ok) throw new Error();
+        setEnSilencioAhora(Boolean(d?.data?.enSilencioAhora));
+        setGuardado('ok');
+      } catch {
+        setGuardado('error');
+      }
+    }, 500);
+  };
+
+  const enviarPrueba = async () => {
+    setPrueba('enviando');
+    try {
+      const token = await getToken();
+      const res = await fetch('/api/push/prueba', { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+      const d = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(d?.error || 'No se pudo enviar');
+      setPrueba('ok');
+    } catch (e: any) {
+      setPrueba(e?.message || 'No se pudo enviar');
+    }
+  };
 
   const handleToggle = async () => {
     setError(null);
@@ -2038,13 +2100,13 @@ function NotificacionesPanel() {
     }
   };
 
-  const EVENTS = [
-    { icon: MessageCircle, label: 'Mensajes del chat interno', desc: 'Cuando alguien te escribe en un canal o directo.' },
-    { icon: MailIcon,      label: 'Correo nuevo',              desc: 'Al llegar un correo a tu bandeja de entrada (se revisa cada pocos minutos).' },
-    { icon: Phone,         label: 'WhatsApp entrante',         desc: 'Cuando un cliente escribe por WhatsApp (si puedes ver Comunicación externa).' },
-    { icon: Clock3,        label: 'Plazos y recordatorios',    desc: 'Tareas y notificaciones de expediente próximas a vencer o vencidas.' },
-    { icon: Gavel,         label: 'Vistas',                    desc: 'Vistas por confirmar, cambios y cancelaciones de las que te tocan.' },
-    { icon: LifeBuoy,      label: 'Centro de soporte',         desc: 'Respuestas y cambios de estado en tus tickets.' },
+  const EVENTS: { key: TipoPrefAviso; icon: any; label: string; desc: string }[] = [
+    { key: 'chat', icon: MessageCircle, label: 'Mensajes del chat interno', desc: 'Cuando alguien te escribe en un canal o directo. No llegan si estás en "No molestar", "En juicio" o "En reunión".' },
+    { key: 'correo', icon: MailIcon, label: 'Correo nuevo',              desc: 'Al llegar un correo a tu bandeja de entrada (se revisa cada pocos minutos).' },
+    { key: 'whatsapp', icon: Phone, label: 'WhatsApp entrante',         desc: 'Cuando un cliente escribe por WhatsApp (si puedes ver Comunicación externa).' },
+    { key: 'plazo', icon: Clock3, label: 'Plazos y recordatorios', desc: 'A 3 días, el día antes y el mismo día; si vence, hasta 3 recordatorios (uno por semana).' },
+    { key: 'vista', icon: Gavel, label: 'Vistas',                    desc: 'Vistas por confirmar, cambios y cancelaciones de las que te tocan.' },
+    { key: 'soporte', icon: LifeBuoy, label: 'Centro de soporte',         desc: 'Respuestas y cambios de estado en tus tickets.' },
   ];
 
   return (
@@ -2069,6 +2131,16 @@ function NotificacionesPanel() {
                 Recibe un aviso del sistema aunque tengas Vantia cerrado o en segundo plano. Se activa por dispositivo/navegador, no por cuenta.
               </p>
               {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
+              {push.subscribed && (
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <button type="button" onClick={() => void enviarPrueba()} disabled={prueba === 'enviando'}
+                    className="text-xs font-semibold text-red-600 hover:underline disabled:opacity-60">
+                    {prueba === 'enviando' ? 'Enviando…' : 'Enviar aviso de prueba'}
+                  </button>
+                  {prueba === 'ok' && <span className="text-xs text-emerald-700">Enviado: debería aparecer en unos segundos (con Vantia en segundo plano).</span>}
+                  {prueba && prueba !== 'ok' && prueba !== 'enviando' && <span className="text-xs text-red-600">{prueba}</span>}
+                </div>
+              )}
             </div>
             <button
               type="button"
@@ -2087,18 +2159,70 @@ function NotificacionesPanel() {
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 p-5">
-        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">Qué avisa</h3>
-        <div className="space-y-3">
-          {EVENTS.map((e) => (
-            <div key={e.label} className="flex items-start gap-3">
-              <e.icon size={16} className="text-slate-400 mt-0.5 shrink-0" />
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-slate-700">{e.label}</p>
-                <p className="text-xs text-slate-500">{e.desc}</p>
-              </div>
-            </div>
-          ))}
+        <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-200 pb-2">
+          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Qué te avisa</h3>
+          <span className="text-[11px] text-slate-400">
+            {guardado === 'guardando' ? 'Guardando…' : guardado === 'ok' ? 'Guardado' : guardado === 'error' ? 'No se pudo guardar' : 'Para todos tus dispositivos'}
+          </span>
         </div>
+        <div className="space-y-3">
+          {EVENTS.map((e) => {
+            const on = prefs ? prefs.tipos[e.key] : true;
+            return (
+              <div key={e.key} className="flex items-start gap-3">
+                <e.icon size={16} className="text-slate-400 mt-0.5 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-slate-700">{e.label}</p>
+                  <p className="text-xs text-slate-500">{e.desc}</p>
+                </div>
+                <button type="button" role="switch" aria-checked={on} aria-label={e.label} disabled={!prefs}
+                  onClick={() => prefs && cambiarPrefs({ ...prefs, tipos: { ...prefs.tipos, [e.key]: !on } })}
+                  className={`relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${on ? 'bg-red-600' : 'bg-slate-300'}`}>
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${on ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-slate-200 p-5">
+        <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-200 pb-2">
+          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Horario de silencio</h3>
+          {prefs && (
+            <button type="button" role="switch" aria-checked={prefs.silencio.activo} aria-label="Horario de silencio"
+              onClick={() => cambiarPrefs({ ...prefs, silencio: { ...prefs.silencio, activo: !prefs.silencio.activo } })}
+              className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${prefs.silencio.activo ? 'bg-red-600' : 'bg-slate-300'}`}>
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${prefs.silencio.activo ? 'translate-x-4' : 'translate-x-0.5'}`} />
+            </button>
+          )}
+        </div>
+        {!prefs ? (
+          <p className="text-sm text-slate-400">Cargando…</p>
+        ) : (
+          <div className={prefs.silencio.activo ? '' : 'opacity-50'}>
+            <div className="flex flex-wrap items-center gap-2 text-sm text-slate-700">
+              <span>Sin avisos de</span>
+              <input type="time" value={prefs.silencio.desde} disabled={!prefs.silencio.activo}
+                onChange={(ev) => ev.target.value && cambiarPrefs({ ...prefs, silencio: { ...prefs.silencio, desde: ev.target.value } })}
+                className="rounded-lg border border-slate-200 px-2 py-1 text-sm" />
+              <span>a</span>
+              <input type="time" value={prefs.silencio.hasta} disabled={!prefs.silencio.activo}
+                onChange={(ev) => ev.target.value && cambiarPrefs({ ...prefs, silencio: { ...prefs.silencio, hasta: ev.target.value } })}
+                className="rounded-lg border border-slate-200 px-2 py-1 text-sm" />
+              <span className="text-xs text-slate-400">(hora de Madrid)</span>
+            </div>
+            <label className="mt-3 flex items-center gap-2 text-sm text-slate-700">
+              <input type="checkbox" checked={prefs.silencio.finDeSemana} disabled={!prefs.silencio.activo} className="accent-red-600"
+                onChange={(ev) => cambiarPrefs({ ...prefs, silencio: { ...prefs.silencio, finDeSemana: ev.target.checked } })} />
+              Y todo el fin de semana
+            </label>
+            <p className="mt-3 text-xs text-slate-500">
+              Los mensajes directos del chat y las vistas llegan siempre: son lo urgente. Los plazos que caigan en silencio se avisan al terminar.
+              {prefs.silencio.activo && enSilencioAhora && <span className="ml-1 font-semibold text-slate-700">Ahora mismo estás en silencio.</span>}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

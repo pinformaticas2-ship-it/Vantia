@@ -108,3 +108,45 @@ export function getSendingProvider(): 'resend' | 'brevo' | 'relay' | 'smtp' {
   if (process.env.SMTP_RELAY_HOST) return 'relay';
   return 'smtp';
 }
+
+// ── ¿Llegará bien lo que se envía por Brevo? (13/10/2026) ───────────────────
+// Con Brevo, los correos de los usuarios salen con SU dirección (p.ej.
+// @animalegis.es) pero desde servidores de Brevo. Si ese dominio no está
+// autenticado en Brevo (SPF/DKIM), muchos servidores los mandan a spam o los
+// rechazan. Se consulta a Brevo (cacheado 1 h) y Correo lo avisa.
+
+let cacheDominios: { at: number; dominios: Map<string, boolean> } | null = null;
+
+async function dominiosBrevo(): Promise<Map<string, boolean> | null> {
+  if (cacheDominios && Date.now() - cacheDominios.at < 60 * 60 * 1000) return cacheDominios.dominios;
+  try {
+    const res = await fetch('https://api.brevo.com/v3/senders/domains', {
+      headers: { 'api-key': process.env.BREVO_API_KEY!, accept: 'application/json' },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return null;
+    const d: any = await res.json();
+    const dominios = new Map<string, boolean>();
+    for (const x of d?.domains || []) {
+      if (x?.domain_name) dominios.set(String(x.domain_name).toLowerCase(), Boolean(x.authenticated));
+    }
+    cacheDominios = { at: Date.now(), dominios };
+    return dominios;
+  } catch {
+    return null;
+  }
+}
+
+/** Aviso a mostrar para una dirección remitente, o null si todo bien (o si
+ *  no se usa Brevo, o Brevo no responde: en la duda, no se alarma). */
+export async function avisoEnvioDominio(email: string): Promise<string | null> {
+  if (getSendingProvider() !== 'brevo') return null;
+  const dominio = String(email || '').split('@')[1]?.toLowerCase();
+  if (!dominio) return null;
+  const dominios = await dominiosBrevo();
+  if (!dominios) return null;
+  if (dominios.get(dominio) === true) return null;
+  return dominios.has(dominio)
+    ? `El dominio ${dominio} está añadido en Brevo pero sin autenticar (SPF/DKIM): lo que envíes desde Vantia puede acabar en spam.`
+    : `El dominio ${dominio} no está verificado en Brevo, el servicio con el que Vantia envía: lo que mandes puede acabar en spam o ser rechazado.`;
+}
