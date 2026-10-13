@@ -15,6 +15,8 @@ import { sendEmail, SmtpConfig, MailMessage, testSmtpConnection } from '../utils
 import { dispatchEmail, getSendingProvider } from '../utils/mailer';
 import { logActivityForReq } from './activityController';
 import { emitEmailEvent } from '../utils/emailSSE';
+import { avisarCorreosNuevos, CorreoNuevo } from '../utils/correoPush';
+import MailComposer from 'nodemailer/lib/mail-composer';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -905,9 +907,14 @@ async function pruneVanishedImapEmails(accountId: string, folder: string, state:
 async function saveImapEnvelopes(acc: any, folder: string, messages: any[], knownUids?: Set<number>): Promise<{ saved: number; nuevos: number }> {
   let saved = 0;
   let nuevos = 0;
+  // Push de correo nuevo: solo bandeja de entrada, solo inserciones reales
+  // (xmax = 0), sin leer, y nunca en la primera carga de una cuenta recién
+  // añadida (traería de golpe todo lo de las últimas horas).
+  const esBandeja = folder.toUpperCase() === 'INBOX';
+  const avisar: CorreoNuevo[] = [];
   for (const msg of messages) {
     const sentAt = msg.date ? new Date(msg.date) : null;
-    const { rowCount } = await pool.query(
+    const { rowCount, rows: filas } = await pool.query(
       `INSERT INTO emails
          (account_id, user_id, uid, message_id, folder, from_email, from_name,
           to_emails, subject, snippet, is_read, is_starred, has_attachments, size_bytes, sent_at)
@@ -916,7 +923,8 @@ async function saveImapEnvelopes(acc: any, folder: string, messages: any[], know
          is_read         = EXCLUDED.is_read,
          is_starred      = EXCLUDED.is_starred,
          has_attachments = EXCLUDED.has_attachments,
-         snippet         = COALESCE(EXCLUDED.snippet, emails.snippet)`,
+         snippet         = COALESCE(EXCLUDED.snippet, emails.snippet)
+       RETURNING id, (xmax = 0) AS insertado`,
       [
         acc.id, acc.user_id,
         msg.uid > 0 ? msg.uid : null, msg.messageId || null,
@@ -928,7 +936,11 @@ async function saveImapEnvelopes(acc: any, folder: string, messages: any[], know
     );
     if (rowCount) saved++;
     if (knownUids && msg.uid > 0 && !knownUids.has(msg.uid)) nuevos++;
+    if (esBandeja && acc.last_sync_at && filas[0]?.insertado && !msg.flags.includes('\\Seen')) {
+      avisar.push({ id: filas[0].id, from_email: msg.from || null, from_name: msg.fromName || null, subject: msg.subject || null, sent_at: sentAt });
+    }
   }
+  if (avisar.length) void avisarCorreosNuevos(acc, avisar).catch(() => {});
   return { saved, nuevos };
 }
 
@@ -1610,10 +1622,87 @@ export async function emptyTrash(req: Request, res: Response) {
 
 // ── Enviar ────────────────────────────────────────────────────────────────────
 
+// Nombres habituales de la carpeta de enviados cuando el servidor no la marca
+// como \Sent (Dovecot/cPanel en español, Outlook, etc.).
+const NOMBRES_ENVIADOS = /^(inbox[./])?(sent|sent items|sent messages|sent mail|enviados|elementos enviados|mensajes enviados|correo enviado)$/i;
+
+/** Guarda el mensaje en la carpeta de enviados del propio buzón. Devuelve su
+ *  ruta, o null si el buzón no tiene ninguna reconocible. */
+async function guardarEnEnviadosImap(acc: any, raw: Buffer): Promise<string | null> {
+  const client = new ImapClient({
+    host: acc.imap_host, port: acc.imap_port, secure: acc.imap_secure,
+    user: acc.username, password: decryptPassword(acc.password_enc),
+  });
+  try {
+    await client.connect();
+    await client.login();
+    const carpetas = (await withTimeout(client.listFolders({ includeUnsubscribed: true }), LIST_TIMEOUT_MS, 'listar carpetas'))
+      .filter((f) => !f.noSelect);
+    const enviados = carpetas.find((f) => /\\Sent/i.test(f.specialUse || ''))
+      || carpetas.find((f) => NOMBRES_ENVIADOS.test(f.path) || NOMBRES_ENVIADOS.test(f.name));
+    if (!enviados) return null;
+    await withTimeout(client.appendMessage(enviados.path, raw, ['\\Seen']), 60_000, 'guardar en Enviados');
+    return enviados.path;
+  } finally {
+    await client.logout().catch(() => undefined);
+  }
+}
+
+/** Copia de lo enviado (13/10/2026): en la carpeta "Enviados" REAL del buzón
+ *  (antes solo en una carpeta interna de Vantia: desde Outlook/webmail no se
+ *  veía lo enviado). Luego se sincroniza esa carpeta para que aparezca ya en
+ *  Vantia con su UID real, sin duplicados. Si no se puede (sin carpeta de
+ *  enviados, servidor caído...), se guarda la copia interna como antes:
+ *  nunca se pierde. */
+async function guardarCopiaEnviada(acc: any, uid: string, m: {
+  to: string[]; cc?: string[]; bcc?: string[]; subject: string; html: string; text?: string;
+  messageId: string; inReplyTo?: string;
+  attachments?: { filename: string; contentType: string; content: string }[];
+  expedienteId?: string | null;
+}): Promise<void> {
+  const cc = m.cc || [];
+  const bcc = m.bcc || [];
+  const adjuntos = m.attachments || [];
+  let carpeta: string | null = null;
+  if ((acc.protocol || 'imap').toLowerCase() === 'imap') {
+    try {
+      const raw = await new MailComposer({
+        from: acc.label ? { name: acc.label, address: acc.email } : acc.email,
+        to: m.to.join(', '), cc: cc.join(', ') || undefined, bcc: bcc.join(', ') || undefined,
+        subject: m.subject, html: m.html, text: m.text,
+        messageId: m.messageId, inReplyTo: m.inReplyTo, references: m.inReplyTo, date: new Date(),
+        attachments: adjuntos.map((a) => ({ filename: a.filename, contentType: a.contentType, content: a.content, encoding: 'base64' })),
+      }).compile().build();
+      carpeta = await guardarEnEnviadosImap(acc, raw);
+    } catch (e: any) {
+      console.warn(`[correo] no se pudo guardar en Enviados (${acc.email}):`, e?.message || e);
+    }
+  }
+  const mid = m.messageId.replace(/[<>]/g, '');
+  if (carpeta) {
+    await syncImapAccountRecord(acc, carpeta, 10).catch(() => undefined);
+    if (m.expedienteId) {
+      await pool.query(
+        `UPDATE emails SET expediente_id = $3 WHERE account_id = $1 AND trim(both '<>' from message_id) = $2`,
+        [acc.id, mid, m.expedienteId],
+      ).catch(() => undefined);
+    }
+  } else {
+    const plano = m.text || m.html.replace(/<[^>]+>/g, '');
+    await pool.query(
+      `INSERT INTO emails (account_id, user_id, folder, message_id, from_email, from_name,
+        to_emails, cc_emails, subject, body_html, body_text, snippet, is_read, sent_at, expediente_id)
+       VALUES ($1,$2,'Sent',$3,$4,$5,$6,$7,$8,$9,$10,$11,true,NOW(),$12)`,
+      [acc.id, uid, mid, acc.email, acc.label, m.to.join(', '), cc.join(', '), m.subject, m.html, m.text || '', plano.slice(0, 200), m.expedienteId || null],
+    );
+  }
+  emitEmailEvent(uid, { type: 'messageSent', accountId: acc.id, folder: carpeta || 'Sent' });
+}
+
 export async function sendMail(req: Request, res: Response) {
   const uid = userId(req);
   if (!uid) return err(res, 'No autenticado', 401);
-  const { account_id, to, cc, bcc, subject, html, text, draft_id, expediente_id, attachments } = req.body;
+  const { account_id, to, cc, bcc, subject, html, text, draft_id, expediente_id, attachments, reply_to_id } = req.body;
   let accountId = account_id as string | undefined;
 
   if (!to || !subject || !html) {
@@ -1649,33 +1738,54 @@ export async function sendMail(req: Request, res: Response) {
       user: acc.username, password,
     };
 
-    const toList  = Array.isArray(to)  ? to  : [to];
-    const ccList  = Array.isArray(cc)  ? cc  : cc  ? [cc]  : [];
-    const bccList = Array.isArray(bcc) ? bcc : bcc ? [bcc] : [];
+    // "a@x.es, b@y.es" llega como un único texto: se separa (Brevo lo
+    // rechazaba como una sola dirección no válida).
+    const separar = (v: any): string[] => (Array.isArray(v) ? v : v ? [v] : [])
+      .flatMap((s: any) => String(s).split(/[,;]+/)).map((s) => s.trim()).filter(Boolean);
+    const toList  = separar(to);
+    const ccList  = separar(cc);
+    const bccList = separar(bcc);
+    if (!toList.length) return err(res, 'Falta el destinatario', 400);
+
+    // Adjuntos: la pantalla manda { name, type, dataBase64 } (antes no se
+    // enviaban siquiera con cuentas IMAP; se perdían sin avisar).
+    const adjuntos = (Array.isArray(attachments) ? attachments : [])
+      .map((a: any) => ({
+        filename: String(a?.filename || a?.name || 'adjunto'),
+        contentType: String(a?.contentType || a?.type || 'application/octet-stream'),
+        content: String(a?.content || a?.dataBase64 || ''),
+      }))
+      .filter((a) => a.content);
+
+    // Respuesta: se enlaza con el correo original (In-Reply-To/References)
+    // para que el destinatario la vea dentro de la misma conversación.
+    let inReplyTo: string | undefined;
+    if (reply_to_id) {
+      const { rows: orig } = await pool.query(
+        `SELECT message_id FROM emails WHERE id = $1 AND user_id = $2`,
+        [reply_to_id, uid],
+      ).catch(() => ({ rows: [] as any[] }));
+      const mid = String(orig[0]?.message_id || '').replace(/[<>]/g, '').trim();
+      if (mid) inReplyTo = `<${mid}>`;
+    }
+    // Message-ID propio: el mismo en lo enviado y en la copia de Enviados.
+    const dominio = String(acc.email || '').split('@')[1] || 'vantia.app';
+    const messageId = `<${crypto.randomUUID()}@${dominio}>`;
 
     const mailMsg: MailMessage = {
       from: acc.email, fromName: acc.label,
       to: toList, cc: ccList, bcc: bccList,
       subject, html, text,
-      attachments: Array.isArray(attachments) && attachments.length ? attachments : undefined,
+      inReplyTo, messageId,
+      attachments: adjuntos.length ? adjuntos : undefined,
     };
 
     await dispatchEmail(smtpCfg, mailMsg);
 
-    // Save to sent
-    await pool.query(
-      `INSERT INTO emails (account_id, user_id, folder, from_email, from_name,
-        to_emails, cc_emails, subject, body_html, body_text, snippet, is_read, sent_at, expediente_id)
-       VALUES ($1,$2,'Sent',$3,$4,$5,$6,$7,$8,$9,$10,true,NOW(),$11)`,
-      [
-        acc.id, uid, acc.email, acc.label,
-        toList.join(', '), ccList.join(', '),
-        subject, html, text || '',
-        (text || html.replace(/<[^>]+>/g, '')).slice(0, 200),
-        expediente_id || null,
-      ],
-    );
-    emitEmailEvent(uid, { type: 'messageSent', accountId: acc.id, folder: 'Sent' });
+    await guardarCopiaEnviada(acc, uid, {
+      to: toList, cc: ccList, bcc: bccList, subject, html, text,
+      messageId, inReplyTo, attachments: adjuntos, expedienteId: expediente_id || null,
+    });
 
     // Delete draft if any
     if (draft_id) {
@@ -2273,11 +2383,10 @@ export async function sendFromMailbox(opts: {
     { host: acc.smtp_host, port: acc.smtp_port, secure: acc.smtp_secure, user: acc.username, password: decryptPassword(acc.password_enc) },
     { from: acc.email, fromName: acc.label, to: [opts.to], subject: opts.subject, html: opts.html, text, inReplyTo: replyId || undefined, messageId: opts.messageId || undefined },
   );
-  await pool.query(
-    `INSERT INTO emails (account_id, user_id, folder, from_email, from_name,
-       to_emails, subject, body_html, body_text, snippet, is_read, sent_at, expediente_id)
-     VALUES ($1,$2,'Sent',$3,$4,$5,$6,$7,$8,$9,true,NOW(),$10)`,
-    [acc.id, acc.user_id, acc.email, acc.label, opts.to, opts.subject, opts.html, text, text.slice(0, 200), opts.expedienteId || null],
-  );
-  emitEmailEvent(acc.user_id, { type: 'messageSent', accountId: acc.id, folder: 'Sent' });
+  await guardarCopiaEnviada(acc, acc.user_id, {
+    to: [opts.to], subject: opts.subject, html: opts.html, text,
+    // Mismo Message-ID que lo enviado (si no lo trae, uno propio).
+    messageId: opts.messageId || `<${crypto.randomUUID()}@${String(acc.email || '').split('@')[1] || 'vantia.app'}>`,
+    inReplyTo: replyId || undefined, expedienteId: opts.expedienteId || null,
+  });
 }

@@ -122,7 +122,11 @@ app.use('/api/email/webhook/engine', emailEngineWebhookRoute);
 
 app.use(clerkMiddleware());
 app.use(resolveOrg);
-app.use(express.json({ limit: '10mb' }));
+// Enviar correo lleva los adjuntos en base64 (un tercio más que el archivo):
+// hasta ~25 MB de adjuntos, como Gmail. El resto de rutas, 10 MB.
+const jsonNormal = express.json({ limit: '10mb' });
+const jsonCorreo = express.json({ limit: '35mb' });
+app.use((req, res, next) => (req.path === '/api/email/send' ? jsonCorreo : jsonNormal)(req, res, next));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // ── Cache control: evitar datos stale en el navegador ────────

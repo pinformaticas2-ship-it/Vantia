@@ -580,6 +580,13 @@ export class ImapClient {
     }
   }
 
+  /** Guarda un mensaje completo (RFC 822) en una carpeta -- p.ej. la copia de
+   *  lo enviado en "Enviados", para que se vea también desde Outlook/webmail. */
+  async appendMessage(folder: string, raw: Buffer, flags: string[] = ['\\Seen']): Promise<void> {
+    const client = this.ensureClient();
+    await client.append(folder, raw, flags, new Date());
+  }
+
   async copyToFolder(uid: number, folder: string): Promise<void> {
     const client = this.ensureClient();
     await client.messageCopy(uid, folder, { uid: true });

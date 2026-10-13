@@ -21,6 +21,7 @@ async function sendViaResend(msg: MailMessage): Promise<void> {
     html:    msg.html,
     text:    msg.text,
     replyTo: msg.replyTo,
+    headers: msg.inReplyTo ? { 'In-Reply-To': msg.inReplyTo, References: msg.inReplyTo } : undefined,
     attachments: msg.attachments?.map(a => ({
       filename: a.filename,
       content:  Buffer.from(a.content, 'base64'),
@@ -47,6 +48,9 @@ async function sendViaBrevoApi(msg: MailMessage): Promise<void> {
   if (ccList.length)  body.cc  = ccList;
   if (bccList.length) body.bcc = bccList;
   if (msg.replyTo)    body.replyTo = { email: msg.replyTo };
+  // Respuestas: sin estas cabeceras el destinatario no la ve dentro de la
+  // misma conversación (13/10/2026).
+  if (msg.inReplyTo)  body.headers = { 'In-Reply-To': msg.inReplyTo, References: msg.inReplyTo };
   if (msg.attachments?.length) {
     body.attachment = msg.attachments.map(a => ({
       name:    a.filename,

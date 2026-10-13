@@ -3,7 +3,7 @@ import { startDropboxConnect } from '../lib/dropboxConnect';
 import { DriveLogo, DropboxLogo } from '../components/StorageStatusIcons';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { AlertTriangle, Bell, BellOff, BellRing, BookOpen, Building2, Camera, Check, ChevronDown, Cloud, Crown, Facebook, History, Instagram, KeyRound, Link2, Loader2, Lock, LockKeyhole, MessageCircle, Clock3, Mail as MailIcon, Phone, Palette, Plug, Plus, Settings, ShieldCheck, Trash2, UsersRound, X, Zap } from 'lucide-react';
+import { AlertTriangle, Bell, BellOff, BellRing, BookOpen, Building2, Camera, Check, ChevronDown, Cloud, Crown, Facebook, Gavel, History, Instagram, KeyRound, LifeBuoy, Link2, Loader2, Lock, LockKeyhole, MessageCircle, Clock3, Mail as MailIcon, Phone, Palette, Plug, Plus, Settings, ShieldCheck, Trash2, UsersRound, X, Zap } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth, UserProfile } from '@clerk/clerk-react';
 import { useTheme, AppTheme } from '../lib/ThemeContext';
@@ -2040,9 +2040,11 @@ function NotificacionesPanel() {
 
   const EVENTS = [
     { icon: MessageCircle, label: 'Mensajes del chat interno', desc: 'Cuando alguien te escribe en un canal o directo.' },
-    { icon: MailIcon,      label: 'Correo nuevo',              desc: 'Al llegar un correo a tu bandeja de entrada.' },
-    { icon: Phone,         label: 'WhatsApp entrante',         desc: 'Cuando un cliente escribe por WhatsApp.' },
+    { icon: MailIcon,      label: 'Correo nuevo',              desc: 'Al llegar un correo a tu bandeja de entrada (se revisa cada pocos minutos).' },
+    { icon: Phone,         label: 'WhatsApp entrante',         desc: 'Cuando un cliente escribe por WhatsApp (si puedes ver Comunicación externa).' },
     { icon: Clock3,        label: 'Plazos y recordatorios',    desc: 'Tareas y notificaciones de expediente próximas a vencer o vencidas.' },
+    { icon: Gavel,         label: 'Vistas',                    desc: 'Vistas por confirmar, cambios y cancelaciones de las que te tocan.' },
+    { icon: LifeBuoy,      label: 'Centro de soporte',         desc: 'Respuestas y cambios de estado en tus tickets.' },
   ];
 
   return (

@@ -116,6 +116,9 @@ interface ParsedEmail {
   isPinned?: boolean;
   draftId?: string;
   expedienteId?: string | null;
+  /** Cabeceras Message-ID / References (Gmail) para enlazar las respuestas. */
+  messageId?: string;
+  references?: string;
 }
 
 interface ExpedienteOption {
@@ -185,6 +188,10 @@ interface ComposeData {
   body: string;
   replyToId?: string;
   draftId?: string;
+  /** Respuesta en Gmail: Message-ID, References e hilo del original. */
+  replyMessageId?: string;
+  replyReferences?: string;
+  replyThreadId?: string;
 }
 
 interface RecipientSuggestion {
@@ -322,8 +329,9 @@ class GmailService {
     return this.req(`/messages/${id}?format=${format}`);
   }
 
-  async sendMessage(raw: string) {
-    return this.req('/messages/send', { method: 'POST', body: JSON.stringify({ raw }) });
+  async sendMessage(raw: string, threadId?: string) {
+    // Con threadId, Gmail la guarda en la misma conversación que el original.
+    return this.req('/messages/send', { method: 'POST', body: JSON.stringify(threadId ? { raw, threadId } : { raw }) });
   }
 
   async modifyMessage(id: string, add: string[] = [], remove: string[] = []) {
@@ -488,6 +496,8 @@ function parseGmailMessage(msg: any): ParsedEmail {
     isRead: !(msg.labelIds || []).includes('UNREAD'),
     isStarred: (msg.labelIds || []).includes('STARRED'),
     bodyHtml: html, bodyText: text, hasAttachments: hasAtt,
+    messageId: hdr(headers, 'Message-ID') || hdr(headers, 'Message-Id') || undefined,
+    references: hdr(headers, 'References') || undefined,
     source: 'gmail',
     isPinned: readPinnedEmailIds().includes(String(msg.id)),
   };
@@ -588,9 +598,9 @@ function replaceLastRecipient(value: string, nextValue: string): string {
   return `${parts.join(',').replace(/\s+/g, ' ').trim()}, `;
 }
 
-function buildRaw({ from, fromName, to, cc, bcc, subject, body, inReplyTo, attachments = [] }: {
+function buildRaw({ from, fromName, to, cc, bcc, subject, body, inReplyTo, references, attachments = [] }: {
   from: string; fromName?: string; to: string; cc?: string; bcc?: string;
-  subject: string; body: string; inReplyTo?: string;
+  subject: string; body: string; inReplyTo?: string; references?: string;
   attachments?: ComposeAttachment[];
 }): string {
   const boundaryMixed = `mix_${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -603,7 +613,7 @@ function buildRaw({ from, fromName, to, cc, bcc, subject, body, inReplyTo, attac
     `Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,
     'MIME-Version: 1.0',
     `Content-Type: multipart/mixed; boundary="${boundaryMixed}"`,
-    ...(inReplyTo ? [`In-Reply-To: ${inReplyTo}`] : []),
+    ...(inReplyTo ? [`In-Reply-To: ${inReplyTo}`, `References: ${[references, inReplyTo].filter(Boolean).join(' ')}`] : []),
     '',
     `--${boundaryMixed}`,
     `Content-Type: multipart/alternative; boundary="${boundaryAlt}"`,
@@ -876,16 +886,23 @@ function ComposeWindow({
     if (!to.trim())      { setError('Añade al menos un destinatario'); return; }
     if (!subject.trim()) { setError('El asunto está vacío'); return; }
     if (!gmail && !accountId) { setError('Selecciona o configura una cuenta IMAP/SMTP para enviar'); return; }
+    if (attachments.reduce((t, a) => t + (a.size || 0), 0) > 25 * 1024 * 1024) {
+      setError('Los adjuntos suman más de 25 MB: compártelos con un enlace o envíalos en varios correos.');
+      return;
+    }
     setSending(true); setError('');
     try {
       const html = bodyRef.current?.innerHTML || '';
       if (gmail) {
         const raw = buildRaw({
           from: fromEmail, fromName, to, cc, bcc, subject, body: html,
-          inReplyTo: data.replyToId,
+          // Antes iba el id interno del correo, no su Message-ID: la respuesta
+          // no quedaba enlazada con el original.
+          inReplyTo: data.replyMessageId,
+          references: data.replyReferences,
           attachments,
         });
-        await gmail.sendMessage(raw);
+        await gmail.sendMessage(raw, data.replyThreadId);
         const token = await getToken();
         await fetch(`${API}/email/gmail/log-sent`, {
           method: 'POST',
@@ -904,7 +921,13 @@ function ComposeWindow({
         const res = await fetch(`${API}/email/send`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ account_id: accountId, to, cc, bcc, subject, html }),
+          // reply_to_id: el servidor enlaza la respuesta con el original.
+          // attachments: antes no se mandaban con cuentas IMAP (se perdían).
+          body: JSON.stringify({
+            account_id: accountId, to, cc, bcc, subject, html,
+            reply_to_id: data.replyToId || undefined,
+            attachments: attachments.map((a) => ({ name: a.name, type: a.type, dataBase64: a.dataBase64 })),
+          }),
         });
         if (!res.ok) throw new Error((await res.json()).error || 'Error al enviar');
       }
@@ -5252,6 +5275,9 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}
       subject: email.subject.startsWith('Re:') ? email.subject : `Re: ${email.subject}`,
       body: quotedBody,
       replyToId: email.id,
+      replyMessageId: email.messageId,
+      replyReferences: email.references,
+      replyThreadId: email.source === 'gmail' ? email.threadId : undefined,
     });
   };
 
