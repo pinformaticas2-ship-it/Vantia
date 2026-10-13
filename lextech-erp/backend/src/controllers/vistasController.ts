@@ -68,6 +68,23 @@ function canSeeVistas(req: any, cfg: VistasConfig, mailboxOwner: string | null):
   return !isSoporte(req) && !!uid && (uid === cfg.responsableUserId || uid === mailboxOwner);
 }
 
+/** Direcciones de correo (en minúsculas) que ya revisa OTRA organización con
+ *  la automatización activa. Un correo, una organización (13/10/2026): si no,
+ *  el mismo señalamiento -- con los datos del cliente y sus adjuntos -- se
+ *  copiaba en dos organizaciones y se respondía dos veces. Por dirección, no
+ *  por cuenta: cubre también a dos personas que conectan el mismo buzón. */
+async function correosVigiladosEnOtras(organizacionId: string): Promise<Set<string>> {
+  const { rows } = await pool.query(
+    `SELECT DISTINCT lower(COALESCE(a.email, p.email)) AS email
+       FROM organizaciones o
+       LEFT JOIN email_accounts a ON a.id::text = o.vistas_auto_config->'mailbox'->>'id'
+       LEFT JOIN email_oauth_profiles p ON p.id::text = o.vistas_auto_config->'mailbox'->>'id'
+      WHERE o.id <> $1 AND o.vistas_auto_enabled = true AND COALESCE(a.email, p.email) IS NOT NULL`,
+    [organizacionId],
+  );
+  return new Set<string>(rows.map((r: any) => r.email));
+}
+
 async function mailboxOwnerOf(organizacionId: string, cfg: VistasConfig): Promise<{ owner: string | null; label: string | null; hasRefreshToken?: boolean; email?: string }> {
   if (!cfg.mailbox) return { owner: null, label: null };
   if (cfg.mailbox.type === 'imap') {
@@ -126,15 +143,7 @@ export async function getVistasConfig(req: any, res: Response) {
     // Para cada buzón: ¿ya lo revisa otra organización? Así, al elegir, se
     // avisa antes de duplicar vistas. Sin decir cuál (13/10/2026): quien
     // activa la automatización no tiene por qué conocer otras organizaciones.
-    const { rows: vigilados } = await pool.query(
-      `SELECT DISTINCT lower(COALESCE(a.email, p.email)) AS email
-         FROM organizaciones o
-         LEFT JOIN email_accounts a ON a.id::text = o.vistas_auto_config->'mailbox'->>'id'
-         LEFT JOIN email_oauth_profiles p ON p.id::text = o.vistas_auto_config->'mailbox'->>'id'
-        WHERE o.id <> $1 AND o.vistas_auto_enabled = true AND COALESCE(a.email, p.email) IS NOT NULL`,
-      [org.id],
-    );
-    const emailsVigilados = new Set<string>(vigilados.map((v: any) => v.email));
+    const emailsVigilados = await correosVigiladosEnOtras(org.id);
     const yaVigilado = (email: string) => emailsVigilados.has(String(email || '').toLowerCase());
     const mailboxOptions: { type: string; id: string; label: string; email?: string; warning: string | null; vigiladoEnOtra?: boolean }[] = [
       ...accounts.rows.map((a: any) => ({ type: 'imap', id: a.id, label: `${a.label || a.email} <${a.email}>`, email: a.email, warning: null, vigiladoEnOtra: yaVigilado(a.email) })),
@@ -259,6 +268,14 @@ export async function updateVistasConfig(req: any, res: Response) {
       }
     }
     if (enabled && !next.mailbox) return fail(res, 'Elige el buzón de correo que recibe las vistas antes de activar la automatización.', 400);
+    // Un correo, una organización: al activar o al cambiar de buzón, no se
+    // admite uno que ya revise otra (sin decir cuál).
+    if (enabled && next.mailbox && (activando || next.mailbox.id !== current.mailbox?.id)) {
+      const { email } = await mailboxOwnerOf(org.id, next);
+      if (email && (await correosVigiladosEnOtras(org.id)).has(email.toLowerCase())) {
+        return fail(res, 'Este correo ya se revisa en otra organización. Para usarlo aquí, primero hay que desactivarlo allí.', 409);
+      }
+    }
     if (next.responsableUserId) {
       const { rows } = await pool.query(
         `SELECT 1 FROM organizacion_miembros WHERE organizacion_id = $1 AND user_id = $2`,

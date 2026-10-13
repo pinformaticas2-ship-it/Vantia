@@ -76,6 +76,17 @@ test('al elegir, se avisa de que ese correo ya lo revisa otra organización', { 
   assert.equal(cfgA.body.data.mailboxOptions.find((o: any) => o.id === accA).vigiladoEnOtra, false);
   // B no la tiene activada: el buzón de A no está compartido.
   assert.equal(cfgA.body.data.mailboxCompartido, false);
+
+  // Un correo, una organización: B no puede activarla con la misma dirección.
+  const dup = await call(v.updateVistasConfig, 'jefa_buzon', orgB, { body: { enabled: true, config: { mailbox: { type: 'imap', id: accB } } } });
+  assert.equal(dup.status, 409, JSON.stringify(dup.body));
+  assert.ok(!JSON.stringify(dup.body).includes('Despacho A'));
+  assert.equal((await pool.query(`SELECT vistas_auto_enabled FROM organizaciones WHERE id = $1`, [orgB])).rows[0].vistas_auto_enabled, false);
+
+  // Si A la desactiva, B ya puede.
+  await call(v.updateVistasConfig, 'jefa_buzon', orgA, { body: { enabled: false } });
+  const ok = await call(v.updateVistasConfig, 'jefa_buzon', orgB, { body: { enabled: true, config: { mailbox: { type: 'imap', id: accB } } } });
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
 });
 
 test('no se puede elegir un buzón de otra organización', { skip }, async () => {

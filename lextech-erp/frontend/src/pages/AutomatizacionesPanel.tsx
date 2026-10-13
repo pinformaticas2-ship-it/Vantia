@@ -182,7 +182,7 @@ export default function AutomatizacionesPanel() {
         {enabled && data?.mailboxCompartido && (
           <p className="mt-2 flex items-start gap-1.5 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
             <AlertTriangle size={13} className="shrink-0 mt-0.5" />
-            <span>Este correo también se revisa en otra organización: cada vista puede aparecer allí además de aquí. Si no es lo que quieres, elige otro correo.</span>
+            <span>Este correo también se revisa en otra organización, así que las vistas pueden duplicarse. Elige otro correo aquí o pide que lo desactiven allí.</span>
           </p>
         )}
         {enabled && (data?.mailboxWarning || data?.lastError) && (
@@ -223,11 +223,16 @@ function ElegirBuzon({ organizacion, opciones, actual, activando, guardando, err
   organizacion: string; opciones: MailboxOption[]; actual: string | null; activando: boolean; guardando: boolean; error: string;
   onCancel: () => void; onConfirm: (m: MailboxOption) => void;
 }) {
-  const usables = opciones.filter((o) => !o.warning);
-  const [elegido, setElegido] = useState<string | null>(actual || (usables.length === 1 ? usables[0].id : null));
-  const sel = opciones.find((o) => o.id === elegido) || null;
   // Con la automatización apagada no se revisa ninguno (aunque quede guardado el último).
   const actualActivo = activando ? null : actual;
+  // Un correo, una organización: el que ya revisa otra no se puede elegir
+  // (salvo el que esta ya tiene activo).
+  const bloqueada = (o: MailboxOption) => !!o.warning || (!!o.vigiladoEnOtra && o.id !== actualActivo);
+  const usables = opciones.filter((o) => !bloqueada(o));
+  const [elegido, setElegido] = useState<string | null>(
+    (actual && usables.some((o) => o.id === actual) ? actual : null) || (usables.length === 1 ? usables[0].id : null),
+  );
+  const sel = opciones.find((o) => o.id === elegido) || null;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onCancel(); };
     window.addEventListener('keydown', onKey);
@@ -253,7 +258,7 @@ function ElegirBuzon({ organizacion, opciones, actual, activando, guardando, err
           {opciones.map((o) => {
             const activo = elegido === o.id;
             return (
-              <button key={o.id} type="button" disabled={!!o.warning} onClick={() => setElegido(o.id)}
+              <button key={o.id} type="button" disabled={bloqueada(o)} onClick={() => setElegido(o.id)}
                 className={`flex w-full items-start gap-3 rounded-xl border px-3.5 py-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${activo ? 'border-red-300 bg-red-50 ring-1 ring-red-200' : 'border-slate-200 hover:bg-slate-50'}`}>
                 <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${activo ? 'border-red-600 bg-red-600 text-white' : 'border-slate-300 bg-white'}`}>
                   {activo && <Check size={12} />}
@@ -265,7 +270,7 @@ function ElegirBuzon({ organizacion, opciones, actual, activando, guardando, err
                   {o.vigiladoEnOtra && o.id !== actualActivo && (
                     <span className="mt-1 flex items-start gap-1 text-xs text-amber-700">
                       <AlertTriangle size={12} className="mt-0.5 shrink-0" />
-                      <span>Este correo ya se revisa en otra organización: las vistas podrían aparecer duplicadas.</span>
+                      <span>Este correo ya se revisa en otra organización. Para usarlo aquí, primero hay que desactivarlo allí.</span>
                     </span>
                   )}
                 </span>
@@ -276,7 +281,7 @@ function ElegirBuzon({ organizacion, opciones, actual, activando, guardando, err
         </div>
         <div className="flex flex-col-reverse gap-2 border-t border-slate-100 px-5 py-4 sm:flex-row sm:justify-end">
           <button type="button" onClick={onCancel} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancelar</button>
-          <button type="button" disabled={!sel || !!sel.warning || guardando} onClick={() => sel && onConfirm(sel)}
+          <button type="button" disabled={!sel || bloqueada(sel) || guardando} onClick={() => sel && onConfirm(sel)}
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50">
             {guardando && <Loader2 size={14} className="animate-spin" />}
             {activando ? 'Activar con este correo' : 'Usar este correo'}
