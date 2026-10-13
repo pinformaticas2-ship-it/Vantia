@@ -68,10 +68,14 @@ test('al elegir, se avisa de que ese correo ya lo revisa otra organización', { 
   const v = await import('../src/controllers/vistasController');
   const cfgB = await call(v.getVistasConfig, 'jefa_buzon', orgB);
   const opcion = cfgB.body.data.mailboxOptions.find((o: any) => o.id === accB);
-  assert.deepEqual(opcion.vigiladoPor, ['Despacho A']);
+  assert.equal(opcion.vigiladoEnOtra, true);
+  // Sin decir cuál: quien activa no tiene por qué conocer la otra organización.
+  assert.ok(!JSON.stringify(cfgB.body.data).includes('Despacho A'), 'no se revela el nombre de la otra organización');
   // Desde A, su propio buzón no sale como "vigilado por otra".
   const cfgA = await call(v.getVistasConfig, 'jefa_buzon', orgA);
-  assert.deepEqual(cfgA.body.data.mailboxOptions.find((o: any) => o.id === accA).vigiladoPor, []);
+  assert.equal(cfgA.body.data.mailboxOptions.find((o: any) => o.id === accA).vigiladoEnOtra, false);
+  // B no la tiene activada: el buzón de A no está compartido.
+  assert.equal(cfgA.body.data.mailboxCompartido, false);
 });
 
 test('no se puede elegir un buzón de otra organización', { skip }, async () => {

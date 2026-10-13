@@ -123,22 +123,23 @@ export async function getVistasConfig(req: any, res: Response) {
       ),
       listMiembros(org.id),
     ]);
-    // Para cada buzón: qué otras organizaciones (de las tuyas) ya vigilan esa
-    // misma dirección -- así, al elegir, se ve antes de duplicar avisos.
+    // Para cada buzón: ¿ya lo revisa otra organización? Así, al elegir, se
+    // avisa antes de duplicar vistas. Sin decir cuál (13/10/2026): quien
+    // activa la automatización no tiene por qué conocer otras organizaciones.
     const { rows: vigilados } = await pool.query(
-      `SELECT o.nombre, lower(COALESCE(a.email, p.email)) AS email
+      `SELECT DISTINCT lower(COALESCE(a.email, p.email)) AS email
          FROM organizaciones o
-         JOIN organizacion_miembros m ON m.organizacion_id = o.id AND m.user_id = $2
          LEFT JOIN email_accounts a ON a.id::text = o.vistas_auto_config->'mailbox'->>'id'
          LEFT JOIN email_oauth_profiles p ON p.id::text = o.vistas_auto_config->'mailbox'->>'id'
         WHERE o.id <> $1 AND o.vistas_auto_enabled = true AND COALESCE(a.email, p.email) IS NOT NULL`,
-      [org.id, uid],
+      [org.id],
     );
-    const vigiladoPor = (email: string) => vigilados.filter((v: any) => v.email === String(email || '').toLowerCase()).map((v: any) => v.nombre);
-    const mailboxOptions: { type: string; id: string; label: string; email?: string; warning: string | null; vigiladoPor?: string[] }[] = [
-      ...accounts.rows.map((a: any) => ({ type: 'imap', id: a.id, label: `${a.label || a.email} <${a.email}>`, email: a.email, warning: null, vigiladoPor: vigiladoPor(a.email) })),
+    const emailsVigilados = new Set<string>(vigilados.map((v: any) => v.email));
+    const yaVigilado = (email: string) => emailsVigilados.has(String(email || '').toLowerCase());
+    const mailboxOptions: { type: string; id: string; label: string; email?: string; warning: string | null; vigiladoEnOtra?: boolean }[] = [
+      ...accounts.rows.map((a: any) => ({ type: 'imap', id: a.id, label: `${a.label || a.email} <${a.email}>`, email: a.email, warning: null, vigiladoEnOtra: yaVigilado(a.email) })),
       ...profiles.rows.map((p: any) => ({
-        type: 'gmail', id: p.id, label: `Gmail · ${p.email}`, email: p.email, vigiladoPor: vigiladoPor(p.email),
+        type: 'gmail', id: p.id, label: `Gmail · ${p.email}`, email: p.email, vigiladoEnOtra: yaVigilado(p.email),
         warning: p.refresh_token_enc ? null : 'Este Gmail se conectó antes de poder trabajar en segundo plano: vuelve a conectarlo desde Correo para que la automatización pueda leerlo.',
       })),
     ];
@@ -146,26 +147,14 @@ export async function getVistasConfig(req: any, res: Response) {
       mailboxOptions.push({ type: cfg.mailbox.type, id: cfg.mailbox.id, label: `${mailbox.label} (de otro usuario)`, warning: null });
     }
 
-    // Otras organizaciones (de las que eres miembro) que vigilan este mismo
-    // buzón: cada una crea su vista; el aviso solo te llega una vez.
-    let mailboxCompartidoCon: string[] = [];
-    if (org.vistas_auto_enabled && mailbox.email) {
-      const { rows: otras } = await pool.query(
-        `SELECT o.nombre FROM organizaciones o
-           JOIN organizacion_miembros m ON m.organizacion_id = o.id AND m.user_id = $3
-          WHERE o.id <> $1 AND o.vistas_auto_enabled = true
-            AND (EXISTS (SELECT 1 FROM email_accounts a WHERE a.id::text = o.vistas_auto_config->'mailbox'->>'id' AND lower(a.email) = lower($2))
-              OR EXISTS (SELECT 1 FROM email_oauth_profiles p WHERE p.id::text = o.vistas_auto_config->'mailbox'->>'id' AND lower(p.email) = lower($2)))
-          ORDER BY o.nombre`,
-        [org.id, mailbox.email, uid],
-      );
-      mailboxCompartidoCon = otras.map((r: any) => r.nombre);
-    }
+    // El buzón vigilado aquí también lo revisa otra organización (cada una
+    // crea su vista; el aviso solo llega una vez).
+    const mailboxCompartido = Boolean(org.vistas_auto_enabled && mailbox.email && yaVigilado(mailbox.email));
 
     return ok(res, {
       ...base,
       config: cfg,
-      mailboxCompartidoCon,
+      mailboxCompartido,
       mailboxLabel: mailbox.label,
       mailboxWarning: cfg.mailbox?.type === 'gmail' && mailbox.label && !mailbox.hasRefreshToken
         ? 'El Gmail vigilado necesita volver a conectarse desde Correo para poder leerse en segundo plano.'

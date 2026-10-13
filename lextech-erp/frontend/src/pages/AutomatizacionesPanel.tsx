@@ -23,12 +23,12 @@ interface ConfigResponse {
   lastError?: string | null;
   iaDisponible?: boolean;
   config?: CorreoConfig;
-  mailboxCompartidoCon?: string[];
+  mailboxCompartido?: boolean;
   mailboxOptions?: MailboxOption[];
   mailboxId?: string | null;
   organizacionNombre?: string;
 }
-interface MailboxOption { type: 'imap' | 'gmail'; id: string; label: string; email?: string; warning: string | null; vigiladoPor?: string[] }
+interface MailboxOption { type: 'imap' | 'gmail'; id: string; label: string; email?: string; warning: string | null; vigiladoEnOtra?: boolean }
 
 const PASOS = [
   'Llega al correo un señalamiento de vista',
@@ -179,10 +179,10 @@ export default function AutomatizacionesPanel() {
             Por privacidad, las vistas (con sus correos y adjuntos) solo las ven el dueño del buzón vigilado y el abogado responsable.
           </p>
         )}
-        {enabled && !!data?.mailboxCompartidoCon?.length && (
+        {enabled && data?.mailboxCompartido && (
           <p className="mt-2 flex items-start gap-1.5 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
             <AlertTriangle size={13} className="shrink-0 mt-0.5" />
-            <span>Este mismo buzón también lo vigila {data.mailboxCompartidoCon.join(', ')}: cada vista aparecerá en las dos organizaciones (el aviso solo te llega una vez). Si no lo necesitas, desactiva la automatización en una de ellas.</span>
+            <span>Este correo también se revisa en otra organización: cada vista puede aparecer allí además de aquí. Si no es lo que quieres, elige otro correo.</span>
           </p>
         )}
         {enabled && (data?.mailboxWarning || data?.lastError) && (
@@ -226,6 +226,8 @@ function ElegirBuzon({ organizacion, opciones, actual, activando, guardando, err
   const usables = opciones.filter((o) => !o.warning);
   const [elegido, setElegido] = useState<string | null>(actual || (usables.length === 1 ? usables[0].id : null));
   const sel = opciones.find((o) => o.id === elegido) || null;
+  // Con la automatización apagada no se revisa ninguno (aunque quede guardado el último).
+  const actualActivo = activando ? null : actual;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onCancel(); };
     window.addEventListener('keydown', onKey);
@@ -258,12 +260,12 @@ function ElegirBuzon({ organizacion, opciones, actual, activando, guardando, err
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-800"><Mail size={14} className="shrink-0 text-slate-400" /><span className="truncate">{o.label}</span></span>
-                  {o.id === actual && <span className="mt-0.5 block text-xs text-slate-500">Es el que se revisa ahora.</span>}
+                  {o.id === actualActivo && <span className="mt-0.5 block text-xs text-slate-500">Es el que se revisa ahora.</span>}
                   {o.warning && <span className="mt-1 block text-xs text-amber-700">{o.warning}</span>}
-                  {!!o.vigiladoPor?.length && (
+                  {o.vigiladoEnOtra && o.id !== actualActivo && (
                     <span className="mt-1 flex items-start gap-1 text-xs text-amber-700">
                       <AlertTriangle size={12} className="mt-0.5 shrink-0" />
-                      <span>Ya lo revisa {o.vigiladoPor.join(', ')}: cada vista aparecería también allí.</span>
+                      <span>Este correo ya se revisa en otra organización: las vistas podrían aparecer duplicadas.</span>
                     </span>
                   )}
                 </span>
