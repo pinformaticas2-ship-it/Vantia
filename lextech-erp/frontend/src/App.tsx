@@ -6,6 +6,7 @@ import { EmailUnreadProvider } from './contexts/EmailUnreadContext';
 import { WhatsAppUnreadProvider } from './contexts/WhatsAppUnreadContext';
 import { DocumentProcessingProvider } from './contexts/DocumentProcessingContext';
 import { ThemeProvider } from './lib/ThemeContext';
+import { soltarPushDeEsteNavegador } from './lib/usePushNotifications';
 
 // Layouts
 import DashboardLayout from './layouts/DashboardLayout';
@@ -38,6 +39,13 @@ import DirectorioProfesionales from './pages/DirectorioProfesionales';
 import DirectorioProfesionalForm from './pages/DirectorioProfesionalForm';
 import DropboxOAuthCallback from './pages/DropboxOAuthCallback';
 import { useOrganizacion, Modulo } from './lib/useOrganizacion';
+
+// Sin sesión (se cerró desde el menú de usuario, caducó...), este navegador
+// no debe seguir recibiendo los avisos push de nadie.
+function SoltarPushSinSesion() {
+  React.useEffect(() => { void soltarPushDeEsteNavegador(); }, []);
+  return null;
+}
 
 export default function App() {
   return (
@@ -105,6 +113,7 @@ export default function App() {
       </SignedIn>
 
       <SignedOut>
+        <SoltarPushSinSesion />
         <Routes>
           <Route path="/formulario-cliente/:token" element={<FormularioCliente />} />
           <Route path="/reservar/:token" element={<AgendaBookingPublic />} />

@@ -1,5 +1,6 @@
 import webpush from 'web-push';
 import pool from '../config/database';
+import { Modulo, resolveEffectivePermission } from '../config/permissions';
 
 // ── Notificaciones push del navegador ────────────────────────────────────────
 // Envío best-effort: si faltan las claves VAPID en el entorno (no configuradas
@@ -82,28 +83,30 @@ export async function sendPushToUsers(userIds: string[], payload: PushPayload, e
   } catch (e) { console.error('[push] sendPushToUsers:', e); }
 }
 
-/** A todos los miembros de una organización (para avisos de ámbito de despacho: recordatorios de expediente). */
-export async function sendPushToOrg(organizacionId: string | null | undefined, payload: PushPayload, excludeUserId?: string | null): Promise<void> {
-  if (!enabled || !organizacionId) return;
-  try {
-    const { rows: members } = await pool.query(
-      `SELECT user_id FROM organizacion_miembros WHERE organizacion_id = $1`,
-      [organizacionId],
-    );
-    await sendPushToUsers(members.map((m: any) => m.user_id), payload, excludeUserId);
-  } catch (e) { console.error('[push] sendPushToOrg:', e); }
+/** Miembros de la organización que pueden ver un módulo (según los permisos
+ *  de su rol y sus excepciones personales). Con los permisos por defecto,
+ *  soporte queda fuera de todos. */
+export async function miembrosConAcceso(organizacionId: string, modulo: Modulo): Promise<string[]> {
+  const { rows } = await pool.query(
+    `SELECT user_id, rol FROM organizacion_miembros WHERE organizacion_id = $1`,
+    [organizacionId],
+  );
+  const ids: string[] = [];
+  for (const m of rows) {
+    if ((await resolveEffectivePermission(organizacionId, m.user_id, m.rol, modulo)) !== 'ninguno') ids.push(m.user_id);
+  }
+  return ids;
 }
 
-/** A todos los suscritos, sin filtrar por organización -- para módulos aún no aislados por organización (WhatsApp). */
-export async function sendPushToAll(payload: PushPayload, excludeUserId?: string | null): Promise<void> {
-  if (!enabled) return;
+/** A quienes, dentro de la organización, tienen acceso al módulo del aviso
+ *  (13/10/2026: antes iba a TODOS los miembros, soporte incluido, aunque no
+ *  pudieran ni abrir lo que se les avisaba). Ya no existe un "a todo el
+ *  mundo": un aviso sin organización conocida no se envía a nadie. */
+export async function sendPushToOrgModule(
+  organizacionId: string | null | undefined, modulo: Modulo, payload: PushPayload, excludeUserId?: string | null,
+): Promise<void> {
+  if (!enabled || !organizacionId) return;
   try {
-    const { rows } = await pool.query<SubRow>(
-      excludeUserId
-        ? `SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE user_id <> $1`
-        : `SELECT id, endpoint, p256dh, auth FROM push_subscriptions`,
-      excludeUserId ? [excludeUserId] : [],
-    );
-    await deliver(rows, payload);
-  } catch (e) { console.error('[push] sendPushToAll:', e); }
+    await sendPushToUsers(await miembrosConAcceso(organizacionId, modulo), payload, excludeUserId);
+  } catch (e) { console.error('[push] sendPushToOrgModule:', e); }
 }

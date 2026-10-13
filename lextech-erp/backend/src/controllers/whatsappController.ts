@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import pool from '../config/database';
 import { resolveUserName } from './activityController';
-import { sendPushToAll, sendPushToOrg } from '../utils/webPush';
+import { sendPushToOrgModule } from '../utils/webPush';
 import { encryptPassword, decryptPassword } from '../utils/emailCrypto';
 
 type WhatsAppConfig = {
@@ -581,10 +581,12 @@ export async function receiveWebhook(req: Request, res: Response) {
             ],
           );
 
-          // Si el número ya está vinculado a un cliente, se sabe de qué
-          // organización es el mensaje y el push se manda solo a ese
-          // despacho; si no, se manda a todo el mundo (igual que antes) para
-          // que alguien lo vea y lo vincule.
+          // El push va solo a quien, en la organización del mensaje (la del
+          // número de WhatsApp o la del cliente vinculado), puede ver
+          // Comunicación externa. Sin organización conocida no se avisa a
+          // nadie por push (13/10/2026: antes se mandaba a TODOS los usuarios
+          // de TODAS las organizaciones, con el nombre y el texto); el
+          // mensaje sigue guardado y se ve en la bandeja de WhatsApp.
           const pushPayload = {
             title: contactName || 'WhatsApp',
             body: body || 'Mensaje recibido',
@@ -592,8 +594,7 @@ export async function receiveWebhook(req: Request, res: Response) {
             tag: `whatsapp-${fromPhone}`,
           };
           const messageOrgId = webhookOrgId || client?.organizacion_id;
-          if (messageOrgId) void sendPushToOrg(messageOrgId, pushPayload);
-          else void sendPushToAll(pushPayload);
+          if (messageOrgId) void sendPushToOrgModule(messageOrgId, 'whatsapp', pushPayload);
         }
       }
     }

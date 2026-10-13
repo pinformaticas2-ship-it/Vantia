@@ -1620,19 +1620,25 @@ export async function sendMail(req: Request, res: Response) {
     return err(res, 'Faltan campos obligatorios (to, subject, html)', 400);
   }
 
+  // Solo cuentas de la organización activa (13/10/2026): antes, sin cuenta
+  // indicada se cogía la primera del usuario en CUALQUIER organización, y con
+  // cuenta indicada no se comprobaba de cuál era.
+  const organizacionId = (req as any).organizacionId;
+  if (!organizacionId) return err(res, 'Organización no resuelta', 400);
+
   try {
     if (!accountId) {
       const { rows: firstAccountRows } = await pool.query(
-        `SELECT id FROM email_accounts WHERE user_id=$1 AND active=true ORDER BY created_at ASC LIMIT 1`,
-        [uid],
+        `SELECT id FROM email_accounts WHERE user_id=$1 AND organizacion_id=$2 AND active=true ORDER BY created_at ASC LIMIT 1`,
+        [uid, organizacionId],
       );
       accountId = firstAccountRows[0]?.id;
     }
-    if (!accountId) return err(res, 'No hay ninguna cuenta IMAP/SMTP activa para enviar', 400);
+    if (!accountId) return err(res, 'No hay ninguna cuenta de correo activa en esta organización para enviar', 400);
 
     const { rows } = await pool.query(
-      `SELECT * FROM email_accounts WHERE id=$1 AND user_id=$2 AND active=true`,
-      [accountId, uid],
+      `SELECT * FROM email_accounts WHERE id=$1 AND user_id=$2 AND organizacion_id=$3 AND active=true`,
+      [accountId, uid, organizacionId],
     );
     if (!rows.length) return err(res, 'Cuenta no encontrada', 404);
     const acc = rows[0];

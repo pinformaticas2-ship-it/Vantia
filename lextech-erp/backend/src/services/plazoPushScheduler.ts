@@ -1,6 +1,6 @@
 import { randomBytes } from 'crypto';
 import pool from '../config/database';
-import { pushEnabled, sendPushToUser, sendPushToOrg } from '../utils/webPush';
+import { pushEnabled, sendPushToUser, sendPushToOrgModule } from '../utils/webPush';
 
 const PUBLIC_BACKEND_URL = (process.env.PUBLIC_BACKEND_URL || 'https://vantia.up.railway.app').replace(/\/$/, '');
 
@@ -72,7 +72,8 @@ async function checkExpedienteNotificaciones(): Promise<void> {
       diffDays === 1 ? 'Vence mañana' :
       `Vence en ${diffDays} días`;
     const dismissToken = randomBytes(16).toString('hex');
-    await sendPushToOrg(n.organizacion_id, {
+    // Solo a quien puede ver Expedientes en esa organización (no a soporte).
+    await sendPushToOrgModule(n.organizacion_id, 'expedientes', {
       title: n.titulo || 'Recordatorio de expediente',
       body: `${when} · Exp. ${n.anio}/${n.num_exp}`,
       url: `/dashboard/expedientes/${n.expediente_id}?tab=notificaciones`,

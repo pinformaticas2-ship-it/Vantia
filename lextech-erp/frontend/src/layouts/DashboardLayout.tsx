@@ -25,7 +25,7 @@ import { useChatUnread } from "../contexts/ChatUnreadContext";
 import { useEmailUnread } from "../contexts/EmailUnreadContext";
 import { useWhatsAppUnread, WA_LAST_SEEN_KEY } from "../contexts/WhatsAppUnreadContext";
 import { useDocumentProcessing } from "../contexts/DocumentProcessingContext";
-import { usePushNotifications } from "../lib/usePushNotifications";
+import { usePushNotifications, soltarPushDeEsteNavegador } from "../lib/usePushNotifications";
 import { useVistasStatus } from "../lib/useVistasStatus";
 import type { Modulo } from "../lib/useOrganizacion";
 
@@ -2063,6 +2063,9 @@ export default function DashboardLayout() {
         });
       }
     } catch (_e) { /* silencioso */ } finally {
+      // Que este navegador deje de recibir sus avisos push (con token: se
+      // borra ya también en el servidor).
+      try { await soltarPushDeEsteNavegador(await getToken().catch(() => null)); } catch { /* noop */ }
       clerk.signOut({ redirectUrl: '/' });
     }
   }, [getToken, clerk]);
