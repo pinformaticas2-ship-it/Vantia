@@ -20,7 +20,6 @@ import ClientDetail from './pages/ClientDetail';
 import ClientCsvImport from './pages/ClientCsvImport';
 import ExpedienteList from './pages/ExpedienteList';
 import ExpedienteDetail from './pages/ExpedienteDetail';
-import Trazabilidad from './pages/Trazabilidad';
 import Agenda from './pages/Agenda';
 import Tareas from './pages/Tareas';
 import Chat   from './pages/Chat';
@@ -80,7 +79,8 @@ export default function App() {
             <Route path="contrarios/:id/edit" element={<RequireModuleAccess modulo="directorio"><DirectorioProfesionalForm tipo="CONTRARIO" singular="Parte contraria" /></RequireModuleAccess>} />
             <Route path="expedientes" element={<RequireModuleAccess modulo="expedientes"><ExpedienteList /></RequireModuleAccess>} />
             <Route path="expedientes/:id" element={<RequireModuleAccess modulo="expedientes"><ExpedienteDetail /></RequireModuleAccess>} />
-            <Route path="trazabilidad" element={<Trazabilidad />} />
+            {/* Trazabilidad vive en Configuración (14/10/2026); los enlaces antiguos siguen valiendo. */}
+            <Route path="trazabilidad" element={<Navigate to="/dashboard/config?section=trazabilidad" replace />} />
             <Route path="agenda" element={<RequireModuleAccess modulo="agenda"><Agenda /></RequireModuleAccess>} />
             <Route path="tareas" element={<RequireModuleAccess modulo="tareas"><Tareas /></RequireModuleAccess>} />
             <Route path="chat"   element={<RequireModuleAccess modulo="chat"><Chat /></RequireModuleAccess>} />

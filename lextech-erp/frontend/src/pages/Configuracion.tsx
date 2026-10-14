@@ -12,6 +12,7 @@ import { apiFetch, resolveUploadUrl, setActiveOrganizacionId } from '../lib/api'
 import { useOrganizacion, OrgRol, Modulo, NivelAcceso } from '../lib/useOrganizacion';
 import ManualPanel from './ManualPanel';
 import AutomatizacionesPanel from './AutomatizacionesPanel';
+import Trazabilidad from './Trazabilidad';
 import { usePushNotifications } from '../lib/usePushNotifications';
 
 const PALETTES: {
@@ -92,7 +93,8 @@ const PALETTES: {
   },
 ];
 
-type SectionKey = 'apariencia' | 'manual' | 'notificaciones' | 'despacho' | 'seguridad' | 'integraciones' | 'automatizaciones' | 'usuarios';
+const SECCIONES_VALIDAS: string[] = ['apariencia', 'manual', 'notificaciones', 'despacho', 'seguridad', 'integraciones', 'automatizaciones', 'trazabilidad', 'usuarios'];
+type SectionKey = 'apariencia' | 'manual' | 'notificaciones' | 'despacho' | 'seguridad' | 'integraciones' | 'automatizaciones' | 'trazabilidad' | 'usuarios';
 
 const OTHER_SECTIONS: { key: SectionKey; label: string; desc: string; icon: any }[] = [
   { key: 'notificaciones', label: 'Notificaciones',        desc: 'Configura alertas por email y avisos emergentes del sistema.',            icon: Bell },
@@ -100,6 +102,8 @@ const OTHER_SECTIONS: { key: SectionKey; label: string; desc: string; icon: any 
   { key: 'seguridad',      label: 'Seguridad',             desc: 'Cambio de contraseñas, autenticación en dos pasos (2FA) y sesiones activas.', icon: ShieldCheck },
   { key: 'integraciones',  label: 'Integraciones',         desc: 'Conecta Vantia con herramientas y servicios externos.',                    icon: Plug },
   { key: 'automatizaciones', label: 'Automatizaciones',    desc: 'Flujos automáticos de la organización, como las vistas recibidas por correo.', icon: Zap },
+  // Antes en el menú lateral (14/10/2026): es auditoría, no trabajo del día a día.
+  { key: 'trazabilidad',   label: 'Trazabilidad',          desc: 'Historial de accesos y acciones de todo el despacho.',                      icon: History },
   { key: 'usuarios',       label: 'Gestión de Usuarios',   desc: 'Administra los usuarios y permisos del despacho.',                          icon: UsersRound },
 ];
 
@@ -1432,7 +1436,7 @@ function SeguridadPanel() {
           </div>
           <button
             type="button"
-            onClick={() => navigate('/dashboard/trazabilidad')}
+            onClick={() => navigate('/dashboard/config?section=trazabilidad')}
             className="shrink-0 px-3.5 py-2 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
           >
             Ver Trazabilidad
@@ -2261,9 +2265,13 @@ export default function Configuracion() {
   const [searchParams] = useSearchParams();
   const [activeSection, setActiveSection] = useState<SectionKey>(() => {
     const requested = searchParams.get('section') as SectionKey | null;
-    const valid: SectionKey[] = ['apariencia', 'manual', 'notificaciones', 'despacho', 'seguridad', 'integraciones', 'automatizaciones', 'usuarios'];
-    return requested && valid.includes(requested) ? requested : 'apariencia';
+    return requested && SECCIONES_VALIDAS.includes(requested) ? requested : 'apariencia';
   });
+  // Si cambia ?section= estando ya aquí (p.ej. "Ver Trazabilidad" desde Seguridad).
+  useEffect(() => {
+    const requested = searchParams.get('section') as SectionKey | null;
+    if (requested && SECCIONES_VALIDAS.includes(requested)) setActiveSection(requested);
+  }, [searchParams]);
   const activeOther = visibleOtherSections.find((s) => s.key === activeSection);
 
   return (
@@ -2455,6 +2463,12 @@ export default function Configuracion() {
             <IntegracionesPanel canManage={myRol === 'propietario' || myRol === 'admin'} />
           ) : activeSection === 'automatizaciones' && (myRol === 'propietario' || myRol === 'admin') ? (
             <AutomatizacionesPanel />
+          ) : activeSection === 'trazabilidad' ? (
+            // La vista de Trazabilidad es a pantalla completa (lista + detalle):
+            // aquí va en un marco de altura fija.
+            <div className="-m-4 sm:m-0 h-[calc(100dvh-9rem)] min-h-[520px] overflow-hidden sm:rounded-2xl border border-slate-200">
+              <Trazabilidad />
+            </div>
           ) : activeSection === 'usuarios' ? (
             <UsuariosPanel />
           ) : (

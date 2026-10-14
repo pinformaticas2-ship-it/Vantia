@@ -97,7 +97,7 @@ const MODULES = [
   { name: "Procuradores",   path: "/dashboard/procuradores", icon: Scale,           desc: "Directorio de procuradores" },
   { name: "Abogados",       path: "/dashboard/abogados",     icon: Gavel,           desc: "Directorio de abogados" },
   { name: "Partes contrarias", path: "/dashboard/contrarios", icon: UserX,         desc: "Partes contrarias habituales: correo y datos básicos" },
-  { name: "Trazabilidad",   path: "/dashboard/trazabilidad", icon: History,         desc: "Historial de acciones por usuario" },
+  { name: "Trazabilidad",   path: "/dashboard/config?section=trazabilidad", icon: History, desc: "Historial de accesos y acciones (en Configuración)" },
   { name: "Agenda",         path: "/dashboard/agenda",       icon: Calendar,        desc: "Calendario y citas" },
   { name: "Tareas",         path: "/dashboard/tareas",       icon: CheckCircle2,    desc: "Tareas y plazos del usuario" },
   { name: "Chat",           path: "/dashboard/chat",         icon: MessageSquare,   desc: "Chat de equipo" },
@@ -172,7 +172,8 @@ const NAV_GROUPS = [
   },
   {
     label: "Gestión",
-    items: ["Tesorería", "Documental", "Trazabilidad", "Chat IA"],
+    // Trazabilidad está en Configuración (14/10/2026).
+    items: ["Tesorería", "Documental", "Chat IA"],
   },
 ];
 
