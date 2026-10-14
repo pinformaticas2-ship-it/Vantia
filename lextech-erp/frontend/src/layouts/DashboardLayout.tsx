@@ -1543,16 +1543,16 @@ function OrgSwitcherMenu({ menuRef, pos, organizaciones, activaId, rolActivo, on
       role="menu"
       aria-label="Cambiar de organización"
       style={{ position: "fixed", top: pos.top, left: pos.left, width: pos.width }}
-      className="erp-org-menu z-[999] rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/20 outline-none overflow-hidden"
+      className="erp-org-menu z-[999] rounded-2xl border shadow-2xl outline-none overflow-hidden"
     >
       <div className="px-3.5 pt-3 pb-2 flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-[13px] font-semibold text-slate-900">Organizaciones</p>
-          <p className="text-[11px] text-slate-500">
+          <p className="text-[13px] font-semibold om-t1">Organizaciones</p>
+          <p className="text-[11px] om-t3">
             {organizaciones.length > 1 ? "Elige en cuál quieres trabajar" : "Solo perteneces a esta"}
           </p>
         </div>
-        <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-slate-600">
+        <span className="shrink-0 rounded-full om-chip px-2 py-0.5 text-[11px] font-semibold tabular-nums">
           {organizaciones.length}
         </span>
       </div>
@@ -1560,13 +1560,13 @@ function OrgSwitcherMenu({ menuRef, pos, organizaciones, activaId, rolActivo, on
       {conBuscador && (
         <div className="px-3 pb-2">
           <div className="relative">
-            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 om-t4 pointer-events-none" />
             <input
               autoFocus
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Buscar organización…"
-              className="w-full h-8 rounded-lg border border-slate-200 bg-slate-50 pl-8 pr-2 text-xs text-slate-800 placeholder:text-slate-400 outline-none focus:border-red-300 focus:bg-white"
+              className="w-full h-8 om-input rounded-lg border pl-8 pr-2 text-xs outline-none"
             />
           </div>
         </div>
@@ -1574,7 +1574,7 @@ function OrgSwitcherMenu({ menuRef, pos, organizaciones, activaId, rolActivo, on
 
       <div className="max-h-[min(60vh,360px)] overflow-y-auto px-1.5 pb-1.5 space-y-0.5">
         {lista.length === 0 && (
-          <p className="px-3 py-6 text-center text-xs text-slate-500">Ninguna organización coincide con «{q}».</p>
+          <p className="px-3 py-6 text-center text-xs om-t3">Ninguna organización coincide con «{q}».</p>
         )}
         {lista.map((o, i) => {
           const activa = o.id === activaId;
@@ -1592,10 +1592,10 @@ function OrgSwitcherMenu({ menuRef, pos, organizaciones, activaId, rolActivo, on
               className={`group w-full flex items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors border ${
                 activa
                   ? "erp-org-activa"
-                  : enFoco ? "bg-slate-50 border-slate-200" : "border-transparent"
+                  : enFoco ? "om-foco" : "border-transparent"
               }`}
             >
-              <div className={`w-9 h-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden`}>
+              <div className={`w-9 h-9 rounded-lg bg-white border om-logo flex items-center justify-center shrink-0 overflow-hidden`}>
                 <OrgLogoBadge
                   nombre={o.nombre}
                   logoUrl={o.logoUrl}
@@ -1605,8 +1605,8 @@ function OrgSwitcherMenu({ menuRef, pos, organizaciones, activaId, rolActivo, on
                 />
               </div>
               <div className="min-w-0 flex-1">
-                <p className={`text-[13px] leading-snug font-semibold line-clamp-2 break-words ${activa ? "text-slate-900" : "text-slate-800"}`}>{o.nombre}</p>
-                <OrgRolChip rol={o.rol} className="mt-0.5 text-[11px] text-slate-500" />
+                <p className={`text-[13px] leading-snug font-semibold line-clamp-2 break-words om-t1`}>{o.nombre}</p>
+                <OrgRolChip rol={o.rol} className="mt-0.5 text-[11px] om-t3" />
               </div>
               {cambiando === o.id ? (
                 <Loader2 size={16} className="shrink-0 animate-spin text-red-600" />
@@ -1615,34 +1615,34 @@ function OrgSwitcherMenu({ menuRef, pos, organizaciones, activaId, rolActivo, on
                   <Check size={11} strokeWidth={3} /> Actual
                 </span>
               ) : (
-                <ArrowRight size={15} className={`shrink-0 text-slate-400 transition-all ${enFoco ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-1"}`} />
+                <ArrowRight size={15} className={`shrink-0 om-t3 transition-all ${enFoco ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-1"}`} />
               )}
             </button>
           );
         })}
       </div>
 
-      <div className="border-t border-slate-100 px-1.5 py-1.5 bg-slate-50/60">
+      <div className="om-pie border-t px-1.5 py-1.5">
         {gestiona && (
           <button
             type="button"
             onClick={() => { onClose(); navigate("/dashboard/config?section=despacho"); }}
-            className="w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-600 hover:bg-white hover:text-slate-900 transition-colors"
+            className="w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium om-accion transition-colors"
           >
-            <Settings size={14} className="text-slate-400" /> Ajustes del despacho
+            <Settings size={14} className="om-t4" /> Ajustes del despacho
           </button>
         )}
         {gestiona && (
           <button
             type="button"
             onClick={() => { onClose(); navigate("/dashboard/config?section=usuarios"); }}
-            className="w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-600 hover:bg-white hover:text-slate-900 transition-colors"
+            className="w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium om-accion transition-colors"
           >
-            <Users size={14} className="text-slate-400" /> Gestionar miembros
+            <Users size={14} className="om-t4" /> Gestionar miembros
           </button>
         )}
         {organizaciones.length > 1 && (
-          <p className="px-2.5 pt-1 pb-0.5 text-[10px] text-slate-400">
+          <p className="px-2.5 pt-1 pb-0.5 text-[10px] om-t4">
             <kbd className="font-sans">↑</kbd> <kbd className="font-sans">↓</kbd> para moverte · <kbd className="font-sans">Intro</kbd> para entrar
           </p>
         )}

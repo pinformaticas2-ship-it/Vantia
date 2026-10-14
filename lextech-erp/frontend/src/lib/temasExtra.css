@@ -251,3 +251,45 @@ html[data-theme] .erp-company-open.erp-company-icon, html[data-theme] .erp-compa
 html[data-modo="oscuro"] .erp-company-count { box-shadow: 0 0 0 2px var(--o-superficie); }
 .erp-org-activa { background-color: rgba(var(--tema-rgb), 0.08); border-color: rgba(var(--tema-rgb), 0.3); }
 html[data-modo="oscuro"] .erp-org-activa { background-color: rgba(var(--tema-rgb), 0.14); border-color: rgba(var(--tema-rgb), 0.4); }
+
+/* El menú va a juego con la barra lateral: claro si la barra es blanca
+   (azul, verde, violeta, índigo) y oscuro si es oscura (rojo, grafito y
+   cualquier tema en modo oscuro). No usa bg-white/text-slate-* para que las
+   reglas generales del modo oscuro no se le apliquen. */
+.erp-org-menu {
+  --om-bg: #ffffff; --om-borde: #e2e8f0; --om-t1: #0f172a; --om-t3: #64748b; --om-t4: #94a3b8;
+  --om-foco: #f8fafc; --om-pie: #f8fafc; --om-chip: #f1f5f9; --om-input: #f8fafc;
+  --om-sombra: rgba(15, 23, 42, 0.18);
+  background-color: var(--om-bg); border-color: var(--om-borde); color: var(--om-t1);
+  box-shadow: 0 20px 45px -12px var(--om-sombra);
+}
+[data-theme="rojo"] .erp-org-menu {
+  --om-bg: #1e293b; --om-borde: #334155; --om-t1: #f1f5f9; --om-t3: #a3b1c4; --om-t4: #8391a5;
+  --om-foco: rgba(255, 255, 255, 0.06); --om-pie: rgba(15, 23, 42, 0.45); --om-chip: rgba(255, 255, 255, 0.08);
+  --om-input: #0f172a; --om-sombra: rgba(0, 0, 0, 0.55);
+}
+[data-theme="grafito"] .erp-org-menu {
+  --om-bg: #273244; --om-borde: #3b4657; --om-t1: #f3f4f6; --om-t3: #a7b0bd; --om-t4: #8a94a3;
+  --om-foco: rgba(255, 255, 255, 0.06); --om-pie: rgba(17, 24, 39, 0.4); --om-chip: rgba(255, 255, 255, 0.08);
+  --om-input: #1f2937; --om-sombra: rgba(0, 0, 0, 0.55);
+}
+html[data-modo="oscuro"] .erp-org-menu {
+  --om-bg: var(--o-elevado); --om-borde: var(--o-borde-fuerte); --om-t1: var(--o-texto); --om-t3: var(--o-texto-3); --om-t4: var(--o-texto-4);
+  --om-foco: rgba(255, 255, 255, 0.05); --om-pie: rgba(0, 0, 0, 0.18); --om-chip: rgba(255, 255, 255, 0.08);
+  --om-input: var(--o-superficie); --om-sombra: rgba(0, 0, 0, 0.6);
+}
+.erp-org-menu .om-t1 { color: var(--om-t1); }
+.erp-org-menu .om-t3 { color: var(--om-t3); }
+.erp-org-menu .om-t4 { color: var(--om-t4); }
+.erp-org-menu .om-chip { background-color: var(--om-chip); color: var(--om-t3); }
+.erp-org-menu .om-foco { background-color: var(--om-foco); border-color: var(--om-borde); }
+.erp-org-menu .om-logo { border-color: var(--om-borde); }
+.erp-org-menu .om-pie { background-color: var(--om-pie); border-color: var(--om-borde); }
+.erp-org-menu .om-accion { color: var(--om-t3); }
+.erp-org-menu .om-accion:hover { color: var(--om-t1); background-color: var(--om-foco); }
+.erp-org-menu .om-input { background-color: var(--om-input); border-color: var(--om-borde); color: var(--om-t1); }
+.erp-org-menu .om-input::placeholder { color: var(--om-t4); }
+.erp-org-menu .om-input:focus { border-color: rgba(var(--tema-rgb), 0.6); }
+.erp-org-menu .erp-org-activa { background-color: rgba(var(--tema-rgb), 0.08); border-color: rgba(var(--tema-rgb), 0.3); }
+[data-theme="rojo"] .erp-org-menu .erp-org-activa, [data-theme="grafito"] .erp-org-menu .erp-org-activa,
+html[data-modo="oscuro"] .erp-org-menu .erp-org-activa { background-color: rgba(var(--tema-rgb), 0.16); border-color: rgba(var(--tema-rgb), 0.45); }
