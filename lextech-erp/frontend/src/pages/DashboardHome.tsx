@@ -1555,7 +1555,7 @@ export default function DashboardHome() {
                   <p className={`text-2xl font-extrabold leading-tight ${billingCalc.total>=0 ? "text-emerald-700" : "text-red-600"}`}>{fmtEur(billingCalc.total)}</p>
                 </div>
                 {billingCalc.facturasVencidas > 0 && (
-                  <div className="flex items-center gap-1 rounded-lg bg-white px-2 py-1 text-[10px] font-bold text-red-600 shadow-sm">
+                  <div className="peligro flex items-center gap-1 rounded-lg bg-white px-2 py-1 text-[10px] font-bold text-red-600 shadow-sm">
                     <AlertTriangle size={11} />
                     {billingCalc.facturasVencidas} vencida{billingCalc.facturasVencidas === 1 ? "" : "s"}
                   </div>

@@ -266,7 +266,7 @@ function ActionProposalCard({ proposal, onConfirm, onCancel }: {
       <p className="mt-0.5 text-slate-500">{proposal.detalle}</p>
       {proposal.resolved === "confirmed" && <p className="mt-1.5 flex items-center gap-1 font-semibold text-emerald-700"><Check size={12} /> Hecho</p>}
       {proposal.resolved === "cancelled" && <p className="mt-1.5 text-slate-400">Cancelado.</p>}
-      {proposal.resolved === "error" && <p className="mt-1.5 text-red-600">{proposal.errorMsg || "No se pudo completar."}</p>}
+      {proposal.resolved === "error" && <p className="peligro mt-1.5 text-red-600">{proposal.errorMsg || "No se pudo completar."}</p>}
       {!proposal.resolved && (
         <div className="mt-2 flex gap-2">
           <button type="button" disabled={proposal.resolving} onClick={onConfirm}
@@ -779,10 +779,10 @@ function VantiaWidget({ pathname, getToken }: { pathname: string; getToken: (opt
                 return (
                   <div key={i} className="flex justify-center animate-fade-in">
                     <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-3 shadow-sm max-w-[95%]">
-                      <AlertTriangle size={14} className="text-red-500 mt-0.5 shrink-0" />
+                      <AlertTriangle size={14} className="peligro text-red-500 mt-0.5 shrink-0" />
                       <div className="flex flex-col gap-1.5">
-                        <p className="text-xs font-semibold text-red-800 leading-snug">Error al conectar con el motor de IA.</p>
-                        <p className="text-[10px] text-red-600/80 leading-snug">{msg.text.replace(/^❌\s*/, "")}</p>
+                        <p className="peligro text-xs font-semibold text-red-800 leading-snug">Error al conectar con el motor de IA.</p>
+                        <p className="peligro text-[10px] text-red-600/80 leading-snug">{msg.text.replace(/^❌\s*/, "")}</p>
                         {retryText && (
                           <button
                             onClick={retryLast}
@@ -1223,7 +1223,7 @@ function QuickLinksPanel({ getToken, onClose }: { getToken: () => Promise<string
             placeholder="URL (ej. lexnet.justicia.es)"
             className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-red-500"
           />
-          {error && <p className="text-[11px] text-red-600">{error}</p>}
+          {error && <p className="peligro text-[11px] text-red-600">{error}</p>}
           <div className="flex justify-end gap-1.5 pt-0.5">
             <button onClick={resetForm} className="px-2.5 py-1 text-[11px] font-semibold text-slate-500 hover:bg-slate-100 rounded-lg">Cancelar</button>
             <button onClick={handleSave} disabled={saving} className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg disabled:opacity-60">
@@ -1249,7 +1249,7 @@ function QuickLinksPanel({ getToken, onClose }: { getToken: () => Promise<string
             <button onClick={() => startEdit(l)} className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-slate-600 p-1 transition-opacity shrink-0" title="Editar">
               <Pen size={11} />
             </button>
-            <button onClick={() => handleDelete(l.id)} disabled={deletingId === l.id} className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-600 p-1 transition-opacity shrink-0" title="Eliminar">
+            <button onClick={() => handleDelete(l.id)} disabled={deletingId === l.id} className="peligro opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-600 p-1 transition-opacity shrink-0" title="Eliminar">
               {deletingId === l.id ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
             </button>
           </div>
@@ -2581,6 +2581,8 @@ export default function DashboardLayout() {
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
             <input
               type="search"
+              data-buscador-global
+              title="Buscar (atajo: /)"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => setSearchFocused(true)}

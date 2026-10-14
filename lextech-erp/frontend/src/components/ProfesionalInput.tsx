@@ -91,7 +91,7 @@ export function ProfesionalInput({ tipo, value, onChange, options, onCreated, pl
       <div className="space-y-1.5 rounded-lg border border-emerald-200 bg-emerald-50/50 p-2">
         <input autoFocus value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Nombre" className={miniInputCls} />
         <input value={apellidos} onChange={e => setApellidos(e.target.value)} placeholder="Apellidos" className={miniInputCls} />
-        {error && <p className="text-xs text-red-600">{error}</p>}
+        {error && <p className="peligro text-xs text-red-600">{error}</p>}
         <div className="flex gap-1.5">
           <button type="button" disabled={saving || !nombre.trim()} onClick={create}
             className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">

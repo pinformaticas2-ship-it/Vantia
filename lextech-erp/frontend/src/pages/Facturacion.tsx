@@ -635,7 +635,7 @@ class BillingErrorBoundary extends React.Component<{ children: React.ReactNode }
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-[60vh] rounded-3xl border border-red-200 bg-red-50 p-6 text-red-900">
+        <div className="peligro min-h-[60vh] rounded-3xl border border-red-200 bg-red-50 p-6 text-red-900">
           <h2 className="text-lg font-bold">La pantalla de facturación encontró un error</h2>
           <p className="mt-2 text-sm">{this.state.message}</p>
           <p className="mt-2 text-sm">Recarga la página. Si vuelve a pasar, dime el texto exacto que aparece aquí.</p>
@@ -2243,11 +2243,11 @@ function FacturacionContent() {
       <div className="flex-1 overflow-y-auto" style={{ scrollbarGutter: "stable" }}>
         <div className="flex flex-col gap-6 px-6 py-6">
           {errorMsg && (
-            <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
+            <div className="peligro flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
               <AlertCircle size={18} className="mt-0.5 shrink-0" />
               <div>
                 <p className="font-semibold">No se pudo completar la operación de facturación</p>
-                <p className="mt-1 text-red-600">{errorMsg}</p>
+                <p className="peligro mt-1 text-red-600">{errorMsg}</p>
               </div>
             </div>
           )}
@@ -2579,7 +2579,7 @@ function FacturacionContent() {
                           <button onClick={() => setShowQuipuModal(true)} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                             <Settings size={14} /> Editar credenciales
                           </button>
-                          <button onClick={disconnectQuipu} disabled={saving} className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-60">
+                          <button onClick={disconnectQuipu} disabled={saving} className="peligro inline-flex items-center gap-2 rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-60">
                             <Trash2 size={14} /> Desconectar
                           </button>
                         </div>
@@ -3422,7 +3422,7 @@ function BankAccountsTab({
 
   return (
     <div className="space-y-4">
-      {error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+      {error && <div className="peligro rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
 
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -3513,7 +3513,7 @@ function BankAccountsTab({
                 </div>
                 <div className="flex gap-1 shrink-0">
                   <button onClick={() => openForm(acc)} className="rounded-lg border border-slate-200 p-1.5 hover:bg-slate-50"><Pencil size={12} className="text-slate-500" /></button>
-                  <button onClick={() => deleteAcc(acc.id)} className="rounded-lg border border-red-200 p-1.5 hover:bg-red-50"><Trash2 size={12} className="text-red-500" /></button>
+                  <button onClick={() => deleteAcc(acc.id)} className="peligro rounded-lg border border-red-200 p-1.5 hover:bg-red-50"><Trash2 size={12} className="text-red-500" /></button>
                 </div>
               </div>
               <p className={`text-2xl font-bold ${acc.balance >= 0 ? "text-emerald-600" : "text-red-600"}`}>{fmtEur(acc.balance)}</p>

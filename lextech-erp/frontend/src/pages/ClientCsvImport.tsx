@@ -1060,7 +1060,7 @@ function CsvImportCompleteView({
           <div className="rounded-2xl border border-red-100 bg-white p-5">
             <div className="flex items-center justify-between gap-3 mb-4">
               <p className="text-sm font-bold text-slate-900">Detalle de errores</p>
-              <span className="rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-600 border border-red-100">{issues.length} incidencias</span>
+              <span className="peligro rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-600 border border-red-100">{issues.length} incidencias</span>
             </div>
             <div className="space-y-2">
               {visibleIssues.map((issue, index) => (
@@ -1223,7 +1223,7 @@ function CsvImportErrorDetailView({
                     <td className="px-4 py-3 text-sm text-slate-700">{r.email}</td>
                     <td className="px-4 py-3 text-xs">
                       {r.status === "error" ? (
-                        <span className="text-red-600 font-medium">{r.errors}</span>
+                        <span className="peligro text-red-600 font-medium">{r.errors}</span>
                       ) : (
                         <span className="inline-flex items-center gap-1 text-emerald-600 font-semibold"><Check size={11} /> Correcto</span>
                       )}
@@ -1256,8 +1256,8 @@ function CsvImportHistoryView({ rows, loading, error, onBack, onReload, onSelect
       </span>
     );
     if (hasErrors) return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-bold bg-red-50 text-red-700 border border-red-200">
-        <div className="w-1.5 h-1.5 rounded-full bg-red-500" /> Con errores
+      <span className="peligro inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-bold bg-red-50 text-red-700 border border-red-200">
+        <div className="peligro w-1.5 h-1.5 rounded-full bg-red-500" /> Con errores
       </span>
     );
     return (
@@ -1289,7 +1289,7 @@ function CsvImportHistoryView({ rows, loading, error, onBack, onReload, onSelect
       </div>
 
       {error && (
-        <div className="px-6 lg:px-8 py-3 bg-red-50 border-b border-red-200 text-sm text-red-700 flex-shrink-0">{error}</div>
+        <div className="peligro px-6 lg:px-8 py-3 bg-red-50 border-b border-red-200 text-sm text-red-700 flex-shrink-0">{error}</div>
       )}
 
       <div className="modules-scrollbar flex-1 min-h-0 overflow-auto">
@@ -1322,7 +1322,7 @@ function CsvImportHistoryView({ rows, loading, error, onBack, onReload, onSelect
                   <td className="px-6 py-4 whitespace-nowrap text-[13px] text-emerald-600 font-semibold">{row.completed_count}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     {row.error_count > 0 ? (
-                      <span className="text-[13px] text-red-600 font-bold flex items-center gap-1.5">{row.error_count} <AlertCircle size={11} /></span>
+                      <span className="peligro text-[13px] text-red-600 font-bold flex items-center gap-1.5">{row.error_count} <AlertCircle size={11} /></span>
                     ) : (
                       <span className="text-[13px] text-slate-400 font-medium">0</span>
                     )}
@@ -1423,7 +1423,7 @@ function CsvImportHistoryDetailView({
               {retrying && retryProgress ? `Reintentando ${retryProgress.done}/${retryProgress.total}...` : `Reintentar fallidas (${failedCount})`}
             </button>
             <button type="button" onClick={onUndo} disabled={!canUndo || undoing}
-              className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-white hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed text-red-600 px-4 py-2.5 text-sm font-bold transition-colors">
+              className="peligro inline-flex items-center gap-2 rounded-xl border border-red-200 bg-white hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed text-red-600 px-4 py-2.5 text-sm font-bold transition-colors">
               {undoing ? <Loader2 size={14} className="animate-spin" /> : <AlertTriangle size={14} />}
               Deshacer importación ({completedItems.length})
             </button>

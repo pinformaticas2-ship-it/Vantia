@@ -1117,7 +1117,7 @@ function ComposeWindow({
 
           {error && (
             <div className="px-4 pb-2">
-              <p className="text-xs text-red-500 flex items-center gap-1">
+              <p className="peligro text-xs text-red-500 flex items-center gap-1">
                 <AlertCircle size={12} /> {error}
               </p>
             </div>
@@ -1194,7 +1194,7 @@ function ComposeWindow({
             <div className="flex-1" />
             <button onClick={() => onClose()}
               title="Guardar borrador y cerrar"
-              className="p-2 text-gray-400 hover:text-red-500 hover:bg-gray-100 rounded-full transition-colors">
+              className="peligro p-2 text-gray-400 hover:text-red-500 hover:bg-gray-100 rounded-full transition-colors">
               <Trash2 size={16} />
             </button>
           </div>
@@ -1688,7 +1688,7 @@ function Sidebar({
                           type="button"
                           onClick={(e) => { e.stopPropagation(); onDisconnectGmail(); setAccountMenuOpen(false); }}
                           title="Desconectar"
-                          className="opacity-0 group-hover:opacity-100 p-1 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all flex-shrink-0">
+                          className="peligro opacity-0 group-hover:opacity-100 p-1 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all flex-shrink-0">
                           <LogIn size={12} className="rotate-180" />
                         </button>
                       </>
@@ -1697,7 +1697,7 @@ function Sidebar({
                         type="button"
                         onClick={(e) => { e.stopPropagation(); onDeleteGoogleProfile(profile.id); }}
                         title="Borrar cuenta guardada"
-                        className="opacity-0 group-hover:opacity-100 p-1 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all flex-shrink-0">
+                        className="peligro opacity-0 group-hover:opacity-100 p-1 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all flex-shrink-0">
                         <Trash2 size={12} />
                       </button>
                     )}
@@ -1723,7 +1723,7 @@ function Sidebar({
                     type="button"
                     onClick={(e) => { e.stopPropagation(); onDeleteImapAccount(acc.id); }}
                     title="Borrar cuenta"
-                    className="opacity-0 group-hover:opacity-100 p-1 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all flex-shrink-0">
+                    className="peligro opacity-0 group-hover:opacity-100 p-1 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all flex-shrink-0">
                     <Trash2 size={12} />
                   </button>
                 </div>
@@ -2413,7 +2413,7 @@ function EmailReader({
           </button>
           <button
             onClick={onDelete}
-            className={`p-2 rounded-full transition-colors ${headerCx('hover:bg-red-500/10 hover:text-red-300', 'hover:bg-red-50 hover:text-[#ab0433]')} ${toolbarIconCls}`}>
+            className={`peligro p-2 rounded-full transition-colors ${headerCx('hover:bg-red-500/10 hover:text-red-300', 'hover:bg-red-50 hover:text-[#ab0433]')} ${toolbarIconCls}`}>
             <Trash2 size={17} />
           </button>
           <div className="relative">
@@ -3128,7 +3128,7 @@ function ImapForm({
               </div>
 
               {error && (
-                <p className="text-xs text-red-500 flex items-center gap-1">
+                <p className="peligro text-xs text-red-500 flex items-center gap-1">
                   <AlertCircle size={12} /> {error}
                 </p>
               )}
@@ -3436,7 +3436,7 @@ function SignaturesPanel({ onClose, onSelect, getToken }: { onClose: () => void;
                     {!sig.isDefault && <button onClick={() => setDefault(sig.id)} className="text-xs text-gray-400 hover:text-indigo-600">Usar por defecto</button>}
                     {onSelect && <button onClick={() => { onSelect(sig); onClose(); }} className="text-xs text-indigo-600 hover:underline">Insertar</button>}
                     <button onClick={() => setEditing(sig)} className="text-gray-400 hover:text-gray-700"><Edit3 size={14}/></button>
-                    <button onClick={() => del(sig.id)} className="text-red-400 hover:text-red-600"><Trash2 size={14}/></button>
+                    <button onClick={() => del(sig.id)} className="peligro text-red-400 hover:text-red-600"><Trash2 size={14}/></button>
                   </div>
                 </div>
                 <div className="text-xs text-gray-500 border border-gray-100 rounded-lg p-2 max-h-20 overflow-hidden" dangerouslySetInnerHTML={{ __html: sig.html }}/>
@@ -3519,7 +3519,7 @@ function TemplatesPanel({ onClose, onApply, getToken }: { onClose: () => void; o
                       </button>
                     )}
                     <button onClick={() => setEditing(tpl)} className="text-gray-400 hover:text-gray-700"><Edit3 size={14}/></button>
-                    <button onClick={() => del(tpl.id)} className="text-red-400 hover:text-red-600"><Trash2 size={14}/></button>
+                    <button onClick={() => del(tpl.id)} className="peligro text-red-400 hover:text-red-600"><Trash2 size={14}/></button>
                   </div>
                 </div>
                 <p className="text-xs text-gray-400 mb-2">Asunto: {tpl.subject}</p>
@@ -3631,7 +3631,7 @@ function RecipientGroupsPanel({ onClose, getToken }: { onClose: () => void; getT
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-gray-400">{grp.emails.length} destinatario{grp.emails.length !== 1 ? 's' : ''}</span>
                     <button onClick={() => setEditing(grp)} className="text-gray-400 hover:text-gray-700"><Edit3 size={14}/></button>
-                    <button onClick={() => del(grp.id)} className="text-red-400 hover:text-red-600"><Trash2 size={14}/></button>
+                    <button onClick={() => del(grp.id)} className="peligro text-red-400 hover:text-red-600"><Trash2 size={14}/></button>
                   </div>
                 </div>
                 <p className="text-xs text-gray-400 truncate">{grp.emails.join(', ')}</p>
@@ -5626,7 +5626,7 @@ ${email.bodyHtml || `<pre>${email.bodyText}</pre>`}`;
               </div>
             ) : error ? (
               <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
-                <AlertCircle size={32} className="text-red-500 mb-3" />
+                <AlertCircle size={32} className="peligro text-red-500 mb-3" />
                 <p className="text-sm text-rose-600 mb-4">{error}</p>
                 {!gmail && (
                   <button

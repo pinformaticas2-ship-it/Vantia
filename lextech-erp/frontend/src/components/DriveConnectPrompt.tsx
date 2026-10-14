@@ -41,7 +41,7 @@ export default function DriveConnectPrompt() {
           Google Drive no está vinculado. Sin él, los documentos de los expedientes se guardan solo en el servidor y
           pueden perderse con una actualización de la app. Vincúlalo para que cada expediente tenga su carpeta en tu nube.
         </p>
-        {error && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>}
+        {error && <p className="peligro mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>}
         <div className="mt-5 space-y-2">
           <button
             type="button"

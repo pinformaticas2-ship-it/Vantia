@@ -226,7 +226,7 @@ export default function DirectorioProfesionalForm({ tipo, singular }: {
           <ChevronLeft size={13} /> Volver
         </button>
       </Link>
-      <div className="flex items-center gap-3 p-5 bg-red-50 border border-red-200 rounded-xl text-red-700">
+      <div className="peligro flex items-center gap-3 p-5 bg-red-50 border border-red-200 rounded-xl text-red-700">
         <AlertTriangle size={20} className="shrink-0" />
         <span className="text-sm">{loadError}</span>
       </div>
@@ -264,7 +264,7 @@ export default function DirectorioProfesionalForm({ tipo, singular }: {
             </span>
           )}
           {error && (
-            <span className="max-w-xs truncate flex items-center gap-1.5 text-red-600 text-xs">
+            <span className="peligro max-w-xs truncate flex items-center gap-1.5 text-red-600 text-xs">
               <AlertTriangle size={14} className="shrink-0" /> {error}
             </span>
           )}

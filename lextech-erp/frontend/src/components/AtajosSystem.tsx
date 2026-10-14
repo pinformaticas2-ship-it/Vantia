@@ -560,7 +560,7 @@ export function ListadoAtajosModal({
           >
             <div className="flex items-start gap-3 mb-5">
               <div className="p-2 bg-red-100 rounded-xl shrink-0">
-                <AlertTriangle size={18} className="text-red-600" />
+                <AlertTriangle size={18} className="peligro text-red-600" />
               </div>
               <div>
                 <h3 className="font-bold text-slate-900 text-sm">¿Eliminar atajo?</h3>

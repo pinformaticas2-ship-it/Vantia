@@ -148,7 +148,7 @@ export function ImagenesNoAccesibles({ html, onChange }: { html: string; onChang
           </li>
         ))}
       </ul>
-      {error && <p className="mt-1 text-red-600">{error}</p>}
+      {error && <p className="peligro mt-1 text-red-600">{error}</p>}
       <input ref={inputRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" className="hidden"
         onChange={async (e) => {
           const f = e.target.files?.[0]; e.target.value = "";
@@ -204,7 +204,7 @@ function ImagenInput({ label, value, onChange, ayuda }: { label: string; value: 
         <input ref={ref} type="file" accept="image/png,image/jpeg,image/gif,image/webp" className="hidden" onChange={(e) => { void elegir(e.target.files?.[0]); e.target.value = ""; }} />
       </div>
       {ayuda && <p className="mt-1 text-[11px] text-gray-400">{ayuda}</p>}
-      {error && <p className="mt-1 text-[11px] text-red-600">{error}</p>}
+      {error && <p className="peligro mt-1 text-[11px] text-red-600">{error}</p>}
     </div>
   );
 }

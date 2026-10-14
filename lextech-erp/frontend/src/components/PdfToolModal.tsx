@@ -224,14 +224,14 @@ export default function PdfToolModal({ entityId, files, initialFileIds = [], onC
                         </button>
                         <span className="shrink-0 text-xs text-slate-500">
                           {p.estado === "cargando" ? <Loader2 size={13} className="animate-spin" />
-                            : p.estado === "error" ? <span className="text-red-600">no se puede abrir</span>
+                            : p.estado === "error" ? <span className="peligro text-red-600">no se puede abrir</span>
                             : `${incluidas} de ${p.paginas.length} pág.`}
                         </span>
                         <button type="button" title="Subir" onClick={() => mover(i, -1)} disabled={i === 0} className="rounded p-1 text-slate-400 hover:bg-slate-100 disabled:opacity-30"><ArrowUp size={14} /></button>
                         <button type="button" title="Bajar" onClick={() => mover(i, 1)} disabled={i === partes.length - 1} className="rounded p-1 text-slate-400 hover:bg-slate-100 disabled:opacity-30"><ArrowDown size={14} /></button>
-                        <button type="button" title="Quitar" onClick={() => setPartes((ps) => ps.filter((x) => x.key !== p.key))} className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"><Trash2 size={14} /></button>
+                        <button type="button" title="Quitar" onClick={() => setPartes((ps) => ps.filter((x) => x.key !== p.key))} className="peligro rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"><Trash2 size={14} /></button>
                       </div>
-                      {p.estado === "error" && <p className="flex items-center gap-1.5 border-t border-slate-100 px-3 py-2 text-xs text-red-600"><AlertTriangle size={12} /> {p.error}</p>}
+                      {p.estado === "error" && <p className="peligro flex items-center gap-1.5 border-t border-slate-100 px-3 py-2 text-xs text-red-600"><AlertTriangle size={12} /> {p.error}</p>}
                       {p.abierta && p.estado === "ok" && (
                         <div className="border-t border-slate-100 p-3">
                           <p className="mb-2 text-[11px] text-slate-400">Pulsa una página para quitarla o volver a incluirla. Las flechas la mueven; ↻ la gira.</p>
@@ -290,7 +290,7 @@ export default function PdfToolModal({ entityId, files, initialFileIds = [], onC
                   </button>
                 </div>
                 {conError && <p className="text-xs text-amber-700">Quita los documentos que no se pueden abrir para continuar.</p>}
-                {error && <p className="text-xs text-red-600">{error}</p>}
+                {error && <p className="peligro text-xs text-red-600">{error}</p>}
               </div>
             </div>
           </div>

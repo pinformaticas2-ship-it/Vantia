@@ -1794,7 +1794,7 @@ function GifPicker({
         ) : error ? (
           <div className="rounded-2xl border border-dashed border-red-200 bg-red-50 px-4 py-5 text-center">
             <p className="text-sm font-medium text-rose-700">{error}</p>
-            <p className="mt-1 text-xs text-red-500">Añade la clave en `frontend/.env` y reinicia Vite.</p>
+            <p className="peligro mt-1 text-xs text-red-500">Añade la clave en `frontend/.env` y reinicia Vite.</p>
           </div>
         ) : gifs.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-center text-sm text-slate-500">
@@ -2574,7 +2574,7 @@ function MiembroRow({ m, isMe, canAdmin, acting, onDM, onRemove, presenceByUserI
         {!isMe&&<button onClick={onDM} title="Mensaje directo" className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-blue-100 text-slate-400 hover:text-blue-600 transition-colors"><MessageSquare size={12}/></button>}
         {canAdmin&&(
           <button onClick={onRemove} disabled={acting===m.user_id} title="Eliminar del canal"
-            className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-red-100 text-slate-400 hover:text-red-600 transition-colors disabled:opacity-50">
+            className="peligro w-6 h-6 flex items-center justify-center rounded-lg hover:bg-red-100 text-slate-400 hover:text-red-600 transition-colors disabled:opacity-50">
             {acting===m.user_id?<Loader2 size={11} className="animate-spin"/>:<X size={12}/>}
           </button>
         )}
@@ -3019,7 +3019,7 @@ const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserI
             <p className="mt-0.5 flex items-center gap-1 text-[11px] text-slate-400"><Clock3 size={11}/> Enviando…</p>
           )}
           {msg._envio === "error" && (
-            <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-red-600">
+            <p className="peligro mt-1 flex flex-wrap items-center gap-2 text-xs text-red-600">
               <span>No se ha podido enviar.</span>
               <button type="button" onClick={() => onReintentar?.(msg.id)} className="font-semibold underline-offset-2 hover:underline">Reintentar</button>
               <button type="button" onClick={() => onDescartar?.(msg.id)} className="text-slate-500 underline-offset-2 hover:underline">Descartar</button>
@@ -3060,7 +3060,7 @@ const MensajeItem = React.memo(function MensajeItem({ msg, prevMsg, currentUserI
               <button onClick={()=>onEdit(msg)} title="Editar"
                 className="p-1.5 hover:bg-slate-100 rounded-md text-slate-400 hover:text-slate-600 transition-colors"><Edit3 size={14}/></button>
               <button onClick={()=>onDelete(msg.id)} title="Eliminar"
-                className="p-1.5 hover:bg-red-50 rounded-md text-slate-400 hover:text-red-500 transition-colors"><Trash2 size={14}/></button>
+                className="peligro p-1.5 hover:bg-red-50 rounded-md text-slate-400 hover:text-red-500 transition-colors"><Trash2 size={14}/></button>
             </>
           )}
         </div>
@@ -5465,7 +5465,7 @@ export default function Chat() {
                             <Camera size={14} className="text-slate-400"/> Cambiar foto
                           </button>
                           <button type="button" onClick={() => { setMenuFotoGrupo(false); void guardarFotoGrupo(canalActivo.id, null); }}
-                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50">
+                            className="peligro flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50">
                             <Trash2 size={14}/> Quitar foto
                           </button>
                         </div>

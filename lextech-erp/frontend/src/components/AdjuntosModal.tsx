@@ -680,8 +680,8 @@ export default function AdjuntosModal({
         {/* ── Error banner ── */}
         {errorMsg && (
           <div className="flex items-center justify-between px-4 py-2 bg-red-50 border-b border-red-200 shrink-0">
-            <span className="text-xs text-red-700 font-medium flex-1">{errorMsg}</span>
-            <button onClick={() => setErrorMsg(null)} className="ml-3 text-red-400 hover:text-red-700 shrink-0">
+            <span className="peligro text-xs text-red-700 font-medium flex-1">{errorMsg}</span>
+            <button onClick={() => setErrorMsg(null)} className="peligro ml-3 text-red-400 hover:text-red-700 shrink-0">
               <X size={13} />
             </button>
           </div>
@@ -847,7 +847,7 @@ export default function AdjuntosModal({
             disabled={!selectedFileId}
             className="flex flex-col items-center gap-0.5 px-3 py-1.5 text-[10px] font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors min-w-[52px] uppercase tracking-wide disabled:opacity-30"
           >
-            <Trash2 size={15} className="text-red-500" />
+            <Trash2 size={15} className="peligro text-red-500" />
             Baja
           </button>
           {/* Modificar */}
@@ -1197,7 +1197,7 @@ export default function AdjuntosModal({
                                 <Edit3 size={13} />
                               </button>
                               <button onClick={() => setConfirmDeleteFileId(f.id)} title="Eliminar"
-                                className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                                className="peligro p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
                                 <Trash2 size={13} />
                               </button>
                             </div>
@@ -1572,7 +1572,7 @@ export default function AdjuntosModal({
         footer={
           <>
             <button onClick={() => setConfirmDeleteFileId(null)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
-            <button onClick={() => handleDelete(confirmDeleteFileId!)} className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg active:scale-95">Eliminar</button>
+            <button onClick={() => handleDelete(confirmDeleteFileId!)} className="peligro px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg active:scale-95">Eliminar</button>
           </>
         }
       />

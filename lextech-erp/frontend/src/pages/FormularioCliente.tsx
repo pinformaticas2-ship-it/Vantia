@@ -130,7 +130,7 @@ export default function FormularioCliente() {
         {(pageState === "invalid") && (
           <div className="flex flex-col items-center justify-center py-16 px-8 text-center">
             <div className="p-4 bg-red-50 rounded-full mb-4">
-              <AlertCircle className="w-8 h-8 text-red-500" />
+              <AlertCircle className="peligro w-8 h-8 text-red-500" />
             </div>
             <h2 className="text-lg font-semibold text-slate-800 mb-2">Enlace no disponible</h2>
             <p className="text-sm text-slate-500">{errorMsg || "Este enlace no es válido o ha caducado."}</p>
@@ -141,7 +141,7 @@ export default function FormularioCliente() {
         {pageState === "error" && (
           <div className="flex flex-col items-center justify-center py-16 px-8 text-center">
             <div className="p-4 bg-red-50 rounded-full mb-4">
-              <AlertCircle className="w-8 h-8 text-red-500" />
+              <AlertCircle className="peligro w-8 h-8 text-red-500" />
             </div>
             <h2 className="text-lg font-semibold text-slate-800 mb-2">No se pudo enviar</h2>
             <p className="text-sm text-slate-500 mb-4">{errorMsg}</p>
@@ -295,7 +295,7 @@ export default function FormularioCliente() {
 
             {/* Field error */}
             {fieldError && (
-              <p className="mt-3 text-xs text-red-600 flex items-center gap-1">
+              <p className="peligro mt-3 text-xs text-red-600 flex items-center gap-1">
                 <AlertCircle className="w-3.5 h-3.5" /> {fieldError}
               </p>
             )}

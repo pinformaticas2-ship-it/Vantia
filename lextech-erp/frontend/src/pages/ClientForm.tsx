@@ -762,7 +762,7 @@ export default function ClientForm() {
       <Link to="/dashboard/clientes">
         <BackButton />
       </Link>
-      <div className="flex items-center gap-3 p-5 bg-red-50 border border-red-200 rounded-xl text-red-700">
+      <div className="peligro flex items-center gap-3 p-5 bg-red-50 border border-red-200 rounded-xl text-red-700">
         <AlertTriangle size={20} className="shrink-0" />
         <span className="text-sm">{loadError}</span>
       </div>
@@ -839,7 +839,7 @@ export default function ClientForm() {
           </div>
         )}
         {error && (
-          <div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          <div className="peligro flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
             <AlertTriangle size={18} className="shrink-0" /> {error}
           </div>
         )}
@@ -977,7 +977,7 @@ export default function ClientForm() {
               </p>
 
               {scanError && (
-                <div className="mt-4 flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 px-3 py-3 text-xs text-red-700">
+                <div className="peligro mt-4 flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 px-3 py-3 text-xs text-red-700">
                   <AlertTriangle size={14} className="mt-0.5 shrink-0" />
                   <span>{scanError}</span>
                 </div>
@@ -1367,7 +1367,7 @@ export default function ClientForm() {
             </span>
           )}
           {error && (
-            <span className="max-w-xs truncate flex items-center gap-1.5 text-red-600 text-xs">
+            <span className="peligro max-w-xs truncate flex items-center gap-1.5 text-red-600 text-xs">
               <AlertTriangle size={14} className="shrink-0" /> {error}
             </span>
           )}

@@ -107,7 +107,7 @@ function ActionProposalCard({ proposal, onConfirm, onCancel }: {
       <p className="mt-0.5 text-slate-500">{proposal.detalle}</p>
       {proposal.resolved === 'confirmed' && <p className="mt-1.5 flex items-center gap-1 font-semibold text-emerald-700">✓ Hecho</p>}
       {proposal.resolved === 'cancelled' && <p className="mt-1.5 text-slate-400">Cancelado.</p>}
-      {proposal.resolved === 'error' && <p className="mt-1.5 text-red-600">{proposal.errorMsg || 'No se pudo completar.'}</p>}
+      {proposal.resolved === 'error' && <p className="peligro mt-1.5 text-red-600">{proposal.errorMsg || 'No se pudo completar.'}</p>}
       {!proposal.resolved && (
         <div className="mt-2 flex gap-2">
           <button type="button" disabled={proposal.resolving} onClick={onConfirm}

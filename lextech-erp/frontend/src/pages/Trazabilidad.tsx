@@ -12,6 +12,7 @@ import {
 import { safeJson } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
 import { useOrganizacion } from "../lib/useOrganizacion";
+import ComoFunciona from "../components/ComoFunciona";
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 interface UserSummary {
@@ -351,6 +352,7 @@ export default function Trazabilidad() {
             <h1 className="text-xl font-extrabold text-slate-800 leading-none tracking-tight mb-1">{nivel?.nivel === "propia" ? "Tu actividad" : "Trazabilidad"}</h1>
             <p className="hidden sm:block text-xs font-medium text-slate-500">
               {nivel?.nivel === "propia" ? "Tus accesos y acciones en el despacho" : nivel?.nivel === "tecnica" ? "Vista técnica: sesiones y tipos de acción, sin datos de clientes" : "Auditoría completa de sesiones y acciones del sistema"}
+              <ComoFunciona capitulo="15" className="ml-2 align-middle" />
             </p>
           </div>
         </div>

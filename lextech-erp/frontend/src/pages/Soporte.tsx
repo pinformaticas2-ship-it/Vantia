@@ -493,7 +493,7 @@ function NuevoTicketModal({ open, onClose, onCreated }: { open: boolean; onClose
           <textarea value={descripcion} onChange={(e) => setDescripcion(e.target.value)} rows={7}
             placeholder="Describe qué ocurre, qué estabas haciendo y, si aparece, el mensaje de error." className={`${inputCls} resize-y`} />
         </div>
-        {error && <p className="text-xs font-semibold text-red-600">{error}</p>}
+        {error && <p className="peligro text-xs font-semibold text-red-600">{error}</p>}
       </div>
     </Modal>
   );
@@ -563,7 +563,7 @@ function TicketDetail({ id, esGestor, onBack, onChanged }: {
   };
 
   if (loading) return <div className="flex-1 flex items-center justify-center"><Spinner size="lg" /></div>;
-  if (!ticket) return <div className="flex-1 flex items-center justify-center text-sm text-red-600">{error || "Ticket no encontrado"}</div>;
+  if (!ticket) return <div className="peligro flex-1 flex items-center justify-center text-sm text-red-600">{error || "Ticket no encontrado"}</div>;
 
   const cerrado = ticket.estado === "cerrado" || ticket.estado === "resuelto";
 
@@ -630,7 +630,7 @@ function TicketDetail({ id, esGestor, onBack, onChanged }: {
       </div>
 
       <div className="p-4 border-t border-slate-200 bg-white shrink-0">
-        {error && <p className="text-xs font-semibold text-red-600 mb-2">{error}</p>}
+        {error && <p className="peligro text-xs font-semibold text-red-600 mb-2">{error}</p>}
         <div className="flex items-end gap-2">
           <textarea value={respuesta} onChange={(e) => setRespuesta(e.target.value)} rows={2}
             onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) void enviar(); }}
@@ -811,7 +811,7 @@ function SoporteEstadisticas() {
             ))}
           </div>
         </div>
-        {error && <p className="text-xs font-semibold text-red-600">{error}</p>}
+        {error && <p className="peligro text-xs font-semibold text-red-600">{error}</p>}
 
         <div className="bg-white border border-slate-200 rounded-xl overflow-x-auto">
           {stats.length === 0 ? (

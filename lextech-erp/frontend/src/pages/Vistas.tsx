@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { apiFetch, resolveApiUrl } from "../lib/api";
 import { FilePreviewModal } from "../components/FilePreviewModal";
+import ComoFunciona from "../components/ComoFunciona";
 import { notifyVistasChanged, useVistasStatus } from "../lib/useVistasStatus";
 import { usePushNotifications } from "../lib/usePushNotifications";
 
@@ -201,7 +202,7 @@ function AvisoNotificaciones() {
     <div className="px-6 lg:px-8 py-2 bg-red-50 border-b border-red-100 text-xs text-red-900 flex flex-wrap items-center gap-x-3 gap-y-1">
       <Bell size={14} className="shrink-0" />
       <span className="flex-1 min-w-[200px]">Activa las notificaciones para enterarte <b>al momento</b> de cada vista nueva, cambio o cancelación, aunque no tengas Vantia abierta.</span>
-      {fallo && <span className="text-red-700">No se pudo activar. Revisa el permiso del navegador.</span>}
+      {fallo && <span className="peligro text-red-700">No se pudo activar. Revisa el permiso del navegador.</span>}
       <button type="button" disabled={push.busy}
         onClick={async () => { const ok = await push.subscribe(); setHecho(ok); setFallo(!ok); }}
         className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 font-bold text-white hover:bg-red-700 disabled:opacity-50">
@@ -311,7 +312,7 @@ function VistasModulo() {
             </div>
             <div className="min-w-0">
               <h1 className="text-lg font-extrabold text-slate-900 leading-tight">Vistas por correo</h1>
-              <p className="text-xs text-slate-500 mt-0.5 truncate">Señalamientos detectados automáticamente en el buzón de la organización</p>
+              <p className="text-xs text-slate-500 mt-0.5 truncate">Señalamientos detectados automáticamente en el buzón de la organización <ComoFunciona capitulo="16" className="ml-1 align-middle" /></p>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -736,7 +737,7 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
           <ul className="space-y-1.5">
             {pasos.map((p) => (
               <li key={p.paso} className="flex items-start gap-2 text-sm">
-                {p.ok ? <CheckCircle2 size={15} className="text-emerald-500 mt-0.5 shrink-0" /> : <XCircle size={15} className="text-red-500 mt-0.5 shrink-0" />}
+                {p.ok ? <CheckCircle2 size={15} className="peligro text-emerald-500 mt-0.5 shrink-0" /> : <XCircle size={15} className="text-red-500 mt-0.5 shrink-0" />}
                 <span><span className="font-semibold text-slate-700">{PASO_LABEL[p.paso] || p.paso}:</span> <span className="text-slate-600">{p.detalle}</span></span>
               </li>
             ))}
@@ -853,7 +854,7 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
             </label>
           )}
 
-          {actionError && !mostrarFormulario && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{actionError}</p>}
+          {actionError && !mostrarFormulario && <p className="peligro text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{actionError}</p>}
 
           <div className="flex flex-wrap items-center gap-2">
             {d.tipo === "cancelacion" && d.relacion.vista && (
@@ -941,7 +942,7 @@ function VistaDetalle({ id, onClose, onChanged }: { id: string; onClose: () => v
             </p>
           </section>
 
-          {actionError && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{actionError}</p>}
+          {actionError && <p className="peligro text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{actionError}</p>}
 
           {/* 3 · Decisión */}
           <div className="flex flex-wrap items-center gap-2">

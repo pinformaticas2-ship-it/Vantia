@@ -167,7 +167,7 @@ export default function AltaConEnlace() {
 
       {/* Error */}
       {error && (
-        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 mb-4">
+        <div className="peligro flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 mb-4">
           <AlertCircle className="w-4 h-4 shrink-0" />
           {error}
         </div>
@@ -282,7 +282,7 @@ export default function AltaConEnlace() {
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm mx-4 p-6">
             <div className="flex items-start gap-3 mb-4">
               <div className="p-2 bg-red-100 rounded-xl shrink-0">
-                <AlertTriangle size={18} className="text-red-600" />
+                <AlertTriangle size={18} className="peligro text-red-600" />
               </div>
               <div>
                 <h3 className="font-bold text-slate-900 text-sm">¿Eliminar este enlace?</h3>
@@ -291,7 +291,7 @@ export default function AltaConEnlace() {
             </div>
             <div className="flex gap-2 justify-end">
               <button onClick={() => setConfirmDeleteId(null)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
-              <button onClick={() => handleDelete(confirmDeleteId!)} className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg active:scale-95">Eliminar</button>
+              <button onClick={() => handleDelete(confirmDeleteId!)} className="peligro px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg active:scale-95">Eliminar</button>
             </div>
           </div>
         </div>

@@ -3,6 +3,7 @@ import { startDropboxConnect } from '../lib/dropboxConnect';
 import { DriveLogo, DropboxLogo } from '../components/StorageStatusIcons';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { Database, SlidersHorizontal, UserRound } from 'lucide-react';
 import { AlertTriangle, Bell, BellOff, BellRing, BookOpen, Building2, Camera, Check, ChevronDown, Cloud, Crown, Facebook, Gavel, History, Instagram, KeyRound, LifeBuoy, Link2, Loader2, Lock, LockKeyhole, MessageCircle, Clock3, Mail as MailIcon, Phone, Palette, Plug, Plus, Settings, ShieldCheck, Trash2, UsersRound, X, Zap } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth, UserProfile } from '@clerk/clerk-react';
@@ -13,6 +14,8 @@ import { useOrganizacion, OrgRol, Modulo, NivelAcceso } from '../lib/useOrganiza
 import ManualPanel from './ManualPanel';
 import AutomatizacionesPanel from './AutomatizacionesPanel';
 import Trazabilidad from './Trazabilidad';
+import ComoFunciona from '../components/ComoFunciona';
+import { PerfilPanel, PreferenciasTrabajoPanel, PrivacidadPanel, SelectorModo, IntegracionesPropias } from '../components/AjustesPaneles';
 import { usePushNotifications } from '../lib/usePushNotifications';
 
 const PALETTES: {
@@ -93,8 +96,26 @@ const PALETTES: {
   },
 ];
 
-const SECCIONES_VALIDAS: string[] = ['apariencia', 'manual', 'notificaciones', 'despacho', 'seguridad', 'integraciones', 'automatizaciones', 'trazabilidad', 'usuarios'];
-type SectionKey = 'apariencia' | 'manual' | 'notificaciones' | 'despacho' | 'seguridad' | 'integraciones' | 'automatizaciones' | 'trazabilidad' | 'usuarios';
+const SECCIONES_VALIDAS: string[] = ['apariencia', 'perfil', 'preferencias', 'manual', 'notificaciones', 'despacho', 'seguridad', 'integraciones', 'automatizaciones', 'trazabilidad', 'privacidad', 'usuarios'];
+type SectionKey = 'apariencia' | 'perfil' | 'preferencias' | 'manual' | 'notificaciones' | 'despacho' | 'seguridad' | 'integraciones' | 'automatizaciones' | 'trazabilidad' | 'privacidad' | 'usuarios';
+
+// 14/10/2026: Ajustes en dos grupos -- lo tuyo (Mi cuenta) y lo del despacho.
+const SECCIONES_CUENTA: { key: SectionKey; label: string; icon: any }[] = [
+  { key: 'apariencia',    label: 'Apariencia',               icon: Palette },
+  { key: 'perfil',        label: 'Mi perfil',                icon: UserRound },
+  { key: 'preferencias',  label: 'Preferencias de trabajo',  icon: SlidersHorizontal },
+  { key: 'notificaciones', label: 'Notificaciones',          icon: Bell },
+  { key: 'seguridad',     label: 'Seguridad',                icon: ShieldCheck },
+  { key: 'manual',        label: 'Manual de usuario',        icon: BookOpen },
+];
+const SECCIONES_DESPACHO: { key: SectionKey; label: string; icon: any; soloGestor?: boolean }[] = [
+  { key: 'despacho',        label: 'Mi Despacho',          icon: Building2 },
+  { key: 'integraciones',   label: 'Integraciones',        icon: Plug },
+  { key: 'automatizaciones', label: 'Automatizaciones',    icon: Zap, soloGestor: true },
+  { key: 'trazabilidad',    label: 'Trazabilidad',         icon: History },
+  { key: 'privacidad',      label: 'Datos y privacidad',   icon: Database, soloGestor: true },
+  { key: 'usuarios',        label: 'Gestión de Usuarios',  icon: UsersRound, soloGestor: true },
+];
 
 const OTHER_SECTIONS: { key: SectionKey; label: string; desc: string; icon: any }[] = [
   { key: 'notificaciones', label: 'Notificaciones',        desc: 'Configura alertas por email y avisos emergentes del sistema.',            icon: Bell },
@@ -267,7 +288,7 @@ function DeleteOrganizacionModal({ nombre, onClose }: { nombre: string; onClose:
     <div className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm flex items-center justify-center px-4">
       <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden">
         <div className="px-6 py-5 border-b border-slate-100 flex items-start gap-3.5 bg-red-50/60">
-          <div className="h-10 w-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+          <div className="peligro h-10 w-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center shrink-0">
             <AlertTriangle size={20} />
           </div>
           <div className="flex-1 min-w-0">
@@ -287,8 +308,8 @@ function DeleteOrganizacionModal({ nombre, onClose }: { nombre: string; onClose:
           ) : (
             <>
               <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3.5">
-                <p className="text-xs font-bold uppercase tracking-wider text-red-700 mb-2">Se eliminará permanentemente</p>
-                <ul className="space-y-1 text-sm text-red-800">
+                <p className="peligro text-xs font-bold uppercase tracking-wider text-red-700 mb-2">Se eliminará permanentemente</p>
+                <ul className="peligro space-y-1 text-sm text-red-800">
                   <li>• <strong>{impact?.clientes ?? 0}</strong> cliente{impact?.clientes === 1 ? '' : 's'}</li>
                   <li>• <strong>{impact?.expedientes ?? 0}</strong> expediente{impact?.expedientes === 1 ? '' : 's'}</li>
                   <li>• Todo el historial de importaciones de esta organización</li>
@@ -724,7 +745,7 @@ function DespachoPanel() {
                 <p className="text-sm font-semibold text-slate-800">Logotipo <span className="normal-case font-normal text-slate-300">(opcional)</span></p>
                 <p className="text-xs text-slate-400 mt-0.5">Pasa el ratón por encima para elegir una imagen. Si no pones ninguna se usará un icono por defecto.</p>
                 {newLogoPreview && (
-                  <button type="button" onClick={clearNewLogo} className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-700 mt-1">
+                  <button type="button" onClick={clearNewLogo} className="peligro inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-700 mt-1">
                     <Trash2 size={11} /> Quitar
                   </button>
                 )}
@@ -1647,6 +1668,9 @@ function IntegracionesPanel({ canManage }: { canManage: boolean }) {
         <p className="text-sm text-slate-500">Conecta Vantia con canales de mensajería y servicios externos.</p>
       </div>
 
+      {/* Correo y Quipu: se configuran en su módulo; aquí se ve su estado (14/10/2026). */}
+      <IntegracionesPropias />
+
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <div className="flex flex-col rounded-2xl border border-slate-200 bg-white p-5">
           <div className="flex items-start justify-between gap-3">
@@ -2116,7 +2140,10 @@ function NotificacionesPanel() {
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-2xl border border-slate-200 p-5">
-        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">Avisos push del navegador</h3>
+        <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-200 pb-2">
+          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Avisos push del navegador</h3>
+          <ComoFunciona capitulo="17" />
+        </div>
 
         {!push.supported ? (
           <p className="text-sm text-slate-500">Este navegador no admite notificaciones push.</p>
@@ -2134,7 +2161,7 @@ function NotificacionesPanel() {
               <p className="text-xs text-slate-500 mt-0.5 max-w-md">
                 Recibe un aviso del sistema aunque tengas Vantia cerrado o en segundo plano. Se activa por dispositivo/navegador, no por cuenta.
               </p>
-              {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
+              {error && <p className="peligro text-xs text-red-600 mt-2">{error}</p>}
               {push.subscribed && (
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <button type="button" onClick={() => void enviarPrueba()} disabled={prueba === 'enviando'}
@@ -2234,6 +2261,7 @@ function NotificacionesPanel() {
 
 export default function Configuracion() {
   const { rol: myRol } = useOrganizacion();
+  const esGestor = myRol === 'propietario' || myRol === 'admin';
   // "Gestión de Usuarios" (añadir/quitar miembros, roles, permisos) no
   // aparece siquiera como pestaña para quien no sea propietario/admin --
   // antes se mostraba a cualquiera y solo se ocultaban los botones dentro
@@ -2284,40 +2312,29 @@ export default function Configuracion() {
         </div>
         <div className="md:flex-1 md:overflow-y-auto modules-scrollbar p-3">
           <nav className="flex gap-1.5 overflow-x-auto pb-1 modules-scrollbar md:flex-col md:overflow-visible md:pb-0">
-            <button
-              onClick={() => setActiveSection('apariencia')}
-              className={`shrink-0 whitespace-nowrap md:w-full flex items-center gap-3 px-3 py-2.5 rounded-lg font-semibold text-sm transition-colors text-left ${
-                activeSection === 'apariencia' ? 'bg-red-50 text-red-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium'
-              }`}
-            >
-              <Palette size={16} className={activeSection === 'apariencia' ? 'text-red-500' : 'text-slate-400'} /> Apariencia
-            </button>
-            <button
-              onClick={() => setActiveSection('manual')}
-              className={`shrink-0 whitespace-nowrap md:w-full flex items-center gap-3 px-3 py-2.5 rounded-lg font-semibold text-sm transition-colors text-left ${
-                activeSection === 'manual' ? 'bg-red-50 text-red-700' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium'
-              }`}
-            >
-              <BookOpen size={16} className={activeSection === 'manual' ? 'text-red-500' : 'text-slate-400'} /> Manual de usuario
-            </button>
-            {visibleOtherSections.map((s, i) => {
-              const Icon = s.icon;
-              const active = activeSection === s.key;
-              return (
-                <React.Fragment key={s.key}>
-                  {i === visibleOtherSections.length - 1 && <div className="hidden md:block my-4 border-t border-slate-200 mx-2" />}
-                  {i === visibleOtherSections.length - 1 && <div className="shrink-0 w-px self-stretch bg-slate-200 md:hidden" />}
-                  <button
-                    onClick={() => setActiveSection(s.key)}
-                    className={`shrink-0 whitespace-nowrap md:w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors text-left group ${
-                      active ? 'bg-red-50 text-red-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium'
-                    }`}
-                  >
-                    <Icon size={16} className={active ? 'text-red-500' : 'text-slate-400 group-hover:text-slate-600'} /> {s.label}
-                  </button>
-                </React.Fragment>
-              );
-            })}
+            {[
+              { titulo: 'Mi cuenta', items: SECCIONES_CUENTA },
+              { titulo: 'Despacho', items: SECCIONES_DESPACHO.filter((x) => !x.soloGestor || esGestor) },
+            ].map((grupo, gi) => (
+              <React.Fragment key={grupo.titulo}>
+                {gi > 0 && <div className="shrink-0 w-px self-stretch bg-slate-200 md:hidden" />}
+                <p className={`hidden md:block px-3 pb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 ${gi > 0 ? 'mt-5' : ''}`}>{grupo.titulo}</p>
+                {grupo.items.map((it) => {
+                  const Icon = it.icon;
+                  const active = activeSection === it.key;
+                  // Para quien no es propietario/admin, Trazabilidad es solo su actividad.
+                  const label = it.key === 'trazabilidad' && !esGestor && myRol !== 'soporte' ? 'Mi actividad' : it.label;
+                  return (
+                    <button key={it.key} type="button" onClick={() => setActiveSection(it.key)}
+                      className={`shrink-0 whitespace-nowrap md:w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-left group ${
+                        active ? 'bg-red-50 text-red-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium'
+                      }`}>
+                      <Icon size={16} className={active ? 'text-red-500' : 'text-slate-400 group-hover:text-slate-600'} /> {label}
+                    </button>
+                  );
+                })}
+              </React.Fragment>
+            ))}
           </nav>
         </div>
       </aside>
@@ -2355,6 +2372,9 @@ export default function Configuracion() {
                   </div>
                 </div>
               </div>
+
+              {/* Claro / oscuro / como el sistema */}
+              <SelectorModo />
 
               {/* Tema del sistema */}
               <section className="mb-10">
@@ -2459,6 +2479,12 @@ export default function Configuracion() {
             <ManualPanel />
           ) : activeSection === 'despacho' ? (
             <DespachoPanel />
+          ) : activeSection === 'perfil' ? (
+            <PerfilPanel />
+          ) : activeSection === 'preferencias' ? (
+            <PreferenciasTrabajoPanel />
+          ) : activeSection === 'privacidad' && esGestor ? (
+            <PrivacidadPanel />
           ) : activeSection === 'notificaciones' ? (
             <NotificacionesPanel />
           ) : activeSection === 'seguridad' ? (

@@ -364,7 +364,7 @@ export function AdjuntosPanel({ entityId, entityName, onOpenFull }: {
           Subir
         </button>
         <span className="text-[11px] text-slate-400">{loading ? "Cargando…" : `${files.length} archivo${files.length !== 1 ? "s" : ""}`}</span>
-        {error && <span className="text-[11px] text-red-600 font-medium truncate flex-1">{error}</span>}
+        {error && <span className="peligro text-[11px] text-red-600 font-medium truncate flex-1">{error}</span>}
         <button
           onClick={onOpenFull}
           title="Abrir en ventana completa"
@@ -435,7 +435,7 @@ export function AdjuntosPanel({ entityId, entityName, onOpenFull }: {
                       <button
                         onClick={() => setConfirmDeleteId(f.id)}
                         title="Eliminar"
-                        className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                        className="peligro p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
                       ><Trash2 size={12} /></button>
                     </div>
                   </td>
@@ -457,7 +457,7 @@ export function AdjuntosPanel({ entityId, entityName, onOpenFull }: {
         footer={
           <>
             <button onClick={() => setConfirmDeleteId(null)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
-            <button onClick={() => del(confirmDeleteId!)} className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg active:scale-95">Eliminar</button>
+            <button onClick={() => del(confirmDeleteId!)} className="peligro px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg active:scale-95">Eliminar</button>
           </>
         }
       />
@@ -664,8 +664,8 @@ export function ExpedienteModal({ initial, editId, clientes, onSave, onClose, sa
 
       {error && (
         <div className="px-6 sm:px-8 py-3 bg-red-50 border-b border-red-100 flex items-start gap-2.5 flex-shrink-0 animate-fade-in">
-          <AlertTriangle size={15} className="text-red-500 shrink-0 mt-0.5" />
-          <p className="text-sm text-red-700 font-medium">{error}</p>
+          <AlertTriangle size={15} className="peligro text-red-500 shrink-0 mt-0.5" />
+          <p className="peligro text-sm text-red-700 font-medium">{error}</p>
         </div>
       )}
 

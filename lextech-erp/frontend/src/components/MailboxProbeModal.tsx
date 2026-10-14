@@ -112,9 +112,9 @@ export default function MailboxProbeModal({ accountId, accountEmail, onClose, on
               Revisando todas las carpetas del servidor…
             </div>
           )}
-          {error && <p className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+          {error && <p className="peligro mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
           {report?.error && (
-            <p className="mb-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <p className="peligro mb-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               <XCircle size={15} className="mt-0.5 shrink-0" /> No se pudo conectar con el servidor: {report.error}
             </p>
           )}

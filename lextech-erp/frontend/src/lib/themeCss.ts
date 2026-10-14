@@ -266,6 +266,12 @@ ${t} {
   --accent-from: ${ramp[500]};
   --accent-to: ${ramp[600]};
   --accent-glow: ${rgbTriplet(ramp[600])};
+  /* Tonos claros para los estados de interacción (ver lib/temasExtra.css). */
+  --tema-50: ${ramp[50]};
+  --tema-100: ${ramp[100]};
+  --tema-200: ${ramp[200]};
+  --tema-300: ${ramp[300]};
+  --tema-400: ${ramp[400]};
 }
 ${t} input:focus, ${t} textarea:focus, ${t} select:focus {
   box-shadow: 0 0 0 4px ${rgba(ramp[600], 0.08)} !important;

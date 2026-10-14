@@ -196,7 +196,7 @@ export default function AutomatizacionesPanel() {
           </p>
         )}
 
-        {error && !eligiendoBuzon && <p className="mt-3 text-sm text-red-600">{error}</p>}
+        {error && !eligiendoBuzon && <p className="peligro mt-3 text-sm text-red-600">{error}</p>}
       </div>
 
       {eligiendoBuzon && data && (
@@ -277,7 +277,7 @@ function ElegirBuzon({ organizacion, opciones, actual, activando, guardando, err
               </button>
             );
           })}
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="peligro text-sm text-red-600">{error}</p>}
         </div>
         <div className="flex flex-col-reverse gap-2 border-t border-slate-100 px-5 py-4 sm:flex-row sm:justify-end">
           <button type="button" onClick={onCancel} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancelar</button>

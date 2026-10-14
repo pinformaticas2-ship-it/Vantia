@@ -218,7 +218,7 @@ export function BookingPageSettingsModal({
             Página activa (se puede reservar)
           </label>
 
-          {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-600">{error}</p>}
+          {error && <p className="peligro rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-600">{error}</p>}
         </div>
 
         <div className="flex items-center justify-end gap-2 border-t border-slate-100 px-6 py-4">

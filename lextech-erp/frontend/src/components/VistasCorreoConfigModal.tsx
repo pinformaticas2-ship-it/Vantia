@@ -304,7 +304,7 @@ export default function VistasCorreoConfigModal({ initial, canManage, onClose, o
             ? <button type="button" onClick={() => setCfg(DEFAULTS)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700"><RotateCcw size={13} /> Volver a los valores por defecto</button>
             : <p className="text-xs text-slate-500">Solo el propietario o un administrador pueden cambiarlo.</p>}
           <div className="flex items-center gap-2">
-            {error && <span className="text-xs text-red-600">{error}</span>}
+            {error && <span className="peligro text-xs text-red-600">{error}</span>}
             <button type="button" onClick={onClose} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">{canManage ? 'Cancelar' : 'Cerrar'}</button>
             {canManage && (
               <button type="button" disabled={saving} onClick={() => void guardar()}

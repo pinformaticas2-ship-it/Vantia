@@ -960,7 +960,7 @@ function ClientCounterConfigModal({ onClose, getToken }: { onClose: () => void; 
               </div>
 
               {formError && (
-                <p className="text-xs text-red-600 font-medium flex items-center gap-1.5">
+                <p className="peligro text-xs text-red-600 font-medium flex items-center gap-1.5">
                   <AlertCircle size={12} /> {formError}
                 </p>
               )}
@@ -1065,7 +1065,7 @@ function QuickTaskModal({
         </div>
 
         {errorMsg && (
-          <div className="px-5 py-2 bg-red-50 border-b border-red-100 text-xs text-red-700 font-medium">{errorMsg}</div>
+          <div className="peligro px-5 py-2 bg-red-50 border-b border-red-100 text-xs text-red-700 font-medium">{errorMsg}</div>
         )}
 
         <div className="p-5 space-y-4 max-h-[78vh] overflow-y-auto">

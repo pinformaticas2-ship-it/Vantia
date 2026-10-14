@@ -307,7 +307,7 @@ function TaskPanel({
             )}
             {task && (
               <button onClick={() => onDelete(task.id)} disabled={saving}
-                className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50">
+                className="peligro shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50">
                 <Trash2 size={14} />
               </button>
             )}
@@ -331,7 +331,7 @@ function TaskPanel({
         )}
 
         {errorMsg && (
-          <div className="shrink-0 px-5 py-2 bg-red-50 border-b border-red-100 text-xs text-red-700 font-medium">
+          <div className="peligro shrink-0 px-5 py-2 bg-red-50 border-b border-red-100 text-xs text-red-700 font-medium">
             {errorMsg}
           </div>
         )}
@@ -499,7 +499,7 @@ function TaskPanel({
                         {downloadingFile === f.id ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
                       </button>
                       <button onClick={() => handleDeleteFile(f.id)} disabled={deletingFile === f.id}
-                        className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                        className="peligro w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
                         title="Eliminar">
                         {deletingFile === f.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
                       </button>

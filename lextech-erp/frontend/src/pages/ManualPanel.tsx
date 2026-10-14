@@ -1,4 +1,6 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { Search, X } from "lucide-react";
 
 // ── Bloques reutilizables para reproducir el manual ─────────────
 
@@ -124,18 +126,60 @@ const TOC: { n: string; title: string }[] = [
   { n: "11", title: "WhatsApp" },
   { n: "12", title: "Chat interno" },
   { n: "13", title: "Vantia — el asistente de inteligencia artificial" },
-  { n: "14", title: "Configuración" },
+  { n: "14", title: "Configuración (Ajustes)" },
   { n: "15", title: "Trazabilidad" },
-  { n: "16", title: "Preguntas frecuentes" },
-  { n: "17", title: "Glosario" },
+  { n: "16", title: "Vistas recibidas por correo" },
+  { n: "17", title: "Avisos y notificaciones" },
+  { n: "18", title: "Herramienta PDF y adjuntos" },
+  { n: "19", title: "Atajos de teclado y preferencias" },
+  { n: "20", title: "Preguntas frecuentes" },
+  { n: "21", title: "Glosario" },
 ];
 
 export default function ManualPanel() {
+  // Buscador (14/10/2026): oculta los capítulos que no contienen lo buscado.
+  const [busqueda, setBusqueda] = useState("");
+  const [sinResultados, setSinResultados] = useState(false);
+  const contenedor = useRef<HTMLDivElement>(null);
+  const [searchParams] = useSearchParams();
+  useEffect(() => {
+    const raiz = contenedor.current;
+    if (!raiz) return;
+    const q = busqueda.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    let visibles = 0;
+    raiz.querySelectorAll<HTMLElement>("section[id^='cap-']").forEach((sec) => {
+      const texto = (sec.textContent || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      const ok = !q || texto.includes(q);
+      sec.style.display = ok ? "" : "none";
+      if (ok) visibles++;
+    });
+    setSinResultados(Boolean(q) && visibles === 0);
+  }, [busqueda]);
+  // Enlace directo a un capítulo: ?section=manual&capitulo=16
+  useEffect(() => {
+    const cap = searchParams.get("capitulo");
+    if (!cap) return;
+    const t = window.setTimeout(() => document.getElementById(`cap-${cap.padStart(2, "0")}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
+    return () => window.clearTimeout(t);
+  }, [searchParams]);
   return (
-    <div className="max-w-none">
+    <div className="max-w-none" ref={contenedor}>
+      <div className="sticky top-0 z-10 -mx-1 mb-6 bg-[#f4f6f8] px-1 pb-2 pt-1">
+        <div className="relative">
+          <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Buscar en el manual (p. ej. vistas, plazos, oscuro)…"
+            className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-9 text-sm outline-none focus:border-red-300" />
+          {busqueda && (
+            <button type="button" onClick={() => setBusqueda("")} aria-label="Borrar búsqueda" className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:text-slate-600">
+              <X size={14} />
+            </button>
+          )}
+        </div>
+        {sinResultados && <p className="mt-2 text-xs text-slate-500">No hay nada en el manual sobre «{busqueda}».</p>}
+      </div>
       {/* ── Portada ── */}
       <div className="mb-10 rounded-3xl border border-slate-200 bg-white p-8">
-        <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">Manual de usuario · Versión 1.0</p>
+        <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">Manual de usuario · Versión 2.0 · octubre de 2026</p>
         <h1 className="mt-2 font-serif text-3xl font-bold text-slate-900">
           Vantia Legis
           <br />
@@ -148,7 +192,7 @@ export default function ManualPanel() {
         </p>
         <div className="mt-6 grid grid-cols-1 gap-4 border-t border-slate-100 pt-5 sm:grid-cols-3">
           <div>
-            <p className="text-sm font-bold text-slate-800">17 capítulos</p>
+            <p className="text-sm font-bold text-slate-800">21 capítulos</p>
             <p className="text-xs text-slate-400">De la primera sesión a la auditoría de uso</p>
           </div>
           <div>
@@ -229,9 +273,9 @@ export default function ManualPanel() {
         <InfoTable
           headers={["Bloque", "Módulos"]}
           rows={[
-            ["Principal", "Dashboard, Expedientes, Clientes, Trazabilidad"],
-            ["Productividad", "Agenda, Tareas, Chat, WhatsApp, Correo, Facturación"],
-            ["Conocimiento", <>Documental, Plaud IA <em>(en construcción)</em>, Chat IA</>],
+            ["Principal", "Dashboard, Expedientes, Directorio (clientes, procuradores, abogados, contrarios), Agenda, Tareas"],
+            ["Comunicación", "Chat, Correo, Vistas (si su despacho tiene activada la automatización), Comunicación externa (WhatsApp)"],
+            ["Gestión", "Tesorería (facturación), Documental, Chat IA"],
           ]}
         />
         <P>
@@ -689,6 +733,25 @@ export default function ManualPanel() {
           Un canal vinculado a un expediente es una forma cómoda de que todo el equipo que trabaja en un caso tenga
           una conversación aparte, sin mezclarla con el chat general del despacho.
         </Callout>
+        <SubHeading>12.1 Tiempo real</SubHeading>
+        <P>
+          Los mensajes llegan al instante y, al enviar, el suyo aparece en la conversación en el momento: no hace
+          falta esperar. Si tarda de verdad (una imagen grande con mala conexión) verá «Enviando…», y si falla,
+          «No se ha podido enviar» con los botones Reintentar y Descartar. Las ediciones, los borrados y las
+          reacciones de los compañeros también se ven al momento.
+        </P>
+        <SubHeading>12.2 Estados</SubHeading>
+        <P>
+          Pulse su nombre, abajo a la izquierda del chat, para elegir un estado: Ocupado, No molestar, En juicio, En
+          reunión o Ausente, o escribir uno personalizado con emoji y color («⚖️ En sala 3»). Puede hacer que se
+          quite solo pasados 30 minutos, 1 hora, 4 horas o al acabar el día. Todos los compañeros ven su estado. Con
+          «No molestar», «En juicio» o «En reunión» no recibirá avisos push del chat.
+        </P>
+        <SubHeading>12.3 Foto de cada grupo</SubHeading>
+        <P>
+          Cualquier miembro de un grupo puede ponerle foto: pulse el icono del grupo en la cabecera de la
+          conversación y elija una imagen. Desde el mismo botón puede cambiarla o quitarla.
+        </P>
       </Chapter>
 
       {/* ── 13 Vantia ── */}
@@ -748,21 +811,24 @@ export default function ManualPanel() {
       </Chapter>
 
       {/* ── 14 Configuración ── */}
-      <Chapter n="14" title="Configuración">
-        <P>El módulo de Configuración es, por ahora, deliberadamente reducido.</P>
-        <Bullets
-          items={[
-            <>
-              <strong>Paleta de colores:</strong> elija entre dos temas visuales, «Rojo y Negro» (corporativo) o
-              «Azul y Blanco», con una vista previa en miniatura antes de aplicarlo. El cambio se aplica al instante
-              en toda la aplicación.
-            </>,
+      <Chapter n="14" title="Configuración (Ajustes)">
+        <P>Ajustes se divide en dos grupos: lo suyo (Mi cuenta) y lo de la organización (Despacho).</P>
+        <InfoTable
+          headers={["Sección", "Para qué sirve"]}
+          rows={[
+            ["Apariencia", "Modo claro, oscuro o como el sistema; seis temas de color o uno personalizado. Lo que significa peligro (borrar, errores, vencidos) se queda siempre en rojo."],
+            ["Mi perfil", "Su cargo (se ve en el chat) y teléfono. Nombre, foto y correo de acceso, en Seguridad."],
+            ["Preferencias de trabajo", "Página de inicio al entrar, primer día de la semana en la Agenda y atajos de teclado."],
+            ["Notificaciones", "Avisos push: qué tipos quiere, horario de silencio y aviso de prueba (capítulo 17)."],
+            ["Seguridad", "Contraseña, verificación en dos pasos y sesiones activas."],
+            ["Mi Despacho", "Datos fiscales, logotipo, textos de facturas y correo de bienvenida al cliente."],
+            ["Integraciones", "Estado de Correo y Quipu, Google Drive, Dropbox y WhatsApp."],
+            ["Automatizaciones", "Vistas recibidas por correo (capítulo 16). Solo propietario y administradores."],
+            ["Trazabilidad", "Auditoría de accesos y acciones (capítulo 15)."],
+            ["Datos y privacidad", "Cuánto se guarda la trazabilidad y exportación de los datos del despacho. Solo propietario y administradores."],
+            ["Gestión de Usuarios", "Miembros, roles y permisos por módulo y por persona. Solo propietario y administradores."],
           ]}
         />
-        <P>
-          Las secciones de Notificaciones, Empresa (datos del despacho y logotipo) y Seguridad (contraseñas,
-          sesiones y accesos) aparecen anunciadas como «Próximamente»: todavía no están activas en esta versión.
-        </P>
       </Chapter>
 
       {/* ── 15 Trazabilidad ── */}
@@ -784,10 +850,95 @@ export default function ManualPanel() {
           Además de la seguridad, Trazabilidad es útil para reconstruir qué ocurrió con un expediente o un cliente
           concreto: quién lo modificó por última vez, quién exportó un listado o quién descargó un documento.
         </Callout>
+        <SubHeading>15.1 Quién ve qué</SubHeading>
+        <InfoTable
+          headers={["Quién", "Qué ve"]}
+          rows={[
+            ["Propietario y administradores", "Todo."],
+            ["Soporte", "Accesos, IP, dispositivo y el tipo de cada acción de todos, sin nombres de clientes ni contenido. El propietario o un administrador puede darle acceso completo durante 24 horas («Acceso de soporte»); queda registrado."],
+            ["Resto de miembros", "Solo su propia actividad («Mi actividad»)."],
+          ]}
+        />
+        <P>
+          Está en Ajustes → Despacho → Trazabilidad. Cuánto tiempo se guarda se decide en Ajustes → Datos y
+          privacidad (lo habitual, 12 meses).
+        </P>
+      </Chapter>
+
+      {/* ── 16 Vistas ── */}
+      <Chapter n="16" title="Vistas recibidas por correo">
+        <P>
+          Si su despacho la tiene activada (Ajustes → Automatizaciones), Vantia revisa el correo elegido y detecta
+          los señalamientos de vista: lee fecha, hora, juzgado, autos y NIG, y comprueba si chocan con su agenda.
+        </P>
+        <Steps
+          items={[
+            <>Le llega un aviso (campana y push) con la vista por confirmar.</>,
+            <>Revise los datos en Vistas y pulse Aceptar o Rechazar. Siempre decide una persona.</>,
+            <>Al aceptar, se responde al remitente, se crea o vincula el expediente, se guardan los adjuntos, se añade a la agenda y se programa un recordatorio para prepararla.</>,
+          ]}
+        />
+        <P>
+          Los cambios de fecha y las cancelaciones también se detectan y, al confirmarlos, se reflejan en la agenda y
+          en el expediente. Cada correo solo puede revisarse en una organización, para no duplicar vistas.
+        </P>
+        <Callout tone="amber" label="Privacidad">
+          Las vistas (con sus correos y adjuntos) solo las ven el dueño del buzón revisado y el abogado responsable.
+        </Callout>
+      </Chapter>
+
+      {/* ── 17 Avisos ── */}
+      <Chapter n="17" title="Avisos y notificaciones">
+        <P>
+          La campana de arriba reúne lo pendiente: mensajes, correos sin leer, plazos, vistas y respuestas de
+          soporte. Lo que descarte allí queda descartado en todos sus dispositivos.
+        </P>
+        <P>
+          Los avisos push le llegan aunque tenga Vantia cerrado. Actívelos en Ajustes → Notificaciones en cada
+          dispositivo y elija qué tipos quiere. Por defecto hay horario de silencio (de 21:00 a 08:00 y fines de
+          semana); los mensajes directos y las vistas llegan siempre. Si ya está mirando esa sección de Vantia, no
+          le llega el aviso del sistema.
+        </P>
+        <Bullets
+          items={[
+            <><strong>Plazos:</strong> a 3 días, el día antes y el mismo día; si vence, hasta 3 recordatorios, uno por semana.</>,
+            <><strong>Correo nuevo:</strong> de lo que llegue a su bandeja de entrada (se revisa cada pocos minutos).</>,
+            <><strong>Al cerrar sesión</strong>, ese navegador deja de recibir sus avisos; al volver a entrar se reactivan solos.</>,
+          ]}
+        />
+      </Chapter>
+
+      {/* ── 18 Herramienta PDF ── */}
+      <Chapter n="18" title="Herramienta PDF y adjuntos">
+        <P>
+          Desde los adjuntos de clientes y expedientes puede unir varios documentos en un solo PDF (también Word e
+          imágenes), cambiar el orden de las páginas, girarlas o quitar las que sobren, y guardar el resultado como
+          documento nuevo.
+        </P>
+        <P>
+          Los adjuntos se previsualizan en el propio Vantia (PDF, imágenes, Word, Excel, texto y páginas HTML) sin
+          tener que descargarlos.
+        </P>
+      </Chapter>
+
+      {/* ── 19 Atajos y preferencias ── */}
+      <Chapter n="19" title="Atajos de teclado y preferencias">
+        <InfoTable
+          headers={["Atajo", "Qué hace"]}
+          rows={[
+            ["?", "Muestra todos los atajos."],
+            ["/", "Va al buscador de arriba."],
+            ["G y luego D, E, L, A, T, V, C, M, O o S", "Va a Dashboard, Expedientes, Clientes, Agenda, Tareas, Vistas, Chat, Correo, Documental o Ajustes."],
+          ]}
+        />
+        <P>
+          Los atajos no actúan mientras escribe en un campo y se pueden desactivar en Ajustes → Preferencias de
+          trabajo, donde también elige la página de inicio y el primer día de la semana de la Agenda.
+        </P>
       </Chapter>
 
       {/* ── 16 Preguntas frecuentes ── */}
-      <Chapter n="16" title="Preguntas frecuentes">
+      <Chapter n="20" title="Preguntas frecuentes">
         {[
           {
             q: "¿Puedo deshacer una eliminación por error?",
@@ -822,7 +973,7 @@ export default function ManualPanel() {
       </Chapter>
 
       {/* ── 17 Glosario ── */}
-      <Chapter n="17" title="Glosario">
+      <Chapter n="21" title="Glosario">
         <InfoTable
           headers={["Término", "Significado en Vantia"]}
           rows={[

@@ -1,0 +1,177 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   Temas con colores con significado + modo oscuro (14/10/2026)
+
+   Los temas (index.css + themeCss.ts) recolorean a la fuerza los rojos fijos
+   de la app. Esto añade tres cosas:
+   1. Los estados de interacción claros (borde/halo al editar un campo, fondo
+      al pasar el ratón) también siguen el tema; los avisos fijos (fondos y
+      bordes suaves de error) se quedan rojos a propósito.
+   2. Lo marcado como "peligro" (borrar, errores, vencidos, rechazos...) se
+      queda SIEMPRE rojo, con cualquier tema: rojo = cuidado.
+   3. Modo oscuro (html[data-modo="oscuro"]): invierte la gama neutra (fondos
+      blancos/grises, textos, bordes) y suaviza los tintes de aviso.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. Tonos claros de cada tema (el personalizado los pone themeCss.ts) ── */
+[data-theme="azul"]    { --tema-50: #eff6ff; --tema-100: #dbeafe; --tema-200: #bfdbfe; --tema-300: #93c5fd; --tema-400: #60a5fa; }
+[data-theme="verde"]   { --tema-50: #ecfdf5; --tema-100: #d1fae5; --tema-200: #a7f3d0; --tema-300: #6ee7b7; --tema-400: #34d399; }
+[data-theme="violeta"] { --tema-50: #f5f3ff; --tema-100: #ede9fe; --tema-200: #ddd6fe; --tema-300: #c4b5fd; --tema-400: #a78bfa; }
+[data-theme="grafito"] { --tema-50: #f0fdfa; --tema-100: #ccfbf1; --tema-200: #99f6e4; --tema-300: #5eead4; --tema-400: #2dd4bf; }
+[data-theme="indigo"]  { --tema-50: #eef2ff; --tema-100: #e0e7ff; --tema-200: #c7d2fe; --tema-300: #a5b4fc; --tema-400: #818cf8; }
+
+[data-theme]:not([data-theme="rojo"]) .hover\:bg-red-50:hover:not(.peligro):not(.peligro *)   { background-color: var(--tema-50) !important; }
+[data-theme]:not([data-theme="rojo"]) .hover\:bg-red-100:hover:not(.peligro):not(.peligro *)  { background-color: var(--tema-100) !important; }
+[data-theme]:not([data-theme="rojo"]) .hover\:border-red-200:hover:not(.peligro):not(.peligro *) { border-color: var(--tema-200) !important; }
+[data-theme]:not([data-theme="rojo"]) .hover\:border-red-300:hover:not(.peligro):not(.peligro *) { border-color: var(--tema-300) !important; }
+[data-theme]:not([data-theme="rojo"]) .focus\:border-red-300:focus:not(.peligro):not(.peligro *) { border-color: var(--tema-300) !important; }
+[data-theme]:not([data-theme="rojo"]) .focus\:border-red-400:focus:not(.peligro):not(.peligro *) { border-color: var(--tema-400) !important; }
+[data-theme]:not([data-theme="rojo"]) .focus\:ring-red-100:focus:not(.peligro):not(.peligro *)   { --tw-ring-color: var(--tema-100) !important; }
+[data-theme]:not([data-theme="rojo"]) .focus\:ring-red-200:focus:not(.peligro):not(.peligro *)   { --tw-ring-color: var(--tema-200) !important; }
+[data-theme]:not([data-theme="rojo"]) .focus\:ring-red-300:focus:not(.peligro):not(.peligro *)   { --tw-ring-color: var(--tema-300) !important; }
+[data-theme]:not([data-theme="rojo"]) .focus\:ring-red-400:focus:not(.peligro):not(.peligro *)   { --tw-ring-color: var(--tema-400) !important; }
+[data-theme]:not([data-theme="rojo"]) .focus-within\:border-red-300:focus-within:not(.peligro):not(.peligro *) { border-color: var(--tema-300) !important; }
+[data-theme]:not([data-theme="rojo"]) .focus-within\:ring-red-100:focus-within:not(.peligro):not(.peligro *) { --tw-ring-color: var(--tema-100) !important; }
+
+/* ── 2. Peligro: el rojo de siempre, con cualquier tema ── */
+[data-theme] .peligro.bg-red-500, [data-theme] .peligro .bg-red-500 { background-color: #ef4444 !important; }
+[data-theme] .peligro.bg-red-600, [data-theme] .peligro .bg-red-600 { background-color: #dc2626 !important; }
+[data-theme] .peligro.bg-red-700, [data-theme] .peligro .bg-red-700 { background-color: #b91c1c !important; }
+[data-theme] .peligro.bg-red-800, [data-theme] .peligro .bg-red-800 { background-color: #991b1b !important; }
+[data-theme] .peligro.bg-red-900, [data-theme] .peligro .bg-red-900 { background-color: #7f1d1d !important; }
+[data-theme] .peligro.text-red-500, [data-theme] .peligro .text-red-500 { color: #ef4444 !important; }
+[data-theme] .peligro.text-red-600, [data-theme] .peligro .text-red-600 { color: #dc2626 !important; }
+[data-theme] .peligro.text-red-700, [data-theme] .peligro .text-red-700 { color: #b91c1c !important; }
+[data-theme] .peligro.text-red-800, [data-theme] .peligro .text-red-800 { color: #991b1b !important; }
+[data-theme] .peligro.border-red-500, [data-theme] .peligro .border-red-500 { border-color: #ef4444 !important; }
+[data-theme] .peligro.border-red-600, [data-theme] .peligro .border-red-600 { border-color: #dc2626 !important; }
+[data-theme] .peligro.border-red-700, [data-theme] .peligro .border-red-700 { border-color: #b91c1c !important; }
+[data-theme] .peligro.hover\:bg-red-500:hover, [data-theme] .peligro .hover\:bg-red-500:hover { background-color: #ef4444 !important; }
+[data-theme] .peligro.hover\:bg-red-600:hover, [data-theme] .peligro .hover\:bg-red-600:hover { background-color: #dc2626 !important; }
+[data-theme] .peligro.hover\:bg-red-700:hover, [data-theme] .peligro .hover\:bg-red-700:hover { background-color: #b91c1c !important; }
+[data-theme] .peligro.hover\:bg-red-800:hover, [data-theme] .peligro .hover\:bg-red-800:hover { background-color: #991b1b !important; }
+[data-theme] .peligro.hover\:text-red-500:hover, [data-theme] .peligro .hover\:text-red-500:hover { color: #ef4444 !important; }
+[data-theme] .peligro.hover\:text-red-600:hover, [data-theme] .peligro .hover\:text-red-600:hover { color: #dc2626 !important; }
+[data-theme] .peligro.hover\:text-red-700:hover, [data-theme] .peligro .hover\:text-red-700:hover { color: #b91c1c !important; }
+[data-theme] .peligro.ring-red-500, [data-theme] .peligro .ring-red-500 { --tw-ring-color: rgb(239 68 68 / 0.5) !important; }
+[data-theme] .peligro.bg-red-500.text-white, [data-theme] .peligro.bg-red-600.text-white,
+[data-theme] .peligro.bg-red-700.text-white, [data-theme] .peligro .bg-red-600.text-white { color: #ffffff !important; }
+
+/* ── 3. Modo oscuro ───────────────────────────────────────────────────────── */
+html[data-modo="oscuro"] { color-scheme: dark; }
+html[data-modo="oscuro"] body { background-color: #0b1220; color: #e2e8f0; }
+
+/* Fondos */
+html[data-modo="oscuro"] .bg-white,
+html[data-modo="oscuro"] .bg-white\/80,
+html[data-modo="oscuro"] .bg-white\/90,
+html[data-modo="oscuro"] .bg-white\/95 { background-color: #111a2e !important; }
+html[data-modo="oscuro"] .bg-slate-50, html[data-modo="oscuro"] .bg-gray-50,
+html[data-modo="oscuro"] .bg-\[\#f4f6f8\], html[data-modo="oscuro"] .bg-slate-50\/50,
+html[data-modo="oscuro"] .bg-gray-50\/50 { background-color: #0b1220 !important; }
+html[data-modo="oscuro"] .bg-slate-100, html[data-modo="oscuro"] .bg-gray-100 { background-color: #1a2438 !important; }
+html[data-modo="oscuro"] .bg-slate-200, html[data-modo="oscuro"] .bg-gray-200 { background-color: #243049 !important; }
+html[data-modo="oscuro"] .erp-shell { background: #0b1220 !important; }
+html[data-modo="oscuro"] .hover\:bg-slate-50:hover, html[data-modo="oscuro"] .hover\:bg-gray-50:hover,
+html[data-modo="oscuro"] .hover\:bg-white:hover { background-color: #172036 !important; }
+html[data-modo="oscuro"] .hover\:bg-slate-100:hover, html[data-modo="oscuro"] .hover\:bg-gray-100:hover { background-color: #1f2a40 !important; }
+html[data-modo="oscuro"] .hover\:bg-slate-200:hover, html[data-modo="oscuro"] .hover\:bg-gray-200:hover { background-color: #2a3650 !important; }
+
+/* Textos */
+html[data-modo="oscuro"] .text-slate-900, html[data-modo="oscuro"] .text-gray-900,
+html[data-modo="oscuro"] .text-slate-800, html[data-modo="oscuro"] .text-gray-800 { color: #e2e8f0 !important; }
+html[data-modo="oscuro"] .text-slate-700, html[data-modo="oscuro"] .text-gray-700 { color: #cbd5e1 !important; }
+html[data-modo="oscuro"] .text-slate-600, html[data-modo="oscuro"] .text-gray-600 { color: #a3b1c6 !important; }
+html[data-modo="oscuro"] .text-slate-500, html[data-modo="oscuro"] .text-gray-500 { color: #8b9ab0 !important; }
+html[data-modo="oscuro"] .text-slate-400, html[data-modo="oscuro"] .text-gray-400 { color: #6f7f97 !important; }
+html[data-modo="oscuro"] .hover\:text-slate-700:hover, html[data-modo="oscuro"] .hover\:text-slate-800:hover,
+html[data-modo="oscuro"] .hover\:text-slate-900:hover, html[data-modo="oscuro"] .hover\:text-gray-700:hover { color: #f1f5f9 !important; }
+
+/* Bordes y divisores */
+html[data-modo="oscuro"] .border-slate-100, html[data-modo="oscuro"] .border-gray-100,
+html[data-modo="oscuro"] .border-slate-200, html[data-modo="oscuro"] .border-gray-200,
+html[data-modo="oscuro"] .divide-slate-100 > * + *, html[data-modo="oscuro"] .divide-slate-200 > * + *,
+html[data-modo="oscuro"] .divide-gray-100 > * + * { border-color: #23304a !important; }
+html[data-modo="oscuro"] .border-slate-300, html[data-modo="oscuro"] .border-gray-300 { border-color: #33415a !important; }
+
+/* Campos */
+html[data-modo="oscuro"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+html[data-modo="oscuro"] textarea,
+html[data-modo="oscuro"] select { background-color: #0f1729 !important; color: #e2e8f0 !important; border-color: #33415a !important; }
+html[data-modo="oscuro"] input::placeholder, html[data-modo="oscuro"] textarea::placeholder { color: #6f7f97 !important; }
+html[data-modo="oscuro"] [contenteditable="true"] { color: #e2e8f0; }
+
+/* Tintes de aviso y de estado (fondos suaves de color → versión translúcida) */
+html[data-modo="oscuro"] .bg-red-50, html[data-modo="oscuro"] .bg-rose-50 { background-color: rgb(239 68 68 / 0.12) !important; }
+html[data-modo="oscuro"] .bg-red-100, html[data-modo="oscuro"] .bg-rose-100 { background-color: rgb(239 68 68 / 0.2) !important; }
+html[data-modo="oscuro"] .bg-amber-50, html[data-modo="oscuro"] .bg-yellow-50, html[data-modo="oscuro"] .bg-orange-50 { background-color: rgb(245 158 11 / 0.12) !important; }
+html[data-modo="oscuro"] .bg-amber-100, html[data-modo="oscuro"] .bg-yellow-100, html[data-modo="oscuro"] .bg-orange-100 { background-color: rgb(245 158 11 / 0.2) !important; }
+html[data-modo="oscuro"] .bg-emerald-50, html[data-modo="oscuro"] .bg-green-50, html[data-modo="oscuro"] .bg-teal-50 { background-color: rgb(16 185 129 / 0.12) !important; }
+html[data-modo="oscuro"] .bg-emerald-100, html[data-modo="oscuro"] .bg-green-100, html[data-modo="oscuro"] .bg-teal-100 { background-color: rgb(16 185 129 / 0.2) !important; }
+html[data-modo="oscuro"] .bg-blue-50, html[data-modo="oscuro"] .bg-sky-50, html[data-modo="oscuro"] .bg-indigo-50 { background-color: rgb(59 130 246 / 0.12) !important; }
+html[data-modo="oscuro"] .bg-blue-100, html[data-modo="oscuro"] .bg-sky-100, html[data-modo="oscuro"] .bg-indigo-100 { background-color: rgb(59 130 246 / 0.2) !important; }
+html[data-modo="oscuro"] .bg-violet-50, html[data-modo="oscuro"] .bg-purple-50 { background-color: rgb(139 92 246 / 0.12) !important; }
+html[data-modo="oscuro"] .bg-violet-100, html[data-modo="oscuro"] .bg-purple-100 { background-color: rgb(139 92 246 / 0.2) !important; }
+html[data-modo="oscuro"] .border-red-100, html[data-modo="oscuro"] .border-red-200, html[data-modo="oscuro"] .border-rose-200 { border-color: rgb(239 68 68 / 0.35) !important; }
+html[data-modo="oscuro"] .border-amber-100, html[data-modo="oscuro"] .border-amber-200, html[data-modo="oscuro"] .border-yellow-200 { border-color: rgb(245 158 11 / 0.35) !important; }
+html[data-modo="oscuro"] .border-emerald-100, html[data-modo="oscuro"] .border-emerald-200, html[data-modo="oscuro"] .border-green-200 { border-color: rgb(16 185 129 / 0.35) !important; }
+html[data-modo="oscuro"] .border-blue-100, html[data-modo="oscuro"] .border-blue-200, html[data-modo="oscuro"] .border-sky-200 { border-color: rgb(59 130 246 / 0.35) !important; }
+html[data-modo="oscuro"] .text-amber-900, html[data-modo="oscuro"] .text-amber-800, html[data-modo="oscuro"] .text-amber-700 { color: #fcd34d !important; }
+html[data-modo="oscuro"] .text-emerald-800, html[data-modo="oscuro"] .text-emerald-700, html[data-modo="oscuro"] .text-green-700 { color: #6ee7b7 !important; }
+html[data-modo="oscuro"] .text-blue-800, html[data-modo="oscuro"] .text-blue-700, html[data-modo="oscuro"] .text-sky-700 { color: #93c5fd !important; }
+html[data-modo="oscuro"] .text-violet-700, html[data-modo="oscuro"] .text-purple-700 { color: #c4b5fd !important; }
+html[data-modo="oscuro"] .peligro.text-red-700, html[data-modo="oscuro"] .peligro .text-red-700,
+html[data-modo="oscuro"] .peligro.text-red-800, html[data-modo="oscuro"] .peligro .text-red-800 { color: #fca5a5 !important; }
+
+/* Sombras: en oscuro se notan poco; se refuerzan un poco */
+html[data-modo="oscuro"] .shadow-sm, html[data-modo="oscuro"] .shadow, html[data-modo="oscuro"] .shadow-md,
+html[data-modo="oscuro"] .shadow-lg, html[data-modo="oscuro"] .shadow-xl, html[data-modo="oscuro"] .shadow-2xl {
+  --tw-shadow-color: rgb(0 0 0 / 0.5);
+}
+
+/* Barras de desplazamiento */
+html[data-modo="oscuro"] ::-webkit-scrollbar-track { background: #0b1220; }
+html[data-modo="oscuro"] ::-webkit-scrollbar-thumb { background: #2a3650; }
+
+/* Degradados claros (Tailwind 3.4) → fondo oscuro */
+html[data-modo="oscuro"] .from-white, html[data-modo="oscuro"] .from-white\/95, html[data-modo="oscuro"] .from-slate-50,
+html[data-modo="oscuro"] .from-gray-50, html[data-modo="oscuro"] .from-slate-100 {
+  --tw-gradient-from: #0b1220 var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: rgb(11 18 32 / 0) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+}
+html[data-modo="oscuro"] .via-white, html[data-modo="oscuro"] .via-white\/90, html[data-modo="oscuro"] .via-white\/95, html[data-modo="oscuro"] .via-slate-50 {
+  --tw-gradient-to: rgb(11 18 32 / 0) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), #0b1220 var(--tw-gradient-via-position), var(--tw-gradient-to) !important;
+}
+html[data-modo="oscuro"] .to-white, html[data-modo="oscuro"] .to-slate-50, html[data-modo="oscuro"] .to-gray-50, html[data-modo="oscuro"] .to-slate-100 {
+  --tw-gradient-to: #0b1220 var(--tw-gradient-to-position) !important;
+}
+/* Degradados con tinte suave de color → el mismo tinte, translúcido */
+html[data-modo="oscuro"] .from-red-50, html[data-modo="oscuro"] .from-rose-50 { --tw-gradient-from: rgb(239 68 68 / 0.12) var(--tw-gradient-from-position) !important; --tw-gradient-to: rgb(239 68 68 / 0) var(--tw-gradient-to-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important; }
+html[data-modo="oscuro"] .to-red-50, html[data-modo="oscuro"] .to-rose-50 { --tw-gradient-to: rgb(239 68 68 / 0.12) var(--tw-gradient-to-position) !important; }
+html[data-modo="oscuro"] .from-amber-50, html[data-modo="oscuro"] .from-orange-50 { --tw-gradient-from: rgb(245 158 11 / 0.12) var(--tw-gradient-from-position) !important; --tw-gradient-to: rgb(245 158 11 / 0) var(--tw-gradient-to-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important; }
+html[data-modo="oscuro"] .to-orange-50, html[data-modo="oscuro"] .to-amber-50 { --tw-gradient-to: rgb(245 158 11 / 0.12) var(--tw-gradient-to-position) !important; }
+html[data-modo="oscuro"] .from-emerald-50 { --tw-gradient-from: rgb(16 185 129 / 0.12) var(--tw-gradient-from-position) !important; --tw-gradient-to: rgb(16 185 129 / 0) var(--tw-gradient-to-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important; }
+html[data-modo="oscuro"] .to-emerald-50 { --tw-gradient-to: rgb(16 185 129 / 0.12) var(--tw-gradient-to-position) !important; }
+html[data-modo="oscuro"] .from-blue-50, html[data-modo="oscuro"] .from-sky-50, html[data-modo="oscuro"] .from-indigo-50 { --tw-gradient-from: rgb(59 130 246 / 0.12) var(--tw-gradient-from-position) !important; --tw-gradient-to: rgb(59 130 246 / 0) var(--tw-gradient-to-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important; }
+html[data-modo="oscuro"] .to-sky-50, html[data-modo="oscuro"] .to-blue-50 { --tw-gradient-to: rgb(59 130 246 / 0.12) var(--tw-gradient-to-position) !important; }
+/* Fondos decorativos escritos a mano (bg-[linear-gradient(...)]...): en oscuro, fuera */
+html[data-modo="oscuro"] [class*="bg-[linear-gradient"], html[data-modo="oscuro"] [class*="bg-[radial-gradient"] { background-image: none !important; }
+html[data-modo="oscuro"] .erp-orb-top-right, html[data-modo="oscuro"] .erp-orb-bottom-left { display: none !important; }
+/* Fondos de la app (index.css) */
+html[data-modo="oscuro"] .erp-glow-bg,
+html[data-modo="oscuro"] .erp-content-glow-bg { background: radial-gradient(circle at top right, rgba(var(--accent-glow, 171 4 51), 0.06), transparent 28%), #0b1220 !important; }
+html[data-modo="oscuro"] .erp-sidebar-glow-bg { background: #111a2e !important; }
+html[data-modo="oscuro"] .erp-body-glow-wash { background: none !important; }
+html[data-modo="oscuro"] .erp-panel, html[data-modo="oscuro"] .erp-line { display: none !important; }
+html[data-modo="oscuro"] .text-neutral-900, html[data-modo="oscuro"] .text-neutral-800 { color: #e2e8f0 !important; }
+html[data-modo="oscuro"] .text-neutral-700 { color: #cbd5e1 !important; }
+html[data-modo="oscuro"] .text-neutral-500, html[data-modo="oscuro"] .text-neutral-400 { color: #8b9ab0 !important; }
+/* Tintes suaves con transparencia (bg-rose-50/50, bg-slate-50/80...) */
+html[data-modo="oscuro"] [class*="bg-red-50/"], html[data-modo="oscuro"] [class*="bg-rose-50/"] { background-color: rgb(239 68 68 / 0.1) !important; }
+html[data-modo="oscuro"] [class*="bg-amber-50/"], html[data-modo="oscuro"] [class*="bg-yellow-50/"], html[data-modo="oscuro"] [class*="bg-orange-50/"] { background-color: rgb(245 158 11 / 0.1) !important; }
+html[data-modo="oscuro"] [class*="bg-emerald-50/"], html[data-modo="oscuro"] [class*="bg-green-50/"], html[data-modo="oscuro"] [class*="bg-teal-50/"] { background-color: rgb(16 185 129 / 0.1) !important; }
+html[data-modo="oscuro"] [class*="bg-blue-50/"], html[data-modo="oscuro"] [class*="bg-sky-50/"], html[data-modo="oscuro"] [class*="bg-indigo-50/"] { background-color: rgb(59 130 246 / 0.1) !important; }
+html[data-modo="oscuro"] [class*="bg-violet-50/"], html[data-modo="oscuro"] [class*="bg-purple-50/"] { background-color: rgb(139 92 246 / 0.1) !important; }
+html[data-modo="oscuro"] [class*="bg-slate-50/"], html[data-modo="oscuro"] [class*="bg-gray-50/"] { background-color: rgb(255 255 255 / 0.03) !important; }
+html[data-modo="oscuro"] .border-rose-100, html[data-modo="oscuro"] .border-amber-100, html[data-modo="oscuro"] .border-yellow-100 { border-color: rgb(148 163 184 / 0.2) !important; }

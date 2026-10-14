@@ -6,6 +6,8 @@ import { EmailUnreadProvider } from './contexts/EmailUnreadContext';
 import { WhatsAppUnreadProvider } from './contexts/WhatsAppUnreadContext';
 import { DocumentProcessingProvider } from './contexts/DocumentProcessingContext';
 import { ThemeProvider } from './lib/ThemeContext';
+import { PreferenciasProvider } from './lib/preferencias';
+import AtajosTeclado, { InicioPreferido } from './components/AtajosTeclado';
 import { soltarPushDeEsteNavegador } from './lib/usePushNotifications';
 
 // Layouts
@@ -49,8 +51,11 @@ function SoltarPushSinSesion() {
 export default function App() {
   return (
     <ThemeProvider>
+      <PreferenciasProvider>
       <>
       <SignedIn>
+        <AtajosTeclado />
+        <InicioPreferido />
         <ChatUnreadProvider>
         <EmailUnreadProvider>
         <WhatsAppUnreadProvider>
@@ -122,6 +127,7 @@ export default function App() {
         </Routes>
       </SignedOut>
       </>
+      </PreferenciasProvider>
     </ThemeProvider>
   );
 }

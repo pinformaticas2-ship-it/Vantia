@@ -16,6 +16,7 @@ import { useAutoRefresh } from "../lib/useAutoRefresh";
 import { useIsMobile } from "../lib/useIsMobile";
 import { createPortal } from "react-dom";
 import BackButton from "../components/BackButton";
+import { primerDiaSemana } from "../lib/preferencias";
 import { BookingPageSettingsModal, type BookingPage } from "../components/BookingPageSettingsModal";
 
 // ── Google Calendar Types ─────────────────────────────────────────────────────
@@ -221,8 +222,9 @@ function buildGooglePayload(data: any) {
 function buildCalendarDays(year: number, month: number): (Date | null)[] {
   const firstDay = new Date(year, month, 1);
   const lastDay  = new Date(year, month + 1, 0);
-  // lunes = 0, domingo = 6
-  let startDow = firstDay.getDay() - 1; // JS: 0=dom → ajustar a lunes=0
+  // Huecos antes del día 1 según el primer día de la semana elegido en
+  // Ajustes → Preferencias de trabajo (lunes por defecto, o domingo).
+  let startDow = primerDiaSemana() === 'domingo' ? firstDay.getDay() : firstDay.getDay() - 1;
   if (startDow < 0) startDow = 6;
   const days: (Date | null)[] = [];
   for (let i = 0; i < startDow; i++) days.push(null);
@@ -297,11 +299,17 @@ function layoutOverlappingEvents(items: OverlapLayoutItem[]): Map<string, Overla
   return result;
 }
 
+/** Primer día (lunes, o domingo si se eligió así) de la semana de esa fecha. */
 function getMondayOfWeek(dateStr: string): Date {
   const d = new Date(dateStr + "T12:00:00");
   const dow = d.getDay();
-  d.setDate(d.getDate() + (dow === 0 ? -6 : 1 - dow));
+  if (primerDiaSemana() === 'domingo') d.setDate(d.getDate() - dow);
+  else d.setDate(d.getDate() + (dow === 0 ? -6 : 1 - dow));
   return d;
+}
+/** Nombres de los días en el orden de la semana elegida. */
+function diasCabecera(): string[] {
+  return primerDiaSemana() === 'domingo' ? [DIAS[6], ...DIAS.slice(0, 6)] : DIAS;
 }
 
 function addDays(dateStr: string, n: number): string {
@@ -510,7 +518,7 @@ function EventModal({
         </div>
 
         {errorMsg && (
-          <div className="flex-shrink-0 px-5 py-2 bg-red-50 border-b border-red-200 text-xs text-red-700 font-medium">
+          <div className="peligro flex-shrink-0 px-5 py-2 bg-red-50 border-b border-red-200 text-xs text-red-700 font-medium">
             {errorMsg}
           </div>
         )}
@@ -1866,7 +1874,7 @@ function EventViewPopover({
             ) : (
               <button
                 onClick={() => setConfirmDelete(true)}
-                className="rounded-lg p-1.5 text-slate-300 hover:bg-red-50 hover:text-red-500 transition-colors"
+                className="peligro rounded-lg p-1.5 text-slate-300 hover:bg-red-50 hover:text-red-500 transition-colors"
                 title="Eliminar"
               >
                 <Trash2 size={13} />
@@ -3781,7 +3789,7 @@ export default function Agenda() {
               <button
                 onClick={disconnectGcal}
                 title="Desconectar Google Calendar"
-                className="px-2.5 h-full text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                className="peligro px-2.5 h-full text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
               >
                 <Unlink size={12} />
               </button>
@@ -3892,7 +3900,7 @@ export default function Agenda() {
         <div className="agenda-google-grid flex-1 min-w-0 flex flex-col overflow-hidden border-r border-slate-100">
           {/* Días de la semana */}
           <div className="grid grid-cols-7 border-b border-slate-100 bg-slate-50 shrink-0">
-            {DIAS.map(d => (
+            {diasCabecera().map(d => (
               <div key={d} className="py-2.5 text-center text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                 {d}
               </div>

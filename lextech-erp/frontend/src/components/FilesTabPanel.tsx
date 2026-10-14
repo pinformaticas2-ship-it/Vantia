@@ -1137,7 +1137,7 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
                             </button>
                             {!locked && (
                             <button onClick={() => handleDelete(f.id)} title="Eliminar"
-                              className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                              className="peligro p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
                               <Trash2 size={14} />
                             </button>
                             )}

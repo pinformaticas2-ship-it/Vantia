@@ -162,7 +162,7 @@ export default function StorageStatusIcons({ driveConnected, driveEmail, driveHa
         <div className={panel}>
           {header("Google Drive", driveConnected ? (driveHasError ? "Vinculado · con error" : `Vinculado${driveEmail ? ` · ${driveEmail}` : ""}`) : "No vinculado", driveConnected && !driveHasError)}
           {driveConnected && driveHasError && (
-            <p className="border-b border-slate-100 bg-red-50 px-4 py-2 text-xs text-red-700">
+            <p className="peligro border-b border-slate-100 bg-red-50 px-4 py-2 text-xs text-red-700">
               {driveErrorMessage || "Hubo un error reciente al hablar con Google Drive. Avisa a un administrador."}
             </p>
           )}
@@ -180,7 +180,7 @@ export default function StorageStatusIcons({ driveConnected, driveEmail, driveHa
               <MenuItem icon={<Settings size={14} />} label="Ir a Integraciones" onClick={goIntegraciones} />
             </>
           )}
-          {error && <p className="px-4 py-2 text-xs text-red-600">{error}</p>}
+          {error && <p className="peligro px-4 py-2 text-xs text-red-600">{error}</p>}
         </div>
       )}
       {open === "onedrive" && (
@@ -207,7 +207,7 @@ export default function StorageStatusIcons({ driveConnected, driveEmail, driveHa
               <MenuItem icon={<Settings size={14} />} label="Ir a Integraciones" onClick={goIntegraciones} />
             </>
           )}
-          {error && <p className="px-4 py-2 text-xs text-red-600">{error}</p>}
+          {error && <p className="peligro px-4 py-2 text-xs text-red-600">{error}</p>}
         </div>
       )}
     </div>

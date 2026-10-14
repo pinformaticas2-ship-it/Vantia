@@ -518,7 +518,7 @@ export default function DirectorioProfesionales({ tipo, title, singular, desc }:
             </p>
             <div className="flex items-center justify-end gap-2 mt-5">
               <button onClick={() => setDeleteTarget(null)} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors">Cancelar</button>
-              <button onClick={handleDelete} disabled={deleting} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-700 disabled:opacity-50 transition-colors">
+              <button onClick={handleDelete} disabled={deleting} className="peligro inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-700 disabled:opacity-50 transition-colors">
                 {deleting && <Loader2 size={13} className="animate-spin" />} Eliminar
               </button>
             </div>

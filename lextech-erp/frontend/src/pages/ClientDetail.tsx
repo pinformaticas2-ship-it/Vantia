@@ -647,7 +647,7 @@ function TabHistorial({ clientId }: { clientId: string }) {
           <div className="p-10 flex flex-col items-center gap-2 text-red-400">
             <AlertCircle size={26} className="opacity-60" />
             <p className="text-sm font-medium">{error}</p>
-            <button onClick={() => fetchActividades(true)} className="text-xs text-red-500 underline mt-1">Reintentar</button>
+            <button onClick={() => fetchActividades(true)} className="peligro text-xs text-red-500 underline mt-1">Reintentar</button>
           </div>
         ) : actividades.length === 0 ? (
           <div className="p-14 flex flex-col items-center gap-3 text-slate-300">
@@ -1045,7 +1045,7 @@ function TabNotas({ clientId }: { clientId: string }) {
             <div className="p-6 space-y-4">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
-                  <Trash2 size={18} className="text-red-600" />
+                  <Trash2 size={18} className="peligro text-red-600" />
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-900">Eliminar nota</h3>
@@ -1718,7 +1718,7 @@ function TabTareas({ clientId, autoOpen = false, initialTaskType = "" }: { clien
                     <Edit3 size={12} /> Editar
                   </button>
                   <button onClick={() => handleDelete(t.id)}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors">
+                    className="peligro flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors">
                     <Trash2 size={12} /> Borrar
                   </button>
                 </div>
@@ -1737,7 +1737,7 @@ function TabTareas({ clientId, autoOpen = false, initialTaskType = "" }: { clien
             <div className="p-6 space-y-4">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
-                  <Trash2 size={18} className="text-red-600" />
+                  <Trash2 size={18} className="peligro text-red-600" />
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-900">Eliminar tarea</h3>
@@ -1751,7 +1751,7 @@ function TabTareas({ clientId, autoOpen = false, initialTaskType = "" }: { clien
                 Cancelar
               </button>
               <button onClick={confirmDeleteTarea}
-                className="flex-1 px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors">
+                className="peligro flex-1 px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors">
                 Eliminar
               </button>
             </div>
@@ -2954,7 +2954,7 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
                               <ExternalLink size={14} />
                             </button>
                             <button onClick={() => handleDelete(f.id)} title="Eliminar"
-                              className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                              className="peligro p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
                               <Trash2 size={14} />
                             </button>
                           </div>
@@ -3958,7 +3958,7 @@ export default function ClientDetail() {
       <Link to="/dashboard/clientes">
         <BackButton />
       </Link>
-      <div className="flex items-center gap-3 p-5 bg-red-50 border border-red-200 rounded-xl text-red-700">
+      <div className="peligro flex items-center gap-3 p-5 bg-red-50 border border-red-200 rounded-xl text-red-700">
         <AlertCircle size={20} className="shrink-0" />
         <span className="text-sm">{error || "Cliente no encontrado"}</span>
       </div>
