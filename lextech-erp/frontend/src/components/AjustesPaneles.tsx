@@ -41,7 +41,7 @@ export function SelectorModo() {
           const activo = prefs.modo === v;
           return (
             <button key={v} type="button" onClick={() => void guardar({ modo: v }).catch(() => {})}
-              className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${activo ? 'border-red-300 bg-red-50 ring-1 ring-red-200' : 'border-slate-200 bg-white hover:bg-slate-50'}`}>
+              className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${activo ? 'border-red-600 bg-red-600/10' : 'border-slate-200 bg-white hover:bg-slate-50'}`}>
               <Icon size={18} className={activo ? 'text-red-600' : 'text-slate-400'} />
               <span>
                 <span className="block text-sm font-semibold text-slate-800">{label}</span>

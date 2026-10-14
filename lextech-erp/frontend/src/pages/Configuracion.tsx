@@ -16,6 +16,7 @@ import AutomatizacionesPanel from './AutomatizacionesPanel';
 import Trazabilidad from './Trazabilidad';
 import ComoFunciona from '../components/ComoFunciona';
 import { PerfilPanel, PreferenciasTrabajoPanel, PrivacidadPanel, SelectorModo, IntegracionesPropias } from '../components/AjustesPaneles';
+import { usePreferencias, esOscuro } from '../lib/preferencias';
 import { usePushNotifications } from '../lib/usePushNotifications';
 
 const PALETTES: {
@@ -133,6 +134,13 @@ function PaletteCard({ p, active, onClick }: {
   active: boolean;
   onClick: () => void;
 }) {
+  // En modo oscuro, la vista previa enseña la versión oscura del tema.
+  const { prefs } = usePreferencias();
+  const oscuro = esOscuro(prefs.modo);
+  const panel = oscuro ? { backgroundColor: '#111a2e', border: '1px solid #23304a' } : { backgroundColor: '#ffffff', border: '1px solid #e2e8f0' };
+  const fondo = oscuro ? '#0b1220' : p.bg;
+  const barraLateral = oscuro ? '#0f172a' : p.sidebar;
+  const bordeLateral = oscuro ? '#1e293b' : p.sidebarBorder;
   return (
     <div className="relative">
       {/* ── Resplandor ambiental cuando está activo ── */}
@@ -150,11 +158,11 @@ function PaletteCard({ p, active, onClick }: {
         style={active ? { borderColor: p.accent, boxShadow: `0 20px 25px -5px ${p.accent}26, 0 8px 10px -6px ${p.accent}26` } : undefined}
       >
       {/* ── Mini app preview ── */}
-      <div className="h-40 flex overflow-hidden select-none pointer-events-none transition-transform duration-500 group-hover:scale-[1.03]" style={{ backgroundColor: p.bg }}>
+      <div className="h-40 flex overflow-hidden select-none pointer-events-none transition-transform duration-500 group-hover:scale-[1.03]" style={{ backgroundColor: fondo }}>
         {/* Sidebar */}
         <div
           className="w-16 h-full flex flex-col pt-3 px-2 gap-1.5 shrink-0"
-          style={{ backgroundColor: p.sidebar, borderRight: `1px solid ${p.sidebarBorder}` }}
+          style={{ backgroundColor: barraLateral, borderRight: `1px solid ${bordeLateral}` }}
         >
           {/* Logo placeholder */}
           <div className="rounded-md h-5 mb-2" style={{ backgroundColor: p.accent, opacity: 0.9 }} />
@@ -172,13 +180,13 @@ function PaletteCard({ p, active, onClick }: {
         </div>
 
         {/* Content */}
-        <div className="flex-1 p-3 space-y-2" style={{ backgroundColor: p.bg }}>
+        <div className="flex-1 p-3 space-y-2" style={{ backgroundColor: fondo }}>
           {/* Topbar */}
           <div
             className="rounded-lg h-7 flex items-center px-2 gap-2"
-            style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}
+            style={panel}
           >
-            <div className="rounded h-2 flex-1" style={{ backgroundColor: '#e2e8f0' }} />
+            <div className="rounded h-2 flex-1" style={{ backgroundColor: oscuro ? '#23304a' : '#e2e8f0' }} />
             <div className="rounded h-4 w-10" style={{ backgroundColor: p.accent }} />
           </div>
           {/* Cards row */}
@@ -187,7 +195,7 @@ function PaletteCard({ p, active, onClick }: {
               <div
                 key={i}
                 className="flex-1 rounded-xl p-2 space-y-1"
-                style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}
+                style={panel}
               >
                 <div className="rounded h-1.5" style={{ backgroundColor: i === 2 ? (p.secondary ?? p.accent) : p.accent, width: `${w * 60}%` }} />
                 <div className="rounded h-1.5 bg-slate-100" style={{ width: '80%' }} />
@@ -198,7 +206,7 @@ function PaletteCard({ p, active, onClick }: {
           {/* Table row */}
           <div
             className="rounded-xl h-10 px-2 flex items-center gap-2"
-            style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}
+            style={panel}
           >
             <div className="rounded-full h-3 w-3" style={{ backgroundColor: p.accent, opacity: 0.3 }} />
             <div className="rounded h-1.5 flex-1 bg-slate-100" />
@@ -1370,48 +1378,6 @@ function RolesPermisosPanel({ editable }: { editable: boolean }) {
   );
 }
 
-function ColorField({ label, value, onChange, onCommit, valid }: {
-  label: string; value: string; onChange: (v: string) => void; onCommit: (v: string) => void; valid: boolean;
-}) {
-  // El <input type="color"> nativo se deja tal cual por debajo (mismo
-  // selector del sistema, con cuentagotas incluido en navegadores que lo
-  // soportan) pero se le quita el aspecto por defecto -- el "chip" redondeado
-  // de encima es el que se ve, el input real vive invisible justo encima
-  // capturando el clic.
-  return (
-    <div className={`rounded-xl border bg-white p-3 transition-colors ${valid ? 'border-slate-200 hover:border-slate-300' : 'border-rose-200'}`}>
-      <p className="mb-2 text-[10.5px] font-bold uppercase tracking-wider text-slate-400">{label}</p>
-      <div className="flex items-center gap-2.5">
-        <div
-          className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl shadow-inner ring-1 ring-inset ring-black/10 transition-transform hover:scale-105"
-          style={{ backgroundColor: valid ? value : '#e2e8f0' }}
-        >
-          <input
-            type="color"
-            value={valid ? value : '#000000'}
-            onChange={(e) => { onChange(e.target.value); onCommit(e.target.value); }}
-            title={`Elegir ${label.toLowerCase()}`}
-            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-          />
-        </div>
-        <div className={`flex min-w-0 flex-1 items-center gap-0.5 rounded-lg border bg-white px-2.5 transition-colors ${valid ? 'border-slate-200 focus-within:border-slate-400' : 'border-rose-300'}`}>
-          <span className="text-sm font-mono text-slate-300">#</span>
-          <input
-            type="text"
-            value={value.replace(/^#/, '')}
-            onChange={(e) => onChange('#' + e.target.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 6))}
-            onBlur={() => { if (valid) onCommit(value); }}
-            onKeyDown={(e) => { if (e.key === 'Enter' && valid) onCommit(value); }}
-            maxLength={6}
-            className="w-full min-w-0 border-0 bg-transparent py-2 text-sm font-mono uppercase text-slate-700 outline-none"
-          />
-        </div>
-      </div>
-      {!valid && <p className="mt-1.5 text-[10px] font-semibold text-rose-500">Formato no válido (ej. 0F766E)</p>}
-    </div>
-  );
-}
-
 function SeguridadPanel() {
   const navigate = useNavigate();
 
@@ -2270,22 +2236,7 @@ export default function Configuracion() {
     // Automatizaciones: igual, solo quien puede activarlas y configurarlas.
     (s) => (s.key !== 'usuarios' && s.key !== 'automatizaciones') || myRol === 'propietario' || myRol === 'admin',
   );
-  const { theme, setTheme, customColor, customSecondary, customSidebar, setCustomColors } = useTheme();
-  const [draftPrimary, setDraftPrimary] = useState(customColor);
-  const [draftSecondary, setDraftSecondary] = useState(customSecondary);
-  const [draftSidebar, setDraftSidebar] = useState(customSidebar);
-  useEffect(() => { setDraftPrimary(customColor); }, [customColor]);
-  useEffect(() => { setDraftSecondary(customSecondary); }, [customSecondary]);
-  useEffect(() => { setDraftSidebar(customSidebar); }, [customSidebar]);
-  const HEX_RE = /^#[0-9a-fA-F]{6}$/;
-  const draftPrimaryValid = HEX_RE.test(draftPrimary);
-  const draftSecondaryValid = HEX_RE.test(draftSecondary);
-  const draftSidebarValid = HEX_RE.test(draftSidebar);
-  const allDraftsValid = draftPrimaryValid && draftSecondaryValid && draftSidebarValid;
-  const isCustomInUse = theme === 'custom'
-    && draftPrimary.toLowerCase() === customColor.toLowerCase()
-    && draftSecondary.toLowerCase() === customSecondary.toLowerCase()
-    && draftSidebar.toLowerCase() === customSidebar.toLowerCase();
+  const { theme, setTheme } = useTheme();
   const currentAccent = PALETTES.find((p) => p.id === theme)?.accent ?? PALETTES[0].accent;
   // Permite enlazar directamente a una sección concreta (p.ej. desde el aviso
   // de "conéctalo desde Configuración → Integraciones" en Comunicación Externa)
@@ -2391,89 +2342,11 @@ export default function Configuracion() {
                 </div>
               </section>
 
-              {/* Color personalizado */}
-              <section>
-                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">Color personalizado</h3>
-                {(() => {
-                  const previewAccent = draftPrimaryValid ? draftPrimary : customColor;
-                  const previewSecondary = draftSecondaryValid ? draftSecondary : customSecondary;
-                  const previewSidebarRaw = draftSidebarValid ? draftSidebar : customSidebar;
-                  const previewIsDark = pickSidebarStyle(previewSidebarRaw) === 'dark';
-                  const previewSidebarBg = muteSidebarColor(previewSidebarRaw);
-                  const previewSidebarBorder = autoSidebarBorder(previewSidebarBg, previewIsDark ? 'dark' : 'light');
-                  const previewBars = previewIsDark
-                    ? ['#374151', previewAccent, previewSecondary, '#4b5563', '#374151']
-                    : ['#e2e8f0', previewAccent, previewSecondary, '#f1f5f9', '#e2e8f0'];
-                  return (
-                    <div className="mt-6 flex flex-col gap-6 lg:flex-row lg:items-start">
-                      <div className="flex flex-1 flex-col gap-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <div className="flex items-start gap-3">
-                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-50 ring-1 ring-slate-100">
-                            <Palette size={16} className="text-slate-400" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-bold text-slate-800">Elige tus propios colores</p>
-                            <p className="mt-0.5 text-xs leading-5 text-slate-500">Primario, secundario y barra lateral — se aplican al instante en toda la aplicación. El color de la barra lateral se suaviza para que quede elegante, no invasivo.</p>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                          <ColorField
-                            label="Primario (acentos)"
-                            value={draftPrimary}
-                            onChange={setDraftPrimary}
-                            onCommit={(v) => setCustomColors({ primary: v })}
-                            valid={draftPrimaryValid}
-                          />
-                          <ColorField
-                            label="Secundario (insignias)"
-                            value={draftSecondary}
-                            onChange={setDraftSecondary}
-                            onCommit={(v) => setCustomColors({ secondary: v })}
-                            valid={draftSecondaryValid}
-                          />
-                          <ColorField
-                            label="Barra lateral"
-                            value={draftSidebar}
-                            onChange={setDraftSidebar}
-                            onCommit={(v) => setCustomColors({ sidebar: v })}
-                            valid={draftSidebarValid}
-                          />
-                        </div>
-                        <div className="flex items-center gap-2 border-t border-slate-100 pt-4">
-                          {isCustomInUse ? (
-                            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-600">
-                              <Check size={11} /> En uso
-                            </span>
-                          ) : (
-                            <p className="text-xs leading-5 text-slate-400">
-                              {allDraftsValid
-                                ? 'Pulsa Intro en cada campo, o haz clic en la vista previa para aplicar los tres a la vez.'
-                                : 'Corrige el formato marcado en rojo para poder aplicar los colores.'}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="w-full lg:w-72 lg:shrink-0">
-                        <PaletteCard
-                          p={{
-                            id: 'custom',
-                            name: 'Tu combinación',
-                            description: `${previewAccent.toUpperCase()} · ${previewSecondary.toUpperCase()}`,
-                            sidebar: previewSidebarBg,
-                            sidebarBorder: previewSidebarBorder,
-                            accent: previewAccent,
-                            secondary: previewSecondary,
-                            bg: '#f8fafc',
-                            bars: previewBars,
-                          }}
-                          active={isCustomInUse}
-                          onClick={() => { if (allDraftsValid) setCustomColors({ primary: draftPrimary, secondary: draftSecondary, sidebar: draftSidebar }); }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })()}
-              </section>
+              {/* 15/10/2026: sin colores a medida -- solo los temas predefinidos, cada
+                  uno con su versión clara y oscura, para que todo se vea siempre bien. */}
+              <p className="text-xs text-slate-500">
+                Cada tema tiene su versión clara y oscura: elige el modo arriba y el tema aquí.
+              </p>
             </>
           ) : activeSection === 'manual' ? (
             <ManualPanel />

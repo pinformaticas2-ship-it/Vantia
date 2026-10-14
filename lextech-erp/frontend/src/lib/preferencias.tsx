@@ -58,14 +58,22 @@ function leerCache(): Preferencias {
 }
 
 /** ¿Va en oscuro ahora? (con "sistema", lo que diga el ordenador). */
-function esOscuro(modo: Modo): boolean {
+export function esOscuro(modo: Modo): boolean {
   if (modo === 'oscuro') return true;
   if (modo === 'sistema') return typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches;
   return false;
 }
 
 export function aplicarModo(modo: Modo) {
-  document.documentElement.setAttribute('data-modo', esOscuro(modo) ? 'oscuro' : 'claro');
+  const html = document.documentElement;
+  const nuevo = esOscuro(modo) ? 'oscuro' : 'claro';
+  const anterior = html.getAttribute('data-modo');
+  // Al cambiar (no en la primera carga), transición suave de colores.
+  if (anterior && anterior !== nuevo) {
+    html.classList.add('cambiando-apariencia');
+    window.setTimeout(() => html.classList.remove('cambiando-apariencia'), 450);
+  }
+  html.setAttribute('data-modo', nuevo);
 }
 
 // Lo antes posible (al importar el módulo): el modo guardado, sin parpadeo.

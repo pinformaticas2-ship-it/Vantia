@@ -175,3 +175,50 @@ html[data-modo="oscuro"] [class*="bg-blue-50/"], html[data-modo="oscuro"] [class
 html[data-modo="oscuro"] [class*="bg-violet-50/"], html[data-modo="oscuro"] [class*="bg-purple-50/"] { background-color: rgb(139 92 246 / 0.1) !important; }
 html[data-modo="oscuro"] [class*="bg-slate-50/"], html[data-modo="oscuro"] [class*="bg-gray-50/"] { background-color: rgb(255 255 255 / 0.03) !important; }
 html[data-modo="oscuro"] .border-rose-100, html[data-modo="oscuro"] .border-amber-100, html[data-modo="oscuro"] .border-yellow-100 { border-color: rgb(148 163 184 / 0.2) !important; }
+
+/* ══ 4. Cada tema con su versión oscura (15/10/2026) ═══════════════════════
+   Los temas de barra lateral clara (Azul, Verde, Violeta, Índigo) dejaban la
+   barra blanca en modo oscuro. En oscuro, todas las barras son oscuras con el
+   acento de su tema. (Rojo y Grafito ya la tienen oscura de serie.) */
+[data-theme="azul"]    { --tema-acento: #60a5fa; --tema-rgb: 59, 130, 246;  --tema-sec: #f59e0b; }
+[data-theme="verde"]   { --tema-acento: #34d399; --tema-rgb: 16, 185, 129;  --tema-sec: #fbbf24; }
+[data-theme="violeta"] { --tema-acento: #a78bfa; --tema-rgb: 139, 92, 246;  --tema-sec: #f43f5e; }
+[data-theme="grafito"] { --tema-acento: #2dd4bf; --tema-rgb: 20, 184, 166;  --tema-sec: #fbbf24; }
+[data-theme="indigo"]  { --tema-acento: #818cf8; --tema-rgb: 99, 102, 241;  --tema-sec: #f97316; }
+
+html[data-modo="oscuro"]:not([data-theme="rojo"]) .erp-sidebar { background-color: #0f172a !important; border-right-color: #1e293b !important; }
+html[data-modo="oscuro"]:not([data-theme="rojo"]) .erp-sidebar-logo-border { border-bottom-color: #1e293b !important; }
+html[data-modo="oscuro"]:not([data-theme="rojo"]) .erp-sidebar-group-label { color: #64748b !important; }
+html[data-modo="oscuro"]:not([data-theme="rojo"]) .erp-sidebar-divider { background-color: #1e293b !important; }
+html[data-modo="oscuro"]:not([data-theme="rojo"]) .erp-sidebar-nav-inactive { color: #94a3b8 !important; border-color: transparent !important; }
+html[data-modo="oscuro"]:not([data-theme="rojo"]) .erp-sidebar-nav-inactive:hover { background-color: rgba(255, 255, 255, 0.05) !important; color: #ffffff !important; }
+html[data-modo="oscuro"]:not([data-theme="rojo"]) .erp-sidebar-nav-active { background-color: rgba(var(--tema-rgb), 0.14) !important; color: #ffffff !important; border-color: var(--tema-sec) !important; }
+html[data-modo="oscuro"]:not([data-theme="rojo"]) .erp-sidebar-icon-active { color: var(--tema-acento) !important; }
+html[data-modo="oscuro"]:not([data-theme="rojo"]) .erp-sidebar-icon-inactive { color: #64748b !important; }
+html[data-modo="oscuro"]:not([data-theme="rojo"]) .erp-sidebar-collapse { color: #64748b !important; }
+html[data-modo="oscuro"]:not([data-theme="rojo"]) .erp-sidebar-collapse:hover { background-color: rgba(255, 255, 255, 0.05) !important; color: #ffffff !important; }
+html[data-modo="oscuro"]:not([data-theme="rojo"]) .erp-sidebar-user { background-color: rgba(255, 255, 255, 0.03) !important; border-color: #1e293b !important; }
+html[data-modo="oscuro"]:not([data-theme="rojo"]) .erp-sidebar-user:hover { background-color: rgba(255, 255, 255, 0.06) !important; }
+html[data-modo="oscuro"]:not([data-theme="rojo"]) .erp-sidebar-username { color: #ffffff !important; }
+html[data-modo="oscuro"]:not([data-theme="rojo"]) .erp-sidebar-active-dot { background-color: var(--tema-sec) !important; }
+html[data-modo="oscuro"]:not([data-theme="rojo"]) .erp-company-btn { background-color: rgba(255, 255, 255, 0.03) !important; border-color: #1e293b !important; }
+html[data-modo="oscuro"]:not([data-theme="rojo"]) .erp-company-btn:hover { background-color: rgba(255, 255, 255, 0.06) !important; border-color: #475569 !important; }
+html[data-modo="oscuro"]:not([data-theme="rojo"]) .erp-company-logo { background-color: rgba(255, 255, 255, 0.06) !important; border-color: #1e293b !important; }
+html[data-modo="oscuro"]:not([data-theme="rojo"]) .erp-company-icon { background-color: rgba(255, 255, 255, 0.05) !important; border-color: #1e293b !important; }
+html[data-modo="oscuro"]:not([data-theme="rojo"]) .erp-company-icon:hover { background-color: rgba(255, 255, 255, 0.1) !important; }
+html[data-modo="oscuro"]:not([data-theme="rojo"]) .erp-company-name { color: #ffffff !important; }
+html[data-modo="oscuro"]:not([data-theme="rojo"]) .erp-company-sub { color: #94a3b8 !important; }
+html[data-modo="oscuro"]:not([data-theme="rojo"]) .erp-company-chevron { color: #64748b !important; }
+/* El fondo de la app en oscuro, con un toque del acento del tema */
+html[data-modo="oscuro"]:not([data-theme="rojo"]) .erp-content-glow-bg,
+html[data-modo="oscuro"]:not([data-theme="rojo"]) .erp-glow-bg { background: radial-gradient(circle at top right, rgba(var(--tema-rgb), 0.07), transparent 30%), #0b1220 !important; }
+
+/* ══ 5. Cambio suave al pasar de claro a oscuro o de tema ══════════════════
+   Solo mientras dura el cambio (clase puesta 450 ms): el resto del tiempo no
+   hay transiciones globales que ralenticen la app. */
+html.cambiando-apariencia, html.cambiando-apariencia *, html.cambiando-apariencia *::before, html.cambiando-apariencia *::after {
+  transition: background-color 0.4s ease, color 0.4s ease, border-color 0.4s ease, fill 0.4s ease, stroke 0.4s ease, box-shadow 0.4s ease !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  html.cambiando-apariencia, html.cambiando-apariencia * { transition: none !important; }
+}

@@ -3,7 +3,9 @@ import pool from '../config/database';
 
 const pgErr = (e: any) => `${e?.message || String(e)}${e?.code ? ' | code: ' + e.code : ''}`;
 
-const VALID_THEMES = new Set(['rojo', 'azul', 'verde', 'violeta', 'grafito', 'indigo', 'custom']);
+// 15/10/2026: sin tema personalizado -- solo los predefinidos (con versión
+// clara y oscura en el frontend). Si llega 'custom' (versiones antiguas), rojo.
+const VALID_THEMES = new Set(['rojo', 'azul', 'verde', 'violeta', 'grafito', 'indigo']);
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
 export const getMyPreferences = async (req: any, res: Response) => {
@@ -35,7 +37,8 @@ export const updateMyPreferences = async (req: any, res: Response) => {
   const userId = req.auth?.userId;
   if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
 
-  const theme = String(req.body?.theme || '').trim();
+  let theme = String(req.body?.theme || '').trim();
+  if (theme === 'custom') theme = 'rojo';
   if (!VALID_THEMES.has(theme)) {
     return res.status(400).json({ success: false, error: 'Tema no válido' });
   }

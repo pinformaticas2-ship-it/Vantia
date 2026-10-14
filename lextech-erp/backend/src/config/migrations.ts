@@ -2399,6 +2399,10 @@ export async function runMigrations(): Promise<void> {
     try {
       await client.query(`ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS extras JSONB NOT NULL DEFAULT '{}'::jsonb;`);
     } catch (_e: any) {}
+    // Sin tema personalizado (15/10/2026): quien lo tenía pasa a Rojo y Negro.
+    try {
+      await client.query(`UPDATE user_preferences SET theme = 'rojo', theme_custom_color = NULL, theme_custom_secondary = NULL, theme_custom_sidebar = NULL WHERE theme = 'custom';`);
+    } catch (_e: any) {}
     // Cuántos meses se guarda la trazabilidad de la organización (NULL = sin límite).
     try {
       await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS trazabilidad_retencion_meses INTEGER;`);

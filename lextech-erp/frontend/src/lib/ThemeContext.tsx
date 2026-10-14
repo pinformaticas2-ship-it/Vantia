@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { apiFetch } from './api';
-import { buildThemeCss, rampFromAccent, pickSidebarStyle, autoSidebarBorder, muteSidebarColor } from './themeCss';
 
 export type AppTheme = 'rojo' | 'azul' | 'verde' | 'violeta' | 'grafito' | 'indigo' | 'custom';
 
@@ -29,27 +28,24 @@ const ThemeContext = createContext<ThemeCtx>({
   setCustomColors: () => {},
 });
 
-function applyCustomStyle(primary: string, secondary: string, sidebar: string) {
-  let tag = document.getElementById(CUSTOM_STYLE_TAG_ID) as HTMLStyleElement | null;
-  if (!tag) {
-    tag = document.createElement('style');
-    tag.id = CUSTOM_STYLE_TAG_ID;
-    document.head.appendChild(tag);
-  }
-  const sidebarStyle = pickSidebarStyle(sidebar);
-  const mutedSidebar = muteSidebarColor(sidebar);
-  tag.textContent = buildThemeCss('custom', rampFromAccent(primary), {
-    secondary,
-    sidebarStyle,
-    sidebarBg: mutedSidebar,
-    sidebarBorder: autoSidebarBorder(mutedSidebar, sidebarStyle),
-  });
+
+// 15/10/2026: ya no hay colores a medida -- solo los temas predefinidos (con
+// su versión clara y oscura, ver lib/temasExtra.css). Quien tuviera el
+// personalizado pasa a "Rojo y Negro".
+const TEMAS_VALIDOS: AppTheme[] = ['rojo', 'azul', 'verde', 'violeta', 'grafito', 'indigo'];
+const temaValido = (t: any): AppTheme => (TEMAS_VALIDOS.includes(t) ? t : 'rojo');
+
+/** Transición suave al cambiar de tema o de modo (solo durante el cambio). */
+export function transicionSuave() {
+  const html = document.documentElement;
+  html.classList.add('cambiando-apariencia');
+  window.setTimeout(() => html.classList.remove('cambiando-apariencia'), 450);
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const { isLoaded, isSignedIn, getToken } = useAuth();
   const [theme, setThemeState] = useState<AppTheme>(() => {
-    return (localStorage.getItem('app-theme') as AppTheme) || 'rojo';
+    return temaValido(localStorage.getItem('app-theme'));
   });
   const [customColor, setCustomColorState] = useState<string>(() => {
     return localStorage.getItem('app-theme-custom-color') || DEFAULT_CUSTOM_COLOR;
@@ -63,12 +59,14 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const hasSyncedFromServer = useRef(false);
   const saveCustomColorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const applyTheme = (t: AppTheme, primary: string, secondary: string, sidebar: string) => {
-    document.documentElement.setAttribute('data-theme', t);
-    if (t === 'custom') applyCustomStyle(primary, secondary, sidebar);
+  const applyTheme = (t: AppTheme, _primary?: string, _secondary?: string, _sidebar?: string) => {
+    document.documentElement.setAttribute('data-theme', temaValido(t));
+    document.getElementById(CUSTOM_STYLE_TAG_ID)?.remove();
   };
 
-  const setTheme = (t: AppTheme) => {
+  const setTheme = (tPedido: AppTheme) => {
+    const t = temaValido(tPedido);
+    transicionSuave();
     setThemeState(t);
     localStorage.setItem('app-theme', t);
     applyTheme(t, customColor, customSecondary, customSidebar);
@@ -133,7 +131,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       .then((res) => {
         const data = res?.data;
         if (!data?.theme) return;
-        const serverTheme = data.theme as AppTheme;
+        const serverTheme = temaValido(data.theme);
         const serverColor = data.themeCustomColor || DEFAULT_CUSTOM_COLOR;
         const serverSecondary = data.themeCustomSecondary || DEFAULT_CUSTOM_SECONDARY;
         const serverSidebar = data.themeCustomSidebar || DEFAULT_CUSTOM_SIDEBAR;
