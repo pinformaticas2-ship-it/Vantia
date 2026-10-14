@@ -15,6 +15,7 @@ import { safeJson } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
 import { useIsMobile } from "../lib/useIsMobile";
 import { createPortal } from "react-dom";
+import { useSearchParams } from "react-router-dom";
 import BackButton from "../components/BackButton";
 import { primerDiaSemana } from "../lib/preferencias";
 import { BookingPageSettingsModal, type BookingPage } from "../components/BookingPageSettingsModal";
@@ -3652,6 +3653,18 @@ export default function Agenda() {
       setShowModal(true);
     }
   };
+
+  // ?nuevo=1 (botón "+ Nuevo" de la barra superior): abre el formulario de
+  // evento nuevo y quita el parámetro para que no se reabra al recargar.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get("nuevo") !== "1") return;
+    openNew();
+    const next = new URLSearchParams(searchParams);
+    next.delete("nuevo");
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const handleExpandQuickEvent = (formData: AgendaFormData) => {
     setQuickPopover(null);

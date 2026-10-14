@@ -1652,6 +1652,72 @@ function OrgSwitcherMenu({ menuRef, pos, organizaciones, activaId, rolActivo, on
   );
 }
 
+// ── "+ Nuevo" de la barra superior (16/10/2026) ────────────────────────────
+// Crear lo más habitual desde cualquier página. Ocupa el hueco que antes
+// llenaba el logo de la organización (repetido: ya sale en la barra lateral).
+const ACCIONES_NUEVO: { label: string; desc: string; to: string; modulo: Modulo; icon: typeof Plus }[] = [
+  { label: "Cliente",    desc: "Ficha de un cliente nuevo",       to: "/dashboard/clientes/new",     modulo: "clientes",    icon: Users },
+  { label: "Expediente", desc: "Abrir un expediente",             to: "/dashboard/expedientes?nuevo=1", modulo: "expedientes", icon: Briefcase },
+  { label: "Tarea",      desc: "Tarea o plazo con fecha límite",  to: "/dashboard/tareas?open=new",  modulo: "tareas",      icon: CheckCircle2 },
+  { label: "Evento",     desc: "Cita, vista o reunión en la agenda", to: "/dashboard/agenda?nuevo=1", modulo: "agenda",    icon: Calendar },
+];
+
+function BotonNuevo({ puede }: { puede: (m: Modulo) => boolean }) {
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const acciones = ACCIONES_NUEVO.filter((a) => puede(a.modulo));
+  useEffect(() => {
+    if (!open) return;
+    const fuera = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", fuera);
+    document.addEventListener("keydown", esc);
+    return () => { document.removeEventListener("mousedown", fuera); document.removeEventListener("keydown", esc); };
+  }, [open]);
+  if (!acciones.length) return null;
+  return (
+    <div ref={ref} className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title="Crear nuevo"
+        className={`flex items-center gap-1.5 h-10 px-3 sm:px-3.5 rounded-lg text-sm font-semibold text-white shadow-sm transition-colors ${open ? "bg-red-700" : "bg-red-600 hover:bg-red-700"}`}
+      >
+        <Plus size={16} strokeWidth={2.5} />
+        <span className="hidden sm:inline">Nuevo</span>
+        <ChevronDown size={14} className={`hidden sm:block opacity-80 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div role="menu" className="absolute left-0 top-full mt-2 w-64 z-50 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl shadow-slate-900/10">
+          {acciones.map((a) => {
+            const Icon = a.icon;
+            return (
+              <button
+                key={a.label}
+                type="button"
+                role="menuitem"
+                onClick={() => { setOpen(false); navigate(a.to); }}
+                className="group w-full flex items-center gap-3 rounded-lg px-2.5 py-2 text-left hover:bg-slate-50 transition-colors"
+              >
+                <span className="h-8 w-8 shrink-0 rounded-lg bg-red-50 flex items-center justify-center">
+                  <Icon size={15} className="text-red-600" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-[13px] font-semibold text-slate-800">{a.label}</span>
+                  <span className="block text-[11px] text-slate-500 truncate">{a.desc}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onToggleCollapse }: {
   pathname: string;
   search?: string;
@@ -2097,7 +2163,7 @@ export default function DashboardLayout() {
   const { unreadCount: emailUnreadCount, latestUnread, clearLatestUnread } = useEmailUnread();
   const { totalUnread: chatTotalUnread } = useChatUnread();
   const { latestToast: latestWaToast, clearToast: clearWaToast, markSeen: markWaSeen, markAllSeen: markAllWaSeen } = useWhatsAppUnread();
-  const { organizacion, rol: orgRolMain } = useOrganizacion();
+  const { organizacion, rol: orgRolMain, puede: puedeMain } = useOrganizacion();
 
   const isMobile = useIsMobile();
   const pushNotifications = usePushNotifications();
@@ -2712,7 +2778,7 @@ export default function DashboardLayout() {
           </button>
 
           {/* Búsqueda */}
-          <div ref={searchRef} className="relative flex-1 min-w-0 max-w-2xl">
+          <div ref={searchRef} className="relative flex-1 min-w-0 max-w-4xl">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
             <input
               type="search"
@@ -2722,28 +2788,22 @@ export default function DashboardLayout() {
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => setSearchFocused(true)}
               placeholder={isMobile ? "Buscar..." : "Buscar módulos, clientes, expedientes..."}
-              className="pl-10 h-10 w-full rounded-lg border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:ring-2 focus:ring-red-500/20 focus:border-red-400 outline-none transition-all"
+              className="pl-10 sm:pr-10 h-10 w-full rounded-lg border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:ring-2 focus:ring-red-500/20 focus:border-red-400 outline-none transition-all"
             />
+            {!searchQuery && !searchFocused && (
+              <kbd className="hidden sm:flex absolute right-2.5 top-1/2 -translate-y-1/2 h-6 min-w-[24px] px-1.5 items-center justify-center rounded-md border border-slate-200 bg-white text-[11px] font-sans font-semibold text-slate-400 pointer-events-none" title="Pulsa / para buscar">/</kbd>
+            )}
             {searchFocused && searchQuery && (
               <SearchDropdown query={searchQuery} onSelect={() => { setSearchQuery(""); setSearchFocused(false); }} />
             )}
           </div>
 
-          {/* Logo de la organización activa -- justo tras la búsqueda (que
-              tiene max-w-2xl) para que ocupe el hueco central en pantallas
-              anchas, en vez de quedar pegado del todo a la derecha tras los
-              iconos. */}
-          {organizacion && (
-            <div className="hidden sm:block mx-auto shrink-0">
-              <OrgLogoBadge
-                nombre={organizacion.nombre}
-                logoUrl={organizacion.logoUrl}
-                className="h-11 w-28 rounded-xl text-sm ring-1 ring-slate-200"
-                imgClassName="object-contain p-0.5"
-              />
-            </div>
-          )}
+          {/* + Nuevo (16/10/2026: sustituye al logo de la organización, que ya
+              sale en la barra lateral). El hueco hasta los iconos lo absorbe el
+              buscador, más ancho. */}
+          <BotonNuevo puede={puedeMain} />
 
+          <div className="ml-auto" />
           {organizacion && (
             <StorageStatusIcons
               driveConnected={!!organizacion.googleDriveConnected}
