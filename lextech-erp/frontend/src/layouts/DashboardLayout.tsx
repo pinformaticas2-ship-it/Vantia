@@ -1642,7 +1642,7 @@ function OrgSwitcherMenu({ menuRef, pos, organizaciones, activaId, rolActivo, on
           </button>
         )}
         {organizaciones.length > 1 && (
-          <p className="px-2.5 pt-1 pb-0.5 text-[10px] om-t4">
+          <p className="hidden [@media(hover:hover)]:block px-2.5 pt-1 pb-0.5 text-[10px] om-t4">
             <kbd className="font-sans">↑</kbd> <kbd className="font-sans">↓</kbd> para moverte · <kbd className="font-sans">Intro</kbd> para entrar
           </p>
         )}
@@ -1691,7 +1691,7 @@ function BotonNuevo({ puede }: { puede: (m: Modulo) => boolean }) {
         <ChevronDown size={14} className={`hidden sm:block opacity-80 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
-        <div role="menu" className="absolute left-0 top-full mt-2 w-64 z-50 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl shadow-slate-900/10">
+        <div role="menu" className="absolute right-0 sm:right-auto sm:left-0 top-full mt-2 w-64 max-w-[calc(100vw-24px)] z-50 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl shadow-slate-900/10">
           {acciones.map((a) => {
             const Icon = a.icon;
             return (
@@ -1843,7 +1843,7 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
             </button>
           </div>
         ) : (
-          <div className="flex items-center gap-1.5">
+          <div className={`flex items-center gap-1.5 ${onToggleCollapse ? "" : "pr-9"}`}>
           <div className="relative flex-1 min-w-0" ref={orgMenuRef}>
             <button
               ref={orgBtnRef}
@@ -1881,7 +1881,7 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
                 )}
                 <div className="erp-company-sub mt-1 flex items-center gap-1.5 text-[11px] text-slate-400 min-w-0">
                   {orgRol && <OrgRolChip rol={orgRol} className={`erp-company-role erp-company-role-${orgRol} shrink-0 rounded-md px-1.5 py-px font-medium`} />}
-                  {organizaciones.length > 1 && <span className="truncate">{organizaciones.length} organizaciones</span>}
+                  {organizaciones.length > 1 && onToggleCollapse && <span className="truncate">{organizaciones.length} organizaciones</span>}
                 </div>
               </div>
               <span className="erp-company-chevron shrink-0 h-6 w-6 flex items-center justify-center rounded-lg text-slate-500 group-hover:text-slate-300 transition-colors">
@@ -1889,14 +1889,14 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
               </span>
             </button>
           </div>
-          <button
+          {onToggleCollapse && <button
             type="button"
             onClick={onToggleCollapse}
             title="Colapsar menú"
             className="shrink-0 h-8 w-8 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-200 hover:bg-slate-800 transition-colors"
           >
             <ChevronLeft size={16} />
-          </button>
+          </button>}
           </div>
         )}
         {orgMenuOpen && orgMenuPos && (
