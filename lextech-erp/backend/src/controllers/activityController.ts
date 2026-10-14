@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { createClerkClient } from '@clerk/backend';
 import pool from '../config/database';
+import { resolveEffectivePermission } from '../config/permissions';
 import { getClientIp } from '../utils/clientIp';
 
 const pgErr = (e: any) =>
@@ -114,6 +115,9 @@ export async function logActivity(
   entityName?: string,
   opts?: { eventType?: EventType; ipAddress?: string; sessionId?: string; userAgent?: string; deviceId?: string; organizacionId?: string | null }
 ): Promise<void> {
+  // entity_id es UUID: un identificador de otro tipo (de Quipu, de Gmail...)
+  // hacía fallar el registro entero. Se guarda la acción sin él.
+  if (entityId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(entityId)) entityId = undefined;
   try {
     await pool.query(
       `INSERT INTO activity_log
@@ -135,7 +139,11 @@ export async function logActivity(
         opts?.organizacionId || (await inferOrganizacionId(entityType, entityId)),
       ]
     );
-  } catch (_e) {}
+  } catch (e: any) {
+    // Nunca rompe la acción que se registra, pero que un registro de auditoría
+    // se pierda no debe pasar en silencio (14/10/2026).
+    console.warn('[trazabilidad] no se pudo registrar:', actionType, '-', e?.message || e);
+  }
 }
 
 export async function logActivityForReq(
@@ -231,15 +239,145 @@ export const registerLogout = async (req: Request, res: Response) => {
   }
 };
 
+// ── Quién ve qué en Trazabilidad (14/10/2026) ───────────────────────────────
+// Antes cualquier miembro veía la actividad de todos (IP, dispositivo, a quién
+// se mandó cada correo, qué cliente tocó...). Ahora:
+//  · propietario y administradores: la trazabilidad completa;
+//  · soporte: la "técnica" -- sesiones, IP, dispositivo y tipo de cada acción
+//    de todos, pero sin datos de clientes (ni nombres ni asuntos); el
+//    propietario o un administrador puede darle acceso completo unas horas;
+//  · el resto: solo su propia actividad.
+export type NivelTrazabilidad = 'completa' | 'tecnica' | 'propia';
+
+export async function nivelTrazabilidad(req: Request): Promise<{ nivel: NivelTrazabilidad; hasta: string | null }> {
+  const rol = (req as any).organizacionRol;
+  if (rol === 'propietario' || rol === 'admin') return { nivel: 'completa', hasta: null };
+  if (rol === 'soporte') {
+    const { rows } = await pool.query(
+      `SELECT MAX(hasta) AS hasta FROM trazabilidad_accesos
+        WHERE organizacion_id = $1 AND user_id = $2 AND revocado_at IS NULL AND hasta > NOW()`,
+      [(req as any).organizacionId, (req as any).auth?.userId],
+    ).catch(() => ({ rows: [] as any[] }));
+    if (rows[0]?.hasta) return { nivel: 'completa', hasta: new Date(rows[0].hasta).toISOString() };
+    return { nivel: 'tecnica', hasta: null };
+  }
+  return { nivel: 'propia', hasta: null };
+}
+
+const VERBO: Record<string, string> = {
+  CREATE: 'Creación', UPDATE: 'Modificación', DELETE: 'Eliminación', VIEW: 'Consulta',
+  EXPORT: 'Exportación', UPLOAD: 'Subida de archivo', DOWNLOAD: 'Descarga', ACTION: 'Acción',
+};
+const MODULO: Record<string, string> = {
+  CLIENT: 'cliente', CLIENT_IMPORT: 'importación de clientes', EXPEDIENTE: 'expediente', AGENDA: 'agenda',
+  TASK: 'tarea', EMAIL: 'correo', DIRECTORIO: 'directorio', QUIPU: 'Quipu', ORGANIZACION: 'organización',
+  FACTURACION_FACTURA: 'factura', FACTURACION_GASTO: 'gasto', FACTURACION_PRESUPUESTO: 'presupuesto',
+};
+const SIN_CONTENIDO = new Set(['LOGIN', 'LOGOUT', 'SERVER_START', 'AUTH_ERROR']);
+
+/** Vista técnica: el texto de la acción se rehace con su tipo y módulo (el
+ *  original puede llevar nombres o asuntos) y se quitan entidad y nombre. */
+function sinContenido(row: any) {
+  if (SIN_CONTENIDO.has(row.event_type)) return { ...row, entity_id: null, entity_name: null };
+  const modulo = row.entity_type ? (MODULO[row.entity_type] || String(row.entity_type).toLowerCase()) : null;
+  return {
+    ...row,
+    action_type: `${VERBO[row.event_type] || 'Acción'}${modulo ? ' · ' + modulo : ''}`,
+    entity_id: null,
+    entity_name: null,
+  };
+}
+
+/** GET /api/activity/nivel — qué ve esta persona (para que la pantalla lo diga). */
+export const getNivelTrazabilidad = async (req: Request, res: Response) => {
+  try {
+    res.json({ success: true, data: await nivelTrazabilidad(req) });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: pgErr(e) });
+  }
+};
+
+const esGestor = (req: Request) => ['propietario', 'admin'].includes((req as any).organizacionRol);
+
+/** GET /api/activity/accesos-temporales — miembros de soporte y si tienen
+ *  ahora acceso completo (solo propietario/administradores). */
+export const getAccesosTemporales = async (req: Request, res: Response) => {
+  if (!esGestor(req)) return res.status(403).json({ success: false, error: 'Solo el propietario o un administrador.' });
+  try {
+    const { rows } = await pool.query(
+      `SELECT m.user_id,
+              (SELECT MAX(a.hasta) FROM trazabilidad_accesos a
+                WHERE a.organizacion_id = m.organizacion_id AND a.user_id = m.user_id
+                  AND a.revocado_at IS NULL AND a.hasta > NOW()) AS hasta
+         FROM organizacion_miembros m
+        WHERE m.organizacion_id = $1 AND m.rol = 'soporte'`,
+      [(req as any).organizacionId],
+    );
+    const data = await Promise.all(rows.map(async (r: any) => ({
+      user_id: r.user_id, nombre: await resolveUserName(r.user_id), hasta: r.hasta ? new Date(r.hasta).toISOString() : null,
+    })));
+    res.json({ success: true, data });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: pgErr(e) });
+  }
+};
+
+/** POST /api/activity/accesos-temporales { user_id, horas } — da acceso
+ *  completo a un miembro de soporte durante unas horas (1-72). */
+export const concederAccesoTemporal = async (req: Request, res: Response) => {
+  if (!esGestor(req)) return res.status(403).json({ success: false, error: 'Solo el propietario o un administrador.' });
+  const organizacionId = (req as any).organizacionId;
+  const target = String(req.body?.user_id || '');
+  const horas = Math.round(Number(req.body?.horas || 24));
+  if (!target || !(horas >= 1 && horas <= 72)) return res.status(400).json({ success: false, error: 'Indica la persona y entre 1 y 72 horas.' });
+  try {
+    const { rows } = await pool.query(`SELECT rol FROM organizacion_miembros WHERE organizacion_id = $1 AND user_id = $2`, [organizacionId, target]);
+    if (rows[0]?.rol !== 'soporte') return res.status(400).json({ success: false, error: 'Solo se da a miembros con rol de soporte (el resto ya tiene su nivel).' });
+    const { rows: ins } = await pool.query(
+      `INSERT INTO trazabilidad_accesos (organizacion_id, user_id, concedido_por, hasta)
+       VALUES ($1, $2, $3, NOW() + make_interval(hours => $4)) RETURNING hasta`,
+      [organizacionId, target, (req as any).auth?.userId, horas],
+    );
+    const nombre = await resolveUserName(target);
+    await logActivityForReq(req, `Acceso completo a la trazabilidad concedido a ${nombre} durante ${horas} h`, 'ORGANIZACION', organizacionId, undefined, 'UPDATE');
+    res.status(201).json({ success: true, data: { user_id: target, hasta: new Date(ins[0].hasta).toISOString() } });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: pgErr(e) });
+  }
+};
+
+/** DELETE /api/activity/accesos-temporales/:userId — lo retira antes de tiempo. */
+export const revocarAccesoTemporal = async (req: Request, res: Response) => {
+  if (!esGestor(req)) return res.status(403).json({ success: false, error: 'Solo el propietario o un administrador.' });
+  const organizacionId = (req as any).organizacionId;
+  const target = String(req.params.userId || '');
+  try {
+    const { rowCount } = await pool.query(
+      `UPDATE trazabilidad_accesos SET revocado_at = NOW()
+        WHERE organizacion_id = $1 AND user_id = $2 AND revocado_at IS NULL AND hasta > NOW()`,
+      [organizacionId, target],
+    );
+    if (rowCount) {
+      const nombre = await resolveUserName(target);
+      await logActivityForReq(req, `Acceso completo a la trazabilidad retirado a ${nombre}`, 'ORGANIZACION', organizacionId, undefined, 'UPDATE');
+    }
+    res.json({ success: true, data: { revocados: rowCount || 0 } });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: pgErr(e) });
+  }
+};
+
 export const getActivity = async (req: Request, res: Response) => {
   const limit = Math.min(parseInt((req.query.limit as string) || '100'), 500);
   const eventType = (req.query.event_type as string) || '';
 
   try {
     // Solo la organización activa (ver migración 'Trazabilidad por organización').
+    const { nivel } = await nivelTrazabilidad(req);
     const params: any[] = [limit, (req as any).organizacionId];
-    const filter = eventType ? `WHERE organizacion_id=$2 AND event_type=$3` : 'WHERE organizacion_id=$2';
-    if (eventType) params.push(eventType);
+    let filter = 'WHERE organizacion_id=$2';
+    if (eventType) { params.push(eventType); filter += ` AND event_type=$${params.length}`; }
+    if (nivel === 'propia') { params.push((req as any).auth?.userId); filter += ` AND user_id=$${params.length}`; }
 
     const { rows } = await pool.query(
       `
@@ -253,7 +391,7 @@ export const getActivity = async (req: Request, res: Response) => {
       params
     );
 
-    res.json({ success: true, data: rows });
+    res.json({ success: true, data: nivel === 'tecnica' ? rows.map(sinContenido) : rows });
   } catch (e: any) {
     res.status(500).json({ success: false, error: pgErr(e) });
   }
@@ -263,6 +401,14 @@ export const getClientActivity = async (req: Request, res: Response) => {
   const { clientId } = req.params;
 
   try {
+    // Historial de la ficha del cliente: para quien puede ver Clientes. La IP
+    // y el dispositivo, solo con la trazabilidad completa (14/10/2026).
+    const organizacionId = (req as any).organizacionId;
+    const uid = (req as any).auth?.userId;
+    if ((await resolveEffectivePermission(organizacionId, uid, (req as any).organizacionRol, 'clientes')) === 'ninguno') {
+      return res.status(403).json({ success: false, error: 'No tienes acceso a Clientes.' });
+    }
+    const { nivel } = await nivelTrazabilidad(req);
     const { rows } = await pool.query(
       `
       SELECT al.id, al.user_id, al.user_name, al.action_type,
@@ -277,13 +423,15 @@ export const getClientActivity = async (req: Request, res: Response) => {
         ORDER BY user_id, joined_at DESC NULLS LAST
       ) cm ON cm.user_id = al.user_id
       WHERE al.organizacion_id = $2
-        AND (al.entity_id = $1
-         OR al.entity_id IN (SELECT id::text FROM expedientes WHERE cliente_id::text = $1 AND organizacion_id = $2))
+        -- entity_id es UUID: antes se comparaba con texto y la consulta fallaba
+        -- (la pestaña de historial de la ficha del cliente daba error).
+        AND (al.entity_id = $1::uuid
+         OR al.entity_id IN (SELECT id FROM expedientes WHERE cliente_id = $1::uuid AND organizacion_id = $2))
       ORDER BY al.created_at DESC LIMIT 200`,
       [clientId, (req as any).organizacionId]
     );
 
-    res.json({ success: true, data: rows });
+    res.json({ success: true, data: nivel === 'completa' ? rows : rows.map((r: any) => ({ ...r, ip_address: null, device_id: null })) });
   } catch (e: any) {
     res.status(500).json({ success: false, error: pgErr(e) });
   }
@@ -325,6 +473,9 @@ export const addClientActivity = async (req: Request, res: Response) => {
 
 export const getActivityByUsers = async (req: Request, res: Response) => {
   try {
+    // Sin trazabilidad completa ni técnica, solo aparece uno mismo.
+    const { nivel } = await nivelTrazabilidad(req);
+    const soloYo = nivel === 'propia';
     const { rows } = await pool.query(`
       SELECT
         user_id,
@@ -342,10 +493,10 @@ export const getActivityByUsers = async (req: Request, res: Response) => {
         json_agg(DISTINCT event_type) FILTER (WHERE event_type IS NOT NULL) AS event_types,
         json_agg(DISTINCT entity_type) FILTER (WHERE entity_type IS NOT NULL) AS entity_types
       FROM activity_log
-      WHERE user_id != 'SYSTEM' AND organizacion_id = $1
+      WHERE user_id != 'SYSTEM' AND organizacion_id = $1 ${soloYo ? 'AND user_id = $2' : ''}
       GROUP BY user_id
       ORDER BY MAX(created_at) DESC
-    `, [(req as any).organizacionId]);
+    `, soloYo ? [(req as any).organizacionId, (req as any).auth?.userId] : [(req as any).organizacionId]);
 
     res.json({ success: true, data: rows });
   } catch (e: any) {
@@ -362,6 +513,10 @@ export const getUserActivity = async (req: Request, res: Response) => {
   const dateTo = (req.query.date_to as string) || '';
 
   try {
+    const { nivel } = await nivelTrazabilidad(req);
+    if (nivel === 'propia' && userId !== (req as any).auth?.userId) {
+      return res.status(403).json({ success: false, error: 'Solo puedes ver tu propia actividad.' });
+    }
     // WHERE compartido entre la consulta de filas y la de total, para que
     // "Mostrando X de Y" y el paginado ("hay mas") reflejen los mismos filtros.
     const conditions: string[] = ['user_id=$1', 'organizacion_id=$2'];
@@ -387,7 +542,7 @@ export const getUserActivity = async (req: Request, res: Response) => {
       pool.query(`SELECT COUNT(*)::int AS total FROM activity_log WHERE ${where}`, whereParams),
     ]);
 
-    res.json({ success: true, data: rows.rows, total: total.rows[0]?.total ?? 0 });
+    res.json({ success: true, data: nivel === 'tecnica' ? rows.rows.map(sinContenido) : rows.rows, total: total.rows[0]?.total ?? 0 });
   } catch (e: any) {
     res.status(500).json({ success: false, error: pgErr(e) });
   }

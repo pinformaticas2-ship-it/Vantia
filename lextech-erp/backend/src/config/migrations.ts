@@ -2393,6 +2393,33 @@ export async function runMigrations(): Promise<void> {
         );
       `);
     } catch (_e: any) {}
+    // ── Trazabilidad: action_type era VARCHAR(60) y entity_name VARCHAR(300);
+    // cualquier registro más largo ("Correo enviado: <asunto largo>"...) fallaba
+    // y se perdía en silencio (14/10/2026). varchar → text no reescribe la tabla.
+    try {
+      await client.query(`ALTER TABLE activity_log ALTER COLUMN action_type TYPE TEXT;`);
+      await client.query(`ALTER TABLE activity_log ALTER COLUMN entity_name TYPE TEXT;`);
+    } catch (_e: any) {}
+
+    // ── Trazabilidad (14/10/2026): acceso completo temporal para soporte ──
+    // Soporte ve por defecto la trazabilidad "técnica" (sesiones y tipos de
+    // acción, sin datos de clientes). El propietario o un administrador puede
+    // darle acceso completo durante unas horas; queda registrado aquí.
+    try {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS trazabilidad_accesos (
+          id               UUID         PRIMARY KEY DEFAULT uuid_generate_v4(),
+          organizacion_id  UUID         NOT NULL REFERENCES organizaciones(id) ON DELETE CASCADE,
+          user_id          VARCHAR(150) NOT NULL,
+          concedido_por    VARCHAR(150) NOT NULL,
+          hasta            TIMESTAMPTZ  NOT NULL,
+          revocado_at      TIMESTAMPTZ,
+          created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+        );
+      `);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_trazabilidad_accesos_org_user ON trazabilidad_accesos (organizacion_id, user_id);`);
+    } catch (_e: any) {}
+
     // Plazos: en qué "fase" se avisó por última vez (pronto / mañana / hoy /
     // vencida) y cuántas veces ya vencida -- antes se repetía cada ~20 h para
     // siempre (también de madrugada).

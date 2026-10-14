@@ -97,7 +97,10 @@ test('chat: no llega push a quien está en "No molestar" / "En juicio"', { skip 
   enviados.length = 0;
   const r = await call(chat.sendMensaje, 'pa_ana', { params: { id: canal }, body: { contenido: 'Hola equipo' } });
   assert.equal(r.status, 201, JSON.stringify(r.body));
-  await new Promise((ok) => setTimeout(ok, 700));
+  // El push va en segundo plano (resuelve el nombre del autor antes): se
+  // espera a que llegue, con tope de 5 s.
+  for (let i = 0; i < 50 && paraUsuario('pa_luis').length === 0; i++) await new Promise((ok) => setTimeout(ok, 100));
+  await new Promise((ok) => setTimeout(ok, 200));
   assert.equal(paraUsuario('pa_eva').length, 0, 'en juicio: sin push');
   assert.equal(paraUsuario('pa_luis').length, 1);
   assert.equal(paraUsuario('pa_ana').length, 0, 'nunca al autor');

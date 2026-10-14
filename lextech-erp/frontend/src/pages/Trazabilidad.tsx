@@ -7,10 +7,11 @@ import {
   Users, Activity, Filter,
   ExternalLink, LogIn, LogOut, Server, Shield, Eye,
   Upload, Download, Plus, Edit2, Trash2, Globe,
-  FolderOpen, UserPlus, Monitor,
+  FolderOpen, UserPlus, Monitor, ShieldCheck,
 } from "lucide-react";
 import { safeJson } from "../lib/api";
 import { useAutoRefresh } from "../lib/useAutoRefresh";
+import { useOrganizacion } from "../lib/useOrganizacion";
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 interface UserSummary {
@@ -206,6 +207,46 @@ export default function Trazabilidad() {
     return { Authorization: `Bearer ${t}` };
   }, [getToken]);
 
+  // ── Qué ves (14/10/2026): completa (propietario/admin, o soporte con
+  // acceso temporal), técnica (soporte: sin datos de clientes) o la propia.
+  const [nivel, setNivel] = useState<{ nivel: "completa" | "tecnica" | "propia"; hasta: string | null } | null>(null);
+  const { rol } = useOrganizacion();
+  const esGestor = rol === "propietario" || rol === "admin";
+  const [soporte, setSoporte] = useState<{ user_id: string; nombre: string; hasta: string | null }[]>([]);
+  const [soporteOpen, setSoporteOpen] = useState(false);
+  const [soporteBusy, setSoporteBusy] = useState<string | null>(null);
+  const [soporteError, setSoporteError] = useState("");
+  useEffect(() => {
+    void (async () => {
+      const res = await fetch("/api/activity/nivel", { headers: await hdr() });
+      const d = await safeJson(res);
+      if (res.ok && d?.data) setNivel(d.data);
+    })();
+  }, [hdr]);
+  const fetchSoporte = useCallback(async () => {
+    if (!esGestor) return;
+    const res = await fetch("/api/activity/accesos-temporales", { headers: await hdr() });
+    const d = await safeJson(res);
+    if (res.ok) setSoporte(d.data || []);
+  }, [esGestor, hdr]);
+  useEffect(() => { void fetchSoporte(); }, [fetchSoporte]);
+  const cambiarAccesoSoporte = async (userId: string, dar: boolean) => {
+    setSoporteBusy(userId); setSoporteError("");
+    try {
+      const h = await hdr();
+      const res = dar
+        ? await fetch("/api/activity/accesos-temporales", { method: "POST", headers: { ...h, "Content-Type": "application/json" }, body: JSON.stringify({ user_id: userId, horas: 24 }) })
+        : await fetch(`/api/activity/accesos-temporales/${encodeURIComponent(userId)}`, { method: "DELETE", headers: h });
+      const d = await safeJson(res);
+      if (!res.ok) throw new Error(d?.error || "No se pudo cambiar");
+      await fetchSoporte();
+    } catch (e: any) {
+      setSoporteError(e?.message || "No se pudo cambiar");
+    } finally {
+      setSoporteBusy(null);
+    }
+  };
+
   // ── Fetch usuarios ──────────────────────────────────────────────────────────
   const fetchUsers = useCallback(async () => {
     const res = await fetch("/api/activity/users", { headers: await hdr() });
@@ -307,11 +348,49 @@ export default function Trazabilidad() {
             <History size={18} />
           </div>
           <div>
-            <h1 className="text-xl font-extrabold text-slate-800 leading-none tracking-tight mb-1">Trazabilidad</h1>
-            <p className="hidden sm:block text-xs font-medium text-slate-500">Auditoría completa de sesiones y acciones del sistema</p>
+            <h1 className="text-xl font-extrabold text-slate-800 leading-none tracking-tight mb-1">{nivel?.nivel === "propia" ? "Tu actividad" : "Trazabilidad"}</h1>
+            <p className="hidden sm:block text-xs font-medium text-slate-500">
+              {nivel?.nivel === "propia" ? "Tus accesos y acciones en el despacho" : nivel?.nivel === "tecnica" ? "Vista técnica: sesiones y tipos de acción, sin datos de clientes" : "Auditoría completa de sesiones y acciones del sistema"}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-3">
+          {esGestor && (
+            <div className="relative">
+              <button type="button" onClick={() => { setSoporteOpen((v) => !v); void fetchSoporte(); }}
+                className="px-3 py-1.5 bg-white border border-slate-200 rounded-md text-xs font-semibold text-slate-600 hover:bg-slate-50 flex items-center gap-2"
+                title="Dar o quitar a soporte el acceso completo durante 24 h">
+                <ShieldCheck size={13} /> Acceso de soporte
+              </button>
+              {soporteOpen && (
+                <>
+                  <button type="button" aria-label="Cerrar" className="fixed inset-0 z-30 cursor-default" onClick={() => setSoporteOpen(false)} />
+                  <div className="absolute right-0 top-10 z-40 w-80 rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
+                    <p className="text-sm font-bold text-slate-800">Acceso de soporte</p>
+                    <p className="mt-0.5 text-xs text-slate-500">Soporte ve sesiones y tipos de acción, sin datos de clientes. Si necesita el detalle para ayudar, dale acceso completo durante 24 h (queda registrado).</p>
+                    <div className="mt-3 space-y-2">
+                      {soporte.length === 0 && <p className="text-xs text-slate-400">No hay nadie con rol de soporte en esta organización.</p>}
+                      {soporte.map((p) => (
+                        <div key={p.user_id} className="flex items-center gap-2 rounded-lg border border-slate-100 px-2.5 py-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold text-slate-700">{p.nombre}</p>
+                            <p className="text-[11px] text-slate-500">
+                              {p.hasta ? `Acceso completo hasta ${new Date(p.hasta).toLocaleString("es-ES", { weekday: "short", hour: "2-digit", minute: "2-digit" })}` : "Vista técnica"}
+                            </p>
+                          </div>
+                          <button type="button" disabled={soporteBusy === p.user_id} onClick={() => void cambiarAccesoSoporte(p.user_id, !p.hasta)}
+                            className={`shrink-0 rounded-md px-2.5 py-1 text-[11px] font-bold disabled:opacity-60 ${p.hasta ? "border border-slate-200 text-slate-600 hover:bg-slate-50" : "bg-red-600 text-white hover:bg-red-700"}`}>
+                            {soporteBusy === p.user_id ? "…" : p.hasta ? "Quitar" : "Dar 24 h"}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    {soporteError && <p className="mt-2 text-xs text-red-600">{soporteError}</p>}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
           <div className="px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-md text-xs font-semibold text-slate-600 flex items-center gap-2">
             <Users size={13} /> {users.length} usuarios
           </div>
@@ -323,6 +402,22 @@ export default function Trazabilidad() {
           </button>
         </div>
       </div>
+
+      {/* Qué estás viendo (si no es la trazabilidad completa) */}
+      {nivel && nivel.nivel !== "completa" && (
+        <div className="px-4 sm:px-6 py-2 bg-slate-50 border-b border-slate-200 text-xs text-slate-600 flex items-start gap-2 shrink-0">
+          <ShieldCheck size={13} className="mt-0.5 shrink-0 text-slate-400" />
+          {nivel.nivel === "tecnica"
+            ? <span>Ves los accesos y el tipo de cada acción de todo el despacho, sin nombres de clientes ni contenido. Si necesitas el detalle para ayudar, pide acceso completo al propietario o a un administrador.</span>
+            : <span>Solo ves tu propia actividad. La trazabilidad de todo el despacho la ven el propietario y los administradores.</span>}
+        </div>
+      )}
+      {nivel?.nivel === "completa" && nivel.hasta && (
+        <div className="px-4 sm:px-6 py-2 bg-amber-50 border-b border-amber-200 text-xs text-amber-900 flex items-start gap-2 shrink-0">
+          <ShieldCheck size={13} className="mt-0.5 shrink-0" />
+          <span>Tienes acceso completo temporal hasta el {new Date(nivel.hasta).toLocaleString("es-ES", { weekday: "long", hour: "2-digit", minute: "2-digit" })}.</span>
+        </div>
+      )}
 
       {/* SPLIT VIEW */}
       <main className="flex-1 flex overflow-hidden">
