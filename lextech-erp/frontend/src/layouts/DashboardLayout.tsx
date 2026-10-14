@@ -10,7 +10,7 @@ import { Clock,
   Menu, Search, X, Bell, Calendar,
   MessageCircle, Bot, Send, ChevronRight, ChevronLeft, Loader2, History, CheckCircle2,
   MessageSquare, LogOut, Mail, Library, Receipt, Sparkles, ChevronsUpDown,
-  MoreVertical, RotateCcw, Copy, Check, Crown,
+  MoreVertical, RotateCcw, Copy, Check, Crown, ShieldCheck, UserRound, ArrowRight,
   Pen, AlertTriangle, RefreshCw, Link2, Plus, Trash2, Scale, Gavel, ChevronDown,
   Wallet, CreditCard, Building2, BarChart3, FileText, Calculator, Square, BellRing, LifeBuoy, CalendarCheck, UserX,
 } from "lucide-react";
@@ -1471,6 +1471,187 @@ function CollapsedGroupItem({ item, childActive, pathname, currentSearch, onClos
 }
 
 // ── Sidebar ──────────────────────────────────────────────────────────────────
+// ── Selector de organización (16/10/2026) ──────────────────────────────────
+// Un único menú para la barra expandida y la colapsada, pintado en un portal
+// (el sidebar tiene overflow-hidden y lo recortaba). Usa las clases normales
+// de la app (bg-white, text-slate-*, red-*) para heredar sin más el color del
+// tema y el modo oscuro.
+const ORG_ROL_ICON: Record<string, typeof Crown> = {
+  propietario: Crown, admin: ShieldCheck, miembro: UserRound, soporte: LifeBuoy,
+};
+
+function OrgRolChip({ rol, className = "" }: { rol?: string | null; className?: string }) {
+  if (!rol) return null;
+  const Icon = ORG_ROL_ICON[rol] || UserRound;
+  return (
+    <span className={`inline-flex items-center gap-1 ${className}`}>
+      <Icon size={10} className="shrink-0" />
+      {ORG_ROL_LABEL[rol] || rol}
+    </span>
+  );
+}
+
+function OrgSwitcherMenu({ menuRef, pos, organizaciones, activaId, rolActivo, onSwitch, onClose }: {
+  menuRef: React.RefObject<HTMLDivElement>;
+  pos: { top: number; left: number; width: number };
+  organizaciones: { id: string; nombre: string; logoUrl?: string | null; rol: string }[];
+  activaId?: string;
+  rolActivo?: string | null;
+  onSwitch: (id: string) => void;
+  onClose: () => void;
+}) {
+  const navigate = useNavigate();
+  const [q, setQ] = useState("");
+  const [cambiando, setCambiando] = useState<string | null>(null);
+  const conBuscador = organizaciones.length > 5;
+  // La activa siempre arriba; el resto, por orden alfabético.
+  const lista = useMemo(() => {
+    const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+    const t = norm(q.trim());
+    return [...organizaciones]
+      .filter((o) => !t || norm(o.nombre).includes(t))
+      .sort((a, b) => (a.id === activaId ? -1 : b.id === activaId ? 1 : a.nombre.localeCompare(b.nombre, "es")));
+  }, [organizaciones, activaId, q]);
+  const [foco, setFoco] = useState(0);
+  useEffect(() => { setFoco(0); }, [q]);
+  const itemsRef = useRef<(HTMLButtonElement | null)[]>([]);
+  useEffect(() => { itemsRef.current[foco]?.scrollIntoView({ block: "nearest" }); }, [foco]);
+
+  const elegir = (id: string) => {
+    if (id === activaId) { onClose(); return; }
+    setCambiando(id);
+    onSwitch(id);
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape") { e.preventDefault(); onClose(); }
+    else if (e.key === "ArrowDown") { e.preventDefault(); setFoco((f) => Math.min(f + 1, lista.length - 1)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setFoco((f) => Math.max(f - 1, 0)); }
+    else if (e.key === "Enter" && lista[foco]) { e.preventDefault(); elegir(lista[foco].id); }
+  };
+
+  // Sin buscador, el foco va al propio menú para que funcionen las flechas.
+  useEffect(() => { if (!conBuscador) menuRef.current?.focus(); }, [conBuscador, menuRef]);
+
+  const gestiona = rolActivo === "propietario" || rolActivo === "admin";
+
+  return createPortal(
+    <div
+      ref={menuRef}
+      tabIndex={-1}
+      onKeyDown={onKeyDown}
+      role="menu"
+      aria-label="Cambiar de organización"
+      style={{ position: "fixed", top: pos.top, left: pos.left, width: pos.width }}
+      className="erp-org-menu z-[999] rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/20 outline-none overflow-hidden"
+    >
+      <div className="px-3.5 pt-3 pb-2 flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[13px] font-semibold text-slate-900">Organizaciones</p>
+          <p className="text-[11px] text-slate-500">
+            {organizaciones.length > 1 ? "Elige en cuál quieres trabajar" : "Solo perteneces a esta"}
+          </p>
+        </div>
+        <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-slate-600">
+          {organizaciones.length}
+        </span>
+      </div>
+
+      {conBuscador && (
+        <div className="px-3 pb-2">
+          <div className="relative">
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <input
+              autoFocus
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Buscar organización…"
+              className="w-full h-8 rounded-lg border border-slate-200 bg-slate-50 pl-8 pr-2 text-xs text-slate-800 placeholder:text-slate-400 outline-none focus:border-red-300 focus:bg-white"
+            />
+          </div>
+        </div>
+      )}
+
+      <div className="max-h-[min(60vh,360px)] overflow-y-auto px-1.5 pb-1.5 space-y-0.5">
+        {lista.length === 0 && (
+          <p className="px-3 py-6 text-center text-xs text-slate-500">Ninguna organización coincide con «{q}».</p>
+        )}
+        {lista.map((o, i) => {
+          const activa = o.id === activaId;
+          const enFoco = i === foco;
+          return (
+            <button
+              key={o.id}
+              ref={(el) => { itemsRef.current[i] = el; }}
+              type="button"
+              role="menuitem"
+              title={o.nombre}
+              disabled={!!cambiando}
+              onMouseEnter={() => setFoco(i)}
+              onClick={() => elegir(o.id)}
+              className={`group w-full flex items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors border ${
+                activa
+                  ? "erp-org-activa"
+                  : enFoco ? "bg-slate-50 border-slate-200" : "border-transparent"
+              }`}
+            >
+              <div className={`w-9 h-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden`}>
+                <OrgLogoBadge
+                  nombre={o.nombre}
+                  logoUrl={o.logoUrl}
+                  className="h-full w-full text-[11px]"
+                  fallbackClassName={`bg-gradient-to-br ${orgAvatarGradient(o.id)}`}
+                  imgClassName="object-contain p-0.5"
+                />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className={`text-[13px] leading-snug font-semibold line-clamp-2 break-words ${activa ? "text-slate-900" : "text-slate-800"}`}>{o.nombre}</p>
+                <OrgRolChip rol={o.rol} className="mt-0.5 text-[11px] text-slate-500" />
+              </div>
+              {cambiando === o.id ? (
+                <Loader2 size={16} className="shrink-0 animate-spin text-red-600" />
+              ) : activa ? (
+                <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-semibold text-white">
+                  <Check size={11} strokeWidth={3} /> Actual
+                </span>
+              ) : (
+                <ArrowRight size={15} className={`shrink-0 text-slate-400 transition-all ${enFoco ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-1"}`} />
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="border-t border-slate-100 px-1.5 py-1.5 bg-slate-50/60">
+        {gestiona && (
+          <button
+            type="button"
+            onClick={() => { onClose(); navigate("/dashboard/config?section=despacho"); }}
+            className="w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-600 hover:bg-white hover:text-slate-900 transition-colors"
+          >
+            <Settings size={14} className="text-slate-400" /> Ajustes del despacho
+          </button>
+        )}
+        {gestiona && (
+          <button
+            type="button"
+            onClick={() => { onClose(); navigate("/dashboard/config?section=usuarios"); }}
+            className="w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-600 hover:bg-white hover:text-slate-900 transition-colors"
+          >
+            <Users size={14} className="text-slate-400" /> Gestionar miembros
+          </button>
+        )}
+        {organizaciones.length > 1 && (
+          <p className="px-2.5 pt-1 pb-0.5 text-[10px] text-slate-400">
+            <kbd className="font-sans">↑</kbd> <kbd className="font-sans">↓</kbd> para moverte · <kbd className="font-sans">Intro</kbd> para entrar
+          </p>
+        )}
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onToggleCollapse }: {
   pathname: string;
   search?: string;
@@ -1493,7 +1674,23 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
   // overflow-hidden y lo recortaba -- se abría pero no se veía. Al vivir fuera
   // del árbol del sidebar, el click-fuera necesita comprobar también esta ref.
   const orgMenuPortalRef = useRef<HTMLDivElement>(null);
-  const [orgMenuPos, setOrgMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const [orgMenuPos, setOrgMenuPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const orgBtnRef = useRef<HTMLButtonElement>(null);
+  const toggleOrgMenu = () => {
+    if (orgMenuOpen) { setOrgMenuOpen(false); return; }
+    const r = orgBtnRef.current?.getBoundingClientRect();
+    if (!r) return;
+    const width = 300;
+    // Expandida: debajo del botón. Colapsada: a su derecha.
+    const left = Math.min(collapsed ? r.right + 10 : r.left, window.innerWidth - width - 8);
+    const top = collapsed ? r.top : r.bottom + 8;
+    setOrgMenuPos({ top, left: Math.max(8, left), width });
+    setOrgMenuOpen(true);
+  };
+  const closeOrgMenu = useCallback(() => {
+    setOrgMenuOpen(false);
+    orgBtnRef.current?.focus();
+  }, []);
   useEffect(() => {
     if (!orgMenuOpen) return;
     const h = (e: MouseEvent) => {
@@ -1502,9 +1699,13 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
       if (orgMenuPortalRef.current?.contains(target)) return;
       setOrgMenuOpen(false);
     };
+    // Al cambiar el tamaño de la ventana la posición fija ya no vale.
+    const cerrar = () => setOrgMenuOpen(false);
     document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
+    window.addEventListener("resize", cerrar);
+    return () => { document.removeEventListener("mousedown", h); window.removeEventListener("resize", cerrar); };
   }, [orgMenuOpen]);
+  useEffect(() => { setOrgMenuOpen(false); }, [collapsed]);
   const currentSearch = search || "";
 
   const isGroupActive = useCallback((item: NavItem) =>
@@ -1543,92 +1744,53 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
               <ChevronRight size={16} />
             </button>
             <button
+              ref={orgBtnRef}
               type="button"
-              title={organizacion?.nombre || "Vantia Legis"}
-              onClick={(e) => {
-                if (organizaciones.length <= 1) return;
-                if (!orgMenuOpen) {
-                  const r = e.currentTarget.getBoundingClientRect();
-                  setOrgMenuPos({ top: r.top, left: r.right + 8 });
-                }
-                setOrgMenuOpen((v) => !v);
-              }}
-              className="erp-company-icon w-10 h-10 rounded-xl border border-slate-700/60 bg-slate-800/50 flex items-center justify-center cursor-pointer overflow-hidden transition-all duration-200 hover:scale-105 active:scale-95"
+              title={organizacion?.nombre ? `${organizacion.nombre} · cambiar de organización` : "Vantia Legis"}
+              aria-haspopup="menu"
+              aria-expanded={orgMenuOpen}
+              onClick={toggleOrgMenu}
+              className={`erp-company-icon relative w-10 h-10 rounded-xl border border-slate-700/60 bg-slate-800/50 flex items-center justify-center cursor-pointer transition-all duration-200 hover:scale-105 active:scale-95 ${orgMenuOpen ? "erp-company-open" : ""}`}
             >
-              {organizacion?.nombre ? (
-                <OrgLogoBadge
-                  nombre={organizacion.nombre}
-                  logoUrl={organizacion.logoUrl}
-                  className="h-full w-full text-[11px]"
-                  fallbackClassName={`bg-gradient-to-br ${orgAvatarGradient(organizacion.id)}`}
-                  imgClassName="object-contain p-1.5"
-                />
-              ) : !orgLoaded ? (
-                // Cargando: nada de logos (antes salía el de Avalentia, que es lo
-                // que contiene vantia-sidebar-slate.png, en cualquier organización).
-                <span className="h-6 w-6 rounded-md bg-slate-700/60 animate-pulse" />
-              ) : (
-                <img src="/vantia-mark-96.png" alt="Vantia Legis" className="h-6 w-6 object-contain" />
+              <span className="h-full w-full rounded-[10px] overflow-hidden flex items-center justify-center">
+                {organizacion?.nombre ? (
+                  <OrgLogoBadge
+                    nombre={organizacion.nombre}
+                    logoUrl={organizacion.logoUrl}
+                    className="h-full w-full text-[11px]"
+                    fallbackClassName={`bg-gradient-to-br ${orgAvatarGradient(organizacion.id)}`}
+                    imgClassName="object-contain p-1.5"
+                  />
+                ) : !orgLoaded ? (
+                  // Cargando: nada de logos (antes salía el de Avalentia, que es lo
+                  // que contiene vantia-sidebar-slate.png, en cualquier organización).
+                  <span className="h-6 w-6 rounded-md bg-slate-700/60 animate-pulse" />
+                ) : (
+                  <img src="/vantia-mark-96.png" alt="Vantia Legis" className="h-6 w-6 object-contain" />
+                )}
+              </span>
+              {organizaciones.length > 1 && (
+                <span className="erp-company-count absolute -bottom-1 -right-1 min-w-[16px] h-4 px-1 rounded-full text-[9px] font-bold leading-4 text-center tabular-nums">
+                  {organizaciones.length}
+                </span>
               )}
             </button>
-
-            {/* Portal: el contenedor del sidebar tiene overflow-hidden, así que
-                un desplegable posicionado "absolute" dentro de él se abre pero
-                queda recortado (invisible). Pintarlo en document.body con
-                position:fixed usando las coordenadas del botón lo evita. */}
-            {orgMenuOpen && organizaciones.length > 1 && orgMenuPos && createPortal(
-              <div
-                ref={orgMenuPortalRef}
-                style={{ position: "fixed", top: orgMenuPos.top, left: orgMenuPos.left }}
-                className="animate-fade-in w-56 bg-slate-800 border border-slate-700 rounded-xl shadow-xl shadow-black/30 py-1.5 z-[999] overflow-hidden origin-top-left"
-              >
-                <p className="px-3 pb-1.5 pt-1 text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500">
-                  Tus organizaciones
-                </p>
-                {organizaciones.map((o) => {
-                  const active = o.id === organizacion?.id;
-                  return (
-                    <button
-                      key={o.id}
-                      type="button"
-                      onClick={() => { setOrgMenuOpen(false); if (!active) switchOrganizacion(o.id); }}
-                      className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors ${
-                        active ? "bg-red-500/10" : "hover:bg-slate-700/50"
-                      }`}
-                    >
-                      <div className="w-7 h-7 rounded-lg bg-slate-900 border border-slate-700/60 flex items-center justify-center shrink-0 overflow-hidden">
-                        <OrgLogoBadge
-                          nombre={o.nombre}
-                          logoUrl={o.logoUrl}
-                          className="h-full w-full text-[10px]"
-                          fallbackClassName={`bg-gradient-to-br ${orgAvatarGradient(o.id)}`}
-                          imgClassName="object-contain"
-                        />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className={`text-xs font-semibold truncate ${active ? "text-white" : "text-slate-200"}`}>{o.nombre}</p>
-                        <p className="text-[10px] text-slate-500 truncate">{ORG_ROL_LABEL[o.rol] || o.rol}</p>
-                      </div>
-                      {active && <Check size={14} className="text-red-500 shrink-0" />}
-                    </button>
-                  );
-                })}
-              </div>,
-              document.body
-            )}
           </div>
         ) : (
-          <div className="flex items-start gap-1.5">
+          <div className="flex items-center gap-1.5">
           <div className="relative flex-1 min-w-0" ref={orgMenuRef}>
             <button
+              ref={orgBtnRef}
               type="button"
-              title="Seleccionar empresa"
-              onClick={() => organizaciones.length > 1 && setOrgMenuOpen((v) => !v)}
-              className={`erp-company-btn w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl border transition-all duration-200 active:scale-[0.98] group ${
-                orgMenuOpen ? "border-slate-600 bg-slate-700/50" : "border-slate-700/60 bg-slate-800/40 hover:bg-slate-700/50 hover:border-slate-600"
+              title={organizacion?.nombre ? `${organizacion.nombre} · cambiar de organización` : "Organización"}
+              aria-haspopup="menu"
+              aria-expanded={orgMenuOpen}
+              onClick={toggleOrgMenu}
+              className={`erp-company-btn w-full flex items-center gap-3 p-2 rounded-2xl border transition-all duration-200 active:scale-[0.98] group ${
+                orgMenuOpen ? "erp-company-open border-slate-600 bg-slate-700/50" : "border-slate-700/60 bg-slate-800/40 hover:bg-slate-700/50 hover:border-slate-600"
               }`}
             >
-              <div className="erp-company-logo w-9 h-9 rounded-lg bg-slate-800 border border-slate-700/50 flex items-center justify-center shrink-0 overflow-hidden">
+              <div className="erp-company-logo w-10 h-10 rounded-xl bg-slate-800 border border-slate-700/50 flex items-center justify-center shrink-0 overflow-hidden">
                 {organizacion?.nombre ? (
                   <OrgLogoBadge
                     nombre={organizacion.nombre}
@@ -1644,60 +1806,22 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
                 )}
               </div>
               <div className="flex-1 min-w-0 text-left">
-                <HoverScrollText className="erp-company-name text-[11px] font-bold text-slate-200 leading-tight">
-                  {orgLoaded ? (organizacion?.nombre || "Vantia Legis") : "Cargando…"}
-                </HoverScrollText>
-                <HoverScrollText className="erp-company-sub text-[10px] text-slate-500 mt-0.5 gap-1">
-                  {orgRol && orgRol !== 'miembro' && (
-                    <span className="inline-flex items-center gap-0.5 shrink-0">
-                      <Crown size={9} className="text-amber-500" />
-                      {ORG_ROL_LABEL[orgRol]}
-                    </span>
-                  )}
-                  {orgRol && orgRol !== 'miembro' && organizaciones.length > 1 && <span className="text-slate-700">·</span>}
-                  {organizaciones.length > 1 ? `${organizaciones.length} despachos` : "Despacho"}
-                </HoverScrollText>
+                {orgLoaded ? (
+                  <p className="erp-company-name text-[13px] font-semibold text-slate-100 leading-[1.2] line-clamp-2 break-words">
+                    {organizacion?.nombre || "Vantia Legis"}
+                  </p>
+                ) : (
+                  <span className="block h-3 w-28 rounded bg-slate-700/60 animate-pulse" />
+                )}
+                <div className="erp-company-sub mt-1 flex items-center gap-1.5 text-[11px] text-slate-400 min-w-0">
+                  {orgRol && <OrgRolChip rol={orgRol} className={`erp-company-role erp-company-role-${orgRol} shrink-0 rounded-md px-1.5 py-px font-medium`} />}
+                  {organizaciones.length > 1 && <span className="truncate">{organizaciones.length} organizaciones</span>}
+                </div>
               </div>
-              {organizaciones.length > 1 && (
-                <ChevronsUpDown size={13} className={`erp-company-chevron text-slate-600 group-hover:text-slate-400 shrink-0 transition-transform duration-200 ${orgMenuOpen ? "rotate-180" : ""}`} />
-              )}
+              <span className="erp-company-chevron shrink-0 h-6 w-6 flex items-center justify-center rounded-lg text-slate-500 group-hover:text-slate-300 transition-colors">
+                <ChevronsUpDown size={14} />
+              </span>
             </button>
-
-            {orgMenuOpen && organizaciones.length > 1 && (
-              <div className="animate-fade-in absolute left-0 right-0 top-full mt-1.5 bg-slate-800 border border-slate-700 rounded-xl shadow-xl shadow-black/30 py-1.5 z-20 overflow-hidden origin-top">
-                <p className="px-3 pb-1.5 pt-1 text-[9px] font-bold uppercase tracking-[0.18em] text-slate-500">
-                  Tus organizaciones
-                </p>
-                {organizaciones.map((o) => {
-                  const active = o.id === organizacion?.id;
-                  return (
-                    <button
-                      key={o.id}
-                      type="button"
-                      onClick={() => { setOrgMenuOpen(false); if (!active) switchOrganizacion(o.id); }}
-                      className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors ${
-                        active ? "bg-red-500/10" : "hover:bg-slate-700/50"
-                      }`}
-                    >
-                      <div className="w-7 h-7 rounded-lg bg-slate-900 border border-slate-700/60 flex items-center justify-center shrink-0 overflow-hidden">
-                        <OrgLogoBadge
-                          nombre={o.nombre}
-                          logoUrl={o.logoUrl}
-                          className="h-full w-full text-[10px]"
-                          fallbackClassName={`bg-gradient-to-br ${orgAvatarGradient(o.id)}`}
-                          imgClassName="object-contain"
-                        />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className={`text-xs font-semibold truncate ${active ? "text-white" : "text-slate-200"}`}>{o.nombre}</p>
-                        <p className="text-[10px] text-slate-500 truncate">{ORG_ROL_LABEL[o.rol] || o.rol}</p>
-                      </div>
-                      {active && <Check size={14} className="text-red-500 shrink-0" />}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
           </div>
           <button
             type="button"
@@ -1708,6 +1832,17 @@ function SidebarContent({ pathname, search, onClose, onSignOut, collapsed, onTog
             <ChevronLeft size={16} />
           </button>
           </div>
+        )}
+        {orgMenuOpen && orgMenuPos && (
+          <OrgSwitcherMenu
+            menuRef={orgMenuPortalRef}
+            pos={orgMenuPos}
+            organizaciones={organizaciones}
+            activaId={organizacion?.id}
+            rolActivo={orgRol}
+            onSwitch={switchOrganizacion}
+            onClose={closeOrgMenu}
+          />
         )}
       </div>
 

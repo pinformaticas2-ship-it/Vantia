@@ -221,3 +221,33 @@ html[data-modo="oscuro"] .text-amber-500, html[data-modo="oscuro"] .text-amber-6
 html[data-modo="oscuro"] .text-yellow-600 { color: #e3b75a !important; }
 /* El día de hoy y similares (círculo de color con número blanco) se quedan como están */
 html[data-modo="oscuro"] [class*="bg-blue-6"].text-white, html[data-modo="oscuro"] [class*="bg-red-6"].text-white { color: #ffffff !important; }
+
+/* ── 8. Selector de organización (barra lateral) ────────────────────────────
+   Barra clara (azul, verde, violeta, índigo) o barra oscura (rojo, grafito y
+   cualquier tema en modo oscuro): el chip del rol y el contador se adaptan. */
+@keyframes erp-org-pop { from { opacity: 0; transform: translateY(-4px) scale(0.98); } to { opacity: 1; transform: none; } }
+.erp-org-menu { animation: erp-org-pop 0.14s ease-out; transform-origin: top left; }
+@media (prefers-reduced-motion: reduce) { .erp-org-menu { animation: none; } }
+
+.erp-company-role { background-color: rgba(100, 116, 139, 0.12); color: #475569; }
+.erp-company-role-propietario { background-color: rgba(245, 158, 11, 0.15); color: #b45309; }
+.erp-company-role-admin { background-color: rgba(var(--tema-rgb), 0.12); }
+[data-theme="rojo"] .erp-company-role, [data-theme="grafito"] .erp-company-role,
+html[data-modo="oscuro"] .erp-company-role { background-color: rgba(255, 255, 255, 0.08); color: #cbd5e1; }
+[data-theme="rojo"] .erp-company-role-propietario, [data-theme="grafito"] .erp-company-role-propietario,
+html[data-modo="oscuro"] .erp-company-role-propietario { background-color: rgba(251, 191, 36, 0.14); color: #fcd34d; }
+
+/* Texto secundario del botón: el gris de antes no llegaba a leerse sobre blanco */
+html:not([data-modo="oscuro"])[data-theme]:not([data-theme="rojo"]):not([data-theme="grafito"]) .erp-company-sub { color: #64748b !important; }
+
+.erp-company-btn:hover .erp-company-chevron, .erp-company-open .erp-company-chevron { background-color: rgba(127, 127, 127, 0.14); }
+html[data-theme] .erp-company-open.erp-company-btn, html[data-theme] .erp-company-open.erp-company-btn:hover,
+html[data-theme] .erp-company-open.erp-company-icon, html[data-theme] .erp-company-open.erp-company-icon:hover { border-color: rgba(var(--tema-rgb), 0.55) !important; box-shadow: 0 0 0 3px rgba(var(--tema-rgb), 0.14); }
+.erp-company-btn:focus-visible, .erp-company-icon:focus-visible { outline: 2px solid rgba(var(--tema-rgb), 0.7); outline-offset: 2px; }
+
+.erp-company-count { background-color: rgb(var(--tema-rgb)); color: #ffffff; box-shadow: 0 0 0 2px #ffffff; }
+[data-theme="rojo"] .erp-company-count { box-shadow: 0 0 0 2px #0f172a; }
+[data-theme="grafito"] .erp-company-count { box-shadow: 0 0 0 2px #1f2937; }
+html[data-modo="oscuro"] .erp-company-count { box-shadow: 0 0 0 2px var(--o-superficie); }
+.erp-org-activa { background-color: rgba(var(--tema-rgb), 0.08); border-color: rgba(var(--tema-rgb), 0.3); }
+html[data-modo="oscuro"] .erp-org-activa { background-color: rgba(var(--tema-rgb), 0.14); border-color: rgba(var(--tema-rgb), 0.4); }
