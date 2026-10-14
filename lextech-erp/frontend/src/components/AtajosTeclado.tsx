@@ -3,9 +3,10 @@ import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Keyboard, X } from 'lucide-react';
 import { usePreferencias } from '../lib/preferencias';
+import { abrirPaleta } from './PaletaComandos';
 
 // ── Atajos de teclado (14/10/2026) ───────────────────────────────────────────
-// "?" abre esta ayuda; "/" va al buscador; "g" y luego una letra salta a un
+// "?" abre esta ayuda; "/" (o Ctrl+K) abre la paleta de comandos; "g" y luego una letra salta a un
 // módulo (estilo Gmail/GitHub). Nunca actúan mientras se escribe en un campo.
 // Se desactivan en Ajustes → Preferencias de trabajo.
 
@@ -47,7 +48,7 @@ export function AyudaAtajos({ onClose }: { onClose: () => void }) {
         </div>
         <div className="space-y-2 text-sm text-slate-700">
           <div className="flex items-center justify-between"><span>Ver esta ayuda</span><Tecla>?</Tecla></div>
-          <div className="flex items-center justify-between"><span>Ir al buscador</span><Tecla>/</Tecla></div>
+          <div className="flex items-center justify-between"><span>Buscar o ejecutar una acción</span><span className="flex items-center gap-1"><Tecla>Ctrl</Tecla><Tecla>K</Tecla><span className="text-xs text-slate-400">o</span><Tecla>/</Tecla></span></div>
           <p className="pt-2 text-xs font-semibold uppercase tracking-wider text-slate-400">Ir a… (pulsa G y luego la letra)</p>
           <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
             {IR_A.map((a) => (
@@ -76,11 +77,7 @@ export default function AtajosTeclado() {
     const onKey = (ev: KeyboardEvent) => {
       if (ev.ctrlKey || ev.metaKey || ev.altKey || escribiendo(ev.target)) return;
       if (ev.key === '?') { ev.preventDefault(); setAyuda(true); return; }
-      if (ev.key === '/') {
-        const buscador = document.querySelector<HTMLInputElement>('input[data-buscador-global]');
-        if (buscador) { ev.preventDefault(); buscador.focus(); }
-        return;
-      }
+      if (ev.key === '/') { ev.preventDefault(); abrirPaleta(); return; }
       const k = ev.key.toLowerCase();
       if (esperandoG.current) {
         window.clearTimeout(esperandoG.current);

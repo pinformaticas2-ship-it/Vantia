@@ -14,6 +14,7 @@ import { UndoToast } from "./UndoToast";
 import { useUndoDelete } from "../lib/useUndoDelete";
 import { Modal } from "./Modal";
 import PdfToolModal, { isPdfToolCompatible } from "./PdfToolModal";
+import { aviso } from "../lib/avisos";
 
 // ── helpers ───────────────────────────────────────────────────
 function fileIcon(mime: string, name: string) {
@@ -199,7 +200,7 @@ export default function AdjuntosModal({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        alert(`Error al descargar: ${err.error || res.status}`);
+        aviso(`Error al descargar: ${err.error || res.status}`);
         return;
       }
       const blob = await res.blob();
@@ -212,7 +213,7 @@ export default function AdjuntosModal({
       document.body.removeChild(a);
       setTimeout(() => URL.revokeObjectURL(url), 10_000);
     } catch (_e) {
-      alert("Error al descargar el archivo");
+      aviso("Error al descargar el archivo");
     }
   }, [entityId, getToken]);
 

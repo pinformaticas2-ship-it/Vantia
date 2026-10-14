@@ -5,6 +5,7 @@ import {
   Pencil, Trash2, Settings, AlertTriangle, ChevronUp,
   ChevronDown as ChevronDownIcon,
 } from "lucide-react";
+import { aviso } from "../lib/avisos";
 
 // ── Tipos ──────────────────────────────────────────────────────
 export interface Atajo {
@@ -671,7 +672,7 @@ export function AtajosButton({ modulo }: { modulo: string }) {
                 {items.map(a => (
                   <button
                     key={a.id}
-                    onClick={() => { setOpen(false); alert(`Ejecutando: ${a.nombre}`); }}
+                    onClick={() => { setOpen(false); aviso(`Ejecutando: ${a.nombre}`); }}
                     className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors text-left"
                   >
                     <Bookmark size={13} className="text-slate-400 shrink-0" />

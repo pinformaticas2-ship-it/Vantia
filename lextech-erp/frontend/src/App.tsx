@@ -9,6 +9,7 @@ import { ThemeProvider } from './lib/ThemeContext';
 import { PreferenciasProvider } from './lib/preferencias';
 import AtajosTeclado, { InicioPreferido } from './components/AtajosTeclado';
 import { soltarPushDeEsteNavegador } from './lib/usePushNotifications';
+import { AvisosHost } from './lib/avisos';
 
 // Layouts
 import DashboardLayout from './layouts/DashboardLayout';
@@ -53,6 +54,7 @@ export default function App() {
     <ThemeProvider>
       <PreferenciasProvider>
       <>
+      <AvisosHost />
       <SignedIn>
         <AtajosTeclado />
         <InicioPreferido />

@@ -5,6 +5,7 @@ import { Download, Keyboard, Loader2, Moon, Monitor, Sun, Trash2 } from 'lucide-
 import { apiFetch, resolveApiUrl } from '../lib/api';
 import { PAGINAS_INICIO, usePreferencias, Modo } from '../lib/preferencias';
 import { AyudaAtajos } from './AtajosTeclado';
+import { confirmar } from "../lib/avisos";
 
 // Secciones nuevas de Ajustes (14/10/2026): Mi perfil, Preferencias de trabajo,
 // Datos y privacidad, y el selector de modo claro/oscuro de Apariencia.
@@ -181,7 +182,7 @@ export function PrivacidadPanel() {
 
   const cambiarRetencion = async (valor: string) => {
     const meses = valor === '' ? null : Number(valor);
-    if (meses && datos?.desde && !window.confirm(`Se borrarán los registros de trazabilidad de más de ${meses} meses. Esto no se puede deshacer. ¿Continuar?`)) return;
+    if (meses && datos?.desde && !(await confirmar({ titulo: `¿Borrar la trazabilidad de más de ${meses} meses?`, mensaje: "Los registros más antiguos se eliminarán para siempre. Esto no se puede deshacer.", confirmar: "Borrar y guardar", peligro: true }))) return;
     g.setEstado('guardando');
     try {
       const res = await apiFetch('/api/privacidad', { method: 'PUT', getToken, body: JSON.stringify({ retencionMeses: meses }) });

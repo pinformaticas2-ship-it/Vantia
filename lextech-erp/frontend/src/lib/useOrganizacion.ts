@@ -32,6 +32,12 @@ export interface OrganizacionInfo {
   documentStorageDefaultProvider?: 'drive' | 'dropbox';
 }
 
+// La organización en la que el backend está trabajando de verdad (puede no
+// coincidir con la preferencia guardada si esta ya no es válida). Para quien
+// necesite saberlo fuera de React, p. ej. los borradores (lib/borradores).
+let orgResuelta: string | null = null;
+export const getOrganizacionResuelta = () => orgResuelta;
+
 export interface OrganizacionMembership extends OrganizacionInfo {
   rol: OrgRol;
 }
@@ -52,6 +58,7 @@ export function useOrganizacion() {
     try {
       const data = await apiFetch('/api/organizacion', { getToken });
       if (data?.success) {
+        orgResuelta = data.data.organizacion?.id || null;
         setOrganizacion(data.data.organizacion || null);
         setRol(data.data.rol || null);
         setPermisos(data.data.permisos || null);

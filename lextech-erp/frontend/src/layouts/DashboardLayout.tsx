@@ -17,6 +17,8 @@ import { Clock,
 import { UserButton, useUser, useAuth, useClerk } from "@clerk/clerk-react";
 import { getDeviceId, safeJson, waitForClientIp, resolveUploadUrl } from "../lib/api";
 import { useOrganizacion } from "../lib/useOrganizacion";
+import { PantallaSegura } from "../lib/errores";
+import PaletaComandos, { abrirPaleta } from "../components/PaletaComandos";
 import DriveConnectPrompt from "../components/DriveConnectPrompt";
 import StorageStatusIcons from "../components/StorageStatusIcons";
 import { AI_MODELS, MODEL_STORAGE_KEY, pickInitialModel, useVantiaUsageOnDemand, VantiaModelPickerPanel } from "../components/VantiaModelPicker";
@@ -1260,40 +1262,6 @@ function QuickLinksPanel({ getToken, onClose }: { getToken: () => Promise<string
 }
 
 // ── Search Dropdown ──────────────────────────────────────────────────────────
-function SearchDropdown({ query, onSelect }: { query: string; onSelect: () => void }) {
-  const navigate  = useNavigate();
-  const { puede } = useOrganizacion();
-  const { visible: vistasVisible } = useVistasStatus();
-  const filtered  = MODULES
-    .filter((m) => { const mod = moduloForPath(m.path); return !mod || puede(mod); })
-    .filter((m) => m.path !== "/dashboard/vistas" || vistasVisible)
-    .filter(
-      (m) => m.name.toLowerCase().includes(query.toLowerCase()) ||
-             m.desc.toLowerCase().includes(query.toLowerCase())
-    );
-  if (!query || !filtered.length) return null;
-  return (
-    <div className="absolute top-full left-0 mt-2 w-full bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden">
-      {filtered.map((m) => {
-        const Icon = m.icon;
-        return (
-          <button key={m.path} onClick={() => { navigate(m.path); onSelect(); }}
-            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-neutral-50 transition-colors text-left group">
-            <div className="h-8 w-8 bg-neutral-100 group-hover:bg-red-50 rounded-lg flex items-center justify-center transition-colors">
-              <Icon size={14} className="text-neutral-500 group-hover:text-red-700" />
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-semibold text-neutral-700 group-hover:text-red-700">{m.name}</p>
-              <p className="text-[11px] text-neutral-400">{m.desc}</p>
-            </div>
-            <ChevronRight size={14} className="text-neutral-300 group-hover:text-red-400" />
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 // Compara la ruta actual (pathname + query) contra un href de nav que puede
 // llevar su propio query string (p.ej. "/dashboard/facturacion?tab=gastos"),
 // para que cada sub-opción con el mismo pathname pero distinto tab se
@@ -2164,6 +2132,10 @@ export default function DashboardLayout() {
   const { totalUnread: chatTotalUnread } = useChatUnread();
   const { latestToast: latestWaToast, clearToast: clearWaToast, markSeen: markWaSeen, markAllSeen: markAllWaSeen } = useWhatsAppUnread();
   const { organizacion, rol: orgRolMain, puede: puedeMain } = useOrganizacion();
+  const { visible: vistasVisibleMain } = useVistasStatus();
+  const modulosPaleta = useMemo(() => MODULES
+    .filter((m) => !m.path.endsWith("/new") && (m.path !== "/dashboard/vistas" || vistasVisibleMain))
+    .map((m) => ({ ...m, modulo: moduloForPath(m.path) })), [vistasVisibleMain]);
 
   const isMobile = useIsMobile();
   const pushNotifications = usePushNotifications();
@@ -2183,12 +2155,9 @@ export default function DashboardLayout() {
   const isCollapsed = pantallaMedia ? !abiertoEnMedia : colapsadoPref;
   const [isNotifOpen,     setIsNotifOpen]     = useState(false);
   const [isLinksOpen,     setIsLinksOpen]     = useState(false);
-  const [searchQuery,     setSearchQuery]     = useState("");
-  const [searchFocused,   setSearchFocused]   = useState(false);
   const [notifications,   setNotifications]   = useState<UnifiedNotification[]>([]);
   const [notifLoading,    setNotifLoading]    = useState(false);
 
-  const searchRef          = useRef<HTMLDivElement>(null);
   const notifRef           = useRef<HTMLDivElement>(null);
   const linksRef           = useRef<HTMLDivElement>(null);
   const loginFiredRef      = useRef<string | null>(null);
@@ -2324,9 +2293,6 @@ export default function DashboardLayout() {
   // Cerrar paneles al clicar fuera
   useEffect(() => {
     const h = (e: MouseEvent) => {
-      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
-        setSearchFocused(false); setSearchQuery("");
-      }
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) setIsNotifOpen(false);
       if (linksRef.current && !linksRef.current.contains(e.target as Node)) setIsLinksOpen(false);
     };
@@ -2777,26 +2743,20 @@ export default function DashboardLayout() {
             <Menu className="h-5 w-5" />
           </button>
 
-          {/* Búsqueda */}
-          <div ref={searchRef} className="relative flex-1 min-w-0 max-w-4xl">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
-            <input
-              type="search"
-              data-buscador-global
-              title="Buscar (atajo: /)"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onFocus={() => setSearchFocused(true)}
-              placeholder={isMobile ? "Buscar..." : "Buscar módulos, clientes, expedientes..."}
-              className="pl-10 sm:pr-10 h-10 w-full rounded-lg border border-slate-200 bg-slate-50 text-sm focus:bg-white focus:ring-2 focus:ring-red-500/20 focus:border-red-400 outline-none transition-all"
-            />
-            {!searchQuery && !searchFocused && (
-              <kbd className="hidden sm:flex absolute right-2.5 top-1/2 -translate-y-1/2 h-6 min-w-[24px] px-1.5 items-center justify-center rounded-md border border-slate-200 bg-white text-[11px] font-sans font-semibold text-slate-400 pointer-events-none" title="Pulsa / para buscar">/</kbd>
-            )}
-            {searchFocused && searchQuery && (
-              <SearchDropdown query={searchQuery} onSelect={() => { setSearchQuery(""); setSearchFocused(false); }} />
-            )}
-          </div>
+          {/* Búsqueda: abre la paleta de comandos (Ctrl+K), que busca de verdad
+              clientes y expedientes además de módulos, ajustes y acciones. */}
+          <button
+            type="button"
+            data-buscador-global
+            onClick={() => abrirPaleta()}
+            title="Buscar (Ctrl+K o /)"
+            className="group relative flex-1 min-w-0 max-w-4xl h-10 flex items-center gap-2.5 pl-3.5 pr-2.5 rounded-lg border border-slate-200 bg-slate-50 text-left text-sm text-slate-400 hover:bg-white hover:border-slate-300 transition-colors"
+          >
+            <Search className="h-4 w-4 shrink-0 text-slate-400" />
+            <span className="flex-1 min-w-0 truncate">{isMobile ? "Buscar..." : "Buscar clientes, expedientes, módulos o acciones..."}</span>
+            <kbd className="hidden sm:inline-flex shrink-0 h-6 px-1.5 items-center rounded-md border border-slate-200 bg-white text-[11px] font-sans font-semibold text-slate-400">Ctrl K</kbd>
+          </button>
+          <PaletaComandos modulos={modulosPaleta} puede={puedeMain} />
 
           {/* + Nuevo (16/10/2026: sustituye al logo de la organización, que ya
               sale en la barra lateral). El hueco hasta los iconos lo absorbe el
@@ -2865,7 +2825,7 @@ export default function DashboardLayout() {
               : location.pathname === '/dashboard/tareas' ? 'w-full p-4 md:p-8 module-page'
               : 'max-w-[1600px] mx-auto p-4 md:p-8 module-page'
             }>
-            <Outlet />
+            <PantallaSegura clave={location.pathname}><Outlet /></PantallaSegura>
           </div>
         </div>
       </main>

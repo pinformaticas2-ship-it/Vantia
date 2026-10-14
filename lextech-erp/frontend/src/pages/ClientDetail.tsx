@@ -21,6 +21,8 @@ import { FilesTabPanel } from "../components/FilesTabPanel";
 import { EtapaSelect } from "../components/EtapaSelect";
 import BackButton from "../components/BackButton";
 import { Spinner } from "../components/Spinner";
+import { aviso, confirmar } from "../lib/avisos";
+import { useAvisoSalida } from "../lib/borradores";
 
 // ── helpers ───────────────────────────────────────────────────
 const statusColor: Record<string, string> = {
@@ -2221,7 +2223,7 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        alert(`Error al descargar: ${err.error || res.status}`);
+        aviso(`Error al descargar: ${err.error || res.status}`);
         return;
       }
       const blob = await res.blob();
@@ -2234,7 +2236,7 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
       document.body.removeChild(a);
       setTimeout(() => URL.revokeObjectURL(url), 10_000);
     } catch (_e) {
-      alert('Error al descargar el archivo');
+      aviso('Error al descargar el archivo');
     }
   }, [clientId, getToken]);
 
@@ -2267,7 +2269,7 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        alert(`Error al abrir PDF: ${err.error || res.status}`);
+        aviso(`Error al abrir PDF: ${err.error || res.status}`);
         return;
       }
       const blob = await res.blob();
@@ -2276,7 +2278,7 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (_e) {
       setOpeningMessage(null);
-      alert('No se pudo abrir el PDF en el navegador.');
+      aviso('No se pudo abrir el PDF en el navegador.');
     }
   }, [clientId, getToken, showOpeningMessage]);
 
@@ -2293,7 +2295,7 @@ function _TabAdjuntosOld({ clientId, client }: { clientId: string; client: any }
       window.location.href = `vantia:${b64}`;
     } catch (error: any) {
       setOpeningMessage(null);
-      alert(error?.message || 'No se pudo abrir el PDF en PDF Studio.');
+      aviso(error?.message || 'No se pudo abrir el PDF en PDF Studio.');
     }
   }, [getTempOpenUrl, showOpeningMessage]);
 
@@ -3854,6 +3856,8 @@ export default function ClientDetail() {
   const [error, setError]   = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState<any>(null);
+  // Si se cierra o recarga la pestaña en plena edición, el navegador pregunta antes.
+  useAvisoSalida(editing);
   const [saving, setSaving] = useState(false);
   const setEF = (key: string, val: any) => setEditForm((prev: any) => ({ ...prev, [key]: val }));
   const initialTab = searchParams.get("tab") || "perfil";
@@ -4028,21 +4032,21 @@ export default function ClientDetail() {
         // sobreescribir en silencio -- se ofrece recargar en vez de un simple
         // "error al guardar" que no explica qué pasó.
         if (res.status === 409 && d.conflict) {
-          if (window.confirm(`${d.error}\n\n¿Recargar el cliente ahora? Perderás los cambios que no hayas guardado.`)) {
+          if (await confirmar({ titulo: "Alguien ha cambiado este cliente mientras lo editabas", mensaje: `${d.error}\n\n¿Recargar el cliente ahora? Perderás los cambios que no hayas guardado.`, confirmar: "Recargar" })) {
             setEditing(false);
             setEditForm(null);
             await fetchClient();
           }
           return;
         }
-        alert(d.error || "Error al guardar");
+        aviso(d.error || "Error al guardar");
         return;
       }
       setEditing(false);
       setEditForm(null);
       await fetchClient();
     } catch (e: any) {
-      alert(e.message);
+      aviso(e.message);
     } finally {
       setSaving(false);
     }

@@ -37,6 +37,7 @@ import { UndoToast } from "../components/UndoToast";
 import { Modal } from "../components/Modal";
 import { useUndoDelete } from "../lib/useUndoDelete";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { confirmar } from "../lib/avisos";
 
 type FilterPeriod = "year" | "q1" | "q2" | "q3" | "q4" | "jan" | "feb" | "mar" | "apr" | "may" | "jun" | "jul" | "aug" | "sep" | "oct" | "nov" | "dec";
 type TabKey = "dashboard" | "analitica" | "facturas" | "gastos" | "presupuestos" | "contacts" | "bank_accounts" | "receipts" | "config";
@@ -2217,7 +2218,7 @@ function FacturacionContent() {
   };
 
   const deleteContact = async (id: string) => {
-    if (!confirm("¿Eliminar este contacto de Quipu?")) return;
+    if (!(await confirmar({ titulo: "¿Eliminar este contacto de Quipu?", confirmar: "Eliminar contacto", peligro: true }))) return;
     try {
       await apiFetch(`/api/quipu/contacts/${id}`, { method: "DELETE", getToken });
       setQuipuContacts(prev => prev.filter(c => c.id !== id));

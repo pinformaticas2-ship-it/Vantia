@@ -74,6 +74,8 @@ import BackButton from "../components/BackButton";
 import { UndoToast } from "../components/UndoToast";
 import { useUndoDelete } from "../lib/useUndoDelete";
 import { PlazoCalculator } from "../components/PlazoCalculator";
+import { aviso, confirmar } from "../lib/avisos";
+import { useAvisoSalida } from "../lib/borradores";
 
 // ── Google Meet (vía Google Calendar) para el evento rápido del expediente ──
 // Mismas claves que el módulo Agenda (Agenda.tsx) para compartir la sesión
@@ -4397,7 +4399,7 @@ function TabApuntesEconomicos({ expedienteId, locked = false }: { expedienteId: 
       const method = editId ? "PUT" : "POST";
       const res = await fetch(url, { method, headers, body: JSON.stringify(form) });
       const data = await safeJson(res);
-      if (!res.ok) { alert(data.error || "Error al guardar"); return; }
+      if (!res.ok) { aviso(data.error || "Error al guardar"); return; }
       if (editId) setApuntes(prev => prev.map(a => a.id === editId ? data.data : a));
       else setApuntes(prev => [data.data, ...prev]);
       setShowForm(false); setEditId(null); resetForm();
@@ -5260,7 +5262,7 @@ function ConversacionesTab({ expedienteId }: { expedienteId: string }) {
     });
 
   const handleDeleteMessage = async (messageId: string) => {
-    const confirmed = window.confirm('¿Seguro que quieres borrar este mensaje de la conversación asociada?');
+    const confirmed = await confirmar({ titulo: "¿Borrar este mensaje?", mensaje: "Se eliminará de la conversación asociada al expediente.", confirmar: "Borrar mensaje", peligro: true });
     if (!confirmed) return;
     setDeletingMessageId(messageId);
     setActionError("");
@@ -5407,6 +5409,8 @@ export default function ExpedienteDetail() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editForm, setEditForm] = useState<any>(null);
+  // Si se cierra o recarga la pestaña en plena edición, el navegador pregunta antes.
+  useAvisoSalida(editing);
   const setEF = (key: string, val: any) => setEditForm((prev: any) => ({ ...prev, [key]: val }));
   const [clientes, setClientes] = useState<any[]>([]);
   const [billing,  setBilling]  = useState<{ facturas: any[]; gastos: any[] } | null>(null);
@@ -5583,7 +5587,7 @@ export default function ExpedienteDetail() {
   // conflict:true en vez de sobreescribir en silencio -- se ofrece recargar
   // en vez de un simple "error al guardar" que no explica qué pasó.
   const handleConflict = async (d: any): Promise<boolean> => {
-    if (window.confirm(`${d.error}\n\n¿Recargar el expediente ahora? Perderás los cambios que no hayas guardado.`)) {
+    if (await confirmar({ titulo: "Alguien ha cambiado este expediente mientras lo editabas", mensaje: `${d.error}\n\n¿Recargar el expediente ahora? Perderás los cambios que no hayas guardado.`, confirmar: "Recargar" })) {
       setEditing(false);
       await fetchExp();
     }
@@ -5602,13 +5606,13 @@ export default function ExpedienteDetail() {
       const d = await safeJson(res);
       if (!res.ok) {
         if (res.status === 409 && d.conflict) { await handleConflict(d); return; }
-        alert(d.error || "Error al guardar");
+        aviso(d.error || "Error al guardar");
         return;
       }
       setEditing(false);
       await fetchExp();
     } catch (e: any) {
-      alert(e.message);
+      aviso(e.message);
     } finally {
       setSaving(false);
     }
@@ -5624,7 +5628,7 @@ export default function ExpedienteDetail() {
     const d = await safeJson(res);
     if (!res.ok) {
       if (res.status === 409 && d.conflict) return await handleConflict(d);
-      alert(d.error || "Error al guardar");
+      aviso(d.error || "Error al guardar");
       return false;
     }
     await fetchExp();
@@ -5646,11 +5650,11 @@ export default function ExpedienteDetail() {
         body: JSON.stringify(patch),
       });
       const d = await safeJson(res);
-      if (!res.ok) { alert(d.error || "Error al cambiar el estado"); return; }
+      if (!res.ok) { aviso(d.error || "Error al cambiar el estado"); return; }
       await fetchExp();
       setHistorial(null);
     } catch (e: any) {
-      alert(e.message);
+      aviso(e.message);
     } finally {
       setSaving(false);
     }
@@ -5670,11 +5674,11 @@ export default function ExpedienteDetail() {
         body: JSON.stringify({ estado: "abierto" }),
       });
       const d = await safeJson(res);
-      if (!res.ok) { alert(d.error || "Error al desarchivar"); return; }
+      if (!res.ok) { aviso(d.error || "Error al desarchivar"); return; }
       await fetchExp();
       setHistorial(null);
     } catch (e: any) {
-      alert(e.message);
+      aviso(e.message);
     } finally {
       setSaving(false);
     }
@@ -6577,7 +6581,7 @@ export default function ExpedienteDetail() {
                     body: JSON.stringify(body),
                   });
                   const d = await safeJson(res);
-                  if (!res.ok) { alert(d.error || "Error al crear el evento"); return; }
+                  if (!res.ok) { aviso(d.error || "Error al crear el evento"); return; }
                   let savedEvent = d.data;
 
                   // Si se pidió Meet y hay sesión de Google, se crea el evento allí

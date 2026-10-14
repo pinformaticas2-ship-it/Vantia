@@ -23,6 +23,7 @@ import { useChatUnread } from "../contexts/ChatUnreadContext";
 import BackButton from "../components/BackButton";
 import { useIsMobile } from "../lib/useIsMobile";
 import { LinkPreviewCard, firstUrlIn } from "../components/LinkPreviewCard";
+import { aviso } from "../lib/avisos";
 
 // ══════════════════════════════════════════════════════════════════════════════
 // TIPOS
@@ -4646,7 +4647,7 @@ export default function Chat() {
         setMensajes(prev=>prev.map(m=>m.id===editId?{...m,...d.data,editado:true}:m));
       } catch (e: any) {
         if (antes) setMensajes(prev=>prev.map(m=>m.id===editId?antes:m));
-        window.alert(e?.message || "No se pudo guardar el cambio");
+        aviso(e?.message || "No se pudo guardar el cambio");
       }
       return;
     }
@@ -4940,12 +4941,12 @@ export default function Chat() {
     const h = await hdr();
     const res = await fetch(`/api/chat/canales/${canalId}`, { method:"PUT", headers: h, body: JSON.stringify({ foto_url: fotoUrl }) });
     const d = await safeJson(res);
-    if (!res.ok) { window.alert(d?.error || "No se pudo guardar la foto del grupo"); return; }
+    if (!res.ok) { aviso(d?.error || "No se pudo guardar la foto del grupo"); return; }
     setCanales((prev) => prev.map((c) => (c.id === canalId ? { ...c, foto_url: fotoUrl } : c)));
     setCanalActivo((prev) => (prev && prev.id === canalId ? { ...prev, foto_url: fotoUrl } : prev));
   }, [hdr]);
   const subirFotoGrupo = async (canalId: string, file: File) => {
-    if (!file.type.startsWith("image/") || file.type === "image/svg+xml") { window.alert("Elige una imagen (JPG, PNG, GIF o WebP)."); return; }
+    if (!file.type.startsWith("image/") || file.type === "image/svg+xml") { aviso("Elige una imagen (JPG, PNG, GIF o WebP)."); return; }
     setSubiendoFotoGrupo(true);
     try {
       const recortada = await recortarFotoCuadrada(file);
@@ -4957,7 +4958,7 @@ export default function Chat() {
       if (!res.ok || !d?.data?.image_url) throw new Error(d?.error || "No se pudo subir la foto");
       await guardarFotoGrupo(canalId, d.data.image_url);
     } catch (e: any) {
-      window.alert(e?.message || "No se pudo subir la foto");
+      aviso(e?.message || "No se pudo subir la foto");
     } finally {
       setSubiendoFotoGrupo(false);
     }

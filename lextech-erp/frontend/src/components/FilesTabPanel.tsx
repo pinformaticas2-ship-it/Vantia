@@ -15,6 +15,7 @@ import { FilePreviewModal, isVideoFile, isAudioFile } from "./FilePreviewModal";
 import PdfToolModal, { isPdfToolCompatible } from "./PdfToolModal";
 import { useOrganizacion } from "../lib/useOrganizacion";
 import { DriveLogo, DropboxLogo } from "./StorageStatusIcons";
+import { aviso } from "../lib/avisos";
 
 function fileIcon(mime: string, name: string) {
   const n = name.toLowerCase();
@@ -257,7 +258,7 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        alert(`Error al descargar: ${err.error || res.status}`);
+        aviso(`Error al descargar: ${err.error || res.status}`);
         return;
       }
       const blob = await res.blob();
@@ -270,7 +271,7 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
       document.body.removeChild(a);
       setTimeout(() => URL.revokeObjectURL(url), 10_000);
     } catch (_e) {
-      alert('Error al descargar el archivo');
+      aviso('Error al descargar el archivo');
     }
   }, [entityId, getToken]);
 
@@ -306,7 +307,7 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
       const url = await getTempOpenUrl(file.id);
       setRichPreview({ file, url });
     } catch (e: any) {
-      alert(e?.message || 'No se pudo generar la vista previa.');
+      aviso(e?.message || 'No se pudo generar la vista previa.');
     } finally {
       setRichPreviewLoading(null);
     }
@@ -321,7 +322,7 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        alert(`Error al abrir PDF: ${err.error || res.status}`);
+        aviso(`Error al abrir PDF: ${err.error || res.status}`);
         return;
       }
       const blob = await res.blob();
@@ -330,7 +331,7 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (_e) {
       setOpeningMessage(null);
-      alert('No se pudo abrir el PDF en el navegador.');
+      aviso('No se pudo abrir el PDF en el navegador.');
     }
   }, [entityId, getToken, showOpeningMessage]);
 
@@ -347,7 +348,7 @@ export function FilesTabPanel({ entityId, entity, entityType, alwaysShowPreview 
       window.location.href = `vantia:${b64}`;
     } catch (error: any) {
       setOpeningMessage(null);
-      alert(error?.message || 'No se pudo abrir el PDF en PDF Studio.');
+      aviso(error?.message || 'No se pudo abrir el PDF en PDF Studio.');
     }
   }, [getTempOpenUrl, showOpeningMessage]);
 

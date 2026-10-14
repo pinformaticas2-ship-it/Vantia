@@ -19,6 +19,7 @@ import { useSearchParams } from "react-router-dom";
 import BackButton from "../components/BackButton";
 import { primerDiaSemana } from "../lib/preferencias";
 import { BookingPageSettingsModal, type BookingPage } from "../components/BookingPageSettingsModal";
+import { useAvisoSalida } from "../lib/borradores";
 
 // ── Google Calendar Types ─────────────────────────────────────────────────────
 interface GCalEvent {
@@ -401,6 +402,9 @@ function EventModal({
     : (initialFormData || emptyForm(defaultDate || undefined))
   );
 
+  // Cambios sin guardar: si se cierra o recarga la pestaña, el navegador pregunta antes.
+  const formInicialRef = useRef(JSON.stringify(form));
+  useAvisoSalida(JSON.stringify(form) !== formInicialRef.current);
   const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }));
   const typeConf = EVENT_TYPES[form.type] || EVENT_TYPES.otro;
   const statusConf = STATUS_OPTS.find(s => s.value === form.status) || STATUS_OPTS[0];
@@ -1048,6 +1052,9 @@ function QuickEventPopover({
 }) {
   const { getToken } = useAuth();
   const [form, setForm] = useState<AgendaFormData>(() => initialData || emptyForm(date));
+  // Cambios sin guardar: si se cierra o recarga la pestaña, el navegador pregunta antes.
+  const formInicialRef = useRef(JSON.stringify(form));
+  useAvisoSalida(JSON.stringify(form) !== formInicialRef.current);
   const [activeTab, setActiveTab] = useState<QuickTab>("evento");
   const [guestInput, setGuestInput] = useState("");
   const titleRef = useRef<HTMLInputElement>(null);

@@ -122,7 +122,7 @@ html[data-modo="oscuro"] .border-slate-300, html[data-modo="oscuro"] .border-gra
 html[data-modo="oscuro"] .hover\:border-slate-300:hover { border-color: var(--o-borde-fuerte) !important; }
 
 /* Campos */
-html[data-modo="oscuro"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+html[data-modo="oscuro"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not(.paleta-input),
 html[data-modo="oscuro"] textarea, html[data-modo="oscuro"] select {
   background-color: var(--o-elevado) !important; color: var(--o-texto) !important; border-color: var(--o-borde-fuerte) !important;
 }
@@ -293,3 +293,14 @@ html[data-modo="oscuro"] .erp-org-menu {
 .erp-org-menu .erp-org-activa { background-color: rgba(var(--tema-rgb), 0.08); border-color: rgba(var(--tema-rgb), 0.3); }
 [data-theme="rojo"] .erp-org-menu .erp-org-activa, [data-theme="grafito"] .erp-org-menu .erp-org-activa,
 html[data-modo="oscuro"] .erp-org-menu .erp-org-activa { background-color: rgba(var(--tema-rgb), 0.16); border-color: rgba(var(--tema-rgb), 0.45); }
+
+/* ── 9. Avisos y confirmaciones propios (lib/avisos.tsx) ── */
+@keyframes aviso-entra { from { opacity: 0; transform: translateY(-6px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes aviso-fondo { from { opacity: 0; } to { opacity: 1; } }
+@keyframes aviso-dialogo { from { opacity: 0; transform: translateY(8px) scale(0.97); } to { opacity: 1; transform: none; } }
+.aviso-entra { animation: aviso-entra 0.18s ease-out; }
+.aviso-fondo { animation: aviso-fondo 0.15s ease-out; }
+.aviso-dialogo { animation: aviso-dialogo 0.18s ease-out; }
+@media (prefers-reduced-motion: reduce) { .aviso-entra, .aviso-fondo, .aviso-dialogo { animation: none; } }
+
+html input.paleta-input, html input.paleta-input:focus, html[data-modo] input.paleta-input, html[data-modo] input.paleta-input:focus { outline: none !important; box-shadow: none !important; border: 0 !important; background: transparent !important; }

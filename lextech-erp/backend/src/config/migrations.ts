@@ -2435,6 +2435,26 @@ export async function runMigrations(): Promise<void> {
       await client.query(`CREATE INDEX IF NOT EXISTS idx_trazabilidad_accesos_org_user ON trazabilidad_accesos (organizacion_id, user_id);`);
     } catch (_e: any) {}
 
+    // Errores de la app en el navegador (16/10/2026): ver erroresClienteController.
+    try {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS errores_cliente (
+          id               BIGSERIAL    PRIMARY KEY,
+          organizacion_id  UUID         REFERENCES organizaciones(id) ON DELETE CASCADE,
+          user_id          VARCHAR(150) NOT NULL,
+          tipo             VARCHAR(30)  NOT NULL DEFAULT 'pantalla',
+          mensaje          TEXT         NOT NULL,
+          stack            TEXT,
+          component_stack  TEXT,
+          ruta             TEXT,
+          version          VARCHAR(80),
+          user_agent       TEXT,
+          created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+        );
+      `);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_errores_cliente_org_fecha ON errores_cliente (organizacion_id, created_at DESC);`);
+    } catch (e: any) { console.error('[migrations] errores_cliente:', e?.message); }
+
     // Plazos: en qué "fase" se avisó por última vez (pronto / mañana / hoy /
     // vencida) y cuántas veces ya vencida -- antes se repetía cada ~20 h para
     // siempre (también de madrugada).

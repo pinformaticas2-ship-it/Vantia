@@ -31,6 +31,7 @@ import { EtapaSelect } from "../components/EtapaSelect";
 import ColumnVisibilityModal from "../components/ColumnVisibilityModal";
 import { UndoToast } from "../components/UndoToast";
 import { useUndoDelete } from "../lib/useUndoDelete";
+import { aviso, proximamente } from "../lib/avisos";
 
 // ── Helpers ───────────────────────────────────────────────────
 const statusColor: Record<string, string> = {
@@ -1647,7 +1648,7 @@ export default function ClientList() {
       setClients((prev) => prev.map((client) => client.id === selected ? { ...client, color: updatedColor } : client));
       setShowOpciones(false);
     } catch (e: any) {
-      alert(e?.message || "No se pudo asignar el color al cliente.");
+      aviso(e?.message || "No se pudo asignar el color al cliente.");
     }
   }, [getToken, selected, selectedClient]);
 
@@ -1712,10 +1713,10 @@ export default function ClientList() {
       if (res.ok) {
         setClients(prev => prev.map(c => c.id === selected ? { ...c, ...result.data } : c));
       } else {
-        alert(result.error || "Error al reactivar");
+        aviso(result.error || "Error al reactivar");
       }
     } catch (err: any) {
-      alert(err.message);
+      aviso(err.message);
     }
   };
 
@@ -1933,10 +1934,10 @@ export default function ClientList() {
         await fetchClients(true);
         setSelected(result.data?.id ?? null);
       } else {
-        alert(result.error || "Error al duplicar");
+        aviso(result.error || "Error al duplicar");
       }
     } catch (err: any) {
-      alert(err.message);
+      aviso(err.message);
     }
   };
 
@@ -2522,7 +2523,7 @@ export default function ClientList() {
               <div ref={opcionesMenuRef} style={{ top: opcionesPos.top, right: opcionesPos.right }} className="fixed z-[9999] w-[290px] bg-white border border-slate-200 rounded-2xl shadow-[0_24px_60px_rgba(15,23,42,0.18)] py-1.5 overflow-visible">
 
                 {/* Grupo 1 */}
-                <button onClick={() => { alert("Seleccionar opciones favoritas"); setShowOpciones(false); }}
+                <button onClick={() => { proximamente("Seleccionar opciones favoritas"); setShowOpciones(false); }}
                   className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
                   <Star size={12} className="text-slate-400" /> Seleccionar Opciones Favoritas
                 </button>
@@ -2625,7 +2626,7 @@ export default function ClientList() {
                   className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
                   <Zap size={12} className="text-slate-400" /> Alta Acción
                 </button>
-                <button onClick={() => { alert("Crear Recall"); setShowOpciones(false); }}
+                <button onClick={() => { proximamente("Crear Recall"); setShowOpciones(false); }}
                   className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
                   <Bell size={12} className="text-slate-400" /> Crear Recall
                 </button>
@@ -2637,7 +2638,7 @@ export default function ClientList() {
                   className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
                   <Copy size={12} className="text-slate-400" /> Duplicar
                 </button>
-                <button onClick={() => { alert("Fusionar clientes"); setShowOpciones(false); }}
+                <button onClick={() => { proximamente("Fusionar clientes"); setShowOpciones(false); }}
                   className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
                   <GitMerge size={12} className="text-slate-400" /> Fusionar
                 </button>
@@ -2660,11 +2661,11 @@ export default function ClientList() {
                   </button>
                   {opcionesSubMenu === "ver" && (
                     <div className="border-t border-slate-100 bg-slate-50/60 py-0.5">
-                      <button onClick={() => { alert("Ver historial de versiones"); setOpcionesSubMenu(null); }}
+                      <button onClick={() => { proximamente("Ver historial de versiones"); setOpcionesSubMenu(null); }}
                         className="w-full flex items-center gap-2.5 pl-8 pr-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
                         <History size={12} className="text-slate-400" /> Ver historial versiones
                       </button>
-                      <button onClick={() => { alert("Comparar versión"); setOpcionesSubMenu(null); }}
+                      <button onClick={() => { proximamente("Comparar versión"); setOpcionesSubMenu(null); }}
                         className="w-full flex items-center gap-2.5 pl-8 pr-3.5 py-2 text-xs text-slate-700 hover:bg-red-50 hover:text-red-700 transition-colors">
                         <RefreshCw size={12} className="text-slate-400" /> Comparar versión
                       </button>

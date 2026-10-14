@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import BackButton from "../components/BackButton";
 import { safeJson } from "../lib/api";
+import { aviso, confirmar } from "../lib/avisos";
 
 // ─── Tipos ──────────────────────────────────────────────────────────────────
 
@@ -1555,7 +1556,7 @@ export default function ClientCsvImport() {
       setImportHistory((prev) => [d.data, ...prev]);
       setViewMode("configure");
     } catch (e: any) {
-      alert(e.message || "No se pudo registrar la importacion.");
+      aviso(e.message || "No se pudo registrar la importacion.");
     }
   };
 
@@ -1749,9 +1750,12 @@ export default function ClientCsvImport() {
 
   const handleUndoBatch = useCallback(async () => {
     if (!historyDetailBatch) return;
-    const confirmed = window.confirm(
-      `¿Deshacer esta importación? Se eliminarán los ${historyDetailBatch.completed_count} clientes que se crearon en este lote. Esta acción no se puede deshacer.`
-    );
+    const confirmed = await confirmar({
+      titulo: "¿Deshacer esta importación?",
+      mensaje: `Se eliminarán los ${historyDetailBatch.completed_count} clientes que se crearon en este lote. Esta acción no se puede deshacer.`,
+      confirmar: "Deshacer importación",
+      peligro: true,
+    });
     if (!confirmed) return;
     setUndoingBatch(true);
     try {
@@ -1762,7 +1766,7 @@ export default function ClientCsvImport() {
       });
       const d = await safeJson(res);
       if (!res.ok) throw new Error(d.error || "No se pudo deshacer la importación");
-      window.alert(`Se eliminaron ${d.data.deletedCount} cliente(s) creados por esta importación.`);
+      aviso(`Se eliminaron ${d.data.deletedCount} cliente(s) creados por esta importación.`);
       openHistoryDetail(historyDetailBatch.id);
       fetchImportHistory(true);
     } catch (e: any) {

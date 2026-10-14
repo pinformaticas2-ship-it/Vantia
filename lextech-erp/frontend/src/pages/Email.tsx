@@ -29,6 +29,7 @@ import MailboxProbeModal from '../components/MailboxProbeModal';
 import { getActiveOrganizacionId } from '../lib/api';
 import SignatureEditor from '../components/SignatureEditor';
 import { getStoredGmailToken, saveGmailToken, clearGmailToken, getLastMailAccount, saveLastMailAccount, readDraftsRaw, writeDraftsRaw } from '../lib/mailLocalState';
+import { confirmar } from "../lib/avisos";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -5056,7 +5057,7 @@ export default function Email() {
 
   const emptyTrashAction = useCallback(async () => {
     if (activeProvider === 'none') return;
-    const confirmed = window.confirm('¿Vaciar la papelera? Se eliminarán permanentemente todos los mensajes eliminados.');
+    const confirmed = await confirmar({ titulo: "¿Vaciar la papelera?", mensaje: "Se eliminarán para siempre todos los mensajes de la papelera.", confirmar: "Vaciar papelera", peligro: true });
     if (!confirmed) return;
     if (activeProvider === 'imap' && currentImapAccount) {
       await authFetch(`${API}/email/trash?account_id=${currentImapAccount.id}`, { method: 'DELETE' }).catch(() => {});

@@ -25,6 +25,8 @@ import { PlazoCalculator } from "../components/PlazoCalculator";
 import { createPortal } from "react-dom";
 import { EtapaSelect } from "../components/EtapaSelect";
 import BackButton from "../components/BackButton";
+import { confirmar } from "../lib/avisos";
+import { useAvisoSalida } from "../lib/borradores";
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 interface Task {
@@ -160,6 +162,9 @@ function TaskPanel({
   ), [task, initialForm]);
 
   const [form, setForm] = useState<TaskFormData>(buildForm);
+  // Cambios sin guardar: si se cierra o recarga la pestaña, el navegador pregunta antes.
+  const formInicialRef = useRef(JSON.stringify(form));
+  useAvisoSalida(JSON.stringify(form) !== formInicialRef.current);
   const [clientId, setClientId] = useState(task?.client_id || initialClientId);
   const [activeTab, setActiveTab] = useState<"detalles" | "archivos" | "notas">("detalles");
   const [files, setFiles] = useState<TaskFile[]>([]);
@@ -1397,7 +1402,7 @@ export default function Tareas() {
   }, [selectedIds, getToken, fetchTasks]);
 
   const handleBulkDelete = useCallback(async () => {
-    if (!window.confirm(`¿Eliminar ${selectedIds.size} tarea${selectedIds.size !== 1 ? "s" : ""}? Esta acción no se puede deshacer.`)) return;
+    if (!(await confirmar({ titulo: `¿Eliminar ${selectedIds.size} tarea${selectedIds.size !== 1 ? "s" : ""}?`, mensaje: "Esta acción no se puede deshacer.", confirmar: "Eliminar", peligro: true }))) return;
     const ids = Array.from(selectedIds);
     setTasks(prev => prev.filter(t => !ids.includes(t.id)));
     setSelectedIds(new Set());

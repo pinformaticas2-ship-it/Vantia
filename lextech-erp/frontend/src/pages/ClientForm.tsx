@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { safeJson } from "../lib/api";
 import BackButton from "../components/BackButton";
+import { useBorrador, AvisoBorrador } from "../lib/borradores";
 
 // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ UI helpers ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
 const F = ({ label, required, invalid, children }: { label: string; required?: boolean; invalid?: boolean; children: React.ReactNode }) => (
@@ -305,6 +306,12 @@ export default function ClientForm() {
 
   const [form, setForm] = useState({ ...EMPTY_FORM });
 
+  // Borrador (16/10/2026): lo escrito se guarda en este navegador mientras se
+  // rellena; si se sale sin guardar, al volver se ofrece recuperarlo.
+  const baseFormRef = useRef<string | null>(null);
+  const formRef = useRef(form);
+  formRef.current = form;
+
   useEffect(() => {
     if (isEdit) return;
     const firstName = (searchParams.get("first_name") || "").trim();
@@ -321,6 +328,12 @@ export default function ClientForm() {
       nif_cif: nif || prev.nif_cif,
     }));
   }, [isEdit, searchParams]);
+
+  useEffect(() => {
+    if (loadingData || baseFormRef.current !== null) return;
+    const t = setTimeout(() => { baseFormRef.current = JSON.stringify(formRef.current); }, 0);
+    return () => clearTimeout(t);
+  }, [loadingData]);
 
   // Cargar datos cuando es edición
   useEffect(() => {
@@ -698,6 +711,16 @@ export default function ClientForm() {
   };
 
   // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Submit (POST crear / PUT editar) ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
+  const formSucio = baseFormRef.current !== null && !showSuccess && JSON.stringify(form) !== baseFormRef.current;
+  const borrador = useBorrador(isLinkFlow ? null : (isEdit ? `cliente-${id}` : 'cliente-nuevo'), form, formSucio);
+  const avisoBorrador = borrador.pendiente && !loadingData ? (
+    <AvisoBorrador
+      fecha={borrador.pendiente.fecha}
+      onRecuperar={() => { const v = borrador.recuperar(); if (v) setForm((p) => ({ ...p, ...v })); }}
+      onDescartar={borrador.descartar}
+    />
+  ) : null;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const validationError = validateClientForm();
@@ -733,6 +756,7 @@ export default function ClientForm() {
           }
         }
 
+        borrador.limpiar();
         setShowSuccess(true);
         const returnPath = !isEdit && linkedExpedienteId
           ? `/dashboard/expedientes/${linkedExpedienteId}?tab=clientes`
@@ -772,6 +796,7 @@ export default function ClientForm() {
   if (isDniFlow) return (
     <div className="h-full min-h-0 overflow-y-auto overscroll-contain bg-slate-50 p-6 animate-in fade-in duration-500 modules-scrollbar">
       <form onSubmit={handleSubmit} className="mx-auto max-w-[1440px] space-y-6 pb-6">
+        {avisoBorrador}
         <div className="rounded-[24px] border border-slate-200 bg-white px-6 py-5 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="flex items-start gap-3">
@@ -1338,6 +1363,7 @@ export default function ClientForm() {
 
   return (
     <form onSubmit={handleSubmit} className="h-full flex flex-col overflow-hidden animate-page-in">
+      {avisoBorrador && <div className="px-6 sm:px-8 pt-4 shrink-0">{avisoBorrador}</div>}
 
       {/* HEADER */}
       <div className="px-6 sm:px-8 py-5 bg-white border-b border-slate-200 flex-shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-card-in">

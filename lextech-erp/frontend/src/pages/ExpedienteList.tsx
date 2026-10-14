@@ -33,6 +33,7 @@ import { safeJson, resolveApiUrl, resolveUploadUrl, getActiveOrganizacionId } fr
 import { useAutoRefresh } from "../lib/useAutoRefresh";
 import { TIPOS, ESTADOS, EXP_EMPTY, ExpedienteModal, lbl, inp } from "../components/ExpedienteModal";
 import AppSelect from "../components/AppSelect";
+import { aviso, proximamente } from "../lib/avisos";
 
 type SortKey = "anio" | "num_exp" | "descripcion" | "tipo" | "cliente_nombre" | "contrario" | "juzgado" | "estado" | "fecha_inicio";
 type SortDir = "asc" | "desc";
@@ -4944,7 +4945,7 @@ export default function ExpedienteList() {
       setBulkTareaTitulo("");
       setSelectedIds(new Set());
       if (withClient.length < items.length) {
-        alert(`Creada en ${withClient.length} de ${items.length}: ${items.length - withClient.length} no tienen cliente asociado.`);
+        aviso(`Creada en ${withClient.length} de ${items.length}: ${items.length - withClient.length} no tienen cliente asociado.`);
       }
     } catch { setBulkTareaError("No se pudo crear la tarea en todos los expedientes."); }
     finally { setBulkTareaLoading(false); }
@@ -4957,7 +4958,7 @@ export default function ExpedienteList() {
     const emails = Array.from(new Set(
       items.map(exp => clientes.find((c: any) => c.id === exp.cliente_id)?.email).filter(Boolean)
     ));
-    if (!emails.length) { alert("Ninguno de los expedientes marcados tiene un cliente con email."); return; }
+    if (!emails.length) { aviso("Ninguno de los expedientes marcados tiene un cliente con email."); return; }
     const params = new URLSearchParams({ compose: "1", to: emails.join(","), subject: `${items.length} expedientes` });
     navigate(`/dashboard/correo?${params.toString()}`);
   };
@@ -4999,7 +5000,7 @@ export default function ExpedienteList() {
       setShowBulkWaForm(false);
       setBulkWaMessage("");
       setSelectedIds(new Set());
-      if (failed > 0) alert(`No se pudo enviar a ${failed} de ${bulkWaRecipients.length} destinatarios.`);
+      if (failed > 0) aviso(`No se pudo enviar a ${failed} de ${bulkWaRecipients.length} destinatarios.`);
     } catch { setBulkWaError("No se pudo enviar el mensaje."); }
     finally { setBulkWaLoading(false); }
   };
@@ -5494,7 +5495,7 @@ export default function ExpedienteList() {
       setDocumentImportItems(data.data?.items || []);
       setViewMode("documentImport");
     } catch (e: any) {
-      alert(e.message || "Error al cargar el lote");
+      aviso(e.message || "Error al cargar el lote");
     }
   }, [getToken]);
 
@@ -5661,7 +5662,7 @@ export default function ExpedienteList() {
       setImportHistory((prev) => [d.data, ...prev]);
       switchView("csvImportConfigure");
     } catch (e: any) {
-      alert(e.message || "No se pudo registrar la importacion.");
+      aviso(e.message || "No se pudo registrar la importacion.");
     }
   };
 
@@ -6071,7 +6072,7 @@ export default function ExpedienteList() {
       setExpedientes((prev) => prev.map((item) => (item.id === selectedExp.id ? { ...item, color } : item)));
       setShowOpciones(false);
     } catch (e: any) {
-      alert(e?.message || "No se pudo asignar el color");
+      aviso(e?.message || "No se pudo asignar el color");
     }
   }, [getToken, selectedExp]);
   const toggleExpedienteEstado = useCallback(async () => {
@@ -6091,7 +6092,7 @@ export default function ExpedienteList() {
       if (!res.ok) {
         // Revert on failure
         setExpedientes((prev) => prev.map((e) => e.id === selectedExp.id ? { ...e, estado: selectedExp.estado } : e));
-        alert(d.error || "No se pudo cambiar el estado del expediente");
+        aviso(d.error || "No se pudo cambiar el estado del expediente");
       }
     } catch {
       setExpedientes((prev) => prev.map((e) => e.id === selectedExp.id ? { ...e, estado: selectedExp.estado } : e));
@@ -6407,7 +6408,7 @@ export default function ExpedienteList() {
         fileName={csvFileName}
         onBack={() => switchView("list")}
         onOpenHistory={() => switchView("csvImportHistory")}
-        onOpenSettings={() => alert("La configuracion de importacion la dejamos preparada para la siguiente fase.")}
+        onOpenSettings={() => proximamente("Configuración avanzada de importación")}
         onSelectFile={() => csvInputRef.current?.click()}
         onFileChange={(file) => handleCsvSelected(file)}
         inputRef={csvInputRef}
@@ -6428,7 +6429,7 @@ export default function ExpedienteList() {
         onBack={() => switchView("csvImport")}
         onContinue={() => switchView("csvImportReview")}
         onOpenHistory={() => switchView("csvImportHistory")}
-        onOpenSettings={() => alert("La configuracion avanzada de importacion la dejamos preparada para la siguiente fase.")}
+        onOpenSettings={() => proximamente("Configuración avanzada de importación")}
         onSelectFile={() => csvInputRef.current?.click()}
         onChangeMapping={handleCsvMappingChange}
         onFileChange={(file) => handleCsvSelected(file)}
@@ -6448,7 +6449,7 @@ export default function ExpedienteList() {
         onBack={() => switchView("csvImportConfigure")}
         onImport={handleImportCsv}
         onOpenHistory={() => switchView("csvImportHistory")}
-        onOpenSettings={() => alert("La configuracion avanzada de importacion la dejamos preparada para la siguiente fase.")}
+        onOpenSettings={() => proximamente("Configuración avanzada de importación")}
       />
     );
   }
@@ -7360,7 +7361,7 @@ export default function ExpedienteList() {
                 {showOpciones && typeof document !== "undefined" && createPortal(
                   <div data-opciones-menu style={{ position: "fixed", top: opcionesMenuPos.top, left: opcionesMenuPos.left, zIndex: 9999 }}
                     className="bg-white border border-slate-200 rounded-xl shadow-xl min-w-[230px] py-1 overflow-visible">
-                    <button onClick={() => alert("Seleccionar opciones favoritas")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors">
+                    <button onClick={() => proximamente("Seleccionar opciones favoritas")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors">
                       <Star size={13} className="text-slate-400 shrink-0" /> Seleccionar Opciones Favoritas
                     </button>
                     <button type="button" onClick={() => { setShowColumnModal(true); setShowOpciones(false); }} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50">
@@ -7375,7 +7376,7 @@ export default function ExpedienteList() {
                       <div className={`absolute right-full -mr-px top-[-1px] z-50 bg-white border border-slate-200 rounded-xl shadow-xl min-w-[180px] py-1 ${opcionesSubmenu === "ir_a" ? "block" : "hidden"}`}>
                         <button onClick={() => { selectedExp?.cliente_id && navigate(`/dashboard/clientes/${selectedExp.cliente_id}`); }} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><Users size={13} className="text-slate-400 shrink-0" /> Ir a Cliente</button>
                         <button onClick={() => { toolbarSelected && navigate(`/dashboard/expedientes/${toolbarSelected}`); }} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><FolderOpen size={13} className="text-slate-400 shrink-0" /> Ir a Expediente</button>
-                        <button onClick={() => alert("Ir a Juzgado")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><ClipboardList size={13} className="text-slate-400 shrink-0" /> Ir a Juzgado</button>
+                        <button onClick={() => proximamente("Ir a Juzgado")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><ClipboardList size={13} className="text-slate-400 shrink-0" /> Ir a Juzgado</button>
                       </div>
                     </div>
                     <div className="relative">
@@ -7408,12 +7409,12 @@ export default function ExpedienteList() {
                         ? <><Unlock size={13} className="text-slate-400 shrink-0" /> Reabrir expediente</>
                         : <><Lock size={13} className="text-slate-400 shrink-0" /> Cerrar expediente</>}
                     </button>
-                    <button onClick={() => alert("Alta Acción")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><Zap size={13} className="text-slate-400 shrink-0" /> Alta Acción</button>
+                    <button onClick={() => proximamente("Alta Acción")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><Zap size={13} className="text-slate-400 shrink-0" /> Alta Acción</button>
                     <div className="h-px bg-slate-100 my-1" />
                     <button onClick={() => { setShowCounterModal(true); setShowOpciones(false); }} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><Hash size={13} className="text-slate-400 shrink-0" /> Configurar numeración</button>
                     <div className="h-px bg-slate-100 my-1" />
-                    <button onClick={() => alert("Duplicar expediente")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><Copy size={13} className="text-slate-400 shrink-0" /> Duplicar</button>
-                    <button onClick={() => alert("Fusionar expedientes")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><GitMerge size={13} className="text-slate-400 shrink-0" /> Fusionar</button>
+                    <button onClick={() => proximamente("Duplicar expediente")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><Copy size={13} className="text-slate-400 shrink-0" /> Duplicar</button>
+                    <button onClick={() => proximamente("Fusionar expedientes")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><GitMerge size={13} className="text-slate-400 shrink-0" /> Fusionar</button>
                     <div className="h-px bg-slate-100 my-1" />
                     <button onClick={() => selectedExp && window.open(`https://wa.me/?text=Expediente ${selectedExp.anio}/${selectedExp.num_exp}`, "_blank")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><Smartphone size={13} className="text-slate-400 shrink-0" /> Enviar SMS</button>
                     <div className="relative">
@@ -7422,8 +7423,8 @@ export default function ExpedienteList() {
                         <ChevronRight size={11} className="text-slate-300" />
                       </button>
                       <div className={`absolute right-full -mr-px top-[-1px] z-50 bg-white border border-slate-200 rounded-xl shadow-xl min-w-[180px] py-1 ${opcionesSubmenu === "version" ? "block" : "hidden"}`}>
-                        <button onClick={() => alert("Restaurar versión anterior")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><History size={13} className="text-slate-400 shrink-0" /> Ver historial versiones</button>
-                        <button onClick={() => alert("Comparar con versión")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><RefreshCw size={13} className="text-slate-400 shrink-0" /> Comparar versión</button>
+                        <button onClick={() => proximamente("Restaurar versión anterior")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><History size={13} className="text-slate-400 shrink-0" /> Ver historial versiones</button>
+                        <button onClick={() => proximamente("Comparar con versión")} className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"><RefreshCw size={13} className="text-slate-400 shrink-0" /> Comparar versión</button>
                       </div>
                     </div>
                   </div>,

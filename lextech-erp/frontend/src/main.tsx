@@ -7,9 +7,11 @@ import './lib/temasExtra.css'
 import { ClerkProvider } from '@clerk/clerk-react'
 import { esES } from '@clerk/localizations'
 import { initClientIp, installBackendFetchShim, resolveApiUrl } from './lib/api'
+import { AppSegura, instalarCapturaGlobal } from './lib/errores'
 
 // Obtener IP pública lo antes posible — estará lista antes del primer login
 installBackendFetchShim();
+instalarCapturaGlobal();
 initClientIp();
 
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
@@ -137,7 +139,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           },
         }}
       >
-        <App />
+        <AppSegura>
+          <App />
+        </AppSegura>
       </ClerkProvider>
     </BrowserRouter>
   </React.StrictMode>,
