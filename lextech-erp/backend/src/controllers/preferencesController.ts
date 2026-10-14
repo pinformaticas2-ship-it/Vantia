@@ -81,3 +81,75 @@ export const updateMyPreferences = async (req: any, res: Response) => {
     res.status(500).json({ success: false, error: pgErr(e) });
   }
 };
+
+// ── Preferencias personales nuevas (14/10/2026) ─────────────────────────────
+// Modo claro/oscuro, página de inicio, primer día de la semana en la agenda,
+// atajos de teclado y "Mi perfil" (cargo, teléfono). Van en user_preferences.extras.
+
+export const PAGINAS_INICIO = [
+  '/dashboard', '/dashboard/agenda', '/dashboard/expedientes', '/dashboard/tareas',
+  '/dashboard/vistas', '/dashboard/chat', '/dashboard/correo', '/dashboard/clientes',
+];
+
+export interface PrefsExtras {
+  modo: 'claro' | 'oscuro' | 'sistema';
+  inicio: string;
+  primerDia: 'lunes' | 'domingo';
+  atajos: boolean;
+  cargo: string;
+  telefono: string;
+}
+
+export const EXTRAS_POR_DEFECTO: PrefsExtras = {
+  modo: 'claro', inicio: '/dashboard', primerDia: 'lunes', atajos: true, cargo: '', telefono: '',
+};
+
+export function normalizarExtras(raw: any, base: PrefsExtras = EXTRAS_POR_DEFECTO): PrefsExtras {
+  const r = raw && typeof raw === 'object' ? raw : {};
+  return {
+    modo: ['claro', 'oscuro', 'sistema'].includes(r.modo) ? r.modo : base.modo,
+    inicio: PAGINAS_INICIO.includes(r.inicio) ? r.inicio : base.inicio,
+    primerDia: r.primerDia === 'domingo' || r.primerDia === 'lunes' ? r.primerDia : base.primerDia,
+    atajos: typeof r.atajos === 'boolean' ? r.atajos : base.atajos,
+    cargo: typeof r.cargo === 'string' ? r.cargo.trim().slice(0, 100) : base.cargo,
+    telefono: typeof r.telefono === 'string' ? r.telefono.replace(/[^\d+()\s-]/g, '').trim().slice(0, 30) : base.telefono,
+  };
+}
+
+export const getMyExtras = async (req: any, res: Response) => {
+  const userId = req.auth?.userId;
+  if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  try {
+    const { rows } = await pool.query(`SELECT extras FROM user_preferences WHERE user_id = $1`, [userId]);
+    res.json({ success: true, data: normalizarExtras(rows[0]?.extras) });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: pgErr(e) });
+  }
+};
+
+/** PUT /api/preferences/extras — solo cambia lo que llega; lo demás se queda. */
+export const updateMyExtras = async (req: any, res: Response) => {
+  const userId = req.auth?.userId;
+  if (!userId) return res.status(401).json({ success: false, error: 'No autenticado' });
+  try {
+    const { rows } = await pool.query(`SELECT extras FROM user_preferences WHERE user_id = $1`, [userId]);
+    const actual = normalizarExtras(rows[0]?.extras);
+    const nuevo = normalizarExtras(req.body, actual);
+    await pool.query(
+      `INSERT INTO user_preferences (user_id, theme, extras, updated_at) VALUES ($1, 'rojo', $2, NOW())
+       ON CONFLICT (user_id) DO UPDATE SET extras = EXCLUDED.extras, updated_at = NOW()`,
+      [userId, JSON.stringify(nuevo)],
+    );
+    // El cargo es el que se ve junto al nombre en el chat (en esta organización).
+    if (nuevo.cargo !== actual.cargo && req.organizacionId) {
+      await pool.query(
+        `UPDATE chat_miembros SET role_label = $2
+          WHERE user_id = $1 AND canal_id IN (SELECT id FROM chat_canales WHERE organizacion_id = $3)`,
+        [userId, nuevo.cargo || 'Miembro', req.organizacionId],
+      ).catch(() => undefined);
+    }
+    res.json({ success: true, data: nuevo });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: pgErr(e) });
+  }
+};

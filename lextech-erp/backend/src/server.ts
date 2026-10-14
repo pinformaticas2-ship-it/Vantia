@@ -29,6 +29,8 @@ import directorioRoutes     from './routes/directorio';
 import organizacionRoutes   from './routes/organizacion';
 import preferencesRoutes    from './routes/preferences';
 import pushRoutes           from './routes/push';
+import privacidadRoutes     from './routes/privacidad';
+import { startPurgaTrazabilidad } from './controllers/privacidadController';
 import soporteRoutes        from './routes/soporte';
 import plaudRoutes          from './routes/plaud';
 import vistasRoutes         from './routes/vistas';
@@ -267,6 +269,7 @@ app.use('/api/directorio',        directorioRoutes);
 app.use('/api/organizacion',      organizacionRoutes);
 app.use('/api/preferences',       preferencesRoutes);
 app.use('/api/push',              pushRoutes);
+app.use('/api/privacidad',        privacidadRoutes);
 app.use('/api/soporte',           soporteRoutes);
 app.use('/api/plaud',             plaudRoutes);
 app.use('/api/vistas',            vistasRoutes);
@@ -398,6 +401,7 @@ runMigrations().then(() => {
 
     // Notificaciones push: aviso de plazos próximos a vencer
     startPlazoPushScheduler();
+    startPurgaTrazabilidad();
 
     // Centro de soporte: aviso (con CSV) y borrado de tickets cerrados hace 15 días
     startSoporteRetencionScheduler();

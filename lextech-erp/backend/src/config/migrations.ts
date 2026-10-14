@@ -2393,6 +2393,17 @@ export async function runMigrations(): Promise<void> {
         );
       `);
     } catch (_e: any) {}
+    // ── Ajustes (14/10/2026) ──
+    // Preferencias personales nuevas (modo oscuro, página de inicio, primer día
+    // de la semana, atajos, cargo, teléfono) en un JSON aparte del tema.
+    try {
+      await client.query(`ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS extras JSONB NOT NULL DEFAULT '{}'::jsonb;`);
+    } catch (_e: any) {}
+    // Cuántos meses se guarda la trazabilidad de la organización (NULL = sin límite).
+    try {
+      await client.query(`ALTER TABLE organizaciones ADD COLUMN IF NOT EXISTS trazabilidad_retencion_meses INTEGER;`);
+    } catch (_e: any) {}
+
     // ── Trazabilidad: action_type era VARCHAR(60) y entity_name VARCHAR(300);
     // cualquier registro más largo ("Correo enviado: <asunto largo>"...) fallaba
     // y se perdía en silencio (14/10/2026). varchar → text no reescribe la tabla.
