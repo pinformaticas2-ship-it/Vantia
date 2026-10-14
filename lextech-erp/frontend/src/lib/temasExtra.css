@@ -62,15 +62,18 @@
    para los botones principales y lo importante. Todo sale de estas variables. */
 html[data-modo="oscuro"] {
   color-scheme: dark;
-  --o-fondo: #121417;      /* fondo de la app */
-  --o-superficie: #1a1d21; /* tarjetas, paneles, barra lateral */
-  --o-elevado: #23272c;    /* campos, hover, elementos destacados */
-  --o-borde: #2c3036;
-  --o-borde-fuerte: #3a3f46;
-  --o-texto: #e7e9ec;
-  --o-texto-2: #b3b8c0;
-  --o-texto-3: #858b94;
-  --o-texto-4: #6a7079;
+  /* 16/10/2026: más contraste -- antes los grises estaban demasiado juntos y
+     ~40 % del texto no llegaba al mínimo de legibilidad (4,5:1). Ahora los
+     tres fondos se distinguen, los bordes se ven y todo el texto pasa de 4,5:1. */
+  --o-fondo: #0f1114;      /* fondo de la app */
+  --o-superficie: #1a1d22; /* tarjetas, paneles, cabeceras, barra lateral */
+  --o-elevado: #262a31;    /* campos, hover, elementos destacados */
+  --o-borde: #343a44;
+  --o-borde-fuerte: #4a515c;
+  --o-texto: #eef0f3;
+  --o-texto-2: #cdd2d9;
+  --o-texto-3: #aeb5bf;
+  --o-texto-4: #959ca7;
 }
 html[data-modo="oscuro"] body { background-color: var(--o-fondo); color: var(--o-texto); }
 
@@ -197,3 +200,24 @@ html[data-modo="oscuro"] .border-slate-50, html[data-modo="oscuro"] .border-gray
 html[data-modo="oscuro"] .divide-slate-50 > * + *, html[data-modo="oscuro"] .divide-gray-50 > * + *,
 html[data-modo="oscuro"] .border-white, html[data-modo="oscuro"] .divide-white > * + * { border-color: var(--o-borde) !important; }
 html[data-modo="oscuro"] .blur-3xl, html[data-modo="oscuro"] .blur-2xl { display: none !important; }
+
+/* ── 6. Texto de color legible en oscuro ─────────────────────────────────────
+   Los tonos 600-800 (pensados para fondo blanco) no se leen sobre gris
+   oscuro: en oscuro, el texto de marca usa el tono claro del acento del tema
+   y el de peligro un rojo claro; el resto de colores, su versión clara. */
+html[data-modo="oscuro"] .text-red-500, html[data-modo="oscuro"] .text-red-600,
+html[data-modo="oscuro"] .text-red-700, html[data-modo="oscuro"] .text-red-800,
+html[data-modo="oscuro"] .text-\[\#ab0433\], html[data-modo="oscuro"] .text-rose-600,
+html[data-modo="oscuro"] .hover\:text-red-600:hover, html[data-modo="oscuro"] .hover\:text-red-700:hover { color: var(--tema-acento) !important; }
+html[data-modo="oscuro"] .peligro.text-red-500, html[data-modo="oscuro"] .peligro .text-red-500,
+html[data-modo="oscuro"] .peligro.text-red-600, html[data-modo="oscuro"] .peligro .text-red-600,
+html[data-modo="oscuro"] .peligro.hover\:text-red-500:hover, html[data-modo="oscuro"] .peligro .hover\:text-red-500:hover,
+html[data-modo="oscuro"] .peligro.hover\:text-red-600:hover, html[data-modo="oscuro"] .peligro .hover\:text-red-600:hover { color: #f08a8a !important; }
+html[data-modo="oscuro"] .text-blue-500, html[data-modo="oscuro"] .text-blue-600, html[data-modo="oscuro"] .text-sky-600,
+html[data-modo="oscuro"] .text-indigo-500, html[data-modo="oscuro"] .text-indigo-600, html[data-modo="oscuro"] .text-violet-600,
+html[data-modo="oscuro"] .text-purple-600 { color: #9ab8f6 !important; }
+html[data-modo="oscuro"] .text-emerald-500, html[data-modo="oscuro"] .text-emerald-600, html[data-modo="oscuro"] .text-green-600 { color: #6cc9a1 !important; }
+html[data-modo="oscuro"] .text-amber-500, html[data-modo="oscuro"] .text-amber-600, html[data-modo="oscuro"] .text-orange-600,
+html[data-modo="oscuro"] .text-yellow-600 { color: #e3b75a !important; }
+/* El día de hoy y similares (círculo de color con número blanco) se quedan como están */
+html[data-modo="oscuro"] [class*="bg-blue-6"].text-white, html[data-modo="oscuro"] [class*="bg-red-6"].text-white { color: #ffffff !important; }
